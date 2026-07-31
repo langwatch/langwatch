@@ -127,6 +127,38 @@ const TYPES = [
 ];
 
 /**
+ * Selected is a tint and a border, not a solid fill. A block of deep red for
+ * the whole button made choosing a mode look like a warning; the colour should
+ * say which one is on, and the drawer edge already says it is an attack.
+ */
+function ScenarioTypeButton({
+  type,
+  selected,
+  onSelect,
+}: {
+  type: (typeof TYPES)[number];
+  selected: boolean;
+  onSelect: (redTeam: boolean) => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      flex={1}
+      colorPalette={type.redTeam ? "redteam" : "gray"}
+      borderColor={selected ? "colorPalette.solid" : "border.muted"}
+      bg={selected ? "colorPalette.subtle" : undefined}
+      color={selected ? "colorPalette.fg" : "fg.muted"}
+      fontWeight={selected ? "medium" : "normal"}
+      onClick={() => onSelect(type.redTeam)}
+    >
+      {type.redTeam ? <ShieldAlert size={14} /> : null}
+      {type.label}
+    </Button>
+  );
+}
+
+/**
  * Standard vs red team. Switching to red team reveals the attack section
  * below rather than opening a second panel over this one.
  */
@@ -156,33 +188,88 @@ function ScenarioTypeSelector({
         </Tooltip>
       </HStack>
       <HStack gap={2}>
-        {TYPES.map((type) => {
-          const selected = type.redTeam === isRedTeam;
-          return (
-            <Button
-              key={type.label}
-              size="sm"
-              variant="outline"
-              flex={1}
-              // Selected is a tint and a border, not a solid fill. A block of
-              // deep red for the whole button made choosing a mode look like a
-              // warning; the colour should say which one is on, and the drawer
-              // edge already says the scenario is an attack.
-              colorPalette={type.redTeam ? "redteam" : "gray"}
-              borderColor={selected ? "colorPalette.solid" : "border.muted"}
-              bg={selected ? "colorPalette.subtle" : undefined}
-              color={selected ? "colorPalette.fg" : "fg.muted"}
-              fontWeight={selected ? "medium" : "normal"}
-              onClick={() => onSelect(type.redTeam)}
-            >
-              {type.redTeam ? <ShieldAlert size={14} /> : null}
-              {type.label}
-            </Button>
-          );
-        })}
+        {TYPES.map((type) => (
+          <ScenarioTypeButton
+            key={type.label}
+            type={type}
+            selected={type.redTeam === isRedTeam}
+            onSelect={onSelect}
+          />
+        ))}
       </HStack>
     </VStack>
   );
+}
+
+/** Blank values for every field the form owns, before defaults are laid over. */
+const EMPTY_SCENARIO = {
+  name: "",
+  situation: "",
+  criteria: [],
+  labels: [],
+} satisfies Partial<ScenarioFormData>;
+
+/**
+ * Turn the form into a red-team scenario or back into a standard one.
+ *
+ * Picking red team defaults to Crescendo — the SDK's own recommended starting
+ * strategy — so the section opens usable rather than empty. Going back clears
+ * the whole attack, matching what the API does with a null strategy.
+ */
+function applyScenarioType({
+  form,
+  redTeam,
+  redTeamStrategy,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  redTeam: boolean;
+  redTeamStrategy: ScenarioFormData["redTeamStrategy"];
+}) {
+  if (redTeam) {
+    if (!redTeamStrategy) form.setValue("redTeamStrategy", "crescendo");
+    if (!form.getValues("redTeamTotalTurns")) {
+      form.setValue("redTeamTotalTurns", RED_TEAM_DEFAULT_TURNS);
+    }
+    return;
+  }
+  form.setValue("redTeamStrategy", null);
+  form.setValue("redTeamTarget", null);
+  form.setValue("redTeamTotalTurns", null);
+  form.setValue("redTeamConfig", null);
+}
+
+/**
+ * Reset the form when the scenario behind it changes.
+ *
+ * Keyed on every field the form owns, derived from the schema rather than
+ * hand-listed. The old list named four, so the red-team fields could change
+ * without the form noticing — masked today only because the drawer remounts on
+ * `key={scenarioId}`, which is another component's implementation detail to be
+ * depending on. Deriving it means a field added to the schema is covered by
+ * construction.
+ *
+ * Still the fields and not the whole row: `updatedAt` and `lastUpdatedById`
+ * change on every write, and keying on those would reset the form for metadata
+ * churn that changes nothing the user typed.
+ */
+function useResetWhenDefaultsChange({
+  defaultValues,
+  reset,
+}: {
+  defaultValues?: Partial<ScenarioFormData>;
+  reset: UseFormReturn<ScenarioFormData>["reset"];
+}) {
+  const prevDefaultsRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentDefaults = defaultValues
+      ? JSON.stringify(
+          SCENARIO_FORM_FIELDS.map((field) => defaultValues[field]),
+        )
+      : null;
+    if (currentDefaults === prevDefaultsRef.current) return;
+    prevDefaultsRef.current = currentDefaults;
+    if (defaultValues) reset({ ...EMPTY_SCENARIO, ...defaultValues });
+  }, [defaultValues, reset]);
 }
 
 /**
@@ -197,13 +284,7 @@ export function ScenarioForm({
   onIsRedTeamChange,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
-    defaultValues: {
-      name: "",
-      situation: "",
-      criteria: [],
-      labels: [],
-      ...defaultValues,
-    },
+    defaultValues: { ...EMPTY_SCENARIO, ...defaultValues },
     resolver: zodResolver(scenarioFormSchema),
   });
 
@@ -220,21 +301,8 @@ export function ScenarioForm({
   const redTeamStrategy = useWatch({ control, name: "redTeamStrategy" });
   const isRedTeam = !!redTeamStrategy;
 
-  const handleTypeSelect = (redTeam: boolean) => {
-    if (redTeam) {
-      // Default to Crescendo — the SDK's own recommended starting strategy —
-      // so the section opens usable rather than empty.
-      if (!redTeamStrategy) form.setValue("redTeamStrategy", "crescendo");
-      if (!form.getValues("redTeamTotalTurns")) {
-        form.setValue("redTeamTotalTurns", RED_TEAM_DEFAULT_TURNS);
-      }
-      return;
-    }
-    form.setValue("redTeamStrategy", null);
-    form.setValue("redTeamTarget", null);
-    form.setValue("redTeamTotalTurns", null);
-    form.setValue("redTeamConfig", null);
-  };
+  const handleTypeSelect = (redTeam: boolean) =>
+    applyScenarioType({ form, redTeam, redTeamStrategy });
 
   // Expose form to parent
   useEffect(() => {
@@ -245,38 +313,7 @@ export function ScenarioForm({
     onIsRedTeamChange?.(isRedTeam);
   }, [isRedTeam, onIsRedTeamChange]);
 
-  // Reset form when defaultValues change (using ref to track previous serialized values)
-  //
-  // Keyed on every field the form owns, derived from the schema rather than
-  // hand-listed. The old list named four, so the red-team fields could change
-  // without the form noticing — masked today only because the drawer remounts
-  // on `key={scenarioId}`, which is another component's implementation detail
-  // to be depending on. Deriving it means a field added to the schema is
-  // covered by construction.
-  //
-  // Still the fields and not the whole row: `updatedAt` and `lastUpdatedById`
-  // change on every write, and keying on those would reset the form for
-  // metadata churn that changes nothing the user typed.
-  const prevDefaultsRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentDefaults = defaultValues
-      ? JSON.stringify(
-          SCENARIO_FORM_FIELDS.map((field) => defaultValues[field]),
-        )
-      : null;
-    if (currentDefaults !== prevDefaultsRef.current) {
-      prevDefaultsRef.current = currentDefaults;
-      if (defaultValues) {
-        reset({
-          name: "",
-          situation: "",
-          criteria: [],
-          labels: [],
-          ...defaultValues,
-        });
-      }
-    }
-  }, [defaultValues, reset]);
+  useResetWhenDefaultsChange({ defaultValues, reset });
 
   return (
     <VStack align="stretch" gap={6}>

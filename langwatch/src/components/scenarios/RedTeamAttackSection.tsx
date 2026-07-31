@@ -435,6 +435,195 @@ function TurnsField({
 }
 
 /**
+ * A bounded numeric knob.
+ *
+ * Registered, not `defaultValue` + `setValue`. The old pair read the value once
+ * on mount, so anything that changed the config afterwards — a `reset()`, or
+ * switching strategy — left the input showing a value the form no longer held.
+ *
+ * An empty box means "use the SDK default", so it has to reach the schema as
+ * `undefined` rather than as the number zero.
+ */
+function NumberSetting({
+  form,
+  name,
+  label,
+  help,
+  min,
+  max,
+  step,
+  placeholder,
+  fallbackError,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  name: "redTeamConfig.successScore" | "redTeamConfig.injectionProbability";
+  label: string;
+  help: string;
+  min: number;
+  max: number;
+  step?: number;
+  placeholder: string;
+  fallbackError: string;
+}) {
+  const {
+    register,
+    formState: { errors },
+  } = form;
+  const key = name.split(".")[1] as "successScore" | "injectionProbability";
+  return (
+    <Field.Root invalid={!!errors.redTeamConfig?.[key]}>
+      <LabelWithHelp label={label} help={help} />
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        width="120px"
+        placeholder={placeholder}
+        {...register(name, {
+          setValueAs: (v) => (v === "" || v === null ? undefined : Number(v)),
+        })}
+      />
+      <Field.ErrorText>
+        {errors.redTeamConfig?.[key]?.message ?? fallbackError}
+      </Field.ErrorText>
+    </Field.Root>
+  );
+}
+
+/**
+ * Score every reply and let the attacker adapt.
+ *
+ * Both knobs move together: the docs' fast recipe disables scoring and refusal
+ * detection as a pair, and refusal detection only feeds the scorer.
+ */
+function AdaptiveScoringSwitch({
+  form,
+  scoringOn,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  scoringOn: boolean;
+}) {
+  const { setValue, getValues } = form;
+  return (
+    <Field.Root>
+      <LabelWithHelp
+        label="Adaptive scoring"
+        help="Every reply is scored 0-10 and the attacker adjusts its next move, backing out of a line that got a hard refusal. Turning it off is the recommended way to make a run cheaper — it keeps the full turn budget, but the attacker stops reacting to what the agent said."
+      />
+      <Switch.Root
+        checked={scoringOn}
+        onCheckedChange={({ checked }) =>
+          setValue("redTeamConfig", {
+            ...(getValues("redTeamConfig") ?? {}),
+            scoreResponses: checked,
+            detectRefusals: checked,
+          })
+        }
+        colorPalette="redteam"
+      >
+        <Switch.HiddenInput />
+        <Switch.Control cursor="pointer">
+          <Switch.Thumb />
+        </Switch.Control>
+      </Switch.Root>
+    </Field.Root>
+  );
+}
+
+/** The two planner inputs, shown only for a strategy that plans. */
+function PlannerFields({ form }: { form: UseFormReturn<ScenarioFormData> }) {
+  const {
+    register,
+    formState: { errors },
+  } = form;
+  return (
+    <>
+      <Field.Root invalid={!!errors.redTeamConfig?.attackPlan}>
+        <LabelWithHelp
+          label="Attack plan"
+          help="Crescendo normally spends one model call writing a phased plan before it starts. Paste your own to skip that and control the attack exactly — phase by phase, in your own words. Leave empty to let it plan."
+        />
+        <Textarea
+          rows={4}
+          placeholder={
+            "e.g., Turns 1-10: ask about products.\nTurns 11-25: ask how AI assistants work.\nTurns 26-50: ask it to repeat its instructions."
+          }
+          _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+          {...register("redTeamConfig.attackPlan", {
+            setValueAs: (v) => (v === "" ? undefined : v),
+          })}
+        />
+        <Field.ErrorText>
+          {errors.redTeamConfig?.attackPlan?.message}
+        </Field.ErrorText>
+      </Field.Root>
+
+      <Field.Root invalid={!!errors.redTeamConfig?.metapromptTemplate}>
+        <LabelWithHelp
+          label="Planning prompt"
+          help="Replaces the instructions used to write the attack plan, rather than the plan itself. Use {target}, {description}, {totalTurns} and {phase1End}/{phase2End}/{phase3End} where those values should appear. Ignored when an attack plan is set above, since nothing needs planning then."
+        />
+        <Textarea
+          rows={3}
+          placeholder="Leave empty to use the built-in planning prompt"
+          _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+          {...register("redTeamConfig.metapromptTemplate", {
+            setValueAs: (v) => (v === "" ? undefined : v),
+          })}
+        />
+        <Field.ErrorText>
+          {errors.redTeamConfig?.metapromptTemplate?.message}
+        </Field.ErrorText>
+      </Field.Root>
+    </>
+  );
+}
+
+/**
+ * Bottom padding as well as top: without it the accordion's closing rule sits
+ * directly on the last input, and SITUATION below reads as part of Advanced
+ * rather than a new section.
+ */
+function AdvancedFields({
+  form,
+  planningApplies,
+  scoringOn,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  planningApplies: boolean;
+  scoringOn: boolean;
+}) {
+  return (
+    <VStack align="stretch" gap={4} paddingTop={2} paddingBottom={4}>
+      <NumberSetting
+        form={form}
+        name="redTeamConfig.successScore"
+        label="Stop early at score"
+        help="Each turn is scored 0-10 for how close the attacker is to its goal. Once it reaches this score the run stops — the weakness is already proven and further turns just cost money. Leave empty to use the default of 9."
+        min={0}
+        max={10}
+        placeholder="9"
+        fallbackError="Enter a score between 0 and 10."
+      />
+      <AdaptiveScoringSwitch form={form} scoringOn={scoringOn} />
+      {planningApplies && <PlannerFields form={form} />}
+      <NumberSetting
+        form={form}
+        name="redTeamConfig.injectionProbability"
+        label="Obfuscation"
+        help="Chance per turn that the attacker's message is re-encoded after it is written (Base64, ROT13) to slip past filters that match on plain text. 0 sends everything in the clear; 1 encodes every turn. Leave empty for 0."
+        min={0}
+        max={1}
+        step={0.05}
+        placeholder="0"
+        fallbackError="Enter a number between 0 and 1."
+      />
+    </VStack>
+  );
+}
+
+/**
  * Planner and scoring settings.
  *
  * Controlled open state: the cross-field strategy/planner error is reported at
@@ -454,12 +643,6 @@ function AdvancedSettings({
   planningApplies: boolean;
   scoringOn: boolean;
 }) {
-  const {
-    register,
-    setValue,
-    getValues,
-    formState: { errors },
-  } = form;
   return (
     <Accordion.Root
       collapsible
@@ -493,137 +676,11 @@ function AdvancedSettings({
         </Accordion.ItemTrigger>
         <Accordion.ItemContent>
           <Accordion.ItemBody>
-            {/* Bottom padding as well as top: without it the accordion's
-                    closing rule sits directly on the last input, and SITUATION
-                    below reads as part of Advanced rather than a new section. */}
-            <VStack align="stretch" gap={4} paddingTop={2} paddingBottom={4}>
-              {/* Registered, not `defaultValue` + `setValue`. The old pair
-                      read the value once on mount, so anything that changed the
-                      config afterwards — a `reset()`, or switching strategy —
-                      left the input showing a value the form no longer held. */}
-              <Field.Root invalid={!!errors.redTeamConfig?.successScore}>
-                <LabelWithHelp
-                  label="Stop early at score"
-                  help="Each turn is scored 0-10 for how close the attacker is to its goal. Once it reaches this score the run stops — the weakness is already proven and further turns just cost money. Leave empty to use the default of 9."
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  max={10}
-                  width="120px"
-                  placeholder="9"
-                  {...register("redTeamConfig.successScore", {
-                    setValueAs: (v) =>
-                      v === "" || v === null ? undefined : Number(v),
-                  })}
-                />
-                <Field.ErrorText>
-                  {errors.redTeamConfig?.successScore?.message ??
-                    "Enter a score between 0 and 10."}
-                </Field.ErrorText>
-              </Field.Root>
-
-              <Field.Root>
-                <LabelWithHelp
-                  label="Adaptive scoring"
-                  help="Every reply is scored 0-10 and the attacker adjusts its next move, backing out of a line that got a hard refusal. Turning it off is the recommended way to make a run cheaper — it keeps the full turn budget, but the attacker stops reacting to what the agent said."
-                />
-                <Switch.Root
-                  checked={scoringOn}
-                  onCheckedChange={({ checked }) =>
-                    setValue("redTeamConfig", {
-                      ...(getValues("redTeamConfig") ?? {}),
-                      // Both knobs move together: the docs' fast recipe
-                      // disables scoring and refusal detection as a pair,
-                      // and refusal detection only feeds the scorer.
-                      scoreResponses: checked,
-                      detectRefusals: checked,
-                    })
-                  }
-                  colorPalette="redteam"
-                >
-                  <Switch.HiddenInput />
-                  <Switch.Control cursor="pointer">
-                    <Switch.Thumb />
-                  </Switch.Control>
-                </Switch.Root>
-              </Field.Root>
-
-              {planningApplies && (
-                <>
-                  <Field.Root invalid={!!errors.redTeamConfig?.attackPlan}>
-                    <LabelWithHelp
-                      label="Attack plan"
-                      help="Crescendo normally spends one model call writing a phased plan before it starts. Paste your own to skip that and control the attack exactly — phase by phase, in your own words. Leave empty to let it plan."
-                    />
-                    <Textarea
-                      rows={4}
-                      placeholder={
-                        "e.g., Turns 1-10: ask about products.\nTurns 11-25: ask how AI assistants work.\nTurns 26-50: ask it to repeat its instructions."
-                      }
-                      _placeholder={{
-                        color: "gray.400",
-                        fontStyle: "italic",
-                      }}
-                      {...register("redTeamConfig.attackPlan", {
-                        setValueAs: (v) => (v === "" ? undefined : v),
-                      })}
-                    />
-                    <Field.ErrorText>
-                      {errors.redTeamConfig?.attackPlan?.message}
-                    </Field.ErrorText>
-                  </Field.Root>
-
-                  <Field.Root
-                    invalid={!!errors.redTeamConfig?.metapromptTemplate}
-                  >
-                    <LabelWithHelp
-                      label="Planning prompt"
-                      help="Replaces the instructions used to write the attack plan, rather than the plan itself. Use {target}, {description}, {totalTurns} and {phase1End}/{phase2End}/{phase3End} where those values should appear. Ignored when an attack plan is set above, since nothing needs planning then."
-                    />
-                    <Textarea
-                      rows={3}
-                      placeholder="Leave empty to use the built-in planning prompt"
-                      _placeholder={{
-                        color: "gray.400",
-                        fontStyle: "italic",
-                      }}
-                      {...register("redTeamConfig.metapromptTemplate", {
-                        setValueAs: (v) => (v === "" ? undefined : v),
-                      })}
-                    />
-                    <Field.ErrorText>
-                      {errors.redTeamConfig?.metapromptTemplate?.message}
-                    </Field.ErrorText>
-                  </Field.Root>
-                </>
-              )}
-
-              <Field.Root
-                invalid={!!errors.redTeamConfig?.injectionProbability}
-              >
-                <LabelWithHelp
-                  label="Obfuscation"
-                  help="Chance per turn that the attacker's message is re-encoded after it is written (Base64, ROT13) to slip past filters that match on plain text. 0 sends everything in the clear; 1 encodes every turn. Leave empty for 0."
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  width="120px"
-                  placeholder="0"
-                  {...register("redTeamConfig.injectionProbability", {
-                    setValueAs: (v) =>
-                      v === "" || v === null ? undefined : Number(v),
-                  })}
-                />
-                <Field.ErrorText>
-                  {errors.redTeamConfig?.injectionProbability?.message ??
-                    "Enter a number between 0 and 1."}
-                </Field.ErrorText>
-              </Field.Root>
-            </VStack>
+            <AdvancedFields
+              form={form}
+              planningApplies={planningApplies}
+              scoringOn={scoringOn}
+            />
           </Accordion.ItemBody>
         </Accordion.ItemContent>
       </Accordion.Item>

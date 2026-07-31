@@ -89,6 +89,29 @@ export function ScenarioFormDrawerFromUrl(
 }
 
 /**
+ * A stored row as the form's own shape. Prisma types `redTeamConfig` as
+ * JsonValue and `redTeamStrategy` as a plain string, so both are narrowed
+ * here; anything that does not fit reads as "not configured" rather than
+ * putting a value the editor cannot render into the form.
+ */
+function toFormDefaults(scenario: Scenario): Partial<ScenarioFormData> {
+  const { redTeamConfig, redTeamStrategy, ...rest } = scenario;
+  const isKnownStrategy =
+    redTeamStrategy === "goat" || redTeamStrategy === "crescendo";
+  const isConfigObject =
+    !!redTeamConfig &&
+    typeof redTeamConfig === "object" &&
+    !Array.isArray(redTeamConfig);
+  return {
+    ...rest,
+    redTeamStrategy: isKnownStrategy ? redTeamStrategy : null,
+    redTeamConfig: isConfigObject
+      ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
+      : null,
+  };
+}
+
+/**
  * Drawer container for scenario create/edit form.
  * Two-column layout: form on left, help sidebar on right.
  * Bottom bar with Quick Test and Save and Run.
@@ -444,7 +467,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     // there by applyHandledErrorToForm, which already renders it at its field,
     // and its text is copy we did not write — so it never becomes the summary.
     const fieldMessages = Object.values(errors)
-      .filter((entry) => (entry as { type?: string } | undefined)?.type !== "server")
+      .filter(
+        (entry) => (entry as { type?: string } | undefined)?.type !== "server",
+      )
       .map((entry) => (entry as { message?: string } | undefined)?.message)
       .filter((text): text is string => !!text);
     toaster.create({
@@ -541,27 +566,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
-    if (scenario) {
-      // The Prisma row types redTeamConfig as JsonValue; narrow it to the
-      // form's shape (an unparseable value simply means "no advanced knobs").
-      const { redTeamConfig, redTeamStrategy, ...rest } = scenario;
-      return {
-        ...rest,
-        redTeamStrategy:
-          redTeamStrategy === "goat" || redTeamStrategy === "crescendo"
-            ? redTeamStrategy
-            : null,
-        redTeamConfig:
-          redTeamConfig &&
-          typeof redTeamConfig === "object" &&
-          !Array.isArray(redTeamConfig)
-            ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
-            : null,
-      };
-    }
-    return initialFormData ?? undefined;
-  }, [scenario, initialFormData]);
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
+    () =>
+      scenario ? toFormDefaults(scenario) : (initialFormData ?? undefined),
+    [scenario, initialFormData],
+  );
 
   return (
     <Drawer.Root

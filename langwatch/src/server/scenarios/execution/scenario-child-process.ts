@@ -134,28 +134,14 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     nlpServiceUrl,
   );
 
-  // For HTTP targets, use a remote span judge that queries spans from
-  // the platform API before evaluation. The trace ID will be captured
-  // from the adapter after the conversation completes.
-  let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
-  const judgeAgent =
-    target.type === "http"
-      ? (() => {
-          remoteSpanJudge = new RemoteSpanJudgeAgent({
-            criteria: scenario.criteria,
-            model: judgeModel,
-            projectId: context.projectId,
-            querySpans: createTraceApiSpanQuery({
-              endpoint: langwatchEndpoint,
-              apiKey: langwatchApiKey,
-            }),
-          });
-          return remoteSpanJudge;
-        })()
-      : ScenarioRunner.judgeAgent({
-          criteria: scenario.criteria,
-          model: judgeModel,
-        });
+  const { judgeAgent, remoteSpanJudge } = createJudge({
+    isHttpTarget: target.type === "http",
+    criteria: scenario.criteria,
+    model: judgeModel,
+    projectId: context.projectId,
+    langwatchEndpoint,
+    langwatchApiKey,
+  });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -166,10 +152,12 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
   }
 
-  // A red-team attacker IS a user simulator (it extends the same adapter), so
-  // it drops straight into the simulator slot and everything downstream — the
-  // judge, the criteria, the reporting — stays exactly as it is.
-  const redTeam = buildRedTeamAgent({ scenario, model: simulatorModel });
+  const { agents, script } = buildConversation({
+    adapter,
+    scenario,
+    simulatorModel,
+    judgeAgent,
+  });
 
   const result = await ScenarioRunner.run(
     {
@@ -177,23 +165,8 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       name: scenario.name,
       description: scenario.situation,
       setId: context.setId,
-      agents: [
-        adapter,
-        redTeam?.agent ??
-          ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-        judgeAgent,
-      ],
-      // marathonScript is what makes a red-team run a real one. Without it the
-      // judge runs every turn and can end the scenario the moment nothing has
-      // gone wrong — "must never reveal X" is satisfied by one clean exchange,
-      // so a 50-turn attack finishes at turn one reporting that the agent held.
-      //
-      // The script is also the turn control. It expands to totalTurns rounds
-      // and the runner walks it step by step, so maxTurns is not consulted on
-      // this path at all (verified in the SDK: the scripted branch loops over
-      // script.length; the maxTurns check lives in the auto-advance branch).
-      // Setting it here would be dead config that reads like a safeguard.
-      ...(redTeam ? { script: redTeam.script } : {}),
+      agents,
+      ...script,
       verbose,
       metadata: {
         langwatch: {
@@ -234,6 +207,89 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     outputResult.reasoning = result.reasoning;
   }
   process.stdout.write(JSON.stringify(outputResult) + "\n");
+}
+
+/**
+ * Who talks, and — for a red-team run — in what order.
+ *
+ * A red-team attacker IS a user simulator (it extends the same adapter), so it
+ * drops straight into the simulator slot and everything downstream — the judge,
+ * the criteria, the reporting — stays exactly as it is.
+ *
+ * marathonScript is what makes a red-team run a real one. Without it the judge
+ * runs every turn and can end the scenario the moment nothing has gone wrong —
+ * "must never reveal X" is satisfied by one clean exchange, so a 50-turn attack
+ * finishes at turn one reporting that the agent held.
+ *
+ * The script is also the turn control. It expands to totalTurns rounds and the
+ * runner walks it step by step, so maxTurns is not consulted on this path at
+ * all (verified in the SDK: the scripted branch loops over script.length; the
+ * maxTurns check lives in the auto-advance branch). Setting it here would be
+ * dead config that reads like a safeguard.
+ */
+function buildConversation({
+  adapter,
+  scenario,
+  simulatorModel,
+  judgeAgent,
+}: {
+  adapter: ScenarioRunner.AgentAdapter;
+  scenario: ChildProcessJobData["scenario"];
+  simulatorModel: ReturnType<typeof createModelFromParams>;
+  judgeAgent: ScenarioRunner.JudgeAgentAdapter;
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script: { script?: ScenarioRunner.ScriptStep[] };
+} {
+  const redTeam = buildRedTeamAgent({ scenario, model: simulatorModel });
+  const simulator =
+    redTeam?.agent ??
+    ScenarioRunner.userSimulatorAgent({ model: simulatorModel });
+  return {
+    agents: [adapter, simulator, judgeAgent],
+    script: redTeam ? { script: redTeam.script } : {},
+  };
+}
+
+/**
+ * The judge, and the remote-span judge when there is one.
+ *
+ * An HTTP target's judge queries spans from the platform API before it
+ * evaluates, so the caller needs the instance itself to bridge the adapter's
+ * trace ID into it once the conversation is done. Every other target gets the
+ * plain judge and no second reference.
+ */
+function createJudge({
+  isHttpTarget,
+  criteria,
+  model,
+  projectId,
+  langwatchEndpoint,
+  langwatchApiKey,
+}: {
+  isHttpTarget: boolean;
+  criteria: string[];
+  model: ReturnType<typeof createModelFromParams>;
+  projectId: string;
+  langwatchEndpoint: string;
+  langwatchApiKey: string;
+}): {
+  judgeAgent: ScenarioRunner.JudgeAgentAdapter;
+  remoteSpanJudge?: RemoteSpanJudgeAgent;
+} {
+  if (!isHttpTarget) {
+    return { judgeAgent: ScenarioRunner.judgeAgent({ criteria, model }) };
+  }
+  const remoteSpanJudge = new RemoteSpanJudgeAgent({
+    criteria,
+    model,
+    projectId,
+    querySpans: createTraceApiSpanQuery({
+      endpoint: langwatchEndpoint,
+      apiKey: langwatchApiKey,
+    }),
+  });
+  return { judgeAgent: remoteSpanJudge, remoteSpanJudge };
 }
 
 /**
