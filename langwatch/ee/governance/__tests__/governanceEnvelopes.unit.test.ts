@@ -7,7 +7,7 @@ import {
   vkLifecycleToEnvelope,
 } from "../webhooks/governanceEnvelopes";
 
-const lifecycle = (action: "created" | "disabled" | "enabled" | "revoked") => ({
+const lifecycle = (action: "created" | "rotated" | "disabled" | "enabled" | "revoked") => ({
   tenantId: "proj_1",
   organization_id: "org_1",
   virtual_key_id: "vk_1",
@@ -37,7 +37,7 @@ const crossing = (kind: "threshold_crossed" | "breached") => ({
 describe("governance envelopes", () => {
   /** @scenario Key lifecycle changes become their own envelope types */
   it("types each lifecycle action with a deterministic id and carries the reason", () => {
-    const actions = ["created", "disabled", "enabled", "revoked"] as const;
+    const actions = ["created", "rotated", "disabled", "enabled", "revoked"] as const;
     for (const action of actions) {
       const env = vkLifecycleToEnvelope(lifecycle(action));
       expect(env.type).toBe(`gateway.virtual_key.${action}`);

@@ -57,7 +57,14 @@ export type CreateGatewayBudgetScope =
   | { kind: "PROJECT"; project_id: string }
   | { kind: "VIRTUAL_KEY"; virtual_key_id: string }
   | { kind: "PRINCIPAL"; principal_user_id: string }
-  | { kind: "GROUP"; group_id: string };
+  | { kind: "GROUP"; group_id: string }
+  // Template: each distinct external end user on the anchor gets the
+  // budget's limit per window. Exactly one anchor id.
+  | {
+      kind: "ATTRIBUTED_USER";
+      anchor_virtual_key_id?: string;
+      anchor_project_id?: string;
+    };
 
 export interface CreateGatewayBudgetInput {
   scope: CreateGatewayBudgetScope;

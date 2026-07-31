@@ -248,10 +248,12 @@ Feature: Webhook endpoints, signed outbound event delivery
 
     @unit
     Scenario: Key lifecycle changes become their own envelope types
-      Given a key that is created, disabled, enabled, and revoked
+      Given a key that is created, rotated, disabled, enabled, and revoked
       When each change's envelope is built
       Then each carries its lifecycle type with a deterministic id
       And the reason travels on a disable
+      # Rotation included: consumers watching credentials hear about the
+      # grace window starting, same seam as every other lifecycle exit.
 
     @unit
     Scenario: A budget crossing becomes a threshold or breach envelope

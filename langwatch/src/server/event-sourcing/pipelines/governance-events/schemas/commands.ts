@@ -9,6 +9,7 @@ import { z } from "zod";
 
 export const vkLifecycleActionSchema = z.enum([
   "created",
+  "rotated",
   "disabled",
   "enabled",
   "revoked",
