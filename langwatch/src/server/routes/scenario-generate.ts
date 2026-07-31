@@ -19,6 +19,7 @@ import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
 } from "~/server/nlpgo/goHandledError";
+import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 
@@ -181,63 +182,6 @@ secured
     }
 
     try {
-      const model = await getVercelAIModel({ projectId, featureKey: "scenarios.generator" });
-
-      const userPrompt = currentScenario
-        ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`
-        : prompt;
-
-      const result = await generateObject({
-        model,
-        schema: scenarioSchema,
-        system: redTeam ? RED_TEAM_SYSTEM_PROMPT : SYSTEM_PROMPT,
-        prompt: userPrompt,
-        maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
-        abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),
-      });
-
-      return c.json({ scenario: result.object });
-    } catch (error) {
-      // Handled Go-side failures (nlpgo / AI Gateway) arrive as a typed
-      // envelope on the AI SDK error — forward them with their kind so
-      // the browser can react (e.g. missing_provider → settings link).
-      const handled = nlpgoHandledErrorFrom(error);
-      if (handled) {
-        logger.warn(
-          { error: handled.serialize() },
-          "Scenario generation rejected by LLM gateway",
-        );
-        // The code, never `handled.message` — server copy stays server-side
-        // (ADR-045); the client keys its copy off `error.code`.
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
-    }
-
-    let body;
-    try {
-      body = requestSchema.parse(await c.req.json());
-    } catch (error) {
-      logger.error({ error }, "Invalid request body");
-      return c.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    const { prompt, currentScenario, projectId } = body;
-
-    const hasPermission = await hasProjectPermission(
-      { prisma, session },
-      projectId,
-      "scenarios:manage",
-    );
-    if (!hasPermission) {
-      return c.json(
-        { error: "You do not have permission to access this endpoint." },
-        { status: 403 },
-      );
-    }
-
-    try {
       const model = await getVercelAIModel({
         projectId,
         featureKey: "scenarios.generator",
@@ -250,7 +194,7 @@ secured
       const result = await generateObject({
         model,
         schema: scenarioSchema,
-        system: SYSTEM_PROMPT,
+        system: redTeam ? RED_TEAM_SYSTEM_PROMPT : SYSTEM_PROMPT,
         prompt: userPrompt,
         maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
         abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),
