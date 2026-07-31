@@ -86,11 +86,14 @@ type fakeSystem struct {
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
-	now             time.Time
+	// portsUp is which ports answer. Nil means none, which is what every test
+	// that predates health-aware restarting assumed.
+	portsUp map[int]bool
+	now     time.Time
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(int) bool             { return false }
+func (f *fakeSystem) PortInUse(port int) bool        { return f.portsUp[port] }
 func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)

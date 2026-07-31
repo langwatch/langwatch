@@ -30,6 +30,25 @@ Feature: haven logs
     Then output streams live until interrupted
     And "-t" means tail nowhere else and nothing else in the CLI
 
+  # The sink stamps every line in UTC. Rendering that as-is printed a wall time
+  # that matched the developer's clock only in Britain in winter — everywhere
+  # else live output was labelled hours old, which reads as a stale or broken
+  # capture rather than as a timezone. Bound by cmd/logs_test.go.
+  Scenario: Timestamps are on the reader's own clock
+    Given a line a service printed a second ago
+    When the developer runs "haven logs"
+    Then the line's timestamp matches the developer's own clock
+    And it agrees with the timestamp the service printed in its own message
+
+  # A command that prints exactly 200 lines and says nothing is indistinguishable
+  # from a service that stopped 200 lines ago. Bound by cmd/logs_test.go.
+  Scenario: How much history is a flag, and the clipping is stated
+    When the developer runs "haven logs"
+    Then the newest 200 lines print
+    And the developer is told the view was clipped, and by which flag
+    And "haven logs -n 2000" prints that much instead
+    And "haven logs -n 0" prints every line the bounded read produced
+
   Scenario: A time window is one flag
     When the developer runs "haven logs --since 10m"
     Then only lines from the last ten minutes appear

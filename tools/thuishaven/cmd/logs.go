@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +23,8 @@ import (
 // logsink.go); the launcher's terminal view and these files carry the same
 // lines.
 
-// logsTailLines is how much history a plain `haven logs` prints.
+// logsTailLines is how much history a plain `haven logs` prints, and the
+// default for -n.
 const logsTailLines = 200
 
 // logReadCapBytes bounds how much of one capture file a single read pulls into
@@ -89,6 +91,10 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	if level != "" && minLevelRank(level) == 0 {
 		return fmt.Errorf("--level wants debug, info, warn, or error, got %q", level)
 	}
+	limit, err := logLineLimit(inv.value("--lines"))
+	if err != nil {
+		return err
+	}
 
 	services, err := selectLogServices(dir, inv.args)
 	if err != nil {
@@ -97,14 +103,21 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 
 	lines, offsets, elided := readLogTails(dir, services)
 	lines = filterLogLines(lines, since, level)
-	if since.IsZero() && len(lines) > logsTailLines {
-		lines = lines[len(lines)-logsTailLines:]
+	clipped := false
+	if limit > 0 && len(lines) > limit {
+		lines, clipped = lines[len(lines)-limit:], true
 	}
 	if elided {
 		// stderr, so a `haven logs | grep` or an agent parsing stdout sees only
 		// log lines — but the developer is still told their window was clipped
 		// rather than silently shown a shorter history than they asked for.
 		fmt.Fprintf(os.Stderr, "(reading the last %d MiB of each capture — older history elided)\n", logReadCapBytes>>20)
+	}
+	if clipped {
+		// Same reason, one level up: a plain `haven logs` that prints exactly 200
+		// lines is indistinguishable from a service that stopped 200 lines ago
+		// unless the command says which of the two it is.
+		fmt.Fprintf(os.Stderr, "(showing the newest %d lines — `-n <count>` for more, `-n 0` for every line read)\n", limit)
 	}
 	for _, l := range lines {
 		printLogLine(l, d.isAgent)
@@ -116,6 +129,32 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		return nil
 	}
 	return followLogs(ctx, dir, inv.args, offsets, since, level, d.isAgent)
+}
+
+// logLineLimit reads -n. Empty means the default window; 0 means "every line
+// the bounded read produced", which is the escape hatch from the default.
+func logLineLimit(raw string) (int, error) {
+	if raw == "" {
+		return logsTailLines, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("-n wants a line count (0 for no limit), got %q", raw)
+	}
+	return n, nil
+}
+
+// logEndOffsets records where every capture currently ends. A follow started
+// from these shows only what happens next — which is what `haven restart -t`
+// wants: the bounce's own output, not the history that led up to it.
+func logEndOffsets(dir string) map[string]int64 {
+	offsets := map[string]int64{}
+	for _, svc := range capturedServices(dir) {
+		if info, err := os.Stat(filepath.Join(dir, svc+".log")); err == nil {
+			offsets[svc] = info.Size()
+		}
+	}
+	return offsets
 }
 
 // selectLogServices resolves which capture files to read: the named services,
@@ -332,15 +371,29 @@ func printLogLine(l logLine, plain bool) { fmt.Println(formatLogLine(l, plain)) 
 // formatLogLine renders one captured line: plain for pipes/agents, coloured
 // label + warn/error highlighting for humans. Shared by `haven logs` and the
 // attached up viewer so a service reads the same everywhere.
-func formatLogLine(l logLine, plain bool) string {
+func formatLogLine(l logLine, plain bool) string { return formatLogLineIn(l, plain, time.Local) }
+
+// formatLogLineIn is formatLogLine with the reader's zone injected, so the one
+// thing worth pinning about the timestamp can be pinned without the test's
+// result depending on where the machine running it is.
+//
+// The zone is the whole point. The sink stamps every line in UTC, and
+// time.Parse hands that back in UTC, so rendering it as-is printed a wall time
+// that agreed with the developer's clock only in Britain in winter. Everywhere
+// else `haven logs` reported live output as hours old — the very line vite had
+// just printed as "1:37:33 AM" arrived stamped 23:37:33 — which reads as a
+// stale or broken capture rather than as a timezone. The lines were always
+// current; only the column lied.
+func formatLogLineIn(l logLine, plain bool, loc *time.Location) string {
+	clock := l.ts.In(loc).Format("15:04:05.000")
 	if plain {
-		return fmt.Sprintf("%s %-8s | %s", l.ts.Format("15:04:05.000"), l.service, l.text)
+		return fmt.Sprintf("%s %-8s | %s", clock, l.service, l.text)
 	}
 	color := logServiceColors[l.service]
 	if color == "" {
 		color = "37"
 	}
-	return fmt.Sprintf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s", l.ts.Format("15:04:05.000"), color, l.service, highlightLevel(l.text))
+	return fmt.Sprintf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s", clock, color, l.service, highlightLevel(l.text))
 }
 
 // highlightLevel paints a line red at error-or-worse, yellow at warn.

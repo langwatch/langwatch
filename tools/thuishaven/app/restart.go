@@ -8,6 +8,11 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// Restart's scopes: one named service, every supervised child, or only the ones
+// that stopped answering (RestartUnhealthy). All three go through bounce(),
+// which signals process groups and lets the launcher's supervisor bring the
+// children back — haven never restarts a child itself.
+
 // restartTarget is one supervised child `haven restart` can bounce: a name and
 // the loopback port its process listens on.
 type restartTarget struct {
@@ -87,17 +92,77 @@ func (o *Orchestrator) RestartStackQuiet(slug, name string) (string, error) {
 // supervisor bring it back — the crash-restart loop, triggered on purpose. It
 // returns one human line per child and never touches the launcher's own group.
 func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
-	st, ok := o.stackBySlug(slug)
-	if !ok {
-		return nil, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
-	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
-		return nil, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
+	st, err := o.runningStack(slug)
+	if err != nil {
+		return nil, err
 	}
 	targets := restartTargets(st, name)
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("unknown service %q — restartable: %s", name, strings.Join(restartableNames(st), ", "))
 	}
+	return o.bounce(st, targets), nil
+}
+
+// RestartUnhealthy bounces only the supervised children whose port has stopped
+// answering, leaving a working stack alone — "restart what is broken" rather
+// than the blanket bounce of a plain `haven restart`. It returns the names it
+// bounced (nil when everything answers), so the caller can follow exactly those.
+func (o *Orchestrator) RestartUnhealthy(_ context.Context, p UpParams) ([]string, error) {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return nil, err
+	}
+	st, err := o.runningStack(slug)
+	if err != nil {
+		return nil, err
+	}
+	sick := unhealthyTargets(restartTargets(st, ""), o.sys.PortInUse)
+	if len(sick) == 0 {
+		fmt.Printf("  every supervised service on %q is answering — nothing to bounce\n", slug)
+		return nil, nil
+	}
+	for _, m := range o.bounce(st, sick) {
+		fmt.Printf("  %s\n", m)
+	}
+	names := make([]string, len(sick))
+	for i, t := range sick {
+		names[i] = t.Name
+	}
+	return names, nil
+}
+
+// unhealthyTargets picks the restart targets whose port is not answering. A
+// target with no port cannot be probed, so it is left alone rather than bounced
+// on a guess — `haven restart` with no argument is what bounces regardless.
+func unhealthyTargets(targets []restartTarget, portUp func(int) bool) []restartTarget {
+	var out []restartTarget
+	for _, t := range targets {
+		if t.Port == 0 || portUp(t.Port) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// runningStack resolves a slug to a stack that can actually be acted on: one
+// that is registered, and whose launcher is still alive to restart what we
+// signal. Both refusals name the command that fixes them.
+func (o *Orchestrator) runningStack(slug string) (domain.Stack, error) {
+	st, ok := o.stackBySlug(slug)
+	if !ok {
+		return domain.Stack{}, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
+	}
+	if !o.sys.ProcessAlive(st.LauncherPID) {
+		return domain.Stack{}, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
+	}
+	return st, nil
+}
+
+// bounce SIGTERMs each target's process group and lets the launcher's supervisor
+// bring it back, returning one human line per child. It never signals the
+// launcher's own group: that would take the whole stack down instead of a child.
+func (o *Orchestrator) bounce(st domain.Stack, targets []restartTarget) []string {
 	var msgs []string
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
@@ -106,8 +171,6 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 			continue
 		}
 		for _, pid := range pids {
-			// Never signal the launcher's own group: that would take the whole
-			// stack down instead of one child.
 			if pid == st.LauncherPID {
 				continue
 			}
@@ -115,7 +178,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 		}
 		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
 	}
-	return msgs, nil
+	return msgs
 }
 
 // restartTargets resolves which children to bounce. Only supervised children
@@ -163,6 +226,22 @@ func restartableNames(st domain.Stack) []string {
 // ResolveSlug exposes slug resolution to the composition root (for log paths,
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
+
+// LiveStackForWorktree answers "is this worktree's own stack up right now" —
+// what makes bare `haven` open that stack's attached view instead of the fleet
+// hub. A registered stack whose launcher has died is deliberately not live:
+// there is nothing to attach to, so the hub stays the right answer.
+func (o *Orchestrator) LiveStackForWorktree(p UpParams) (string, bool) {
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return "", false
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || !o.sys.ProcessAlive(st.LauncherPID) {
+		return "", false
+	}
+	return slug, true
+}
 
 // ResolveSelection loads the worktree's sticky service selection (lean default
 // when none exists), applies any ±deltas, and persists the result — so the
