@@ -113,16 +113,21 @@ export class VirtualKeysApiError extends Error {
 export class VirtualKeysApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  private readonly projectId: string | undefined;
 
-  constructor(config?: { endpoint?: string; apiKey?: string }) {
+  constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
     this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
+      // Org-anchored API keys carry no project of their own; the surface
+      // scopes on this header. Absent for project keys, which self-scope.
+      ...(this.projectId ? { "X-Project-Id": this.projectId } : {}),
     };
   }
 
