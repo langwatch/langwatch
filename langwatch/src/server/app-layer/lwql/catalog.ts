@@ -88,7 +88,8 @@ const TRACE_FIELDS: Record<string, LwqlFieldDef> = {
     filterExpr: "Models",
     filterKind: "array",
     type: "string",
-    description: "Model used by the trace. Traces with none group as 'unknown'.",
+    description:
+      "Model used by the trace. Traces with none group as 'unknown'.",
   },
   duration_ms: {
     selectExpr: "TotalDurationMs",
@@ -301,7 +302,9 @@ export type LwqlAggregation = keyof typeof AGGREGATIONS;
 export const AGGREGATION_NAMES = Object.keys(AGGREGATIONS) as LwqlAggregation[];
 
 /** `count(*)` is the one aggregate that takes no field. */
-export const AGGREGATIONS_ALLOWING_STAR: ReadonlySet<string> = new Set(["count"]);
+export const AGGREGATIONS_ALLOWING_STAR: ReadonlySet<string> = new Set([
+  "count",
+]);
 
 /** Aggregates that only make sense over a numeric domain. */
 export const NUMERIC_ONLY_AGGREGATIONS: ReadonlySet<string> = new Set([

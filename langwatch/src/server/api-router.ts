@@ -25,8 +25,8 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
-import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";

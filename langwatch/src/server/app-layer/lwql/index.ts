@@ -6,7 +6,9 @@
  * the tenant-scoping and gating guarantees stop being centralised.
  */
 
-export { describeCatalogue, LwqlService } from "./lwql.service";
+export { AGGREGATION_NAMES, ENTITIES, ENTITY_NAMES } from "./catalog";
+export { LwqlError, type LwqlErrorCode } from "./errors";
+export { type LwqlQuery, lwqlQuerySchema } from "./ir";
 export type {
   LwqlExecutionOptions,
   LwqlRequest,
@@ -14,9 +16,7 @@ export type {
   LwqlResultMeta,
   VisibilityCutoffResolver,
 } from "./lwql.service";
-export { LwqlError, type LwqlErrorCode } from "./errors";
-export { ENTITIES, ENTITY_NAMES, AGGREGATION_NAMES } from "./catalog";
-export { lwqlQuerySchema, type LwqlQuery } from "./ir";
+export { describeCatalogue, LwqlService } from "./lwql.service";
 export { parseLwql } from "./parser";
 
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";

@@ -85,9 +85,10 @@ const SPAN_IGNORED = new Set<string>([]);
 describe("gated field parity with visibility-window.service", () => {
   it("accounts for every trace field the redaction service touches", () => {
     const before = sentinelTrace() as unknown as Record<string, unknown>;
-    const after = redactTraceContent(
-      sentinelTrace(),
-    ) as unknown as Record<string, unknown>;
+    const after = redactTraceContent(sentinelTrace()) as unknown as Record<
+      string,
+      unknown
+    >;
 
     const redacted = changedFields(before, after, TRACE_IGNORED);
 
@@ -103,9 +104,10 @@ describe("gated field parity with visibility-window.service", () => {
 
   it("accounts for every span field the redaction service touches", () => {
     const before = sentinelSpan() as unknown as Record<string, unknown>;
-    const after = redactSpanContent(
-      sentinelSpan(),
-    ) as unknown as Record<string, unknown>;
+    const after = redactSpanContent(sentinelSpan()) as unknown as Record<
+      string,
+      unknown
+    >;
 
     const redacted = changedFields(before, after, SPAN_IGNORED);
     expect(redacted.size).toBeGreaterThan(0);
@@ -146,21 +148,25 @@ describe("gated field parity with visibility-window.service", () => {
   it("does not gate a catalogue field that maps to no redacted content", () => {
     // The reverse direction: a field marked gated but not backed by the
     // redaction service would deny access for no reason.
-    const mapped = new Set<string>();
-    for (const mapping of Object.values(CONTENT_FIELD_MAP)) {
-      for (const target of Object.values(mapping)) {
-        if (target) mapped.add(`${target.entity}.${target.field}`);
-      }
-    }
+    const mapped = new Set(
+      Object.values(CONTENT_FIELD_MAP)
+        .flatMap((mapping) => Object.values(mapping))
+        .filter((target) => target !== null)
+        .map((target) => `${target!.entity}.${target!.field}`),
+    );
 
-    for (const [entityName, entity] of Object.entries(ENTITIES)) {
-      for (const [fieldName, def] of Object.entries(entity.fields)) {
-        if (!def.contentGated) continue;
-        expect(
-          mapped.has(`${entityName}.${fieldName}`),
-          `${entityName}.${fieldName} is gated but no redaction-service field maps to it`,
-        ).toBe(true);
-      }
+    const gatedInCatalogue = Object.entries(ENTITIES).flatMap(
+      ([entityName, entity]) =>
+        Object.entries(entity.fields)
+          .filter(([, def]) => def.contentGated)
+          .map(([fieldName]) => `${entityName}.${fieldName}`),
+    );
+
+    for (const key of gatedInCatalogue) {
+      expect(
+        mapped.has(key),
+        `${key} is gated but no redaction-service field maps to it`,
+      ).toBe(true);
     }
   });
 });

@@ -97,9 +97,9 @@ describe("allowlist totality", () => {
   });
 
   it("rejects an unknown aggregate function", () => {
-    expect(() => compileText("SELECT groupArray(trace_id) FROM traces")).toThrow(
-      /Unknown function 'groupArray'/,
-    );
+    expect(() =>
+      compileText("SELECT groupArray(trace_id) FROM traces"),
+    ).toThrow(/Unknown function 'groupArray'/);
   });
 
   it("suggests the closest field on a typo", () => {
@@ -270,9 +270,9 @@ describe("aggregation correctness", () => {
   });
 
   it("rejects a bare field alongside an aggregate unless grouped", () => {
-    expect(() =>
-      compileText("SELECT trace_id, count(*) FROM traces"),
-    ).toThrow(/must appear in GROUP BY or be aggregated/);
+    expect(() => compileText("SELECT trace_id, count(*) FROM traces")).toThrow(
+      /must appear in GROUP BY or be aggregated/,
+    );
   });
 
   it("rejects ORDER BY on a field that is neither grouped nor aggregated", () => {
@@ -303,9 +303,9 @@ describe("aggregation correctness", () => {
   });
 
   it("rejects GROUP BY without an aggregate", () => {
-    expect(() => compileText("SELECT model FROM traces GROUP BY model")).toThrow(
-      /requires at least one aggregate/,
-    );
+    expect(() =>
+      compileText("SELECT model FROM traces GROUP BY model"),
+    ).toThrow(/requires at least one aggregate/);
   });
 
   it("rejects a numeric aggregate over a string field", () => {

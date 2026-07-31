@@ -32,7 +32,7 @@ const queryRequestSchema = z
       .max(8000)
       .optional()
       .describe(
-        "SQL-like query text, e.g. \"SELECT model, avg(cost_usd) FROM traces GROUP BY model\".",
+        'SQL-like query text, e.g. "SELECT model, avg(cost_usd) FROM traces GROUP BY model".',
       ),
     ir: lwqlQuerySchema
       .optional()
@@ -76,9 +76,10 @@ const errorBody = (error: LwqlError) => ({
   },
 });
 
-export function registerQueryRoutes(
-  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
-): void {
+type QueryApp = SecuredApp<{ Variables: AuthMiddlewareVariables }>;
+
+/** POST / — execute a query. */
+function registerExecuteRoute(secured: QueryApp): void {
   // POST / — execute a query
   secured.access(requires("traces:view")).post(
     "/",
@@ -118,8 +119,10 @@ export function registerQueryRoutes(
       }
     },
   );
+}
 
-  // POST /validate — compile without executing
+/** POST /validate — compile without executing. */
+function registerValidateRoute(secured: QueryApp): void {
   secured.access(requires("traces:view")).post(
     "/validate",
     describeRoute({
@@ -172,8 +175,10 @@ export function registerQueryRoutes(
       }
     },
   );
+}
 
-  // GET /catalogue — the queryable surface
+/** GET /catalogue — the queryable surface. */
+function registerCatalogueRoute(secured: QueryApp): void {
   secured.access(requires("traces:view")).get(
     "/catalogue",
     describeRoute({
@@ -210,4 +215,10 @@ export function registerQueryRoutes(
     }),
     async (c) => c.json({ entities: describeCatalogue() }),
   );
+}
+
+export function registerQueryRoutes(secured: QueryApp): void {
+  registerExecuteRoute(secured);
+  registerValidateRoute(secured);
+  registerCatalogueRoute(secured);
 }

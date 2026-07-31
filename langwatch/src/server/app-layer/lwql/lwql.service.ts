@@ -6,15 +6,14 @@
  * Anything that decides what a caller may read lives here or below.
  */
 
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseSettings } from "@clickhouse/client";
-import type { ClickHouseClient } from "@clickhouse/client";
 
 import { ENTITIES, fieldNames, gatedFieldNames } from "./catalog";
-import { compile, type CompiledQuery } from "./compiler";
+import { type CompiledQuery, compile } from "./compiler";
 import { LwqlError } from "./errors";
 import type { GatingContext } from "./gating";
-import { lwqlQuerySchema, type LwqlQuery } from "./ir";
+import { type LwqlQuery, lwqlQuerySchema } from "./ir";
 import { parseLwql } from "./parser";
 
 const logger = createLogger("langwatch:app-layer:lwql");
@@ -92,9 +91,27 @@ export class LwqlService {
     private readonly resolveVisibilityCutoff: VisibilityCutoffResolver,
   ) {}
 
+  /**
+   * Validates against the IR schema, which both input forms must satisfy — the
+   * text parser gets no privilege the structured form lacks, and vice versa.
+   */
+  private validateIr(raw: unknown): LwqlQuery {
+    const parsed = lwqlQuerySchema.safeParse(raw);
+    if (parsed.success) return parsed.data as LwqlQuery;
+
+    const first = parsed.error.issues[0];
+    throw new LwqlError(
+      "invalid_query",
+      first
+        ? `${first.path.join(".") || "query"}: ${first.message}`
+        : "Query failed validation.",
+      { hint: "Check the field names and value types against the catalogue." },
+    );
+  }
+
   /** Parses/validates a request into IR without touching the database. */
   toIr(request: LwqlRequest, now?: number): LwqlQuery {
-    const hasText = typeof request.query === "string" && request.query.trim();
+    const hasText = typeof request.query === "string" && !!request.query.trim();
     const hasIr = request.ir !== undefined && request.ir !== null;
 
     if (hasText && hasIr) {
@@ -109,23 +126,9 @@ export class LwqlService {
       });
     }
 
-    const raw = hasText ? parseLwql(request.query!, { now }) : request.ir;
-
-    // Both paths land in the same schema — the text parser gets no privilege
-    // the structured form lacks, and vice versa.
-    const parsed = lwqlQuerySchema.safeParse(raw);
-    if (!parsed.success) {
-      const first = parsed.error.issues[0];
-      throw new LwqlError(
-        "invalid_query",
-        first
-          ? `${first.path.join(".") || "query"}: ${first.message}`
-          : "Query failed validation.",
-        { hint: "Check the field names and value types against the catalogue." },
-      );
-    }
-
-    return parsed.data as LwqlQuery;
+    return this.validateIr(
+      hasText ? parseLwql(request.query!, { now }) : request.ir,
+    );
   }
 
   /**

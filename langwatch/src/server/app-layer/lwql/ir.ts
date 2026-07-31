@@ -20,9 +20,13 @@ import { AGGREGATION_NAMES, ENTITY_NAMES } from "./catalog";
  * their *shape* here keeps malformed input out of error messages that get
  * echoed back to callers.
  */
-const identifier = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/, {
-  message: "Field names are lowercase alphanumeric with underscores.",
-});
+const identifier = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_]*$/, {
+    message: "Field names are lowercase alphanumeric with underscores.",
+  });
 
 export const comparisonOperatorSchema = z.enum([
   "=",
@@ -70,7 +74,9 @@ export type LwqlPredicate =
 const comparisonSchema: z.ZodType<LwqlComparison> = z.object({
   field: identifier,
   op: comparisonOperatorSchema,
-  value: z.union([literalSchema, z.array(literalSchema).min(1).max(1000)]).optional(),
+  value: z
+    .union([literalSchema, z.array(literalSchema).min(1).max(1000)])
+    .optional(),
 });
 
 /**

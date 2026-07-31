@@ -20,13 +20,13 @@
 
 import { LwqlError } from "./errors";
 import {
-  MAX_PREDICATE_DEPTH,
   type LwqlComparisonOperator,
   type LwqlLiteral,
   type LwqlOrderBy,
   type LwqlPredicate,
   type LwqlQuery,
   type LwqlSelectItem,
+  MAX_PREDICATE_DEPTH,
 } from "./ir";
 
 type TokenType =
@@ -93,6 +93,130 @@ const DURATION_UNITS: Record<string, number> = {
 
 const MAX_QUERY_LENGTH = 8000;
 
+/** A scanner's result: the token it produced, and where scanning resumes. */
+interface Scanned {
+  token: Token;
+  next: number;
+}
+
+/** Skips whitespace and `-- line comments`, returning the next code position. */
+const skipTrivia = (input: string, start: number): number => {
+  let i = start;
+  while (i < input.length) {
+    if (/\s/.test(input[i]!)) {
+      i++;
+      continue;
+    }
+    if (input[i] === "-" && input[i + 1] === "-") {
+      while (i < input.length && input[i] !== "\n") i++;
+      continue;
+    }
+    break;
+  }
+  return i;
+};
+
+/**
+ * Scans a quoted string. Two escapes are honoured: a backslash pair, and SQL's
+ * own doubled quote — without the latter, `'o''brien'` terminates early and the
+ * remainder parses as garbage.
+ */
+const scanString = (input: string, start: number): Scanned => {
+  const quote = input[start]!;
+  let i = start + 1;
+  let value = "";
+
+  while (i < input.length) {
+    if (input[i] === "\\" && i + 1 < input.length) {
+      value += input[i + 1];
+      i += 2;
+      continue;
+    }
+    if (input[i] === quote && input[i + 1] === quote) {
+      value += quote;
+      i += 2;
+      continue;
+    }
+    if (input[i] === quote) {
+      return { token: { type: "string", value, position: start }, next: i + 1 };
+    }
+    value += input[i];
+    i++;
+  }
+
+  throw new LwqlError("parse_error", "Unterminated string literal.", {
+    hint: "Add the closing quote.",
+    position: start,
+  });
+};
+
+/** Scans a number, keeping any trailing unit so `24h` stays one token. */
+const scanNumber = (input: string, start: number): Scanned => {
+  let i = start;
+  while (i < input.length && /[0-9._]/.test(input[i]!)) i++;
+  while (i < input.length && /[a-zA-Z]/.test(input[i]!)) i++;
+  return {
+    token: { type: "number", value: input.slice(start, i), position: start },
+    next: i,
+  };
+};
+
+const scanIdentifier = (input: string, start: number): Scanned => {
+  let i = start;
+  while (i < input.length && /[a-zA-Z0-9_]/.test(input[i]!)) i++;
+  return {
+    token: {
+      type: "identifier",
+      value: input.slice(start, i),
+      position: start,
+    },
+    next: i,
+  };
+};
+
+/** Scans an operator or punctuation mark, or returns null if `ch` is neither. */
+const scanSymbol = (input: string, start: number): Scanned | null => {
+  const twoChar = input.slice(start, start + 2);
+  if (MULTI_CHAR_OPERATORS.includes(twoChar)) {
+    return {
+      token: { type: "operator", value: twoChar, position: start },
+      next: start + 2,
+    };
+  }
+
+  const ch = input[start]!;
+  if (SINGLE_CHAR_OPERATORS.includes(ch)) {
+    return {
+      token: { type: "operator", value: ch, position: start },
+      next: start + 1,
+    };
+  }
+  if ("(),*".includes(ch)) {
+    return {
+      token: { type: "punctuation", value: ch, position: start },
+      next: start + 1,
+    };
+  }
+  return null;
+};
+
+/** Dispatches one token by its opening character. */
+const scanToken = (input: string, start: number): Scanned => {
+  const ch = input[start]!;
+
+  if (ch === "'" || ch === '"') return scanString(input, start);
+  if (/[0-9]/.test(ch)) return scanNumber(input, start);
+  if (/[a-zA-Z_]/.test(ch)) return scanIdentifier(input, start);
+
+  const symbol = scanSymbol(input, start);
+  if (symbol) return symbol;
+
+  throw new LwqlError("parse_error", `Unexpected character '${ch}'.`, {
+    hint: "Remove it — LWQL supports a small SQL subset.",
+    position: start,
+  });
+};
+
 const tokenize = (input: string): Token[] => {
   if (input.length > MAX_QUERY_LENGTH) {
     throw new LwqlError("parse_error", "Query is too long.", {
@@ -101,106 +225,12 @@ const tokenize = (input: string): Token[] => {
   }
 
   const tokens: Token[] = [];
-  let i = 0;
+  let i = skipTrivia(input, 0);
 
   while (i < input.length) {
-    const ch = input[i]!;
-
-    if (/\s/.test(ch)) {
-      i++;
-      continue;
-    }
-
-    // Line comments keep saved/generated queries annotatable.
-    if (ch === "-" && input[i + 1] === "-") {
-      while (i < input.length && input[i] !== "\n") i++;
-      continue;
-    }
-
-    if (ch === "'" || ch === '"') {
-      const quote = ch;
-      const start = i;
-      i++;
-      let value = "";
-      let closed = false;
-      while (i < input.length) {
-        if (input[i] === "\\" && i + 1 < input.length) {
-          value += input[i + 1];
-          i += 2;
-          continue;
-        }
-        // SQL's own escape: a doubled quote is one literal quote. Without this,
-        // `'o''brien'` terminates early and the remainder parses as garbage.
-        if (input[i] === quote && input[i + 1] === quote) {
-          value += quote;
-          i += 2;
-          continue;
-        }
-        if (input[i] === quote) {
-          closed = true;
-          i++;
-          break;
-        }
-        value += input[i];
-        i++;
-      }
-      if (!closed) {
-        throw new LwqlError("parse_error", "Unterminated string literal.", {
-          hint: "Add the closing quote.",
-          position: start,
-        });
-      }
-      tokens.push({ type: "string", value, position: start });
-      continue;
-    }
-
-    if (/[0-9]/.test(ch)) {
-      const start = i;
-      while (i < input.length && /[0-9._]/.test(input[i]!)) i++;
-      // `24h` — a duration shorthand; the unit rides along on the token.
-      while (i < input.length && /[a-zA-Z]/.test(input[i]!)) i++;
-      tokens.push({
-        type: "number",
-        value: input.slice(start, i),
-        position: start,
-      });
-      continue;
-    }
-
-    if (/[a-zA-Z_]/.test(ch)) {
-      const start = i;
-      while (i < input.length && /[a-zA-Z0-9_]/.test(input[i]!)) i++;
-      tokens.push({
-        type: "identifier",
-        value: input.slice(start, i),
-        position: start,
-      });
-      continue;
-    }
-
-    const twoChar = input.slice(i, i + 2);
-    if (MULTI_CHAR_OPERATORS.includes(twoChar)) {
-      tokens.push({ type: "operator", value: twoChar, position: i });
-      i += 2;
-      continue;
-    }
-
-    if (SINGLE_CHAR_OPERATORS.includes(ch)) {
-      tokens.push({ type: "operator", value: ch, position: i });
-      i++;
-      continue;
-    }
-
-    if ("(),*".includes(ch)) {
-      tokens.push({ type: "punctuation", value: ch, position: i });
-      i++;
-      continue;
-    }
-
-    throw new LwqlError("parse_error", `Unexpected character '${ch}'.`, {
-      hint: "Remove it — LWQL supports a small SQL subset.",
-      position: i,
-    });
+    const { token, next } = scanToken(input, i);
+    tokens.push(token);
+    i = skipTrivia(input, next);
   }
 
   tokens.push({ type: "eof", value: "", position: input.length });
@@ -226,8 +256,7 @@ class Parser {
   private atKeyword(...words: string[]): boolean {
     const token = this.peek();
     return (
-      token.type === "identifier" &&
-      words.includes(token.value.toLowerCase())
+      token.type === "identifier" && words.includes(token.value.toLowerCase())
     );
   }
 
@@ -276,49 +305,21 @@ class Parser {
     this.expectKeyword("from");
     const from = this.expectName("an entity name");
 
-    let where: LwqlPredicate | undefined;
-    if (this.atKeyword("where")) {
-      this.next();
-      where = this.parseOr(0);
-    }
+    const where = this.parseOptionalClause("where", () => this.parseOr(0));
+    const groupBy = this.parseOptionalByClause("group", () =>
+      this.parseNameList(),
+    );
+    const orderBy = this.parseOptionalByClause("order", () =>
+      this.parseOrderList(),
+    );
+    const limit = this.parseOptionalClause("limit", () =>
+      this.parseInteger("LIMIT"),
+    );
+    const offset = this.parseOptionalClause("offset", () =>
+      this.parseInteger("OFFSET"),
+    );
 
-    let groupBy: string[] | undefined;
-    if (this.atKeyword("group")) {
-      this.next();
-      this.expectKeyword("by");
-      groupBy = this.parseNameList();
-    }
-
-    let orderBy: LwqlOrderBy[] | undefined;
-    if (this.atKeyword("order")) {
-      this.next();
-      this.expectKeyword("by");
-      orderBy = this.parseOrderList();
-    }
-
-    let limit: number | undefined;
-    if (this.atKeyword("limit")) {
-      this.next();
-      limit = this.parseInteger("LIMIT");
-    }
-
-    let offset: number | undefined;
-    if (this.atKeyword("offset")) {
-      this.next();
-      offset = this.parseInteger("OFFSET");
-    }
-
-    const trailing = this.peek();
-    if (trailing.type !== "eof") {
-      throw new LwqlError(
-        "parse_error",
-        `Unexpected '${trailing.value}' after the end of the query.`,
-        {
-          hint: "LWQL supports SELECT, FROM, WHERE, GROUP BY, ORDER BY, LIMIT and OFFSET only — joins and subqueries are not available.",
-          position: trailing.position,
-        },
-      );
-    }
+    this.expectEnd();
 
     return {
       from,
@@ -329,6 +330,46 @@ class Parser {
       ...(limit !== undefined ? { limit } : {}),
       ...(offset !== undefined ? { offset } : {}),
     };
+  }
+
+  /** Parses `<keyword> <body>` when the keyword is present, else undefined. */
+  private parseOptionalClause<T>(
+    keyword: string,
+    body: () => T,
+  ): T | undefined {
+    if (!this.atKeyword(keyword)) return undefined;
+    this.next();
+    return body();
+  }
+
+  /** As `parseOptionalClause`, for the two-word `GROUP BY` / `ORDER BY` forms. */
+  private parseOptionalByClause<T>(
+    keyword: string,
+    body: () => T,
+  ): T | undefined {
+    return this.parseOptionalClause(keyword, () => {
+      this.expectKeyword("by");
+      return body();
+    });
+  }
+
+  /**
+   * Rejects anything after the final clause. Without this a query ending in
+   * unsupported SQL (a JOIN, a subquery) would silently parse as its valid
+   * prefix and run something the caller did not ask for.
+   */
+  private expectEnd(): void {
+    const trailing = this.peek();
+    if (trailing.type === "eof") return;
+
+    throw new LwqlError(
+      "parse_error",
+      `Unexpected '${trailing.value}' after the end of the query.`,
+      {
+        hint: "LWQL supports SELECT, FROM, WHERE, GROUP BY, ORDER BY, LIMIT and OFFSET only — joins and subqueries are not available.",
+        position: trailing.position,
+      },
+    );
   }
 
   private parseInteger(clause: string): number {
@@ -351,7 +392,10 @@ class Parser {
     } while (this.consumeComma());
 
     if (items.length === 0) {
-      throw new LwqlError("parse_error", "SELECT requires at least one column.");
+      throw new LwqlError(
+        "parse_error",
+        "SELECT requires at least one column.",
+      );
     }
     return items;
   }
@@ -415,33 +459,42 @@ class Parser {
     return names;
   }
 
+  /**
+   * Consumes `( field )` or `( * )` when the next token opens a call, so
+   * `count(*)` and a bare `model` are told apart by one lookahead. Returns null
+   * when there is no call to consume.
+   */
+  private tryParseCallArgument(): string | null {
+    const after = this.peek();
+    if (after.type !== "punctuation" || after.value !== "(") return null;
+
+    this.next();
+    const inner = this.peek();
+    const field =
+      inner.type === "punctuation" && inner.value === "*"
+        ? (this.next(), "*")
+        : this.expectName("a field name");
+    this.expectPunctuation(")");
+    return field;
+  }
+
+  private parseOrderItem(): LwqlOrderBy {
+    const name = this.expectName("a field name");
+    const called = this.tryParseCallArgument();
+
+    const direction = this.atKeyword("asc", "desc")
+      ? (this.next().value.toLowerCase() as "asc" | "desc")
+      : "asc";
+
+    return called === null
+      ? { field: name, direction }
+      : { field: called, direction, fn: name };
+  }
+
   private parseOrderList(): LwqlOrderBy[] {
     const items: LwqlOrderBy[] = [];
     do {
-      const name = this.expectName("a field name");
-      let field = name;
-      let fn: string | undefined;
-
-      const after = this.peek();
-      if (after.type === "punctuation" && after.value === "(") {
-        this.next();
-        const inner = this.peek();
-        if (inner.type === "punctuation" && inner.value === "*") {
-          this.next();
-          field = "*";
-        } else {
-          field = this.expectName("a field name");
-        }
-        this.expectPunctuation(")");
-        fn = name;
-      }
-
-      let direction: "asc" | "desc" = "asc";
-      if (this.atKeyword("asc", "desc")) {
-        direction = this.next().value.toLowerCase() as "asc" | "desc";
-      }
-
-      items.push({ field, direction, ...(fn ? { fn } : {}) });
+      items.push(this.parseOrderItem());
     } while (this.consumeComma());
     return items;
   }
@@ -492,57 +545,32 @@ class Parser {
     }
   }
 
-  private parseComparison(): LwqlPredicate {
-    const fieldToken = this.peek();
-    const field = this.expectName("a field name");
-
-    // IS NULL / IS NOT NULL
-    if (this.atKeyword("is")) {
-      this.next();
-      let op: LwqlComparisonOperator = "is_null";
-      if (this.atKeyword("not")) {
-        this.next();
-        op = "is_not_null";
-      }
-      this.expectKeyword("null");
-      return { field, op };
-    }
-
-    // [NOT] IN (…) / [NOT] LIKE '…'
-    let negated = false;
+  /** `IS NULL` / `IS NOT NULL`, once `IS` has been seen. */
+  private parseIsNull(field: string): LwqlPredicate {
+    this.next();
+    let op: LwqlComparisonOperator = "is_null";
     if (this.atKeyword("not")) {
       this.next();
-      negated = true;
+      op = "is_not_null";
     }
+    this.expectKeyword("null");
+    return { field, op };
+  }
 
-    if (this.atKeyword("in")) {
-      this.next();
-      this.expectPunctuation("(");
-      const values: LwqlLiteral[] = [];
-      do {
-        values.push(this.parseLiteral());
-      } while (this.consumeComma());
-      this.expectPunctuation(")");
-      return { field, op: negated ? "not_in" : "in", value: values };
-    }
+  /** `IN ( … )`, once `IN` has been seen. */
+  private parseIn(field: string, negated: boolean): LwqlPredicate {
+    this.next();
+    this.expectPunctuation("(");
+    const values: LwqlLiteral[] = [];
+    do {
+      values.push(this.parseLiteral());
+    } while (this.consumeComma());
+    this.expectPunctuation(")");
+    return { field, op: negated ? "not_in" : "in", value: values };
+  }
 
-    if (this.atKeyword("like")) {
-      this.next();
-      return {
-        field,
-        op: negated ? "not_like" : "like",
-        value: this.parseLiteral(),
-      };
-    }
-
-    if (negated) {
-      throw new LwqlError(
-        "parse_error",
-        `Expected IN or LIKE after NOT on '${field}'.`,
-        { position: fieldToken.position },
-      );
-    }
-
+  /** Reads and validates a binary comparison operator. */
+  private expectComparisonOperator(field: string): LwqlComparisonOperator {
     const opToken = this.next();
     if (opToken.type !== "operator") {
       throw new LwqlError(
@@ -563,10 +591,42 @@ class Parser {
         { position: opToken.position },
       );
     }
+    return op as LwqlComparisonOperator;
+  }
+
+  private parseComparison(): LwqlPredicate {
+    const fieldToken = this.peek();
+    const field = this.expectName("a field name");
+
+    if (this.atKeyword("is")) return this.parseIsNull(field);
+
+    // `NOT` here belongs to the following IN/LIKE, not to the whole clause —
+    // clause-level negation is handled by parseUnary.
+    const negated = this.atKeyword("not");
+    if (negated) this.next();
+
+    if (this.atKeyword("in")) return this.parseIn(field, negated);
+
+    if (this.atKeyword("like")) {
+      this.next();
+      return {
+        field,
+        op: negated ? "not_like" : "like",
+        value: this.parseLiteral(),
+      };
+    }
+
+    if (negated) {
+      throw new LwqlError(
+        "parse_error",
+        `Expected IN or LIKE after NOT on '${field}'.`,
+        { position: fieldToken.position },
+      );
+    }
 
     return {
       field,
-      op: op as LwqlComparisonOperator,
+      op: this.expectComparisonOperator(field),
       value: this.parseLiteral(),
     };
   }
@@ -593,18 +653,8 @@ class Parser {
     }
 
     if (token.type === "identifier") {
-      const word = token.value.toLowerCase();
-      if (word === "true" || word === "false") {
-        this.next();
-        return word === "true";
-      }
-      if (word === "null") {
-        this.next();
-        return null;
-      }
-      if (word === "now") {
-        return this.parseNowExpression();
-      }
+      const keyword = this.tryParseKeywordLiteral(token.value.toLowerCase());
+      if (keyword !== undefined) return keyword;
     }
 
     throw new LwqlError(
@@ -615,6 +665,69 @@ class Parser {
         position: token.position,
       },
     );
+  }
+
+  /** `true` / `false` / `null` / `now(...)`, or undefined if not one of them. */
+  private tryParseKeywordLiteral(word: string): LwqlLiteral | undefined {
+    if (word === "true" || word === "false") {
+      this.next();
+      return word === "true";
+    }
+    if (word === "null") {
+      this.next();
+      return null;
+    }
+    if (word === "now") return this.parseNowExpression();
+    return undefined;
+  }
+
+  /**
+   * Reads the duration after `now() -`, in either the `24 HOUR` or `24h` form,
+   * and returns it in milliseconds.
+   */
+  private parseDurationMs(): number {
+    const amountToken = this.next();
+    if (amountToken.type !== "number") {
+      throw new LwqlError("parse_error", "Expected a duration after now().", {
+        hint: "Write now() - INTERVAL 24 HOUR, or the shorthand now() - INTERVAL 24h.",
+        position: amountToken.position,
+      });
+    }
+
+    // The tokenizer keeps `24h` as one token; split the trailing unit back off.
+    const match = /^([0-9._]+)([a-zA-Z]*)$/.exec(amountToken.value);
+    if (!match) {
+      throw new LwqlError(
+        "parse_error",
+        `'${amountToken.value}' is not a valid duration.`,
+        { position: amountToken.position },
+      );
+    }
+
+    const amount = Number(match[1]!.replace(/_/g, ""));
+    const unit = match[2] ? match[2].toLowerCase() : this.expectDurationUnit();
+
+    const multiplier = DURATION_UNITS[unit];
+    if (multiplier === undefined || !Number.isFinite(amount)) {
+      throw new LwqlError("parse_error", `Unknown duration unit '${unit}'.`, {
+        hint: `Supported units: ${[...new Set(Object.keys(DURATION_UNITS))].join(", ")}.`,
+        position: amountToken.position,
+      });
+    }
+
+    return amount * multiplier;
+  }
+
+  private expectDurationUnit(): string {
+    const unitToken = this.next();
+    if (unitToken.type !== "identifier") {
+      throw new LwqlError(
+        "parse_error",
+        "Expected a duration unit such as HOUR or DAY.",
+        { position: unitToken.position },
+      );
+    }
+    return unitToken.value.toLowerCase();
   }
 
   /**
@@ -634,58 +747,11 @@ class Parser {
       return this.now;
     }
     this.next();
+
+    if (this.atKeyword("interval")) this.next();
+
     const sign = operator.value === "-" ? -1 : 1;
-
-    if (this.atKeyword("interval")) {
-      this.next();
-    }
-
-    const amountToken = this.next();
-    if (amountToken.type !== "number") {
-      throw new LwqlError(
-        "parse_error",
-        `Expected a duration after now() ${operator.value}.`,
-        {
-          hint: "Write now() - INTERVAL 24 HOUR, or the shorthand now() - INTERVAL 24h.",
-          position: amountToken.position,
-        },
-      );
-    }
-
-    // The tokenizer keeps `24h` as one token; split the trailing unit back off.
-    const match = /^([0-9._]+)([a-zA-Z]*)$/.exec(amountToken.value);
-    if (!match) {
-      throw new LwqlError(
-        "parse_error",
-        `'${amountToken.value}' is not a valid duration.`,
-        { position: amountToken.position },
-      );
-    }
-
-    const amount = Number(match[1]!.replace(/_/g, ""));
-    let unit = match[2]!.toLowerCase();
-
-    if (!unit) {
-      const unitToken = this.next();
-      if (unitToken.type !== "identifier") {
-        throw new LwqlError(
-          "parse_error",
-          "Expected a duration unit such as HOUR or DAY.",
-          { position: unitToken.position },
-        );
-      }
-      unit = unitToken.value.toLowerCase();
-    }
-
-    const multiplier = DURATION_UNITS[unit];
-    if (multiplier === undefined || !Number.isFinite(amount)) {
-      throw new LwqlError("parse_error", `Unknown duration unit '${unit}'.`, {
-        hint: `Supported units: ${[...new Set(Object.keys(DURATION_UNITS))].join(", ")}.`,
-        position: amountToken.position,
-      });
-    }
-
-    return this.now + sign * amount * multiplier;
+    return this.now + sign * this.parseDurationMs();
   }
 }
 

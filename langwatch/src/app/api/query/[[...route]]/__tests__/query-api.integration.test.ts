@@ -14,11 +14,10 @@
  * store behind visibility gating. The ClickHouse client is the real container.
  */
 
+import type { ClickHouseClient } from "@clickhouse/client";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
-import type { ClickHouseClient } from "@clickhouse/client";
 import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 /**

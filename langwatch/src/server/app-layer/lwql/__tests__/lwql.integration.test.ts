@@ -172,7 +172,11 @@ beforeAll(async () => {
     values: [
       spanRow({ traceId: "t-gpt4-a", spanName: "call", toolName: "search" }),
       spanRow({ traceId: "t-gpt4-b", spanName: "call", toolName: "search" }),
-      spanRow({ traceId: "t-claude", spanName: "call", toolName: "calculator" }),
+      spanRow({
+        traceId: "t-claude",
+        spanName: "call",
+        toolName: "calculator",
+      }),
       spanRow({ traceId: "t-nomodel", spanName: "plain" }),
     ],
   });
