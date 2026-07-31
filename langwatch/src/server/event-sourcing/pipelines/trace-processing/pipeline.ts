@@ -1,6 +1,9 @@
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import {
+  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+  graphTriggerActivityGroupKey,
+} from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
@@ -206,6 +209,11 @@ export function createTraceProcessingPipeline(
         extend: false,
         replace: false,
       },
+      // One lane per tenant: the dedup bounds staging rate, the lane bounds
+      // CONCURRENCY — without it, sweeps staged across successive windows sat
+      // in per-trace groups and ran as a parallel storm (see
+      // graphTriggerActivityGroupKey).
+      groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
     })

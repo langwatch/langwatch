@@ -401,6 +401,7 @@ export class StaticPipelineBuilderWithNameAndType<
       eventTypes: spec.events ?? [],
       options: {
         delay: spec.delay,
+        groupKeyFn: spec.groupKeyFn,
         deduplication:
           spec.dedup ??
           (spec.dedupId

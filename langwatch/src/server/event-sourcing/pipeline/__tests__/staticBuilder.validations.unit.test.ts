@@ -127,6 +127,27 @@ describe("StaticPipelineBuilder validations", () => {
       );
     });
 
+    it("threads a custom groupKeyFn through to the raw subscriber definition", () => {
+      // Without the pass-through, a subscriber spec's groupKeyFn silently
+      // vanished and the queue fell back to per-aggregate groups — the gap
+      // behind the 2026-07-31 parallel sweep storm (dedup bounded staging,
+      // nothing bounded concurrency).
+      const laneFn = (e: Event) => `lane:${e.tenantId}`;
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withSubscriber("settle", {
+          events: ["trace_received"],
+          groupKeyFn: laneFn,
+          handler: vi.fn(),
+        })
+        .build();
+
+      const options = pipeline.eventSubscribers.get("settle")?.options;
+      expect(options?.groupKeyFn).toBe(laneFn);
+      expect(options?.groupKeyFn?.(event)).toBe("lane:project-1");
+    });
+
     it("preserves the full deduplication contract on a raw subscriber", () => {
       const pipeline = definePipeline<Event>()
         .withName("test-pipeline")

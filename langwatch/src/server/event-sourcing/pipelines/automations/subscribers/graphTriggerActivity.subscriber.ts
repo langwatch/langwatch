@@ -10,6 +10,29 @@ const logger = createLogger(
 /** Locked ADR-034 Phase 5 real-time debounce. */
 export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 
+/**
+ * One queue lane per tenant for graph-trigger sweeps.
+ *
+ * Without this the subscriber inherited per-aggregate (per-trace) groups, so
+ * the 5s dedup only bounded how fast sweep jobs were STAGED — jobs staged
+ * across successive windows landed in different trace-keyed groups and
+ * dispatched concurrently. Under sustained traffic that stacked into a
+ * parallel sweep storm: measured 2026-07-31, ~85 concurrent sweeps for one
+ * tenant (~8/s where the debounce intends 0.2/s), each a multi-hundred-MiB
+ * analytics query, saturating ClickHouse selects fleet-wide.
+ *
+ * A sweep evaluates the tenant's CURRENT trigger state — running two
+ * concurrently is pure waste — so all of a tenant's sweeps belong in one
+ * serialized lane. Queued deliveries then drain one at a time, and a backlog
+ * of stale sweep jobs degrades to cheap sequential re-evaluations. The queue
+ * prefixes `<tenantId>/subscriber/graphTriggerActivity/` around this key.
+ */
+export function graphTriggerActivityGroupKey(event: {
+  tenantId: string;
+}): string {
+  return `graph-trigger-activity:${event.tenantId}`;
+}
+
 export interface GraphTriggerActivityDeps {
   triggers: TriggerService;
   evaluateGraphTrigger: (params: {
