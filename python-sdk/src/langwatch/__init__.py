@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .analytics import AnalyticsFacade
     from .traces import TracesFacade
     from .monitors import MonitorsFacade
+    from .gateway_admin import GatewayAdminFacade
     from .spend_events import SpendEventsFacade
     from .webhooks import WebhooksFacade
     from .secrets import SecretsFacade
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     analytics: AnalyticsFacade
     traces: TracesFacade
     monitors: MonitorsFacade
+    gateway_admin: GatewayAdminFacade
     spend_events: SpendEventsFacade
     webhooks: WebhooksFacade
     secrets: SecretsFacade
@@ -100,6 +102,7 @@ _LAZY_FACADES = {
     "analytics": (".analytics", "AnalyticsFacade"),
     "traces": (".traces", "TracesFacade"),
     "monitors": (".monitors", "MonitorsFacade"),
+    "gateway_admin": (".gateway_admin", "GatewayAdminFacade"),
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),

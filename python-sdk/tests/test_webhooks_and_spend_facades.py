@@ -154,3 +154,48 @@ def test_errors_surface_operation_and_detail():
     facade = SpendEventsFacade(FakeRestClient(handler))
     with pytest.raises(RuntimeError, match="list spend events"):
         facade.list(from_ms=1, to_ms=2)
+
+
+def test_gateway_admin_scopes_org_keys_with_the_project_header():
+    from langwatch.gateway_admin import GatewayAdminFacade
+
+    handler, calls = recorder(
+        {
+            ("POST", "/api/gateway/v1/virtual-keys"): {
+                "virtual_key": {"id": "vk_1"},
+                "secret": "vk-lw-once",
+            },
+            ("POST", "/api/gateway/v1/budgets"): {"budget": {"id": "b_1"}},
+            ("POST", "/api/gateway/v1/budgets/b_1/reset"): {
+                "budget": {"id": "b_1"}
+            },
+        }
+    )
+    facade = GatewayAdminFacade(FakeRestClient(handler), project_id="proj_9")
+
+    minted = facade.create_virtual_key(name="ACME Corp")
+    assert minted["secret"] == "vk-lw-once"
+
+    budget = facade.create_budget(
+        scope={"kind": "ATTRIBUTED_USER", "anchor_virtual_key_id": "vk_1"},
+        name="per-user",
+        window="MONTH",
+        limit_usd="1.00",
+    )
+    assert budget["id"] == "b_1"
+    assert facade.reset_budget("b_1", reason="close")["id"] == "b_1"
+
+
+def test_gateway_admin_project_header_rides_every_call():
+    from langwatch.gateway_admin import GatewayAdminFacade
+
+    seen_headers: List[Optional[str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_headers.append(request.headers.get("X-Project-Id"))
+        return httpx.Response(200, json={"data": [], "budgets": [], "virtual_key": {}})
+
+    facade = GatewayAdminFacade(FakeRestClient(handler), project_id="proj_9")
+    facade.list_virtual_keys()
+    facade.list_budgets()
+    assert seen_headers == ["proj_9", "proj_9"]
