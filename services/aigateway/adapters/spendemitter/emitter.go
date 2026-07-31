@@ -17,6 +17,7 @@ type Emitter struct {
 // NewEmitter wraps an open spool.
 func NewEmitter(spool *Spool) *Emitter { return &Emitter{spool: spool} }
 
+// AdmitSpend records a request's admission on the local spool.
 func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 	payload := AdmittedPayload{
 		GatewayRequestID: a.GatewayRequestID,
@@ -43,24 +44,21 @@ func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 	e.append(CommandAdmit, payload)
 }
 
+// ConfirmSpend records a served request's usage on the local spool.
 func (e *Emitter) ConfirmSpend(o pipeline.SpendOutcome) {
 	e.append(CommandConfirm, ConfirmedPayload{
 		GatewayRequestID: o.GatewayRequestID,
 		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
 		ProjectID:        o.ProjectID,
-		Usage: usageFromDomain(
-			o.Usage.PromptTokens,
-			o.Usage.CompletionTokens,
-			o.Usage.CacheReadTokens,
-			o.Usage.CacheCreationTokens,
-			0, // reasoning tokens do not reach domain.Usage today; see report
-		),
+		// reasoning tokens do not reach domain.Usage today; see report
+		Usage:           usageFromDomain(o.Usage, 0),
 		Model:           o.Model,
 		ModelProviderID: o.ModelProviderID,
 		DurationMS:      o.Duration.Milliseconds(),
 	})
 }
 
+// FailSpend records a failed request's outcome on the local spool.
 func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 	var errPayload ErrorPayload
 	if o.Err != nil {
@@ -71,16 +69,10 @@ func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
 		ProjectID:        o.ProjectID,
 		Error:            errPayload,
-		Usage: usageFromDomain(
-			o.Usage.PromptTokens,
-			o.Usage.CompletionTokens,
-			o.Usage.CacheReadTokens,
-			o.Usage.CacheCreationTokens,
-			0,
-		),
-		Model:           o.Model,
-		ModelProviderID: o.ModelProviderID,
-		DurationMS:      o.Duration.Milliseconds(),
+		Usage:            usageFromDomain(o.Usage, 0),
+		Model:            o.Model,
+		ModelProviderID:  o.ModelProviderID,
+		DurationMS:       o.Duration.Milliseconds(),
 	})
 }
 

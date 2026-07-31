@@ -90,53 +90,88 @@ func (c *Checker) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.B
 
 	for i := range bundle.Config.Budget.Scopes {
 		scope := &bundle.Config.Budget.Scopes[i]
-		if scope.LimitMicroUSD <= 0 {
+		spent, judgeable := c.spendFor(ctx, scope, endUserID)
+		if !judgeable {
 			continue
 		}
-		spent := scope.SpentMicroUSD
-		if scope.PerUser {
-			// Template entry: the bundle figure is meaningless, the
-			// request's own bucket is the allowance. Unreadable bucket
-			// (no reader wired, fetch failed, cache cold and slow) allows:
-			// permissive-on-error, never permissive-on-missing-id (that
-			// case was rejected before this ran).
-			if c.buckets == nil || endUserID == "" {
-				continue
-			}
-			bucketSpent, ok := c.buckets.BucketSpendMicroUSD(ctx, scope.ID, endUserID)
-			if !ok {
-				continue
-			}
-			spent = bucketSpent
+		if blocked := c.applyExhaustion(scope, spent, &decision); blocked != nil {
+			return domain.BudgetDecision{
+				Verdict:   domain.BudgetBlock,
+				BlockedBy: blocked,
+			}, nil
 		}
-		exhausted := spent >= scope.LimitMicroUSD
-		if exhausted && scope.OnBreach == "block" {
-			if scope.ProviderKey == "" {
-				if c.metrics != nil {
-					c.metrics.RecordBudgetBlock(scope.Scope)
-				}
-				blocked := *scope
-				return domain.BudgetDecision{
-					Verdict:   domain.BudgetBlock,
-					BlockedBy: &blocked,
-				}, nil
-			}
-			decision.ExcludedProviders = append(decision.ExcludedProviders, domain.ExcludedProvider{
-				ProviderKey: scope.ProviderKey,
-				Budget:      *scope,
-			})
-		}
-		pctUsed := int((spent * 100) / scope.LimitMicroUSD)
-		if pctUsed < SoftWarnPercent {
-			continue
-		}
-		decision.Verdict = domain.BudgetWarn
-		decision.Warnings = append(decision.Warnings, domain.BudgetWarning{
-			Scope:       scope.Scope,
-			ProviderKey: scope.ProviderKey,
-			PctUsed:     pctUsed,
-		})
+		applyWarning(scope, spent, &decision)
 	}
 
 	return decision, nil
+}
+
+// spendFor resolves the figure this scope is judged on. The second result is
+// false when the scope cannot be judged and must be skipped: no limit set, or
+// a per-user template whose bucket is unreadable (no reader wired, fetch
+// failed, cache cold and slow). Unreadable allows: permissive-on-error, never
+// permissive-on-missing-id, which was rejected before this ran.
+func (c *Checker) spendFor(
+	ctx context.Context,
+	scope *domain.BudgetScope,
+	endUserID string,
+) (int64, bool) {
+	if scope.LimitMicroUSD <= 0 {
+		return 0, false
+	}
+	if !scope.PerUser {
+		return scope.SpentMicroUSD, true
+	}
+	// Template entry: the bundle figure is meaningless, the request's own
+	// bucket is the allowance.
+	if c.buckets == nil || endUserID == "" {
+		return 0, false
+	}
+	bucketSpent, ok := c.buckets.BucketSpendMicroUSD(ctx, scope.ID, endUserID)
+	if !ok {
+		return 0, false
+	}
+	return bucketSpent, true
+}
+
+// applyExhaustion handles a scope at or past its limit. An unfiltered blocking
+// scope stops the request and is returned to the caller; a provider-filtered
+// one excludes its vendor from the candidate chain instead, leaving the block
+// decision to the dispatcher once the chain empties.
+func (c *Checker) applyExhaustion(
+	scope *domain.BudgetScope,
+	spent int64,
+	decision *domain.BudgetDecision,
+) *domain.BudgetScope {
+	if spent < scope.LimitMicroUSD || scope.OnBreach != "block" {
+		return nil
+	}
+	if scope.ProviderKey == "" {
+		if c.metrics != nil {
+			c.metrics.RecordBudgetBlock(scope.Scope)
+		}
+		blocked := *scope
+		return &blocked
+	}
+	decision.ExcludedProviders = append(decision.ExcludedProviders, domain.ExcludedProvider{
+		ProviderKey: scope.ProviderKey,
+		Budget:      *scope,
+	})
+	return nil
+}
+
+// applyWarning contributes this scope's soft-threshold warning, whatever its
+// on_breach, so an exhausted filtered budget still tells the caller which
+// vendor's allowance ran out.
+func applyWarning(scope *domain.BudgetScope, spent int64, decision *domain.BudgetDecision) {
+	pctUsed := int((spent * 100) / scope.LimitMicroUSD)
+	if pctUsed < SoftWarnPercent {
+		return
+	}
+	decision.Verdict = domain.BudgetWarn
+	decision.Warnings = append(decision.Warnings, domain.BudgetWarning{
+		Scope:       scope.Scope,
+		ProviderKey: scope.ProviderKey,
+		PctUsed:     pctUsed,
+	})
 }

@@ -472,13 +472,6 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 	return tid, sid
 }
 
-// clientSessionID resolves the wrapped tool's own session / conversation id.
-// Header first (stashed on the context by the gateway middleware: claude-code
-// X-Claude-Code-Session-Id, opencode X-Session-Affinity, codex Session-Id),
-// then a request-body fallback for the two tools that also echo it inline so
-// the id survives even if a future middleware change stops forwarding the
-// header. Empty when the tool sends no per-conversation id on the gateway wire
-// (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
 // endUserID resolves the external end-user id for attribution: the
 // middleware-lifted header value wins (already sanitized), else the OpenAI
 // `user` body param on the request shapes that carry one. Both paths land in
@@ -491,6 +484,12 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
 		domain.RequestTypeResponses, domain.RequestTypeSpeech:
 		return EndUserIDFromBody(params.RequestBody)
+	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
+		domain.RequestTypeTranscription:
+		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
+		// messages body carries attribution under metadata.user_id, passthrough
+		// bodies are provider-shaped and forwarded verbatim, and transcription
+		// arrives as multipart form data rather than JSON.
 	}
 	return ""
 }
@@ -506,6 +505,13 @@ func EndUserIDFromBody(body []byte) string {
 	return ""
 }
 
+// clientSessionID resolves the wrapped tool's own session / conversation id.
+// Header first (stashed on the context by the gateway middleware: claude-code
+// X-Claude-Code-Session-Id, opencode X-Session-Affinity, codex Session-Id),
+// then a request-body fallback for the two tools that also echo it inline so
+// the id survives even if a future middleware change stops forwarding the
+// header. Empty when the tool sends no per-conversation id on the gateway wire
+// (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
 func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 	if id := ClientSessionID(ctx); id != "" {
 		return id

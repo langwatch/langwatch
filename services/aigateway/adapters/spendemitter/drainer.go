@@ -77,51 +77,73 @@ func (d *Drainer) Stop() {
 	}
 }
 
+// nextBackoff advances the retry ladder one step: floor on the first
+// failure, doubling up to the cap after that.
+func (d *Drainer) nextBackoff() time.Duration {
+	if d.backoff == 0 {
+		d.backoff = drainBackoffFloor
+		return d.backoff
+	}
+	d.backoff *= 2
+	if d.backoff > drainBackoffCap {
+		d.backoff = drainBackoffCap
+	}
+	return d.backoff
+}
+
+// waitFor sleeps for wait (or returns early on ctx cancel), resetting the
+// timer defensively for pre-Go-1.23 semantics. Returns false when the
+// context was canceled and the loop should stop.
+func (d *Drainer) waitFor(ctx context.Context, timer *time.Timer, wait time.Duration) bool {
+	// A fired-but-undrained timer keeps its value buffered and Reset does
+	// not clear it, which would collapse the backoff ladder into a tight
+	// loop. Drain defensively.
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(wait)
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+// waitAfter turns one drain outcome into the next wait: the backoff ladder
+// on failure, zero (keep draining) while a backlog remains, the idle tick
+// otherwise.
+func (d *Drainer) waitAfter(shipped bool, err error) time.Duration {
+	if err != nil {
+		wait := d.nextBackoff()
+		d.logf("spend drainer ship failed, retrying in %s: %v", wait, err)
+		return wait
+	}
+	d.backoff = 0
+	if shipped {
+		// Backlog may remain; keep draining without idling.
+		return 0
+	}
+	return d.tick
+}
+
 func (d *Drainer) run(ctx context.Context) {
 	timer := time.NewTimer(d.tick)
 	defer timer.Stop()
 	for {
-		wait := d.tick
-		if shipped, err := d.drainOnce(ctx); err != nil {
-			if d.backoff == 0 {
-				d.backoff = drainBackoffFloor
-			} else {
-				d.backoff *= 2
-				if d.backoff > drainBackoffCap {
-					d.backoff = drainBackoffCap
-				}
-			}
-			wait = d.backoff
-			d.logf("spend drainer ship failed, retrying in %s: %v", wait, err)
-		} else {
-			d.backoff = 0
-			if shipped {
-				// Backlog may remain; keep draining without idling.
-				wait = 0
-			}
-		}
-		if wait == 0 {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				continue
-			}
-		}
-		// Pre-Go-1.23 timer semantics: a fired-but-undrained timer keeps its
-		// value buffered and Reset does not clear it, which would collapse
-		// the backoff ladder into a tight loop. Drain defensively.
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		timer.Reset(wait)
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
-		case <-timer.C:
+		}
+		shipped, err := d.drainOnce(ctx)
+		wait := d.waitAfter(shipped, err)
+		if wait == 0 {
+			continue
+		}
+		if !d.waitFor(ctx, timer, wait) {
+			return
 		}
 	}
 }

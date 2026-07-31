@@ -47,6 +47,7 @@ const (
 	maxBucketEntries = 10_000
 )
 
+// NewCachedBucketSpend wraps a fetcher with a per-request bucket-spend cache.
 func NewCachedBucketSpend(fetcher BucketSpendFetcher) *CachedBucketSpend {
 	return &CachedBucketSpend{
 		fetcher: fetcher,
@@ -56,6 +57,8 @@ func NewCachedBucketSpend(fetcher BucketSpendFetcher) *CachedBucketSpend {
 	}
 }
 
+// BucketSpendMicroUSD returns one end user's spend under a budget, cached
+// for the lifetime of the request.
 func (c *CachedBucketSpend) BucketSpendMicroUSD(
 	ctx context.Context,
 	budgetID, endUserID string,

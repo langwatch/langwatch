@@ -164,6 +164,7 @@ type Stats struct {
 	DroppedOverflow uint64
 }
 
+// Stats snapshots the spool's counters (appended, shipped, dropped).
 func (s *Spool) Stats() Stats {
 	return Stats{
 		Appended:        s.appended.Load(),
@@ -414,24 +415,33 @@ func countRecords(path string) (int, error) {
 
 // recover seals a previous process's active segment and restores sequence
 // and segment counters from what is on disk.
+// sealLeftoverActiveLocked handles an active segment left by a process that
+// did not close cleanly: seal a non-empty one as-is (a torn last line is
+// skipped on read), remove an empty one.
+func (s *Spool) sealLeftoverActiveLocked() error {
+	st, statErr := os.Stat(filepath.Join(s.dir, activeName))
+	if statErr != nil {
+		// No leftover active segment (the normal case); nothing to seal.
+		return nil //nolint:nilerr // stat failure here means "absent", not an error to surface
+	}
+	if st.Size() == 0 {
+		_ = os.Remove(filepath.Join(s.dir, activeName))
+		return nil
+	}
+	s.segCounter = s.maxSegOrdinalLocked() + 1
+	sealed := filepath.Join(s.dir, fmt.Sprintf("%s%020d%s", segPrefix, s.segCounter, segSuffix))
+	if err := os.Rename(filepath.Join(s.dir, activeName), sealed); err != nil {
+		return fmt.Errorf("spendemitter: seal leftover active segment: %w", err)
+	}
+	return nil
+}
+
 func (s *Spool) recover() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// A leftover active segment means the previous process did not close
-	// cleanly. Seal it as-is: whatever reached the page cache before the
-	// crash is preserved; a torn last line is skipped by ReadSegment.
-	if st, err := os.Stat(filepath.Join(s.dir, activeName)); err == nil {
-		if st.Size() > 0 {
-			s.segCounter = s.maxSegOrdinalLocked()
-			s.segCounter++
-			sealed := filepath.Join(s.dir, fmt.Sprintf("%s%020d%s", segPrefix, s.segCounter, segSuffix))
-			if err := os.Rename(filepath.Join(s.dir, activeName), sealed); err != nil {
-				return fmt.Errorf("spendemitter: seal leftover active segment: %w", err)
-			}
-		} else {
-			_ = os.Remove(filepath.Join(s.dir, activeName))
-		}
+	if err := s.sealLeftoverActiveLocked(); err != nil {
+		return err
 	}
 
 	s.segCounter = s.maxSegOrdinalLocked()

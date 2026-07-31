@@ -14,6 +14,8 @@ package spendemitter
 
 import (
 	"encoding/json"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // Command names accepted by the control plane's spend-command ingest.
@@ -101,12 +103,15 @@ type ErrorPayload struct {
 	HTTPStatus int    `json:"http_status"`
 }
 
-func usageFromDomain(prompt, completion, cacheRead, cacheCreation, reasoning int) UsagePayload {
+// usageFromDomain maps the gateway's measured usage onto the wire payload.
+// reasoning is passed separately because domain.Usage does not carry a
+// reasoning-token count today.
+func usageFromDomain(u domain.Usage, reasoning int) UsagePayload {
 	return UsagePayload{
-		InputTokens:         prompt,
-		OutputTokens:        completion,
-		CacheReadTokens:     cacheRead,
-		CacheCreationTokens: cacheCreation,
+		InputTokens:         u.PromptTokens,
+		OutputTokens:        u.CompletionTokens,
+		CacheReadTokens:     u.CacheReadTokens,
+		CacheCreationTokens: u.CacheCreationTokens,
 		ReasoningTokens:     reasoning,
 	}
 }

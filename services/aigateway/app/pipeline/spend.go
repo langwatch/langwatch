@@ -6,10 +6,11 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // SpendAdmission records that a request entered the gateway, before any
@@ -77,10 +78,10 @@ func Spend(emit SpendEmitter) Interceptor {
 				emit.AdmitSpend(admissionFor(ctx, call, start))
 				resp, err := next(ctx, call)
 				if err != nil {
-					emit.FailSpend(outcomeFor(call, start, domain.Usage{}, classifySpendError(err)))
+					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err)}))
 					return nil, err
 				}
-				emit.ConfirmSpend(outcomeFor(call, start, resp.Usage, nil))
+				emit.ConfirmSpend(outcomeFor(outcomeInput{call: call, start: start, usage: resp.Usage}))
 				return resp, nil
 			}
 		},
@@ -90,7 +91,7 @@ func Spend(emit SpendEmitter) Interceptor {
 				emit.AdmitSpend(admissionFor(ctx, call, start))
 				iter, err := next(ctx, call)
 				if err != nil {
-					emit.FailSpend(outcomeFor(call, start, domain.Usage{}, classifySpendError(err)))
+					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err)}))
 					return nil, err
 				}
 				return &spendStreamWrapper{
@@ -141,30 +142,46 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 		return id
 	}
 	switch call.Request.Type {
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
-		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+	case domain.RequestTypeChat, domain.RequestTypeMessages,
+		domain.RequestTypeEmbeddings, domain.RequestTypeResponses,
+		domain.RequestTypeSpeech:
 		if err := call.MaterializeBody(); err != nil {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
+	case domain.RequestTypePassthrough, domain.RequestTypeTranscription:
+		// Passthrough carries a provider-native body shape, and
+		// transcription is multipart form, not JSON: neither exposes the
+		// OpenAI `user` field this reads, so header-only attribution
+		// (resolved above) is all these types get.
+		return ""
 	}
 	return ""
 }
 
-func outcomeFor(call *Call, start time.Time, usage domain.Usage, spendErr *SpendError) SpendOutcome {
-	model := call.Request.Model
-	if call.Request.Resolved != nil {
-		model = call.Request.Resolved.ModelID
+// outcomeInput bundles the four things an outcome is built from: the call,
+// when it started, the usage measured, and the spend error if it failed.
+type outcomeInput struct {
+	call  *Call
+	start time.Time
+	usage domain.Usage
+	err   *SpendError
+}
+
+func outcomeFor(in outcomeInput) SpendOutcome {
+	model := in.call.Request.Model
+	if in.call.Request.Resolved != nil {
+		model = in.call.Request.Resolved.ModelID
 	}
 	return SpendOutcome{
-		GatewayRequestID: call.Meta.GatewayRequestID(),
+		GatewayRequestID: in.call.Meta.GatewayRequestID(),
 		OccurredAt:       time.Now(),
-		ProjectID:        call.Bundle.ProjectID,
-		Err:              spendErr,
-		Usage:            usage,
+		ProjectID:        in.call.Bundle.ProjectID,
+		Err:              in.err,
+		Usage:            in.usage,
 		Model:            model,
-		ModelProviderID:  call.Meta.DispatchedProviderID(),
-		Duration:         time.Since(start),
+		ModelProviderID:  in.call.Meta.DispatchedProviderID(),
+		Duration:         time.Since(in.start),
 	}
 }
 
@@ -220,9 +237,9 @@ func (w *spendStreamWrapper) Close() error {
 func (w *spendStreamWrapper) finish() {
 	w.once.Do(func() {
 		if err := w.inner.Err(); err != nil {
-			w.emit.FailSpend(outcomeFor(w.call, w.start, w.inner.Usage(), classifySpendError(err)))
+			w.emit.FailSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage(), err: classifySpendError(err)}))
 			return
 		}
-		w.emit.ConfirmSpend(outcomeFor(w.call, w.start, w.inner.Usage(), nil))
+		w.emit.ConfirmSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage()}))
 	})
 }
