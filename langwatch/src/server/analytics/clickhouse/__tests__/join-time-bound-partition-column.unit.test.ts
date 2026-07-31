@@ -202,9 +202,7 @@ describe("analytics JOIN time bounds", () => {
   });
 
   describe("given an evaluation_runs bound qualified with the table's own name", () => {
-    /**
-     * @scenario Bounds qualified with the bounded table's own name are inspected, not skipped
-     */
+    /** @scenario Bounds qualified with the bounded table's own name are inspected, not skipped */
     it("sees both evaluation_runs bounds and allows the legacy one", () => {
       resetParamCounter();
       const { sql } = buildTimeseriesQuery({
@@ -220,9 +218,7 @@ describe("analytics JOIN time bounds", () => {
       expect(partitionBoundViolations(sql)).toEqual([]);
     });
 
-    /**
-     * @scenario A qualified bound on a column the table cannot prune on is still reported
-     */
+    /** @scenario A qualified bound on a column the table cannot prune on is still reported */
     it("reports a qualified bound on a non-partition column", () => {
       const sql =
         "SELECT 1 FROM evaluation_runs WHERE evaluation_runs.CreatedAt >= {startDate:DateTime64(3)}";
@@ -230,9 +226,7 @@ describe("analytics JOIN time bounds", () => {
       expect(partitionBoundViolations(sql)).toHaveLength(1);
     });
 
-    /**
-     * @scenario A bound qualified with the outer query's alias stays out of the inner table's bounds
-     */
+    /** @scenario A bound qualified with the outer query's alias stays out of the inner table's bounds */
     it("ignores a bound qualified with an alias rather than a table", () => {
       const sql =
         "SELECT 1 FROM evaluation_runs WHERE ts.OccurredAt >= {startDate:DateTime64(3)}";
