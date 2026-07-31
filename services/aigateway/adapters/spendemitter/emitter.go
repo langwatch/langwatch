@@ -2,6 +2,7 @@ package spendemitter
 
 import (
 	"encoding/json"
+	"log/slog"
 
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 )
@@ -28,8 +29,16 @@ func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 		RequestType:      a.RequestType,
 		Labels:           a.Labels,
 	}
+	// The echo is caller-controlled; invalid bytes inside a RawMessage would
+	// invalidate the WHOLE record's JSON, losing the admission for a bad
+	// header. Validate here and drop only the echo.
 	if a.MetadataJSON != "" {
-		payload.Metadata = json.RawMessage(a.MetadataJSON)
+		if json.Valid([]byte(a.MetadataJSON)) {
+			payload.Metadata = json.RawMessage(a.MetadataJSON)
+		} else {
+			slog.Warn("spend emitter dropped an invalid metadata echo",
+				"gateway_request_id", a.GatewayRequestID)
+		}
 	}
 	e.append(CommandAdmit, payload)
 }
@@ -76,6 +85,10 @@ func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 func (e *Emitter) append(command string, payload any) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
+		// A billing record must never vanish silently: this is the one drop
+		// site the spool's counters cannot see.
+		slog.Error("spend emitter dropped a record on marshal failure",
+			"command", command, "error", err)
 		return
 	}
 	e.spool.Append(Record{Command: command, Payload: raw})

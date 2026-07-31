@@ -108,6 +108,15 @@ func (d *Drainer) run(ctx context.Context) {
 				continue
 			}
 		}
+		// Pre-Go-1.23 timer semantics: a fired-but-undrained timer keeps its
+		// value buffered and Reset does not clear it, which would collapse
+		// the backoff ladder into a tight loop. Drain defensively.
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
 		timer.Reset(wait)
 		select {
 		case <-ctx.Done():

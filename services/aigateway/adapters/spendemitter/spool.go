@@ -55,7 +55,8 @@ type Spool struct {
 	droppedOverflow atomic.Uint64
 	appended        atomic.Uint64
 
-	done chan struct{}
+	done   chan struct{}
+	closed atomic.Bool
 	wg   sync.WaitGroup
 
 	logf func(format string, args ...any)
@@ -141,6 +142,13 @@ func (s *Spool) PodID() string { return s.podID }
 // channel drops the record and counts it. The record's PodID/PodSeq are
 // assigned by the spool; caller-set values are overwritten.
 func (s *Spool) Append(r Record) {
+	// After Close the writer is gone: a buffered send would sit in the
+	// channel forever, a loss no counter would ever see.
+	if s.closed.Load() {
+		s.droppedIntake.Add(1)
+		s.logDropRateLimited("spend spool closed, dropping record")
+		return
+	}
 	select {
 	case s.intake <- r:
 	default:
@@ -164,8 +172,12 @@ func (s *Spool) Stats() Stats {
 	}
 }
 
-// Close stops the writer, sealing and syncing whatever is buffered.
+// Close stops the writer, sealing and syncing whatever is buffered. Safe
+// to call twice; later calls are no-ops.
 func (s *Spool) Close() error {
+	if !s.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 	close(s.done)
 	s.wg.Wait()
 	s.mu.Lock()
@@ -205,6 +217,7 @@ func (s *Spool) writeRecord(r Record) {
 	line, err := json.Marshal(r)
 	if err != nil {
 		s.droppedIntake.Add(1)
+		s.logDropRateLimited("spend spool marshal failed for %s: %v", r.Command, err)
 		return
 	}
 	if err := s.ensureActiveLocked(); err != nil {
@@ -265,13 +278,27 @@ func (s *Spool) sealActiveLocked() error {
 	if s.active == nil {
 		return nil
 	}
+	// bufio errors are sticky: on a failed flush or sync the handle must be
+	// released, or every later seal hits the same error, the segment never
+	// rotates, and the fd leaks while the file grows unreclaimed.
 	if err := s.activeBuf.Flush(); err != nil {
+		_ = s.active.Close()
+		s.active = nil
+		s.activeBuf = nil
+		s.activeSize = 0
 		return err
 	}
 	if err := s.active.Sync(); err != nil {
+		_ = s.active.Close()
+		s.active = nil
+		s.activeBuf = nil
+		s.activeSize = 0
 		return err
 	}
 	if err := s.active.Close(); err != nil {
+		s.active = nil
+		s.activeBuf = nil
+		s.activeSize = 0
 		return err
 	}
 	s.active = nil

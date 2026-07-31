@@ -6,6 +6,7 @@ package spendemitter
 
 import (
 	"context"
+	"sync"
 	"encoding/json"
 	"errors"
 	"os"
@@ -90,6 +91,9 @@ func TestSpoolCrashRecovery(t *testing.T) {
 	s.Append(Record{Command: CommandAdmit, Payload: json.RawMessage(`{"ok":true}`)})
 	// Force the write through without a clean Close: flush tick seals it.
 	waitForSealed(t, s, 1)
+	// Stop the writer goroutine; the sealed segment is already on disk and
+	// the crash simulation below only touches the NEXT active file.
+	require.NoError(t, s.Close())
 	// Simulate the crash: abandon the spool without Close, corrupt a torn
 	// last line into the next active segment as a dead process would leave.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, activeName), []byte(`{"command":"confirmSp`), 0o600))
@@ -156,11 +160,20 @@ func TestSpoolAppendNeverBlocks(t *testing.T) {
 }
 
 type stubShipper struct {
+	mu      sync.Mutex
 	fail    int
 	shipped [][]Record
 }
 
+func (s *stubShipper) snapshot() (int, [][]Record) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.fail, append([][]Record(nil), s.shipped...)
+}
+
 func (s *stubShipper) Ship(ctx context.Context, records []Record) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.fail > 0 {
 		s.fail--
 		return errors.New("ingest down")
@@ -188,8 +201,9 @@ func TestDrainerShipsAndAcks(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	require.Empty(t, s.SealedSegments(), "acked segment deleted")
-	require.Len(t, shipper.shipped, 1)
-	assert.Equal(t, CommandAdmit, shipper.shipped[0][0].Command)
+	_, shippedBatches := shipper.snapshot()
+	require.Len(t, shippedBatches, 1)
+	assert.Equal(t, CommandAdmit, shippedBatches[0][0].Command)
 }
 
 /** @scenario Ship failures back off and never touch the spooled data */
@@ -215,5 +229,6 @@ func TestDrainerRetryKeepsData(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	assert.Empty(t, s.SealedSegments(), "ships once the endpoint recovers")
-	require.Len(t, shipper.shipped, 1)
+	_, shippedBatches := shipper.snapshot()
+	require.Len(t, shippedBatches, 1)
 }

@@ -110,12 +110,15 @@ const endUserIDMaxRunes = 256
 // body `user` param at the emitter) so the stamped value is identical no
 // matter where it came from. Returns empty when nothing survives.
 func SanitizeEndUserID(raw string) string {
-	cleaned := strings.Map(func(r rune) rune {
+	// Strip control characters FIRST: a control rune at the edge would
+	// otherwise shield inner whitespace from the trim, so the result could
+	// still carry leading or trailing spaces.
+	cleaned := strings.TrimSpace(strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return -1
 		}
 		return r
-	}, strings.TrimSpace(raw))
+	}, raw))
 	if cleaned == "" {
 		return ""
 	}

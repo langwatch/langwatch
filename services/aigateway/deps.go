@@ -232,22 +232,30 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 			Logf:            func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
 		})
 		if err != nil {
-			return ctx, nil, fmt.Errorf("spend spool: %w", err)
+			// Spend emission is best-effort billing telemetry: a bad spool
+			// directory must not take the LLM proxy down with it. Serve
+			// without emission and scream; settlement reconciliation surfaces
+			// the gap.
+			logger.Sugar().Errorf("spend spool unavailable, serving WITHOUT spend emission: %v", err)
+		} else {
+			ingestBase := cfg.SpendEmitter.IngestBaseURL
+			if ingestBase == "" {
+				ingestBase = cfg.ControlPlane.BaseURL
+			}
+			ingestClient, err := spendemitter.NewIngestClient(ingestBase, signer)
+			if err != nil {
+				logger.Sugar().Errorf("spend ingest client unavailable, serving WITHOUT spend emission: %v", err)
+				_ = spendSpool.Close()
+				spendSpool = nil
+			} else {
+				spendEmitterAdapter = spendemitter.NewEmitter(spendSpool)
+				spendDrainer = spendemitter.NewDrainer(spendemitter.DrainerOptions{
+					Spool:   spendSpool,
+					Shipper: ingestClient,
+					Logf:    func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+				})
+			}
 		}
-		ingestBase := cfg.SpendEmitter.IngestBaseURL
-		if ingestBase == "" {
-			ingestBase = cfg.ControlPlane.BaseURL
-		}
-		ingestClient, err := spendemitter.NewIngestClient(ingestBase, signer)
-		if err != nil {
-			return ctx, nil, fmt.Errorf("spend ingest client: %w", err)
-		}
-		spendEmitterAdapter = spendemitter.NewEmitter(spendSpool)
-		spendDrainer = spendemitter.NewDrainer(spendemitter.DrainerOptions{
-			Spool:   spendSpool,
-			Shipper: ingestClient,
-			Logf:    func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
-		})
 	}
 
 	return ctx, &Deps{

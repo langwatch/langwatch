@@ -8,8 +8,10 @@ package spendemitter
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,6 +140,7 @@ func TestContractFailedPayload(t *testing.T) {
 
 /** @scenario A shipped batch is signed with the shared gateway HMAC scheme */
 func TestContractShipSignsBatch(t *testing.T) {
+	var mu sync.Mutex
 	var got struct {
 		body      []byte
 		timestamp string
@@ -145,12 +148,14 @@ func TestContractShipSignsBatch(t *testing.T) {
 		node      string
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body := make([]byte, r.ContentLength)
-		_, _ = r.Body.Read(body)
+		// A single Read can legally return short; ReadAll never does.
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
 		got.body = body
 		got.timestamp = r.Header.Get("X-LangWatch-Gateway-Timestamp")
 		got.signature = r.Header.Get("X-LangWatch-Gateway-Signature")
 		got.node = r.Header.Get("X-LangWatch-Gateway-Node")
+		mu.Unlock()
 		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer server.Close()
@@ -168,6 +173,8 @@ func TestContractShipSignsBatch(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
+	mu.Lock()
+	defer mu.Unlock()
 	assert.NotEmpty(t, got.timestamp)
 	assert.Len(t, got.signature, 64, "hex sha256 hmac")
 	assert.Equal(t, "pod-test", got.node)
