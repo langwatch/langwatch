@@ -63,8 +63,16 @@ describe("spanStorage shard group key", () => {
       // `<tenantId>/map/spanStorage/<domainKey>`, so the domain key must be a
       // pure function of the span identity: same span id → same lane string,
       // and the tenant prefix keeps lanes tenant-scoped.
-      const a = { id: "evt_1", tenantId: "tenant_a", metadata: { spanId: "span_s", traceId: "t" } } as never;
-      const b = { id: "evt_2", tenantId: "tenant_b", metadata: { spanId: "span_s", traceId: "t" } } as never;
+      const a = {
+        id: "evt_1",
+        tenantId: "tenant_a",
+        metadata: { spanId: "span_s", traceId: "t" },
+      } as never;
+      const b = {
+        id: "evt_2",
+        tenantId: "tenant_b",
+        metadata: { spanId: "span_s", traceId: "t" },
+      } as never;
       expect(spanStorageMapGroupKey(a)).toBe(spanStorageMapGroupKey(b));
     });
   });
