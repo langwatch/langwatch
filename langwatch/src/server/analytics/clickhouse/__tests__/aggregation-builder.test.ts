@@ -195,8 +195,11 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
+      // NULL-safe: legacy deployments carry ScheduledAt Nullable(DateTime64(3)),
+      // where a bare `ScheduledAt >= x` evaluates NULL for NULL rows and
+      // silently drops those evaluations from every graph.
       expect(result.sql).toContain(
-        "ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY",
+        "(ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY)",
       );
       // Table-qualified: trace_summaries also has UpdatedAt, and a bare
       // identifier would silently resolve against the outer scope.

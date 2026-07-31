@@ -102,11 +102,20 @@ const SPAN_TIME_FILTER_START_END =
 // pins the reference to evaluation_runs' own column so neither ClickHouse nor
 // the guard has to guess. ScheduledAt stays bare: it is evaluation_runs' own
 // partition column per the migrations and does not exist on trace_summaries.
+//
+// The ScheduledAt bound is NULL-safe. On the unified schema (00002) the column
+// is `DateTime64(3) DEFAULT now64(3)` and the IS NULL branch is statically
+// false, so partition pruning is unaffected. But long-lived deployments that
+// predate the unified DDL carry `ScheduledAt Nullable(DateTime64(3))`, where a
+// bare `ScheduledAt >= x` evaluates to NULL for NULL rows and silently DROPS
+// those evaluations from every graph — a correctness regression, not a missed
+// optimisation. NULL rows on such deployments are still bounded by the
+// UpdatedAt predicate, which is their actual partition column anyway.
 const EVAL_TIME_FILTER_BOTH_PERIODS =
-  "AND ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY " +
+  "AND (ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY) " +
   "AND evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY";
 const EVAL_TIME_FILTER_START_END =
-  "AND ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY " +
+  "AND (ScheduledAt IS NULL OR ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY) " +
   "AND evaluation_runs.UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
 
 /**

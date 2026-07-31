@@ -3,20 +3,24 @@ import { createLogger } from "@langwatch/observability";
 const logger = createLogger("langwatch:clickhouse:connection-pool");
 
 /**
- * Default HTTP connection pool size per ClickHouse client.
+ * Default HTTP connection pool size per ClickHouse client INSTANCE — each
+ * `createClient` call (`~/server/clickhouse/client.ts` and
+ * `~/server/app-layer/clients/clickhouse.factory.ts`) gets its own pool, so a
+ * process holding both can open up to 2x this value. The server budget must
+ * therefore sum every client pool across every pod.
  *
- * Sizing note: the pool bounds this process's concurrent in-flight queries.
- * The historical value of 25 predated the event-sourcing dispatch concurrency
- * (GLOBAL_QUEUE_CONCURRENCY=256 in production) and became the system
- * bottleneck: with 4 worker pods the server showed exactly 4 x 25 = 100 open
- * connections pinned at cap while sitting at a third of its
+ * Sizing note: the historical value of 25 predated the event-sourcing dispatch
+ * concurrency (GLOBAL_QUEUE_CONCURRENCY=256 in production) and became the
+ * system bottleneck: with 4 worker pods the server showed exactly 4 x 25 = 100
+ * open connections pinned at cap while sitting at a third of its
  * `max_concurrent_queries` (300) and answering in ~55ms — workers measured
  * multi-second latency for those same queries, all of it client-side queueing
  * for a pooled socket.
  *
- * 64 keeps a 4-pod worker fleet (256 potential concurrent queries) within the
- * server's 300-query ceiling. Deployments with more replicas or a different
- * server budget tune CLICKHOUSE_MAX_OPEN_CONNECTIONS instead of editing code.
+ * 64 keeps a 4-pod worker fleet driving one hot client each (256 potential
+ * concurrent queries) within the server's 300-query ceiling. Deployments with
+ * more replicas, both clients hot, or a different server budget tune
+ * CLICKHOUSE_MAX_OPEN_CONNECTIONS instead of editing code.
  */
 const DEFAULT_MAX_OPEN_CONNECTIONS = 64;
 
