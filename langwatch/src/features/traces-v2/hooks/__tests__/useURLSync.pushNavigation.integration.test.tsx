@@ -102,7 +102,15 @@ describe("useURLSync applying a same-route push while already mounted", () => {
       await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
 
       expect(barState()).toEqual({ queryText: '"checkout"', presetId: "24h" });
-      expect(window.location.hash).toContain("checkout");
+      // Both halves of the address, not just the query: a writer that dropped
+      // `preset=24h` would leave the store correct here while handing the next
+      // reader of this link the Explorer's 30-day default instead of the
+      // window the search actually covered.
+      const fragment = new URLSearchParams(
+        window.location.hash.slice(window.location.hash.indexOf("?") + 1),
+      );
+      expect(fragment.get("q")).toBe('"checkout"');
+      expect(fragment.get("preset")).toBe("24h");
     });
   });
 });
