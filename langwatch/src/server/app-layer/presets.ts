@@ -29,6 +29,7 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { detectBudgetCrossings } from "@ee/governance/services/governanceSignals.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
@@ -740,13 +741,24 @@ export function initializeDefaultApp(options?: {
   };
 
   const gatewayBudgetSync = clickhouseEnabled
-    ? {
-        prisma,
-        budgetRepository: new GatewayBudgetRepository(prisma),
-        budgetCHRepository: new GatewayBudgetClickHouseRepository(
+    ? (() => {
+        const budgetCHRepository = new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
-        ),
-      }
+        );
+        return {
+          prisma,
+          budgetRepository: new GatewayBudgetRepository(prisma),
+          budgetCHRepository,
+          detectCrossings: (
+            rows: Array<{
+              tenantId: string;
+              budgetId: string;
+              bucketScopeId: string;
+              endUserId: string | null;
+            }>,
+          ) => detectBudgetCrossings({ prisma, budgetCHRepository }, rows),
+        };
+      })()
     : undefined;
 
   // The spend-command pipeline projects gateway_spend; it shares the

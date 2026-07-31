@@ -22,6 +22,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 
+import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
@@ -315,6 +316,7 @@ export class VirtualKeyService {
       return vk;
     });
 
+    await emitVkLifecycle(this.prisma, created, "created");
     return { virtualKey: created, secret };
   }
 
@@ -567,6 +569,9 @@ export class VirtualKeyService {
         tx,
       );
       return vk;
+    }).then(async (vk) => {
+      await emitVkLifecycle(this.prisma, vk, "revoked");
+      return vk;
     });
   }
 
@@ -622,6 +627,9 @@ export class VirtualKeyService {
         tx,
       );
       return vk;
+    }).then(async (vk) => {
+      await emitVkLifecycle(this.prisma, vk, "disabled", input.reason ?? null);
+      return vk;
     });
   }
 
@@ -669,6 +677,9 @@ export class VirtualKeyService {
         },
         tx,
       );
+      return vk;
+    }).then(async (vk) => {
+      await emitVkLifecycle(this.prisma, vk, "enabled");
       return vk;
     });
   }

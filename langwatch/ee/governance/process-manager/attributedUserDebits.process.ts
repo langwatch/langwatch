@@ -21,6 +21,7 @@ import {
   rateSpendNanoUsd,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { detectBudgetCrossings } from "../services/governanceSignals.service";
 import {
   budgetAppliesToProvider,
   resolveApplicableBudgets,
@@ -157,6 +158,23 @@ export function runWriteAttributedDebits(deps: AttributedDebitsProcessDeps) {
       // Rethrow for the outbox retry: a lost debit under-enforces the cap.
       throw error;
     }
+
+    // Post-debit crossing detection (threshold/breach webhook families).
+    // Best effort inside its own service: a notification can never fail
+    // the debit path, and store-level idempotency makes retries safe.
+    await detectBudgetCrossings(deps, [
+      ...new Map(
+        templates.map((t) => [
+          `${t.budget.id}:${t.bucketScopeId}`,
+          {
+            tenantId: payload.project_id,
+            budgetId: t.budget.id,
+            bucketScopeId: t.bucketScopeId,
+            endUserId: payload.end_user_id,
+          },
+        ]),
+      ).values(),
+    ]);
   };
 }
 
