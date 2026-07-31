@@ -316,7 +316,7 @@ describe("Feature: Run report — every block variant", () => {
     /** @scenario Every question the report asks appears in it */
     it("renders each variant without throwing", () => {
       expect(html).toContain('<dl class="stats">');
-      expect(html).toContain('<svg class="chart"');
+      expect(html).toContain('<svg class="chart outcome-bar"');
       expect(html).toContain('<div class="table-wrap">');
       expect(html).toContain('<ul class="list">');
       expect(html).toContain("<details");

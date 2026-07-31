@@ -109,7 +109,7 @@ export function passRateBar({ segments }: { segments: BarSegment[] }): string {
       : `<rect x="0" y="0" width="${BAR_WIDTH}" height="${BAR_HEIGHT}" class="chart-empty"></rect>`;
 
   return [
-    `<svg class="chart" viewBox="0 0 ${BAR_WIDTH} ${BAR_HEIGHT}" preserveAspectRatio="none" role="img">`,
+    `<svg class="chart outcome-bar" viewBox="0 0 ${BAR_WIDTH} ${BAR_HEIGHT}" preserveAspectRatio="none" role="img">`,
     `<title>${escapeHtml(title)}</title>`,
     content,
     "</svg>",

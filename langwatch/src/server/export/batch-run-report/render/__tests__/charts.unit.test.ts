@@ -12,7 +12,7 @@ describe("Feature: Run report — the outcome bar", () => {
 
     /** @scenario The report opens with no network access */
     it("renders an inline svg that names itself as an image", () => {
-      expect(bar).toContain('<svg class="chart"');
+      expect(bar).toContain('<svg class="chart outcome-bar"');
       expect(bar).toContain('role="img"');
       expect(bar).toContain("<title>Outcomes: 3 passed, 1 failed</title>");
     });
