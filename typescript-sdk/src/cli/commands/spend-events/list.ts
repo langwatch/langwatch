@@ -36,10 +36,13 @@ export const listSpendEventsCommand = async (options: {
   const apiKey = checkOrgApiKey();
   // Parse flags before the spinner starts: bad input must produce a clean
   // structured error, not frames interleaved with a dying spinner.
+  // The pull is a ranged read by contract; default to the last 24 hours.
+  const now = Date.now();
   const from =
-    options.from !== undefined ? parseInstant(options.from, "--from") : undefined;
-  const to =
-    options.to !== undefined ? parseInstant(options.to, "--to") : undefined;
+    options.from !== undefined
+      ? parseInstant(options.from, "--from")
+      : now - 24 * 60 * 60 * 1000;
+  const to = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const limit =
     options.limit !== undefined
       ? parsePositiveInt(options.limit, "--limit")

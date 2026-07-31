@@ -52,8 +52,10 @@ async function requireBillingPlan(c: Context, next: Next): Promise<void> {
 }
 
 const spendEventsQuerySchema = z.object({
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
+  // The reconciliation pull is a RANGED read by contract: without bounds
+  // the walk sorts the whole 13-month table under FINAL on every page.
+  from: z.coerce.number().int().positive(),
+  to: z.coerce.number().int().positive(),
   cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
   virtual_key_id: z.string().min(1).max(100).optional(),

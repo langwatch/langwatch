@@ -161,9 +161,10 @@ export class SpendEventsApiService {
     return (await response.json()) as T;
   }
 
-  async list(options?: {
-    from?: number;
-    to?: number;
+  async list(options: {
+    /** Required: the pull is a ranged read by contract. */
+    from: number;
+    to: number;
     cursor?: string;
     limit?: number;
     virtualKeyId?: string;
@@ -173,15 +174,15 @@ export class SpendEventsApiService {
     status?: "success" | "error";
   }): Promise<SpendEventsPage> {
     const params = new URLSearchParams();
-    if (options?.from !== undefined) params.set("from", String(options.from));
-    if (options?.to !== undefined) params.set("to", String(options.to));
-    if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
-    if (options?.virtualKeyId) params.set("virtual_key_id", options.virtualKeyId);
-    if (options?.endUserId) params.set("end_user_id", options.endUserId);
-    if (options?.projectId) params.set("project_id", options.projectId);
-    if (options?.model) params.set("model", options.model);
-    if (options?.status) params.set("status", options.status);
+    params.set("from", String(options.from));
+    params.set("to", String(options.to));
+    if (options.cursor) params.set("cursor", options.cursor);
+    if (options.limit !== undefined) params.set("limit", String(options.limit));
+    if (options.virtualKeyId) params.set("virtual_key_id", options.virtualKeyId);
+    if (options.endUserId) params.set("end_user_id", options.endUserId);
+    if (options.projectId) params.set("project_id", options.projectId);
+    if (options.model) params.set("model", options.model);
+    if (options.status) params.set("status", options.status);
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     return await this.request<SpendEventsPage>(
       "list spend events",

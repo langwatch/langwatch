@@ -252,7 +252,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         if (!tenant) continue;
         await chClient
           .command({
-            query: `ALTER TABLE gateway_spend_events DELETE WHERE TenantId = '${tenant}'`,
+            query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenant}'`,
           })
           ;
       }
@@ -326,7 +326,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     ]);
 
     const page1Res = await app.request(
-      "/api/gateway/v1/spend-events?limit=2",
+      `/api/gateway/v1/spend-events?limit=2&from=${baseTime - 120_000}&to=${baseTime + 600_000}`,
       { headers: headers() },
     );
     expect(page1Res.status).toBe(200);
@@ -347,7 +347,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     let cursor = page1.next_cursor;
     while (cursor !== null) {
       const res = await app.request(
-        `/api/gateway/v1/spend-events?limit=2&cursor=${encodeURIComponent(cursor)}`,
+        `/api/gateway/v1/spend-events?limit=2&from=${baseTime - 120_000}&to=${baseTime + 600_000}&cursor=${encodeURIComponent(cursor)}`,
         { headers: headers() },
       );
       expect(res.status).toBe(200);
@@ -374,7 +374,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         organizationId: foreignOrganization.id,
       },
     ]);
-    const res = await app.request("/api/gateway/v1/spend-events?limit=200", {
+    const res = await app.request(`/api/gateway/v1/spend-events?limit=200&from=${baseTime - 120_000}&to=${baseTime + 600_000}`, {
       headers: headers(),
     });
     // Envelope ids are type-suffixed, so the fence must assert on the raw
@@ -390,7 +390,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   /** @scenario A garbled cursor is refused, not silently reset */
   it("rejects an undecodable cursor with 400", async () => {
     const res = await app.request(
-      "/api/gateway/v1/spend-events?cursor=%25garbage%25",
+      `/api/gateway/v1/spend-events?cursor=%25garbage%25&from=${baseTime - 120_000}&to=${baseTime + 600_000}`,
       { headers: headers() },
     );
     expect(res.status).toBe(400);
