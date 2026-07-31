@@ -114,7 +114,14 @@ function pickTranscript({
   const fact = factsById.get(runId);
   if (!run || !fact) return null;
 
-  return toTranscript({ run, fact, signatureId });
+  const transcript = toTranscript({ run, fact, signatureId });
+  // A run that died before saying anything has no conversation to read.
+  // Selecting it would spend one of the budget's slots, mark its group as
+  // covered, and be counted in "read N of M failing conversations" - three
+  // claims about reading something that does not exist.
+  if (transcript.turns.length === 0) return null;
+
+  return transcript;
 }
 
 /**

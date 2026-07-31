@@ -153,9 +153,13 @@ function verdict(evidence: ReportEvidence): { text: string; tone: Tone } {
       tone: "warn",
     };
   }
-  if (counts.failedCount === 0) {
+  // `failedCount` is only ERROR and FAILED. A stalled or cancelled run did
+  // not pass either, and telling someone everything passed when three
+  // scenarios never finished is the single most misleading sentence this
+  // report could open with.
+  if (counts.passedCount === counts.settledCount && counts.settledCount > 0) {
     return {
-      text: `Everything passed — ${plural(counts.settledCount, "scenario", "scenarios")}, no failures.`,
+      text: `Everything passed — ${plural(counts.passedCount, "scenario", "scenarios")}, no failures.`,
       tone: "pass",
     };
   }

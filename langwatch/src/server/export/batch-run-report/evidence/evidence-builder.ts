@@ -275,7 +275,12 @@ function signatureFor({
   kind: FailureSignature["kind"];
   signatures: Map<string, FailureSignature>;
 }): FailureSignature {
-  const errorShape = run.error ? normalizeErrorShape(run.error) : null;
+  // Unwrapped first: normalising a serialised Error envelope collapses every
+  // JSON-shaped error in the run into one signature, because the
+  // quoted-fragment rule reduces the whole envelope to `{"<value>":"<value>"}`.
+  const errorShape = run.error
+    ? normalizeErrorShape(unwrapErrorMessage(run.error))
+    : null;
   const signatureId = signatureIdFor({
     kind,
     unmetCriteria: kind === "judged" ? run.unmetCriteria : [],

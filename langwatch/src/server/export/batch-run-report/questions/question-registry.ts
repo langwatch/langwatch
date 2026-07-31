@@ -1,6 +1,7 @@
 import {
   bySeverityDescending,
   computeSeverityPrior,
+  severityRank,
 } from "../evidence/severity";
 import { formatDuration } from "../format";
 import type {
@@ -158,7 +159,12 @@ function runRow(run: ReportEvidence["runs"][number]) {
             : ("warn" as const),
     },
     {
-      text: `${run.metCriteria.length}/${run.metCriteria.length + run.unmetCriteria.length}`,
+      // A run that never reached the judge has no criteria either way, and
+      // "0/0" reads as a verdict rather than as the absence of one.
+      text:
+        run.metCriteria.length + run.unmetCriteria.length === 0
+          ? "—"
+          : `${run.metCriteria.length}/${run.metCriteria.length + run.unmetCriteria.length}`,
       sortValue: run.metCriteria.length,
     },
     { text: String(run.turnCount), sortValue: run.turnCount },
@@ -471,7 +477,7 @@ function severityBlocks(evidence: ReportEvidence): Block[] {
           text: severity,
           tone:
             severity === "critical" || severity === "high" ? "fail" : "warn",
-          sortValue: severity,
+          sortValue: severityRank(severity),
         },
         {
           text: String(signature.runIds.length),
@@ -574,7 +580,7 @@ function coverageBlocks(evidence: ReportEvidence): Block[] {
       tone: "pass",
       text:
         evidence.priorBatches.length > 0
-          ? `This run executed every one of the ${evidence.coverage.scenariosInSuite.length} scenarios that ran in previous runs.`
+          ? `This run executed every scenario that ran in previous runs, ${plural(evidence.coverage.scenariosInSuite.length, "scenario", "scenarios")} in all.`
           : `This run executed ${evidence.coverage.scenariosInSuite.length} scenarios. With no earlier run to compare against, there is nothing to say about what it might have skipped.`,
     },
   ];

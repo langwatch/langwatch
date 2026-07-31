@@ -51,17 +51,33 @@ export function criterionIdFor({
  * Strips the parts that differ per occurrence — ids, numbers, quoted fragments,
  * URLs, hex blobs — which is what stops one recurring error from looking like
  * forty unrelated ones.
+ *
+ * Give it the human message, not a serialised envelope: the quoted-fragment
+ * rule turns `{"name":"Error","message":"..."}` into `{"<value>":"<value>"}`,
+ * which is the same string for every JSON-shaped error there has ever been.
  */
 export function normalizeErrorShape(error: string): string {
-  return error
-    .replace(/https?:\/\/\S+/g, "<url>")
-    .replace(/\b[0-9a-f]{8,}\b/gi, "<id>")
-    .replace(/"[^"]*"/g, '"<value>"')
-    .replace(/'[^']*'/g, "'<value>'")
-    .replace(/\b\d+(\.\d+)?\b/g, "<n>")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 200);
+  return (
+    error
+      .replace(/https?:\/\/\S+/g, "<url>")
+      // Before the bare-hex rule: a UUID's middle groups are four characters, so
+      // that rule alone eats only the ends and leaves the rest varying, which
+      // splits one recurring error across as many signatures as it has occurred.
+      .replace(
+        /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+        "<id>",
+      )
+      .replace(/\b[0-9a-f]{8,}\b/gi, "<id>")
+      .replace(/"[^"]*"/g, '"<value>"')
+      .replace(/'[^']*'/g, "'<value>'")
+      // No trailing boundary: a duration is written `30000ms`, and `\b` between
+      // a digit and a letter does not match, so requiring one left every timeout
+      // error carrying its own duration as a group of one.
+      .replace(/\b\d+(\.\d+)?/g, "<n>")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200)
+  );
 }
 
 /**

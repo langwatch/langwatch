@@ -156,6 +156,7 @@ describe("BatchRunReportService.generate() history", () => {
   describe("given later runs exist in the same set", () => {
     const RUN_AT = 1_700_000_000_000;
     let requestedBatchIds: string[] = [];
+    let requestedLimits: number[] = [];
 
     function readerWithHistory(): BatchRunReportReader {
       return {
@@ -164,16 +165,19 @@ describe("BatchRunReportService.generate() history", () => {
           lastUpdatedAt: 1,
           runs: DEFAULT_RUNS.map((run) => ({ ...run, timestamp: RUN_AT })),
         }),
-        getBatchHistoryForScenarioSet: async () => ({
-          batches: [
-            { batchRunId: "batch_after", lastRunAt: RUN_AT + 60_000 },
-            { batchRunId: "batch_1", lastRunAt: RUN_AT },
-            { batchRunId: "batch_before", lastRunAt: RUN_AT - 60_000 },
-          ],
-          hasMore: false,
-          lastUpdatedAt: 0,
-          totalCount: 3,
-        }),
+        getBatchHistoryForScenarioSet: async ({ limit }: { limit: number }) => {
+          requestedLimits.push(limit);
+          return {
+            batches: [
+              { batchRunId: "batch_after", lastRunAt: RUN_AT + 60_000 },
+              { batchRunId: "batch_1", lastRunAt: RUN_AT },
+              { batchRunId: "batch_before", lastRunAt: RUN_AT - 60_000 },
+            ],
+            hasMore: false,
+            lastUpdatedAt: 0,
+            totalCount: 3,
+          };
+        },
         findRunOutcomesForBatchIds: async ({
           batchRunIds,
         }: {
@@ -184,6 +188,25 @@ describe("BatchRunReportService.generate() history", () => {
         },
       } as unknown as BatchRunReportReader;
     }
+
+    /**
+     * Nearly every export is of the newest run, where the window is enough.
+     * Asking for the repository's maximum page regardless materialised most of
+     * a page in order to discard it, before the user is shown anything.
+     */
+    it("reads narrow when the run being reported is the newest", async () => {
+      requestedLimits = [];
+      generateObjectMock.mockRejectedValue(new Error("no model"));
+
+      await generate(
+        BatchRunReportService.create({
+          reader: readerWithHistory(),
+          resolveModel: async () => ({}) as never,
+        }),
+      );
+
+      expect(requestedLimits).toEqual([20]);
+    });
 
     /** @scenario A run is only ever compared against runs that preceded it */
     it("compares only against runs that came before it", async () => {

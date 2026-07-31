@@ -60,25 +60,6 @@ export type ReportTier = "verified" | "unchecked" | "figures_only";
  * down with "attempted to access a server-side environment variable on the
  * client". This module is types and zod only, so it crosses that line safely.
  */
-export const REPORT_STAGES = [
-  "reading",
-  "measuring",
-  "writing",
-  "checking",
-  "rendering",
-] as const;
-export type ReportStage = (typeof REPORT_STAGES)[number];
-
-/** What each stage is called on screen. */
-export const REPORT_STAGE_LABELS: Readonly<Record<ReportStage, string>> = {
-  reading: "Reading the run",
-  measuring: "Working out what happened",
-  writing: "Langy is writing the analysis",
-  checking: "Langy is checking it against the run",
-  rendering: "Putting the report together",
-};
-
-export type ReportProgress = (stage: ReportStage) => void;
 
 /** Which of the three acts a question belongs to. */
 export type QuestionTier = "past" | "present" | "future";

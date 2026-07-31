@@ -97,9 +97,9 @@ function reportModel(overrides: Partial<ReportModel> = {}): ReportModel {
   };
 }
 
-async function post(body: unknown) {
+async function post(body: unknown, query = "") {
   const { app } = await import("../[[...route]]/app");
-  return app.request("/api/export/batch-run-report/download", {
+  return app.request(`/api/export/batch-run-report/download${query}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -217,6 +217,94 @@ describe("POST /api/export/batch-run-report/download delivery", () => {
       const response = await post(BODY);
 
       expect(response.status).toBe(404);
+    });
+  });
+});
+
+/**
+ * The path every real export takes.
+ *
+ * `useBatchRunReport` always appends `?stream=1`, so the buffered branch above
+ * is exercised by nothing a user does. Tested separately because a stream
+ * cannot report a failure the way a status code does - the headers are gone
+ * by the time `generate()` runs - so what a caller can act on is the shape of
+ * the last line, not the response code.
+ */
+describe("POST /api/export/batch-run-report/download?stream=1", () => {
+  async function lines(response: Response): Promise<Record<string, unknown>[]> {
+    return (await response.text())
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  describe("when the report is produced", () => {
+    it("streams each stage, then the document on the last line", async () => {
+      generate.mockImplementation(
+        async ({ onProgress }: { onProgress: (stage: string) => void }) => {
+          onProgress("reading");
+          onProgress("rendering");
+          return reportModel();
+        },
+      );
+
+      const response = await post(BODY, "?stream=1");
+      const events = await lines(response);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toContain(
+        "application/x-ndjson",
+      );
+      expect(events.slice(0, 2).map((it) => it.stage)).toEqual([
+        "reading",
+        "rendering",
+      ]);
+
+      const last = events.at(-1);
+      expect(last?.done).toBe(true);
+      expect(last?.tier).toBe("figures_only");
+      expect(String(last?.html)).toContain("<!doctype html>");
+      expect(String(last?.filename)).toMatch(/\.html$/);
+    });
+  });
+
+  describe("when the run does not exist", () => {
+    /** @scenario Asking for a run that does not exist is refused */
+    it("ends the stream with an error rather than a document", async () => {
+      const { BatchRunNotFoundError } = await import(
+        "~/server/export/batch-run-report/batch-run-report.service"
+      );
+      generate.mockRejectedValue(new BatchRunNotFoundError("batch_1"));
+
+      const events = await lines(await post(BODY, "?stream=1"));
+
+      expect(events.at(-1)).toEqual({ error: "Run not found." });
+      expect(events.some((it) => it.done)).toBe(false);
+    });
+  });
+
+  describe("when producing the report throws", () => {
+    it("says so without leaking the reason to the caller", async () => {
+      generate.mockRejectedValue(new Error("ClickHouse said no: dsn=secret"));
+
+      const events = await lines(await post(BODY, "?stream=1"));
+
+      expect(events.at(-1)).toEqual({
+        error: "The report could not be produced.",
+      });
+      expect(JSON.stringify(events)).not.toContain("secret");
+    });
+  });
+
+  describe("when the caller cannot view scenarios in this project", () => {
+    /** @scenario A report requires permission to view scenarios */
+    it("is refused before the stream opens", async () => {
+      hasProjectPermission.mockResolvedValue(false);
+
+      const response = await post(BODY, "?stream=1");
+
+      expect(response.status).toBe(403);
+      expect(generate).not.toHaveBeenCalled();
     });
   });
 });

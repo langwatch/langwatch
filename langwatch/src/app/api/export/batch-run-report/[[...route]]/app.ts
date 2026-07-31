@@ -28,9 +28,9 @@ import {
   type BatchRunReportRequest,
   batchRunReportRequestSchema,
   type ReportModel,
-  type ReportStage,
 } from "~/server/export/batch-run-report/report.types";
 import { ExportUnauthenticatedError } from "~/server/export/errors";
+import type { ReportStage } from "~/shared/scenario-run-report/report-stages";
 import type { NextRequest } from "~/types/next-stubs";
 
 const logger = createLogger("langwatch:api:batch-run-report");

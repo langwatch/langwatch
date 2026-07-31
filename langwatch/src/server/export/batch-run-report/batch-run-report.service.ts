@@ -1,6 +1,7 @@
 import type { generateObject } from "ai";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ReportProgress } from "~/shared/scenario-run-report/report-stages";
 import { buildEvidenceBlock } from "./evidence/evidence-block";
 import { buildEvidence, TREND_WINDOW } from "./evidence/evidence-builder";
 import { buildRunSummary } from "./evidence/run-summary";
@@ -14,7 +15,6 @@ import type {
   BatchRunReportRequest,
   ReportEvidence,
   ReportModel,
-  ReportProgress,
   ReportTier,
 } from "./report.types";
 
@@ -30,8 +30,17 @@ type ResolveModel = (params: {
  * The history arrives newest first and everything at or after the run being
  * reported on is discarded, so reading exactly one window's worth would find
  * nothing to compare against whenever the run is not the latest.
+ *
+ * Two sizes rather than one: exporting the newest run - which is nearly every
+ * export - needs only the window, while exporting an older one has to reach
+ * back past everything newer. Asking for the repository's maximum page every
+ * time materialised ~90% of a page to throw it away, on a read that happens
+ * before a user is shown anything.
  */
-const HISTORY_READ_LIMIT = 100;
+const HISTORY_READ_LIMIT = TREND_WINDOW * 2;
+
+/** The repository's own ceiling, used only when the narrow read fell short. */
+const HISTORY_READ_LIMIT_MAX = 100;
 
 /** A run with no scenarios in it is not a run this project can report on. */
 export class BatchRunNotFoundError extends Error {
@@ -269,9 +278,12 @@ export class BatchRunReportService {
   /**
    * The runs before this one, oldest first.
    *
-   * Read without transcripts: the comparison needs each run's criteria and
-   * nothing else, and pulling conversations for ten previous runs would cost
-   * far more than the answer is worth.
+   * Read through the list projection rather than the full run: the comparison
+   * needs each run's criteria and nothing else. That projection still carries
+   * the first six messages of every run - it exists for the grid cards - so
+   * this is "far less than a transcript", not "no transcript at all". Reading
+   * whole conversations for ten previous runs would cost far more than the
+   * answer is worth, and nothing here reads a message.
    */
   private async readHistory({
     request,
@@ -283,14 +295,30 @@ export class BatchRunReportService {
     priorRuns: ScenarioRunData[];
     priorBatchOrder: string[];
   }> {
-    const history = await this.reader.getBatchHistoryForScenarioSet({
+    const earlierThanThisRun = (batch: { lastRunAt: number }) =>
+      batch.lastRunAt < startedAt;
+
+    let history = await this.reader.getBatchHistoryForScenarioSet({
       projectId: request.projectId,
       scenarioSetId: request.scenarioSetId,
-      // Read wider than the window, because the history comes back newest
-      // first and everything after this run is about to be discarded. Reporting
-      // on a run from a fortnight ago should still find the runs before it.
       limit: HISTORY_READ_LIMIT,
     });
+
+    // The narrow read is newest-first, so a run from a fortnight ago can fill
+    // it entirely with runs that came after it. Only then is the wide read
+    // worth its cost, and only then does it find anything the first one did
+    // not.
+    if (
+      history.hasMore &&
+      !history.batches.some(earlierThanThisRun) &&
+      HISTORY_READ_LIMIT < HISTORY_READ_LIMIT_MAX
+    ) {
+      history = await this.reader.getBatchHistoryForScenarioSet({
+        projectId: request.projectId,
+        scenarioSetId: request.scenarioSetId,
+        limit: HISTORY_READ_LIMIT_MAX,
+      });
+    }
 
     const priorBatchOrder = history.batches
       .filter(

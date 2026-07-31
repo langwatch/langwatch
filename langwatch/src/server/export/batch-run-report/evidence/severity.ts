@@ -127,6 +127,18 @@ function capAt({
 }
 
 /** Most severe first; ties keep their incoming order. */
+/**
+ * A severity as a number, worst highest.
+ *
+ * The rendered table sorts on `sortValue`, and the client comparator only
+ * takes its numeric path when both keys parse as numbers - so handing it the
+ * severity *word* sorts "critical" before "low" alphabetically and destroys
+ * the one ordering that section exists to provide.
+ */
+export function severityRank(severity: Severity): number {
+  return SEVERITY_ORDER.indexOf(severity);
+}
+
 export function bySeverityDescending(a: Severity, b: Severity): number {
   return SEVERITY_ORDER.indexOf(b) - SEVERITY_ORDER.indexOf(a);
 }

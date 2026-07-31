@@ -172,6 +172,12 @@ export async function runNarrativePass({
     });
     return object;
   } catch (error) {
+    // A cancelled export must stop, not degrade. Swallowing the abort here
+    // returns null, which reads as "the model failed" and lets the service
+    // carry on into the next pass - so cancelling bought nothing and the
+    // reader would have been handed a figures-only report they never asked
+    // for. Rethrown, the route's stream ends and both passes stop.
+    if (error instanceof Error && error.name === "AbortError") throw error;
     logger.warn({ error }, "Run report narrative pass failed; falling back");
     return null;
   }

@@ -203,8 +203,58 @@ describe("buildEvidence() error reporting", () => {
       suiteName: null,
     }).signatures;
 
-    expect(signature?.errorShape).not.toContain("content flagged");
+    // The fingerprint is computed on the unwrapped message. Normalising the
+    // serialised envelope instead reduced it to `{"<value>":"<value>"}` -
+    // identical for every JSON-shaped error there has ever been - so two
+    // unrelated failures grouped as one. What matters is that the shape
+    // survives to distinguish this error from a different one, not that it is
+    // unreadable.
+    expect(signature?.errorShape).toContain("content flagged");
     expect(signature?.errorExample).toBe("AI_APICallError: content flagged");
+  });
+
+  /**
+   * The property fingerprinting exists for, stated directly: two occurrences
+   * of one error group, two different errors do not. Grouping every serialised
+   * envelope together passed the old assertion and failed this one.
+   */
+  /** @scenario Infrastructure errors are separated from judged failures */
+  it("groups two occurrences of one error and separates a different one", () => {
+    const errorRun = (runId: string, message: string) =>
+      makeRun({
+        scenarioRunId: runId,
+        status: ScenarioRunStatus.ERROR,
+        results: {
+          verdict: Verdict.INCONCLUSIVE,
+          metCriteria: [],
+          unmetCriteria: [],
+          error: JSON.stringify({ name: "Error", message, stack: "at x" }),
+        },
+      });
+
+    const { signatures } = buildEvidence({
+      runs: [
+        errorRun(
+          "run_a",
+          "Timed out after 30000ms calling 550e8400-e29b-41d4-a716-446655440000",
+        ),
+        errorRun(
+          "run_b",
+          "Timed out after 45000ms calling 6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+        ),
+        errorRun("run_c", "AI_APICallError: content flagged"),
+      ],
+      priorRuns: [],
+      priorBatchOrder: [],
+      batchRunId: BATCH,
+      scenarioSetId: "set_1",
+      suiteName: null,
+    });
+
+    // The two timeouts differ only by a duration and a UUID.
+    expect(signatures).toHaveLength(2);
+    const timeouts = signatures.find((it) => it.runIds.length === 2);
+    expect(timeouts?.runIds).toEqual(["run_a", "run_b"]);
   });
 
   /** @scenario Infrastructure errors are separated from judged failures */

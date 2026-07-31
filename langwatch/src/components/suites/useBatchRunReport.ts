@@ -14,10 +14,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { readHandledError, showErrorToast } from "~/features/errors";
-import type {
-  ReportStage,
-  ReportTier,
-} from "~/server/export/batch-run-report/report.types";
+import type { ReportTier } from "~/server/export/batch-run-report/report.types";
+import type { ReportStage } from "~/shared/scenario-run-report/report-stages";
 
 export const BATCH_RUN_REPORT_DOWNLOAD_PATH =
   "/api/export/batch-run-report/download";

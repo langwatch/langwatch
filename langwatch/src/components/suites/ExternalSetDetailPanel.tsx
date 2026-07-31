@@ -23,9 +23,9 @@ import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { REPORT_STAGE_LABELS } from "~/server/export/batch-run-report/report.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { REPORT_STAGE_LABELS } from "~/shared/scenario-run-report/report-stages";
 import { api } from "~/utils/api";
 import { GroupRow } from "./GroupRow";
 import {

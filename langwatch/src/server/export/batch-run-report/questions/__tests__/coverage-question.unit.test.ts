@@ -61,7 +61,7 @@ describe("the coverage question", () => {
       );
       const text = textOf(blocks);
 
-      expect(text).toContain("every one of the");
+      expect(text).toContain("every scenario that ran in previous runs");
       expect(text).toContain("previous runs");
       // The suite roster is unknown, so this claim must never be made.
       expect(text).not.toContain("nothing was left unattempted");

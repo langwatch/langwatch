@@ -84,26 +84,40 @@ export async function runVerifierPass({
       abortSignal,
     });
 
+    // One ruling per claim. A model repeating an id is an ordinary
+    // generateObject failure mode, and left as-is it breaks both derived
+    // values: `seen.length` counts the repeat towards coverage, so twenty
+    // verdicts on one claim can pass a gate meant to prove breadth, and a
+    // later `supported: true` would overwrite an earlier `false`. First
+    // verdict wins, which is the conservative half of that.
     const known = new Set(claims.map((claim) => claim.id));
-    const seen = object.verdicts.filter((verdict) =>
-      known.has(verdict.claimId),
-    );
-    const isUsable = seen.length >= claims.length * MIN_COVERAGE_TO_TRUST;
+    const ruledOn = new Map<string, boolean>();
+    for (const verdict of object.verdicts) {
+      if (!known.has(verdict.claimId)) continue;
+      if (ruledOn.has(verdict.claimId)) continue;
+      ruledOn.set(verdict.claimId, verdict.supported);
+    }
+    const isUsable = ruledOn.size >= claims.length * MIN_COVERAGE_TO_TRUST;
 
     if (!isUsable) {
       logger.warn(
-        { reviewed: seen.length, total: claims.length },
+        { reviewed: ruledOn.size, total: claims.length },
         "Run report check reviewed too few statements to act on",
       );
     }
 
     return {
       supported: new Set(
-        seen.filter((verdict) => verdict.supported).map((it) => it.claimId),
+        [...ruledOn]
+          .filter(([, isSupported]) => isSupported)
+          .map(([claimId]) => claimId),
       ),
       isUsable,
     };
   } catch (error) {
+    // Same reasoning as the narrative pass: an abort is a cancellation, not a
+    // degradation, and must not be turned into an unchecked report.
+    if (error instanceof Error && error.name === "AbortError") throw error;
     logger.warn({ error }, "Run report check failed; leaving report unchecked");
     return null;
   }

@@ -357,6 +357,10 @@ function RunRowData({
                   onKeyDown={(e: React.KeyboardEvent) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.stopPropagation();
+                      // A span with role="button" does not get the browser's
+                      // button behaviour, so Space still scrolls the panel out
+                      // from under whoever was trying to open this menu.
+                      e.preventDefault();
                     }
                   }}
                   aria-label={`Actions for ${suiteName ?? "this run"}`}
