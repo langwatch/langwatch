@@ -111,6 +111,30 @@ export const experimentResultsCommand = async ({
       evaluationsByRow.set(key, list);
     }
 
+    // Evaluations that belong to no dataset entry.
+    //
+    // The dataset is one entry per (row, target), and the join below walks it.
+    // A Comparison evaluator judges the whole field of targets in a single
+    // verdict, so its result is recorded against the comparison itself rather
+    // than any one target — leaving it with no (row, target) pair to attach
+    // to. Walking the dataset alone therefore drops it without a word, which
+    // is how a real four-way run reported 240 of its 300 evaluations while the
+    // run summary still advertised the comparison.
+    //
+    // These are keyed by row instead, and follow whichever rows survive the
+    // filter and limit below.
+    const datasetKeys = new Set(
+      results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
+    );
+    const rowIndependentEvaluations = results.evaluations.filter(
+      (evaluation) => {
+        if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
+          return false;
+        }
+        return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
+      },
+    );
+
     // Determine evaluator columns to show
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
@@ -123,9 +147,34 @@ export const experimentResultsCommand = async ({
       evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
     }));
 
+    // A row's failures are not all reachable through the dataset join.
+    //
+    // `isFailedRow` was handed only the evaluations keyed to that (row,
+    // target), so a row whose ONLY failure was the comparison — every target
+    // produced output, every per-target evaluation passed, and the judge
+    // errored — looked clean and was filtered out. That is the evaluator this
+    // command was just taught to display, so `--filter failed` could hide
+    // exactly the failure a caller came to find.
+    //
+    // Grouped by row index because that is all a row-independent evaluation
+    // has. Every target-row of that index carries it, which is right: the
+    // comparison covers the whole field on that row, so the row failed.
+    const rowIndependentByIndex = new Map<number, ExperimentRunEvaluation[]>();
+    for (const evaluation of rowIndependentEvaluations) {
+      const list = rowIndependentByIndex.get(evaluation.index) ?? [];
+      list.push(evaluation);
+      rowIndependentByIndex.set(evaluation.index, list);
+    }
+
     if (filter === "failed") {
       rows = rows.filter((r) =>
-        isFailedRow({ entry: r.entry, evaluations: r.evaluations }),
+        isFailedRow({
+          entry: r.entry,
+          evaluations: [
+            ...r.evaluations,
+            ...(rowIndependentByIndex.get(r.entry.index) ?? []),
+          ],
+        }),
       );
     }
 
@@ -133,11 +182,21 @@ export const experimentResultsCommand = async ({
     const truncated = rows.length > limit;
     rows = rows.slice(0, limit);
 
+    // Carry a row-independent evaluation only when its row is still on screen,
+    // so a verdict never describes a row the caller cannot see.
+    const shownIndices = new Set(rows.map((row) => row.entry.index));
+    const shownRowIndependent = rowIndependentEvaluations.filter((evaluation) =>
+      shownIndices.has(evaluation.index),
+    );
+
     return {
       data: {
         ...results,
         dataset: rows.map((row) => row.entry),
-        evaluations: rows.flatMap((row) => row.evaluations),
+        evaluations: [
+          ...rows.flatMap((row) => row.evaluations),
+          ...shownRowIndependent,
+        ],
         meta: {
           totalMatching,
           truncated,

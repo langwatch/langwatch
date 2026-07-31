@@ -55,7 +55,12 @@ function makePrisma({
         if (where.group) return [];
         return userHasBinding ? [customBinding(USER_ROLE)] : [];
       }),
+      // These users are on RoleBindings, not legacy membership, so the
+      // fallback in step 4 is switched off and cannot rescue a stale key.
+      count: vi.fn().mockResolvedValue(1),
     },
+    user: { findFirst: vi.fn().mockResolvedValue(null) },
+    teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
     customRole: {
       findUnique: vi.fn().mockImplementation(async ({ where }: any) => ({
         permissions:

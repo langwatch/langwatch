@@ -32,7 +32,11 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
+import {
+  axisLabelProps,
+  buildAxisLabels,
+  truncateLabel,
+} from "./chartAxisLabels";
 
 import type { BatchComparisonColumn } from "./types";
 
@@ -41,7 +45,7 @@ import type { BatchComparisonColumn } from "./types";
  * Deliberately excludes red: a losing variant isn't a failure, so no bar
  * should read as one. Ties get their own gray.
  */
-const VARIANT_COLORS = [
+export const VARIANT_COLORS = [
   "#22C55E",
   "#8B5CF6",
   "#0EA5E9",
@@ -109,8 +113,12 @@ export function WinRateChart({
   // what's actually rendered.
   const axis = axisLabelProps(column.variants.length + 1);
   const trimAxisLabel = (s: string) => truncateLabel(s, axis.maxLabelLength);
-  const variantNames = disambiguateNames(
-    column.variants.map((v) => trimAxisLabel(v.name)),
+  // buildAxisLabels, not a local trim: every chart in this row has to render
+  // these names identically, and deriving them per-chart is what let the
+  // leaderboard and the cost chart disagree.
+  const variantNames = buildAxisLabels(
+    column.variants.map((v) => v.name),
+    axis.maxLabelLength,
   );
   // Untruncated counterpart of the axis labels, for the hover tooltip — the
   // axis stays elided so it can't eat the chart, and the full name is one

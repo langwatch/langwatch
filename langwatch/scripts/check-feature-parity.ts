@@ -624,7 +624,6 @@ const LEGACY_INERT: string[] = [
   "specs/triggers/event-sourced-graph-triggers.feature",
   "specs/typescript-sdk/cli-docs.feature",
   "specs/typescript-sdk/cli-error-handling.feature",
-  "specs/typescript-sdk/cli-experiment-results.feature",
   "specs/typescript-sdk/cli-projects-api-keys.feature",
   "specs/typescript-sdk/prompt-tags.feature",
   "specs/variables-ui/prompt-editor-drawer-mappings.feature",

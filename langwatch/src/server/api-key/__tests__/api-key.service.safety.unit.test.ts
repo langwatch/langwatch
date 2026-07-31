@@ -16,6 +16,9 @@ const mockCheckPermission = vi.fn().mockResolvedValue(true);
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
   checkRoleBindingPermission: (...args: unknown[]) =>
     mockCheckPermission(...args),
+  // These cases are about the binding path; the legacy fallback grants
+  // nothing so the binding decision is the only one under test.
+  resolveLegacyCeiling: () => ({ grants: () => false }),
 }));
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {

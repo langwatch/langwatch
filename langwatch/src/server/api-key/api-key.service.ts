@@ -8,7 +8,10 @@ import {
   parseCustomRolePermissions,
   permissionFormatSchema,
 } from "~/server/rbac/custom-role-permissions";
-import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
+import {
+  checkRoleBindingPermission,
+  resolveLegacyCeiling,
+} from "~/server/rbac/role-binding-resolver";
 import {
   CUSTOM_ROLE_KIND,
   RoleRepository,
@@ -618,14 +621,26 @@ export class ApiKeyService {
       }
       throw err;
     }
+    // Same legacy fallback as the raw-permission and builtin-role branches.
+    // This one used to call `checkRoleBindingPermission` bare, so a user whose
+    // access comes from legacy membership was refused here even though the
+    // branch beside it would have allowed the identical permission.
+    const legacy = await resolveLegacyCeiling({
+      prisma,
+      userId: ceilingUserId,
+      organizationId,
+      scope,
+    });
+
     for (const perm of perms) {
-      const userHas = await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: perm as Permission,
-      });
+      const userHas =
+        (await checkRoleBindingPermission({
+          prisma,
+          principal: { type: "user", id: ceilingUserId },
+          organizationId,
+          scope,
+          permission: perm as Permission,
+        })) || legacy.grants(perm as Permission);
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
@@ -648,14 +663,28 @@ export class ApiKeyService {
     scope: CreatorScope;
     permissions: string[];
   }): Promise<void> {
+    // Resolved once for the whole request, not per permission. The mint path
+    // that calls this (Langy's per-turn session key) passes ~23 permissions
+    // inside a 5-second interactive transaction, and langyApiKey.ts records
+    // what per-permission queries did to it once already: the fan-out starved
+    // the connection pool and aborted the transaction. Two queries, flat.
+    const legacy = await resolveLegacyCeiling({
+      prisma,
+      userId: ceilingUserId,
+      organizationId,
+      scope,
+    });
+
     for (const perm of permissions) {
-      const userHas = await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: perm as Permission,
-      });
+      const userHas =
+        (await checkRoleBindingPermission({
+          prisma,
+          principal: { type: "user", id: ceilingUserId },
+          organizationId,
+          scope,
+          permission: perm as Permission,
+        })) || legacy.grants(perm as Permission);
+
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
@@ -690,13 +719,25 @@ export class ApiKeyService {
             : "project:update"
           : "project:view";
 
-    const userHasPermission = await checkRoleBindingPermission({
-      prisma,
-      principal: { type: "user", id: ceilingUserId },
-      organizationId,
-      scope,
-      permission: representativePermission,
-    });
+    const userHasPermission =
+      (await checkRoleBindingPermission({
+        prisma,
+        principal: { type: "user", id: ceilingUserId },
+        organizationId,
+        scope,
+        permission: representativePermission,
+      })) ||
+      // The builtin-role UI is the ordinary way a person creates a key, so
+      // leaving this branch bare meant the common path still refused a
+      // legacy-membership user while the Langy path had been fixed.
+      (
+        await resolveLegacyCeiling({
+          prisma,
+          userId: ceilingUserId,
+          organizationId,
+          scope,
+        })
+      ).grants(representativePermission);
 
     if (!userHasPermission) {
       throw new ApiKeyScopeViolationError(

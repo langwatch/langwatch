@@ -164,6 +164,22 @@ export const extractTargetOutput = (
 };
 
 /**
+ * Wall-clock duration from a pair of epoch-millisecond timestamps.
+ *
+ * Guards on `undefined` rather than truthiness. The target and evaluator
+ * paths each computed this inline and had already drifted on that point, and
+ * a truthy test reads a `started_at` of 0 as "no timestamp" — unreachable
+ * with real epoch milliseconds, but the two readers of one field disagreeing
+ * is worth removing rather than reasoning about.
+ */
+const durationOf = (
+  timestamps: { started_at?: number; finished_at?: number } | undefined,
+): number | undefined =>
+  timestamps?.started_at !== undefined && timestamps?.finished_at !== undefined
+    ? timestamps.finished_at - timestamps.started_at
+    : undefined;
+
+/**
  * Maps a target completion event to a target_result SSE event.
  */
 export const mapTargetResult = (
@@ -182,13 +198,7 @@ export const mapTargetResult = (
 ): EvaluationV3Event => {
   const { targetId } = parseNodeId(nodeId);
 
-  // Calculate duration if timestamps available
-  const duration =
-    executionState.timestamps?.started_at &&
-    executionState.timestamps?.finished_at
-      ? executionState.timestamps.finished_at -
-        executionState.timestamps.started_at
-      : undefined;
+  const duration = durationOf(executionState.timestamps);
 
   // A coded engine failure travels the handled channel; the raw `error`
   // string is kept only as a legacy fallback for engines that don't send a
@@ -218,6 +228,39 @@ export const mapTargetResult = (
 };
 
 /**
+ * The part of an evaluator's request worth keeping forever.
+ *
+ * Only the candidate IDS are ever read back — `readCandidateIds` rebuilds the
+ * per-row matchup set from them for the leaderboard. The rest of the payload
+ * (every candidate's full output text, the golden answer, the task input,
+ * per-candidate cost and duration) duplicates data the run already stores per
+ * target, and it is not cheap duplication: it reaches ClickHouse twice, in the
+ * event log and in `experiment_run_items.EvaluationInputs`, is handed to the
+ * browser by a `SELECT *`, and is billed against the storage meter — all at
+ * rows × targets × evaluators. On main this column was null for orchestrator
+ * runs, so persisting the whole payload would have been a new cost introduced
+ * by this branch rather than an existing one it inherited.
+ *
+ * Returns undefined when there is no candidate list, so every non-Comparison
+ * evaluator persists nothing here rather than an empty object.
+ */
+const persistableInputs = (
+  inputs: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined => {
+  const candidates = inputs?.candidates;
+  if (!Array.isArray(candidates)) return undefined;
+
+  return {
+    candidates: candidates.map((candidate) => ({
+      id:
+        candidate && typeof candidate === "object"
+          ? (candidate as { id?: unknown }).id
+          : undefined,
+    })),
+  };
+};
+
+/**
  * Maps an evaluator completion event to an evaluator_result SSE event.
  *
  * @param nodeId - The node ID in format "{targetId}.{evaluatorId}"
@@ -236,7 +279,17 @@ export const mapEvaluatorResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     error?: string;
   },
-  options?: { stripScore?: boolean },
+  options?: {
+    stripScore?: boolean;
+    /**
+     * The evaluator's own request payload (e.g. a Comparison evaluator's
+     * ordered `candidates` list). Persisted alongside the result so
+     * downstream aggregation (Bradley-Terry leaderboard) can recover which
+     * variants the judge actually compared on this row — the response alone
+     * only names the winner, not the full candidate set.
+     */
+    inputs?: Record<string, unknown>;
+  },
 ): EvaluationV3Event => {
   const { targetId, evaluatorId } = parseNodeId(nodeId);
 
@@ -244,13 +297,7 @@ export const mapEvaluatorResult = (
     throw new Error(`Expected evaluator node ID but got: ${nodeId}`);
   }
 
-  // Calculate duration if timestamps available
-  const _duration =
-    executionState.timestamps?.started_at &&
-    executionState.timestamps?.finished_at
-      ? executionState.timestamps.finished_at -
-        executionState.timestamps.started_at
-      : undefined;
+  const duration = durationOf(executionState.timestamps);
 
   // Build SingleEvaluationResult
   // Check for errors: either execution-level error OR evaluator returned error status in outputs
@@ -308,6 +355,8 @@ export const mapEvaluatorResult = (
     targetId,
     evaluatorId,
     result,
+    duration,
+    inputs: persistableInputs(options?.inputs),
   };
 };
 
@@ -318,14 +367,24 @@ export const mapEvaluatorResult = (
  * @param rowIndex - The dataset row index this event corresponds to
  * @param targetNodes - Set of node IDs that are target nodes (not evaluators)
  * @param config - Optional configuration for result mapping
+ * @param evaluatorInputs - The request payload sent to the evaluator for this
+ * cell (only relevant when the event's node is an evaluator node); passed
+ * through untouched to `mapEvaluatorResult`.
  * @returns The mapped SSE event, or null if the event should be ignored
  */
-export const mapNlpEvent = (
-  event: StudioServerEvent,
-  rowIndex: number,
-  targetNodes: Set<string>,
-  config?: ResultMapperConfig,
-): EvaluationV3Event | null => {
+export const mapNlpEvent = ({
+  event,
+  rowIndex,
+  targetNodes,
+  config,
+  evaluatorInputs,
+}: {
+  event: StudioServerEvent;
+  rowIndex: number;
+  targetNodes: Set<string>;
+  config?: ResultMapperConfig;
+  evaluatorInputs?: Record<string, unknown>;
+}): EvaluationV3Event | null => {
   if (event.type !== "component_state_change") {
     // Ignore non-component events (debug, done, etc.)
     return null;
@@ -384,7 +443,7 @@ export const mapNlpEvent = (
         timestamps: execution_state.timestamps,
         error: isError ? execution_state.error : undefined,
       },
-      { stripScore },
+      { stripScore, inputs: evaluatorInputs },
     );
   }
 

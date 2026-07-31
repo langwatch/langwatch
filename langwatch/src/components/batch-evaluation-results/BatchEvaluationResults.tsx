@@ -564,6 +564,7 @@ export function BatchEvaluationResults({
             onVisibilityChange={setChartsVisible}
             onTargetColorsChange={setTargetColors}
             comparisonColumns={transformedData?.comparisonColumns}
+            comparisonRows={transformedData?.rows}
           />
         )}
 

@@ -833,19 +833,20 @@ export function EvaluatorEditorBody({
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
-            // For the Comparison shortcut, keep ONLY the Model picker from
-            // the schema-driven form. Every other field is either duplicated
-            // by the inline ComparisonConfigForm (has_golden_answer,
-            // include_metrics) or a configurable default the user rarely
-            // needs during the "which columns am I comparing" flow
-            // (prompt / swap_and_confirm / allow_tie / randomize_order).
-            // They remain fully editable via the full evaluator editor
-            // (click the column chip on the workbench after creation).
+            // For the Comparison shortcut, drop the fields the inline
+            // ComparisonConfigForm already owns (has_golden_answer,
+            // include_metrics) plus the ones that would only be noise beside
+            // it (allow_tie, randomize_order), and the legacy pairwise judge's
+            // `swap_and_confirm`, which this evaluator does not have.
+            //
+            // Everything NOT listed still renders here — model, max_tokens,
+            // prompt, temperature and swap_and_reconcile. This comment used to
+            // say the opposite ("keep ONLY the Model picker", naming `prompt`
+            // among the skipped), which is how a reviewer came to conclude
+            // swap_and_reconcile had no off switch. It has one, right here.
             skipFields={
               isComparison
                 ? [
-                    // The comparison form owns these; `swap_and_confirm` only
-                    // exists on the legacy pairwise judge and is not offered.
                     "swap_and_confirm",
                     "randomize_order",
                     "allow_tie",

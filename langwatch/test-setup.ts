@@ -166,6 +166,15 @@ vi.mock("recharts", () => {
     Pie: MockComponent,
     Cell: MockComponent,
     ComposedChart: MockComponent,
+    // Every one of these is imported somewhere in src/. A name missing from
+    // this list does not degrade gracefully — the first test to render the
+    // chart that uses it dies with "No <X> export is defined on the recharts
+    // mock", which reads as a broken test rather than a stale mock.
+    ErrorBar: MockComponent,
+    Label: MockComponent,
+    LabelList: MockComponent,
+    ReferenceDot: MockComponent,
+    ZAxis: MockComponent,
     ReferenceLine: MockComponent,
     ReferenceArea: MockComponent,
     Brush: MockComponent,

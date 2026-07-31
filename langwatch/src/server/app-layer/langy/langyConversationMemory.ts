@@ -191,7 +191,7 @@ export function extractLangyConversationMemory({
         ...(name ? { name } : {}),
         ...(typeof total === "number" && total > ids.length ? { total } : {}),
       };
-      const key = `${resource} ${ids.join(",")}`;
+      const key = `${resource}\u0000${ids.join(",")}`;
       // Delete-then-set so the re-inserted entry also moves to the END of the
       // insertion order — "most recent" has to mean the latest TOUCH, not the
       // first sighting.
