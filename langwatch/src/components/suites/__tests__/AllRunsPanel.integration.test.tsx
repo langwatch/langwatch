@@ -101,6 +101,9 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: [] }),
       },
     },
+    export: {
+      onScenarioRunExportProgress: { useSubscription: vi.fn() },
+    },
   },
 }));
 

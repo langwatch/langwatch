@@ -38,7 +38,13 @@ const logger = createLogger("langwatch:api:export-scenario-runs");
 const secured = createServiceApp({ basePath: "/api/export/scenario-runs" });
 
 secured
-  .access(handlerManagedAuth("user session + scenarios:view enforced in-handler"))
+  .access(
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["scenarios:view"],
+      credential: "session",
+    }),
+  )
   .post(
     "/download",
     zValidator("json", scenarioRunExportRequestSchema),

@@ -46,6 +46,9 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
+    export: {
+      onScenarioRunExportProgress: { useSubscription: vi.fn() },
+    },
   },
 }));
 
