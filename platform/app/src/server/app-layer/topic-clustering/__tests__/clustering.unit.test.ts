@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockClickHouseQuery = vi.fn();
+// Hoisted: `vi.mock` factories run before the module body, so a plain
+// top-level const would still be in its temporal dead zone here.
+const { mockClickHouseForProject } = vi.hoisted(() => ({
+  mockClickHouseForProject: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: mockClickHouseForProject,
+}));
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -8,10 +17,6 @@ vi.mock("~/server/db", () => ({
     topic: { findMany: vi.fn(), createMany: vi.fn(), deleteMany: vi.fn() },
     cost: { create: vi.fn() },
   },
-}));
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -55,7 +60,6 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
   }),
 }));
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { stagedLangevalsFetch } from "../../../langevals/stagedFetch";
 import {
@@ -84,20 +88,17 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // CH count query (single query for all 4 counts)
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "5", recent: "5", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "5", recent: "5", assigned: "0" },
+      ]);
 
       // CH search query returns fewer than minimumTraces (10 for batch)
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () => Promise.resolve([]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([]);
 
       const outcome = await clusterTopicsForProject("proj-1");
 
@@ -114,15 +115,14 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
 
       // Search: a full page of empty-input traces (returnedCount > 10).
       const now = Date.now();
@@ -133,9 +133,7 @@ describe("clusterTopicsForProject", () => {
         SubTopicId: null,
         OccurredAtMs: String(now - i * 1000),
       }));
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () => Promise.resolve(emptyPage),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce(emptyPage);
 
       const outcome = await clusterTopicsForProject("proj-1");
 
@@ -150,15 +148,14 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
 
       // CH search returns 12 traces (above the 10 minimum for batch)
       const chRows = Array.from({ length: 12 }, (_, i) => ({
@@ -168,9 +165,7 @@ describe("clusterTopicsForProject", () => {
         SubTopicId: null,
         OccurredAtMs: String(Date.now() - i * 1000),
       }));
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () => Promise.resolve(chRows),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce(chRows);
 
       await clusterTopicsForProject("proj-1");
 
@@ -179,18 +174,10 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
-  describe("when getClickHouseClientForProject returns null", () => {
-    it("throws because ClickHouse is required", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
-
-      await expect(clusterTopicsForProject("proj-1")).rejects.toThrow(
-        "ClickHouse client not available for project proj-1",
-      );
-    });
-  });
+  // The "ClickHouse client not available" guard is gone with the driver: the
+  // one client is constructed from CLICKHOUSE_URL and a deployment without it
+  // fails at construction, so `resolveClickHouseClient` never hands back a null
+  // for this function to check.
 
   describe("when topics were just created by the run's previous page", () => {
     // Regression: page 1 of a batch run writes topics with createdAt = now.
@@ -208,15 +195,14 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts: topics exist but < 1200 assigned, so still batch mode.
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
 
       const outcome = await clusterTopicsForProject("proj-1");
 
@@ -229,18 +215,15 @@ describe("clusterTopicsForProject", () => {
         makeProject() as any,
       );
       vi.mocked(prisma.topic.findMany).mockResolvedValue(freshTopics as any);
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
       // The fetch runs (the gate did not fire) and returns nothing further.
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () => Promise.resolve([]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([]);
 
       const outcome = await clusterTopicsForProject("proj-1", [
         1700000000000,
@@ -257,27 +240,24 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
       // Counts
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
 
       // Search - empty result
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () => Promise.resolve([]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([]);
 
       const searchAfter: [number, string] = [1700000000000, "trace-xyz"];
       await clusterTopicsForProject("proj-1", searchAfter);
 
       // Verify the search query included cursor params
       const searchCall = mockClickHouseQuery.mock.calls[1]!;
-      expect(searchCall[0].query_params).toEqual(
+      expect(searchCall[0].params).toEqual(
         expect.objectContaining({
           lastTs: 1700000000000,
           lastTraceId: "trace-xyz",
@@ -292,44 +272,40 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+      mockClickHouseForProject.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        { total: "100", recent: "100", assigned: "0" },
+      ]);
 
       // Return traces with various ComputedInput formats
-      mockClickHouseQuery.mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([
-            // Simple JSON string
-            ...Array.from({ length: 10 }, (_, i) => ({
-              TraceId: `trace-${i}`,
-              ComputedInput: JSON.stringify(`User message ${i}`),
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(Date.now() - i * 1000),
-            })),
-            // Null/empty should be filtered out
-            {
-              TraceId: "trace-empty",
-              ComputedInput: "",
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(Date.now()),
-            },
-            {
-              TraceId: "trace-null",
-              ComputedInput: null,
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(Date.now()),
-            },
-          ]),
-      });
+      mockClickHouseQuery.mockResolvedValueOnce([
+        // Simple JSON string
+        ...Array.from({ length: 10 }, (_, i) => ({
+          TraceId: `trace-${i}`,
+          ComputedInput: JSON.stringify(`User message ${i}`),
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(Date.now() - i * 1000),
+        })),
+        // Null/empty should be filtered out
+        {
+          TraceId: "trace-empty",
+          ComputedInput: "",
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(Date.now()),
+        },
+        {
+          TraceId: "trace-null",
+          ComputedInput: null,
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(Date.now()),
+        },
+      ]);
 
       await clusterTopicsForProject("proj-1");
 
@@ -350,32 +326,29 @@ describe("fetchTracesFromClickHouse de-duplication", () => {
     // must not double-count. Rows arrive ordered OccurredAt DESC, TraceId ASC.
     const now = Date.now();
     const mockCh = {
-      query: vi.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve([
-            {
-              TraceId: "t-0",
-              ComputedInput: JSON.stringify("a"),
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(now),
-            },
-            {
-              TraceId: "t-0",
-              ComputedInput: JSON.stringify("a"),
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(now - 1),
-            },
-            {
-              TraceId: "t-1",
-              ComputedInput: JSON.stringify("b"),
-              TopicId: null,
-              SubTopicId: null,
-              OccurredAtMs: String(now - 2),
-            },
-          ]),
-      }),
+      query: vi.fn().mockResolvedValue([
+        {
+          TraceId: "t-0",
+          ComputedInput: JSON.stringify("a"),
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(now),
+        },
+        {
+          TraceId: "t-0",
+          ComputedInput: JSON.stringify("a"),
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(now - 1),
+        },
+        {
+          TraceId: "t-1",
+          ComputedInput: JSON.stringify("b"),
+          TopicId: null,
+          SubTopicId: null,
+          OccurredAtMs: String(now - 2),
+        },
+      ]),
     } as any;
 
     const res = await fetchTracesFromClickHouse(

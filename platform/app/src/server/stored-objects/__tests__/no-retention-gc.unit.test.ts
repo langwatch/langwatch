@@ -102,6 +102,21 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // delete/update/truncate on the table.
   /^src\/server\/storage\.ts$/,
   /^src\/server\/datasets\/dataset-storage\.ts$/,
+  // write-targets.ts lists stored_objects in the static table -> merge-engine
+  // map that decides whether a failed INSERT may be re-sent (ADR-109). Audited:
+  // a lookup table of literals, consulted by the client's insert path only. It
+  // issues no statement of its own, and nothing in it can delete a row — the
+  // entry's whole content is "this table is a ReplacingMergeTree".
+  /^src\/server\/app-layer\/clients\/clickhouse\/write-targets\.ts$/,
+  // migrationDdl.ts and schema-catalogue.ts name stored_objects among the
+  // tables whose deployed shape is checked against its declaration. Audited:
+  // both are describe-and-compare only — they read `system.tables` /
+  // `system.columns` and the migration files, and neither issues a
+  // delete/update/truncate against the table. These two predate this
+  // allowlist's last update and were failing this test before the ClickHouse
+  // client migration; they are listed now rather than left red.
+  /^src\/server\/clickhouse\/migrationDdl\.ts$/,
+  /^src\/server\/clickhouse\/schema-catalogue\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {

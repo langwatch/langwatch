@@ -1,7 +1,8 @@
 import { performance } from "node:perf_hooks";
 import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -37,10 +38,11 @@ const logger = createLogger(
  * ClickHouse persistence for the coding-agent session row (ADR-056,
  * migration 00051).
  *
- * The UInt64 columns are serialised as STRINGS in the JSONEachRow body: JSON
- * numbers cannot safely round-trip past 2^53, and a long session's token counts
- * and byte totals are exactly the columns that get large. UInt32 / Float64 / Bool
- * fit in JSON numbers and pass through as-is.
+ * The UInt64 columns are serialised as STRINGS on the wire: JSON numbers cannot
+ * safely round-trip past 2^53, and a long session's token counts and byte
+ * totals are exactly the columns that get large. ClickHouse accepts a quoted
+ * integer for a `UInt64` on input, so this costs nothing but the quotes.
+ * UInt32 / Float64 / Bool fit in JSON numbers and pass through as-is.
  */
 interface ClickHouseWriteRecord {
   TenantId: string;
@@ -319,7 +321,7 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: [
+        rows: [
           toRecord({
             row,
             retentionDays,
@@ -327,8 +329,7 @@ export class CodingAgentSessionClickHouseRepository
             versionStampMs: this.nextVersionStamp(row.updatedAt),
           }),
         ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(
@@ -436,8 +437,9 @@ export class CodingAgentSessionClickHouseRepository
         ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
         : "";
 
-    const result = await client.query({
-      query: `
+    const rows = await client.query<Record<string, unknown>>({
+      table: TABLE_NAME,
+      sql: `
         SELECT *
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -458,17 +460,15 @@ export class CodingAgentSessionClickHouseRepository
           StartedAt ASC
         LIMIT 1
       `,
-      query_params: {
+      params: {
         tenantId,
         sessionId,
         ...(window !== undefined
           ? { from: window.fromMs, to: window.toMs }
           : {}),
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<Record<string, unknown>>();
     return rows[0] ?? null;
   }
 
@@ -586,8 +586,9 @@ export class CodingAgentSessionClickHouseRepository
 
     let rows: Record<string, unknown>[];
     try {
-      const result = await client.query({
-        query: `
+      rows = await client.query<Record<string, unknown>>({
+        table: TABLE_NAME,
+        sql: `
           SELECT *
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
@@ -602,7 +603,7 @@ export class CodingAgentSessionClickHouseRepository
           ORDER BY StartedAt DESC
           LIMIT {limit:UInt32}
         `,
-        query_params: {
+        params: {
           tenantId,
           from: fromMs,
           to: toMs,
@@ -617,10 +618,7 @@ export class CodingAgentSessionClickHouseRepository
           limit: limit * LIST_READ_DEDUP_OVERFETCH,
           ...(userId !== undefined ? { userId } : {}),
         },
-        format: "JSONEachRow",
       });
-
-      rows = await result.json<Record<string, unknown>>();
     } catch (error) {
       observe("error");
       throw error;
@@ -667,7 +665,7 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
+        rows: entries.map(({ row, retentionDays, appliedEventIds }) =>
           toRecord({
             row,
             retentionDays,
@@ -675,8 +673,7 @@ export class CodingAgentSessionClickHouseRepository
             versionStampMs: this.nextVersionStamp(row.updatedAt),
           }),
         ),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(
@@ -811,7 +808,7 @@ function preferredOf(
 }
 
 /**
- * Decode one `JSONEachRow` record.
+ * Decode one row, as the client hands it back keyed by column name.
  *
  * Every DateTime64(3) goes through `parseClickHouseDateTimeMs`: ClickHouse emits
  * them without a zone suffix ("2026-07-24 12:00:00.123") and V8 reads a bare

@@ -20,12 +20,18 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
   cleanupTestData,
   getTestClickHouseClient,
+  startTestContainers,
 } from "~/test-utils/integration/testContainers";
 import { fetchTracesFromClickHouse } from "../clustering";
 
@@ -85,12 +91,20 @@ async function insertRows(ch: ClickHouseClient, rows: TraceRow[]) {
 }
 
 describe("fetchTracesFromClickHouse integration", () => {
+  /** The driver client, used only to seed rows. */
   let ch: ClickHouseClient;
+  let packageClient: ReturnType<typeof createClickHouseClient>;
+
+  /** What the code under test now takes, bound to the tenant under test. */
+  const clientFor = (tenantId: string): TenantClickHouseClient =>
+    tenantClickHouseClient({ client: packageClient, tenantId });
 
   beforeAll(async () => {
     const raw = getTestClickHouseClient();
     if (!raw) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(raw);
+    const containers = await startTestContainers();
+    packageClient = createClickHouseClient({ url: containers.clickHouseUrl });
     const input = JSON.stringify("hello world");
     await insertRows(
       ch,
@@ -100,11 +114,18 @@ describe("fetchTracesFromClickHouse integration", () => {
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);
+    await packageClient?.close();
   });
 
   describe("when fetching a full batch", () => {
     it("returns the 2000 newest traces, newest first, all with input", async () => {
-      const res = await fetchTracesFromClickHouse(ch, TENANT_ID, false, [], []);
+      const res = await fetchTracesFromClickHouse(
+        clientFor(TENANT_ID),
+        TENANT_ID,
+        false,
+        [],
+        [],
+      );
 
       expect(res.traces).toHaveLength(2000);
       expect(res.returnedCount).toBe(2000);
@@ -117,14 +138,14 @@ describe("fetchTracesFromClickHouse integration", () => {
   describe("when the search cursor advances", () => {
     it("returns strictly older, non-overlapping traces", async () => {
       const first = await fetchTracesFromClickHouse(
-        ch,
+        clientFor(TENANT_ID),
         TENANT_ID,
         false,
         [],
         [],
       );
       const second = await fetchTracesFromClickHouse(
-        ch,
+        clientFor(TENANT_ID),
         TENANT_ID,
         false,
         [],
@@ -165,7 +186,7 @@ describe("fetchTracesFromClickHouse integration", () => {
 
     it("advances the cursor past a full empty page to reach older traces", async () => {
       const page1 = await fetchTracesFromClickHouse(
-        ch,
+        clientFor(EMPTY_TENANT),
         EMPTY_TENANT,
         false,
         [],
@@ -181,7 +202,7 @@ describe("fetchTracesFromClickHouse integration", () => {
       // Page 2, seeked from that cursor, reaches the older input-bearing
       // traces that the pre-fix SQL filter would have stranded.
       const page2 = await fetchTracesFromClickHouse(
-        ch,
+        clientFor(EMPTY_TENANT),
         EMPTY_TENANT,
         false,
         [],
@@ -223,7 +244,7 @@ describe("fetchTracesFromClickHouse integration", () => {
 
     it("returns the in-window trace and excludes the older one", async () => {
       const res = await fetchTracesFromClickHouse(
-        ch,
+        clientFor(WINDOW_TENANT),
         WINDOW_TENANT,
         false,
         [],

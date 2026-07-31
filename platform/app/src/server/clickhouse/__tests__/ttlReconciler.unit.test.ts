@@ -1,4 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const clickhouseMocks = vi.hoisted(() => ({
+  client: { query: vi.fn(), command: vi.fn() },
+  resolveClient: vi.fn(),
+}));
+
+// The reconciler resolves its endpoint through the deployment's own ClickHouse
+// client rather than building one from the URL, so the seam is what these tests
+// stand in for — no driver, no sockets, no pool left open.
+vi.mock("~/server/app-layer/clients/clickhouse/shared", () => ({
+  getInfrastructureClickHouseClient: () => clickhouseMocks.client,
+  getSharedAppClickHouseClient: () => ({
+    resolveClient: clickhouseMocks.resolveClient,
+  }),
+}));
+
 import {
   buildDesiredTTLExpression,
   hasLegacyRetentionTTL,
@@ -272,6 +288,13 @@ describe("ttlReconciler", () => {
       savedEnv.CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
       delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
       delete process.env.CLICKHOUSE_URL;
+      vi.clearAllMocks();
+      clickhouseMocks.resolveClient.mockReturnValue(clickhouseMocks.client);
+      clickhouseMocks.client.query.mockResolvedValue({
+        rows: [],
+        header: { names: [], types: [] },
+      });
+      clickhouseMocks.client.command.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -295,8 +318,12 @@ describe("ttlReconciler", () => {
         // CLICKHOUSE_URL=valid, no cold-storage flag → must NOT silently skip.
         // The retention DELETE-by-_retention_days clause is platform-enforced
         // and has to install on every deployment; only the cold-storage MOVE
-        // clause is operator-managed.
+        // clause is operator-managed. The read failing is what proves the run
+        // reached ClickHouse rather than returning early.
         process.env.CLICKHOUSE_URL = "http://localhost:1/langwatch";
+        clickhouseMocks.client.query.mockRejectedValue(
+          new Error("connect ECONNREFUSED"),
+        );
         await expect(reconcileTTL()).rejects.toThrow();
       });
     });
@@ -316,14 +343,44 @@ describe("ttlReconciler", () => {
       });
     });
 
-    describe("when connectionUrl is provided explicitly", () => {
-      it("bypasses the env var gates", async () => {
-        // CLICKHOUSE_URL is not set, but connectionUrl bypasses the gate.
-        // This will fail at the ClickHouse connection level (no server running),
-        // proving it got past the env-var guards.
+    describe("when connectionUrl names an endpoint the deployment never declared", () => {
+      it("refuses rather than connecting to it", async () => {
+        // Past the skip-gate — a connectionUrl is present — but the reconciler
+        // resolves endpoints through the deployment's own client, and a URL
+        // that is neither CLICKHOUSE_URL nor a declared private endpoint is not
+        // a schema it should be rewriting.
         await expect(
           reconcileTTL({ connectionUrl: "http://localhost:1/testdb" }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(/CLICKHOUSE_URL is not set/);
+      });
+
+      it("names no URL in the refusal — a connection URL carries credentials", async () => {
+        process.env.CLICKHOUSE_URL = "http://shared:8123/langwatch";
+        await expect(
+          reconcileTTL({ connectionUrl: "http://user:secret@other:8123/db" }),
+        ).rejects.toThrow(
+          /matches neither CLICKHOUSE_URL nor any organisation's/,
+        );
+        await expect(
+          reconcileTTL({ connectionUrl: "http://user:secret@other:8123/db" }),
+        ).rejects.not.toThrow(/secret/);
+      });
+    });
+
+    describe("when connectionUrl names an organisation's private endpoint", () => {
+      it("resolves it through the deployment's own client, keyed by organisation", async () => {
+        const privateUrl = "http://private:8123/langwatch";
+        process.env.CLICKHOUSE_URL = "http://shared:8123/langwatch";
+        process.env.CLICKHOUSE_URL__acme__org_1 = privateUrl;
+        try {
+          await expect(
+            reconcileTTL({ connectionUrl: privateUrl }),
+          ).resolves.toBeUndefined();
+        } finally {
+          delete process.env.CLICKHOUSE_URL__acme__org_1;
+        }
+
+        expect(clickhouseMocks.resolveClient).toHaveBeenCalledWith("org_1");
       });
     });
   });

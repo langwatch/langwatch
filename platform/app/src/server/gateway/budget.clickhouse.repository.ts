@@ -27,7 +27,8 @@ import type {
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
 } from "@prisma/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import {
   bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
@@ -232,12 +233,11 @@ export class GatewayBudgetClickHouseRepository {
     }
 
     const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
+    const probeRows = await client.query<Record<string, unknown>>({
+      table: EVENTS_TABLE,
+      sql: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
+      params: { tenantId, gatewayRequestId },
     });
-    const probeRows = (await probe.json()) as unknown[];
     if (probeRows.length > 0) {
       logger.debug(
         { tenantId, gatewayRequestId, batchSize: rows.length },
@@ -249,9 +249,8 @@ export class GatewayBudgetClickHouseRepository {
     try {
       await client.insert({
         table: EVENTS_TABLE,
-        values: rows.map(toLedgerRecord),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: rows.map(toLedgerRecord),
+        target: writeTargetFor(EVENTS_TABLE),
       });
     } catch (error) {
       logger.error(
@@ -300,15 +299,13 @@ export class GatewayBudgetClickHouseRepository {
 
     const gatewayRequestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
     const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {gatewayRequestIds:Array(String)}`,
-      query_params: { tenantId, gatewayRequestIds },
-      format: "JSONEachRow",
+    const probeRows = await client.query<{ GatewayRequestId: string }>({
+      table: EVENTS_TABLE,
+      sql: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {gatewayRequestIds:Array(String)}`,
+      params: { tenantId, gatewayRequestIds },
     });
     const alreadyLedgered = new Set(
-      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
-        (row) => row.GatewayRequestId,
-      ),
+      probeRows.map((row) => row.GatewayRequestId),
     );
 
     const toInsert = rows.filter(
@@ -329,9 +326,8 @@ export class GatewayBudgetClickHouseRepository {
     try {
       await client.insert({
         table: EVENTS_TABLE,
-        values: toInsert.map(toLedgerRecord),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: toInsert.map(toLedgerRecord),
+        target: writeTargetFor(EVENTS_TABLE),
       });
     } catch (error) {
       logger.error(
@@ -459,8 +455,10 @@ export class GatewayBudgetClickHouseRepository {
         // `gateway_budget_scope_totals` which is a single physical
         // table; `resolveClient` only differs by project for routing.
         const client = await this.resolveClient(tenantIds[0]!);
-        const result = await client.query({
-          query: `
+        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
+        const rows = await client.query<Row>({
+          table: TOTALS_TABLE,
+          sql: `
             SELECT
               Scope,
               ScopeId,
@@ -472,11 +470,8 @@ export class GatewayBudgetClickHouseRepository {
               AND (${scopeFilter})
             GROUP BY Scope, ScopeId
           `,
-          query_params: params,
-          format: "JSONEachRow",
+          params,
         });
-        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
-        const rows = (await result.json()) as Row[];
         for (const t of targetsForWindow) {
           const scope = scopeToClickHouse(t.scope);
           const total = rows
@@ -530,8 +525,13 @@ export class GatewayBudgetClickHouseRepository {
     limit = 20,
   ): Promise<LedgerEventRow[]> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+      occurredAtMs: string;
+      status: string;
+    };
+    const rows = await client.query<Row>({
+      table: EVENTS_TABLE,
+      sql: `
         SELECT
           GatewayRequestId AS id,
           BudgetId AS budgetId,
@@ -550,14 +550,8 @@ export class GatewayBudgetClickHouseRepository {
         ORDER BY OccurredAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, budgetId, limit },
-      format: "JSONEachRow",
+      params: { tenantId, budgetId, limit },
     });
-    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
-      occurredAtMs: string;
-      status: string;
-    };
-    const rows = (await result.json()) as Row[];
     return rows.map(toLedgerEventRow);
   }
 
@@ -590,8 +584,13 @@ export class GatewayBudgetClickHouseRepository {
         return `{vk${i}:String}`;
       })
       .join(",");
-    const result = await client.query({
-      query: `
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+      occurredAtMs: string;
+      status: string;
+    };
+    const rows = await client.query<Row>({
+      table: EVENTS_TABLE,
+      sql: `
         SELECT
           GatewayRequestId AS id,
           BudgetId AS budgetId,
@@ -611,14 +610,8 @@ export class GatewayBudgetClickHouseRepository {
           AND OccurredAt <  fromUnixTimestamp64Milli({to:Int64})
         ORDER BY OccurredAt DESC
       `,
-      query_params: params,
-      format: "JSONEachRow",
+      params,
     });
-    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
-      occurredAtMs: string;
-      status: string;
-    };
-    const rows = (await result.json()) as Row[];
     return rows.map(toLedgerEventRow);
   }
 }

@@ -1,6 +1,12 @@
 /**
- * Retry safety is a property of the write target, never of the error
- * (ADR-104 §2-3). A socket timeout looks identical from the caller's side
+ * Only inserts are retried. A select and a DDL statement are re-issued by
+ * whoever called them or not at all (ADR-104 §3, amended) — see
+ * {@link evaluateDuplicateSafety} for why a read's retry costs more than it
+ * buys, and why a repeated `CREATE`/`ALTER` is not a thing this client may
+ * decide to do on its own.
+ *
+ * Within inserts, retry safety is a property of the write target, never of the
+ * error (ADR-104 §2-3). A socket timeout looks identical from the caller's side
  * whether the block landed on the server or not — what differs is the
  * consequence, and the consequence is entirely a function of what the
  * destination table does with two rows sharing a key. Keying the decision on
@@ -82,18 +88,37 @@ export function isTransientTransportError(error: unknown): boolean {
 }
 
 /**
- * Whether a duplicate delivery of this operation is safe to make, independent
- * of whether the failure that prompted the retry was transient. This is the
- * ADR-099 / ADR-104 table verbatim: `replacing` collapses duplicates at
- * merge; `append` collapses only when its sort key already carries a
- * per-record identity; `aggregating` and DDL never do.
+ * Whether this operation may be re-issued at all.
+ *
+ * For an insert this is a duplicate-safety question, and the answer is the
+ * ADR-099 / ADR-104 table verbatim: `replacing` collapses duplicates at merge;
+ * `append` collapses only when its sort key already carries a per-record
+ * identity; `aggregating` never does.
+ *
+ * For a select it is not a duplicate question at all — a repeated read
+ * corrupts nothing — and the client still refuses, because the cost of the
+ * retry is paid by everyone else. Only inserts are retried (ADR-104 §3,
+ * amended). A read that failed on transport has already consumed its slice of
+ * a pool that defaults to 10 and a per-tenant bulkhead below that; re-issuing
+ * it holds that slot for up to three more request timeouts while the very
+ * condition that broke the connection is still in force, which is how a
+ * ClickHouse blip becomes a queue of reads long enough to outlive it. A read
+ * also always has a caller waiting on it — an HTTP request, a UI panel — and
+ * that caller is the right place to decide whether a stale answer, a narrower
+ * query or a visible failure beats another 30 seconds of waiting. An insert
+ * has no such caller: its retry is the only thing standing between a transient
+ * blip and lost data, which is why it keeps one.
  */
 function evaluateDuplicateSafety(
   operation: Operation,
 ): { readonly safe: true } | { readonly safe: false; readonly reason: string } {
   switch (operation.kind) {
     case "select":
-      return { safe: true };
+      return {
+        safe: false,
+        reason:
+          "selects are never retried: a read has a caller waiting and holds a pooled connection the rest of the process needs",
+      };
     case "ddl":
       return {
         safe: false,
@@ -176,17 +201,21 @@ export function decideRetry(args: {
     maxAttempts = DEFAULT_MAX_ATTEMPTS,
   } = args;
 
+  // Structural refusals are evaluated before the error is classified, so the
+  // reason a select or a DDL gives back names the real ground — "selects are
+  // never retried" — rather than whichever property the failure happened to
+  // have. For an operation that is never retried, the error is irrelevant.
+  const safety = evaluateDuplicateSafety(operation);
+  if (!safety.safe) {
+    return { retry: false, reason: safety.reason };
+  }
+
   if (!isTransientTransportError(error)) {
     return {
       retry: false,
       reason:
         "not a transient transport failure — retrying would reproduce a deterministic server-side outcome",
     };
-  }
-
-  const safety = evaluateDuplicateSafety(operation);
-  if (!safety.safe) {
-    return { retry: false, reason: safety.reason };
   }
 
   if (attempt >= maxAttempts) {

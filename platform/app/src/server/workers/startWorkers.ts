@@ -43,17 +43,33 @@ async function verifyDatabaseReady(): Promise<void> {
 }
 
 // ClickHouse storage-stats collection (feeds the Ops storage metrics).
+//
+// Reads `system.parts` / `system.disks` / `system.backup_log` — facts about the
+// deployment, not about any tenant — so it takes the infrastructure client
+// rather than a resolver. The tenant wrapper is what turns the package client's
+// positional rows back into the named rows this collector's SQL is written
+// against, and what converts the UInt64 byte/row counts back to numbers.
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } = await import(
-    "~/server/clickhouse/clickhouseClient"
+  const { getInfrastructureClickHouseClient } = await import(
+    "~/server/app-layer/clients/clickhouse/shared"
+  );
+  const { tenantClickHouseClient } = await import(
+    "~/server/app-layer/clients/clickhouse/tenant-client"
   );
   const { startStorageStatsCollection, stopStorageStatsCollection } =
     await import("~/server/clickhouse/metrics");
-  const clickHouseClient = getSharedClickHouseClient();
+  const clickHouseClient = getInfrastructureClickHouseClient();
   if (clickHouseClient) {
-    startStorageStatsCollection(clickHouseClient);
+    startStorageStatsCollection(
+      tenantClickHouseClient({
+        client: clickHouseClient,
+        // Matches no organisation, so routing resolves it to the shared
+        // endpoint — the one whose parts and disks these gauges describe.
+        tenantId: "__infrastructure__",
+      }),
+    );
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }

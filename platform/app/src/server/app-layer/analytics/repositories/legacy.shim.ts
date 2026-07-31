@@ -30,7 +30,7 @@ import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/cli
 import type { TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { adjustTimeScaleForBucketCap } from "../query-builders/_shared";
 import { parseTimeseriesRows } from "./_timeseries-row-parser";
@@ -38,6 +38,17 @@ import { parseTimeseriesRows } from "./_timeseries-row-parser";
 const logger = createLogger(
   "langwatch:app-layer:analytics:legacy-analytics-shim",
 );
+
+/**
+ * Metric/log label for this read.
+ *
+ * `trace_summaries` for both routes: the eval-source registry entries reach the
+ * same `buildTimeseriesQuery`, which drives from `trace_summaries` and joins
+ * `evaluation_runs` in. Labelling by the driving table keeps one legacy read
+ * path reporting as one series on `clickhouse_query_duration_seconds{table}`
+ * rather than splitting by which registry the caller asked for.
+ */
+const DRIVING_TABLE = "trace_summaries";
 
 export interface LegacyAnalyticsShim {
   run(input: TimeseriesInputType): Promise<TimeseriesResult>;
@@ -84,13 +95,12 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
     });
 
     try {
-      const result = await client.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      const rows = await client.query<Record<string, unknown>>({
+        table: DRIVING_TABLE,
+        sql,
+        params,
+        settings: ANALYTICS_CLICKHOUSE_SETTINGS,
       });
-      const rows = (await result.json()) as Array<Record<string, unknown>>;
       return parseTimeseriesRows({
         rows,
         series: input.series,

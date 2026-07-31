@@ -5,9 +5,7 @@ export {
   initializeApp,
   resetApp,
 } from "./app";
-export type { ClickHouseFactoryOptions } from "./clients/clickhouse.factory";
 // Client factories
-export { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 export type { PrismaFactoryOptions } from "./clients/prisma.factory";
 export { createPrismaClient } from "./clients/prisma.factory";
 export type { RedisFactoryOptions } from "./clients/redis.factory";

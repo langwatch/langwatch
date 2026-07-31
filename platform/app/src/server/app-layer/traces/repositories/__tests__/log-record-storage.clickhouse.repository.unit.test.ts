@@ -7,7 +7,10 @@ import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clic
 const LEGACY_CLAUDE_KIND_ATTR = "langwatch.claude_code.kind";
 
 const repoCapturingQuery = (rows: unknown[] = []) => {
-  const query = vi.fn().mockResolvedValue({ json: async () => rows });
+  // The client returns decoded, column-named rows directly — the repository
+  // mutates that array to trim the over-fetched detection row, so each call
+  // hands back its own copy.
+  const query = vi.fn(async () => [...rows]);
   const resolveClient = (async () => ({
     query,
   })) as unknown as ConstructorParameters<
@@ -19,8 +22,8 @@ const repoCapturingQuery = (rows: unknown[] = []) => {
 
 const capturedQuery = (query: ReturnType<typeof vi.fn>) =>
   query.mock.calls[0]![0] as {
-    query: string;
-    query_params: Record<string, unknown>;
+    sql: string;
+    params: Record<string, unknown>;
   };
 
 describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
@@ -34,13 +37,13 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
 
       await repo.getLogsByTraceId("project_test", "trace-1", occurredAtMs);
 
-      const { query: sql, query_params } = capturedQuery(query);
+      const { sql, params } = capturedQuery(query);
       expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
         2,
       );
       const windowMs = 2 * 24 * 60 * 60 * 1000;
-      expect(query_params.fromMs).toBe(occurredAtMs - windowMs);
-      expect(query_params.toMs).toBe(occurredAtMs + windowMs);
+      expect(params.fromMs).toBe(occurredAtMs - windowMs);
+      expect(params.toMs).toBe(occurredAtMs + windowMs);
     });
   });
 
@@ -55,12 +58,12 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
 
       expect(query).toHaveBeenCalledTimes(1);
-      const { query_params } = capturedQuery(query);
+      const { params } = capturedQuery(query);
       const windowMs = 2 * 24 * 60 * 60 * 1000;
       // The single query stayed on the ±2d hinted window; it never fell back to
       // the now-anchored lookback frame.
-      expect(query_params.fromMs).toBe(1_700_000_000_000 - windowMs);
-      expect(query_params.toMs).toBe(1_700_000_000_000 + windowMs);
+      expect(params.fromMs).toBe(1_700_000_000_000 - windowMs);
+      expect(params.toMs).toBe(1_700_000_000_000 + windowMs);
     });
   });
 
@@ -72,14 +75,14 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       await repo.getLogsByTraceId("project_test", "trace-1");
 
       const after = Date.now();
-      const { query: sql, query_params } = capturedQuery(query);
+      const { sql, params } = capturedQuery(query);
       expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
         2,
       );
       const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
       const lookbackMs = 90 * 24 * 60 * 60 * 1000;
-      const toMs = query_params.toMs as number;
-      const fromMs = query_params.fromMs as number;
+      const toMs = params.toMs as number;
+      const fromMs = params.fromMs as number;
       // Upper bound is now() + 2d (clock-skew headroom).
       expect(toMs).toBeGreaterThanOrEqual(before + partitionWindowMs);
       expect(toMs).toBeLessThanOrEqual(after + partitionWindowMs);
@@ -108,9 +111,9 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
 
       await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
 
-      const { query: sql, query_params } = capturedQuery(query);
+      const { sql, params } = capturedQuery(query);
       expect(sql).toContain("LIMIT {limitPlusOne:UInt32}");
-      expect(query_params.limitPlusOne).toBe(2001);
+      expect(params.limitPlusOne).toBe(2001);
     });
 
     it("returns only the oldest rows up to a caller-narrowed limit", async () => {
@@ -137,14 +140,14 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
 
       await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
 
-      const { query: sql, query_params } = capturedQuery(query);
+      const { sql, params } = capturedQuery(query);
       expect(sql).toContain("Body");
       expect(sql).toContain("Attributes");
       // The generic read must NOT re-introduce the retired claude-kind filter.
       expect(sql).not.toContain(LEGACY_CLAUDE_KIND_ATTR);
       expect(sql).not.toMatch(/Attributes\[\{kindKey/);
-      expect(query_params.tenantId).toBe("project_test");
-      expect(query_params.traceId).toBe("trace-1");
+      expect(params.tenantId).toBe("project_test");
+      expect(params.traceId).toBe("trace-1");
     });
 
     it("maps stored rows to StoredLogRecordRow with body + attributes + scope", async () => {

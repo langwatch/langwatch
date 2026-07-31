@@ -31,9 +31,6 @@ beforeEach(() => {
       ingestionSource: { findUnique: sourceFindUnique, update: sourceUpdate },
     },
   }));
-  vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForProject: async () => ({}),
-  }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
     GovernanceOcsfEventsClickHouseRepository: class {
       async insertEvent(row: unknown) {

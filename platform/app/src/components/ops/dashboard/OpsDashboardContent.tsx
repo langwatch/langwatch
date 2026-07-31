@@ -1,104 +1,44 @@
-import {
-  Box,
-  Card,
-  HStack,
-  SimpleGrid,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { AnomaliesCard } from "~/components/ops/queues/AnomaliesCard";
-import { BlockedCard } from "~/components/ops/queues/BlockedCard";
-import { DlqCard } from "~/components/ops/queues/DlqCard";
-import { GroupsCard } from "~/components/ops/queues/GroupsCard";
-import { PipelineTreeCard } from "~/components/ops/queues/PipelineTreeCard";
-import {
-  formatCount,
-  formatMs,
-  formatRate,
-} from "~/components/ops/shared/formatters";
+import { LanesCard } from "~/components/ops/queues/LanesCard";
+import { ParkedLanesCard } from "~/components/ops/queues/ParkedLanesCard";
 import type { DashboardData } from "~/server/app-layer/ops/types";
-import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
+import { buildDashboardTiles } from "./dashboardTiles";
+import { LaneDepthChart } from "./LaneDepthChart";
 import { LinkedStat } from "./LinkedStat";
 import { RedisStatTiles } from "./RedisStatTiles";
 import { ReplayHistorySection } from "./ReplayHistorySection";
-import { ThroughputChart } from "./ThroughputChart";
 
+/**
+ * The ops dashboard, over the dispatch plane's lane vocabulary (ADR-108).
+ *
+ * Every figure below is read from a lane key or from the collector's own
+ * process sampling. Throughput, latency and dead-letter tiles used to sit in
+ * this grid; the substrate for all three went with the old plane, and rates
+ * leave the new one through a scraped `Metrics` port that has no read seam.
+ * They are absent rather than zeroed — a zero here is a number an operator
+ * would trust during the incident this page exists for.
+ */
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
-  const totalBlocked = data.queues.reduce(
-    (sum, q) => sum + q.blockedGroupCount,
-    0,
-  );
-  const totalParked = data.queues.reduce(
-    (sum, q) => sum + q.parkedGroupCount,
-    0,
-  );
-  const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
-
-  const queuesQuery = api.ops.listQueues.useQuery(undefined, {
-    refetchInterval: 10000,
-  });
-  const queueNames = useMemo(
-    () => (queuesQuery.data ?? []).map((q) => q.name),
-    [queuesQuery.data],
-  );
+  const tiles = useMemo(() => buildDashboardTiles(data), [data]);
 
   return (
     <VStack align="stretch" gap={5} width="full">
-      <ActiveOperationsSection data={data} />
+      <ActiveOperationsSection />
 
-      <SimpleGrid columns={{ base: 2, md: 5, lg: 10 }} gap={1}>
-        <LinkedStat
-          label="Staged/s"
-          value={formatRate(data.throughputIngestedPerSec)}
-          sublabel={`peak ${formatRate(data.peakIngestedPerSec)}`}
-        />
-        <LinkedStat
-          label="Completed/s"
-          value={formatRate(data.completedPerSec)}
-          sublabel={`peak ${formatRate(data.peakCompletedPerSec)} · ${formatCount(
-            data.totalCompleted,
-          )} total`}
-        />
-        <LinkedStat
-          label="Failed/s"
-          value={formatRate(data.failedPerSec)}
-          sublabel={
-            data.totalFailed > 0
-              ? `${formatCount(data.totalFailed)} total`
-              : undefined
-          }
-          color={data.failedPerSec > 0 ? "red.500" : undefined}
-        />
-        <LinkedStat
-          label="Blocked"
-          value={totalBlocked.toString()}
-          sublabel={`${data.totalGroups} groups`}
-          color={totalBlocked > 0 ? "red.500" : undefined}
-        />
-        <LinkedStat
-          label="Parked"
-          value={totalParked.toString()}
-          sublabel="over cap"
-          color={totalParked > 0 ? "orange.500" : undefined}
-        />
-        <LinkedStat
-          label="P50"
-          value={formatMs(data.latencyP50Ms)}
-          sublabel={`peak ${formatMs(data.peakLatencyP50Ms)}`}
-        />
-        <LinkedStat
-          label="P99"
-          value={formatMs(data.latencyP99Ms)}
-          sublabel={`peak ${formatMs(data.peakLatencyP99Ms)}`}
-        />
-        <LinkedStat
-          label="DLQ"
-          value={totalDlq.toString()}
-          color={totalDlq > 0 ? "orange.500" : undefined}
-        />
+      <SimpleGrid columns={{ base: 2, md: 5, lg: 9 }} gap={1}>
+        {tiles.map((tile) => (
+          <LinkedStat
+            key={tile.source}
+            label={tile.label}
+            value={tile.value}
+            sublabel={tile.sublabel}
+            color={tile.color}
+            testId={tile.testId}
+          />
+        ))}
         <RedisStatTiles data={data} />
       </SimpleGrid>
 
@@ -110,72 +50,19 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
             color="fg.muted"
             marginBottom={2}
           >
-            Throughput
+            Lane depth
           </Text>
-          <ThroughputChart data={data} />
+          <LaneDepthChart data={data} />
         </Card.Body>
       </Card.Root>
 
-      <PipelineTreeCard
-        pipelineTree={data.pipelineTree}
-        pausedKeys={data.pausedKeys}
-        queueNames={queueNames}
+      <ParkedLanesCard
+        clusters={data.topParkReasons}
+        totalParked={data.parkedLanes}
       />
 
-      <Card.Root overflow="hidden">
-        <HStack paddingX={4} paddingTop={3} paddingBottom={2}>
-          <Text textStyle="xs" fontWeight="medium" color="fg.muted">
-            Top Errors
-          </Text>
-        </HStack>
-        {data.topErrors.length > 0 ? (
-          <Table.ScrollArea>
-            <Table.Root
-              size="sm"
-              variant="line"
-              css={{ "& tr:last-child td": { borderBottom: "none" } }}
-            >
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="60px">Count</Table.ColumnHeader>
-                  <Table.ColumnHeader>Error</Table.ColumnHeader>
-                  <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {data.topErrors.slice(0, 5).map((err) => (
-                  <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
-                    <Table.Cell>
-                      <Text color="red.500" fontWeight="medium">
-                        {err.count}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text truncate maxWidth="400px">
-                        {err.sampleMessage}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell color="fg.muted">
-                      {err.pipelineName ?? "\u2014"}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Table.ScrollArea>
-        ) : (
-          <Box paddingX={4} paddingBottom={4}>
-            <Text textStyle="xs" color="fg.muted">
-              {totalBlocked > 0 ? "0 errors" : "No errors"}
-            </Text>
-          </Box>
-        )}
-      </Card.Root>
-
       <AnomaliesCard />
-      <BlockedCard queueNames={queueNames} />
-      <DlqCard queueNames={queueNames} />
-      <GroupsCard queueNames={queueNames} />
+      <LanesCard laneKinds={data.laneKinds} />
 
       <ReplayHistorySection />
     </VStack>

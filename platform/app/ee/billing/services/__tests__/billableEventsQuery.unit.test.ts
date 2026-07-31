@@ -4,13 +4,13 @@ import {
   queryTraceSummariesTotalUniq,
 } from "../billableEventsQuery";
 
-const { mockGetClickHouseClientForProject } = vi.hoisted(() => ({
-  mockGetClickHouseClientForProject: vi.fn(),
+const { mockClickHouseForProject } = vi.hoisted(() => ({
+  mockClickHouseForProject: vi.fn(),
 }));
 
-vi.mock("../../../../src/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: mockGetClickHouseClientForProject,
-  getClickHouseClientForOrganization: vi.fn(),
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: mockClickHouseForProject,
+  clickHouseForOrganization: vi.fn(),
 }));
 
 describe("billingMonthDateRange", () => {
@@ -50,10 +50,8 @@ describe("queryTraceSummariesTotalUniq", () => {
 
   describe("when a ClickHouse client is available", () => {
     it("queries with tenant-scoped and month-bounded params and parses the total", async () => {
-      const mockQuery = vi
-        .fn()
-        .mockResolvedValue({ json: () => Promise.resolve([{ total: "42" }]) });
-      mockGetClickHouseClientForProject.mockResolvedValue({
+      const mockQuery = vi.fn().mockResolvedValue([{ total: "42" }]);
+      mockClickHouseForProject.mockResolvedValue({
         query: mockQuery,
       });
 
@@ -63,25 +61,24 @@ describe("queryTraceSummariesTotalUniq", () => {
       });
 
       expect(result).toBe(42);
-      expect(mockGetClickHouseClientForProject).toHaveBeenCalledWith("proj-1");
+      expect(mockClickHouseForProject).toHaveBeenCalledWith("proj-1");
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: {
+          params: {
             tenantIds: ["proj-1", "proj-2"],
             startDate: "2026-02-01 00:00:00.000",
             endDate: "2026-03-01 00:00:00.000",
           },
         }),
       );
-      const queryString = (mockQuery.mock.calls[0]?.[0] as { query: string })
-        .query;
-      expect(queryString).toContain("TenantId IN {tenantIds:Array(String)}");
+      const sql = (mockQuery.mock.calls[0]?.[0] as { sql: string }).sql;
+      expect(sql).toContain("TenantId IN {tenantIds:Array(String)}");
     });
   });
 
   describe("when no ClickHouse client is available", () => {
     it("returns null so callers can distinguish outage from zero usage", async () => {
-      mockGetClickHouseClientForProject.mockResolvedValue(null);
+      mockClickHouseForProject.mockResolvedValue(null);
 
       const result = await queryTraceSummariesTotalUniq({
         projectIds: ["proj-1"],
@@ -100,7 +97,7 @@ describe("queryTraceSummariesTotalUniq", () => {
       });
 
       expect(result).toBe(0);
-      expect(mockGetClickHouseClientForProject).not.toHaveBeenCalled();
+      expect(mockClickHouseForProject).not.toHaveBeenCalled();
     });
   });
 });

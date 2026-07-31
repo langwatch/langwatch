@@ -1,6 +1,15 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import IORedis, { type Redis } from "ioredis";
+import {
+  type ClickHouseClientResolver,
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
+import {
+  type AppClickHouseClient,
+  createAppClickHouseClient,
+} from "~/server/app-layer/clients/clickhouseClient.factory";
 import { migrateUp } from "~/server/clickhouse/goose";
 import { toError } from "~/utils/posthogErrorCapture";
 
@@ -8,6 +17,13 @@ const logger = createLogger("langwatch:event-sourcing:test-containers");
 
 let clickHouseClient: ClickHouseClient | null = null;
 let redisConnection: Redis | null = null;
+/**
+ * The url the driver client was built from, database included. Distinct from
+ * the `clickHouseUrl` `startTestContainers` returns, which on the CI branch
+ * carries no database path.
+ */
+let qualifiedClickHouseUrl: string | null = null;
+let testAppClickHouseClient: AppClickHouseClient | null = null;
 const migratedUrls = new Set<string>();
 
 /**
@@ -76,6 +92,7 @@ export async function startTestContainers(): Promise<{
     const urlWithDatabase = new URL(clickHouseUrl);
     urlWithDatabase.pathname = `/${TEST_DATABASE}`;
 
+    qualifiedClickHouseUrl = urlWithDatabase.toString();
     clickHouseClient = createClient({
       url: urlWithDatabase,
       clickhouse_settings: {
@@ -105,6 +122,7 @@ export async function startTestContainers(): Promise<{
 
     // Don't run migrations - globalSetup already did that
     // globalSetup provides URL with correct database already in pathname
+    qualifiedClickHouseUrl = clickHouseUrl;
     if (!clickHouseClient) {
       clickHouseClient = createClient({
         url: new URL(clickHouseUrl),
@@ -143,6 +161,23 @@ export async function stopTestContainers(): Promise<void> {
 
   // Close ClickHouse client. Bounded by a small timeout so a wedged
   // HTTP keep-alive pool can't hold the shard's afterAll forever.
+  // Closed before the driver client so its pools release with the rest, and
+  // reset so the next file's `startTestContainers` rebuilds against whatever
+  // url that run resolves.
+  if (testAppClickHouseClient) {
+    const app = testAppClickHouseClient;
+    testAppClickHouseClient = null;
+    qualifiedClickHouseUrl = null;
+    try {
+      await Promise.race([
+        app.close(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch (e) {
+      errors.push(toError(e));
+    }
+  }
+
   if (clickHouseClient) {
     const client = clickHouseClient;
     clickHouseClient = null;
@@ -192,6 +227,49 @@ export async function stopTestContainers(): Promise<void> {
  */
 export function getTestClickHouseClient(): ClickHouseClient | null {
   return clickHouseClient;
+}
+
+/**
+ * A {@link TenantClickHouseClient} over the test container, for the
+ * integration tests whose subject now takes one.
+ *
+ * Here rather than copied into each test file for the obvious reason and one
+ * less obvious one. `startTestContainers` returns `clickHouseUrl` **without
+ * the database in its path** on the CI branch — it grafts the database on
+ * separately when building the driver client — so a test that built its own
+ * client from that returned url would silently run against `default` under CI
+ * and against the test database locally, which is the kind of difference that
+ * shows up as one unreproducible red build. {@link qualifiedClickHouseUrl}
+ * is the url the driver client was actually built from, so both branches agree.
+ *
+ * The tenant is a parameter because it is the thing under test: a repository
+ * bound to the wrong tenant is exactly the bug these suites exist to catch.
+ */
+export function getTestTenantClickHouseClient(
+  tenantId: string,
+): TenantClickHouseClient {
+  if (!qualifiedClickHouseUrl) {
+    throw new Error(
+      "startTestContainers() must run before getTestTenantClickHouseClient()",
+    );
+  }
+
+  testAppClickHouseClient ??= createAppClickHouseClient({
+    url: qualifiedClickHouseUrl,
+  });
+
+  return tenantClickHouseClient({
+    client: testAppClickHouseClient.resolveClient(tenantId),
+    tenantId,
+  });
+}
+
+/**
+ * A resolver over the test container, for subjects that take a
+ * `ClickHouseClientResolver` rather than a bound client.
+ */
+export function getTestClickHouseClientResolver(): ClickHouseClientResolver {
+  return async (tenantId: string) => getTestTenantClickHouseClient(tenantId);
 }
 
 /**

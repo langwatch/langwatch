@@ -17,7 +17,12 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import type {
+  ClickHouseClientResolver,
+  TenantClickHouseClient,
+  TenantQuery,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { AnalyticsClientUnavailableError } from "../errors";
 import {
   type AnalyticsTimeseriesReadRepository,
@@ -28,28 +33,85 @@ import {
   type RunTimeseriesParams,
 } from "../repositories/analyticsTimeseriesRead.repository";
 
+/**
+ * `metric` is the one each destination's builder accepts — the trace tables
+ * serve trace metrics and the evaluation tables serve evaluation metrics, and
+ * every builder refuses a metric the router should never have sent it. The
+ * guards below never get far enough to build SQL, but the success-path case
+ * does, so it has to ask each destination for something it can answer.
+ */
 const DESTINATIONS: {
   name: string;
+  table: string;
+  metric: string;
   create: (
     resolve: ClickHouseClientResolver,
   ) => AnalyticsTimeseriesReadRepository;
 }[] = [
-  { name: "trace-analytics-rollup", create: createTraceRollupReadRepo },
-  { name: "trace-analytics", create: createTraceSlimReadRepo },
-  { name: "evaluation-analytics-rollup", create: createEvalRollupReadRepo },
-  { name: "evaluation-analytics", create: createEvalSlimReadRepo },
+  {
+    name: "trace-analytics-rollup",
+    table: "trace_analytics_rollup",
+    metric: "performance.total_cost",
+    create: createTraceRollupReadRepo,
+  },
+  {
+    name: "trace-analytics",
+    table: "trace_analytics",
+    metric: "performance.total_cost",
+    create: createTraceSlimReadRepo,
+  },
+  {
+    name: "evaluation-analytics-rollup",
+    table: "evaluation_analytics_rollup",
+    metric: "evaluations.evaluation_score",
+    create: createEvalRollupReadRepo,
+  },
+  {
+    name: "evaluation-analytics",
+    table: "evaluation_analytics",
+    metric: "evaluations.evaluation_score",
+    create: createEvalSlimReadRepo,
+  },
 ];
 
-function params(overrides: Partial<RunTimeseriesParams> = {}) {
+/**
+ * A client that records what each read sent and answers with no rows. The
+ * repositories are asserted on the request they issued, not on a decoded
+ * result — the row shape is the parser's contract, covered in
+ * `timeseries-row-parser.unit.test.ts`.
+ */
+function capturingClient(): {
+  resolve: ClickHouseClientResolver;
+  requests: TenantQuery[];
+} {
+  const requests: TenantQuery[] = [];
+  const client = {
+    tenantId: "project-1",
+    query: async (request: TenantQuery) => {
+      requests.push(request);
+      return [];
+    },
+    insert: vi.fn(),
+    queryWindowed: vi.fn(),
+  } as unknown as TenantClickHouseClient;
+
+  return { resolve: async () => client, requests };
+}
+
+function params(
+  overrides: Partial<RunTimeseriesParams> = {},
+  metric = "performance.total_cost",
+) {
+  const series = [{ metric, aggregation: "sum" }];
   return {
     tenantId: "project-1",
-    series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+    series,
     builderInput: {
       projectId: "project-1",
       startDate: new Date("2026-06-15T00:00:00.000Z"),
       endDate: new Date("2026-06-16T00:00:00.000Z"),
       previousPeriodStartDate: new Date("2026-06-14T00:00:00.000Z"),
-      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+      series,
       timeScale: 60,
     },
     ...overrides,
@@ -57,8 +119,22 @@ function params(overrides: Partial<RunTimeseriesParams> = {}) {
 }
 
 describe("ADR-034 read repositories", () => {
-  for (const { name, create } of DESTINATIONS) {
+  for (const { name, table, metric, create } of DESTINATIONS) {
     describe(`${name} read repository`, () => {
+      describe("when the read reaches the client", () => {
+        it("labels the read with its own table and carries the analytics settings", async () => {
+          const { resolve, requests } = capturingClient();
+
+          await create(resolve).run(params({}, metric));
+
+          expect(requests).toHaveLength(1);
+          expect(requests[0]).toMatchObject({
+            table,
+            settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
+        });
+      });
+
       describe("given an empty tenantId", () => {
         it("throws before resolving a client", async () => {
           const resolveClient = vi.fn();

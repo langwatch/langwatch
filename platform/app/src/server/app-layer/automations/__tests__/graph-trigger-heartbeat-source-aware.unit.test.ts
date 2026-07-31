@@ -7,10 +7,10 @@
  * query `evaluation_analytics`.
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsMetricSource } from "~/server/app-layer/analytics/routing/field-availability";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   decideGraphTriggerHeartbeat,
   type GraphTriggerHeartbeatDeps,
@@ -91,23 +91,23 @@ interface QueryCall {
 }
 
 function makeClickHouseStub(): {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   calls: QueryCall[];
 } {
   const calls: QueryCall[] = [];
   const client = {
     query: vi.fn(
-      async (params: { query: string; query_params: { tenantId: string } }) => {
+      async (params: { sql: string; params: { tenantId: string } }) => {
         calls.push({
-          query: params.query,
-          tenantId: params.query_params.tenantId,
+          query: params.sql,
+          tenantId: params.params.tenantId,
         });
         // Return null recency so EVERY candidate enqueues (the test cares
         // about query routing, not enqueue filtering).
-        return { json: async () => [{ lastMs: null }] };
+        return [{ lastMs: null }];
       },
     ),
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   return { client, calls };
 }
 

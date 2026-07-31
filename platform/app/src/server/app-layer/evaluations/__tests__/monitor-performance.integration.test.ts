@@ -8,10 +8,15 @@
  * on the headline, the previous period, and every daily bucket.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deleteEvaluationRunsByTenant } from "~/server/analytics/clickhouse/__tests__/test-utils/clickhouse-cleanup";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   cleanupTestData,
   startTestContainers,
@@ -43,16 +48,20 @@ const previousStartMs = currentVsPreviousDates({
   filters: {},
 }).previousPeriodStartDate.getTime();
 
+/** The driver client, used by the fixtures to seed and read comparison rows. */
 let clickHouse: ClickHouseClient;
+let packageClient: ReturnType<typeof createClickHouseClient>;
+/** What the repository under test now takes. */
+let tenantClient: TenantClickHouseClient;
 let queryCount = 0;
 
 const countingClient = () =>
-  new Proxy(clickHouse, {
+  new Proxy(tenantClient, {
     get(target, property, receiver) {
       if (property === "query") {
-        return (params: Parameters<ClickHouseClient["query"]>[0]) => {
+        return (request: Parameters<TenantClickHouseClient["query"]>[0]) => {
           queryCount++;
-          return target.query(params);
+          return target.query(request);
         };
       }
       const value = Reflect.get(target, property, receiver);
@@ -62,7 +71,7 @@ const countingClient = () =>
 
 const readTablePerformance = async () => {
   const service = new MonitorPerformanceService(
-    new MonitorPerformanceClickHouseRepository(async () => clickHouse),
+    new MonitorPerformanceClickHouseRepository(async () => tenantClient),
   );
   return service.getPerformance({
     tenantId,
@@ -101,6 +110,8 @@ const expectSameNumbers = ({
 beforeAll(async () => {
   const containers = await startTestContainers();
   clickHouse = containers.clickHouseClient;
+  packageClient = createClickHouseClient({ url: containers.clickHouseUrl });
+  tenantClient = tenantClickHouseClient({ client: packageClient, tenantId });
 
   await seedMonitorPerformance({
     client: clickHouse,
@@ -118,6 +129,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await cleanupTestData(tenantId);
   await deleteEvaluationRunsByTenant({ client: clickHouse, tenantId });
+  await packageClient?.close();
   await stopTestContainers();
 });
 
@@ -162,7 +174,7 @@ describe("online evaluation monitor performance", () => {
 
   it("returns an explicit no-data result for a monitor without runs", async () => {
     const repository = new MonitorPerformanceClickHouseRepository(
-      async () => clickHouse,
+      async () => tenantClient,
     );
     const buckets = await repository.findBuckets({
       tenantId,
@@ -194,7 +206,7 @@ describe("online evaluation monitor performance", () => {
     it("reports the same score values as the analytics page", async () => {
       const [scorePerformance] = await readTablePerformance();
       const analyticsPage = await readAnalyticsPageNumbers({
-        client: clickHouse,
+        client: tenantClient,
         tenantId,
         evaluatorId: scoreEvaluatorId,
         metric: "evaluations.evaluation_score",
@@ -209,7 +221,7 @@ describe("online evaluation monitor performance", () => {
     it("reports the same pass rate as the analytics page", async () => {
       const [, guardrailPerformance] = await readTablePerformance();
       const analyticsPage = await readAnalyticsPageNumbers({
-        client: clickHouse,
+        client: tenantClient,
         tenantId,
         evaluatorId: guardrailEvaluatorId,
         metric: "evaluations.evaluation_pass_rate",

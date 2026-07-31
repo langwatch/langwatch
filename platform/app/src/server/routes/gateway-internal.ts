@@ -20,10 +20,8 @@ import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -506,7 +504,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   // stale `GatewayBudget.spentUsd` PG column that no writer updates.
   const chRepo = isClickHouseEnabled()
     ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await clickHouseForProject(projectId);
         if (!client) {
           throw new Error(
             `ClickHouse enabled but no client for project ${projectId}`,
@@ -667,7 +665,7 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
     prisma,
     isClickHouseEnabled()
       ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-          const client = await getClickHouseClientForProject(projectId);
+          const client = await clickHouseForProject(projectId);
           if (!client) {
             throw new Error(
               `ClickHouse enabled but no client for project ${projectId}`,

@@ -26,12 +26,10 @@
  * has 0 or 10k traces — we surface clear empty-state so the UI can
  * render "no usage yet" cards without special-case branching.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
@@ -146,7 +144,7 @@ export class PersonalUsageService {
    */
   async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
     const window = input.window ?? defaultMonthWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
+    const client = await clickHouseForProject(input.personalProjectId);
     if (!client) return emptySummary();
 
     const summaryRow = await this.querySummary(client, {
@@ -225,11 +223,18 @@ export class PersonalUsageService {
     input: PersonalUsageQueryInput,
   ): Promise<PersonalUsageBucket[]> {
     const window = input.window ?? defaultLast14DaysWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
+    const client = await clickHouseForProject(input.personalProjectId);
     if (!client) return fillEmptyBuckets(window);
 
-    const result = await client.query({
-      query: `
+    type RawBucket = {
+      Day: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
+    const rows = await client.query<RawBucket>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           toDate(LatestOccurredAt) AS Day,
           sum(TraceSpentUsd)       AS SpentUsd,
@@ -251,21 +256,12 @@ export class PersonalUsageService {
         ORDER BY Day
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
       `,
-      query_params: {
+      params: {
         tenantId: input.personalProjectId,
         fromMs: window.start.getTime(),
         toMs: window.end.getTime(),
       },
-      format: "JSONEachRow",
     });
-
-    type RawBucket = {
-      Day: string;
-      SpentUsd: number;
-      BilledUsd: number;
-      Requests: number;
-    };
-    const rows = (await result.json()) as RawBucket[];
 
     const byDay = new Map<
       string,
@@ -308,13 +304,15 @@ export class PersonalUsageService {
   }
 
   private async queryIngestionPrincipalBuckets(
-    client: ClickHouseClient,
+    client: TenantClickHouseClient,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBucket[]> {
     if (!isClickHouseEnabled()) return [];
     try {
-      const result = await client.query({
-        query: `
+      type Raw = { Day: string; SpentUsd: number; Requests: number };
+      const rows = await client.query<Raw>({
+        table: "gateway_budget_ledger_events",
+        sql: `
           SELECT
             toDate(OccurredAt) AS Day,
             sum(AmountUSD)     AS SpentUsd,
@@ -329,16 +327,13 @@ export class PersonalUsageService {
           ORDER BY Day
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
-        query_params: {
+        params: {
           tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
         },
-        format: "JSONEachRow",
       });
-      type Raw = { Day: string; SpentUsd: number; Requests: number };
-      const rows = (await result.json()) as Raw[];
       return rows.map((r) => {
         const spentUsd = Number(r.SpentUsd) || 0;
         // The gateway ledger records real per-token spend (virtual-key
@@ -374,11 +369,18 @@ export class PersonalUsageService {
     limit = 8,
   ): Promise<PersonalUsageBreakdown[]> {
     const window = input.window ?? defaultMonthWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
+    const client = await clickHouseForProject(input.personalProjectId);
     if (!client) return [];
 
-    const result = await client.query({
-      query: `
+    type RawBreakdown = {
+      Model: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
+    const rows = await client.query<RawBreakdown>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           Model,
           sum(TraceSpentUsd) AS SpentUsd,
@@ -402,22 +404,13 @@ export class PersonalUsageService {
         LIMIT {lim:UInt32}
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
       `,
-      query_params: {
+      params: {
         tenantId: input.personalProjectId,
         fromMs: window.start.getTime(),
         toMs: window.end.getTime(),
         lim: limit,
       },
-      format: "JSONEachRow",
     });
-
-    type RawBreakdown = {
-      Model: string;
-      SpentUsd: number;
-      BilledUsd: number;
-      Requests: number;
-    };
-    const rows = (await result.json()) as RawBreakdown[];
 
     // Aggregate per-model since GROUP BY TraceId, Model returned per-trace rows.
     const aggregated = new Map<string, PersonalUsageBreakdown>();
@@ -461,13 +454,15 @@ export class PersonalUsageService {
   }
 
   private async queryIngestionPrincipalBreakdown(
-    client: ClickHouseClient,
+    client: TenantClickHouseClient,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBreakdown[]> {
     if (!isClickHouseEnabled()) return [];
     try {
-      const result = await client.query({
-        query: `
+      type Raw = { Label: string; SpentUsd: number; Requests: number };
+      const rows = await client.query<Raw>({
+        table: "gateway_budget_ledger_events",
+        sql: `
           SELECT
             Model AS Label,
             sum(AmountUSD)             AS SpentUsd,
@@ -482,16 +477,13 @@ export class PersonalUsageService {
           ORDER BY SpentUsd DESC
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
-        query_params: {
+        params: {
           tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
         },
-        format: "JSONEachRow",
       });
-      type Raw = { Label: string; SpentUsd: number; Requests: number };
-      const rows = (await result.json()) as Raw[];
       return rows.map((r) => {
         const spentUsd = Number(r.SpentUsd) || 0;
         // Gateway ledger spend is real per-token spend, so fully billed.
@@ -510,7 +502,7 @@ export class PersonalUsageService {
   // --- internals ---------------------------------------------------------
 
   private async querySummary(
-    client: ClickHouseClient,
+    client: TenantClickHouseClient,
     params: { tenantId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
@@ -519,8 +511,16 @@ export class PersonalUsageService {
     promptTokens: number;
     completionTokens: number;
   }> {
-    const result = await client.query({
-      query: `
+    type RawSummary = {
+      TotalCost: number | null;
+      BilledCost: number | null;
+      RequestCount: number | null;
+      PromptTokens: number | null;
+      CompletionTokens: number | null;
+    };
+    const [row] = await client.query<RawSummary>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           sum(SpentUsd)        AS TotalCost,
           sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledCost,
@@ -542,22 +542,12 @@ export class PersonalUsageService {
         )
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
       `,
-      query_params: {
+      params: {
         tenantId: params.tenantId,
         fromMs: params.window.start.getTime(),
         toMs: params.window.end.getTime(),
       },
-      format: "JSONEachRow",
     });
-
-    type RawSummary = {
-      TotalCost: number | null;
-      BilledCost: number | null;
-      RequestCount: number | null;
-      PromptTokens: number | null;
-      CompletionTokens: number | null;
-    };
-    const [row] = (await result.json()) as RawSummary[];
     if (!row) {
       return {
         totalCost: 0,
@@ -597,7 +587,7 @@ export class PersonalUsageService {
    *     request per user.
    */
   private async queryIngestionPrincipalSummary(
-    client: ClickHouseClient,
+    client: TenantClickHouseClient,
     params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
@@ -608,8 +598,15 @@ export class PersonalUsageService {
   } | null> {
     if (!isClickHouseEnabled()) return null;
     try {
-      const result = await client.query({
-        query: `
+      type RawSummary = {
+        TotalCost: number | null;
+        RequestCount: number | null;
+        PromptTokens: number | null;
+        CompletionTokens: number | null;
+      };
+      const [row] = await client.query<RawSummary>({
+        table: "gateway_budget_ledger_events",
+        sql: `
           SELECT
             sum(AmountUSD)            AS TotalCost,
             countDistinct(GatewayRequestId) AS RequestCount,
@@ -623,26 +620,19 @@ export class PersonalUsageService {
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
-        query_params: {
+        params: {
           tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
         },
-        format: "JSONEachRow",
       });
-
-      type RawSummary = {
-        TotalCost: number | null;
-        RequestCount: number | null;
-        PromptTokens: number | null;
-        CompletionTokens: number | null;
-      };
-      const [row] = (await result.json()) as RawSummary[];
       if (!row || !Number(row.RequestCount)) return null;
 
-      const topModelResult = await client.query({
-        query: `
+      type RawTop = { Name: string; Requests: number | null };
+      const [topRow] = await client.query<RawTop>({
+        table: "gateway_budget_ledger_events",
+        sql: `
           SELECT
             Model AS Name,
             countDistinct(GatewayRequestId) AS Requests
@@ -657,16 +647,13 @@ export class PersonalUsageService {
           LIMIT 1
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
-        query_params: {
+        params: {
           tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
         },
-        format: "JSONEachRow",
       });
-      type RawTop = { Name: string; Requests: number | null };
-      const [topRow] = (await topModelResult.json()) as RawTop[];
 
       return {
         totalCost: Number(row.TotalCost) || 0,
@@ -686,11 +673,13 @@ export class PersonalUsageService {
   }
 
   private async queryTopModel(
-    client: ClickHouseClient,
+    client: TenantClickHouseClient,
     params: { tenantId: string; window: PersonalUsageWindow },
   ): Promise<{ model: string; requests: number } | null> {
-    const result = await client.query({
-      query: `
+    type RawTopModel = { Model: string; Requests: number };
+    const rows = await client.query<RawTopModel>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           Model,
           count() AS Requests
@@ -710,16 +699,12 @@ export class PersonalUsageService {
         LIMIT 1
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
       `,
-      query_params: {
+      params: {
         tenantId: params.tenantId,
         fromMs: params.window.start.getTime(),
         toMs: params.window.end.getTime(),
       },
-      format: "JSONEachRow",
     });
-
-    type RawTopModel = { Model: string; Requests: number };
-    const rows = (await result.json()) as RawTopModel[];
     const top = rows[0];
     if (!top) return null;
     return { model: top.Model, requests: Number(top.Requests) || 0 };

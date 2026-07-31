@@ -23,7 +23,6 @@ import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langy
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import {
-  type ClickHouseClientResolver,
   clearCustomClientCache,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
@@ -32,6 +31,7 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import { prismaOutbox } from "~/server/event-sourcing/adapters/prismaOutbox";
 import { prismaProcessStore } from "~/server/event-sourcing/adapters/prismaProcessStore";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -83,7 +83,15 @@ import {
 import { ExperimentService } from "../experiments/experiment.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
-import type { ScenarioExecutionDispatcherHandle } from "../scenarios/execution/execution-dispatcher";
+import {
+  createScenarioExecutionDispatcher,
+  type ScenarioExecutionDispatcherHandle,
+} from "../scenarios/execution/execution-dispatcher";
+import { createScenarioExecutionDispatchDeps } from "../scenarios/execution/scenario-execution.deps";
+import {
+  createProcessorDependencies,
+  executeScenarioRun,
+} from "../scenarios/scenario.processor";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
@@ -108,8 +116,12 @@ import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { PrismaBillingReportingCandidatesService } from "./billing/billingReportingCandidates.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
-import { createAppClickHouseClient } from "./clients/clickhouseClient.factory";
-import { clickhouseClientMetrics } from "./clients/clickhouseClient.metrics";
+import {
+  closeSharedAppClickHouseClient,
+  requireClickHouse,
+} from "./clients/clickhouse/shared";
+import type { ClickHouseClientResolver } from "./clients/clickhouse/tenant-client";
+import { createClickHouseClientResolver } from "./clients/clickhouse/tenant-resolver";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
@@ -217,6 +229,10 @@ import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.pri
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicService } from "./topic-clustering/topic.service";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
+import {
+  CanonicalizeSpanAttributesService,
+  canonicalizeSpan,
+} from "./traces/canonicalisation";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
@@ -232,6 +248,7 @@ import { NullTraceListRepository } from "./traces/repositories/trace-list.reposi
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
+import { SpanNormalizationPipelineService } from "./traces/span-normalization.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import {
@@ -243,13 +260,49 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
+interface ScenarioExecutionGlobals {
+  __scenarioExecutionHandle?: ScenarioExecutionDispatcherHandle | null;
+}
+
+/**
+ * The hot-reload-surviving slot the scenario execution handle lives in.
+ *
+ * Read through a call rather than bound at module scope. `app-layer/index.ts`
+ * re-exports this module, so a router unit test that mocks `./app` down to the
+ * one export it needs imports `presets.ts` as a side effect — and a module-level
+ * dereference of `globalForApp` makes every such mock have to know about a
+ * global this module happens to keep, before a single line of it runs.
+ */
+function scenarioExecutionGlobals(): ScenarioExecutionGlobals {
+  return globalForApp as unknown as ScenarioExecutionGlobals;
+}
+
 /**
  * Late-bound handle the worker binds its scenario execution pool into, and
- * that the `scenarioExecution` process outbox dispatches through (ADR-073).
+ * that the `scenarioExecution` process outbox dispatches through (ADR-103).
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
 export function getScenarioExecutionHandle(): ScenarioExecutionDispatcherHandle | null {
-  return (globalForApp as any).__scenarioExecutionHandle ?? null;
+  return scenarioExecutionGlobals().__scenarioExecutionHandle ?? null;
+}
+
+/**
+ * Creates the handle and publishes it, so the process outbox has something to
+ * dispatch through from the moment the pipeline is built — the worker binds
+ * the pool into it a moment later (`bootScenarioProcessor`). Reuses the
+ * existing handle across a dev hot-reload: replacing it would orphan the pool
+ * the running worker already bound, and dispatches would land on a handle with
+ * no executor.
+ */
+function registerScenarioExecutionHandle(): ScenarioExecutionDispatcherHandle {
+  const globals = scenarioExecutionGlobals();
+  const existing = globals.__scenarioExecutionHandle;
+  if (existing) return existing;
+  const handle = createScenarioExecutionDispatcher({
+    run: ({ job, pool }) => executeScenarioRun(job, pool),
+  });
+  globals.__scenarioExecutionHandle = handle;
+  return handle;
 }
 
 export function initializeWebApp(): App {
@@ -279,8 +332,26 @@ export function initializeDefaultApp(options?: {
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
-  // Resolver: given a tenantId (projectId), returns the right ClickHouse client
-  const resolveClickHouseClient: ClickHouseClientResolver = async (
+  // The one `@langwatch/clickhouse` client this process has (ADR-104 §1) — the
+  // same instance the paths with no composition root reach for ambiently (the
+  // metrics collector, the TTL reconciler, `trace-blob-resolution.deps`).
+  // Constructing a second one here would open a second 25-connection pool
+  // against the same endpoint, and one that had not parsed the private
+  // per-organisation endpoints, so a pinned customer's rows would come from the
+  // shared server depending on which client the caller happened to hold.
+  const appClickHouse = requireClickHouse();
+
+  // Resolver: given a tenantId (projectId), the client bound to that tenant.
+  const resolveClickHouseClient: ClickHouseClientResolver =
+    createClickHouseClientResolver({ client: appClickHouse, prisma });
+
+  // The driver-based resolver, still here for the one slice the package client
+  // has not reached: `SimulationClickHouseRepository` reads through
+  // `JSONEachRow` and `ResultSet.json()`, which `TenantClickHouseClient` does
+  // not expose. Wiring it to the new resolver would not typecheck, and
+  // rewriting that repository is a migration of its own rather than part of
+  // this one.
+  const resolveLegacyClickHouseClient = async (
     tenantId: string,
   ): Promise<ClickHouseClient> => {
     const client = await getClickHouseClientForProject(tenantId);
@@ -288,18 +359,6 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
-
-  // ADR-104 composition seam: the new client, constructed once, alongside the
-  // legacy one above rather than in place of it. Only wired for the shared
-  // deployment (`config.clickhouseUrl`) — a private per-org ClickHouse URL
-  // still resolves through the legacy resolver until a caller needs the new
-  // client to route through `mappedTenantRouter` too (ADR-102 decision 6).
-  // Repositories take this as a constructor argument; nothing imports it
-  // ambiently.
-  const newClickHouseClient = createAppClickHouseClient({
-    url: config.clickhouseUrl,
-    observability: { metrics: clickhouseClientMetrics },
-  });
 
   const redis = config.skipRedis
     ? null
@@ -439,17 +498,22 @@ export function initializeDefaultApp(options?: {
 
   const dspySteps = traced(
     new DspyStepService(
-      // ADR-104: query/insert on the new client, DELETE on the legacy one —
-      // the new client has no mutation path.
+      // ADR-104: the raw package client, because this repository builds its
+      // rows through `@langwatch/clickhouse`'s codec rather than as objects.
       new DspyStepClickHouseRepository(
-        newClickHouseClient.resolveClient,
+        appClickHouse.resolveClient,
         retentionPolicyCache,
-        resolveClickHouseClient,
       ),
     ),
     "DspyStepService",
   );
-  const simulationReads = SimulationRunService.create(resolveClickHouseClient);
+  const simulationReads = SimulationRunService.create(
+    resolveLegacyClickHouseClient,
+  );
+  // What the `scenarioExecution` process manager records a run's ending with —
+  // the same pair the worker's own failure paths use, so a run ends the same
+  // way whichever side noticed it was over.
+  const scenarioProcessorDeps = createProcessorDependencies();
   // SuiteRunService is created after pipeline registration (needs queueRun command)
 
   const evaluations = {
@@ -798,11 +862,11 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // ADR-110: the event-sourcing composition root. `newClickHouseClient`
-  // already resolves the one `@langwatch/clickhouse` client every deployment
-  // shares today (`sharedDatabaseRouter`) — the tenant id passed here never
-  // changes which pooled client comes back, so any constant works.
-  const esClient = newClickHouseClient.resolveClient("__event_sourcing__");
+  // ADR-110: the event-sourcing composition root. The event log is
+  // deployment-wide rather than an organisation's, so it has no routing key of
+  // its own; an unrecognised key resolves to the shared endpoint, which is
+  // where it belongs.
+  const esClient = appClickHouse.resolveClient("__event_sourcing__");
   // `@langwatch/groupqueue`'s Redis substrate takes a single-node client;
   // a Cluster deployment falls back to the in-memory queue/spool until that
   // package grows Cluster support.
@@ -929,7 +993,24 @@ export function initializeDefaultApp(options?: {
       reap: () => reapExpiredLangySessionApiKeys({ prisma }),
       recordTick: async () => undefined,
     },
-    simulation: { cache: foldCache("simulation_run_state") },
+    simulation: {
+      cache: foldCache("simulation_run_state"),
+      // Without this a queued run is never dispatched and a dead one never
+      // reaches a terminal state — the run sits at QUEUED for good.
+      scenarioExecution: createScenarioExecutionDispatchDeps({
+        dispatcher: registerScenarioExecutionHandle(),
+        // The run store itself, not `cache` above: a fold cache is allowed to
+        // be behind, and behind here means dispatching a run that is already
+        // executing (see the port's own docblock).
+        runStatus: simulationReads,
+        scenarios: scenarioProcessorDeps.scenarioLookup,
+        terminalWriter: scenarioProcessorDeps.failureEmitter,
+      }),
+      broadcast,
+      // The publish half of the cancel channel; the worker subscribes to it in
+      // `startScenarioProcessor` and kills the child it owns.
+      ...(redis ? { cancellationPublisher: redis } : {}),
+    },
     topicClustering: {
       ports: {
         // The tenant rides on the handler context now, not the intent payload.
@@ -1075,11 +1156,34 @@ export function initializeDefaultApp(options?: {
     queueSimulationRun: commands.simulations.queueRun,
   });
 
+  const spanNormalization = new SpanNormalizationPipelineService(
+    new CanonicalizeSpanAttributesService(),
+  );
+
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
+      // `recordSpan` accepts a `CanonicalSpan`, never the OTLP envelope the
+      // edge assembles: decoding and canonicalisation are the trust boundary
+      // ADR-105 decision 7 puts upstream of the command. Handing the envelope
+      // straight over left `spanReceived`'s `(d) => d.traceId` resolver reading
+      // an absent field, so every event committed with an empty `AggregateId`
+      // and neither aggregate-scoped fold could key a row.
       recordSpan: async (data) => {
-        await commands.traces.recordSpan(data, { tenantId: data.tenantId });
+        const normalized = spanNormalization.normalizeSpanReceived(
+          data.tenantId,
+          data.span,
+          data.resource,
+          data.instrumentationScope,
+        );
+        const span = canonicalizeSpan({
+          normalized,
+          piiRedactionLevel:
+            data.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL,
+          occurredAt: data.occurredAt,
+          acceptedAt: Date.now(),
+        });
+        await commands.traces.recordSpan(span, { tenantId: span.tenantId });
       },
       // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
       // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
@@ -1199,14 +1303,16 @@ export function initializeDefaultApp(options?: {
   }> = [];
   gracefulCloseables.push({
     name: "clickhouse",
+    close: () => closeSharedAppClickHouseClient(),
+  });
+  // The driver pool behind `resolveLegacyClickHouseClient` and the ops event
+  // explorer. Goes when the last two call sites do.
+  gracefulCloseables.push({
+    name: "clickhouse-driver",
     close: async () => {
       await clearCustomClientCache();
       await closeClickHouseClient();
     },
-  });
-  gracefulCloseables.push({
-    name: "clickhouse-new",
-    close: () => newClickHouseClient.close(),
   });
   if (redis) {
     gracefulCloseables.push({
@@ -1352,7 +1458,6 @@ export function initializeDefaultApp(options?: {
     dataRetention,
     share,
     sharedTraceCache,
-    newClickHouseClient,
     commands,
     ops,
     _eventSourcing: es,
@@ -1746,16 +1851,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
     // No ClickHouse in the test preset — tests wire Null*Repository doubles
-    // directly instead. A caller that reaches for the raw client (rather than
-    // an injected repository) has a wiring bug the throw surfaces immediately.
-    newClickHouseClient: {
-      resolveClient: () => {
-        throw new Error("newClickHouseClient not wired in test app");
-      },
-      close: async () => {
-        /* noop */
-      },
-    },
+    // directly instead.
     ...overrides,
   });
 }

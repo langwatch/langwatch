@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getClickHouseClientForProjectMock = vi.hoisted(() => vi.fn());
+const clickHouseForProjectMock = vi.hoisted(() => vi.fn());
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: getClickHouseClientForProjectMock,
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: clickHouseForProjectMock,
 }));
 
+import { QueryMemoryExceededError } from "~/server/app-layer/traces/errors";
 import { EvaluationService } from "../evaluation.service";
 
 /**
@@ -13,19 +14,33 @@ import { EvaluationService } from "../evaluation.service";
  * throws the memory-limit error (when the heavy `Inputs` column is in the
  * projection) or returns `rows` (when it isn't). Lets us assert the
  * service degrades to the light projection instead of surfacing a 500.
+ *
+ * `failure` is a parameter because the shape of a memory limit depends on who
+ * hands it over, and the fallback has to survive both. A caller holding a raw
+ * client sees the driver's own message; a caller going through the tenant
+ * client sees a translated `QueryMemoryExceededError`, whose message is "Query
+ * exceeded its memory limit and was aborted" and shares no substring with the
+ * driver's. Testing only the first is how this fallback sat unreachable in
+ * production while its tests stayed green.
  */
-function clientThatOOMsOnInputs(rows: unknown[]) {
+function clientThatOOMsOnInputs(rows: unknown[], failure: () => Error) {
   return {
-    query: vi.fn(async ({ query }: { query: string }) => {
-      if (/\bInputs\b/.test(query)) {
-        throw new Error(
-          "Query memory limit exceeded: would use 6.00 GiB (attempt to allocate chunk of 4.00 GiB), maximum: 3.50 GiB: (while reading column Inputs)",
-        );
-      }
-      return { json: async () => rows };
+    query: vi.fn(async ({ sql }: { sql: string }) => {
+      if (/\bInputs\b/.test(sql)) throw failure();
+      return rows;
     }),
   };
 }
+
+/** What a caller holding a raw `@clickhouse/client` sees. */
+const rawDriverMemoryLimit = () =>
+  new Error(
+    "Query memory limit exceeded: would use 6.00 GiB (attempt to allocate chunk of 4.00 GiB), maximum: 3.50 GiB: (while reading column Inputs)",
+  );
+
+/** What the tenant client actually throws, translated, with the driver error in `reasons`. */
+const translatedMemoryLimit = () =>
+  new QueryMemoryExceededError({ reasons: [rawDriverMemoryLimit()] });
 
 const ROW = {
   EvaluationId: "eval-1",
@@ -51,10 +66,27 @@ describe("EvaluationService memory-limit fallback", () => {
   });
 
   describe("given the Inputs column read exceeds the ClickHouse memory limit", () => {
-    describe("when fetching evaluations for a single trace", () => {
+    describe("when the client reports it as the handled error it really throws", () => {
+      it("retries without Inputs rather than surfacing the failure", async () => {
+        const client = clientThatOOMsOnInputs([ROW], translatedMemoryLimit);
+        clickHouseForProjectMock.mockResolvedValue(client);
+
+        const service = EvaluationService.create();
+        const result = await service.getEvaluationsForTrace({
+          projectId: "project_test",
+          traceId: "trace-1",
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result?.[0]?.inputs).toBeNull();
+        expect(client.query).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when a caller holding a raw client reports the driver's own error", () => {
       it("retries without Inputs and still returns the verdicts", async () => {
-        const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const client = clientThatOOMsOnInputs([ROW], rawDriverMemoryLimit);
+        clickHouseForProjectMock.mockResolvedValue(client);
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationsForTrace({
@@ -72,8 +104,8 @@ describe("EvaluationService memory-limit fallback", () => {
 
     describe("when fetching evaluations for multiple traces", () => {
       it("retries without Inputs and groups the verdicts by trace", async () => {
-        const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const client = clientThatOOMsOnInputs([ROW], translatedMemoryLimit);
+        clickHouseForProjectMock.mockResolvedValue(client);
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationsMultiple({

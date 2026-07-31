@@ -2,14 +2,15 @@ import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/app-layer/traces/ingest/constants";
 import { generateDeterministicTraceSummaryId } from "~/server/app-layer/traces/ingest/spanRecordId";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
+import type { ClickHouseClientResolver } from "../../clients/clickhouse/tenant-client";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "../../clients/clickhouse/windowed-read";
+import { writeTargetFor } from "../../clients/clickhouse/write-targets";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
@@ -75,9 +76,8 @@ export class TraceSummaryClickHouseRepository
 
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        rows: [record],
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -125,9 +125,8 @@ export class TraceSummaryClickHouseRepository
 
       await client.insert({
         table: TABLE_NAME,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: records,
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -307,8 +306,12 @@ export class TraceSummaryClickHouseRepository
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      rowCount: string | number;
+      occurredAtMs: string | number | null;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           count() AS rowCount,
           toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
@@ -316,13 +319,8 @@ export class TraceSummaryClickHouseRepository
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
       `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
+      params: { tenantId, traceId },
     });
-    const rows = (await result.json()) as Array<{
-      rowCount: string | number;
-      occurredAtMs: string | number | null;
-    }>;
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount =
@@ -362,8 +360,9 @@ export class TraceSummaryClickHouseRepository
     // latest version, then the outer SELECT pulls the heavy columns
     // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
     // See dev/docs/best_practices/clickhouse-queries.md.
-    const result = await client.query({
-      query: `
+    const rows = await client.query<ClickHouseSummaryRecord>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           t.ProjectionId AS ProjectionId,
           t.TenantId AS TenantId,
@@ -421,13 +420,11 @@ export class TraceSummaryClickHouseRepository
           )
         LIMIT 1
       `,
-      query_params: window
+      params: window
         ? { tenantId, traceId, fromMs: window.fromMs, toMs: window.toMs }
         : { tenantId, traceId },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<ClickHouseSummaryRecord>();
     const row = rows[0];
     if (!row) return null;
     return {

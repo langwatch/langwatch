@@ -23,10 +23,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { AiToolEntryService } from "./aiToolEntry.service";
@@ -237,7 +235,7 @@ export class CliBootstrapService {
     }
 
     const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
-      const client = await getClickHouseClientForProject(projectId);
+      const client = await clickHouseForProject(projectId);
       if (!client) {
         throw new Error(
           `ClickHouse enabled but no client for project ${projectId}`,

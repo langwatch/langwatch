@@ -21,7 +21,6 @@ import type {
   TestFireTriggerInput,
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
-import type { AppClickHouseClient } from "./clients/clickhouseClient.factory";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -161,12 +160,24 @@ export interface AppDependencies {
   commands: AppCommands;
   ops?: OpsDependencies;
 
-  /**
-   * ADR-104 composition-root client, exposed so callers outside presets.ts
-   * (governance router, puller worker) resolve through the same pool
-   * instead of building their own.
+  /*
+   * There is deliberately no ClickHouse client here.
+   *
+   * A datastore client is a repository's dependency, not the application's. It
+   * used to sit on `App` as `newClickHouseClient` so that callers outside the
+   * composition root could "resolve through the same pool" — but what that
+   * bought was a global handle to the database reachable from anywhere,
+   * including from services, which then read rows instead of asking a
+   * repository for them. Repositories take a `ClickHouseClientResolver` in
+   * their constructor; services take repositories. Nothing takes a pool.
+   *
+   * The two things that genuinely have no composition root to hand them
+   * anything — a worker booting outside the request path, the metrics
+   * collector — reach for the module accessors in
+   * `./clients/clickhouse/shared.ts` and `./clients/clickhouse/tenant-resolver.ts`
+   * instead. Those are ambient by construction and say so; putting them on
+   * `App` only disguised that.
    */
-  newClickHouseClient: AppClickHouseClient;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: ReturnType<typeof createEventSourcingRegistry>;

@@ -1,10 +1,12 @@
 import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
   type WindowFragment,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   type NormalizedAttributes,
@@ -14,7 +16,6 @@ import {
 } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -48,8 +49,8 @@ const TABLE_NAME = "stored_spans" as const;
  * `input_format_json_throw_on_bad_escape_sequence: 0` is load-bearing.
  * Span strings originate as JS UTF-16 and can carry a lone (unpaired) surrogate
  * half (`\uD800`–`\uDFFF`) — a value truncated mid-emoji, or binary/garbage text
- * an SDK captured as a string. `JSONEachRow` serializes such a half as a bare
- * `\uD800`-style escape with no second part, which ClickHouse's JSON parser
+ * an SDK captured as a string. A JSON insert format serializes such a half as a
+ * bare `\uD800`-style escape with no second part, which ClickHouse's JSON parser
  * rejects by default ("missing second part of surrogate pair"), failing the
  * whole insert. The pipeline then retries and dead-letters, and the span is lost
  * forever (13 groups dead-lettered for one project in prod).
@@ -61,10 +62,12 @@ const TABLE_NAME = "stored_spans" as const;
  * names — unbounded per-span payload) on the hot ingest path just to pre-empt
  * the parser. The rare malformed string is stored verbatim; every valid string
  * is untouched.
+ *
+ * Only the parse setting is stated here. Durability — async_insert and its
+ * wait — is the client's, applied to every write with no override point, so a
+ * call site restating it could only ever weaken it.
  */
 const SPAN_INSERT_SETTINGS = {
-  async_insert: 1,
-  wait_for_async_insert: 1,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
 
@@ -808,9 +811,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       const record = this.toClickHouseRecord(span);
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
-        format: "JSONEachRow",
-        clickhouse_settings: SPAN_INSERT_SETTINGS,
+        rows: [record],
+        target: writeTargetFor(TABLE_NAME),
+        settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -857,9 +860,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       const records = spans.map((span) => this.toClickHouseRecord(span));
       await client.insert({
         table: TABLE_NAME,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: SPAN_INSERT_SETTINGS,
+        rows: records,
+        target: writeTargetFor(TABLE_NAME),
+        settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -899,8 +902,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          const result = await client.query({
-            query: `
+          const rows = await client.query<FullSpanRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
@@ -910,17 +914,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ORDER BY StartTimeMs ASC
               LIMIT {limit:UInt32}
             `,
-            query_params: {
+            params: {
               tenantId,
               traceId,
               limit: effectiveLimit,
               ...partition.params,
             },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
-            format: "JSONEachRow",
+            settings: SINGLE_TRACE_READ_SETTINGS,
           });
 
-          const rows = (await result.json()) as FullSpanRow[];
           return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
         },
       );
@@ -965,8 +967,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          const result = await client.query({
-            query: `
+          const rows = await client.query<FullSpanRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
@@ -976,17 +979,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ORDER BY StartTimeMs ASC
               LIMIT {limit:UInt32}
             `,
-            query_params: {
+            params: {
               tenantId,
               traceId,
               limit: effectiveLimit,
               ...partition.params,
             },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
-            format: "JSONEachRow",
+            settings: SINGLE_TRACE_READ_SETTINGS,
           });
 
-          const rows = (await result.json()) as FullSpanRow[];
           return rows.map(mapChRowToNormalized);
         },
       );
@@ -1136,8 +1137,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }): Promise<NormalizedSpan | null> {
     const partition = partitionFragment(window);
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<FullSpanRow>({
+      table: TABLE_NAME,
+      sql: `
         SELECT ${FULL_SPAN_SELECT}
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -1147,12 +1149,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ORDER BY UpdatedAt DESC
         LIMIT 1
       `,
-      query_params: { tenantId, traceId, spanId, ...partition.params },
-      clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-      format: "JSONEachRow",
+      params: { tenantId, traceId, spanId, ...partition.params },
+      settings: SINGLE_SPAN_FETCH_SETTINGS,
     });
 
-    const rows = (await result.json()) as FullSpanRow[];
     if (rows.length === 0) return null;
     return mapChRowToNormalized(rows[0]!);
   }
@@ -1179,8 +1179,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         // Light projection: only the resource/scope columns plus the bits
         // needed for ordering. SpanAttributes/Events/Links are heavy and
         // unrelated to OTel resource info, so don't read them.
-        const result = await client.query({
-          query: `
+        const rows = await client.query<{
+          SpanId: string;
+          ParentSpanId: string | null;
+          StartTimeMs: number;
+          ResourceAttributes: Record<string, string>;
+          ScopeName: string | null;
+          ScopeVersion: string | null;
+        }>({
+          table: TABLE_NAME,
+          sql: `
             SELECT
               SpanId,
               ParentSpanId,
@@ -1196,18 +1204,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             ORDER BY StartTimeMs ASC
             LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
-          query_params: { tenantId, traceId, ...partition.params },
-          format: "JSONEachRow",
+          params: { tenantId, traceId, ...partition.params },
         });
-
-        const rows = (await result.json()) as Array<{
-          SpanId: string;
-          ParentSpanId: string | null;
-          StartTimeMs: number;
-          ResourceAttributes: Record<string, string>;
-          ScopeName: string | null;
-          ScopeVersion: string | null;
-        }>;
 
         return rows.map((row) => ({
           spanId: row.SpanId,
@@ -1240,19 +1238,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string,
   ): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      occurredAtMs: string | number | null;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
       `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
+      params: { tenantId, traceId },
     });
-    const rows = (await result.json()) as Array<{
-      occurredAtMs: string | number | null;
-    }>;
     const raw = rows[0]?.occurredAtMs;
     if (raw === null || raw === undefined) return undefined;
     // `min` over no matching rows yields the epoch default (0); treat that — and
@@ -1370,8 +1367,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           // Dedup at row level inside the subquery so ARRAY JOIN only expands
           // surviving spans — applying dedup post-expansion would multiply the
           // tuple lookup by `events_per_span`.
-          const result = await client.query({
-            query: `
+          const rows = await client.query<TraceEventRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT
                 SpanId AS spanId,
                 toUnixTimestamp64Milli(event_timestamp) AS timestamp,
@@ -1396,11 +1394,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ORDER BY event_timestamp ASC
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
+            params: { tenantId, traceId, ...partition.params },
           });
 
-          const rows = (await result.json()) as TraceEventRow[];
           return rows.map((r) => ({
             spanId: r.spanId,
             timestamp:
@@ -1447,8 +1443,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           // Same shape as `getTraceEventsByTraceId`: dedup at row level inside
           // the subquery, then ARRAY JOIN the Events.* arrays of the survivors,
           // and finally drop exception events (which is a per-event filter).
-          const result = await client.query({
-            query: `
+          const rows = await client.query<EventRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT
                 SpanId AS event_id,
                 TraceId AS trace_id,
@@ -1475,11 +1472,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               WHERE event_name != 'exception'
               ORDER BY event_timestamp DESC
             `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
+            params: { tenantId, traceId, ...partition.params },
           });
 
-          const rows = (await result.json()) as EventRow[];
           return rows.map(mapEventRow);
         },
       );
@@ -1517,8 +1512,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          const result = await client.query({
-            query: `
+          const rows = await client.query<EventRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT
                 SpanId AS event_id,
                 TraceId AS trace_id,
@@ -1554,12 +1550,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 Events_Attributes AS event_attrs
               ORDER BY event_timestamp DESC
             `,
-            query_params: { tenantId, traceId, spanId, ...partition.params },
-            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-            format: "JSONEachRow",
+            params: { tenantId, traceId, spanId, ...partition.params },
+            settings: SINGLE_SPAN_FETCH_SETTINGS,
           });
 
-          const rows = (await result.json()) as EventRow[];
           return rows.map(mapEventRow);
         },
       );
@@ -1596,8 +1590,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       async (window) => {
         const partition = partitionFragment(window);
         const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
+        const rows = await client.query<SpanSummaryQueryRow>({
+          table: TABLE_NAME,
+          sql: `
             SELECT ${SUMMARY_SPAN_SELECT}
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
@@ -1607,11 +1602,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             ORDER BY StartTimeMs ASC
             LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
-          query_params: { tenantId, traceId, ...partition.params },
-          format: "JSONEachRow",
+          params: { tenantId, traceId, ...partition.params },
         });
 
-        const rows = await result.json<SpanSummaryQueryRow>();
         return rows.map(mapSpanSummaryRow);
       },
     );
@@ -1641,8 +1634,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         // the key array. Heavy attribute *values* are never read — only
         // their keys — keeping this scan an order of magnitude lighter
         // than getSpansByTraceId.
-        const result = await client.query({
-          query: `
+        const rows = await client.query<{
+          SpanId: string;
+          Signals: string[];
+        }>({
+          table: TABLE_NAME,
+          sql: `
             SELECT
               SpanId,
               arrayFilter(x -> x != '', [
@@ -1670,14 +1667,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
-          query_params: { tenantId, traceId, ...partition.params },
-          format: "JSONEachRow",
+          params: { tenantId, traceId, ...partition.params },
         });
-
-        const rows = (await result.json()) as Array<{
-          SpanId: string;
-          Signals: string[];
-        }>;
 
         const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
         return rows
@@ -1724,9 +1715,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         // — fine for tiny traces, ruinous for the long ones. Parallel two
         // queries scan the same partitions but don't pay for heavy columns
         // on the count side.
-        const [pageResult, countResult] = await Promise.all([
-          client.query({
-            query: `
+        const [pageRows, countRows] = await Promise.all([
+          client.query<FullSpanRow>({
+            table: TABLE_NAME,
+            sql: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
@@ -1737,32 +1729,27 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             `,
-            query_params: {
+            params: {
               tenantId,
               traceId,
               limit,
               offset,
               ...partition.params,
             },
-            format: "JSONEachRow",
           }),
-          client.query({
-            query: `
+          client.query<{ Total: number | string }>({
+            table: TABLE_NAME,
+            sql: `
               SELECT count(DISTINCT SpanId) AS Total
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
+            params: { tenantId, traceId, ...partition.params },
           }),
         ]);
 
-        const pageRows = (await pageResult.json()) as FullSpanRow[];
-        const countRows = (await countResult.json()) as Array<{
-          Total: number | string;
-        }>;
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
@@ -1795,8 +1782,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const sinceFilter =
       "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<FullSpanRow>({
+      table: TABLE_NAME,
+      sql: `
         SELECT ${FULL_SPAN_SELECT}
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -1806,11 +1794,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ORDER BY StartTime ASC
         LIMIT ${MAX_DERIVATION_SPANS}
       `,
-      query_params: { tenantId, traceId, sinceStartTimeMs },
-      format: "JSONEachRow",
+      params: { tenantId, traceId, sinceStartTimeMs },
     });
 
-    const rows = (await result.json()) as FullSpanRow[];
     return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
@@ -1895,8 +1881,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       // Over-fetch one row past the page: `hasMore` comes from that row's
       // existence, so an exact-multiple-of-page-size trace terminates without
       // a follow-up empty fetch.
-      const result = await client.query({
-        query: `
+      const rows = (
+        await client.query<SpanSummaryQueryRow>({
+          table: TABLE_NAME,
+          sql: `
           SELECT ${SUMMARY_SPAN_SELECT}
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
@@ -1907,24 +1895,20 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ORDER BY StartTimeMs ASC, SpanId ASC
           LIMIT {limit:UInt32}
         `,
-        query_params: {
-          tenantId,
-          traceId,
-          limit: effectiveLimit + 1,
-          ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
-          ...(cursor
-            ? {
-                cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
-                cursorSpanId: cursor.spanId,
-              }
-            : {}),
-        },
-        format: "JSONEachRow",
-      });
-
-      const rows = (await result.json<SpanSummaryQueryRow>()).map(
-        mapSpanSummaryRow,
-      );
+          params: {
+            tenantId,
+            traceId,
+            limit: effectiveLimit + 1,
+            ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
+            ...(cursor
+              ? {
+                  cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
+                  cursorSpanId: cursor.spanId,
+                }
+              : {}),
+          },
+        })
+      ).map(mapSpanSummaryRow);
       return {
         rows: rows.slice(0, effectiveLimit),
         hasMore: rows.length > effectiveLimit,
@@ -1972,8 +1956,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const sinceFilter =
       "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<SpanSummaryQueryRow>({
+      table: TABLE_NAME,
+      sql: `
         SELECT ${SUMMARY_SPAN_SELECT}
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -1983,11 +1968,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ORDER BY StartTimeMs ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: { tenantId, traceId, sinceUpdatedAtMs },
-      format: "JSONEachRow",
+      params: { tenantId, traceId, sinceUpdatedAtMs },
     });
 
-    const rows = await result.json<SpanSummaryQueryRow>();
     return rows.map(mapSpanSummaryRow);
   }
 
@@ -2010,8 +1993,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // and reading only two Map subscripts, no heavy attribute values.
     // `uniq` (approximate) instead of count() so ReplacingMergeTree row
     // versions don't inflate the per-model span counts.
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      Model: string;
+      SpanCount: number | string;
+      LastSeenMs: number | string;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           ${MODEL_ATTR_SELECT} AS Model,
           uniq(TraceId, SpanId) AS SpanCount,
@@ -2024,15 +2012,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ORDER BY SpanCount DESC, Model ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, fromMs, limit },
-      format: "JSONEachRow",
+      params: { tenantId, fromMs, limit },
     });
 
-    const rows = await result.json<{
-      Model: string;
-      SpanCount: number | string;
-      LastSeenMs: number | string;
-    }>();
     return rows.map((row) => ({
       model: row.Model,
       spanCount: Number(row.SpanCount),
@@ -2076,8 +2058,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // unchanged: light columns, argMax dedup over ReplacingMergeTree versions,
     // token-bearing spans first, then recency, and `LIMIT BY` so one chatty
     // model can't crowd out the rest of the sample.
-    const result = await client.query({
-      query: `
+    const rows = await client.query<ModelSpanSampleQueryRow>({
+      table: TABLE_NAME,
+      sql: `
         WITH candidate_traces AS (
           SELECT TraceId
           FROM trace_summaries
@@ -2112,7 +2095,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         LIMIT {perModelLimit:UInt32} BY Model
         LIMIT {limit:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId,
         models,
         fromMs,
@@ -2120,10 +2103,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         limit,
         candidatePool: SAMPLE_CANDIDATE_TRACE_POOL,
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<ModelSpanSampleQueryRow>();
     return rows.map(mapModelSpanSampleRow);
   }
 

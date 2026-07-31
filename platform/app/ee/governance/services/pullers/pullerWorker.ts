@@ -22,7 +22,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { createLogger } from "@langwatch/observability";
-import { getApp } from "~/server/app-layer/app";
+import { requireClickHouse } from "~/server/app-layer/clients/clickhouse/shared";
 import { prisma } from "~/server/db";
 import {
   captureException,
@@ -215,8 +215,12 @@ export async function runIngestionPull(params: {
     );
     // ADR-104: resolve through the composition root's client, not a
     // second one built here.
+    // The repository takes the pool directly because it encodes rows through
+    // its own `defineTable` codec and passes the tenant per call. The pool
+    // comes from the module accessor rather than off `App` — a datastore
+    // client is a repository's dependency, not the application's.
     const ocsfRepo = new GovernanceOcsfEventsClickHouseRepository((tenantId) =>
-      getApp().resolveClickHouseClient(tenantId),
+      requireClickHouse().resolveClient(tenantId),
     );
     for (const evt of result.events) {
       await ocsfRepo.insertEvent(

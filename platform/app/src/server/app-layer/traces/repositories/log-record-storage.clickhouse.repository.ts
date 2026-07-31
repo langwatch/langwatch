@@ -1,10 +1,10 @@
 import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
@@ -86,8 +86,18 @@ export class LogRecordStorageClickHouseRepository
         // key columns; the heavy Body / Attributes / ResourceAttributes maps are
         // materialised by the outer SELECT for one row per (TenantId, TraceId,
         // SpanId, ProjectionId) only.
-        const result = await client.query({
-          query: `
+        const rows = await client.query<{
+          TraceId: string;
+          SpanId: string;
+          TimeUnixMs: number;
+          Body: string | null;
+          Attributes: Record<string, string>;
+          ResourceAttributes: Record<string, string>;
+          ScopeName: string | null;
+          ScopeVersion: string | null;
+        }>({
+          table: TABLE_NAME,
+          sql: `
         SELECT
           TraceId,
           SpanId,
@@ -112,26 +122,14 @@ export class LogRecordStorageClickHouseRepository
         ORDER BY TimeUnixMs ASC
         LIMIT {limitPlusOne:UInt32}
       `,
-          query_params: {
+          params: {
             tenantId,
             traceId,
             // One row past the cap so truncation is detectable without a count.
             limitPlusOne: limit + 1,
             ...(window?.params ?? {}),
           },
-          format: "JSONEachRow",
         });
-
-        const rows = (await result.json()) as Array<{
-          TraceId: string;
-          SpanId: string;
-          TimeUnixMs: number;
-          Body: string | null;
-          Attributes: Record<string, string>;
-          ResourceAttributes: Record<string, string>;
-          ScopeName: string | null;
-          ScopeVersion: string | null;
-        }>;
 
         if (rows.length > limit) {
           rows.length = limit;

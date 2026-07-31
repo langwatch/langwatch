@@ -86,13 +86,17 @@ describe("given isTransientTransportError()", () => {
 
 describe("given decideRetry()", () => {
   describe("when a select hits a transient transport failure", () => {
-    it("retries", () => {
+    /** @scenario a select is never retried by the client */
+    it("does not retry, because only inserts are retried", () => {
       const decision = decideRetry({
         operation: SELECT,
         error: connectionResetError(),
         attempt: 1,
       });
-      expect(decision.retry).toBe(true);
+      expect(decision).toEqual({
+        retry: false,
+        reason: expect.any(String),
+      });
     });
   });
 
@@ -107,6 +111,18 @@ describe("given decideRetry()", () => {
         retry: false,
         reason: expect.any(String),
       });
+    });
+  });
+
+  describe("when a select has attempts left in the budget", () => {
+    it("still does not retry, because the refusal is structural rather than budgeted", () => {
+      const decision = decideRetry({
+        operation: SELECT,
+        error: connectionResetError(),
+        attempt: 1,
+        maxAttempts: 10,
+      });
+      expect(decision.retry).toBe(false);
     });
   });
 
@@ -172,7 +188,7 @@ describe("given decideRetry()", () => {
   describe("when the retry budget is already spent", () => {
     it("stops retrying once the attempt count reaches maxAttempts", () => {
       const decision = decideRetry({
-        operation: SELECT,
+        operation: INSERT_REPLACING,
         error: connectionResetError(),
         attempt: 3,
         maxAttempts: 3,
@@ -181,17 +197,19 @@ describe("given decideRetry()", () => {
     });
   });
 
+  // Backoff is only ever observable on an insert now, since it is the only
+  // operation that reaches the delay calculation at all.
   describe("given repeated backoff decisions", () => {
     it("grows the delay ceiling with the attempt number", () => {
       const randomSpy = vi.spyOn(Math, "random").mockReturnValue(1);
       try {
         const early = decideRetry({
-          operation: SELECT,
+          operation: INSERT_REPLACING,
           error: connectionResetError(),
           attempt: 1,
         });
         const later = decideRetry({
-          operation: SELECT,
+          operation: INSERT_REPLACING,
           error: connectionResetError(),
           attempt: 3,
         });
@@ -210,7 +228,7 @@ describe("given decideRetry()", () => {
       const seen = new Set<number>();
       for (let i = 0; i < 25; i++) {
         const decision = decideRetry({
-          operation: SELECT,
+          operation: INSERT_REPLACING,
           error: connectionResetError(),
           attempt: 1,
         });

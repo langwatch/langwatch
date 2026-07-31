@@ -32,10 +32,10 @@
  * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 
 import {
   GOVERNANCE_ATTR,
@@ -87,7 +87,7 @@ export interface QuarantineFillStats {
 
 export interface QuarantineFillEvaluatorDeps {
   prisma: PrismaClient;
-  clickHouseClient?: ClickHouseClient;
+  clickHouseClient?: TenantClickHouseClient;
 }
 
 export class QuarantineFillEvaluator {
@@ -123,14 +123,26 @@ export class QuarantineFillEvaluator {
     const tenantId = govProject.id;
 
     const ch =
-      this.deps.clickHouseClient ??
-      (await getClickHouseClientForOrganization(organizationId));
+      this.deps.clickHouseClient ?? clickHouseForOrganization(organizationId);
+    // `clickHouseForOrganization` returns null only on a deployment with no
+    // ClickHouse at all, which the legacy accessor surfaced as a throw from
+    // this same line. Kept a throw so the caller sees the misconfiguration
+    // rather than a zero fill rate that reads as "quiet".
+    if (!ch) {
+      throw new Error(
+        `ClickHouse is not available for organization ${organizationId}`,
+      );
+    }
 
     const since = Date.now() - windowSeconds * 1000;
 
     try {
-      const result = await ch.query({
-        query: `
+      const rows = await ch.query<{
+        sourceId: string;
+        spanCount: number | string;
+      }>({
+        table: "trace_summaries",
+        sql: `
           SELECT
             ts.Attributes[{sourceIdKey:String}] AS sourceId,
             count() AS spanCount
@@ -141,19 +153,14 @@ export class QuarantineFillEvaluator {
           GROUP BY sourceId
           ORDER BY spanCount DESC
         `,
-        query_params: {
+        params: {
           tenantId,
           since,
           originKey: GOVERNANCE_ATTR.ORIGIN_KIND,
           originValue: GOVERNANCE_ORIGIN_KIND_VALUE,
           sourceIdKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
         },
-        format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{
-        sourceId: string;
-        spanCount: number | string;
-      }>;
 
       const perSource = rows
         .filter((r) => r.sourceId)

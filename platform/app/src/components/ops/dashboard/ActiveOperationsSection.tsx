@@ -8,18 +8,23 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 import NextLink from "~/utils/compat/next-link";
 
-export function ActiveOperationsSection({ data }: { data: DashboardData }) {
+/**
+ * Long-running operations worth interrupting the dashboard for.
+ *
+ * Paused pipelines used to appear here too. The dispatch plane has no pause
+ * key any more — pausing was a property of the plane that was replaced — so
+ * there is nothing to list, and listing "no pipelines paused" would imply a
+ * switch that does not exist.
+ */
+export function ActiveOperationsSection() {
   const statusQuery = useReplayStatus();
 
   const replayStatus = statusQuery.data;
   const isReplayRunning = replayStatus?.state === "running";
-  const pausedKeys = data.pausedKeys;
-  const hasPaused = pausedKeys.length > 0;
 
-  if (!isReplayRunning && !hasPaused) return null;
+  if (!isReplayRunning) return null;
 
   return (
     <Card.Root overflow="hidden">
@@ -34,13 +39,8 @@ export function ActiveOperationsSection({ data }: { data: DashboardData }) {
         Active Operations
       </Text>
       <VStack align="stretch" gap={0} paddingX={4} paddingBottom={3}>
-        {isReplayRunning && replayStatus && (
-          <HStack
-            gap={2}
-            paddingY={2}
-            borderBottom={hasPaused ? "1px solid" : undefined}
-            borderBottomColor="border"
-          >
+        {replayStatus && (
+          <HStack gap={2} paddingY={2}>
             <Status.Root colorPalette="blue" size="sm">
               <Status.Indicator />
             </Status.Root>
@@ -64,25 +64,6 @@ export function ActiveOperationsSection({ data }: { data: DashboardData }) {
               </NextLink>
             )}
           </HStack>
-        )}
-        {hasPaused && (
-          <VStack align="stretch" gap={1} paddingY={2}>
-            <Text textStyle="xs" color="fg.muted">
-              Paused pipelines
-            </Text>
-            <HStack gap={2} flexWrap="wrap">
-              {pausedKeys.map((key) => (
-                <Badge
-                  key={key}
-                  size="sm"
-                  colorPalette="orange"
-                  variant="subtle"
-                >
-                  {key}
-                </Badge>
-              ))}
-            </HStack>
-          </VStack>
         )}
       </VStack>
     </Card.Root>

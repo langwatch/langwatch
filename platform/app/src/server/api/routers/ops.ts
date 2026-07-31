@@ -115,10 +115,9 @@ export const opsRouter = createTRPCRouter({
 
   /**
    * Cheap counts-only query for the global ops badge in the main menu.
-   * Returns just the two integers the badge renders (blocked groups +
-   * DLQ jobs), bypassing the full dashboard aggregation. Use this for
-   * always-on polling; reach for `getDashboardSnapshot` only on the
-   * ops route itself.
+   * Returns just the parked-lane count the badge renders, bypassing the full
+   * dashboard aggregation. Use this for always-on polling; reach for
+   * `getDashboardSnapshot` only on the ops route itself.
    */
   getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
@@ -146,11 +145,6 @@ export const opsRouter = createTRPCRouter({
       }
     }),
 
-  listQueues: protectedProcedure.use(opsViewPermission).query(async () => {
-    const ops = requireOps();
-    return ops.queues.getQueues();
-  }),
-
   listScheduledJobs: protectedProcedure
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
@@ -159,188 +153,101 @@ export const opsRouter = createTRPCRouter({
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
     }),
 
-  listGroups: protectedProcedure
+  // ---------------------------------------------------------------------------
+  // Lanes (ADR-108's dispatch plane).
+  //
+  // A lane is the unit the plane serialises on, so it is the unit an operator
+  // inspects and recovers. Depth, lease and park state are lane keys, so they
+  // are answerable here. The old plane's DLQ, blocked set and per-pipeline /
+  // per-tenant pause keys are not: they were removed with it, and there is no
+  // key left to read or write for any of them.
+  // ---------------------------------------------------------------------------
+
+  listLanes: protectedProcedure
     .use(opsViewPermission)
     .input(
       z.object({
-        queueName: z.string(),
+        laneKind: z.string(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(200).default(50),
       }),
     )
     .query(async ({ input }) => {
       const ops = requireOps();
-      return ops.queues.getGroups(input);
+      return ops.queues.getLanes(input);
     }),
 
-  getGroupDetail: protectedProcedure
+  getLaneDetail: protectedProcedure
     .use(opsViewPermission)
     .input(
       z.object({
-        queueName: z.string(),
-        groupId: z.string(),
+        laneKind: z.string(),
+        laneId: z.string(),
       }),
     )
     .query(async ({ input }) => {
       const ops = requireOps();
-      const group = await ops.queues.getGroupDetail(input);
-      if (!group) {
+      const lane = await ops.queues.getLaneDetail(input);
+      if (!lane) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: `Group "${input.groupId}" not found in queue "${input.queueName}"`,
+          message: `Lane "${input.laneId}" not found among the ${input.laneKind} lanes`,
         });
       }
-      return group;
+      return lane;
     }),
 
-  getBlockedSummary: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      const ops = requireOps();
-      return ops.queues.getBlockedSummary();
-    }),
-
-  getGroupJobs: protectedProcedure
+  getLaneJobs: protectedProcedure
     .use(opsViewPermission)
     .input(
       z.object({
-        queueName: z.string(),
-        groupId: z.string(),
+        laneId: z.string(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(20),
       }),
     )
     .query(async ({ input }) => {
       const ops = requireOps();
-      return ops.queues.getGroupJobs(input);
+      return ops.queues.getLaneJobs(input);
     }),
 
-  unblockGroup: protectedProcedure
+  unparkLane: protectedProcedure
     .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        groupId: z.string(),
-      }),
-    )
+    .input(z.object({ laneId: z.string() }))
     .mutation(async ({ input }) => {
       const ops = requireOps();
-      return ops.queues.unblockGroup(input);
+      return ops.queues.unparkLane(input);
     }),
 
-  unblockAll: protectedProcedure
+  unparkAll: protectedProcedure
     .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-      }),
-    )
+    .input(z.object({ laneKind: z.string() }))
     .mutation(async ({ input }) => {
       const ops = requireOps();
-      return ops.queues.unblockAll(input);
+      return ops.queues.unparkAll(input);
     }),
 
-  drainGroup: protectedProcedure
+  drainLane: protectedProcedure
     .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        groupId: z.string(),
-      }),
-    )
+    .input(z.object({ laneId: z.string() }))
     .mutation(async ({ input }) => {
       const ops = requireOps();
-      return ops.queues.drainGroup(input);
-    }),
-
-  pausePipeline: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        key: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.pausePipeline(input);
-    }),
-
-  unpausePipeline: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        key: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.unpausePipeline(input);
-    }),
-
-  pauseTenant: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        tenantId: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.pauseTenant(input);
-    }),
-
-  unpauseTenant: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        tenantId: z.string().min(1),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.unpauseTenant(input);
-    }),
-
-  listPausedTenants: protectedProcedure
-    .use(opsViewPermission)
-    .input(z.object({ queueName: z.string() }))
-    .query(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.listPausedTenants(input);
+      return ops.queues.drainLane(input);
     }),
 
   drainTenant: protectedProcedure
     .use(opsManagePermission)
     .input(
       z.object({
-        queueName: z.string(),
         tenantId: z.string().min(1),
-        // Optional substring filter on groupId. Honest substring semantics —
-        // see drainTenant repo doc for example fragments to type.
-        groupIdContains: z.string().optional(),
+        // Optional substring filter on the lane id. Honest substring semantics
+        // — what the operator sees in the Lanes table is what they match on.
+        laneIdContains: z.string().optional(),
       }),
     )
     .mutation(async ({ input }) => {
       const ops = requireOps();
       return ops.queues.drainTenant(input);
-    }),
-
-  retryBlocked: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        groupId: z.string(),
-        jobId: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.retryBlocked(input);
     }),
 
   /**
@@ -510,133 +417,6 @@ export const opsRouter = createTRPCRouter({
     .mutation(async () => {
       const ops = requireOps();
       return ops.replay.cancelReplay();
-    }),
-
-  listDlqGroups: protectedProcedure
-    .use(opsViewPermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-      }),
-    )
-    .query(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.listDlqGroups(input);
-    }),
-
-  listAllDlqGroups: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      const ops = requireOps();
-      return ops.queues.getAllDlqGroups();
-    }),
-
-  listPausedKeys: protectedProcedure
-    .use(opsViewPermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-      }),
-    )
-    .query(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.listPausedKeys(input);
-    }),
-
-  drainAllBlockedPreview: protectedProcedure
-    .use(opsViewPermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        pipelineFilter: z.string().optional(),
-        errorFilter: z.string().optional(),
-      }),
-    )
-    .query(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.getDrainPreview(input);
-    }),
-
-  moveToDlq: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        groupId: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.moveToDlq(input);
-    }),
-
-  moveAllBlockedToDlq: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        pipelineFilter: z.string().optional(),
-        errorFilter: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.moveAllBlockedToDlq(input);
-    }),
-
-  replayFromDlq: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        groupId: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.replayFromDlq(input);
-    }),
-
-  replayAllFromDlq: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        pipelineFilter: z.string().optional(),
-        errorFilter: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.replayAllFromDlq(input);
-    }),
-
-  canaryRedrive: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        count: z.number().int().min(1).max(100).default(5),
-        pipelineFilter: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.canaryRedrive(input);
-    }),
-
-  canaryUnblock: protectedProcedure
-    .use(opsManagePermission)
-    .input(
-      z.object({
-        queueName: z.string(),
-        count: z.number().int().min(1).max(100).default(5),
-        pipelineFilter: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const ops = requireOps();
-      return ops.queues.canaryUnblock(input);
     }),
 
   searchAggregates: protectedProcedure

@@ -293,6 +293,85 @@ describe("SimulationClickHouseRepository", () => {
     });
   });
 
+  describe("findRunStatus()", () => {
+    function makeRepoCapturingStatusRead(rows: unknown[]) {
+      const { client, getCapturedQueries } = makeMockClientWithQueryCapture({
+        rowsForQuery: () => rows,
+      });
+      return {
+        repo: new SimulationClickHouseRepository(
+          vi.fn().mockResolvedValue(client),
+        ),
+        statusQuery: () => getCapturedQueries()[0],
+      };
+    }
+
+    describe("when the run has a stored row", () => {
+      it("answers with the latest version's status", async () => {
+        const { repo } = makeRepoCapturingStatusRead([{ Status: "SUCCESS" }]);
+
+        await expect(
+          repo.findRunStatus({
+            projectId: "project-1",
+            scenarioRunId: "run-1",
+          }),
+        ).resolves.toBe("SUCCESS");
+      });
+    });
+
+    describe("when nothing has been stored for the run", () => {
+      it("answers that nothing is known about it", async () => {
+        const { repo } = makeRepoCapturingStatusRead([]);
+
+        await expect(
+          repo.findRunStatus({
+            projectId: "project-1",
+            scenarioRunId: "run-1",
+          }),
+        ).resolves.toBeNull();
+      });
+    });
+
+    describe("when the run was archived after it ran", () => {
+      // The caller asks "has anything already reached this run?" before
+      // executing it. Filtering archived rows out would answer "nothing is
+      // known", and the scenario would be run — and billed — a second time.
+      /** @scenario "A run archived after it ran is still recognised as already run" */
+      it("does not hide the archived run's status", async () => {
+        const { repo, statusQuery } = makeRepoCapturingStatusRead([
+          { Status: "SUCCESS" },
+        ]);
+
+        await repo.findRunStatus({
+          projectId: "project-1",
+          scenarioRunId: "run-1",
+        });
+
+        expect(statusQuery()?.query).not.toContain("ArchivedAt");
+      });
+    });
+
+    describe("when reading the status", () => {
+      it("filters by tenant before anything else", async () => {
+        const { repo, statusQuery } = makeRepoCapturingStatusRead([]);
+
+        await repo.findRunStatus({
+          projectId: "project-1",
+          scenarioRunId: "run-1",
+        });
+
+        const query = statusQuery()?.query ?? "";
+        expect(query.indexOf("TenantId = {tenantId:String}")).toBeLessThan(
+          query.indexOf("ScenarioRunId = {scenarioRunId:String}"),
+        );
+        expect(statusQuery()?.params).toMatchObject({
+          tenantId: "project-1",
+          scenarioRunId: "run-1",
+        });
+      });
+    });
+  });
+
   describe("startedAtBoundsForPage()", () => {
     it("spans the min and max StartedAt across the page rows", () => {
       const bounds = startedAtBoundsForPage([

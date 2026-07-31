@@ -31,6 +31,7 @@ import {
 import type { CommittedEvent, EventLog } from "@langwatch/event-sourcing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { tenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { EvaluationReportedData } from "~/server/event-sourcing/evaluation-processing/schema";
@@ -108,10 +109,7 @@ function reportedEvent(args: {
 function buildStoredObjects(): StoredObjectsService {
   const driver = new LocalFilesystemDriver();
   const registry = new StorageRegistry({ file: driver, s3: driver });
-  const repository = new StoredObjectsRepository(
-    () => esClient,
-    async () => ch,
-  );
+  const repository = new StoredObjectsRepository(() => esClient);
   const mintUri: MintStorageUri = async ({ projectId, sha256 }) =>
     mintFileUri({ root: tmpDir, projectId, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
@@ -192,8 +190,10 @@ beforeAll(async () => {
     clickhouseClientModule.getClickHouseClientForProject,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository(async () => ch);
   esClient = createClickHouseClient({ url: containers.clickHouseUrl });
+  evalRepo = new EvaluationRunClickHouseRepository(async () =>
+    tenantClickHouseClient({ client: esClient, tenantId }),
+  );
   eventLog = clickhouseEventLog({ client: esClient });
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));

@@ -4,7 +4,7 @@
  * new ClickHouse client.
  */
 import type { ClickHouseClient } from "@langwatch/clickhouse";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { StoredObject } from "../stored-object";
 import { StoredObjectsRepository } from "../stored-objects.repository";
 
@@ -70,15 +70,18 @@ function wireRowFor(row: StoredObject): unknown[] {
 describe("StoredObjectsRepository", () => {
   let insert: ReturnType<typeof vi.fn>;
   let query: ReturnType<typeof vi.fn>;
-  let resolveClient: ReturnType<typeof vi.fn>;
+  let command: ReturnType<typeof vi.fn>;
+  let resolveClient: Mock<(tenantId: string) => ClickHouseClient>;
   let repo: StoredObjectsRepository;
 
   beforeEach(() => {
     insert = vi.fn().mockResolvedValue(undefined);
     query = vi.fn().mockResolvedValue({ rows: [] });
-    resolveClient = vi
-      .fn()
-      .mockReturnValue({ insert, query } as unknown as ClickHouseClient);
+    command = vi.fn().mockResolvedValue(undefined);
+    resolveClient = vi.fn(
+      (_tenantId: string) =>
+        ({ insert, query, command }) as unknown as ClickHouseClient,
+    );
     repo = new StoredObjectsRepository(resolveClient);
   });
 
@@ -199,41 +202,35 @@ describe("StoredObjectsRepository", () => {
   });
 
   describe("delete methods", () => {
-    describe("when no legacy client resolver is wired", () => {
-      /** @scenario DELETE mutations stay on the legacy client (ADR-104 gap) */
-      it("throws for deleteByProject", async () => {
-        await expect(
-          repo.deleteByProject({ projectId: "proj-1" }),
-        ).rejects.toThrow(/legacy client resolver/);
-      });
+    describe("when deleting every row for a project", () => {
+      it("issues the mutation as a project-scoped command with mutations_sync", async () => {
+        await repo.deleteByProject({ projectId: "proj-1" });
 
-      it("throws for deleteByIds", async () => {
-        await expect(
-          repo.deleteByIds({ projectId: "proj-1", ids: ["a"] }),
-        ).rejects.toThrow(/legacy client resolver/);
+        expect(resolveClient).toHaveBeenCalledWith("proj-1");
+        expect(command).toHaveBeenCalledOnce();
+        const request = command.mock.calls[0]![0];
+        expect(request.tenantId).toBe("proj-1");
+        expect(request.sql).toContain("project_id = {projectId:String}");
+        expect(request.params).toEqual({ projectId: "proj-1" });
+        expect(request.settings).toEqual({ mutations_sync: "1" });
       });
     });
 
-    describe("when a legacy client resolver is wired", () => {
-      it("issues the mutation through the legacy client", async () => {
-        const exec = vi.fn().mockResolvedValue(undefined);
-        const legacyResolveClient = vi.fn().mockResolvedValue({ exec });
-        const repoWithLegacy = new StoredObjectsRepository(
-          resolveClient,
-          legacyResolveClient,
-        );
+    describe("when deleting a subset of ids", () => {
+      it("issues the mutation as a project-scoped command with mutations_sync", async () => {
+        await repo.deleteByIds({ projectId: "proj-1", ids: ["a", "b"] });
 
-        await repoWithLegacy.deleteByIds({
+        expect(resolveClient).toHaveBeenCalledWith("proj-1");
+        expect(command).toHaveBeenCalledOnce();
+        const request = command.mock.calls[0]![0];
+        expect(request.tenantId).toBe("proj-1");
+        expect(request.sql).toContain("project_id = {projectId:String}");
+        expect(request.sql).toContain("id IN ({ids:Array(String)})");
+        expect(request.params).toEqual({
           projectId: "proj-1",
           ids: ["a", "b"],
         });
-
-        expect(legacyResolveClient).toHaveBeenCalledWith("proj-1");
-        expect(exec).toHaveBeenCalledWith(
-          expect.objectContaining({
-            query_params: { projectId: "proj-1", ids: ["a", "b"] },
-          }),
-        );
+        expect(request.settings).toEqual({ mutations_sync: "1" });
       });
     });
 

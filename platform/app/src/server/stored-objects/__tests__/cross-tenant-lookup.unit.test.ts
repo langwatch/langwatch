@@ -17,10 +17,10 @@ import {
   StoredObjectOwnerLookupUnavailableError,
 } from "../stored-objects-cross-tenant-lookup";
 
-const mockGetAllInstances = vi.fn();
+const mockAllClickHouseTargets = vi.fn();
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getAllClickHouseInstances: () => mockGetAllInstances(),
+vi.mock("~/server/app-layer/clients/clickhouse/shared", () => ({
+  allClickHouseTargets: () => mockAllClickHouseTargets(),
 }));
 
 vi.mock("langwatch", () => ({
@@ -33,10 +33,12 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+/** The client hands back positional wire rows: one `project_id` cell per row. */
 function makeMockClient(rows: { project_id: string }[]) {
   return {
     query: vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(rows),
+      rows: rows.map((row) => [row.project_id]),
+      header: { names: ["project_id"], types: ["String"] },
     }),
   };
 }
@@ -49,26 +51,33 @@ function makeFailingClient(error: Error) {
 
 describe("resolveStoredObjectOwner", () => {
   beforeEach(() => {
-    mockGetAllInstances.mockReset();
+    mockAllClickHouseTargets.mockReset();
   });
 
   describe("when only the shared instance is configured", () => {
     it("finds the row in the shared instance", async () => {
-      mockGetAllInstances.mockResolvedValue([
-        {
-          target: "shared",
-          client: makeMockClient([{ project_id: "proj_a" }]),
-        },
-      ]);
+      const client = makeMockClient([{ project_id: "proj_a" }]);
+      mockAllClickHouseTargets.mockReturnValue([{ label: "shared", client }]);
 
       const owner = await resolveStoredObjectOwner({ id: "obj-1" });
 
       expect(owner).toEqual({ projectId: "proj_a" });
     });
 
+    it("routes the untenanted read under a constant that is not a tenant id", async () => {
+      const client = makeMockClient([{ project_id: "proj_a" }]);
+      mockAllClickHouseTargets.mockReturnValue([{ label: "shared", client }]);
+
+      await resolveStoredObjectOwner({ id: "obj-1" });
+
+      const request = client.query.mock.calls[0]![0];
+      expect(request.tenantId).toBe("__stored_object_owner_lookup__");
+      expect(request.params).toEqual({ id: "obj-1" });
+    });
+
     it("returns null when the row is not in any instance", async () => {
-      mockGetAllInstances.mockResolvedValue([
-        { target: "shared", client: makeMockClient([]) },
+      mockAllClickHouseTargets.mockReturnValue([
+        { label: "shared", client: makeMockClient([]) },
       ]);
 
       const owner = await resolveStoredObjectOwner({ id: "missing" });
@@ -80,10 +89,10 @@ describe("resolveStoredObjectOwner", () => {
   describe("when a private-CH tenant owns the row", () => {
     /** @scenario "Cross-tenant owner lookup fans out to every ClickHouse instance" */
     it("finds the row in the private instance even though shared has no match", async () => {
-      mockGetAllInstances.mockResolvedValue([
-        { target: "shared", client: makeMockClient([]) },
+      mockAllClickHouseTargets.mockReturnValue([
+        { label: "shared", client: makeMockClient([]) },
         {
-          target: "org_byoc",
+          label: "org_byoc",
           client: makeMockClient([{ project_id: "proj_byoc" }]),
         },
       ]);
@@ -98,9 +107,9 @@ describe("resolveStoredObjectOwner", () => {
     it("returns null after fanning out to all of them", async () => {
       const sharedClient = makeMockClient([]);
       const privateClient = makeMockClient([]);
-      mockGetAllInstances.mockResolvedValue([
-        { target: "shared", client: sharedClient },
-        { target: "org_byoc", client: privateClient },
+      mockAllClickHouseTargets.mockReturnValue([
+        { label: "shared", client: sharedClient },
+        { label: "org_byoc", client: privateClient },
       ]);
 
       const owner = await resolveStoredObjectOwner({ id: "unknown" });
@@ -114,13 +123,13 @@ describe("resolveStoredObjectOwner", () => {
   describe("when one instance is degraded", () => {
     /** @scenario "Cross-tenant owner lookup isolates failures across instances" */
     it("returns the hit from a healthy instance even when another instance fails", async () => {
-      mockGetAllInstances.mockResolvedValue([
+      mockAllClickHouseTargets.mockReturnValue([
         {
-          target: "org_byoc_down",
+          label: "org_byoc_down",
           client: makeFailingClient(new Error("connection refused")),
         },
         {
-          target: "shared",
+          label: "shared",
           client: makeMockClient([{ project_id: "proj_shared" }]),
         },
       ]);
@@ -132,13 +141,13 @@ describe("resolveStoredObjectOwner", () => {
 
     /** @scenario "Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed" */
     it("throws StoredObjectOwnerLookupUnavailableError when no instance returned a hit AND any instance failed", async () => {
-      mockGetAllInstances.mockResolvedValue([
+      mockAllClickHouseTargets.mockReturnValue([
         {
-          target: "shared",
+          label: "shared",
           client: makeMockClient([]),
         },
         {
-          target: "org_byoc_down",
+          label: "org_byoc_down",
           client: makeFailingClient(new Error("timeout")),
         },
       ]);
@@ -149,13 +158,13 @@ describe("resolveStoredObjectOwner", () => {
     });
 
     it("includes the failed targets on the thrown error", async () => {
-      mockGetAllInstances.mockResolvedValue([
+      mockAllClickHouseTargets.mockReturnValue([
         {
-          target: "shared",
+          label: "shared",
           client: makeMockClient([]),
         },
         {
-          target: "org_byoc_down",
+          label: "org_byoc_down",
           client: makeFailingClient(new Error("timeout")),
         },
       ]);
@@ -174,7 +183,7 @@ describe("resolveStoredObjectOwner", () => {
 
   describe("when no ClickHouse instance is configured", () => {
     it("throws a descriptive error", async () => {
-      mockGetAllInstances.mockResolvedValue([]);
+      mockAllClickHouseTargets.mockReturnValue([]);
 
       await expect(resolveStoredObjectOwner({ id: "obj-1" })).rejects.toThrow(
         /ClickHouse is not configured/,

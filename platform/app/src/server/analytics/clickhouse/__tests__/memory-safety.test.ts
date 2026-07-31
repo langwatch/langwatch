@@ -12,10 +12,52 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  TenantClickHouseClient,
+  TenantQuery,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import { buildTimeseriesQuery } from "../aggregation-builder";
+import {
+  ANALYTICS_CLICKHOUSE_SETTINGS,
+  ClickHouseAnalyticsService,
+} from "../clickhouse-analytics.service";
 import { resetParamCounter } from "../filter-translator";
+
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: vi.fn(),
+}));
+
+const START_MS = new Date("2024-01-01T00:00:00Z").getTime();
+const END_MS = new Date("2024-01-02T00:00:00Z").getTime();
+
+/**
+ * The service resolves its client ambiently, so the stand-in is installed by
+ * mocking the resolver rather than by injection. It records every request and
+ * answers with no rows — the reads under test are asserted on what they sent,
+ * not on what came back.
+ */
+function analyticsServiceWithFakeClient(): {
+  service: ClickHouseAnalyticsService;
+  queries: TenantQuery[];
+} {
+  const queries: TenantQuery[] = [];
+  const client = {
+    tenantId: "test-project",
+    query: async (request: TenantQuery) => {
+      queries.push(request);
+      return [];
+    },
+    insert: vi.fn(),
+    queryWindowed: vi.fn(),
+  } as unknown as TenantClickHouseClient;
+
+  vi.mocked(clickHouseForProject).mockResolvedValue(client);
+
+  return { service: new ClickHouseAnalyticsService(), queries };
+}
 
 describe("memory-safety", () => {
   beforeEach(() => {
@@ -257,87 +299,53 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 5: All query execution paths include memory safety settings
   // -------------------------------------------------------------------------
+  /**
+   * These used to read `clickhouse-analytics.service.ts` off disk and assert
+   * the string `clickhouse_settings` appeared inside every `.query({...})`
+   * block. That proved the characters were present, not that a setting reached
+   * ClickHouse — a rename of the field, or a fourth read added without one,
+   * would still have matched somewhere in the file. They now run the service's
+   * three reads against a stand-in client and assert on what each call carried.
+   *
+   * The companion check on `clickhouse-trace.service.ts` — "the source mentions
+   * `getClickHouseClientForProject`, which wraps with default settings" — is
+   * gone rather than renamed. The spill threshold is no longer something a
+   * service opts into by importing the right accessor: the app-layer client
+   * applies it to every read as a default, and `tenant-client.unit.test.ts`
+   * pins both the default and a caller's override of it. Pinning another
+   * service's imports by substring from here proved nothing that survives the
+   * accessor being renamed.
+   */
   describe("memory safety settings on query execution paths", () => {
-    describe("when ANALYTICS_CLICKHOUSE_SETTINGS is inspected in source", () => {
+    describe("when the analytics settings are inspected", () => {
       /** @scenario "Analytics queries include a memory spill-to-disk safety setting" */
-      it("defines max_bytes_before_external_group_by with a positive value", () => {
-        const servicePath = path.resolve(
-          __dirname,
-          "..",
-          "clickhouse-analytics.service.ts",
-        );
-        const source = fs.readFileSync(servicePath, "utf-8");
-
-        // Verify the settings constant exists and contains the required key
-        expect(source).toContain("ANALYTICS_CLICKHOUSE_SETTINGS");
-        expect(source).toContain("max_bytes_before_external_group_by");
-
-        // Verify it has a positive numeric value
-        const settingsMatch = source.match(
-          /max_bytes_before_external_group_by:\s*(\d[\d_]*)/,
-        );
-        expect(settingsMatch).not.toBeNull();
-        const value = parseInt(settingsMatch![1]!.replace(/_/g, ""), 10);
-        expect(value).toBeGreaterThan(0);
+      it("caps GROUP BY memory before it spills to disk", () => {
+        expect(
+          ANALYTICS_CLICKHOUSE_SETTINGS.max_bytes_before_external_group_by,
+        ).toBeGreaterThan(0);
       });
     });
 
-    describe("when the analytics service source is inspected", () => {
-      /**
-       * Structural test: verify every .query() call in the analytics service
-       * passes clickhouse_settings. This reads the source file and checks
-       * that all query() invocations include the settings parameter.
-       */
+    describe("when every analytics read runs", () => {
       /** @scenario All query execution paths include memory safety settings */
-      it("passes clickhouse_settings to every .query() call in clickhouse-analytics.service.ts", () => {
-        const servicePath = path.resolve(
-          __dirname,
-          "..",
-          "clickhouse-analytics.service.ts",
+      it("carries the analytics settings on each query the service issues", async () => {
+        const { service, queries } = analyticsServiceWithFakeClient();
+
+        await service.getDataForFilter(
+          "test-project",
+          "topics.topics",
+          START_MS,
+          END_MS,
         );
-        const source = fs.readFileSync(servicePath, "utf-8");
+        await service.getTopUsedDocuments("test-project", START_MS, END_MS);
+        await service.getFeedbacks("test-project", START_MS, END_MS);
 
-        // Find all .query({ ... }) blocks
-        const queryCallPattern = /\.query\(\s*\{/g;
-        let match: RegExpExecArray | null;
-        const queryBlocks: string[] = [];
-
-        while ((match = queryCallPattern.exec(source)) !== null) {
-          // Extract the block from the opening { to its matching }
-          const startIdx = match.index + match[0].length - 1;
-          let depth = 1;
-          let i = startIdx + 1;
-          while (i < source.length && depth > 0) {
-            if (source[i] === "{") depth++;
-            else if (source[i] === "}") depth--;
-            i++;
-          }
-          queryBlocks.push(source.slice(startIdx, i));
+        // Four reads, not three: topDocuments issues its page and its total
+        // count as two separate queries.
+        expect(queries).toHaveLength(4);
+        for (const query of queries) {
+          expect(query.settings).toEqual(ANALYTICS_CLICKHOUSE_SETTINGS);
         }
-
-        expect(queryBlocks.length).toBeGreaterThan(0);
-
-        for (const block of queryBlocks) {
-          expect(block).toContain("clickhouse_settings");
-        }
-      });
-
-      it("clickhouse-trace.service.ts uses getClickHouseClientForProject which wraps with default settings", () => {
-        const traceServicePath = path.resolve(
-          __dirname,
-          "..",
-          "..",
-          "..",
-          "traces",
-          "clickhouse-trace.service.ts",
-        );
-        const source = fs.readFileSync(traceServicePath, "utf-8");
-
-        // The trace service must use getClickHouseClientForProject, which
-        // internally wraps clients with wrapWithDefaultSettings. This ensures
-        // memory-safety defaults are automatically injected on every query.
-        // The wrapper's merge behavior is tested in safeClickhouseClient.unit.test.ts.
-        expect(source).toContain("getClickHouseClientForProject");
       });
     });
   });

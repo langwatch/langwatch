@@ -55,7 +55,7 @@ function makeDeps({
   getActiveGraphTriggersForProject: (p: string) => Promise<TriggerSummary[]>;
 }): GraphTriggerHeartbeatDeps {
   const clickHouse = {
-    query: vi.fn(async () => ({ json: async () => [{ lastMs: null }] })),
+    query: vi.fn(async () => [{ lastMs: null }]),
   };
   return {
     triggers: { getActiveGraphTriggersForProject } as unknown as TriggerService,

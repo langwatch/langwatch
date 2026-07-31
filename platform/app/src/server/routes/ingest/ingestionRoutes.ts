@@ -50,10 +50,8 @@ import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -686,7 +684,7 @@ secured
             const budgetRepo = new GatewayBudgetRepository(prisma);
             const budgetCHRepo = new GatewayBudgetClickHouseRepository(
               async (projectId) => {
-                const client = await getClickHouseClientForProject(projectId);
+                const client = await clickHouseForProject(projectId);
                 if (!client) {
                   throw new Error(
                     `ClickHouse enabled but no client for project ${projectId}`,

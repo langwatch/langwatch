@@ -29,8 +29,8 @@ import type {
   TopDocumentsResult,
 } from "~/server/analytics/types";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -317,12 +317,12 @@ async function isTripwireEnabled(projectId: string): Promise<boolean> {
 
 /**
  * Default ClickHouse resolver — same shape as `app-layer/presets.ts`:
- * `getClickHouseClientForProject` returns `null` for "not configured"; the
- * resolver contract is "throw if no client", which lets the repository
- * `await` it without a null-check.
+ * `clickHouseForProject` returns `null` for "not configured"; the resolver
+ * contract is "throw if no client", which lets the repository `await` it
+ * without a null-check.
  */
 const defaultResolveClient: ClickHouseClientResolver = async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
+  const client = await clickHouseForProject(tenantId);
   if (!client)
     throw new Error(`ClickHouse not available for tenant ${tenantId}`);
   return client;
