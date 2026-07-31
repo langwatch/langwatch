@@ -104,7 +104,7 @@ export default function Error() {
       return;
     }
 
-    setTimeout(() => {
+    const redirectTimeout = setTimeout(() => {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (isAuth0) {
           const referrer = document.referrer;
@@ -121,6 +121,8 @@ export default function Error() {
         }
       }
     }, 5000);
+
+    return () => clearTimeout(redirectTimeout);
   }, [publicEnv.data, isAuth0, isAzureAD, session, error]);
 
   if (error) {

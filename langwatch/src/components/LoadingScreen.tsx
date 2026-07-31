@@ -44,12 +44,17 @@ export const LoadingScreen = () => {
   reduceMotionRef.current = reduceMotion;
 
   useEffect(() => {
-    setTimeout(() => {
+    let logoSettledTimeout: ReturnType<typeof setTimeout> | undefined;
+    const showLogoTimeout = setTimeout(() => {
       setShowLogo(true);
-      setTimeout(() => {
+      logoSettledTimeout = setTimeout(() => {
         logoVisibleOnce = true;
       }, 500);
     }, 50);
+    return () => {
+      clearTimeout(showLogoTimeout);
+      if (logoSettledTimeout) clearTimeout(logoSettledTimeout);
+    };
   }, []);
 
   useIsomorphicLayoutEffect(() => {

@@ -16,7 +16,13 @@ import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Download, ExternalLink } from "react-feather";
 import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
@@ -205,16 +211,35 @@ export const useBatchEvaluationState = ({
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
 
+  // The polling data in the deps churns while we wait, so the timeout is armed
+  // once through a ref instead of being re-armed on every re-run, which would
+  // push the deadline out forever.
+  const keepFetchingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
   useEffect(() => {
     if (selectedRunId && !selectedRun) {
       setKeepFetching(true);
-      setTimeout(() => {
-        setKeepFetching(false);
-      }, 5_000);
+      if (!keepFetchingTimerRef.current) {
+        keepFetchingTimerRef.current = setTimeout(() => {
+          keepFetchingTimerRef.current = null;
+          setKeepFetching(false);
+        }, 5_000);
+      }
     } else {
       setKeepFetching(false);
     }
   }, [batchEvaluationRuns.data?.runs, selectedRunId, selectedRun]);
+
+  useEffect(
+    () => () => {
+      if (keepFetchingTimerRef.current) {
+        clearTimeout(keepFetchingTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const setSelectedRunId_ = useCallback(
     (runId: string) => {

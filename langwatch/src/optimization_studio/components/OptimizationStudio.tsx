@@ -153,16 +153,23 @@ export default function OptimizationStudio() {
     }
   };
 
+  // The effect below clears the request it just handled, so its own dependency
+  // flips mid-flight and an effect-scoped cleanup would cut the expand
+  // animation short. The frame is tracked on a ref and cancelled on unmount.
+  const expandFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (openResultsPanelRequest === "evaluations") {
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
 
       const step = () => {
-        const size = panelRef.current?.getSize() ?? 0;
+        const panel = panelRef.current;
+        if (!panel) return;
+        const size = panel.getSize();
         if (size < 70) {
-          panelRef.current?.resize(size + 10);
-          window.requestAnimationFrame(step);
+          panel.resize(size + 10);
+          expandFrameRef.current = window.requestAnimationFrame(step);
         }
       };
       step();
@@ -173,6 +180,15 @@ export default function OptimizationStudio() {
     setOpenResultsPanelRequest(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResultsPanelRequest]);
+
+  useEffect(
+    () => () => {
+      if (expandFrameRef.current !== null) {
+        window.cancelAnimationFrame(expandFrameRef.current);
+      }
+    },
+    [],
+  );
 
   // The Crisp bubble policy keeps the support bubble hidden app-wide unless
   // deliberately opened; re-assert on entering the studio so it can never
