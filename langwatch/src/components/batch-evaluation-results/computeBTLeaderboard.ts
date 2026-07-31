@@ -135,6 +135,19 @@ export type BTLeaderboardOptions = {
   tol?: number;
 };
 
+/**
+ * Beta(eps, eps) pseudo-count added to every pair when the field contains a
+ * degenerate variant, so the MM fit stays finite (Hunter §4).
+ *
+ * Named because the value is load-bearing rather than incidental: it decides
+ * how hard the prior pulls short-sample pairs toward 50/50, and with it the
+ * rank order of variants that are not themselves degenerate. Measured at 545
+ * order flips across 4000 such matrices between 1e-4 and this value — see the
+ * note at the call site. Changing it silently changes published rankings, so
+ * it belongs somewhere a reader can find it.
+ */
+const DEGENERATE_SMOOTHING_EPS = 0.5;
+
 const DEFAULT_OPTS: Required<BTLeaderboardOptions> = {
   bootstrapSamples: 1000,
   seed: 1,
@@ -191,7 +204,7 @@ export function computeBTLeaderboard({
   // Kept because the alternative — no finite fit at all — is worse, and
   // because the degenerate variant that triggers it is excluded from the
   // ranking anyway. Callers are told via the trust panel.
-  const smooth = hasDegenerate ? 0.5 : 0;
+  const smooth = hasDegenerate ? DEGENERATE_SMOOTHING_EPS : 0;
   const { strength, didConverge } = fitBT({
     W,
     smooth,
