@@ -772,6 +772,17 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // Attributed-user budget debits ride the same pipeline and the same
+  // ClickHouse gate: per-user buckets only exist on the spend ledger.
+  const attributedDebits = clickhouseEnabled
+    ? {
+        prisma,
+        budgetCHRepository: new GatewayBudgetClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+      }
+    : undefined;
+
   const governanceKpisSync = clickhouseEnabled
     ? {
         governanceKpisRepository: new GovernanceKpisClickHouseRepository(
@@ -999,6 +1010,7 @@ export function initializeDefaultApp(options?: {
     gatewayBudgetSync,
     gatewaySpend,
     webhookDelivery,
+    attributedDebits,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.

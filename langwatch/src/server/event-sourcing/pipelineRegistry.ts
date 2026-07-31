@@ -6,6 +6,7 @@ import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import type { AttributedDebitsProcessDeps } from "@ee/governance/process-manager/attributedUserDebits.process";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import {
   createGovernanceKpisSyncReactor,
@@ -335,6 +336,7 @@ export interface PipelineRegistryDeps {
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
+  attributedDebits?: AttributedDebitsProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -774,6 +776,7 @@ export class PipelineRegistry {
         // The ADR-073 delivery process manager consumes this pipeline's
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
+        attributedDebits: this.deps.attributedDebits,
       }),
     );
   }

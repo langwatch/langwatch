@@ -27,7 +27,14 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  budgetPeriodFloorMs,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+} from "~/server/gateway/budgetResolution.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
@@ -805,6 +812,105 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
  * Query: ?cursor=<opaque>&limit=1000
  * Response: { jwts: [...], next_cursor: null | string, current_revision }
  */
+
+// ── attributed-user bucket spend ────────────────────────────────────────
+
+/**
+ * Per-bucket spend read for ATTRIBUTED_USER templates. The bundle carries
+ * the template entry only (per-user cardinality is unbounded), so the
+ * gateway resolves the request's own bucket here, caches it briefly, and
+ * enforces against the returned figure. The read honors the template's
+ * period boundary and any single-bucket boundary from a per-user reset:
+ * whichever is later bounds the sum.
+ */
+secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
+  const budgetId = c.req.query("budget_id") ?? "";
+  const endUserId = c.req.query("end_user_id") ?? "";
+  if (!budgetId || !endUserId) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_parameter",
+          message: "budget_id and end_user_id are required",
+        },
+      },
+      400,
+    );
+  }
+  const budget = await prisma.gatewayBudget.findUnique({
+    where: { id: budgetId },
+  });
+  if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
+    return c.json(
+      {
+        error: {
+          type: "not_found",
+          code: "budget_not_found",
+          message: "unknown attributed-user budget",
+        },
+      },
+      404,
+    );
+  }
+  if (!isClickHouseEnabled()) {
+    // Without the ledger there is no bucket figure; report zero spend so
+    // enforcement stays permissive rather than inventing a number.
+    return c.json({ spent_micro_usd: 0, bucket: null });
+  }
+  const bucketScopeId = bucketScopeIdFor(
+    budget,
+    attributedUserBucketScopeId(budget.scopeId, endUserId),
+  );
+  const bucketBoundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
+    where: {
+      budgetId_bucketScopeId: { budgetId: budget.id, bucketScopeId },
+    },
+    select: { periodStartedAt: true },
+  });
+  const templateFloor = budgetPeriodFloorMs(budget);
+  const floorCandidates = [
+    templateFloor,
+    bucketBoundary?.periodStartedAt.getTime(),
+  ].filter((n): n is number => typeof n === "number");
+  const periodFloorMs =
+    floorCandidates.length > 0 ? Math.max(...floorCandidates) : undefined;
+
+  const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        `ClickHouse enabled but no client for project ${projectId}`,
+      );
+    }
+    return client;
+  });
+  const projects = await prisma.project.findMany({
+    where: { team: { organizationId: budget.organizationId } },
+    select: { id: true },
+  });
+  if (projects.length === 0) {
+    return c.json({ spent_micro_usd: 0, bucket: bucketScopeId });
+  }
+  const spends = await chRepo.getSpendForTargetsAcrossTenants(
+    projects.map((p) => p.id),
+    [
+      {
+        budgetId: budget.id,
+        scope: budget.scopeType,
+        scopeId: bucketScopeId,
+        window: budget.window,
+        match: "exact",
+        periodFloorMs,
+      },
+    ],
+  );
+  const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
+  return c.json({
+    spent_micro_usd: Math.round(spentUsd * 1_000_000),
+    bucket: bucketScopeId,
+  });
+});
 
 // ── spend command ingest (spend-command spine) ──────────────────────────
 

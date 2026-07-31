@@ -207,6 +207,13 @@ export class GatewayBudgetClickHouseRepository {
       return;
     }
 
+    await this.insertRows(rows);
+  }
+
+  /** Map + insert debit rows; shared by every probing insert path. */
+  private async insertRows(rows: BudgetDebitRow[]): Promise<void> {
+    const tenantId = rows[0]!.tenantId;
+    const client = await this.resolveClient(tenantId);
     const records = rows.map((r) => ({
       TenantId: r.tenantId,
       BudgetId: r.budgetId,
@@ -333,6 +340,46 @@ export class GatewayBudgetClickHouseRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Debit insert for a writer that owns specific BUDGETS on a request,
+   * next to another writer owning the request's other budgets. The
+   * whole-request probe insertDebit uses would make two independent
+   * writers mutually exclusive (whoever lands second sees the request id
+   * present and skips); this probes per (BudgetId, GatewayRequestId), so
+   * replays of THIS writer dedup while the other writer's rows never
+   * suppress it.
+   */
+  async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    const tenantId = rows[0]!.tenantId;
+    const gatewayRequestId = rows[0]!.gatewayRequestId;
+    if (rows.some((r) => r.tenantId !== tenantId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebitsForBudgets: rows span multiple tenants",
+      );
+    }
+    if (rows.some((r) => r.gatewayRequestId !== gatewayRequestId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebitsForBudgets: rows span multiple gateway_request_ids",
+      );
+    }
+    const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT DISTINCT BudgetId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
+      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
+      format: "JSONEachRow",
+    });
+    const seen = new Set(
+      ((await probe.json()) as Array<{ BudgetId: string }>).map(
+        (r) => r.BudgetId,
+      ),
+    );
+    const fresh = rows.filter((r) => !seen.has(r.budgetId));
+    if (fresh.length === 0) return;
+    await this.insertRows(fresh);
   }
 
   /**
