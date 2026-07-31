@@ -102,6 +102,7 @@ import {
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
@@ -458,6 +459,7 @@ export class PipelineRegistry {
     const codingAgentPipeline = this.registerCodingAgentPipeline();
     if (this.deps.gatewaySpend) {
       this.registerGatewaySpendPipeline(this.deps.gatewaySpend);
+      this.registerGovernanceEventsPipeline();
     }
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline({
@@ -764,6 +766,14 @@ export class PipelineRegistry {
    * as a fold projection over gateway_spend, rating in the pipeline. Only
    * registered when ClickHouse is on (the spend table has no PG fallback).
    */
+  private registerGovernanceEventsPipeline() {
+    return this.deps.eventSourcing.register(
+      createGovernanceEventsPipeline({
+        webhookDelivery: this.deps.webhookDelivery,
+      }),
+    );
+  }
+
   private registerGatewaySpendPipeline(deps: {
     repository: GatewaySpendEventsRepository;
   }) {

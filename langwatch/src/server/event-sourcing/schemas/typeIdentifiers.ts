@@ -19,6 +19,10 @@ import {
 } from "../pipelines/automations/schemas/constants";
 import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
+  GOVERNANCE_EVENTS_COMMAND_TYPES,
+  GOVERNANCE_EVENTS_EVENT_TYPES,
+} from "../pipelines/governance-events/schemas/constants";
+import {
   GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
   GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
 } from "../pipelines/gateway-spend-processing/schemas/constants";
@@ -88,6 +92,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
   ...ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
   ...GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
+  ...GOVERNANCE_EVENTS_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -109,6 +114,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
   ...GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
+  ...GOVERNANCE_EVENTS_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -138,6 +144,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
   "billing_report",
   "gateway_request",
+  "governance_subject",
   "global",
   TEST_AGGREGATE_TYPE,
 ] as const;
