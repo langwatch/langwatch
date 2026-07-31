@@ -133,9 +133,15 @@ describe("spend event envelope", () => {
     );
   });
 
-  it("mapping an admitted row throws: in-flight is not emitted", () => {
-    expect(() => spendRowToEnvelope(row({ status: "admitted" }))).toThrow(
-      /admitted/,
-    );
+  /** @scenario The pull surface serves in-flight rows as admitted envelopes */
+  it("maps an admitted row to gateway.request.admitted with unknowns null", () => {
+    const envelope = spendRowToEnvelope(row({ status: "admitted" }));
+    expect(envelope.type).toBe("gateway.request.admitted");
+    expect(envelope.id.endsWith(":admitted")).toBe(true);
+    expect(envelope.data.status).toBe("admitted");
+    expect(envelope.data.usage).toBeNull();
+    expect(envelope.data.cost).toBeNull();
+    expect(envelope.data.duration_ms).toBeNull();
+    expect(envelope.data.needs_reconciliation).toBeNull();
   });
 });

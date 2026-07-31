@@ -199,6 +199,15 @@ Feature: Billing spend events, one durable record per gateway request
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
 
+  Rule: The pull surface serves the ledger, in-flight rows included
+
+    @unit
+    Scenario: The pull surface serves in-flight rows as admitted envelopes
+      Given a spend row that has been admitted but has no outcome yet
+      When the row is mapped for the pull surface
+      Then the envelope type is admitted with usage, cost, and duration null
+      And that type never appears on the push stream
+
   Rule: Summaries are the reconciliation checksum
 
     @integration

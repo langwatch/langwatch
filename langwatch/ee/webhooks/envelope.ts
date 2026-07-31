@@ -35,8 +35,12 @@ export interface WebhookEnvelope {
  * reconcile on `gateway_request_id` and REPLACE the settled figure, never
  * sum the two.
  *
- * `admitted` rows are in-flight requests, not emitted events; mapping one
- * is a programming error and throws.
+ * `admitted` rows are in-flight requests. The delivery process manager
+ * never maps them (nothing is emitted until an outcome), but the PULL
+ * surface serves the ledger, whose status filter includes them; an
+ * admitted row maps to `gateway.request.admitted` with null usage, cost,
+ * and duration (unknown YET, which is not zero). That type never appears
+ * on the push stream.
  *
  * Naming seam: the ClickHouse column is `ProviderKey` (the budget ledger's
  * audit-column precedent) but the external contract field is
@@ -45,17 +49,21 @@ export interface WebhookEnvelope {
  * parsed back to an object when it holds one.
  */
 export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
-  if (row.status === "admitted") {
-    throw new Error(
-      "spendRowToEnvelope: admitted rows are in-flight, not emitted events",
-    );
-  }
   const type =
-    row.status === "settled"
-      ? "gateway.request.settled"
-      : "gateway.request.completed";
-  const idSuffix = row.status === "settled" ? "settled" : "completed";
+    row.status === "admitted"
+      ? "gateway.request.admitted"
+      : row.status === "settled"
+        ? "gateway.request.settled"
+        : "gateway.request.completed";
+  const idSuffix =
+    row.status === "admitted"
+      ? "admitted"
+      : row.status === "settled"
+        ? "settled"
+        : "completed";
   const settled = row.status === "settled";
+  // Both in-flight and settled rows have no known quantities or cost.
+  const unknownQuantities = settled || row.status === "admitted";
   return {
     id: `${row.gatewayRequestId}:${idSuffix}`,
     type,
@@ -76,7 +84,7 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
       model: row.model || null,
       model_provider_id: row.providerKey || null,
       request_type: row.requestType || null,
-      usage: settled
+      usage: unknownQuantities
         ? null
         : {
             input_tokens: row.tokensInput,
@@ -85,7 +93,7 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
             cache_creation_input_tokens: row.tokensCacheWrite,
             reasoning_tokens: row.tokensReasoning,
           },
-      cost: settled
+      cost: unknownQuantities
         ? null
         : {
             total_usd: row.costUsd,
@@ -97,13 +105,15 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
           ? "success"
           : row.status === "failed"
             ? "error"
-            : "settled",
+            : row.status === "admitted"
+              ? "admitted"
+              : "settled",
       needs_reconciliation: settled ? true : null,
       settle_reason: settled ? row.settleReason || null : null,
       error: row.errorClass
         ? { class: row.errorClass, http_status: row.httpStatus || null }
         : null,
-      duration_ms: settled ? null : row.durationMs,
+      duration_ms: unknownQuantities ? null : row.durationMs,
       labels: row.labels,
       metadata: parseMetadata(row.metadata),
     },

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -122,6 +123,14 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
+		// The control plane distinguishes the reversible disable from the
+		// one-way revoke in its error code; forward the distinction so a
+		// disabled tenant is not told its credential is gone for good.
+		if strings.Contains(string(respBody), "virtual_key_disabled") {
+			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
+				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			})
+		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
 	case resp.StatusCode != http.StatusOK:
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))

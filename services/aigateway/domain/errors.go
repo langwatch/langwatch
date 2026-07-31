@@ -72,6 +72,10 @@ const (
 	ErrCircuitOpen                  = herr.Code("circuit_open")
 	ErrProviderTimeout              = herr.Code("provider_timeout")
 	ErrKeyRevoked                   = herr.Code("virtual_key_revoked")
+	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
+	// an administrator can re-enable it. Distinct from revoked (one-way)
+	// so tenant tooling can branch on which one it is.
+	ErrKeyDisabled = herr.Code("virtual_key_disabled")
 	ErrAuthUpstream                 = herr.Code("auth_upstream_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
