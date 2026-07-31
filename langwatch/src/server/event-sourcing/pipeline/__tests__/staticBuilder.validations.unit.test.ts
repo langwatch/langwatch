@@ -166,8 +166,8 @@ describe("StaticPipelineBuilder validations", () => {
         })
         .build();
 
-      const reactorGroupKeyFn = pipeline.foldReactors?.get("settle")?.definition
-        .options?.groupKeyFn;
+      const reactorGroupKeyFn =
+        pipeline.foldReactors?.get("settle")?.definition.options?.groupKeyFn;
       expect(reactorGroupKeyFn?.({ event, foldState: {} })).toBe(
         "lane:project-1",
       );
