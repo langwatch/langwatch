@@ -236,11 +236,16 @@ async function startAndAwaitReplay(params: {
     userName: "integration-test",
   });
 
+  // Throwing rather than asserting: vi.waitFor retries on a throw, and the
+  // run's outcome is asserted in the test that started it.
   await vi.waitFor(
     async () => {
       const status = await opsReplay.getStatus();
-      expect(status.runId).toBe(runId);
-      expect(status.state).not.toBe("running");
+      if (status.runId !== runId || status.state === "running") {
+        throw new Error(
+          `run ${runId} has not finished (status ${status.state} for ${status.runId})`,
+        );
+      }
     },
     { timeout: 30_000, interval: 100 },
   );
