@@ -138,7 +138,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
       translating(() =>
         new WebhookHealthService({
           prisma: ctx.prisma,
-          endpoints: new WebhookEndpointService({ prisma: ctx.prisma }),
+          endpoints: service(ctx.prisma),
           processStore: new PrismaProcessStore(ctx.prisma),
         }).health({
           organizationId: input.organizationId,
