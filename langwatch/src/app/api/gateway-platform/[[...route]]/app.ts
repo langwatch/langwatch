@@ -1516,7 +1516,10 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       select: { id: true },
     });
     const boundaries = await prisma.gatewayBudgetBucketBoundary.findMany({
-      where: { budgetId: { in: templates.map((t) => t.id) } },
+      where: {
+        organizationId,
+        budgetId: { in: templates.map((t) => t.id) },
+      },
     });
     const boundaryByKey = new Map(
       boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),

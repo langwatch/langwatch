@@ -194,3 +194,42 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a spend event is delivered
       Then the healthy endpoint's send succeeds
       And only the dead endpoint's message retries
+
+  Rule: Governance families ride the same platform
+
+    @unit
+    Scenario: Key lifecycle changes become their own envelope types
+      Given a key that is created, disabled, enabled, and revoked
+      When each change's envelope is built
+      Then each carries its lifecycle type with a deterministic id
+      And the reason travels on a disable
+
+    @unit
+    Scenario: A budget crossing becomes a threshold or breach envelope
+      Given a bucket that crossed its warn threshold and one that reached its limit
+      When each crossing's envelope is built
+      Then one is the threshold family and the other the breach family
+      And both carry the bucket, the window, the period, and both figures
+
+    @unit
+    Scenario: A crossing fires once per bucket per period
+      Given the same bucket crosses its threshold twice inside one period
+      When both crossings are appended
+      Then the second append collapses on the store's idempotency key
+      # (budget, bucket, kind, period) IS the once-per-crossing rule; a
+      # new period mints a new key and fires again.
+
+    @unit
+    Scenario: Crossing detection reads the boundary-aware figure
+      Given a bucket below the threshold, one above it, and one past the limit
+      When post-debit detection runs
+      Then only the above-threshold bucket appends a threshold crossing
+      And only the past-limit bucket appends a breach
+      And a detection failure never fails the debit that triggered it
+
+    @unit
+    Scenario: Governance events only reach endpoints subscribed to their types
+      Given endpoints subscribed to spend events only, lifecycle events only, and the gateway family
+      When a key lifecycle event is delivered
+      Then the spend-only endpoint receives nothing
+      And the lifecycle and family subscriptions receive it

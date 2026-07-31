@@ -141,7 +141,10 @@ export async function detectBudgetCrossings(
     const now = new Date();
     const bucketBoundaries =
       await deps.prisma.gatewayBudgetBucketBoundary.findMany({
-        where: { budgetId: { in: budgetIds } },
+        where: {
+          organizationId: { in: orgIds },
+          budgetId: { in: budgetIds },
+        },
       });
     const boundaryByKey = new Map(
       bucketBoundaries.map((b) => [

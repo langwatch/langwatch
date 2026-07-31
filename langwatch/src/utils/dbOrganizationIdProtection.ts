@@ -217,6 +217,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   RoutingPolicy: {},
   AiToolEntry: {},
   GatewayBudget: {},
+  // Per-bucket period boundaries for attributed-user templates. Bound by
+  // organizationId, or by the parent budget (org-owned) through budgetId /
+  // the compound unique key.
+  GatewayBudgetBucketBoundary: {
+    extraBound: ({ clause }) => {
+      const budgetId = clauseField(clause, "budgetId");
+      return (
+        typeof budgetId === "string" ||
+        (budgetId != null && Array.isArray((budgetId as { in?: unknown }).in)) ||
+        clauseField(clause, "budgetId_bucketScopeId") !== undefined
+      );
+    },
+  },
   // GitHub App installation mapped to a LangWatch org (Langy bot-authored PRs).
   // Bound by organizationId (admin reads) or the globally-unique installationId
   // (webhook + mint paths). Issue #4747; spec

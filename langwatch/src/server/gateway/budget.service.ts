@@ -991,7 +991,7 @@ export class GatewayBudgetService {
       // template starts a fresh period, including buckets that had their
       // own single-user resets inside the old one.
       await tx.gatewayBudgetBucketBoundary.deleteMany({
-        where: { budgetId: existing.id },
+        where: { organizationId: input.organizationId, budgetId: existing.id },
       });
       await this.changeEvents.append(
         {
