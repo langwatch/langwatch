@@ -65,6 +65,17 @@ Feature: trusting a haven stack from outside haven
     And when the CLI has not been built the failure says which command builds it,
       rather than surfacing a missing file
 
+  Scenario: sugar that owned a flag namespace would not be sugar
+    a transparent runner cannot also own flags. "haven cli onboard --help" has to
+    reach the CLI, and it did not while only single-dash arguments were passed
+    through, so "--help" was read as haven's and rejected.
+    When the developer runs "haven cli onboard --help"
+    Then "--help" reaches the CLI and prints the CLI's own help
+    And no argument after "haven cli" is ever read as haven's, so the command
+      declares no flags of its own and nothing is silently ignored
+    And "haven exec" keeps its "--" instead, because there the boundary between
+      haven's arguments and the command's is genuinely ambiguous
+
   @unimplemented
   Scenario: the CLI trusts a private root without being told where it is
     reading the CA at runtime would remove the ordering trap entirely, but node's

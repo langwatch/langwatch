@@ -38,7 +38,14 @@ type commandSpec struct {
 	// flag as a positional instead of an error — how `up` reads service deltas
 	// like "-nlp" once selection lands.
 	minusArgs bool
-	hidden    bool // internal (daemon): dispatchable, absent from help
+	// passthrough hands every argument to the command verbatim, double-dash
+	// flags included. It is for the transparent runners only: `haven cli
+	// onboard --json` has to reach the CLI, and a command whose whole job is
+	// to be something else cannot also own a flag namespace. Such a command
+	// declares no flags of its own — there is nothing left to collide with,
+	// so nothing is being silently ignored.
+	passthrough bool
+	hidden      bool // internal (daemon): dispatchable, absent from help
 	run       func(ctx context.Context, d deps, inv invocation) error
 }
 
@@ -83,6 +90,14 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 		}
 		inv.args = append(inv.args, a)
 		return nil
+	}
+	if spec.passthrough {
+		for _, a := range rest {
+			if err := addPositional(a); err != nil {
+				return inv, err
+			}
+		}
+		return inv, nil
 	}
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
@@ -408,12 +423,12 @@ var table = []commandSpec{
 		run:       runExec,
 	},
 	{
-		name:      "cli",
-		summary:   "run this checkout's langwatch CLI against this stack",
-		args:      "[args…]",
-		maxArgs:   -1,
-		minusArgs: true,
-		run:       runCLI,
+		name:        "cli",
+		summary:     "run this checkout's langwatch CLI against this stack",
+		args:        "[args…]",
+		maxArgs:     -1,
+		passthrough: true,
+		run:         runCLI,
 	},
 	{
 		name:    "typecheck",

@@ -46,6 +46,47 @@ func TestTerminatorGrantsNoArgumentsToACommandThatDeclaresNone(t *testing.T) {
 	}
 }
 
+// @scenario "sugar that owned a flag namespace would not be sugar"
+func TestCLIPassesEveryArgumentToTheCLI(t *testing.T) {
+	t.Run("when the argument is a double-dash flag haven also declares", func(t *testing.T) {
+		// --help is the case that caught this: it reached haven's parser as an
+		// undeclared flag and the command could not be asked for its own help.
+		inv, err := parse(specByName(t, "cli"), []string{"onboard", "--help", "--solo"})
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		want := []string{"onboard", "--help", "--solo"}
+		if !slices.Equal(inv.args, want) {
+			t.Errorf("args = %v, want %v", inv.args, want)
+		}
+		if len(inv.flags) != 0 {
+			t.Errorf("haven claimed flags that belong to the CLI: %v", inv.flags)
+		}
+	})
+
+	t.Run("when a terminator is passed it is the CLI's argument, not a separator", func(t *testing.T) {
+		inv, err := parse(specByName(t, "cli"), []string{"--", "onboard"})
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		want := []string{"--", "onboard"}
+		if !slices.Equal(inv.args, want) {
+			t.Errorf("args = %v, want %v", inv.args, want)
+		}
+	})
+}
+
+// A passthrough command has no flags to collide with, so nothing it accepts can
+// be silently ignored — the property the CLI constitution actually protects.
+// @scenario "sugar that owned a flag namespace would not be sugar"
+func TestPassthroughCommandsDeclareNoFlags(t *testing.T) {
+	for _, spec := range table {
+		if spec.passthrough && len(spec.flags) > 0 {
+			t.Errorf("haven %s is passthrough but declares flags %v; they could never be reached", spec.name, spec.flags)
+		}
+	}
+}
+
 // @scenario "one command runs anything against the stack"
 func TestExecNeedsACommandToRun(t *testing.T) {
 	err := runExec(context.Background(), deps{}, invocation{})
