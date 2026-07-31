@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { readHandledError, showErrorToast } from "~/features/errors";
+import type { ReportStage } from "~/server/export/batch-run-report/batch-run-report.service";
 import type { ReportTier } from "~/server/export/batch-run-report/report.types";
 
 export const BATCH_RUN_REPORT_DOWNLOAD_PATH =
@@ -31,6 +32,8 @@ interface UseBatchRunReportReturn {
   runningBatchIds: ReadonlySet<string>;
   /** Whether THIS batch run is currently producing a report. */
   isReportRunning: (batchRunId: string) => boolean;
+  /** Which stage THIS run's report is in, or null when it is not running. */
+  reportStage: (batchRunId: string) => ReportStage | null;
   startReport: (input: StartReportInput) => void;
   cancelReport: (input: { batchRunId: string }) => void;
 }
@@ -73,6 +76,83 @@ async function deliverReport({
         "Every figure for this run is in the file. The written part couldn't be produced this time.",
       type: "info",
     });
+  }
+}
+
+/**
+ * Reads the progress stream and delivers the file from its last line.
+ *
+ * One JSON object per line. Stages arrive as the server enters them, so the
+ * label tracks the real wait rather than a timer, and the document arrives
+ * whole at the end — a report that appeared progressively would be readable
+ * before its own header could say how much of it survived being produced.
+ */
+async function consumeReportStream({
+  response,
+  suiteName,
+  batchRunId,
+  onStage,
+}: {
+  response: Response;
+  suiteName?: string;
+  batchRunId: string;
+  onStage: (stage: ReportStage) => void;
+}): Promise<void> {
+  if (!response.ok) {
+    throw await reportRequestError(response);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("The report stream carried no body.");
+
+  const decoder = new TextDecoder();
+  let buffered = "";
+  let delivered = false;
+
+  const handle = (line: string) => {
+    if (line.trim() === "") return;
+    const event = JSON.parse(line) as {
+      stage?: ReportStage;
+      done?: boolean;
+      tier?: ReportTier;
+      filename?: string;
+      html?: string;
+      error?: string;
+    };
+
+    if (event.stage) return onStage(event.stage);
+    if (event.error) throw new Error(event.error);
+    if (!event.done || event.html === undefined) return;
+
+    triggerBlobDownload({
+      blob: new Blob([event.html], { type: "text/html;charset=utf-8" }),
+      filename:
+        event.filename ?? fallbackReportFilename({ suiteName, batchRunId }),
+    });
+    delivered = true;
+
+    if (event.tier === "figures_only") {
+      toaster.create({
+        title: "Report downloaded without its written analysis",
+        description:
+          "Every figure for this run is in the file. The written part couldn't be produced this time.",
+        type: "info",
+      });
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffered += decoder.decode(value, { stream: true });
+    const lines = buffered.split("\n");
+    buffered = lines.pop() ?? "";
+    for (const line of lines) handle(line);
+  }
+  handle(buffered);
+
+  if (!delivered) {
+    throw new Error("The report stream ended before the file arrived.");
   }
 }
 
@@ -158,6 +238,9 @@ export function useBatchRunReport({
   const [runningBatchIds, setRunningBatchIds] = useState<ReadonlySet<string>>(
     new Set<string>(),
   );
+  const [stages, setStages] = useState<ReadonlyMap<string, ReportStage>>(
+    new Map<string, ReportStage>(),
+  );
 
   // A report outlives a re-render but not the panel: leaving one running after
   // the list unmounts would download a file onto a page nobody is looking at.
@@ -176,6 +259,12 @@ export function useBatchRunReport({
     setRunningBatchIds((previous) => {
       if (!previous.has(batchRunId)) return previous;
       const next = new Set(previous);
+      next.delete(batchRunId);
+      return next;
+    });
+    setStages((previous) => {
+      if (!previous.has(batchRunId)) return previous;
+      const next = new Map(previous);
       next.delete(batchRunId);
       return next;
     });
@@ -200,13 +289,21 @@ export function useBatchRunReport({
       controllersRef.current.set(batchRunId, controller);
       setRunningBatchIds((previous) => new Set(previous).add(batchRunId));
 
-      void fetch(BATCH_RUN_REPORT_DOWNLOAD_PATH, {
+      void fetch(`${BATCH_RUN_REPORT_DOWNLOAD_PATH}?stream=1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, scenarioSetId, batchRunId }),
         signal: controller.signal,
       })
-        .then((response) => deliverReport({ response, suiteName, batchRunId }))
+        .then((response) =>
+          consumeReportStream({
+            response,
+            suiteName,
+            batchRunId,
+            onStage: (stage) =>
+              setStages((previous) => new Map(previous).set(batchRunId, stage)),
+          }),
+        )
         .catch((error: unknown) => {
           if (error instanceof Error && error.name === "AbortError") return;
           showErrorToast({ error, fallbackTitle: "Couldn't build the report" });
@@ -229,5 +326,16 @@ export function useBatchRunReport({
     [runningBatchIds],
   );
 
-  return { runningBatchIds, isReportRunning, startReport, cancelReport };
+  const reportStage = useCallback(
+    (batchRunId: string) => stages.get(batchRunId) ?? null,
+    [stages],
+  );
+
+  return {
+    runningBatchIds,
+    isReportRunning,
+    reportStage,
+    startReport,
+    cancelReport,
+  };
 }

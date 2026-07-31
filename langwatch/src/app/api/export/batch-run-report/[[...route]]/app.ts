@@ -22,9 +22,13 @@ import { getApp } from "~/server/app-layer/app";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { BatchRunNotFoundError } from "~/server/export/batch-run-report/batch-run-report.service";
+import {
+  BatchRunNotFoundError,
+  type ReportStage,
+} from "~/server/export/batch-run-report/batch-run-report.service";
 import { renderReportHtml } from "~/server/export/batch-run-report/render/render-report-html";
 import {
+  type BatchRunReportRequest,
   batchRunReportRequestSchema,
   type ReportModel,
 } from "~/server/export/batch-run-report/report.types";
@@ -83,6 +87,15 @@ secured
         },
       });
 
+      // The two model passes take tens of seconds each and everything else
+      // takes under a millisecond, so the caller is told which stage it is
+      // waiting in rather than left with a spinner. Streamed on the same
+      // request: a status endpoint would mean persisting a job, a projection
+      // and a retention policy to narrate a single wait.
+      if (c.req.query("stream") === "1") {
+        return streamReport({ request, signal: c.req.raw.signal });
+      }
+
       let model: ReportModel;
       try {
         model = await getApp().simulations.report.generate({
@@ -127,6 +140,69 @@ secured
       });
     },
   );
+
+/**
+ * The same report, delivered as a progress stream.
+ *
+ * One JSON object per line rather than Server-Sent Events: the client is a
+ * fetch reader, not an EventSource, and a line is the whole protocol. Stages
+ * arrive as they begin and the finished document arrives last, so the wait is
+ * narrated without the report ever being half-written on screen.
+ */
+function streamReport({
+  request,
+  signal,
+}: {
+  request: BatchRunReportRequest;
+  signal: AbortSignal;
+}): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (payload: unknown) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+
+      try {
+        const model = await getApp().simulations.report.generate({
+          request,
+          generatedAt: new Date().toISOString(),
+          abortSignal: signal,
+          onProgress: (stage: ReportStage) => send({ stage }),
+        });
+        send({
+          done: true,
+          tier: model.tier,
+          filename: buildFileName({
+            suiteName: request.suiteName,
+            generatedAt: model.meta.generatedAt,
+          }),
+          html: renderReportHtml({ model }),
+        });
+      } catch (error) {
+        send({
+          error:
+            error instanceof BatchRunNotFoundError
+              ? "Run not found."
+              : "The report could not be produced.",
+        });
+        logger.error(
+          { error, batchRunId: request.batchRunId },
+          "Run report stream failed",
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(body, {
+    headers: new Headers({
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    }),
+  });
+}
 
 /**
  * Content-Disposition's filename is a quoted string, so a quote in the suite

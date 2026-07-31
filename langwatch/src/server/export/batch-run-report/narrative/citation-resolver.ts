@@ -129,6 +129,44 @@ export function humaniseRunIds({
   );
 }
 
+/**
+ * The strict citation a draft citation describes, or null when it names none.
+ *
+ * The model is allowed to send a citation missing its id — see
+ * `draftCitationSchema` — because rejecting it at parse time costs the whole
+ * report. It costs the citation here instead, and a claim left with none is
+ * dropped by the rule that was already there.
+ */
+export function toCitation(draft: {
+  kind: string;
+  runId?: string;
+  criterionId?: string;
+  signatureId?: string;
+  turnIndex?: number;
+  path?: string;
+}): Citation | null {
+  switch (draft.kind) {
+    case "run":
+      return draft.runId ? { kind: "run", runId: draft.runId } : null;
+    case "criterion":
+      return draft.criterionId
+        ? { kind: "criterion", criterionId: draft.criterionId }
+        : null;
+    case "signature":
+      return draft.signatureId
+        ? { kind: "signature", signatureId: draft.signatureId }
+        : null;
+    case "turn":
+      return draft.runId && draft.turnIndex !== undefined
+        ? { kind: "turn", runId: draft.runId, turnIndex: draft.turnIndex }
+        : null;
+    case "stat":
+      return draft.path ? { kind: "stat", path: draft.path } : null;
+    default:
+      return null;
+  }
+}
+
 export function resolveClaims({
   claims,
   index,

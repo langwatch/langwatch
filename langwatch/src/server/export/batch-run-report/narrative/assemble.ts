@@ -17,8 +17,9 @@ import {
   buildCitationIndex,
   humaniseRunIds,
   resolveClaims,
+  toCitation,
 } from "./citation-resolver";
-import type { DraftAnswer, DraftReport } from "./narrative-pass";
+import type { DraftAnswer, DraftCitation, DraftReport } from "./narrative-pass";
 import type { VerifierOutcome } from "./verifier-pass";
 
 /**
@@ -96,7 +97,7 @@ export function assembleSections({
     questionId,
     offset,
   }: {
-    claims: { text: string; citations: Claim["citations"] }[];
+    claims: { text: string; citations: DraftCitation[] }[];
     questionId: string;
     offset: number;
   }): Claim[] => {
@@ -105,7 +106,13 @@ export function assembleSections({
       // Before anything reads it: the id belongs in the citation, not in the
       // sentence, where it is unreadable and already present underneath.
       text: humaniseRunIds({ text: claim.text, evidence }),
-      citations: claim.citations,
+      // A citation that names no id is dropped here rather than rejected at
+      // parse time, where it would have cost every answer instead of one.
+      citations: claim.citations
+        .map(toCitation)
+        .filter((citation): citation is Claim["citations"][number] =>
+          Boolean(citation),
+        ),
     }));
 
     const resolved = resolveClaims({ claims: identified, index });
@@ -192,7 +199,7 @@ function gapReasonFor({
 }
 
 type Admit = (params: {
-  claims: { text: string; citations: Claim["citations"] }[];
+  claims: { text: string; citations: DraftCitation[] }[];
   questionId: string;
   offset: number;
 }) => Claim[];

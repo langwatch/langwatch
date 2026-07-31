@@ -56,6 +56,8 @@ type RunRowDataProps = {
   onCancelReport?: () => void;
   /** Whether a report is being produced for THIS batch, not for any other. */
   isReportRunning?: boolean;
+  /** Which stage the report is in, so the wait says what it is doing. */
+  reportStage?: string | null;
 };
 
 type RunRowProps = RunRowLoadingProps | RunRowDataProps;
@@ -152,6 +154,7 @@ function RunRowData({
   onExportReport,
   onCancelReport,
   isReportRunning = false,
+  reportStage = null,
 }: RunRowDataProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
@@ -321,7 +324,7 @@ function RunRowData({
               data-testid="cancel-report-button"
             >
               <Spinner size="xs" />
-              <Text fontSize="xs">Report</Text>
+              <Text fontSize="xs">{reportStage ?? "Report"}</Text>
             </HStack>
           )}
           <Box flex={1} />

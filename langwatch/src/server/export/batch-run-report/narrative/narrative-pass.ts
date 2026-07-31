@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { QuestionDescriptor } from "../questions/question-registry";
-import { citationSchema } from "../report.types";
 import { buildNarrativeSystemPrompt } from "./prompts";
 
 const logger = createLogger("langwatch:batch-run-report:narrative");
@@ -52,13 +51,36 @@ const logger = createLogger("langwatch:batch-run-report:narrative");
 const MAX_SENTENCE = 4_000;
 const MAX_PARAGRAPH = 8_000;
 
+/**
+ * A citation as the MODEL sends it, not as the report requires it.
+ *
+ * Deliberately looser than `citationSchema`: the strict union rejects a
+ * citation whose id is missing, and because `generateObject` validates the
+ * whole response as one object, a single malformed citation threw away all
+ * eleven answers. It has happened with a criterion citation that arrived
+ * without its criterionId.
+ *
+ * A missing id is not a reason to lose the report — it is a reason to lose that
+ * citation, and with it the sentence that leaned on it. Resolution already does
+ * exactly that, so the shape is accepted here and judged there.
+ */
+const draftCitationSchema = z.object({
+  kind: z.enum(["run", "criterion", "signature", "turn", "stat"]),
+  runId: z.string().optional(),
+  criterionId: z.string().optional(),
+  signatureId: z.string().optional(),
+  turnIndex: z.number().int().min(0).optional(),
+  path: z.string().optional(),
+});
+export type DraftCitation = z.infer<typeof draftCitationSchema>;
+
 const draftStatementSchema = z.object({
   text: z
     .string()
     .max(MAX_SENTENCE)
     .describe("One plain sentence. No markdown."),
   citations: z
-    .array(citationSchema)
+    .array(draftCitationSchema)
     .max(64)
     .describe(
       "Ids copied verbatim from EVIDENCE. Uncited sentences are discarded.",

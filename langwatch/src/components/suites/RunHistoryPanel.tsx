@@ -26,6 +26,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { REPORT_STAGE_LABELS } from "~/server/export/batch-run-report/batch-run-report.service";
 import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -196,9 +197,10 @@ export function RunHistoryPanel({
 
   // One instance for the whole list: the scope of a report is passed per call,
   // so two rows can be producing one at the same time.
-  const { startReport, cancelReport, isReportRunning } = useBatchRunReport({
-    projectId: project?.id,
-  });
+  const { startReport, cancelReport, isReportRunning, reportStage } =
+    useBatchRunReport({
+      projectId: project?.id,
+    });
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -537,6 +539,11 @@ export function RunHistoryPanel({
                       cancelReport({ batchRunId: batchRun.batchRunId })
                     }
                     isReportRunning={isReportRunning(batchRun.batchRunId)}
+                    reportStage={
+                      reportStage(batchRun.batchRunId)
+                        ? REPORT_STAGE_LABELS[reportStage(batchRun.batchRunId)!]
+                        : null
+                    }
                   />
                 );
               })

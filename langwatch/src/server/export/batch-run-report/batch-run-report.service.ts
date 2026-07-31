@@ -32,6 +32,34 @@ type ResolveModel = (params: {
  */
 const HISTORY_READ_LIMIT = 100;
 
+/**
+ * The stages a report actually passes through, in order.
+ *
+ * Reported as they happen rather than estimated: the two model passes take
+ * tens of seconds each and everything else takes under a millisecond, so a
+ * percentage would be a fiction and a spinner says nothing about which of the
+ * two long waits a reader is in.
+ */
+export const REPORT_STAGES = [
+  "reading",
+  "measuring",
+  "writing",
+  "checking",
+  "rendering",
+] as const;
+export type ReportStage = (typeof REPORT_STAGES)[number];
+
+/** What each stage is called on screen. */
+export const REPORT_STAGE_LABELS: Readonly<Record<ReportStage, string>> = {
+  reading: "Reading the run",
+  measuring: "Working out what happened",
+  writing: "Writing the analysis",
+  checking: "Checking it against the run",
+  rendering: "Putting the report together",
+};
+
+export type ReportProgress = (stage: ReportStage) => void;
+
 /** A run with no scenarios in it is not a run this project can report on. */
 export class BatchRunNotFoundError extends Error {
   constructor(batchRunId: string) {
@@ -74,19 +102,28 @@ export class BatchRunReportService {
     request,
     generatedAt,
     abortSignal,
+    onProgress = () => undefined,
   }: {
     request: BatchRunReportRequest;
     /** Passed in so the same unchanged run renders the same file twice. */
     generatedAt: string;
     abortSignal?: AbortSignal;
+    /** Called as each stage begins, so a caller can say where the wait is. */
+    onProgress?: ReportProgress;
   }): Promise<ReportModel> {
+    onProgress("reading");
     const { evidence, evidenceBlock } = await this.readEvidence(request);
+
+    onProgress("measuring");
     const { draft, verdicts, unchecked } = await this.runModelPasses({
       request,
       evidence,
       evidenceBlock,
       abortSignal,
+      onProgress,
     });
+
+    onProgress("rendering");
 
     const { sections, integrity } = verdicts?.usable
       ? assembleSections({
@@ -180,16 +217,19 @@ export class BatchRunReportService {
     evidence,
     evidenceBlock,
     abortSignal,
+    onProgress,
   }: {
     request: BatchRunReportRequest;
     evidence: ReportEvidence;
     evidenceBlock: string;
     abortSignal?: AbortSignal;
+    onProgress: ReportProgress;
   }): Promise<{
     draft: Awaited<ReturnType<typeof runNarrativePass>>;
     verdicts: Awaited<ReturnType<typeof runVerifierPass>>;
     unchecked: ReturnType<typeof assembleSections>;
   }> {
+    onProgress("writing");
     const draft = await runNarrativePass({
       evidenceBlock,
       questions: QUESTION_REGISTRY,
@@ -208,6 +248,7 @@ export class BatchRunReportService {
       verdicts: null,
     });
 
+    if (draft) onProgress("checking");
     const verdicts = draft
       ? await runVerifierPass({
           evidenceBlock,
