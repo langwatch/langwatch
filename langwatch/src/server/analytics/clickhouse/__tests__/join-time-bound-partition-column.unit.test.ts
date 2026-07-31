@@ -107,7 +107,7 @@ function partitionBoundViolations(sql: string): string[] {
     for (const column of columns) {
       if (prunable.includes(column)) continue;
       violations.push(
-        `${table} is bounded on ${column}, which is none of the columns it can prune on (${prunable.join(", ")}); ClickHouse resolves an unqualified ${column} against the outer trace_summaries scope instead of failing`,
+        `${table} is bounded on ${column}, which is none of the columns it can prune on (${prunable.join(", ")}); unqualified, ClickHouse resolves it against the outer trace_summaries scope instead of failing, and qualified it prunes nothing`,
       );
     }
   }

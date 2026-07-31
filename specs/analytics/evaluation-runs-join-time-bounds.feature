@@ -15,10 +15,11 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
   # still. An upper bound of any width silently empties those graphs.
   #
   # Both halves failed in production before. Filtering on TenantId alone walked
-  # the tenant's whole evaluation history on every graph, and the attempt to
-  # bound it on a column evaluation_runs does not have resolved outward to the
-  # enclosing trace_summaries scope instead of failing, turning the dedup into
-  # a correlated subquery that ClickHouse rejects at query time.
+  # the tenant's whole evaluation history on every graph. The attempt to bound
+  # it on OccurredAt, which evaluation_runs has not got, then took the read
+  # path down: an unqualified name the inner table lacks resolves against the
+  # enclosing trace_summaries scope rather than failing, which turned the dedup
+  # into a correlated subquery that ClickHouse rejects at query time.
 
   # ---------------------------------------------------------------------------
   # Executed against ClickHouse: evaluations the window does not contain
@@ -54,11 +55,14 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
     When the analytics layer queries that evaluator's score
     Then only the newest version contributes
 
+  # A tie is not resolved by the dedup: both versions equal max(UpdatedAt), so
+  # both clear the IN and both reach the graph. Recorded as it behaves rather
+  # than as one would want it to, and unchanged by the bounds either way.
   @integration
-  Scenario: A tie on UpdatedAt does not fan one evaluation out into two
+  Scenario: A tie on UpdatedAt leaves both row versions in the join
     Given two row versions of one evaluation carrying the same UpdatedAt
-    When the analytics layer counts that evaluator's runs
-    Then the evaluation counts once and keeps its score
+    When the analytics layer reads that evaluator's runs and score
+    Then the count and the average are unaffected and a summed metric doubles
 
   # ---------------------------------------------------------------------------
   # The guard over the generated SQL

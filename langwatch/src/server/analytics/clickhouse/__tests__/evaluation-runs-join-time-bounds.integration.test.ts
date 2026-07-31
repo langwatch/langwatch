@@ -17,7 +17,8 @@
  *   it (the offline-experiment / re-run shape), still reaches the graph;
  * - row versions of one evaluation spread across weekly partitions, inserted
  *   out of `UpdatedAt` order, collapse to the newest and only the newest;
- * - two versions tied on `UpdatedAt` do not fan the evaluation out into two.
+ * - two versions tied on `UpdatedAt` both survive the dedup, which a distinct
+ *   count and an average absorb and a summed metric does not.
  *
  * @see https://github.com/langwatch/langwatch/issues/6392
  */
@@ -37,7 +38,10 @@ import {
   buildTimeseriesQuery,
 } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
-import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
+import {
+  deleteEvaluationRunsByTenant,
+  deleteTraceSummariesByTenant,
+} from "./test-utils/clickhouse-cleanup";
 
 const TENANT_ID = "test-eval-join-bounds-6392";
 
@@ -184,6 +188,12 @@ describe("evaluation_runs JOIN time bounds", () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(rawClient);
+
+    // Every assertion below is an exact count or an exact aggregate, so the
+    // tenant has to be empty before seeding: rows surviving an aborted run
+    // would join this one and inflate all of them.
+    await deleteEvaluationRunsByTenant({ client: ch, tenantId: TENANT_ID });
+    await deleteTraceSummariesByTenant({ client: ch, tenantId: TENANT_ID });
 
     await ch.insert({
       table: "trace_summaries",
@@ -336,21 +346,30 @@ describe("evaluation_runs JOIN time bounds", () => {
   });
 
   describe("given two row versions of one evaluation tied on UpdatedAt", () => {
-    /** @scenario A tie on UpdatedAt does not fan one evaluation out into two */
-    it("counts the evaluation once and keeps its score", async () => {
+    /** @scenario A tie on UpdatedAt leaves both row versions in the join */
+    it("keeps the count and the average, and doubles a summed metric", async () => {
       const runs = await currentPeriodMetric(
         "evaluations.evaluation_runs",
         "cardinality",
         TIED_EVALUATOR,
       );
-      const score = await currentPeriodMetric(
+      const avg = await currentPeriodMetric(
         "evaluations.evaluation_score",
         "avg",
         TIED_EVALUATOR,
       );
+      const sum = await currentPeriodMetric(
+        "evaluations.evaluation_score",
+        "sum",
+        TIED_EVALUATOR,
+      );
 
+      // The dedup keeps every version whose UpdatedAt equals the max, so a tie
+      // keeps both. A distinct count and an average absorb that; a sum does
+      // not. The bounds do not change it either way: both versions clear them.
       expect(runs).toBe(1);
-      expect(score).toBeCloseTo(0.25, 10);
+      expect(avg).toBeCloseTo(0.25, 10);
+      expect(sum).toBeCloseTo(0.5, 10);
     });
   });
 });
