@@ -160,7 +160,7 @@ describe("Feature: Run report — what survived being produced", () => {
 
     /** @scenario A report still downloads when no model is configured */
     it("states that the written analysis is unavailable", () => {
-      expect(html).toContain("The written analysis is unavailable");
+      expect(html).toContain("Langy could not write the analysis");
       expect(html).toContain("Figures only");
     });
 
@@ -179,7 +179,7 @@ describe("Feature: Run report — what survived being produced", () => {
       const html = renderReportHtml({
         model: makeModel({ tier: "unchecked" }),
       });
-      expect(html).toContain("could not be independently checked");
+      expect(html).toContain("could not be checked a second time");
     });
   });
 });

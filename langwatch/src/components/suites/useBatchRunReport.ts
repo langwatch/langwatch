@@ -73,9 +73,9 @@ async function deliverReport({
 
   if (tier === "figures_only") {
     toaster.create({
-      title: "Report downloaded without its written analysis",
+      title: "Report downloaded without Langy's analysis",
       description:
-        "Every figure for this run is in the file. The written part couldn't be produced this time.",
+        "Every figure for this run is in the file. Langy couldn't write the analysis this time.",
       type: "info",
     });
   }
@@ -135,9 +135,9 @@ async function consumeReportStream({
 
     if (event.tier === "figures_only") {
       toaster.create({
-        title: "Report downloaded without its written analysis",
+        title: "Report downloaded without Langy's analysis",
         description:
-          "Every figure for this run is in the file. The written part couldn't be produced this time.",
+          "Every figure for this run is in the file. Langy couldn't write the analysis this time.",
         type: "info",
       });
     }

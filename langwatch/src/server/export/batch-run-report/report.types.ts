@@ -62,8 +62,8 @@ export type ReportStage = (typeof REPORT_STAGES)[number];
 export const REPORT_STAGE_LABELS: Readonly<Record<ReportStage, string>> = {
   reading: "Reading the run",
   measuring: "Working out what happened",
-  writing: "Writing the analysis",
-  checking: "Checking it against the run",
+  writing: "Langy is writing the analysis",
+  checking: "Langy is checking it against the run",
   rendering: "Putting the report together",
 };
 

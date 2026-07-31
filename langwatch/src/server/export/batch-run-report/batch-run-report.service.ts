@@ -327,19 +327,19 @@ function buildNotes({
 
   if (tier === "figures_only") {
     notes.push(
-      "No written analysis was produced for this report, so it contains the figures only.",
+      "Langy did not write an analysis for this report, so it contains the figures only.",
     );
   }
   if (tier === "unchecked") {
     notes.push(
-      "The written analysis could not be independently checked against the run data.",
+      "Langy's analysis could not be checked a second time against the run data.",
     );
   }
   if (
     evidence.truncation.failingRuns > evidence.truncation.transcriptsIncluded
   ) {
     notes.push(
-      `The analysis read ${evidence.truncation.transcriptsIncluded} of ${evidence.truncation.failingRuns} failing conversations, covering ${evidence.truncation.signaturesCovered} of ${evidence.truncation.signaturesTotal} distinct failure groups.`,
+      `Langy read ${evidence.truncation.transcriptsIncluded} of ${evidence.truncation.failingRuns} failing conversations, covering ${evidence.truncation.signaturesCovered} of ${evidence.truncation.signaturesTotal} distinct failure groups.`,
     );
   }
   if (evidence.stillRunning) {

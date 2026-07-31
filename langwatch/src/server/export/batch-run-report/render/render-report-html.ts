@@ -44,8 +44,8 @@ const QUESTION_TIERS: readonly { tier: QuestionTier; heading: string }[] = [
 ];
 
 const TIER_BADGES: Readonly<Record<ReportTier, string>> = {
-  verified: "Analysis checked",
-  unchecked: "Analysis not checked",
+  verified: "Langy checked",
+  unchecked: "Langy unchecked",
   figures_only: "Figures only",
 };
 
@@ -58,9 +58,9 @@ const TIER_BADGES: Readonly<Record<ReportTier, string>> = {
 const TIER_NOTES: Readonly<Record<ReportTier, string | null>> = {
   verified: null,
   unchecked:
-    "The analysis could not be independently checked. The figures below are computed directly from the run data.",
+    "Langy's analysis could not be checked a second time. The figures below are computed directly from the run data.",
   figures_only:
-    "The written analysis is unavailable. Everything below is computed directly from the run data.",
+    "Langy could not write the analysis this time. Everything below is computed directly from the run data.",
 };
 
 const SEVERITY_TONES: Readonly<Record<Severity, Tone>> = {
@@ -534,7 +534,7 @@ function renderIntegrity(integrity: ReportIntegrity): string {
   const notes = integrity.notes.map((note) => `<li>${escapeHtml(note)}</li>`);
   return [
     "<h2>How this report was produced</h2>",
-    "<p>The figures are computed from this run’s data with no model involved. The written analysis is produced by a model, and every statement is traced back to the run before it is allowed into the file.</p>",
+    "<p>The figures are computed from this run’s data with no AI involved. The written analysis is Langy’s, and every sentence of it is traced back to the run before it is allowed into the file.</p>",
     `<ul>${dropped.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
     notes.length === 0 ? "" : `<ul>${notes.join("")}</ul>`,
   ].join("");

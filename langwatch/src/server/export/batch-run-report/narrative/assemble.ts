@@ -190,7 +190,7 @@ function gapReasonFor({
   draft: DraftReport | null;
 }): string {
   if (draft === null) {
-    return "This question needs the written analysis, which was not available for this report.";
+    return "This question needs Langy's analysis, which was not available for this report.";
   }
   if (answer?.declined && answer.declinedReason) {
     return answer.declinedReason;

@@ -248,7 +248,7 @@ describe("BatchRunReportService.generate() degradation", () => {
 
       expect(model.tier).toBe("unchecked");
       expect(model.integrity.notes.join(" ")).toContain(
-        "could not be independently checked",
+        "could not be checked a second time",
       );
     });
   });
