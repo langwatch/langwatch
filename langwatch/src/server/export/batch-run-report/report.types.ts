@@ -35,6 +35,40 @@ export type BatchRunReportRequest = z.infer<typeof batchRunReportRequestSchema>;
  */
 export type ReportTier = "verified" | "unchecked" | "figures_only";
 
+/**
+ * The stages a report actually passes through, in order.
+ *
+ * Reported as they happen rather than estimated: the two model passes take tens
+ * of seconds each and everything else takes under a millisecond, so a
+ * percentage would be a fiction and a spinner says nothing about which of the
+ * two long waits a reader is in.
+ *
+ * Declared here rather than beside the service because the run-history rows
+ * render these labels. Importing them from the service pulled the model
+ * resolution graph into the browser bundle and took the whole Simulations page
+ * down with "attempted to access a server-side environment variable on the
+ * client". This module is types and zod only, so it crosses that line safely.
+ */
+export const REPORT_STAGES = [
+  "reading",
+  "measuring",
+  "writing",
+  "checking",
+  "rendering",
+] as const;
+export type ReportStage = (typeof REPORT_STAGES)[number];
+
+/** What each stage is called on screen. */
+export const REPORT_STAGE_LABELS: Readonly<Record<ReportStage, string>> = {
+  reading: "Reading the run",
+  measuring: "Working out what happened",
+  writing: "Writing the analysis",
+  checking: "Checking it against the run",
+  rendering: "Putting the report together",
+};
+
+export type ReportProgress = (stage: ReportStage) => void;
+
 /** Which of the three acts a question belongs to. */
 export type QuestionTier = "past" | "present" | "future";
 
