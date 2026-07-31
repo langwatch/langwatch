@@ -123,6 +123,17 @@ export function AgreementBar({
   chance: number | null;
 }) {
   const asWidth = (value: number) => `${Math.min(100, value * 100)}%`;
+  // Markers are positioned by their left edge inside an overflow-hidden
+  // track, so at 100% an unclamped marker sits entirely in the clipped
+  // region and a perfect judge shows no marker at all. Cap the offset so
+  // the marker's full width stays inside the track.
+  const asMarkerInset = ({
+    value,
+    markerWidthPx,
+  }: {
+    value: number;
+    markerWidthPx: number;
+  }) => `min(${asWidth(value)}, calc(100% - ${markerWidthPx}px))`;
   const clearsChance = chance !== null && accuracy > chance;
 
   return (
@@ -184,7 +195,7 @@ export function AgreementBar({
             position="absolute"
             top={0}
             bottom={0}
-            insetStart={asWidth(chance)}
+            insetStart={asMarkerInset({ value: chance, markerWidthPx: 2 })}
             width="2px"
             bg="border.emphasized"
           />
@@ -194,7 +205,7 @@ export function AgreementBar({
           position="absolute"
           top={0}
           bottom={0}
-          insetStart={asWidth(accuracy)}
+          insetStart={asMarkerInset({ value: accuracy, markerWidthPx: 3 })}
           width="3px"
           bg="blue.solid"
         />
