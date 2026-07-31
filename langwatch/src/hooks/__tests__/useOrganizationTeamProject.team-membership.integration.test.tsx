@@ -127,9 +127,12 @@ function renderResolution() {
 }
 
 /**
- * The predicate `DashboardLayout` gates every page body on. Asserting it here
- * keeps the test honest about what the resolution has to produce: not merely
- * "a team", but one the caller can be shown a page for.
+ * The predicate `DashboardLayout` gates every page body on, restated here
+ * rather than imported. What the resolution has to produce is not merely "a
+ * team" but one the caller can be shown a page for, and an independent
+ * statement of that is what makes the assertion mean anything: calling the
+ * hook's own exported predicate would let the two drift together and still
+ * agree, which is exactly the failure this covers.
  */
 function chromeWouldRefuse(
   team: { members?: { userId: string }[] } | undefined,

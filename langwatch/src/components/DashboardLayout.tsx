@@ -46,7 +46,10 @@ import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/Globa
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import {
+  useOrganizationTeamProject,
+  userBelongsToTeam,
+} from "../hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
@@ -621,7 +624,9 @@ export const DashboardLayout = ({
     // path on personal-project URLs.
     isPersonalScopeRoute ||
     isDemoProject ||
-    (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
+    // Same predicate the ambient team resolution prefers on, so the team the
+    // app picks and the team the chrome will render for cannot diverge.
+    (!!team && !!user?.id && userBelongsToTeam(team, user.id)) ||
     // Org admins created via RoleBinding-only flow have no TeamUser row but still
     // have full team access - mirrors server-side org-scoped ADMIN RoleBinding logic.
     organizationRole === OrganizationUserRole.ADMIN;

@@ -45,10 +45,11 @@ export function isOrgScopedPermission(permission: Permission): boolean {
  *
  * `organization.getAll` returns every team in the organization but narrows
  * `team.members` to the caller's own row, synthesizing one from a RoleBinding
- * when the legacy TeamUser row is absent. A match here is therefore the same
- * membership the app chrome gates on before it will render a page at all.
+ * when the legacy TeamUser row is absent.
  *
- * @internal Exported for testing only
+ * Shared with `DashboardLayout`, which gates the page body on it: the team the
+ * ambient resolution picks and the team the chrome will render for have to be
+ * decided the same way, or the app resolves a context it then refuses.
  */
 export function userBelongsToTeam<T extends { members?: { userId: string }[] }>(
   team: T,
