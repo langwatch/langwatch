@@ -106,6 +106,24 @@ const CHIP_STYLES: Record<
 };
 
 /**
+ * What a chip says on hover: the kind, the target's name, and whatever
+ * identifying detail was moved off the visible line to keep the chip to
+ * one row. Pure so the composition is assertable without driving a
+ * portal-rendered tooltip open.
+ */
+export function scopeChipTooltip(entry: {
+  scopeType: ProviderScopeType;
+  name?: string;
+  detail?: string;
+}): string {
+  const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
+  const label = entry.name ?? style.fallbackLabel;
+  return entry.detail
+    ? `${style.kind}: ${label} · ${entry.detail}`
+    : `${style.kind}: ${label}`;
+}
+
+/**
  * Renders a horizontal list of scope chips. Each chip shows the
  * scope's icon + name (e.g. "LangWatch", "Acme Team", "web-app") with
  * a hover tooltip naming the scope type so the kind is unambiguous
@@ -179,9 +197,7 @@ export function ProviderScopeChips({
         const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
         const Icon = style.icon;
         const label = entry.name ?? style.fallbackLabel;
-        const tooltip = entry.detail
-          ? `${style.kind}: ${label} · ${entry.detail}`
-          : `${style.kind}: ${label}`;
+        const tooltip = scopeChipTooltip(entry);
         const chip = (
           <Badge colorPalette={style.colorPalette} variant="subtle" size={size}>
             <HStack gap={1}>

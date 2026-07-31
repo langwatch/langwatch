@@ -46,15 +46,12 @@ describe("SectionNavigationFrame", () => {
     expect(navigation.nextElementSibling).toBe(content);
   });
 
-  /**
-   * jsdom resolves no media queries, so the responsive values are asserted
-   * as declarations rather than as computed layout: what is pinned is that
-   * the rail's fixed width, its shrink lock and its divider are all
-   * conditioned on the breakpoint, which is what stopped a phone-width
-   * content column from collapsing to nothing.
-   *
-   * @scenario "The local navigation stops taking a column on a narrow viewport"
-   */
+  // jsdom resolves no media queries, so the responsive values are asserted
+  // as declarations rather than as computed layout: what is pinned is that
+  // the rail's fixed width and its shrink lock are conditioned on the
+  // breakpoint, which is what stopped a phone-width content column from
+  // collapsing to nothing.
+  /** @scenario "The local navigation stops taking a column on a narrow viewport" */
   it("drops the fixed-width rail below the md breakpoint", () => {
     renderFrame();
 

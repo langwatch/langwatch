@@ -94,6 +94,33 @@ const BUDGETS = [
       memberCount: 4,
     },
   }),
+  // The remaining kinds the Scope column can be asked to render. Without
+  // them a mislabelled chip would pass unnoticed: unmapped kinds fall back
+  // to the PROJECT style, so PRINCIPAL and TEAM would silently render as
+  // a project folder.
+  budget({
+    id: "bdg-team",
+    name: "team cap",
+    scopeType: "TEAM",
+    scopeTarget: { kind: "TEAM", id: "team-1", name: "Platform" },
+  }),
+  budget({
+    id: "bdg-project",
+    name: "project cap",
+    scopeType: "PROJECT",
+    scopeTarget: { kind: "PROJECT", id: "proj-1", name: "Web App" },
+  }),
+  budget({
+    id: "bdg-principal",
+    name: "principal cap",
+    scopeType: "PRINCIPAL",
+    scopeTarget: {
+      kind: "PRINCIPAL",
+      id: "usr-1",
+      name: "Ada Lovelace",
+      secondary: "ada@acme.test",
+    },
+  }),
 ];
 
 vi.mock("~/utils/api", () => ({
@@ -140,10 +167,27 @@ describe("budgets list scope column", () => {
     renderPage();
     const row = rowFor("org cap");
     expect(within(row).getByText("ACME")).toBeInTheDocument();
-    // The identifier moved into the tooltip; it is no longer a second
-    // visible line under the name.
-    expect(within(row).queryByText("(acme-HXECRq)")).not.toBeInTheDocument();
+    // The identifier moved into the tooltip, so it must not appear on the
+    // visible line in ANY form — matching the bare id, not the old
+    // parenthesized rendering, is what makes this assertion able to fail.
+    expect(within(row).queryByText(/acme-HXECRq/)).not.toBeInTheDocument();
     expect(within(row).queryByText("organization")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
+  it("gives every other scope kind its own chip, named", () => {
+    renderPage();
+    expect(
+      within(rowFor("team cap")).getByText("Platform"),
+    ).toBeInTheDocument();
+    expect(
+      within(rowFor("project cap")).getByText("Web App"),
+    ).toBeInTheDocument();
+    const principal = rowFor("principal cap");
+    expect(within(principal).getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(
+      within(principal).queryByText(/ada@acme\.test/),
+    ).not.toBeInTheDocument();
   });
 
   /** @scenario "Budget list links a virtual-key scope to that key" */

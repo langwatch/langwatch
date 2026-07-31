@@ -14,6 +14,7 @@
  */
 import type { GatewayBudget, PrismaClient } from "@prisma/client";
 
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   type GatewayBudgetClickHouseRepository,
   spendTargetsForBudgets,
@@ -110,9 +111,15 @@ function chooseOnePerKey(
 ): Map<string, GatewayBudget> {
   const chosen = new Map<string, GatewayBudget>();
   for (const budget of budgets) {
+    // The scope is the budget's target and wins when the caller can see
+    // it. A drawer-managed row whose target is outside the visible set
+    // still belongs to the key whose field manages it, so that is the
+    // fallback rather than dropping the row.
+    const scopedKeyId =
+      budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
     const keyId =
-      budget.scopeType === "VIRTUAL_KEY"
-        ? budget.scopeId
+      scopedKeyId && visibleKeyIds.has(scopedKeyId)
+        ? scopedKeyId
         : budget.managedByVirtualKeyId;
     if (!keyId || !visibleKeyIds.has(keyId)) continue;
     const current = chosen.get(keyId);
@@ -153,7 +160,16 @@ async function loadPeriodSpend(args: {
       now,
     );
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
-  } catch {
+  } catch (error) {
+    // The bar degrades to "unknown" either way, but a broken rollup read
+    // and an expected gap must not look the same to whoever is on call.
+    captureException(toError(error), {
+      extra: {
+        organizationId,
+        budgetIds: budgets.map((b) => b.id),
+        context: "virtualKeyDirectBudget.loadPeriodSpend",
+      },
+    });
     return null;
   }
 }

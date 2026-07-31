@@ -312,8 +312,16 @@ function VirtualKeysPage() {
                 <Card.Root width="full" overflow="hidden">
                   {/* The card clips; the body scrolls. Without this the
                       right-hand columns are simply unreachable on a narrow
-                      window instead of scrolling into view. */}
-                  <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+                      window instead of scrolling into view. Focusable so the
+                      scroll is reachable from the keyboard alone. */}
+                  <Card.Body
+                    paddingY={0}
+                    paddingX={0}
+                    overflowX="auto"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Virtual keys table"
+                  >
                     <Table.Root variant="line" size="md" width="full">
                       <Table.Header>
                         <Table.Row>

@@ -169,8 +169,16 @@ function BudgetsPage() {
               <Card.Root width="full" overflow="hidden">
                 {/* The card clips; the body scrolls. Without this the
                     right-hand columns are simply unreachable on a narrow
-                    window instead of scrolling into view. */}
-                <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+                    window instead of scrolling into view. Focusable so the
+                    scroll is reachable from the keyboard alone. */}
+                <Card.Body
+                  paddingY={0}
+                  paddingX={0}
+                  overflowX="auto"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Budgets table"
+                >
                   <Table.Root variant="line" size="md" width="full">
                     <Table.Header>
                       <Table.Row>
@@ -466,7 +474,9 @@ type ScopeTarget = {
  * target beyond its name (a slug, a key prefix) plus, for a group, how
  * many people the limit is handed to.
  */
-function scopeChipDetail(scopeTarget: ScopeTarget | null): string | undefined {
+export function scopeChipDetail(
+  scopeTarget: ScopeTarget | null,
+): string | undefined {
   if (!scopeTarget) return undefined;
   const parts: string[] = [];
   if (scopeTarget.secondary) parts.push(scopeTarget.secondary);

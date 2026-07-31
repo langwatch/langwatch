@@ -163,7 +163,7 @@ describe("virtual keys table", () => {
     cleanup();
   });
 
-  describe("the routing column", () => {
+  describe("when the routing column renders", () => {
     /** @scenario "Virtual key list Routing column states its three modes" */
     it("renders the null glyph when the key falls back nowhere", () => {
       renderPage();
@@ -189,7 +189,7 @@ describe("virtual keys table", () => {
     });
   });
 
-  describe("the spend column", () => {
+  describe("when the spend column renders", () => {
     /** @scenario "Virtual key list shows a key's own budget under its month spend" */
     it("draws a period bar for a key with a budget of its own", () => {
       renderPage();
