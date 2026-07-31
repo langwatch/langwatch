@@ -19,8 +19,8 @@ const SPEND_COLUMNS = `
   PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
   TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
   TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
-  HttpStatus, NeedsReconciliation, Labels, Metadata, DurationMS,
-  toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
+  HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
+  DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
 function mapSpendRow(r: Record<string, unknown>): SpendEventRow {
   const nano = Number(r.CostNanoUSD ?? 0);
@@ -48,6 +48,7 @@ function mapSpendRow(r: Record<string, unknown>): SpendEventRow {
     errorClass: String(r.ErrorClass),
     httpStatus: Number(r.HttpStatus),
     needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
+    settleReason: String(r.SettleReason ?? ""),
     labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
     metadata: String(r.Metadata ?? ""),
     durationMs: Number(r.DurationMS),
@@ -56,15 +57,13 @@ function mapSpendRow(r: Record<string, unknown>): SpendEventRow {
 }
 
 /**
- * Read side of the webhook delivery pipeline over the spend-event log, plus
- * the first-sight marker ledger.
- *
- * The delivery contract is first-sight-only: `gateway.request.completed`
- * fires once per GatewayRequestId, never again for later RMT versions of
- * the same request (restatements are a future `gateway.request.adjusted`
- * family). The scan walks EventTimestamp (write time) per project, probes
- * the candidate ids against the marker table exactly like the spend
- * writer's own insert probe, and only the never-marked ids are enqueued.
+ * The organization's emitted-events log read: GET /api/webhooks/v1/events
+ * pages the spend records as envelopes, Stripe /v1/events parity, newest
+ * first over a (OccurredAt, GatewayRequestId) cursor. Delivery itself
+ * consumes the event log through the process manager's transactional inbox
+ * and never reads this table; this repository exists for the listing only.
+ * Admitted rows are in-flight requests, not emitted events, and are never
+ * served here.
  */
 export class WebhookEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
@@ -80,14 +79,32 @@ export class WebhookEventsClickHouseRepository {
     toMs,
     cursor,
     limit,
+    types,
   }: {
     tenantIds: string[];
     fromMs?: number;
     toMs?: number;
     cursor?: string | null;
     limit: number;
+    /** Emitted event types to serve; omitted means every emitted type.
+     *  Unknown types yield an empty page (forward-compatible probing). */
+    types?: string[];
   }): Promise<EmittedEventsPage> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
+
+    // The emitted-type filter maps to row statuses: completed covers the
+    // confirmed and failed outcomes, settled is its own stream. Admitted
+    // rows are in-flight and never emitted, so they are always excluded.
+    const statusesFor = (t: string): string[] =>
+      t === "gateway.request.completed"
+        ? ["confirmed", "failed"]
+        : t === "gateway.request.settled"
+          ? ["settled"]
+          : [];
+    const statuses = types
+      ? [...new Set(types.flatMap(statusesFor))]
+      : ["confirmed", "failed", "settled"];
+    if (statuses.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
 
     const decoded = cursor ? decodeCursor(cursor) : null;
@@ -108,6 +125,7 @@ export class WebhookEventsClickHouseRepository {
         SELECT ${SPEND_COLUMNS}
         FROM ${SPEND_TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
+          AND Status IN {statuses:Array(String)}
           ${fromClause}
           ${toClause}
           ${cursorClause}
@@ -116,6 +134,7 @@ export class WebhookEventsClickHouseRepository {
       `,
       query_params: {
         tenantIds,
+        statuses,
         ...(fromMs !== undefined ? { fromMs } : {}),
         ...(toMs !== undefined ? { toMs } : {}),
         ...(decoded

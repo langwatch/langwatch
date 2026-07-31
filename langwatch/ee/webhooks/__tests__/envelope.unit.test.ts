@@ -26,6 +26,7 @@ function row(overrides: Partial<SpendEventRow> = {}): SpendEventRow {
     errorClass: "",
     httpStatus: 200,
     needsReconciliation: false,
+    settleReason: "",
     requestType: "chat",
     labels: ["customer:acme-172"],
     metadata: '{"call_site":"summary"}',
@@ -39,8 +40,9 @@ describe("spend event envelope", () => {
   /** @scenario The envelope renames the provider column to the contract field */
   it("maps ProviderKey to model_provider_id and the request id to the envelope id", () => {
     const envelope = spendRowToEnvelope(row());
-    expect(envelope.id).toBe("01K1REQUESTULID");
+    expect(envelope.id).toBe("01K1REQUESTULID:completed");
     expect(envelope.type).toBe("gateway.request.completed");
+    expect(envelope.data.gateway_request_id).toBe("01K1REQUESTULID");
     expect(envelope.data.model_provider_id).toBe("provider_row_id_1");
     expect(envelope.data).not.toHaveProperty("provider_key");
     expect(envelope.data).not.toHaveProperty("ProviderKey");
@@ -81,10 +83,50 @@ describe("spend event envelope", () => {
     const envelope = spendRowToEnvelope(
       row({ status: "failed", errorClass: "upstream_rate_limited", httpStatus: 429 }),
     );
+    expect(envelope.type).toBe("gateway.request.completed");
     expect(envelope.data.status).toBe("error");
     expect(envelope.data.error).toEqual({
       class: "upstream_rate_limited",
       http_status: 429,
     });
+  });
+
+  /** @scenario A settled request is its own event type with unknown cost */
+  it("settled maps to gateway.request.settled with null cost and usage", () => {
+    const envelope = spendRowToEnvelope(
+      row({
+        status: "settled",
+        needsReconciliation: true,
+        settleReason: "confirmation_deadline_expired",
+        costNanoUsd: 0,
+        costUsd: "0.000000",
+      }),
+    );
+    expect(envelope.type).toBe("gateway.request.settled");
+    expect(envelope.id).toBe("01K1REQUESTULID:settled");
+    expect(envelope.data.event_type).toBe("gateway.request.settled");
+    expect(envelope.data.gateway_request_id).toBe("01K1REQUESTULID");
+    expect(envelope.data.status).toBe("settled");
+    expect(envelope.data.cost).toBeNull();
+    expect(envelope.data.usage).toBeNull();
+    expect(envelope.data.needs_reconciliation).toBe(true);
+    expect(envelope.data.settle_reason).toBe("confirmation_deadline_expired");
+  });
+
+  it("the settled and completed envelopes of one request never share an id", () => {
+    const settled = spendRowToEnvelope(
+      row({ status: "settled", needsReconciliation: true }),
+    );
+    const completed = spendRowToEnvelope(row());
+    expect(settled.id).not.toBe(completed.id);
+    expect(settled.data.gateway_request_id).toBe(
+      completed.data.gateway_request_id,
+    );
+  });
+
+  it("mapping an admitted row throws: in-flight is not emitted", () => {
+    expect(() => spendRowToEnvelope(row({ status: "admitted" }))).toThrow(
+      /admitted/,
+    );
   });
 });

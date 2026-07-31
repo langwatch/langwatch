@@ -55,6 +55,8 @@ export type SpendEventRow = {
   errorClass: string;
   httpStatus: number;
   needsReconciliation: boolean;
+  /** Why settlement fired, set only on settled rows. */
+  settleReason: string;
   labels: string[];
   metadata: string;
   durationMs: number;
@@ -87,8 +89,8 @@ const ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
           TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
-          HttpStatus, NeedsReconciliation, Labels, Metadata, DurationMS,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
+          HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
+          DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
 function mapRow(r: Record<string, unknown>): SpendEventRow {
   const nano = Number(r.CostNanoUSD ?? 0);
@@ -117,6 +119,7 @@ function mapRow(r: Record<string, unknown>): SpendEventRow {
     errorClass: String(r.ErrorClass),
     httpStatus: Number(r.HttpStatus),
     needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
+    settleReason: String(r.SettleReason ?? ""),
     labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
     metadata: String(r.Metadata ?? ""),
     durationMs: Number(r.DurationMS),

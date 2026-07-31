@@ -38,6 +38,14 @@ export const WEBHOOK_EVENT_TYPES: readonly WebhookEventType[] = [
       "One event per gateway request with token classes, rated cost, attribution, and status. The billing feed.",
   },
   {
+    type: "gateway.request.settled",
+    family: "gateway",
+    schemaVersion: "1",
+    emitting: true,
+    description:
+      "An admitted request whose confirmation never arrived, settled with unknown cost and flagged for reconciliation. A later gateway.request.completed for the same gateway_request_id supersedes it.",
+  },
+  {
     type: "gateway.budget.threshold_crossed",
     family: "gateway",
     schemaVersion: "1",

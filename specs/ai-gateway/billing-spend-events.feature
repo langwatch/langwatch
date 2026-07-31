@@ -179,6 +179,13 @@ Feature: Billing spend events, one durable record per gateway request
       Then the status stays confirmed and the attribution fills in
 
     @unit
+    Scenario: A settled request is its own event type with unknown cost
+      Given a settled spend record
+      When it is mapped to its wire envelope
+      Then the type is settled with null cost and null usage
+      And the completed stream never carries it
+
+    @unit
     Scenario: Partial usage on a failure still prices
       Given a failure that consumed tokens before it broke
       When the failed event folds

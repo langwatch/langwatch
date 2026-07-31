@@ -72,6 +72,64 @@ afterAll(async () => {
 });
 
 describe("webhook emitted-events listing", () => {
+  /** @scenario The events listing serves settlements under their own type and hides in-flight rows */
+  it("serves settled rows as gateway.request.settled, filters by type, and never serves admitted rows", async () => {
+    const settledId = `req-settled-${nanoid(6)}`;
+    const admittedId = `req-admitted-${nanoid(6)}`;
+    await spendRepo.upsertFromFold([
+      {
+        tenantId,
+        gatewayRequestId: settledId,
+        state: {
+          ...state(baseTime + 100),
+          status: "settled",
+          usage: null,
+          costNanoUsd: 0,
+          needsReconciliation: true,
+          settleReason: "confirmation_deadline_expired",
+        },
+      },
+      {
+        tenantId,
+        gatewayRequestId: admittedId,
+        state: { ...state(baseTime + 200), status: "admitted" },
+      },
+    ]);
+
+    const settledPage = await eventsRepo.readEmittedEventsPage({
+      tenantIds: [tenantId],
+      fromMs: baseTime - 1,
+      toMs: baseTime + 500,
+      limit: 10,
+      types: ["gateway.request.settled"],
+    });
+    expect(settledPage.rows.map((r) => r.gatewayRequestId)).toEqual([
+      settledId,
+    ]);
+    expect(settledPage.rows[0]!.settleReason).toBe(
+      "confirmation_deadline_expired",
+    );
+
+    const allPage = await eventsRepo.readEmittedEventsPage({
+      tenantIds: [tenantId],
+      fromMs: baseTime - 1,
+      toMs: baseTime + 500,
+      limit: 10,
+    });
+    const served = allPage.rows.map((r) => r.gatewayRequestId);
+    expect(served).toContain(settledId);
+    expect(served).not.toContain(admittedId);
+
+    const unknown = await eventsRepo.readEmittedEventsPage({
+      tenantIds: [tenantId],
+      fromMs: baseTime - 1,
+      toMs: baseTime + 500,
+      limit: 10,
+      types: ["gateway.request.imagined"],
+    });
+    expect(unknown.rows).toEqual([]);
+  });
+
   /** @scenario The events listing pages the organization's emitted events */
   it("pages envelope rows newest first with a continuation cursor", async () => {
     const ids = [1, 2, 3].map((i) => `req-page-${i}-${nanoid(6)}`);

@@ -222,6 +222,7 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     errorClass: payload.error?.type ?? "",
     httpStatus: payload.error?.http_status ?? 0,
     needsReconciliation: payload.status === "settled",
+    settleReason: payload.settle_reason ?? "",
     labels: payload.attribution?.labels ?? [],
     metadata: payload.attribution?.metadata ?? "",
     durationMs: payload.duration_ms,
@@ -255,9 +256,16 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
     const plan = await deps.getPlan(organizationId);
     if (plan.webhookEndpoints !== true) return;
 
+    // Settled requests are their own event type: an endpoint subscribed
+    // only to completed never receives one, and a family or match-all
+    // subscription receives both.
+    const eventType =
+      payload.status === "settled"
+        ? "gateway.request.settled"
+        : "gateway.request.completed";
     const endpoints = (
       await deps.endpoints.listActiveByOrganization({ organizationId })
-    ).filter((e) => eventMatches(e.enabledEvents, "gateway.request.completed"));
+    ).filter((e) => eventMatches(e.enabledEvents, eventType));
     if (endpoints.length === 0) return;
 
     const row = deliverPayloadToRow(payload);

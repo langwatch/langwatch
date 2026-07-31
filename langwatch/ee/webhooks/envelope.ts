@@ -19,7 +19,24 @@ export interface WebhookEnvelope {
 }
 
 /**
- * Map a spend row to its `gateway.request.completed` envelope.
+ * Map a spend row to its wire envelope, branched on the row's lifecycle
+ * status:
+ *
+ * - `confirmed` / `failed` become `gateway.request.completed` (the money
+ *   stream; the payload's `status` distinguishes success from error).
+ * - `settled` becomes `gateway.request.settled`: cost and usage are NULL
+ *   because unknown is not zero, `needs_reconciliation` is true, and the
+ *   settle reason rides along. A settled request NEVER appears in the
+ *   completed stream, so billing consumers can trust completed for money.
+ *
+ * Supersession: a late confirmation after a settlement delivers a real
+ * completed envelope for the same `gateway_request_id`. Envelope ids are
+ * type-suffixed exactly so no dedup layer collides the pair; consumers
+ * reconcile on `gateway_request_id` and REPLACE the settled figure, never
+ * sum the two.
+ *
+ * `admitted` rows are in-flight requests, not emitted events; mapping one
+ * is a programming error and throws.
  *
  * Naming seam: the ClickHouse column is `ProviderKey` (the budget ledger's
  * audit-column precedent) but the external contract field is
@@ -28,14 +45,27 @@ export interface WebhookEnvelope {
  * parsed back to an object when it holds one.
  */
 export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
+  if (row.status === "admitted") {
+    throw new Error(
+      "spendRowToEnvelope: admitted rows are in-flight, not emitted events",
+    );
+  }
+  const type =
+    row.status === "settled"
+      ? "gateway.request.settled"
+      : "gateway.request.completed";
+  const idSuffix = row.status === "settled" ? "settled" : "completed";
+  const settled = row.status === "settled";
   return {
-    id: row.gatewayRequestId,
-    type: "gateway.request.completed",
+    id: `${row.gatewayRequestId}:${idSuffix}`,
+    type,
     created: row.occurredAt.toISOString(),
     schema_version: "1",
     data: {
-      event_id: row.gatewayRequestId,
-      event_type: "gateway.request.completed",
+      event_id: `${row.gatewayRequestId}:${idSuffix}`,
+      event_type: type,
+      /** The join key across the settled/completed pair. */
+      gateway_request_id: row.gatewayRequestId,
       occurred_at: row.occurredAt.toISOString(),
       organization_id: row.organizationId,
       project_id: row.tenantId,
@@ -43,32 +73,37 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
       principal_user_id: row.principalUserId || null,
       end_user_id: row.endUserId || null,
       trace_id: row.traceId,
-      model: row.model,
+      model: row.model || null,
       model_provider_id: row.providerKey || null,
       request_type: row.requestType || null,
-      usage: {
-        input_tokens: row.tokensInput,
-        output_tokens: row.tokensOutput,
-        cache_read_input_tokens: row.tokensCacheRead,
-        cache_creation_input_tokens: row.tokensCacheWrite,
-        reasoning_tokens: row.tokensReasoning,
-      },
-      cost: {
-        total_usd: row.costUsd,
-        nano_usd: row.costNanoUsd,
-        rate_version: row.rateVersion || null,
-      },
+      usage: settled
+        ? null
+        : {
+            input_tokens: row.tokensInput,
+            output_tokens: row.tokensOutput,
+            cache_read_input_tokens: row.tokensCacheRead,
+            cache_creation_input_tokens: row.tokensCacheWrite,
+            reasoning_tokens: row.tokensReasoning,
+          },
+      cost: settled
+        ? null
+        : {
+            total_usd: row.costUsd,
+            nano_usd: row.costNanoUsd,
+            rate_version: row.rateVersion || null,
+          },
       status:
         row.status === "confirmed"
           ? "success"
           : row.status === "failed"
             ? "error"
-            : row.status,
-      needs_reconciliation: row.needsReconciliation ? true : null,
+            : "settled",
+      needs_reconciliation: settled ? true : null,
+      settle_reason: settled ? row.settleReason || null : null,
       error: row.errorClass
         ? { class: row.errorClass, http_status: row.httpStatus || null }
         : null,
-      duration_ms: row.durationMs,
+      duration_ms: settled ? null : row.durationMs,
       labels: row.labels,
       metadata: parseMetadata(row.metadata),
     },

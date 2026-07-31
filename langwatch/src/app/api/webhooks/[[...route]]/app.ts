@@ -4,10 +4,7 @@ import { describeRoute } from "hono-openapi";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import {
-  WEBHOOK_EVENT_TYPES,
-  eventMatches,
-} from "@ee/webhooks/eventRegistry";
+import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import {
   WebhookEventsClickHouseRepository,
 } from "@ee/webhooks/webhookEvents.clickhouse.repository";
@@ -416,26 +413,20 @@ secured
       const organization = c.get("organization") as Organization;
       const query = c.req.valid("query");
 
-      // One family exists today; a type filter for anything else is an
-      // empty page, not an error, so consumers can probe forward-compatibly.
-      if (
-        query.type !== undefined &&
-        !eventMatches([query.type], "gateway.request.completed") &&
-        query.type !== "gateway.request.completed"
-      ) {
-        return c.json({ data: [], next_cursor: null });
-      }
-
       const projects = await prisma.project.findMany({
         where: { team: { organizationId: organization.id } },
         select: { id: true },
       });
+      // The repository maps emitted types to row statuses and serves an
+      // empty page for unknown types, so consumers can probe
+      // forward-compatibly without an error.
       const page = await eventsRepository.readEmittedEventsPage({
         tenantIds: projects.map((p) => p.id),
         fromMs: query.from,
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
+        types: query.type !== undefined ? [query.type] : undefined,
       });
       return c.json({
         data: page.rows.map(spendRowToEnvelope),

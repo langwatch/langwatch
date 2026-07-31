@@ -50,10 +50,38 @@ Feature: Webhook endpoints, signed outbound event delivery
       And no second send message exists
 
     @integration
-    Scenario: Failed and settled requests are delivered with their own statuses
+    Scenario: Failed requests are delivered as completed with their error class
       Given a request that failed at the provider
       When the process manager consumes the failure
-      Then the envelope carries the error class and failed status
+      Then a completed envelope carries the error class and error status
+
+    @integration
+    Scenario: A settled request goes out as its own event type
+      Given an admitted request whose confirmation never arrived
+      When the settlement is consumed
+      Then the envelope type is settled, never completed
+      And its cost and usage are null because unknown is not zero
+      And it is flagged for reconciliation with the settle reason
+
+    @integration
+    Scenario: A late confirmation supersedes the settled event
+      Given a request already delivered as settled
+      When its confirmation finally arrives
+      Then a completed envelope is delivered for the same gateway request id
+      And the two envelopes carry distinct event ids
+      And consumers replace the settled figure, never sum the pair
+
+    @unit
+    Scenario: A settled event never matches a completed-only subscription
+      Given an endpoint subscribed only to completed events
+      Then settled events do not match it
+      And family and match-all subscriptions receive both
+
+    @integration
+    Scenario: A completed-only subscription never receives settlements
+      Given one endpoint on the completed type and one on the gateway family
+      When a settlement is delivered
+      Then only the family-subscribed endpoint gets a send
 
   Rule: Deliveries are signed and attributable
 
@@ -151,6 +179,14 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given spend records across the organization's projects
       When the events log is read with a page limit
       Then envelopes come back newest first with a continuation cursor
+
+    @integration
+    Scenario: The events listing serves settlements under their own type and hides in-flight rows
+      Given a settled record and an admitted record
+      When the events log is read
+      Then the settled record appears as its own event type with its reason
+      And the admitted record never appears
+      And filtering by an unknown type yields an empty page
 
     @integration
     Scenario: Each endpoint retries independently on its own ladder

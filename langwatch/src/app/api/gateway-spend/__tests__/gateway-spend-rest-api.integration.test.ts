@@ -98,6 +98,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     errorClass: "",
     httpStatus: 200,
     needsReconciliation: false,
+    settleReason: "",
     requestType: "chat",
     labels: [],
     metadata: "",
@@ -107,7 +108,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   });
 
   // The write path is the fold's upsert now; tests seed by mapping a row to
-  // the fold state it would have produced.
+  // the fold state it would have produced. Write stamps are strictly
+  // monotonic: the walk pages by (EventTimestamp, GatewayRequestId), and two
+  // seeds landing in the same millisecond would tie, letting the id
+  // tiebreak place a later insert behind an already-served cursor.
+  let seedClock = Date.now();
   async function seed(rows: SpendEventRow[]): Promise<void> {
     await repo.upsertFromFold(
       rows.map((row) => ({
@@ -141,13 +146,13 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           errorType: row.errorClass,
           httpStatus: row.httpStatus,
           needsReconciliation: row.needsReconciliation,
-          settleReason: "",
+          settleReason: row.settleReason,
           occurredAtMs: row.occurredAt.getTime(),
           durationMs: row.durationMs,
           // Write-time stamps: the walk pages by insert order, so the
           // version must be the seed instant, never the occurred-at.
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: ++seedClock,
+          updatedAt: ++seedClock,
           LastEventOccurredAt: row.occurredAt.getTime(),
         },
       })),
@@ -351,7 +356,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       cursor = page.next_cursor;
     }
 
-    expect(seen).toContain(`${ns}-late`);
+    // Envelope ids are type-suffixed; the raw request id rides in
+    // data.gateway_request_id as the join key.
+    expect(seen).toContain(`${ns}-late:completed`);
     expect(new Set(seen).size).toBe(seen.length);
   });
 

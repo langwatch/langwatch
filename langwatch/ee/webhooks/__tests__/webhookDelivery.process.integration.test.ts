@@ -37,6 +37,7 @@ import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { WebhookEndpointService } from "../webhookEndpoint.service";
 import {
@@ -174,6 +175,20 @@ function failedEnvelope(requestId: string): ProcessEventEnvelope {
   );
 }
 
+function settledEnvelope(requestId: string): ProcessEventEnvelope {
+  return envelopeFor(
+    requestId,
+    GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+    {
+      gateway_request_id: requestId,
+      occurred_at: T0 + 600_000,
+      tenantId: project.id,
+      reason: "confirmation_deadline_expired",
+    },
+    T0 + 600_000,
+  );
+}
+
 async function consume(envelope: ProcessEventEnvelope): Promise<void> {
   const result = await service.handleEvent({ envelope, now: clock });
   expect(result.outcome).not.toBe("revisionConflict");
@@ -292,7 +307,8 @@ describe("webhook delivery via the transactional inbox", () => {
       batch: Array<{ id: string; data: Record<string, unknown> }>;
     };
     expect(body.batch).toHaveLength(1);
-    expect(body.batch[0]!.id).toBe(requestId);
+    expect(body.batch[0]!.id).toBe(`${requestId}:completed`);
+    expect(body.batch[0]!.data.gateway_request_id).toBe(requestId);
     expect(body.batch[0]!.data.organization_id).toBe(organization.id);
     expect(body.batch[0]!.data.end_user_id).toBe("end-user-1");
     expect(body.batch[0]!.data.status).toBe("success");
@@ -318,7 +334,111 @@ describe("webhook delivery via the transactional inbox", () => {
     expect(sendWebhookMock).toHaveBeenCalledTimes(1);
   });
 
-  /** @scenario Failed and settled requests are delivered with their own statuses */
+  /** @scenario A settled request goes out as its own event type */
+  it("delivers a settlement as gateway.request.settled with unknown cost", async () => {
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.*"],
+    });
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(settledEnvelope(requestId));
+    await drainOutbox();
+
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
+      batch: Array<{ id: string; type: string; data: Record<string, unknown> }>;
+    };
+    expect(body.batch[0]!.type).toBe("gateway.request.settled");
+    expect(body.batch[0]!.id).toBe(`${requestId}:settled`);
+    expect(body.batch[0]!.data.cost).toBeNull();
+    expect(body.batch[0]!.data.usage).toBeNull();
+    expect(body.batch[0]!.data.needs_reconciliation).toBe(true);
+    expect(body.batch[0]!.data.settle_reason).toBe(
+      "confirmation_deadline_expired",
+    );
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.request.completed"],
+    });
+  });
+
+  /** @scenario A late confirmation supersedes the settled event */
+  it("delivers the real completed envelope after a settlement, distinct ids, same join key", async () => {
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.*"],
+    });
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(settledEnvelope(requestId));
+    await drainOutbox();
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox();
+
+    expect(sendWebhookMock).toHaveBeenCalledTimes(2);
+    const bodies = sendWebhookMock.mock.calls.map(
+      (call) =>
+        (JSON.parse(call[0].body) as {
+          batch: Array<{ id: string; type: string; data: Record<string, unknown> }>;
+        }).batch[0]!,
+    );
+    const settled = bodies.find((b) => b.type === "gateway.request.settled")!;
+    const completed = bodies.find(
+      (b) => b.type === "gateway.request.completed",
+    )!;
+    expect(settled).toBeDefined();
+    expect(completed).toBeDefined();
+    expect(settled.id).not.toBe(completed.id);
+    expect(settled.data.gateway_request_id).toBe(requestId);
+    expect(completed.data.gateway_request_id).toBe(requestId);
+    const cost = completed.data.cost as { nano_usd: number };
+    expect(cost.nano_usd).toBeGreaterThan(0);
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.request.completed"],
+    });
+  });
+
+  /** @scenario A completed-only subscription never receives settlements */
+  it("skips settled delivery for an endpoint subscribed only to completed", async () => {
+    const completedOnly = await endpoints.create({
+      organizationId: organization.id,
+      url: "https://receiver-completed-only.example.com/hooks",
+      enabledEvents: ["gateway.request.completed"],
+    });
+    const allGateway = await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.*"],
+    });
+    expect(allGateway.enabledEvents).toEqual(["gateway.*"]);
+    try {
+      const requestId = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(requestId));
+      await consume(settledEnvelope(requestId));
+      await drainOutbox();
+
+      expect(await sendMessagesFor(completedOnly.endpoint.id)).toHaveLength(0);
+      expect(await sendMessagesFor(endpointId)).toHaveLength(1);
+    } finally {
+      await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        enabledEvents: ["gateway.request.completed"],
+      });
+      await endpoints.archive({
+        organizationId: organization.id,
+        endpointId: completedOnly.endpoint.id,
+      });
+    }
+  });
+
+  /** @scenario Failed requests are delivered as completed with their error class */
   it("delivers a failed request with its error class", async () => {
     const requestId = `req-${nanoid(8)}`;
     await consume(admittedEnvelope(requestId));

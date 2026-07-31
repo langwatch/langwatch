@@ -8,8 +8,16 @@ export interface SpendEvent {
   created: string;
   schema_version: string;
   data: {
+    /** Type-suffixed, unique per (request, event type): a settled and a
+     *  completed event for one request never share an id. */
     event_id: string;
+    /** "gateway.request.completed" (confirmed and failed outcomes) or
+     *  "gateway.request.settled" (confirmation never arrived). */
     event_type: string;
+    /** The join key across a settled/completed pair: a completed event
+     *  SUPERSEDES an earlier settled one for the same request; replace the
+     *  figure, never sum the pair. */
+    gateway_request_id: string;
     occurred_at: string;
     organization_id: string;
     project_id: string;
@@ -17,19 +25,29 @@ export interface SpendEvent {
     principal_user_id: string | null;
     end_user_id: string | null;
     trace_id: string;
-    model: string;
+    model: string | null;
     model_provider_id: string | null;
+    request_type: string | null;
+    /** Null on settled events: unknown is not zero. */
     usage: {
       input_tokens: number;
       output_tokens: number;
       cache_read_input_tokens: number;
       cache_creation_input_tokens: number;
       reasoning_tokens: number;
-    };
-    cost: { total_usd: string; nano_usd?: number; rate_version?: string | null };
+    } | null;
+    /** Null on settled events: unknown is not zero. */
+    cost: {
+      total_usd: string;
+      nano_usd: number;
+      rate_version: string | null;
+    } | null;
+    /** "success" | "error" on completed events, "settled" on settled ones. */
     status: string;
+    needs_reconciliation: boolean | null;
+    settle_reason: string | null;
     error: { class: string; http_status: number | null } | null;
-    duration_ms: number;
+    duration_ms: number | null;
     labels: string[];
     metadata: Record<string, unknown>;
   };

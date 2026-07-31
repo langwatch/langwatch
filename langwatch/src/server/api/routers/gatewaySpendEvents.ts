@@ -1,7 +1,7 @@
 /**
  * tRPC router for the Billing events ledger screen: a read-only,
  * newest-first, cursor-paged view over `gateway_spend_events`, the
- * per-request billing record the billingExport reactor writes
+ * per-request billing record the gateway_spend pipeline writes
  * unconditionally. Project-scoped like the neighboring gateway usage
  * reads; org-wide rollups are a later fast-follow.
  */

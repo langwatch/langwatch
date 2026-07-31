@@ -52,15 +52,26 @@ export const listSpendEventsCommand = async (options: {
         }
         console.log();
         formatTable({
+          // Settled events carry null usage and cost: unknown is not zero,
+          // so the table says so instead of printing 0.
           data: page.data.map((e) => ({
-            "Request id": e.data.event_id,
+            "Request id": e.data.gateway_request_id,
             "Occurred at": new Date(e.data.occurred_at).toLocaleString(),
-            Model: e.data.model,
+            Model: e.data.model ?? chalk.gray("-"),
             "End user": e.data.end_user_id ?? chalk.gray("-"),
-            "In/Out": `${e.data.usage.input_tokens}/${e.data.usage.output_tokens}`,
-            "Cache r/w": `${e.data.usage.cache_read_input_tokens}/${e.data.usage.cache_creation_input_tokens}`,
-            "Cost USD": e.data.cost.total_usd,
-            Status: e.data.status === "success" ? chalk.green("success") : chalk.red(e.data.error?.class ?? "error"),
+            "In/Out": e.data.usage
+              ? `${e.data.usage.input_tokens}/${e.data.usage.output_tokens}`
+              : chalk.gray("?"),
+            "Cache r/w": e.data.usage
+              ? `${e.data.usage.cache_read_input_tokens}/${e.data.usage.cache_creation_input_tokens}`
+              : chalk.gray("?"),
+            "Cost USD": e.data.cost?.total_usd ?? chalk.yellow("unknown"),
+            Status:
+              e.data.status === "success"
+                ? chalk.green("success")
+                : e.data.status === "settled"
+                  ? chalk.yellow("settled")
+                  : chalk.red(e.data.error?.class ?? "error"),
           })),
           headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Cost USD", "Status"],
           colorMap: { "Request id": chalk.gray, Model: chalk.cyan },
