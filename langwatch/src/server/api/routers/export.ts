@@ -27,6 +27,37 @@ export const exportProgressEventSchema = z.object({
 export type ExportProgressEvent = z.infer<typeof exportProgressEventSchema>;
 
 /**
+ * The event this subscription should relay, or null when the payload is not
+ * ours to yield.
+ *
+ * Two reasons to drop one: it did not parse, or it belongs to a different
+ * export. The channel is per-tenant, so every concurrent export in a project
+ * lands here and the exportId is what separates them.
+ */
+function readProgressEvent({
+  raw,
+  exportId,
+  projectId,
+}: {
+  raw: string;
+  exportId: string;
+  projectId: string;
+}): ExportProgressEvent | null {
+  let parsed: ExportProgressEvent;
+  try {
+    parsed = JSON.parse(raw) as ExportProgressEvent;
+  } catch {
+    logger.warn(
+      { projectId, exportId },
+      "Ignoring invalid export progress event",
+    );
+    return null;
+  }
+
+  return parsed.exportId === exportId ? parsed : null;
+}
+
+/**
  * Builds an export-progress subscription gated on a specific permission.
  *
  * Every export publishes to the same `export_progress` channel and is filtered
@@ -55,19 +86,12 @@ function exportProgressSubscription(permission: Permission) {
         })) {
           const event = eventArgs[0] as { event: string; timestamp: number };
 
-          let parsed: ExportProgressEvent;
-          try {
-            parsed = JSON.parse(event.event) as ExportProgressEvent;
-          } catch {
-            logger.warn(
-              { projectId, exportId },
-              "Ignoring invalid export progress event",
-            );
-            continue;
-          }
-
-          // Only yield events for this specific export
-          if (parsed.exportId !== exportId) continue;
+          const parsed = readProgressEvent({
+            raw: event.event,
+            exportId,
+            projectId,
+          });
+          if (!parsed) continue;
 
           logger.debug(
             { projectId, exportId, event: parsed },
