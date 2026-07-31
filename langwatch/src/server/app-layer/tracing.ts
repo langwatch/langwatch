@@ -1,3 +1,4 @@
+import { SpanStatusCode } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 /**
@@ -46,18 +47,28 @@ export function traced<T extends object>(instance: T, className: string): T {
       // promise throws "not async iterable". The failure is silent at wrap
       // time and only surfaces when the method is iterated.
       //
-      // Delegating with `yield*` keeps the method a generator. The work is
-      // still traced: every await inside it runs under whatever span is active
-      // at iteration time, which for a streamed export is the request span.
+      // So the span is managed by hand instead. withActiveSpan owns the whole
+      // call and would close the span at the first yield; a generator's work
+      // happens across every later next(), so what is worth measuring is the
+      // iteration. `finally` covers all three ways a generator ends — drained,
+      // thrown, or abandoned when a `for await` breaks and calls return().
       if (isAsyncGeneratorFunction(value)) {
         const generatorWrapper = async function* (
           this: unknown,
           ...args: unknown[]
         ) {
-          yield* (value as (...a: unknown[]) => AsyncGenerator<unknown>).apply(
-            this ?? target,
-            args,
-          );
+          const span = tracer.startSpan(spanName);
+          try {
+            yield* (
+              value as (...a: unknown[]) => AsyncGenerator<unknown>
+            ).apply(this ?? target, args);
+          } catch (error) {
+            span.recordException(error as Error);
+            span.setStatus({ code: SpanStatusCode.ERROR });
+            throw error;
+          } finally {
+            span.end();
+          }
         };
         wrapperCache.set(prop, generatorWrapper);
         return generatorWrapper;

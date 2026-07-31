@@ -240,10 +240,14 @@ async function downloadExport({
     const total = Number(response.headers.get("X-Total-Runs") ?? "0");
     onAccepted({ total, exportId: response.headers.get("X-Export-Id") });
 
-    const blob = await response.blob();
-    onSwept(total);
-
-    if (blob.size === 0) {
+    // Nothing matched, so the file would be a header and no rows. Said before
+    // the download rather than after, because a spreadsheet with only a header
+    // reads as a broken export and the reason is not in the file.
+    //
+    // Keyed on the count the server reported, not on the size of what came
+    // back: the serializer always writes the header, so the body is never
+    // empty and a size check here would never fire.
+    if (total === 0) {
       toaster.create({
         title: "Export produced no data",
         description:
@@ -252,6 +256,9 @@ async function downloadExport({
       });
       return;
     }
+
+    const blob = await response.blob();
+    onSwept(total);
 
     triggerBlobDownload({
       blob,

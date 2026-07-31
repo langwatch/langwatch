@@ -1,4 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const startSpan = vi.hoisted(() => vi.fn());
+const spans = vi.hoisted(
+  () => [] as { name: string; ended: boolean; errored: boolean }[],
+);
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (_name: string, fn: () => unknown) => fn(),
+    startSpan: (name: string) => {
+      const record = { name, ended: false, errored: false };
+      spans.push(record);
+      startSpan(name);
+      return {
+        end: () => {
+          record.ended = true;
+        },
+        recordException: () => undefined,
+        setStatus: () => {
+          record.errored = true;
+        },
+      };
+    },
+  }),
+}));
+
 import { traced } from "../tracing";
 
 class ExampleService {
@@ -61,6 +87,56 @@ describe("traced()", () => {
       };
 
       await expect(consume()).rejects.toThrow("boom");
+    });
+
+    /**
+     * The delegation alone left these methods with no span at all — the class
+     * looked traced and produced nothing, which is worse than not wrapping it,
+     * because the gap only shows up when someone goes looking for the trace.
+     */
+    it("opens a span named for the method and closes it when drained", async () => {
+      spans.length = 0;
+      const service = traced(new ExampleService(), "ExampleService");
+
+      for await (const _ of service.stream(3)) {
+        // drain
+      }
+
+      expect(spans).toHaveLength(1);
+      expect(spans[0]!.name).toBe("ExampleService.stream");
+      expect(spans[0]!.ended).toBe(true);
+    });
+
+    it("closes the span and marks it errored when the generator throws", async () => {
+      spans.length = 0;
+      const service = traced(new ExampleService(), "ExampleService");
+
+      await expect(
+        (async () => {
+          for await (const _ of service.streamThatThrows()) {
+            // drain
+          }
+        })(),
+      ).rejects.toThrow("boom");
+
+      expect(spans[0]!.ended).toBe(true);
+      expect(spans[0]!.errored).toBe(true);
+    });
+
+    /**
+     * A cancelled export breaks out of the `for await`, which calls the
+     * generator's `return()`. Without the `finally` the span would stay open
+     * for the life of the process.
+     */
+    it("closes the span when the consumer abandons the loop", async () => {
+      spans.length = 0;
+      const service = traced(new ExampleService(), "ExampleService");
+
+      for await (const _ of service.stream(10)) {
+        break;
+      }
+
+      expect(spans[0]!.ended).toBe(true);
     });
   });
 });

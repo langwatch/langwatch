@@ -144,12 +144,7 @@ export function RunHistoryPanel({
     isLoading,
     error,
     refetch,
-  } = useRunHistoryPagination({
-    scenarioSetId,
-    startDateMs,
-    endDateMs,
-    sseConnected,
-  });
+  } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
 
   // CSV export, scoped to whatever this panel is currently showing.
   const {
