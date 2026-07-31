@@ -245,6 +245,28 @@ describe("aggregation, executed", () => {
     expect(Number(result.data[0]!.n)).toBe(3);
   });
 
+  it("orders by an aggregate alias and by a grouping key, executed", async () => {
+    // The negative case (ordering by an ungrouped bare field) is a compile
+    // error asserted in the unit suite; these are the shapes that must still
+    // reach the database and come back ordered.
+    const byAlias = await run(
+      "SELECT model, count(*) AS n FROM traces GROUP BY model ORDER BY n DESC",
+    );
+    const counts = byAlias.data.map((r) => Number(r.n));
+    expect(counts).toEqual([...counts].sort((a, b) => b - a));
+
+    const byKey = await run(
+      "SELECT model, count(*) AS n FROM traces GROUP BY model ORDER BY model ASC",
+    );
+    const models = byKey.data.map((r) => String(r.model));
+    expect(models).toEqual([...models].sort());
+  });
+
+  it("pages with OFFSET, executed", async () => {
+    const page = await run("SELECT trace_id FROM traces LIMIT 2 OFFSET 1");
+    expect(page.data).toHaveLength(2);
+  });
+
   it("executes p95 as a real quantile", async () => {
     const result = await run("SELECT p95(duration_ms) AS p FROM traces");
     const p = Number(result.data[0]!.p);

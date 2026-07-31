@@ -275,6 +275,33 @@ describe("aggregation correctness", () => {
     ).toThrow(/must appear in GROUP BY or be aggregated/);
   });
 
+  it("rejects ORDER BY on a field that is neither grouped nor aggregated", () => {
+    // Found by probing the real database during self-review: this previously
+    // compiled and ClickHouse rejected it with code 215, so the caller got a
+    // raw DB error instead of a message naming the fix.
+    expect(() =>
+      compileText(
+        "SELECT model, count(*) AS n FROM traces GROUP BY model ORDER BY duration_ms DESC",
+      ),
+    ).toThrow(/neither grouped nor aggregated/);
+  });
+
+  it("allows ORDER BY a grouping key", () => {
+    expect(() =>
+      compileText(
+        "SELECT model, count(*) AS n FROM traces GROUP BY model ORDER BY model ASC",
+      ),
+    ).not.toThrow();
+  });
+
+  it("allows ORDER BY an aggregate alias", () => {
+    expect(() =>
+      compileText(
+        "SELECT model, count(*) AS n FROM traces GROUP BY model ORDER BY n DESC",
+      ),
+    ).not.toThrow();
+  });
+
   it("rejects GROUP BY without an aggregate", () => {
     expect(() => compileText("SELECT model FROM traces GROUP BY model")).toThrow(
       /requires at least one aggregate/,

@@ -359,6 +359,7 @@ const compileOrderBy = (
   ctx: Ctx,
   orderBy: LwqlOrderBy[],
   selected: ResolvedSelect[],
+  { grouped, groupBy }: { grouped: boolean; groupBy: string[] },
 ): string => {
   const terms = orderBy.map((item) => {
     const direction = item.direction === "desc" ? "DESC" : "ASC";
@@ -380,6 +381,21 @@ const compileOrderBy = (
     }
 
     const field = resolveField(ctx, item.field, "order_by");
+
+    // A bare field in ORDER BY is only legal in a grouped query if it is one
+    // of the grouping keys. Without this, ClickHouse rejects the query itself
+    // ("not under aggregate function and not in GROUP BY keys", code 215) and
+    // the caller gets a database error instead of a message naming the fix.
+    if (grouped && !groupBy.includes(item.field)) {
+      throw new LwqlError(
+        "invalid_query",
+        `Cannot order by '${item.field}': it is neither grouped nor aggregated.`,
+        {
+          hint: `Add it to GROUP BY, order by an aggregate such as count(*), or order by a selected column.`,
+        },
+      );
+    }
+
     return `${field.selectExpr} ${direction}`;
   });
 
@@ -487,7 +503,12 @@ export const compile = (
   ];
   if (groupExprs.length > 0) parts.push(`GROUP BY ${groupExprs.join(", ")}`);
   if (query.order_by && query.order_by.length > 0) {
-    parts.push(`ORDER BY ${compileOrderBy(ctx, query.order_by, selected)}`);
+    parts.push(
+      `ORDER BY ${compileOrderBy(ctx, query.order_by, selected, {
+        grouped: hasAggregate,
+        groupBy,
+      })}`,
+    );
   }
   // One extra row is fetched so the caller can be told the result was
   // truncated rather than silently receiving a full page.
