@@ -33,6 +33,7 @@ import {
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
+  BatchEvaluatorResult,
   BatchResultRow,
   BatchTargetColumn,
   ComparisonRunData,
@@ -86,6 +87,129 @@ const confusionMetricId = ({
  * on every render: an infinite render loop, not just wasted work.
  */
 const EMPTY_ROWS: BatchResultRow[] = [];
+
+/** One (target, evaluator) pairing that can be scored as a 2x2. */
+type PassFailTarget = {
+  targetId: string;
+  targetName: string;
+  evaluatorId: string;
+  evaluatorName: string;
+};
+
+/** Stable identity for the "no pass/fail evaluator here" path. */
+const EMPTY_PASS_FAIL_TARGETS: PassFailTarget[] = [];
+
+/**
+ * Whether one evaluator result is a verdict this chart can score: a
+ * resolvable pass/fail, and not a Comparison judge — a ranking judge picks a
+ * winner among variants, so it has no single "predicted class" to build a
+ * 2x2 from.
+ */
+const isPassFailVerdict = ({
+  result,
+  comparisonEvaluatorIds,
+}: {
+  result: BatchEvaluatorResult;
+  comparisonEvaluatorIds: Set<string>;
+}): boolean =>
+  !comparisonEvaluatorIds.has(result.evaluatorId) &&
+  result.passed !== null &&
+  result.passed !== undefined;
+
+const passFailPairingsInRow = ({
+  row,
+  comparisonEvaluatorIds,
+}: {
+  row: BatchResultRow;
+  comparisonEvaluatorIds: Set<string>;
+}): { targetId: string; evaluatorId: string; evaluatorName: string }[] => {
+  const pairings: {
+    targetId: string;
+    evaluatorId: string;
+    evaluatorName: string;
+  }[] = [];
+
+  for (const [targetId, target] of Object.entries(row.targets)) {
+    for (const result of target.evaluatorResults) {
+      if (!isPassFailVerdict({ result, comparisonEvaluatorIds })) continue;
+      pairings.push({
+        targetId,
+        evaluatorId: result.evaluatorId,
+        evaluatorName: result.evaluatorName,
+      });
+    }
+  }
+
+  return pairings;
+};
+
+/**
+ * Every distinct (targetId, evaluatorId) pairing with a resolvable pass/fail
+ * verdict anywhere in the run.
+ *
+ * The same evaluator runs against every target, so a card is only
+ * identifiable by BOTH ids — hence the target name travels with the pairing,
+ * to label the otherwise identical cards apart.
+ */
+const collectPassFailTargets = ({
+  rows,
+  comparisonEvaluatorIds,
+  targetNameById,
+}: {
+  rows: BatchResultRow[];
+  comparisonEvaluatorIds: Set<string>;
+  targetNameById: Map<string, string>;
+}): PassFailTarget[] => {
+  const seen = new Set<string>();
+  const targets: PassFailTarget[] = [];
+
+  for (const row of rows) {
+    for (const pairing of passFailPairingsInRow({
+      row,
+      comparisonEvaluatorIds,
+    })) {
+      const key = `${pairing.targetId}::${pairing.evaluatorId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      targets.push({
+        ...pairing,
+        targetName: targetNameById.get(pairing.targetId) ?? pairing.targetId,
+      });
+    }
+  }
+
+  return targets;
+};
+
+/**
+ * Trace ids to look annotations up by — one per row PER TARGET, so this grows
+ * as rows x targets, not rows.
+ *
+ * The hook chunks at 50 ids per request, so an uncapped 2000-row run with
+ * four targets would fan out to 160 concurrent queries against a browser
+ * budget of six connections per origin — starving every other query on the
+ * page. Bound it and say so in the coverage line rather than melting the
+ * results page for a chart the reader may not even open.
+ */
+const collectConfusionMatrixTraceIds = ({
+  rows,
+  targetIds,
+}: {
+  rows: BatchResultRow[];
+  targetIds: Set<string>;
+}): string[] => {
+  const ids: string[] = [];
+
+  for (const row of rows) {
+    for (const targetId of targetIds) {
+      const traceId = row.targets[targetId]?.traceId;
+      if (traceId) ids.push(traceId);
+      if (ids.length >= CONFUSION_MATRIX_MAX_TRACES) return ids;
+    }
+  }
+
+  return ids;
+};
 
 /** Metric types that can be displayed */
 type MetricType =
@@ -981,47 +1105,18 @@ export const ComparisonCharts = ({
   const confusionMatrixRows = firstRunData?.rows ?? EMPTY_ROWS;
   const confusionMatrixProjectId = firstRunData?.projectId;
 
-  // Every distinct (targetId, evaluatorId) pairing with a resolvable pass/fail
-  // verdict anywhere in the run, excluding Comparison evaluators (a ranking
-  // judge has no single "predicted class" to build a 2x2 from).
   const passFailTargets = useMemo(() => {
-    if (!showConfusionMatrix) return [];
-    // The same evaluator runs against every target, so a card is only
-    // identifiable by BOTH ids — hence the target name travels with the
-    // pairing, to label the otherwise identical cards apart.
-    const targetNameById = new Map(
-      (comparisonData[0]?.data?.targetColumns ?? []).map((column) => [
-        column.id,
-        column.name,
-      ]),
-    );
-    const seen = new Set<string>();
-    const out: {
-      targetId: string;
-      targetName: string;
-      evaluatorId: string;
-      evaluatorName: string;
-    }[] = [];
-    for (const row of confusionMatrixRows) {
-      for (const [targetId, target] of Object.entries(row.targets)) {
-        for (const evalResult of target.evaluatorResults) {
-          if (comparisonEvaluatorIds.has(evalResult.evaluatorId)) continue;
-          if (evalResult.passed === null || evalResult.passed === undefined) {
-            continue;
-          }
-          const key = `${targetId}::${evalResult.evaluatorId}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          out.push({
-            targetId,
-            targetName: targetNameById.get(targetId) ?? targetId,
-            evaluatorId: evalResult.evaluatorId,
-            evaluatorName: evalResult.evaluatorName,
-          });
-        }
-      }
-    }
-    return out;
+    if (!showConfusionMatrix) return EMPTY_PASS_FAIL_TARGETS;
+    return collectPassFailTargets({
+      rows: confusionMatrixRows,
+      comparisonEvaluatorIds,
+      targetNameById: new Map(
+        (comparisonData[0]?.data?.targetColumns ?? []).map((column) => [
+          column.id,
+          column.name,
+        ]),
+      ),
+    });
   }, [
     confusionMatrixRows,
     comparisonEvaluatorIds,
@@ -1031,22 +1126,10 @@ export const ComparisonCharts = ({
 
   const confusionMatrixTraceIds = useMemo(() => {
     if (passFailTargets.length === 0) return EMPTY_TRACE_IDS;
-    const targetIds = new Set(passFailTargets.map((t) => t.targetId));
-    const ids: string[] = [];
-    // One trace per row PER TARGET, so this grows as rows x targets, not rows.
-    // The hook chunks at 50 ids per request, so an uncapped 2000-row run with
-    // four targets would fan out to 160 concurrent queries against a browser
-    // budget of six connections per origin — starving every other query on
-    // the page. Bound it and say so in the coverage line rather than melting
-    // the results page for a chart the reader may not even open.
-    for (const row of confusionMatrixRows) {
-      for (const targetId of targetIds) {
-        const traceId = row.targets[targetId]?.traceId;
-        if (traceId) ids.push(traceId);
-        if (ids.length >= CONFUSION_MATRIX_MAX_TRACES) return ids;
-      }
-    }
-    return ids;
+    return collectConfusionMatrixTraceIds({
+      rows: confusionMatrixRows,
+      targetIds: new Set(passFailTargets.map((target) => target.targetId)),
+    });
   }, [confusionMatrixRows, passFailTargets]);
 
   const { data: confusionMatrixAnnotations } = useAnnotationsByTraceIds({

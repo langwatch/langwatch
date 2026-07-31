@@ -17,3 +17,18 @@ export const ERROR_CELL_BG = "red.subtle";
 /** Null means the statistic is undefined, which reads as "—", never as 0%. */
 export const formatPercent = (value: number | null): string =>
   value === null ? "—" : `${Math.round(value * 100)}%`;
+
+/**
+ * One cell's share of the matrix.
+ *
+ * An empty matrix has no shares, so it reads "—". The tempting shortcut is a
+ * `Math.max(1, total)` denominator, which makes every cell of a zero-row
+ * matrix render "0 · 0%" as though that were a measurement someone took.
+ */
+export const formatCellShare = ({
+  value,
+  total,
+}: {
+  value: number;
+  total: number;
+}): string => (total > 0 ? `${Math.round((value / total) * 100)}%` : "—");

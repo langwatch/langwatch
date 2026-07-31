@@ -17,10 +17,11 @@ import { LuMaximize2 } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
 import {
+  type ConfusionMatrixMetrics,
   computeConfusionMatrix,
   kappaAgreementLabel,
 } from "./computeConfusionMatrix";
-import { ERROR_CELL_BG } from "./confusionMatrixDisplay";
+import { ERROR_CELL_BG, formatCellShare } from "./confusionMatrixDisplay";
 import type { BatchResultRow } from "./types";
 
 export type ConfusionMatrixChartProps = {
@@ -35,6 +36,96 @@ export type ConfusionMatrixChartProps = {
   chartHeight: number;
 };
 
+/**
+ * Accuracy with kappa alongside it.
+ *
+ * Carried on the card, not buried in the drawer: accuracy alone cannot
+ * distinguish a judge that agrees from one that just matches the base rate,
+ * so a near-chance kappa is flagged right where the accuracy is read.
+ */
+function AccuracyHeadline({
+  metrics,
+  annotatedRows,
+  totalRows,
+}: {
+  metrics: ConfusionMatrixMetrics;
+  annotatedRows: number;
+  totalRows: number;
+}) {
+  const { cohensKappa } = metrics;
+  /** Below this, agreement is barely distinguishable from guessing. */
+  const isNearChance = cohensKappa !== null && cohensKappa < 0.2;
+
+  return (
+    <HStack justify="space-between" align="baseline">
+      <HStack gap={2} align="baseline">
+        <Text fontSize="2xl" fontWeight="bold" lineHeight="1">
+          {Math.round(metrics.accuracy * 100)}%
+        </Text>
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color={isNearChance ? "orange.fg" : "fg.muted"}
+          title={
+            cohensKappa === null
+              ? "Cohen's kappa is undefined here — one label was used throughout"
+              : `Cohen's kappa ${cohensKappa.toFixed(
+                  2,
+                )} — ${kappaAgreementLabel(
+                  cohensKappa,
+                )} agreement once chance is subtracted`
+          }
+        >
+          κ {cohensKappa === null ? "—" : cohensKappa.toFixed(2)}
+        </Text>
+      </HStack>
+      <Text fontSize="2xs" color="fg.muted">
+        accuracy · {annotatedRows} of {totalRows} rows
+      </Text>
+    </HStack>
+  );
+}
+
+/** The four counts, abbreviated — the full labels live in the drawer. */
+function MiniMatrix({
+  metrics,
+  height,
+}: {
+  metrics: ConfusionMatrixMetrics;
+  height: number;
+}) {
+  const cells = [
+    { key: "tp", label: "TP", value: metrics.truePositive, isError: false },
+    { key: "fp", label: "FP", value: metrics.falsePositive, isError: true },
+    { key: "fn", label: "FN", value: metrics.falseNegative, isError: true },
+    { key: "tn", label: "TN", value: metrics.trueNegative, isError: false },
+  ];
+
+  return (
+    <Grid templateColumns="1fr 1fr" gap={1} height={`${height}px`}>
+      {cells.map((cell) => (
+        <Box
+          key={cell.key}
+          borderRadius="sm"
+          display="flex"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          bg={cell.isError ? ERROR_CELL_BG : "bg.muted"}
+        >
+          <Text fontSize="md" fontWeight="bold">
+            {cell.value}
+          </Text>
+          <Text fontSize="2xs" color="fg.muted">
+            {cell.label} ·{" "}
+            {formatCellShare({ value: cell.value, total: metrics.total })}
+          </Text>
+        </Box>
+      ))}
+    </Grid>
+  );
+}
+
 export function ConfusionMatrixChart({
   evaluatorId,
   evaluatorName,
@@ -45,20 +136,7 @@ export function ConfusionMatrixChart({
   chartHeight,
 }: ConfusionMatrixChartProps) {
   const { openDrawer } = useDrawer();
-  const pairs = coverage.pairs;
-  const metrics = computeConfusionMatrix(pairs);
-  const total = Math.max(1, metrics.total);
-
-  /** Below this, agreement is barely distinguishable from guessing. */
-  const isNearChance =
-    metrics.cohensKappa !== null && metrics.cohensKappa < 0.2;
-
-  const cells = [
-    { key: "tp", label: "TP", value: metrics.truePositive, isError: false },
-    { key: "fp", label: "FP", value: metrics.falsePositive, isError: true },
-    { key: "fn", label: "FN", value: metrics.falseNegative, isError: true },
-    { key: "tn", label: "TN", value: metrics.trueNegative, isError: false },
-  ];
+  const metrics = computeConfusionMatrix(coverage.pairs);
 
   const onExpand = () => {
     // Passed straight through openDrawer's own props (not a preceding
@@ -117,63 +195,12 @@ export function ConfusionMatrixChart({
         </IconButton>
       </HStack>
       <VStack align="stretch" gap={2}>
-        <HStack justify="space-between" align="baseline">
-          <HStack gap={2} align="baseline">
-            <Text fontSize="2xl" fontWeight="bold" lineHeight="1">
-              {Math.round(metrics.accuracy * 100)}%
-            </Text>
-            {/* Carried on the card, not buried in the drawer: accuracy alone
-                cannot distinguish a judge that agrees from one that just
-                matches the base rate, so a near-chance kappa is flagged
-                right where the accuracy is read. */}
-            <Text
-              fontSize="xs"
-              fontWeight="semibold"
-              color={isNearChance ? "orange.fg" : "fg.muted"}
-              title={
-                metrics.cohensKappa === null
-                  ? "Cohen's kappa is undefined here — one label was used throughout"
-                  : `Cohen's kappa ${metrics.cohensKappa.toFixed(
-                      2,
-                    )} — ${kappaAgreementLabel(
-                      metrics.cohensKappa,
-                    )} agreement once chance is subtracted`
-              }
-            >
-              κ{" "}
-              {metrics.cohensKappa === null
-                ? "—"
-                : metrics.cohensKappa.toFixed(2)}
-            </Text>
-          </HStack>
-          <Text fontSize="2xs" color="fg.muted">
-            accuracy · {pairs.length} of {coverage.totalRows} rows
-          </Text>
-        </HStack>
-        <Grid
-          templateColumns="1fr 1fr"
-          gap={1}
-          height={`${Math.max(chartHeight - 46, 60)}px`}
-        >
-          {cells.map((c) => (
-            <Box
-              key={c.key}
-              borderRadius="sm"
-              display="flex"
-              flexDirection="column"
-              justifyContent="center"
-              alignItems="center"
-              bg={c.isError ? ERROR_CELL_BG : "bg.muted"}
-            >
-              <Text fontSize="md" fontWeight="bold">
-                {c.value}
-              </Text>
-              <Text fontSize="2xs" color="fg.muted">
-                {c.label} · {Math.round((c.value / total) * 100)}%
-              </Text>
-            </Box>
-          ))}
-        </Grid>
+        <AccuracyHeadline
+          metrics={metrics}
+          annotatedRows={coverage.pairs.length}
+          totalRows={coverage.totalRows}
+        />
+        <MiniMatrix metrics={metrics} height={Math.max(chartHeight - 46, 60)} />
       </VStack>
     </Box>
   );

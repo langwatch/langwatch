@@ -5,8 +5,104 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
-import type { ConfidenceInterval } from "./computeConfusionMatrix";
+import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
+import {
+  type ConfidenceInterval,
+  type ConfusionMatrixMetrics,
+  kappaAgreementLabel,
+} from "./computeConfusionMatrix";
 import { formatPercent } from "./confusionMatrixDisplay";
+
+/**
+ * How much of the run these figures actually rest on, and the caveat that
+ * no confidence interval can fix.
+ */
+export function CoverageNote({
+  coverage,
+}: {
+  coverage: JudgeAnnotationCoverage;
+}) {
+  // When the lookup was capped, `totalRows` is the slice that was checked
+  // rather than the whole run — say "of the rows checked" so the numerator
+  // keeps meaning "annotated".
+  const denominator = coverage.truncated
+    ? `the ${coverage.totalRows} rows checked are annotated`
+    : `${coverage.totalRows} rows annotated`;
+  const conflicts = coverage.conflictingRows;
+
+  return (
+    <Box>
+      <Text fontSize="sm" fontWeight="semibold">
+        Confusion matrix
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        {coverage.annotatedRows} of {denominator}
+        {conflicts > 0
+          ? `; ${conflicts} row${
+              conflicts === 1 ? "" : "s"
+            } excluded for conflicting reviewer annotations`
+          : ""}
+      </Text>
+      {/* The sharpest limitation of this chart, and the one no confidence
+          interval can fix. Reviewers annotate what catches their eye, so the
+          annotated set skews toward rows that already looked wrong. Every
+          figure below describes THAT set, not the run — say so rather than
+          letting the statistics imply a rigour the sample doesn't have. */}
+      <Text fontSize="xs" color="fg.muted" marginTop={1}>
+        Figures describe the annotated rows only. If those were picked by
+        browsing for problems rather than sampled at random, they will not
+        reflect the full run.
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * Accuracy and kappa, side by side and equally prominent. Accuracy alone is
+ * the misreading this chart exists to prevent, so it never appears without
+ * its chance-corrected counterpart.
+ */
+export function HeadlineMetrics({
+  metrics,
+}: {
+  metrics: ConfusionMatrixMetrics;
+}) {
+  const { accuracyInterval, cohensKappa } = metrics;
+
+  return (
+    <HStack gap={10} align="start" flexWrap="wrap">
+      <VStack gap={0} align="start">
+        <Text fontSize="3xl" fontWeight="bold" lineHeight="1.1">
+          {formatPercent(metrics.accuracy)}
+        </Text>
+        <Text fontSize="xs" fontWeight="semibold">
+          Accuracy
+        </Text>
+        <Text fontSize="2xs" color="fg.muted">
+          {accuracyInterval
+            ? `95% CI ${formatPercent(accuracyInterval.lower)}–${formatPercent(
+                accuracyInterval.upper,
+              )}`
+            : "—"}
+        </Text>
+      </VStack>
+
+      <VStack gap={0} align="start">
+        <Text fontSize="3xl" fontWeight="bold" lineHeight="1.1">
+          {cohensKappa === null ? "—" : cohensKappa.toFixed(2)}
+        </Text>
+        <Text fontSize="xs" fontWeight="semibold">
+          Cohen&apos;s κ
+        </Text>
+        <Text fontSize="2xs" color="fg.muted">
+          {cohensKappa === null
+            ? "undefined — one label used throughout"
+            : `${kappaAgreementLabel(cohensKappa)} agreement`}
+        </Text>
+      </VStack>
+    </HStack>
+  );
+}
 
 /**
  * Plots accuracy against the agreement chance alone would have produced.
@@ -116,6 +212,33 @@ export function AgreementBar({
         </Text>
       </HStack>
     </Box>
+  );
+}
+
+/**
+ * The rates that read straight off the matrix. Secondary to accuracy and
+ * kappa on purpose — each answers a narrower question than "can I trust
+ * this judge", and a wall of equally-sized figures buries the two that do.
+ */
+export function SecondaryMetrics({
+  metrics,
+}: {
+  metrics: ConfusionMatrixMetrics;
+}) {
+  return (
+    <HStack gap={6} flexWrap="wrap">
+      <Metric label="Precision" value={formatPercent(metrics.precision)} />
+      <Metric label="Recall" value={formatPercent(metrics.recall)} />
+      <Metric label="F1" value={formatPercent(metrics.f1)} />
+      <Metric
+        label="False Positive Rate"
+        value={formatPercent(metrics.falsePositiveRate)}
+      />
+      <Metric
+        label="Reviewer pass rate"
+        value={formatPercent(metrics.prevalence)}
+      />
+    </HStack>
   );
 }
 

@@ -121,24 +121,45 @@ export const kappaAgreementLabel = (kappa: number): string => {
   return "almost perfect";
 };
 
-export const computeConfusionMatrix = (
+/**
+ * Which cell of the 2x2 a single judge/reviewer pair lands in. Exported so
+ * the drill-down filters by the same rule the tally counts by — two copies
+ * of this mapping is exactly how a cell's count and its row list drift apart.
+ */
+export const quadrantOf = ({
+  predicted,
+  actual,
+}: JudgeAnnotationPair): keyof ConfusionMatrixCounts => {
+  if (predicted) return actual ? "truePositive" : "falsePositive";
+  return actual ? "falseNegative" : "trueNegative";
+};
+
+const tallyQuadrants = (
   pairs: JudgeAnnotationPair[],
-): ConfusionMatrixMetrics => {
-  let truePositive = 0;
-  let falsePositive = 0;
-  let falseNegative = 0;
-  let trueNegative = 0;
+): ConfusionMatrixCounts => {
+  const counts: ConfusionMatrixCounts = {
+    truePositive: 0,
+    falsePositive: 0,
+    falseNegative: 0,
+    trueNegative: 0,
+  };
+  for (const pair of pairs) counts[quadrantOf(pair)]++;
+  return counts;
+};
 
-  for (const { predicted, actual } of pairs) {
-    if (predicted && actual) truePositive++;
-    else if (predicted && !actual) falsePositive++;
-    else if (!predicted && actual) falseNegative++;
-    else trueNegative++;
-  }
-
-  const total = pairs.length;
-  const accuracy = total > 0 ? (truePositive + trueNegative) / total : 0;
-
+/**
+ * The rates that read off the matrix directly. Each is null when its own
+ * denominator is zero — an undefined rate, never a zero one.
+ */
+const deriveRates = ({
+  truePositive,
+  falsePositive,
+  falseNegative,
+  trueNegative,
+}: ConfusionMatrixCounts): Pick<
+  ConfusionMatrixMetrics,
+  "precision" | "recall" | "f1" | "falsePositiveRate"
+> => {
   const predictedPositive = truePositive + falsePositive;
   const actualPositive = truePositive + falseNegative;
   const actualNegative = falsePositive + trueNegative;
@@ -152,6 +173,28 @@ export const computeConfusionMatrix = (
       : null;
   const falsePositiveRate =
     actualNegative > 0 ? falsePositive / actualNegative : null;
+
+  return { precision, recall, f1, falsePositiveRate };
+};
+
+/**
+ * The chance-correction layer. Accuracy alone cannot say whether a judge
+ * learned anything; these three are what turn it into an answer.
+ */
+const deriveAgreement = ({
+  counts,
+  total,
+  accuracy,
+}: {
+  counts: ConfusionMatrixCounts;
+  total: number;
+  accuracy: number;
+}): Pick<
+  ConfusionMatrixMetrics,
+  "prevalence" | "chanceAgreement" | "cohensKappa"
+> => {
+  const predictedPositive = counts.truePositive + counts.falsePositive;
+  const actualPositive = counts.truePositive + counts.falseNegative;
 
   const prevalence = total > 0 ? actualPositive / total : null;
 
@@ -176,23 +219,23 @@ export const computeConfusionMatrix = (
       ? (accuracy - chanceAgreement) / (1 - chanceAgreement)
       : null;
 
+  return { prevalence, chanceAgreement, cohensKappa };
+};
+
+export const computeConfusionMatrix = (
+  pairs: JudgeAnnotationPair[],
+): ConfusionMatrixMetrics => {
+  const counts = tallyQuadrants(pairs);
+  const total = pairs.length;
+  const agreed = counts.truePositive + counts.trueNegative;
+  const accuracy = total > 0 ? agreed / total : 0;
+
   return {
-    truePositive,
-    falsePositive,
-    falseNegative,
-    trueNegative,
+    ...counts,
     total,
     accuracy,
-    accuracyInterval: wilsonInterval({
-      successes: truePositive + trueNegative,
-      trials: total,
-    }),
-    precision,
-    recall,
-    f1,
-    falsePositiveRate,
-    prevalence,
-    chanceAgreement,
-    cohensKappa,
+    accuracyInterval: wilsonInterval({ successes: agreed, trials: total }),
+    ...deriveRates(counts),
+    ...deriveAgreement({ counts, total, accuracy }),
   };
 };

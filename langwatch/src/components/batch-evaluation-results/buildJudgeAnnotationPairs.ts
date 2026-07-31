@@ -33,6 +33,71 @@ export type JudgeAnnotationCoverage = {
   truncated?: boolean;
 };
 
+/**
+ * The judge's own verdict for one row, or null when there is nothing to
+ * score: no trace id to join reviewers on, or an evaluator that never
+ * resolved to a pass/fail.
+ */
+const judgeVerdictFor = ({
+  row,
+  targetId,
+  evaluatorId,
+}: {
+  row: BatchResultRow;
+  targetId: string;
+  evaluatorId: string;
+}): { traceId: string; passed: boolean } | null => {
+  const target = row.targets[targetId];
+  if (!target?.traceId) return null;
+
+  const passed = target.evaluatorResults.find(
+    (result) => result.evaluatorId === evaluatorId,
+  )?.passed;
+  if (passed === null || passed === undefined) return null;
+
+  return { traceId: target.traceId, passed };
+};
+
+/**
+ * The reviewers' ground truth for one row. Three outcomes, because they are
+ * counted differently: no verdict at all is not an annotated row, whereas
+ * reviewers who disagree is an annotated row with no usable truth.
+ */
+type ReviewerGroundTruth =
+  | { status: "none" }
+  | { status: "conflicting" }
+  | { status: "resolved"; verdict: { actual: boolean; comment?: string } };
+
+const reviewerGroundTruthFor = (
+  annotations: AnnotationByTrace[],
+): ReviewerGroundTruth => {
+  // Only annotations that carry a verdict count as ground truth — and only
+  // they may explain it. A comment-only annotation ("checking this later")
+  // is not the reviewer's rationale for the thumbs up/down being scored,
+  // so it must not become the drill-down's stated reason.
+  const verdicts = annotations.filter(
+    (annotation): annotation is AnnotationByTrace & { isThumbsUp: boolean } =>
+      annotation.isThumbsUp !== null && annotation.isThumbsUp !== undefined,
+  );
+  if (verdicts.length === 0) return { status: "none" };
+
+  const distinct = new Set(verdicts.map((annotation) => annotation.isThumbsUp));
+  if (distinct.size > 1) return { status: "conflicting" };
+
+  // First non-empty comment among the (now known to agree) reviewers.
+  const comment = verdicts
+    .map((annotation) => annotation.comment?.trim())
+    .find((value): value is string => !!value);
+
+  return {
+    status: "resolved",
+    verdict: {
+      actual: verdicts[0]!.isThumbsUp,
+      ...(comment ? { comment } : {}),
+    },
+  };
+};
+
 export const buildJudgeAnnotationPairs = ({
   rows,
   targetId,
@@ -49,51 +114,24 @@ export const buildJudgeAnnotationPairs = ({
   let conflictingRows = 0;
 
   for (const row of rows) {
-    const target = row.targets[targetId];
-    if (!target?.traceId) continue;
+    const judged = judgeVerdictFor({ row, targetId, evaluatorId });
+    if (!judged) continue;
 
-    const evaluatorResult = target.evaluatorResults.find(
-      (result) => result.evaluatorId === evaluatorId,
+    const reviewed = reviewerGroundTruthFor(
+      annotationsByTraceId.get(judged.traceId) ?? [],
     );
-    if (
-      !evaluatorResult ||
-      evaluatorResult.passed === null ||
-      evaluatorResult.passed === undefined
-    ) {
-      continue;
-    }
-
-    const annotations = annotationsByTraceId.get(target.traceId) ?? [];
-    // Only annotations that carry a verdict count as ground truth — and only
-    // they may explain it. A comment-only annotation ("checking this later")
-    // is not the reviewer's rationale for the thumbs up/down being scored,
-    // so it must not become the drill-down's stated reason.
-    const reviewerVerdicts = annotations.filter(
-      (annotation): annotation is AnnotationByTrace & { isThumbsUp: boolean } =>
-        annotation.isThumbsUp !== null && annotation.isThumbsUp !== undefined,
-    );
-    if (reviewerVerdicts.length === 0) continue;
+    if (reviewed.status === "none") continue;
 
     annotatedRows++;
-
-    const distinctVerdicts = new Set(
-      reviewerVerdicts.map((annotation) => annotation.isThumbsUp),
-    );
-    if (distinctVerdicts.size > 1) {
+    if (reviewed.status === "conflicting") {
       conflictingRows++;
       continue;
     }
 
-    // First non-empty comment among the (now known to agree) reviewers.
-    const comment = reviewerVerdicts
-      .map((annotation) => annotation.comment?.trim())
-      .find((value): value is string => !!value);
-
     pairs.push({
       rowIndex: row.index,
-      predicted: evaluatorResult.passed,
-      actual: reviewerVerdicts[0]!.isThumbsUp,
-      ...(comment ? { comment } : {}),
+      predicted: judged.passed,
+      ...reviewed.verdict,
     });
   }
 

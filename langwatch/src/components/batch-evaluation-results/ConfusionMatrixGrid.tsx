@@ -11,7 +11,7 @@
 import { Box, chakra, Grid, Text } from "@chakra-ui/react";
 
 import type { ConfusionMatrixCounts } from "./computeConfusionMatrix";
-import { ERROR_CELL_BG } from "./confusionMatrixDisplay";
+import { ERROR_CELL_BG, formatCellShare } from "./confusionMatrixDisplay";
 
 export type Quadrant = keyof ConfusionMatrixCounts;
 
@@ -61,8 +61,7 @@ export function ConfusionMatrixGrid({
   onSelectQuadrant,
 }: {
   counts: ConfusionMatrixCounts;
-  /** Denominator for the per-cell share. Always positive — callers render an
-   * empty state rather than a matrix when there are no rows at all. */
+  /** Denominator for the per-cell share. Zero reads as "—", not as 0%. */
   total: number;
   selectedQuadrant: Quadrant | null;
   onSelectQuadrant: (quadrant: Quadrant) => void;
@@ -137,7 +136,7 @@ function MatrixCell({
         {value}
       </Text>
       <Text fontSize="2xs" color="fg.muted">
-        {label} · {Math.round((value / total) * 100)}%
+        {label} · {formatCellShare({ value, total })}
       </Text>
     </chakra.button>
   );
