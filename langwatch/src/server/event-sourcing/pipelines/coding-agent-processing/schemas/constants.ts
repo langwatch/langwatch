@@ -39,10 +39,11 @@ export const CODING_AGENT_PROCESSING_COMMAND_TYPES = [
 
 /**
  * How many same-group events the pipeline's map projections persist through
- * one `bulkAppend` call when a group is backed up. Without it the framework
- * default is 1 — one append per queued event — which is the O(n²) drain
- * pattern these maps showed during the 2026-07-31 backlog (one-event-per-job
- * at ~90 busy fleet slots). 256 matches the log/metric map ceilings
+ * one `bulkAppend` call when a group is backed up. MAP projections default
+ * to 1 — one append per queued event (unlike folds, which the router
+ * coalesces at 500 by default) — which is the O(n²) drain pattern these
+ * maps showed during the 2026-07-31 backlog (one-event-per-job at ~90 busy
+ * fleet slots). 256 matches the log/metric map ceilings
  * (`LOG_MAP_COALESCE_MAX_BATCH`, `METRIC_MAP_COALESCE_MAX_BATCH`): both
  * stores append into ClickHouse via `insertMany`, so the batch lands as one
  * insert either way — the ceiling only bounds payload size per dispatch.
