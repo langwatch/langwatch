@@ -132,9 +132,18 @@ function assertValidUrl(url: string): void {
   } catch {
     throw new WebhookEndpointValidationError("url must be a valid URL");
   }
-  if (parsed.protocol !== "https:") {
-    throw new WebhookEndpointValidationError("url must use https");
-  }
+  if (parsed.protocol === "https:") return;
+  // Operator opt-in for local development and internal receivers: plain
+  // http is accepted only when the deployment explicitly set the unsafe
+  // flag. The delivery path relaxes its local-address fence on the same
+  // flag; everything else about the sender stays strict.
+  if (parsed.protocol === "http:" && allowsInsecureLocalUrls()) return;
+  throw new WebhookEndpointValidationError("url must use https");
+}
+
+/** True only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1. */
+export function allowsInsecureLocalUrls(): boolean {
+  return process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1";
 }
 
 function assertValidEvents(enabledEvents: string[]): void {

@@ -4,7 +4,10 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
-import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import {
+  WebhookEndpointService,
+  allowsInsecureLocalUrls,
+} from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";

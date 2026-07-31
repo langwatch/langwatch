@@ -83,6 +83,14 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a settlement is delivered
       Then only the family-subscribed endpoint gets a send
 
+  Rule: Receiver URLs are https unless the operator opts in
+
+    @integration
+    Scenario: Plain-http receiver URLs need the operator opt-in
+      Given the deployment did not set the unsafe local-URLs flag
+      Then creating an endpoint with an http URL is refused
+      And with the flag set the same endpoint is accepted
+
   Rule: Deliveries are signed and attributable
 
     @unit

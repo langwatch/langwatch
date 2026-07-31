@@ -31,6 +31,19 @@ const validateWebhookUrl = createSSRFValidator({
 });
 
 /**
+ * The deliberate escape hatch for local development and self-hosted
+ * installs whose receivers live on internal hosts: relaxes ONLY the
+ * local/private blocking, keeping every other SSRF property (no
+ * redirects, size caps, timeouts). Callers may pass allowInsecureLocal
+ * only when the operator set WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1; the
+ * automations channel never does.
+ */
+const validateWebhookUrlRelaxed = createSSRFValidator({
+  blockLocal: false,
+  allowedHosts: [],
+});
+
+/**
  * If the URL's host is an IP literal that is private / loopback / link-local,
  * return it (brackets stripped); else null. `new URL(...).hostname` keeps IPv6
  * in brackets, which `isIP` rejects — so a bracketed `[::1]` would otherwise
@@ -90,6 +103,10 @@ export interface WebhookSendInput {
   /** 1-based delivery attempt, sent as `X-LangWatch-Delivery-Attempt` so
    *  receivers can distinguish first delivery from ladder retries. */
   attempt?: number;
+  /** Relax the private/loopback block for this send. Only the webhook
+   *  endpoints platform passes this, and only when the operator set
+   *  WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1 (local dev / internal receivers). */
+  allowInsecureLocal?: boolean;
 }
 
 export interface WebhookSendResult {
@@ -125,9 +142,10 @@ export async function sendWebhook({
   signingSecret,
   attempt,
   contextLabel,
+  allowInsecureLocal = false,
 }: WebhookSendInput): Promise<WebhookSendResult> {
   const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
-  const shapeProblem = validateWebhookUrlShape(url);
+  const shapeProblem = allowInsecureLocal ? null : validateWebhookUrlShape(url);
   if (shapeProblem) {
     throw new DispatchError({
       message: `${label}: ${shapeProblem}`,
@@ -137,7 +155,7 @@ export async function sendWebhook({
   // Terminal-block a private/loopback IP literal (incl. bracketed IPv6) up
   // front — the SSRF validator below fails these closed too, but as a
   // retryable "unresolvable host" rather than the permanent block it is.
-  const privateLiteral = privateIpLiteral(url);
+  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
   if (privateLiteral) {
     throw new DispatchError({
       message: `${label}: the destination "${privateLiteral}" is a private or loopback address, which is not allowed.`,
@@ -196,7 +214,9 @@ export async function sendWebhook({
     },
     body,
     contextLabel: label,
-    validateUrl: validateWebhookUrl,
+    validateUrl: allowInsecureLocal
+      ? validateWebhookUrlRelaxed
+      : validateWebhookUrl,
   });
   return { ...response, eventId: resolvedEventId };
 }

@@ -75,6 +75,37 @@ describe("webhook endpoint service", () => {
   });
 
   /** @scenario A success resets the failure streak */
+  /** @scenario Plain-http receiver URLs need the operator opt-in */
+  it("refuses http URLs unless WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS is set", async () => {
+    const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+    try {
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      await expect(
+        service.create({
+          organizationId: organization.id,
+          url: "http://localhost:4101/webhooks/langwatch",
+          enabledEvents: ["gateway.request.completed"],
+        }),
+      ).rejects.toThrow("url must use https");
+
+      process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
+      const created = await service.create({
+        organizationId: organization.id,
+        url: "http://localhost:4101/webhooks/langwatch",
+        enabledEvents: ["gateway.request.completed"],
+      });
+      expect(created.endpoint.url).toBe(
+        "http://localhost:4101/webhooks/langwatch",
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      } else {
+        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = previous;
+      }
+    }
+  });
+
   it("clears failingSince on a successful attempt", async () => {
     const { endpoint } = await createEndpoint();
     await service.recordDeliveryAttempt({

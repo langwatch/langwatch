@@ -40,6 +40,7 @@ import type {
   WebhookEndpointService,
   WebhookEndpointView,
 } from "../webhookEndpoint.service";
+import { allowsInsecureLocalUrls } from "../webhookEndpoint.service";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
@@ -579,6 +580,7 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
         eventId: payload.batchId,
         signingSecret: secret,
         attempt: context.attempt,
+        allowInsecureLocal: allowsInsecureLocalUrls(),
       });
       status = result.status;
       responseBody = result.body;
