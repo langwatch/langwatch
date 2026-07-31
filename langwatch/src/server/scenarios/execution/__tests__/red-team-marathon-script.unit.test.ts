@@ -11,7 +11,11 @@
  * verdict reads as "the agent held up" — indistinguishable from a real pass.
  * A source read is not enough evidence for that; this executes it.
  *
- * Covers @integration scenarios from red-team-scenarios.feature.
+ * Binds nothing in red-team-scenarios.feature on purpose. It is most of "The
+ * attack gets every turn it was configured for", which is still
+ * @unimplemented, but not the second half of it — that a shorter run ended
+ * because the objective was met. These tests disable early exit to isolate the
+ * budget, so claiming that scenario would overstate what is proven here.
  */
 import * as ScenarioRunner from "@langwatch/scenario";
 import { MockLanguageModelV3 } from "ai/test";

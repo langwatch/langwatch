@@ -3,12 +3,13 @@
  *
  * Unit tests for red-team agent selection in the execution pipeline.
  *
- * Covers @unit scenarios from red-team-scenarios.feature:
- * - A red-team run uses the attacker instead of the standard user simulator
- * - A standard run is unaffected
- * - The run allows as many turns as the attack is configured for
+ * Binds "Turn count is bounded" and "Free-text attack settings are bounded"
+ * from red-team-scenarios.feature; the annotations below say which test covers
+ * which. Selecting the attacker over the standard simulator is asserted at the
+ * config boundary only — the scenarios for that are still @unimplemented, and
+ * `red-team-marathon-script.unit.test.ts` is where a run is actually executed.
  *
- * The last one is the point of this file. What bounds a red-team run is the
+ * The turn budget is the point of this file. What bounds a red-team run is the
  * script `marathonScript()` builds from `totalTurns` — the runner walks it
  * step by step and never consults `ScenarioConfig.maxTurns` on this path. So
  * these tests pin the script, not a config field: if the script ever stopped

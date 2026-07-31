@@ -29,12 +29,6 @@ const logger = createLogger("langwatch:api:scenarios");
 
 const getService = () => ScenarioService.create(prisma);
 
-/**
- * Optional adversarial configuration, mirroring the tRPC surface so a
- * red-team scenario can be created over the API and not only in the UI.
- * A null/absent strategy means a standard scenario.
- */
-
 const scenarioResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -57,6 +51,11 @@ const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+/**
+ * Optional adversarial configuration, mirroring the tRPC surface so a
+ * red-team scenario can be created over the API and not only in the UI.
+ * A null/absent strategy means a standard scenario.
+ */
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
