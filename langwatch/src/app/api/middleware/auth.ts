@@ -5,6 +5,7 @@ import {
   requireApiKeyPermission as createRequireApiKeyPermission,
   createUnifiedAuthMiddleware,
 } from "~/server/api-key/auth-middleware";
+import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 
 /**
@@ -16,6 +17,13 @@ export type AuthMiddlewareVariables = {
   apiKeyId?: string;
   apiKeyUserId?: string;
   apiKeyOrganizationId?: string;
+  /**
+   * The full resolved credential. Always set by the unified middleware;
+   * optional here because other middlewares sharing this Variables shape
+   * do not set it. Handlers that need to know WHICH kind of credential
+   * called (scoped API key vs legacy project key) read this.
+   */
+  resolvedToken?: ResolvedToken;
 };
 
 /**

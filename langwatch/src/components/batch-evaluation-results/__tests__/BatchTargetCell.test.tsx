@@ -246,6 +246,48 @@ describe("BatchTargetCell", () => {
       expect(screen.getByTestId("latency-target-1")).toBeInTheDocument();
       expect(screen.getByText("1.5s")).toBeInTheDocument();
     });
+
+    it("displays cost when present", () => {
+      const targetOutput = createTargetOutput({ cost: 0.05 });
+
+      render(<BatchTargetCell targetOutput={targetOutput} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("cost-target-1")).toBeInTheDocument();
+      expect(screen.getByText("$0.0500")).toBeInTheDocument();
+    });
+
+    /** @scenario Hide cost and latency to reduce clutter */
+    it("hides cost and latency when showCostAndLatency is false", () => {
+      const targetOutput = createTargetOutput({ cost: 0.05, duration: 1500 });
+
+      render(
+        <BatchTargetCell
+          targetOutput={targetOutput}
+          showCostAndLatency={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();
+      // Output stays — cost/latency is independent of the output toggle.
+      expect(screen.getByText(/Test output/)).toBeInTheDocument();
+    });
+
+    /** @scenario Increase row height to see more of a long output before expanding */
+    it("applies the row-height tier to the collapsed output box", () => {
+      const targetOutput = createTargetOutput();
+
+      render(<BatchTargetCell targetOutput={targetOutput} rowHeight="l" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(
+        screen.getByText(/Test output/).closest("[data-row-height]"),
+      ).toHaveAttribute("data-row-height", "l");
+    });
   });
 
   describe("Output Unwrapping", () => {

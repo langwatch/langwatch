@@ -125,15 +125,39 @@ const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
 // Most endpoints here authenticate a project key plus a permission ceiling via
 // in-route middleware (authMiddleware + requireApiKeyPermission); the rest are
 // documented at their route.
-const inRouteAuth = handlerManagedAuth(
-  "project auth + permission ceiling enforced by in-route middleware",
-);
+// One policy per grain, mirroring the `requireApiKeyPermission` middleware each
+// route applies. A single shared `inRouteAuth` reported nothing at all, so the
+// registry could not tell an analytics read from a trigger management call.
+const IN_ROUTE_REASON =
+  "project auth + permission ceiling enforced by in-route middleware";
+const analyticsViewAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["analytics:view"],
+  credential: "apiKey",
+});
+const experimentsManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["experiments:manage"],
+  credential: "apiKey",
+});
+const workflowsManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["workflows:manage"],
+  credential: "apiKey",
+});
+const tracesCreateAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["traces:create"],
+  credential: "apiKey",
+});
+const triggersManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["triggers:manage"],
+  credential: "apiKey",
+});
 
-// =============================================
-// POST /api/analytics
-// =============================================
 secured
-  .access(inRouteAuth)
+  .access(analyticsViewAuth)
   .post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
     const project = c.get("project");
 
@@ -204,7 +228,13 @@ const RAG_SYSTEM_PROMPT =
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
 secured
-  .access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler"))
+  .access(
+    handlerManagedAuth({
+      reason: "demo endpoint validates X-Auth-Token in-handler",
+      permissions: [],
+      credential: "apiKey",
+    }),
+  )
   .post("/demo/hotel_bot", async (c) => {
     const authToken = c.req.header("x-auth-token");
     if (!authToken) {
@@ -261,7 +291,7 @@ secured
 // POST /api/dspy/log_steps
 // =============================================
 secured
-  .access(inRouteAuth)
+  .access(experimentsManageAuth)
   .post(
     "/dspy/log_steps",
     bodyLimit({ maxSize: 20 * 1024 * 1024 }),
@@ -408,7 +438,7 @@ const dspyInitParamsSchema = z
   });
 
 secured
-  .access(inRouteAuth)
+  .access(experimentsManageAuth)
   .post(
     "/experiment/init",
     authMiddleware,
@@ -492,9 +522,12 @@ const AUTH_CODE_TTL_SECONDS = 600;
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      // OAuth authorize step; no RBAC permission gates it.
+      permissions: [],
+      credential: "session",
+    }),
   )
   .post("/mcp/authorize", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -654,7 +687,7 @@ secured
 // POST /api/optimization/:workflowId/:versionId  (deprecated)
 // =============================================
 secured
-  .access(inRouteAuth)
+  .access(workflowsManageAuth)
   .post(
     "/optimization/:workflowId/:versionId",
     authMiddleware,
@@ -678,7 +711,7 @@ secured
 // Both this legacy URL and the canonical POST /api/events/track route
 // through track-event.service so behaviour stays identical between them.
 secured
-  .access(inRouteAuth)
+  .access(tracesCreateAuth)
   .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
     const project = c.get("project");
 
@@ -899,7 +932,7 @@ const filterSchema = z
   .default({});
 
 secured
-  .access(inRouteAuth)
+  .access(triggersManageAuth)
   .post("/trigger/slack", authMiddleware, requireTriggersManage, async (c) => {
     const project = c.get("project");
 
@@ -952,7 +985,7 @@ secured
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
 secured
-  .access(inRouteAuth)
+  .access(workflowsManageAuth)
   .post(
     "/workflows/:workflowId/run",
     authMiddleware,
@@ -963,7 +996,7 @@ secured
   );
 
 secured
-  .access(inRouteAuth)
+  .access(workflowsManageAuth)
   .post(
     "/workflows/:workflowId/:versionId/run",
     authMiddleware,

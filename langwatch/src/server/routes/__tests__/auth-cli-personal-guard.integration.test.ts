@@ -68,11 +68,16 @@ const PTEAM_ID = `pteam-guard-${suffix}`;
 // A second team the user is an org admin over but holds NO TeamUser row on.
 const OTHER_TEAM_ID = `oteam-guard-${suffix}`;
 const USER_ID = ids.USER_ID;
+// A second org member whose personal project must stay unreachable.
+const OTHER_USER_ID = `usr-guard-other-${suffix}`;
+const OTHER_PTEAM_ID = `pteam-guard-other-${suffix}`;
 const SHARED_PROJECT_ID = `proj-shared-${suffix}`;
 const PERSONAL_PROJECT_ID = `proj-personal-${suffix}`;
+const OTHER_PERSONAL_PROJECT_ID = `proj-personal-other-${suffix}`;
 const OTHER_TEAM_PROJECT_ID = `proj-other-${suffix}`;
 const SHARED_API_KEY = `sk-lw-shared-${suffix}-${"a".repeat(36)}`;
 const PERSONAL_API_KEY = `sk-lw-personal-${suffix}-${"b".repeat(36)}`;
+const OTHER_PERSONAL_API_KEY = `sk-lw-personal-o-${suffix}-${"d".repeat(34)}`;
 const OTHER_TEAM_API_KEY = `sk-lw-other-${suffix}-${"c".repeat(36)}`;
 
 const GOV_FLAG = "release_ui_ai_governance_enabled";
@@ -169,6 +174,42 @@ describe("CLI login personal-project guards", () => {
         ownerUserId: USER_ID,
       },
     });
+    // A second org member with their own personal workspace. The caller may
+    // be an org admin, and even then that personal project must never back a
+    // project API key for anyone but its owner.
+    await prisma.user.create({
+      data: {
+        id: OTHER_USER_ID,
+        email: `guard-other-${suffix}@example.com`,
+        name: `Guard Other ${suffix}`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: { userId: OTHER_USER_ID, organizationId: ORG_ID, role: "MEMBER" },
+    });
+    await prisma.team.create({
+      data: {
+        id: OTHER_PTEAM_ID,
+        name: `Personal Other ${suffix}`,
+        slug: `pteam-other-${suffix}`,
+        organizationId: ORG_ID,
+        isPersonal: true,
+        ownerUserId: OTHER_USER_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: OTHER_PERSONAL_PROJECT_ID,
+        name: `Their Workspace ${suffix}`,
+        slug: `personal-other-${suffix}`,
+        apiKey: OTHER_PERSONAL_API_KEY,
+        teamId: OTHER_PTEAM_ID,
+        language: "typescript",
+        framework: "openai",
+        isPersonal: true,
+        ownerUserId: OTHER_USER_ID,
+      },
+    });
     // A shared project on a team the user is NOT a direct member of. The user
     // is an org ADMIN (organizationUser above), so they see it in the picker
     // via organization.getAll and hold project:update through the org scope,
@@ -205,30 +246,39 @@ describe("CLI login personal-project guards", () => {
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
   });
 
+  // Deletes are org-scoped rather than keyed on the fixture ids because the
+  // approve path under test PROVISIONS rows with generated ids (the personal
+  // team, its project, and role bindings); an id-list filter would strand
+  // them. Dependency order, and no error swallowing: Team and Project carry
+  // no cascade from Organization, so a stranded child would otherwise turn
+  // every later run's org delete into a silent no-op and the leak would be
+  // invisible.
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
-    await prisma.virtualKey
-      .deleteMany({ where: { principalUserId: USER_ID } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({
-        where: { teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } },
-      })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { userId: USER_ID } })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({ where: { id: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { userId: USER_ID } })
-      .catch(() => {});
-    await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: ORG_ID } })
-      .catch(() => {});
+    // organizationId, not principalUserId-in-list: the tenancy guard
+    // extension on VirtualKey only honours scalar tenancy predicates, and
+    // the org id covers every key the approve path can have minted here.
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.teamUser.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+    });
     await stopTestContainers().catch(() => {});
   });
 
@@ -283,9 +333,28 @@ describe("CLI login personal-project guards", () => {
   });
 
   describe("given a project-login (project_api_key) approval", () => {
-    describe("when the approval targets a personal project id", () => {
-      /** @scenario project-login approval rejects a personal project id */
+    describe("when the approval targets another user's personal project id", () => {
+      /** @scenario project-login approval rejects another user's personal project id */
       it("rejects it and does not return its API key", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: OTHER_PERSONAL_PROJECT_ID,
+        });
+
+        expect(status).toBe(400);
+        expect(json.error).toBe("personal_project_not_allowed");
+        expect(JSON.stringify(json)).not.toContain(OTHER_PERSONAL_API_KEY);
+      });
+    });
+
+    describe("when the caller explicitly picks their OWN personal project", () => {
+      /** @scenario project-login approval honours the caller's own explicitly picked personal project */
+      it("approves it and returns the personal project", async () => {
+        // The hazard this guard exists for was silent AUTO-selection; an
+        // explicit self-pick in the browser is a deliberate act and the
+        // personal project is a normal project with a normal apiKey.
         const userCode = await mintDeviceCode("project_api_key");
 
         const { status, json } = await approve({
@@ -293,9 +362,8 @@ describe("CLI login personal-project guards", () => {
           project_id: PERSONAL_PROJECT_ID,
         });
 
-        expect(status).toBe(400);
-        expect(json.error).toBe("personal_project_not_allowed");
-        expect(JSON.stringify(json)).not.toContain(PERSONAL_API_KEY);
+        expect(status).toBe(200);
+        expect((json.project as { id: string }).id).toBe(PERSONAL_PROJECT_ID);
       });
     });
 

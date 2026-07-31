@@ -12,6 +12,10 @@ export {
   ColumnVisibilityButton,
   type ColumnVisibilityButtonProps,
   DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  type FieldsButtonProps,
+  RowHeightButton,
+  type RowHeightButtonProps,
 } from "./BatchEvaluationResultsTable";
 export { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 // BatchSummaryFooter is still used by ResultsPanel for stop button functionality
@@ -40,9 +44,11 @@ export { SingleRunTable } from "./SingleRunTable";
 // Table utilities
 export {
   calculateMinTableWidth,
+  DEFAULT_ROW_HEIGHT,
   getTableStyles,
   inferColumnType,
-  ROW_HEIGHT,
+  ROW_HEIGHT_OPTIONS,
+  type RowHeight,
 } from "./tableUtils";
 // Types
 export {
@@ -55,3 +61,9 @@ export {
   isImageUrlHeuristic,
   transformBatchEvaluationData,
 } from "./types";
+// Result display preferences (fields visibility + row height)
+export {
+  DEFAULT_RESULT_FIELDS,
+  type ResultField,
+  useResultDisplayPreferences,
+} from "./useResultDisplayPreferences";

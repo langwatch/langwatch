@@ -3,6 +3,7 @@ import { Check, Clipboard, Terminal } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { useAnalytics } from "react-contextual-analytics";
 
 const MotionVStack = motion.create(VStack);
 
@@ -152,6 +153,7 @@ function glassCard(): Record<string, unknown> {
 
 function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  const { emit } = useAnalytics();
 
   const handleCopy = async (): Promise<void> => {
     const ok = await copyToClipboard({
@@ -161,6 +163,7 @@ function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      emit("copied", "prompt", { skill: skill.id });
     }
   };
 
@@ -207,6 +210,8 @@ function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
 }
 
 function SkillRow({ skill }: { skill: SkillItem }): React.ReactElement {
+  const { emit } = useAnalytics();
+
   return (
     <VStack align="stretch" px={4} py={2.5} gap={1} {...glassCard()}>
       <HStack gap={2} align="baseline" minW={0}>
@@ -244,6 +249,8 @@ function SkillRow({ skill }: { skill: SkillItem }): React.ReactElement {
                 void copyToClipboard({
                   text: skill.slashCommand,
                   successMessage: `${skill.slashCommand} copied to clipboard`,
+                }).then((ok) => {
+                  if (ok) emit("copied", "slash_command", { skill: skill.id });
                 });
               }}
             >
@@ -280,6 +287,8 @@ function SkillRow({ skill }: { skill: SkillItem }): React.ReactElement {
               void copyToClipboard({
                 text: skill.installCommand,
                 successMessage: "Install command copied to clipboard",
+              }).then((ok) => {
+                if (ok) emit("copied", "install_command", { skill: skill.id });
               });
             }}
           >
@@ -323,13 +332,18 @@ function accentCredentialSegments(command: string): React.ReactNode[] {
 
 function QuickCommand({
   label,
+  agent,
   displayCommand,
   copyCommand,
 }: {
   label: string;
+  /** Stable agent id reported on the copy analytics event. */
+  agent: string;
   displayCommand: string;
   copyCommand: string;
 }): React.ReactElement {
+  const { emit } = useAnalytics();
+
   return (
     <HStack
       justify="space-between"
@@ -356,7 +370,11 @@ function QuickCommand({
           </Text>
         </VStack>
       </HStack>
-      <InlineCopyButton text={copyCommand} label="Command" />
+      <InlineCopyButton
+        text={copyCommand}
+        label="Command"
+        onCopied={() => emit("copied", "install_command", { agent })}
+      />
     </HStack>
   );
 }
@@ -376,6 +394,7 @@ function McpTab({
   endpoint: string | undefined;
   projectId: string | undefined;
 }): React.ReactElement {
+  const { emit } = useAnalytics();
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
   const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
   const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
@@ -399,11 +418,13 @@ function McpTab({
         </Text>
         <QuickCommand
           label="Claude Code"
+          agent="claude-code"
           displayCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
           copyCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
         />
         <QuickCommand
           label="OpenAI Codex"
+          agent="codex"
           displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
           copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
         />
@@ -432,7 +453,11 @@ function McpTab({
           highlightLines={findLangwatchEnvLines(displayConfigJson)}
         />
         <Box position="absolute" top={2.5} right={2.5}>
-          <InlineCopyButton text={mcpJson} label="Config" />
+          <InlineCopyButton
+            text={mcpJson}
+            label="Config"
+            onCopied={() => emit("copied", "mcp_config")}
+          />
         </Box>
       </Box>
 
@@ -464,6 +489,8 @@ function McpTab({
                 void copyToClipboard({
                   text: ep.path,
                   successMessage: `${ep.editor} config path copied`,
+                }).then((ok) => {
+                  if (ok) emit("copied", "config_path", { editor: ep.editor });
                 });
               }}
             >
@@ -538,6 +565,12 @@ export function ViaClaudeCodeScreen({
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
+  const { emit } = useAnalytics();
+
+  const selectTab = (tab: TabKey): void => {
+    setActiveTab(tab);
+    emit("selected", "tab", { tab });
+  };
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
@@ -596,18 +629,18 @@ export function ViaClaudeCodeScreen({
           <TabButton
             label="Prompt"
             active={activeTab === "prompt"}
-            onClick={() => setActiveTab("prompt")}
+            onClick={() => selectTab("prompt")}
           />
           <TabButton
             label="Skill"
             active={activeTab === "skill"}
-            onClick={() => setActiveTab("skill")}
+            onClick={() => selectTab("skill")}
           />
           {showMcpTab && (
             <TabButton
               label="MCP"
               active={activeTab === "mcp"}
-              onClick={() => setActiveTab("mcp")}
+              onClick={() => selectTab("mcp")}
             />
           )}
         </HStack>

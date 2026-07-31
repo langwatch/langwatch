@@ -140,9 +140,14 @@ secured.hono.onError(handleDatasetError);
 // The browser→S3 direct-upload routes authenticate the in-app upload UI by
 // NextAuth session cookie (or API key), resolved in-handler — the rest of the
 // surface is API-key-only `requires(...)`, which would 401 a cookie request.
-const directUploadSessionAuth = handlerManagedAuth(
-  "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
-);
+const directUploadSessionAuth = handlerManagedAuth({
+  reason:
+    "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
+  // authorizeDirectUpload resolves the caller and the target dataset; it does
+  // not gate on a standalone RBAC permission.
+  permissions: [],
+  credential: "both",
+});
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and
 // sets `project`), so it is applied per-route rather than app-wide.

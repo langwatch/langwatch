@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -13,7 +13,7 @@ export const updateDashboardCommand = async (
   id: string,
   options: { name?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.name) {
     console.error(chalk.red("Error: --name is required"));

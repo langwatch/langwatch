@@ -31,6 +31,8 @@ import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts } from "./ComparisonCharts";
@@ -44,6 +46,7 @@ import {
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
+import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -78,6 +81,12 @@ export function BatchEvaluationResults({
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
     () => new Set(DEFAULT_HIDDEN_COLUMNS),
   );
+
+  // Which target fields render, and how much of each cell's content shows —
+  // see useResultDisplayPreferences for why fields reset per session while
+  // row height persists.
+  const { fields, toggleField, rowHeight, setRowHeight } =
+    useResultDisplayPreferences();
 
   // Toggle column visibility
   const toggleColumn = useCallback((columnName: string) => {
@@ -498,6 +507,12 @@ export function BatchEvaluationResults({
               Charts
             </Button>
           )}
+          {transformedData && transformedData.targetColumns.length > 0 && (
+            <>
+              <RowHeightButton value={rowHeight} onChange={setRowHeight} />
+              <FieldsButton fields={fields} onToggle={toggleField} />
+            </>
+          )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
             <ColumnVisibilityButton
               datasetColumns={transformedData.datasetColumns}
@@ -576,6 +591,10 @@ export function BatchEvaluationResults({
                   onToggleColumn={toggleColumn}
                   comparisonData={comparisonData}
                   targetColors={targetColors}
+                  showOutputs={fields.outputs}
+                  showEvaluations={fields.scores}
+                  showCostAndLatency={fields.costAndLatency}
+                  rowHeight={rowHeight}
                 />
               </Card.Body>
             </Card.Root>

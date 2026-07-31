@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { DatasetService } from "@/client-sdk/services/datasets";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
@@ -9,7 +10,7 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  * Reused by all dataset CLI commands.
  */
 export function createDatasetService(): DatasetService {
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = (
     resolveControlPlaneUrl()
   ).replace(/\/$/, "");

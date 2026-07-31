@@ -70,10 +70,8 @@ spec:
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 
       {{- with (coalesce .Values.workers.nodeSelector .Values.global.scheduling.nodeSelector)}}
       nodeSelector:
@@ -102,17 +100,22 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.workers.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.workers.extraInitContainers}}
       initContainers:
-        {{- with .Values.workers.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
       containers:
         {{- with .Values.workers.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: {{ .Release.Name }}-workers
           securityContext:
-            {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           workingDir: /app/langwatch
@@ -154,6 +157,11 @@ spec:
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- with .Values.workers.extraEnvFrom}}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
           # Probe the worker's HTTP listener (the metrics server port, 2999)
           # rather than just PID 1 liveness — an answered request proves the
@@ -211,7 +219,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.workers.scratchSizeLimit }}
         {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
         - name: stored-objects-data
           persistentVolumeClaim:

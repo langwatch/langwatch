@@ -47,7 +47,7 @@ const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
 ];
 
 function GatewayUsagePage() {
-  const { organization, project } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
   const router = useRouter();
 
   // Range and key filter live in the URL, so the deep link from the
@@ -79,17 +79,21 @@ function GatewayUsagePage() {
   const { fromIso, toIso } = useRollingWindow(days);
 
   const summaryQuery = api.gatewayUsage.summary.useQuery(
-    { projectId: project?.id ?? "", fromDate: fromIso, toDate: toIso },
-    { enabled: !!project?.id && !virtualKeyId },
+    {
+      organizationId: organization?.id ?? "",
+      fromDate: fromIso,
+      toDate: toIso,
+    },
+    { enabled: !!organization?.id && !virtualKeyId },
   );
   const vkSummaryQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
-      projectId: project?.id ?? "",
+      organizationId: organization?.id ?? "",
       virtualKeyId: virtualKeyId ?? "",
       fromDate: fromIso,
       toDate: toIso,
     },
-    { enabled: !!project?.id && !!virtualKeyId },
+    { enabled: !!organization?.id && !!virtualKeyId },
   );
   const keyQuery = api.virtualKeys.get.useQuery(
     { organizationId: organization?.id ?? "", id: virtualKeyId ?? "" },
@@ -161,7 +165,7 @@ function GatewayUsagePage() {
     const stamp = new Date().toISOString().split("T")[0];
     link.setAttribute(
       "download",
-      `gateway_usage_${project?.slug ?? "project"}${
+      `gateway_usage_${organization?.slug ?? "organization"}${
         virtualKeyId ? `_${virtualKeyId}` : ""
       }_${days === "mtd" ? "mtd" : `${days}d`}_${stamp}.csv`,
     );
@@ -246,10 +250,9 @@ function GatewayUsagePage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No usage in this window</EmptyState.Title>
                 <EmptyState.Description>
-                  Spend shows up here once the trace-fold reactor has projected
-                  the first completed request onto the budget ledger. Try
-                  sending a few requests against a virtual key, then come back
-                  in a couple of minutes.
+                  Spend shows up here once the gateway has traced its first
+                  completed request. Send a few requests against a virtual key,
+                  then check back in a couple of minutes.
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>
@@ -369,7 +372,7 @@ function SpendSparkline({
         <Heading size="sm">Spend over time</Heading>
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
-          ledger-backed, day-bucketed UTC
+          day-bucketed UTC
         </Text>
       </HStack>
       <Box

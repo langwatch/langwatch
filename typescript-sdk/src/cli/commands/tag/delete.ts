@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import * as readline from "readline";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 
 const promptConfirmation = (tagName: string): Promise<string> => {
@@ -32,7 +32,7 @@ export const tagDeleteCommand = async (
   tagName: string,
   options?: { force?: boolean },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options?.force) {
     const confirmation = await promptConfirmation(tagName);

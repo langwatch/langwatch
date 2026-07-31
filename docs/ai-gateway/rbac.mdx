@@ -10,7 +10,7 @@ The AI Gateway is governed by LangWatch's existing RBAC system, the same resourc
 
 ## Resources
 
-Every gateway UI, tRPC call, and REST endpoint checks one of these six resource keys:
+Every gateway UI, tRPC call, and REST endpoint checks one of these seven resource keys:
 
 | Resource | What it gates |
 |---|---|
@@ -18,6 +18,7 @@ Every gateway UI, tRPC call, and REST endpoint checks one of these six resource 
 | `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
 | `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
 | `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
+| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
 | `gatewayLogs` | Audit log list, filter, export. |
 | `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation. |
 
@@ -85,17 +86,22 @@ Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalen
 | Endpoint | Permission |
 |---|---|
 | `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` (plus `virtualKeys:manage` at every requested scope) |
+| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
+| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` (re-scoping needs `virtualKeys:manage` at every new scope) |
 | `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
 | `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
 | `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
 | `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
 | `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
-| `POST /api/gateway/v1/budgets/:id/archive` | `gatewayBudgets:delete` |
-| `POST /api/gateway/v1/virtual-keys/:id/guardrails` | `gatewayGuardrails:attach` |
-| `DELETE /api/gateway/v1/virtual-keys/:id/guardrails/:guardrailId` | `gatewayGuardrails:detach` |
-| `GET /api/gateway/v1/usage` | `gatewayUsage:view` |
+| `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
+| `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
+| `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
+| `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
+| `DELETE /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:delete` |
+
+Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
 
 Audit log retrieval is **not** exposed via the public REST API in v1, gateway audit rows live in the platform `AuditLog` table and are read via `/settings/audit-log` (CSV export) or via the tRPC `organization.getAuditLogs` procedure (gated on `auditLog:view`, with TeamUser ADMIN/MEMBER/VIEWER fallback for legacy admins). See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically). The `gatewayLogs:view` permission remains in the enum for backward compatibility but is no longer wired to any endpoint.
 
@@ -106,8 +112,7 @@ A request with an API token that lacks the required permission returns `403 perm
   "error": {
     "type":    "permission_denied",
     "code":    "permission_denied",
-    "message": "missing permission: virtualKeys:create",
-    "param":   null
+    "message": "permission_denied: virtualKeys:manage at ORGANIZATION:org_..."
   }
 }
 ```

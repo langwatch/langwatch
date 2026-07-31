@@ -138,29 +138,35 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // Top-level commands
   const loginCmd = program
     .command("login")
-    .description(
-      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --project, --api-key, or --token to skip prompts.",
+    // The summary is what the top-level `langwatch --help` listing shows;
+    // the description is what `langwatch login --help` itself opens with,
+    // where pointing at `login --help` would be circular.
+    .summary(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). Check login --help for more options.",
     )
-    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
+    .description(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK).",
+    )
+    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key), writes to .env")
     .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
     .option(
       "--device",
       "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
     )
     .option(
-      "--project",
-      "Force project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). The implicit default in non-TTY contexts.",
+      "--project [slug]",
+      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
-      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard), writes to ~/.langwatch/config.json",
     )
     .option(
       "--browser <name>",
       "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
     );
 
-  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean | string; browser?: string; endpoint?: string; token?: string }) => {
     try {
       await loginCommand(options);
     } catch (error) {
@@ -1639,12 +1645,33 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new virtual key (secret is shown once)")
       .requiredOption("--name <name>", "Human-readable name for the key")
       .option("--description <desc>", "Optional description")
-      .option("--env <env>", "Environment: live or test", "live")
-      .option("--scope <typeAndId...>", "Scope row in TYPE:id form (repeatable). Types: ORG | TEAM | PROJECT. Example: --scope ORG:acme --scope TEAM:platform")
-      .option("--routing-policy <id>", "RoutingPolicy id to pin (otherwise uses the org's default policy)")
+      .option(
+        "--scope <typeAndId>",
+        "Scope row in TYPE:id form (repeat the flag for several). Types: ORG | TEAM | PROJECT. Defaults to the calling project when omitted. Example: --scope ORG:acme --scope TEAM:platform",
+        (value: string, previous: string[] = []) => [...previous, value],
+      )
+      .option("--trace-project <id>", "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)")
+      .option("--routing-policy <id>", "RoutingPolicy id to pin (pairs with --routing-mode policy)")
+      .option("--routing-mode <mode>", "none (default: no silent failover) | fallback_all | policy")
       .option("--principal-user <userId>", "Mark this VK as personal and attribute spend to the named principal user")
+      .option("--budget-limit <usd>", "Cap the key's own spend (creates a VK-scoped budget atomically with the key)")
+      .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
+      .option("--budget-breach <action>", "block (default) or warn when the key's budget is hit")
+      .option("--providers-allowed <ids>", "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (options: { name: string; description?: string; env?: "live" | "test"; scope?: string[]; routingPolicy?: string; principalUser?: string }) => {
+    async (options: {
+      name: string;
+      description?: string;
+      scope?: string[];
+      traceProject?: string;
+      routingPolicy?: string;
+      routingMode?: string;
+      principalUser?: string;
+      budgetLimit?: string;
+      budgetWindow?: string;
+      budgetBreach?: "block" | "warn";
+      providersAllowed?: string;
+    }) => {
       const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
       return impl(options);
     },
@@ -1652,14 +1679,38 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     virtualKeysCmd
+      .command("spend <id>")
+      .description("Read a key's aggregate spend (default window: current UTC month)")
+      .option("--from <iso>", "Window start (ISO-8601, e.g. 2026-07-01T00:00:00Z)")
+      .option("--to <iso>", "Window end (ISO-8601, exclusive)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { from?: string; to?: string }) => {
+      const { virtualKeySpendCommand: impl } = await import("./commands/virtual-keys/spend.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    virtualKeysCmd
       .command("update <id>")
-      .description("Update a virtual key's name/description/scopes/routing-policy/config")
+      .description("Update a virtual key's name/description/scopes/routing/budget/config")
       .option("--name <name>", "New display name")
       .option("--description <desc>", "New description")
       .option("--clear-description", "Clear the description")
-      .option("--scope <typeAndId...>", "Replace the scope set (repeatable; supplies the full set). Same TYPE:id form as create.")
+      .option(
+        "--scope <typeAndId>",
+        "Replace the scope set (repeat the flag for several; supplies the full set). Same TYPE:id form as create.",
+        (value: string, previous: string[] = []) => [...previous, value],
+      )
+      .option("--trace-project <id>", "Re-point the key's trace destination project (needs virtualKeys:manage there)")
+      .option("--clear-trace-project", "Clear the explicit trace destination (falls back to project scope or governance project)")
       .option("--routing-policy <id>", "Switch to a different RoutingPolicy (pass id)")
       .option("--clear-routing-policy", "Unpin the routing policy; VK falls back to the org default ordering")
+      .option("--routing-mode <mode>", "none | fallback_all | policy")
+      .option("--budget-limit <usd>", "Upsert the key's own cap (pairs with --budget-window)")
+      .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
+      .option("--budget-breach <action>", "block or warn when the key's budget is hit")
+      .option("--clear-budget", "Archive the key's own budget (spend history is retained)")
       .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config")
       .option("--config-file <path>", "Read partial config JSON from a file")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
@@ -1668,8 +1719,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       description?: string;
       clearDescription?: boolean;
       scope?: string[];
+      traceProject?: string;
+      clearTraceProject?: boolean;
       routingPolicy?: string;
       clearRoutingPolicy?: boolean;
+      routingMode?: string;
+      budgetLimit?: string;
+      budgetWindow?: string;
+      budgetBreach?: "block" | "warn";
+      clearBudget?: boolean;
       configJson?: string;
       configFile?: string;
     }) => {
@@ -1709,10 +1767,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     gatewayBudgetsCmd
       .command("list")
       .description("List all budgets across scopes")
+      .option("--scope-type <kinds>", "Comma-separated filter: organization,team,project,virtual-key,principal,group (default: all)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+    async (options: { scopeType?: string }) => {
       const { listGatewayBudgetsCommand: impl } = await import("./commands/gateway-budgets/list.js");
-      return impl();
+      return impl(options);
     },
   );
 
@@ -1722,30 +1781,34 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Create a new budget (scope + window + limit)")
       .requiredOption("--name <name>", "Human-readable budget name")
       .option("--description <desc>", "Optional description")
-      .requiredOption("--scope <kind>", "Budget scope: organization|team|project|virtual-key|principal")
+      .requiredOption("--scope <kind>", "Budget scope: organization|team|project|virtual-key|principal|group")
       .option("--organization <id>", "Organization id (for scope=organization)")
       .option("--team <id>", "Team id (for scope=team)")
       .option("--project <id>", "Project id (for scope=project)")
       .option("--virtual-key <id>", "Virtual key id (for scope=virtual-key)")
       .option("--principal <id>", "Principal user id (for scope=principal)")
+      .option("--group <id>", "Group id (for scope=group; --limit becomes the PER-MEMBER allowance)")
       .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total")
-      .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99)")
+      .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99). Per member for scope=group")
       .option("--on-breach <action>", "block (default) or warn", "block")
       .option("--timezone <tz>", "IANA timezone for window boundaries (e.g. Europe/Amsterdam)")
+      .option("--provider-key <id>", "Pin the budget to one ModelProvider id (default: counts every provider)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
       description?: string;
-      scope: "organization" | "team" | "project" | "virtual-key" | "principal";
+      scope: "organization" | "team" | "project" | "virtual-key" | "principal" | "group";
       organization?: string;
       team?: string;
       project?: string;
       virtualKey?: string;
       principal?: string;
+      group?: string;
       window: string;
       limit: string;
       onBreach?: "block" | "warn";
       timezone?: string;
+      providerKey?: string;
     }) => {
       const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
       return impl(options);

@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
@@ -32,7 +33,7 @@ export class SecretsApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
   }
 
