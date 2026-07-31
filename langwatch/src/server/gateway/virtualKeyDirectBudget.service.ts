@@ -111,26 +111,39 @@ function chooseOnePerKey(
 ): Map<string, GatewayBudget> {
   const chosen = new Map<string, GatewayBudget>();
   for (const budget of budgets) {
-    // The scope is the budget's target and wins when the caller can see
-    // it. A drawer-managed row whose target is outside the visible set
-    // still belongs to the key whose field manages it, so that is the
-    // fallback rather than dropping the row.
-    const scopedKeyId =
-      budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
-    const keyId =
-      scopedKeyId && visibleKeyIds.has(scopedKeyId)
-        ? scopedKeyId
-        : budget.managedByVirtualKeyId;
-    if (!keyId || !visibleKeyIds.has(keyId)) continue;
-    const current = chosen.get(keyId);
-    if (
-      !current ||
-      (!current.managedByVirtualKeyId && budget.managedByVirtualKeyId)
-    ) {
-      chosen.set(keyId, budget);
-    }
+    const keyId = keyThisBudgetBelongsTo(budget, visibleKeyIds);
+    if (!keyId) continue;
+    if (winsOver(budget, chosen.get(keyId))) chosen.set(keyId, budget);
   }
   return chosen;
+}
+
+/**
+ * The visible key a budget row reports against, or null when it reports
+ * against none.
+ *
+ * The scope is the budget's target and wins when the caller can see it. A
+ * drawer-managed row whose target is outside the visible set still belongs
+ * to the key whose field manages it, so that is the fallback rather than
+ * dropping the row.
+ */
+function keyThisBudgetBelongsTo(
+  budget: GatewayBudget,
+  visibleKeyIds: Set<string>,
+): string | null {
+  const scoped = budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
+  if (scoped && visibleKeyIds.has(scoped)) return scoped;
+  const managed = budget.managedByVirtualKeyId;
+  return managed && visibleKeyIds.has(managed) ? managed : null;
+}
+
+/** First row seen wins, except that a drawer-managed row displaces one that is not. */
+function winsOver(
+  candidate: GatewayBudget,
+  incumbent: GatewayBudget | undefined,
+): boolean {
+  if (!incumbent) return true;
+  return !incumbent.managedByVirtualKeyId && !!candidate.managedByVirtualKeyId;
 }
 
 /**
