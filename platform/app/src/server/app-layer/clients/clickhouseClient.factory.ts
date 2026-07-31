@@ -7,6 +7,29 @@ import {
   sharedDatabaseRouter,
   type TenantTarget,
 } from "@langwatch/clickhouse";
+import { createLogger } from "@langwatch/observability";
+import { incrementConventionViolation } from "~/server/clickhouse/metrics";
+import { enforceConventions } from "./clickhouse/convention-gate";
+
+const gateLogger = createLogger("langwatch:clickhouse:convention-gate");
+
+/**
+ * The injected convention gate: every `query`/`stream` through any client
+ * this factory builds passes it before any cost is paid. It refuses an
+ * unpruned read by default; see ./clickhouse/convention-gate.ts.
+ */
+function gate(sql: string): void {
+  enforceConventions(sql, {
+    onViolation: ({ table, rule }) => incrementConventionViolation(table, rule),
+    warn: (violations) =>
+      gateLogger.warn(
+        { source: "clickhouse", conventionViolations: violations },
+        `ClickHouse convention violation: ${violations
+          .map(({ table, rule }) => `${table} ${rule}`)
+          .join(", ")}`,
+      ),
+  });
+}
 
 /**
  * The app's pool size for the shared client (`~/server/clickhouse/client.ts:65`,
@@ -104,6 +127,7 @@ export function createAppClickHouseClient(
         maxOpenConnections: opts.maxOpenConnections ?? CH_MAX_OPEN_CONNECTIONS,
         requestTimeoutMs: opts.requestTimeoutMs,
         observability: opts.observability,
+        gate,
       }),
     destroy: (client) => client.close(),
   });

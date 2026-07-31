@@ -52,6 +52,9 @@ const READ_YOUR_WRITES_SETTINGS = {
 
 /** Platform default, mirroring the deployed migrations' `_retention_days`. */
 const DEFAULT_RETENTION_DAYS = 308;
+/** TTL deletes lazily. A row can outlive its retention by merge lag; the cushion keeps it readable until the delete lands. */
+const TTL_LAG_CUSHION_DAYS = 31;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * A tier in front of the table. Its failure semantics belong to the store, not
@@ -227,10 +230,18 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
   const keyPredicate = keyColumns
     .map((column, index) => `AND ${names.of(column)} = {key${index}:String}`)
     .join(" ");
+  // Every read carries a lower bound on the partition column, at the widest
+  // range a live row can occupy: the retention window plus a lazy-TTL
+  // cushion. A row past that bound has expired; reading it back would fold
+  // onto state the table is deleting. The bound prunes expired partitions
+  // and satisfies the app's convention gate, which refuses unpruned reads.
+  const retentionColumn = table.partition.column;
+  const retentionChType = table.columns[retentionColumn]?.chType;
+  const retentionPredicate = `AND ${names.of(retentionColumn)} >= {retentionFrom:${retentionChType}} `;
   const selectFrom =
     `SELECT ${names.list(table.columnNames)} ` +
     `FROM ${names.of(table.name)} ` +
-    `WHERE ${names.of(tenant)} = {tenantId:String} ${keyPredicate} `;
+    `WHERE ${names.of(tenant)} = {tenantId:String} ${keyPredicate} ${retentionPredicate}`;
   const orderLimit = `ORDER BY ${names.of(table.merge.version)} DESC LIMIT 1`;
   const readSql = selectFrom + orderLimit;
 
@@ -245,6 +256,18 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
   const windowFrom = (now: number): string | Date => {
     const from = now - (args.readWindow?.lookbackMs ?? 0);
     return windowChType === "UInt64" || windowChType === "Int64"
+      ? String(from)
+      : new Date(from);
+  };
+  const retentionFrom = (
+    now: number,
+    context: StoreContext,
+  ): string | Date => {
+    const days =
+      Math.max(defaultRetentionDays, context.retentionDays ?? 0) +
+      TTL_LAG_CUSHION_DAYS;
+    const from = now - days * DAY_MS;
+    return retentionChType === "UInt64" || retentionChType === "Int64"
       ? String(from)
       : new Date(from);
   };
@@ -274,6 +297,7 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
         ...names.params,
         tenantId: context.tenantId,
         ...keyParams(foldKey),
+        retentionFrom: retentionFrom(Date.now(), context),
         ...(windowed && windowedReadSql !== undefined
           ? { windowFrom: windowFrom(Date.now()) }
           : {}),

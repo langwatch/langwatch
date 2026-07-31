@@ -17,21 +17,20 @@
  * it reads the table list from {@link SCHEMA_CATALOGUE}, it is called before
  * the query is sent, and every violation increments a counter.
  *
- * ## Count-only, on purpose
+ * ## Refusal is the default
  *
- * Nothing here throws by default, in any environment. Twenty-two of the
- * thirty-three tables have never been watched, so nobody knows how many reads
- * violate a rule in production, and promoting an unmeasured guard to a thrown
- * error is how a guard takes down the thing it was meant to protect. ADR-068
- * took the same line for windowed reads: measure first, limit second.
+ * An unpruned read is refused, in every environment. This was an owner
+ * decision (2026-07-31): a non-bounded ClickHouse call must be impossible by
+ * default. The gate ran a measuring release first; the refusal path now has
+ * a cheap compliance story, because a caller with no estimable time range
+ * makes an explicit statement with `retentionBound()` and gets a real
+ * predicate at the widest range a live row can occupy.
  *
- * The intended progression, once the counter has a release of data behind it:
- *
- *   1. read `clickhouse_convention_violation_total` and rank tables by rule;
- *   2. fix the top offenders, which is where the S3 bill actually is;
- *   3. flip dev and test to throw, via {@link CONVENTION_GATE_THROWS};
- *   4. leave production on warn permanently — a convention violation is a cost
- *      problem, and failing a customer's read to save a request is a bad trade.
+ * `LANGWATCH_CLICKHOUSE_CONVENTION_GATE=warn` restores count-and-warn. It
+ * exists as the operational parachute for a false positive in production —
+ * a refused customer read must have a same-minute mitigation — not as a
+ * lifestyle. A checker FAULT (a bug in this module) never refuses a read;
+ * only a found violation does.
  *
  * ## What it deliberately does not do
  *
@@ -56,12 +55,38 @@ export interface ConventionViolation {
 /**
  * Whether a violation refuses the query instead of counting it.
  *
- * Off unless explicitly set. Read once at module load so a single query cannot
- * pay for an env lookup, and so the value is the same for every read in a
- * process.
+ * On unless `LANGWATCH_CLICKHOUSE_CONVENTION_GATE=warn` relaxes it. Read once
+ * at module load so a single query cannot pay for an env lookup, and so the
+ * value is the same for every read in a process.
  */
 export const CONVENTION_GATE_THROWS =
-  process.env.LANGWATCH_CLICKHOUSE_CONVENTION_GATE === "throw";
+  process.env.LANGWATCH_CLICKHOUSE_CONVENTION_GATE !== "warn";
+
+/**
+ * A read the gate refused: it cannot prune partitions, or it carries no
+ * tenant predicate.
+ *
+ * Fix it at the call site. Bound the query on the table's partition column
+ * with the real time range. If no range exists for this read, make the
+ * statement explicit with `retentionBound()` from ./retention-bound.ts and
+ * splice its fragment and params into the query.
+ */
+export class UnprunedClickHouseReadError extends Error {
+  readonly violations: readonly ConventionViolation[];
+
+  constructor(violations: readonly ConventionViolation[]) {
+    super(
+      `ClickHouse read refused: ${violations
+        .map(({ table, rule }) => `${table} ${rule}`)
+        .join(", ")}. Bound the query on the table's partition column, or ` +
+        `state the unbounded intent with retentionBound() ` +
+        `(app-layer/clients/clickhouse/retention-bound.ts). ` +
+        `Emergency relax: LANGWATCH_CLICKHOUSE_CONVENTION_GATE=warn.`,
+    );
+    this.name = "UnprunedClickHouseReadError";
+    this.violations = violations;
+  }
+}
 
 /** Strip line and block comments so they can't hide or fake a predicate. */
 function stripComments(sql: string): string {
@@ -182,4 +207,43 @@ export function detectColdScan(query: string): CatalogueTable | null {
     (violation) => violation.rule === "partition_predicate",
   );
   return cold?.table ?? null;
+}
+
+/**
+ * The one enforcement decision, shared by every client funnel: the packages
+ * client (injected at construction), and the legacy resilient client.
+ *
+ * A found violation counts, logs, and — by default — refuses the read with
+ * {@link UnprunedClickHouseReadError}. A fault in the checker itself never
+ * refuses: the check must not be able to take down a healthy read.
+ * `onViolation` is the metrics seam; the caller wires the counter so this
+ * module stays importable without the app's registry.
+ */
+export function enforceConventions(
+  sql: string,
+  hooks?: {
+    onViolation?: (violation: ConventionViolation) => void;
+    warn?: (violations: readonly ConventionViolation[]) => void;
+  },
+  /** Injectable for tests; the process-wide constant everywhere else. */
+  refuse: boolean = CONVENTION_GATE_THROWS,
+): void {
+  let violations: ConventionViolation[];
+  try {
+    violations = findConventionViolations(sql);
+  } catch {
+    return;
+  }
+  if (violations.length === 0) return;
+
+  try {
+    for (const violation of violations) hooks?.onViolation?.(violation);
+    hooks?.warn?.(violations);
+  } catch {
+    // Reporting faults never change the verdict.
+  }
+
+  if (refuse) {
+    throw new UnprunedClickHouseReadError(violations);
+  }
 }

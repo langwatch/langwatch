@@ -6,10 +6,7 @@ import {
   incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
-import {
-  CONVENTION_GATE_THROWS,
-  findConventionViolations,
-} from "./convention-gate";
+import { enforceConventions } from "./convention-gate";
 import {
   TRANSIENT_NETWORK_CODES,
   translateClickHouseQueryError,
@@ -247,58 +244,34 @@ function logSuccess({
 }
 
 /**
- * Counts the conventions a read breaks, BEFORE it is sent.
+ * The gate check for the LEGACY driver funnel, BEFORE the query is sent.
  *
- * Before the query rather than after it for two reasons. A read that fails —
- * timed out, memory limit — is exactly the read most likely to have been
- * unprunable, and checking on the success path never saw those at all. And a
- * gate that is eventually allowed to refuse has to refuse before the cost is
- * paid, or it is not a gate.
- *
- * Counting only: this never throws unless {@link CONVENTION_GATE_THROWS} is
- * explicitly turned on, which it is not anywhere by default. See
- * ./convention-gate.ts for why, and for the progression past counting.
- *
- * Wrapped so that a fault in the checker can never fail a customer's query.
- * The check is advisory; the read is the product.
+ * The new packages client gets the same gate injected at construction; this
+ * path exists for the driver-based clients that have not migrated yet. One
+ * decision function serves both — see enforceConventions.
  */
 function countConventionViolations(params: unknown): void {
-  try {
-    const query = extractRawQuery(params);
-    const violations = findConventionViolations(query);
-    if (violations.length === 0) return;
-
-    const meta = safeQueryMeta(params);
-
-    for (const { table, rule } of violations) {
-      incrementConventionViolation(table, rule);
-    }
-
-    queryLogger.warn(
-      {
-        source: "clickhouse",
-        operation: "query",
-        queryId: meta.queryId,
-        table: meta.table,
-        paramKeys: meta.paramKeys,
-        query: extractQueryPreview(params),
-        conventionViolations: violations,
-      },
-      `ClickHouse convention violation: ${violations
-        .map(({ table, rule }) => `${table} ${rule}`)
-        .join(", ")}`,
-    );
-
-    if (CONVENTION_GATE_THROWS) {
-      const summary = violations
-        .map(({ table, rule }) => `${table} ${rule}`)
-        .join(", ");
-      throw new Error(`ClickHouse query breaks a convention: ${summary}`);
-    }
-  } catch (error) {
-    if (CONVENTION_GATE_THROWS) throw error;
-    logger.error({ error }, "Failed to check ClickHouse query conventions");
-  }
+  const query = extractRawQuery(params);
+  enforceConventions(query, {
+    onViolation: ({ table, rule }) => incrementConventionViolation(table, rule),
+    warn: (violations) => {
+      const meta = safeQueryMeta(params);
+      queryLogger.warn(
+        {
+          source: "clickhouse",
+          operation: "query",
+          queryId: meta.queryId,
+          table: meta.table,
+          paramKeys: meta.paramKeys,
+          query: extractQueryPreview(params),
+          conventionViolations: violations,
+        },
+        `ClickHouse convention violation: ${violations
+          .map(({ table, rule }) => `${table} ${rule}`)
+          .join(", ")}`,
+      );
+    },
+  });
 }
 
 /**

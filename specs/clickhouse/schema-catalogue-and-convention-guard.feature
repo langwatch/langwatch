@@ -20,11 +20,14 @@ Feature: The schema catalogue is the one description of our tables, and it is en
   checked before the code ever runs, which also reaches the paths no test
   exercises.
 
-  The runtime side ships counting only. Nobody knows yet how many reads of the
-  newly-visible tables actually violate a rule in production, and turning an
-  unmeasured guard into a thrown error is how a guard takes down the thing it was
-  meant to protect. So it counts, and the decision to refuse comes after the
-  counter has been read. (ADR-068 took the same measure-then-limit line.)
+  The runtime side refuses by default. The gate shipped counting-only first,
+  measure-then-limit (ADR-068's line); the refusal followed as an owner
+  decision (2026-07-31): a non-bounded ClickHouse call must be impossible by
+  default. A read with a real time range bounds on it. A read with none makes
+  the statement explicit with retentionBound() and gets a real predicate at
+  the widest range a live row can occupy — the retention window plus the
+  lazy-TTL cushion. LANGWATCH_CLICKHOUSE_CONVENTION_GATE=warn restores
+  count-and-warn as the operational parachute, not as a lifestyle.
 
   # ---------------------------------------------------------------------------
   # The catalogue, pinned to the migrations
@@ -155,13 +158,15 @@ Feature: The schema catalogue is the one description of our tables, and it is en
       When each is inspected
       Then each names the rule it excuses and the reason it is sound
 
-  Rule: The gate counts and does not refuse
+  Rule: The gate refuses by default
 
     @unit
-    Scenario: a violating read is counted rather than refused
+    Scenario: a violating read is refused before it is sent
       Given the gate is at its default setting
       When a read that violates a rule is checked
-      Then the violation is counted and the read is allowed to proceed
+      Then the read is refused before any cost is paid
+      And the violation is still counted
+      And the refusal names the fix and the statement API
 
     @unit
     Scenario: the counter records the table and the rule separately
@@ -176,10 +181,23 @@ Feature: The schema catalogue is the one description of our tables, and it is en
       Then the violation is still counted
 
     @unit
-    Scenario: refusing can be turned on, and is off unless it is
-      Given the gate is configured to refuse
+    Scenario: warn mode counts without refusing, as the operational parachute
+      Given the gate is relaxed to warn
       When a read that violates a rule is checked
-      Then the read is refused before it is sent
+      Then the violation is counted and the read is allowed to proceed
+
+    @unit
+    Scenario: a checker fault never refuses a read
+      Given the violation checker itself throws
+      When a read is checked
+      Then the read is allowed to proceed
+
+    @unit
+    Scenario: a read with no estimable time range states it and passes
+      Given a read whose only predicate is the retentionBound statement
+      When the read is checked
+      Then no partition violation is found
+      And the bound sits at the retention window plus the lazy-TTL cushion
 
     @unit
     Scenario: a write is not judged by the read rules

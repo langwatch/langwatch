@@ -513,8 +513,14 @@ describe("given clickhouseReplacing()", () => {
       expect(sql).toContain(
         "WHERE TenantId = {tenantId:String} AND AggregateId = {key0:String}",
       );
+      // Every read carries the retention lower bound on the partition column.
+      expect(sql).toContain("AND AcceptedAt >= {retentionFrom:DateTime64(3)}");
       expect(sql).toContain("ORDER BY WrittenAt DESC LIMIT 1");
-      expect(valueParams(call)).toEqual({ tenantId: TENANT, key0: KEY });
+      expect(valueParams(call)).toEqual({
+        tenantId: TENANT,
+        key0: KEY,
+        retentionFrom: expect.any(Date),
+      });
     });
   });
 
@@ -1024,6 +1030,7 @@ describe("given a table whose engine key is composite", () => {
       tenantId: TENANT,
       key0: "run-1",
       key1: "exp-1",
+      retentionFrom: expect.any(Date),
     });
   });
 

@@ -391,18 +391,20 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when a query breaks a ClickHouse convention", () => {
-    it("warns naming the table and the rule", async () => {
+    it("refuses before the driver, warning with the table and the rule", async () => {
       const queryResult = { response_headers: {} };
-      const mock = makeMockClient({
-        query: vi.fn().mockResolvedValue(queryResult),
-      });
+      const driverQuery = vi.fn().mockResolvedValue(queryResult);
+      const mock = makeMockClient({ query: driverQuery });
       const client = createResilientClickHouseClient({ client: mock });
 
-      await client.query({
-        query:
-          "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
-      });
+      await expect(
+        client.query({
+          query:
+            "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
+        }),
+      ).rejects.toThrow(/stored_spans partition_predicate/);
 
+      expect(driverQuery).not.toHaveBeenCalled();
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",

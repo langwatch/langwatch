@@ -12694,6 +12694,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -12721,6 +12724,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -12833,6 +12839,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -12921,6 +12930,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -13026,6 +13038,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -13041,6 +13056,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -13474,6 +13492,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -13523,46 +13544,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    scope: {
-                        /** @constant */
-                        kind: "ORGANIZATION";
-                        organization_id: string;
-                    } | {
-                        /** @constant */
-                        kind: "TEAM";
-                        team_id: string;
-                    } | {
-                        /** @constant */
-                        kind: "PROJECT";
-                        project_id: string;
-                    } | {
-                        /** @constant */
-                        kind: "VIRTUAL_KEY";
-                        virtual_key_id: string;
-                    } | {
-                        /** @constant */
-                        kind: "PRINCIPAL";
-                        principal_user_id: string;
-                    } | {
-                        /** @constant */
-                        kind: "GROUP";
-                        group_id: string;
-                    };
-                    name: string;
-                    description?: string;
-                    /** @enum {string} */
-                    window: "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
-                    limit_usd: number | string;
-                    /** @enum {string} */
-                    on_breach?: "BLOCK" | "WARN";
-                    timezone?: string | null;
-                    provider_key?: string | null;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Budget created */
             201: {
@@ -13607,6 +13589,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };
@@ -14127,6 +14112,9 @@ export interface operations {
                             type: string;
                             code: string;
                             message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
                         };
                     };
                 };

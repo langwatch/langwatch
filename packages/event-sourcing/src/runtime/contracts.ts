@@ -31,6 +31,13 @@ export interface EventLogScan {
   readonly aggregateId?: string;
   readonly occurredFrom?: number;
   readonly occurredTo?: number;
+  /**
+   * Widens the store's fallback lower bound for a scan with no
+   * `occurredFrom`. The store bounds such a scan at the default retention
+   * window; a tenant with a longer configured retention passes it here, or
+   * a replay misses their oldest live events.
+   */
+  readonly retentionDays?: number;
 }
 
 export interface EventLog {

@@ -63,6 +63,12 @@ function rowToEvent(row: EventLogRow): CommittedEvent {
   };
 }
 
+/** The `_retention_days` column default: the widest value a row gets without an override. */
+const DEFAULT_RETENTION_DAYS = 308;
+/** TTL deletes lazily. A row can outlive its retention by merge lag; the cushion keeps it readable until the delete lands. */
+const TTL_LAG_CUSHION_DAYS = 31;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export function clickhouseEventLog(args: ClickHouseEventLogArgs): EventLog {
   const { client } = args;
   const codec = args.codec ?? createRowCodec();
@@ -108,13 +114,23 @@ export function clickhouseEventLog(args: ClickHouseEventLogArgs): EventLog {
         params.aggregateId = query.aggregateId;
       }
       // Bounding the partition column whenever a range is given is what keeps
-      // a replay off cold storage (ADR-109 decision 5) — omitted entirely
-      // when neither bound is given, rather than a wide default range.
+      // a replay off cold storage (ADR-109 decision 5). A scan with no lower
+      // bound falls back to the retention window plus the lazy-TTL cushion:
+      // no live event sits past it, and an unbounded scan of every cold
+      // partition is the read class the convention gate refuses.
       if (query.occurredFrom !== undefined) {
         conditions.push(
           `${names.of("EventOccurredAt")} >= {occurredFrom:UInt64}`,
         );
         params.occurredFrom = query.occurredFrom;
+      } else {
+        conditions.push(
+          `${names.of("EventOccurredAt")} >= {retentionFrom:UInt64}`,
+        );
+        const days =
+          Math.max(query.retentionDays ?? 0, DEFAULT_RETENTION_DAYS) +
+          TTL_LAG_CUSHION_DAYS;
+        params.retentionFrom = String(Date.now() - days * DAY_MS);
       }
       if (query.occurredTo !== undefined) {
         conditions.push(

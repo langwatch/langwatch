@@ -527,6 +527,14 @@ export interface ClickHouseClientConfig {
    * from the rest of this config.
    */
   readonly transport?: ClickHouseTransport;
+  /**
+   * Pre-flight check for every `query` and `stream` SQL, before any cost is
+   * paid. The app injects its convention gate here, which refuses a read
+   * that cannot prune partitions. Throw to refuse the read. This package
+   * stays schema-agnostic; the catalogue of partitioned tables lives with
+   * the app that owns them.
+   */
+  readonly gate?: (sql: string) => void;
 }
 
 export interface QueryOptions {
@@ -718,6 +726,9 @@ export function createClickHouseClient(
 
   return {
     async query(options) {
+      // The gate refuses before the bulkhead: a refused read must not cost
+      // a slot, a connection, or a retry.
+      config.gate?.(options.sql);
       return bulkhead.run(options.tenantId, () =>
         runWithRetry({
           operation: { kind: "select" },
@@ -745,6 +756,7 @@ export function createClickHouseClient(
       // held for the lifetime of the returned iterable, released whether the
       // caller consumes it fully, breaks early, or throws.
       const tenantId = options.tenantId;
+      config.gate?.(options.sql);
       async function* run(): AsyncIterable<unknown[][]> {
         // A stream is never retried, so its family has exactly one attempt.
         const queryId = attemptQueryId(deriveQueryIdFamily(), 1);

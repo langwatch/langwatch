@@ -1,6 +1,6 @@
 /**
- * The gate's wiring: that it runs on every read, runs BEFORE the read, and
- * counts rather than refuses.
+ * The gate's wiring: it runs on every read, runs BEFORE the read, and
+ * refuses by default.
  *
  * Separate from convention-gate.unit.test.ts, which tests the rules themselves
  * against query text. This file tests the thing that is easy to get wrong and
@@ -9,13 +9,19 @@
  * examined at all.
  *
  * The counter is read out of the real prom-client registry rather than mocked,
- * because the metric's name and labels ARE the deliverable here: they are what
- * gets queried before anyone decides to make the gate refuse anything.
+ * because the metric's name and labels ARE the deliverable: they are what an
+ * operator queries when a refusal fires.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { register } from "prom-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CONVENTION_GATE_THROWS } from "../../clickhouse/convention-gate";
+import {
+  CONVENTION_GATE_THROWS,
+  enforceConventions,
+  findConventionViolations,
+  UnprunedClickHouseReadError,
+} from "../../clickhouse/convention-gate";
+import { retentionBound } from "../../clickhouse/retention-bound";
 import { createResilientClickHouseClient } from "../../clickhouse/resilient-client";
 
 /** A read of a catalogued table with neither a partition nor a tenant filter. */
@@ -54,61 +60,59 @@ describe("the convention gate's wiring", () => {
   });
 
   describe("given a read that violates a rule", () => {
-    /** @scenario "a violating read is counted rather than refused" */
-    it("lets the read through and counts it", async () => {
+    /** @scenario a violating read is refused before it is sent */
+    it("refuses before the driver is called, counts, and names the fix", async () => {
       const query = vi.fn().mockResolvedValue({ rows: [] });
       const client = createResilientClickHouseClient({
         client: clientThat(query),
       });
 
-      await expect(client.query({ query: VIOLATING_READ })).resolves.toEqual({
-        rows: [],
-      });
-      expect(query).toHaveBeenCalledOnce();
+      await expect(client.query({ query: VIOLATING_READ })).rejects.toThrow(
+        UnprunedClickHouseReadError,
+      );
+      await expect(client.query({ query: VIOLATING_READ })).rejects.toThrow(
+        /retentionBound/,
+      );
+      expect(query).not.toHaveBeenCalled();
       expect(
         await violationCount({
           table: "stored_spans",
           rule: "partition_predicate",
         }),
-      ).toBe(1);
+      ).toBeGreaterThan(0);
     });
 
-    /** @scenario "the counter records the table and the rule separately" */
-    it("counts each broken rule against the table on its own series", async () => {
-      const client = createResilientClickHouseClient({
-        client: clientThat(vi.fn().mockResolvedValue({ rows: [] })),
+    /** @scenario the counter records the table and the rule separately */
+    it("counts each broken rule against the table on its own series", () => {
+      const seen: Array<{ table: string; rule: string }> = [];
+      expect(() =>
+        enforceConventions(VIOLATING_READ, {
+          onViolation: (violation) => seen.push(violation),
+        }),
+      ).toThrow(UnprunedClickHouseReadError);
+
+      expect(seen).toContainEqual({
+        table: "stored_spans",
+        rule: "partition_predicate",
       });
-
-      await client.query({ query: VIOLATING_READ });
-
-      // Both rules are broken by this one read, and each lands on its own
-      // series so one table's offences can be ranked without the other's.
-      expect(
-        await violationCount({
-          table: "stored_spans",
-          rule: "partition_predicate",
-        }),
-      ).toBe(1);
-      expect(
-        await violationCount({
-          table: "stored_spans",
-          rule: "tenant_predicate",
-        }),
-      ).toBe(1);
+      expect(seen).toContainEqual({
+        table: "stored_spans",
+        rule: "tenant_predicate",
+      });
     });
 
-    /** @scenario "a read is checked before it is sent, not after it returns" */
-    it("counts a read that then fails against the database", async () => {
+    /** @scenario a read is checked before it is sent, not after it returns */
+    it("counts and refuses without ever reaching the database", async () => {
+      const query = vi.fn().mockRejectedValue(new Error("nope"));
       const client = createResilientClickHouseClient({
-        client: clientThat(vi.fn().mockRejectedValue(new Error("nope"))),
+        client: clientThat(query),
         maxRetries: 0,
       });
 
-      await expect(client.query({ query: VIOLATING_READ })).rejects.toThrow();
-
-      // The whole point of moving the check off the success path: a read that
-      // fails is the read most likely to have been unprunable, and the old
-      // detector never saw one.
+      await expect(client.query({ query: VIOLATING_READ })).rejects.toThrow(
+        UnprunedClickHouseReadError,
+      );
+      expect(query).not.toHaveBeenCalled();
       expect(
         await violationCount({
           table: "stored_spans",
@@ -119,38 +123,87 @@ describe("the convention gate's wiring", () => {
   });
 
   describe("given a read that breaks nothing", () => {
-    it("counts nothing", async () => {
+    it("counts nothing and lets the read through", async () => {
+      const query = vi.fn().mockResolvedValue({ rows: [] });
       const client = createResilientClickHouseClient({
-        client: clientThat(vi.fn().mockResolvedValue({ rows: [] })),
+        client: clientThat(query),
       });
 
       await client.query({ query: CLEAN_READ });
 
+      expect(query).toHaveBeenCalledOnce();
       expect(
         await violationCount({
           table: "stored_spans",
           rule: "partition_predicate",
         }),
       ).toBe(0);
-      expect(
-        await violationCount({
-          table: "stored_spans",
-          rule: "tenant_predicate",
-        }),
-      ).toBe(0);
     });
   });
 
-  describe("given the refusing mode", () => {
-    /** @scenario "refusing can be turned on, and is off unless it is" */
-    it("is off unless the environment turns it on", () => {
-      // Off in dev, in test and in production. Turning it on is step 3 of the
-      // progression documented in convention-gate.ts, and step 1 — reading the
-      // counter for a release — has not happened yet.
-      expect(CONVENTION_GATE_THROWS).toBe(false);
+  describe("given the gate's default mode", () => {
+    it("refuses unless the environment relaxes it to warn", () => {
+      expect(CONVENTION_GATE_THROWS).toBe(true);
       expect(
         process.env.LANGWATCH_CLICKHOUSE_CONVENTION_GATE ?? "unset",
-      ).not.toBe("throw");
+      ).not.toBe("warn");
+    });
+  });
+
+  describe("given warn mode", () => {
+    /** @scenario warn mode counts without refusing, as the operational parachute */
+    it("counts the violation and lets the read proceed", () => {
+      const seen: Array<{ table: string; rule: string }> = [];
+      expect(() =>
+        enforceConventions(
+          VIOLATING_READ,
+          { onViolation: (violation) => seen.push(violation) },
+          false,
+        ),
+      ).not.toThrow();
+      expect(seen.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given a fault in the reporting hooks", () => {
+    /** @scenario a checker fault never refuses a read */
+    it("still applies the verdict of the check, never the fault", () => {
+      // A hook fault must not change the verdict: the violation still refuses.
+      expect(() =>
+        enforceConventions(VIOLATING_READ, {
+          onViolation: () => {
+            throw new Error("registry down");
+          },
+        }),
+      ).toThrow(UnprunedClickHouseReadError);
+      // And a clean read stays clean even with faulting hooks wired.
+      expect(() =>
+        enforceConventions(CLEAN_READ, {
+          onViolation: () => {
+            throw new Error("registry down");
+          },
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("given a read with no estimable time range", () => {
+    /** @scenario a read with no estimable time range states it and passes */
+    it("passes the gate with the retentionBound statement spliced in", () => {
+      const bound = retentionBound({ column: "StartTime" });
+      const sql =
+        "SELECT SpanId FROM stored_spans " +
+        `WHERE TenantId = {tenantId:String} ${bound.fragment}`;
+
+      expect(findConventionViolations(sql)).toEqual([]);
+
+      // The bound sits at the widest range a live row can occupy: the
+      // retention window plus the lazy-TTL cushion.
+      const from = bound.params.retentionBoundFrom;
+      expect(from).toBeInstanceOf(Date);
+      const days = (Date.now() - (from as Date).getTime()) / 86_400_000;
+      expect(days).toBeGreaterThan(308);
+      expect(days).toBeLessThan(341);
     });
   });
 });

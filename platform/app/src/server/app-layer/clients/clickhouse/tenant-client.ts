@@ -39,13 +39,8 @@ import type { ClickHouseClient, WriteTarget } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
-  incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
-import {
-  CONVENTION_GATE_THROWS,
-  findConventionViolations,
-} from "./convention-gate";
 import { translateClickHouseQueryError } from "./translate-query-error";
 import { queryWindowed } from "./windowed-read";
 import { decodeWireRows } from "./wire-rows";
@@ -151,51 +146,6 @@ export type ClickHouseClientResolver = (
 ) => Promise<TenantClickHouseClient>;
 
 /**
- * Counts the conventions a read breaks, before it is sent.
- *
- * Before rather than after, for the reason the gate has always given: a read
- * that fails is the one most likely to have been unprunable, and a gate that
- * is eventually allowed to refuse has to refuse before the cost is paid.
- *
- * Counting only — this throws only when {@link CONVENTION_GATE_THROWS} is on,
- * which it is nowhere by default. Wrapped so a fault in the checker can never
- * fail a customer's query: the check is advisory, the read is the product.
- */
-function countConventionViolations(sql: string, table: string): void {
-  try {
-    const violations = findConventionViolations(sql);
-    if (violations.length === 0) return;
-
-    for (const violation of violations) {
-      incrementConventionViolation(violation.table, violation.rule);
-    }
-
-    queryLogger.warn(
-      {
-        source: "clickhouse",
-        operation: "query",
-        table,
-        conventionViolations: violations,
-      },
-      `ClickHouse convention violation: ${violations
-        .map(({ table: t, rule }) => `${t} ${rule}`)
-        .join(", ")}`,
-    );
-
-    if (CONVENTION_GATE_THROWS) {
-      throw new Error(
-        `ClickHouse query breaks a convention: ${violations
-          .map(({ table: t, rule }) => `${t} ${rule}`)
-          .join(", ")}`,
-      );
-    }
-  } catch (error) {
-    if (CONVENTION_GATE_THROWS) throw error;
-    logger.error({ error }, "Failed to check ClickHouse query conventions");
-  }
-}
-
-/**
  * The column order for a positional insert: every key any row carries, in the
  * order they were first seen.
  *
@@ -239,7 +189,6 @@ async function runQuery<T>(args: {
 }): Promise<T[]> {
   const { client, tenantId, request } = args;
   const table = request.table ?? "unknown";
-  countConventionViolations(request.sql, table);
 
   const start = performance.now();
   try {
