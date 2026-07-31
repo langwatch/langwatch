@@ -48,66 +48,100 @@ export interface WebhookEnvelope {
  * the rename happens here and only here. `metadata` is the caller's echo,
  * parsed back to an object when it holds one.
  */
+/** The wire event type, the envelope id's suffix, and the payload's own
+ *  `status`, all three of which a row's lifecycle status decides together. */
+function envelopeKind(status: SpendEventRow["status"]): {
+  type: string;
+  idSuffix: string;
+  payloadStatus: string;
+} {
+  switch (status) {
+    case "admitted":
+      return {
+        type: "gateway.request.admitted",
+        idSuffix: "admitted",
+        payloadStatus: "admitted",
+      };
+    case "settled":
+      return {
+        type: "gateway.request.settled",
+        idSuffix: "settled",
+        payloadStatus: "settled",
+      };
+    case "failed":
+      return {
+        type: "gateway.request.completed",
+        idSuffix: "completed",
+        payloadStatus: "error",
+      };
+    case "confirmed":
+      return {
+        type: "gateway.request.completed",
+        idSuffix: "completed",
+        payloadStatus: "success",
+      };
+  }
+}
+
+/** The identity fields, with the log's empty strings mapped to the null
+ *  the external contract uses for absent. */
+function envelopeIdentity(row: SpendEventRow): Record<string, unknown> {
+  return {
+    organization_id: row.organizationId,
+    project_id: row.tenantId,
+    virtual_key_id: row.virtualKeyId,
+    principal_user_id: row.principalUserId || null,
+    end_user_id: row.endUserId || null,
+    trace_id: row.traceId,
+    model: row.model || null,
+    model_provider_id: row.providerKey || null,
+    request_type: row.requestType || null,
+  };
+}
+
+/** Usage and cost as the wire carries them, for the rows that know both. */
+function envelopeQuantities(row: SpendEventRow): {
+  usage: Record<string, number>;
+  cost: Record<string, unknown>;
+} {
+  return {
+    usage: {
+      input_tokens: row.tokensInput,
+      output_tokens: row.tokensOutput,
+      cache_read_input_tokens: row.tokensCacheRead,
+      cache_creation_input_tokens: row.tokensCacheWrite,
+      reasoning_tokens: row.tokensReasoning,
+    },
+    cost: {
+      total_usd: row.costUsd,
+      nano_usd: row.costNanoUsd,
+      rate_version: row.rateVersion || null,
+    },
+  };
+}
+
 export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
-  const type =
-    row.status === "admitted"
-      ? "gateway.request.admitted"
-      : row.status === "settled"
-        ? "gateway.request.settled"
-        : "gateway.request.completed";
-  const idSuffix =
-    row.status === "admitted"
-      ? "admitted"
-      : row.status === "settled"
-        ? "settled"
-        : "completed";
+  const { type, idSuffix, payloadStatus } = envelopeKind(row.status);
   const settled = row.status === "settled";
   // Both in-flight and settled rows have no known quantities or cost.
   const unknownQuantities = settled || row.status === "admitted";
+  const quantities = envelopeQuantities(row);
+  const eventId = `${row.gatewayRequestId}:${idSuffix}`;
   return {
-    id: `${row.gatewayRequestId}:${idSuffix}`,
+    id: eventId,
     type,
     created: row.occurredAt.toISOString(),
     schema_version: "1",
     data: {
-      event_id: `${row.gatewayRequestId}:${idSuffix}`,
+      event_id: eventId,
       event_type: type,
       /** The join key across the settled/completed pair. */
       gateway_request_id: row.gatewayRequestId,
       occurred_at: row.occurredAt.toISOString(),
-      organization_id: row.organizationId,
-      project_id: row.tenantId,
-      virtual_key_id: row.virtualKeyId,
-      principal_user_id: row.principalUserId || null,
-      end_user_id: row.endUserId || null,
-      trace_id: row.traceId,
-      model: row.model || null,
-      model_provider_id: row.providerKey || null,
-      request_type: row.requestType || null,
-      usage: unknownQuantities
-        ? null
-        : {
-            input_tokens: row.tokensInput,
-            output_tokens: row.tokensOutput,
-            cache_read_input_tokens: row.tokensCacheRead,
-            cache_creation_input_tokens: row.tokensCacheWrite,
-            reasoning_tokens: row.tokensReasoning,
-          },
-      cost: unknownQuantities
-        ? null
-        : {
-            total_usd: row.costUsd,
-            nano_usd: row.costNanoUsd,
-            rate_version: row.rateVersion || null,
-          },
-      status:
-        row.status === "confirmed"
-          ? "success"
-          : row.status === "failed"
-            ? "error"
-            : row.status === "admitted"
-              ? "admitted"
-              : "settled",
+      ...envelopeIdentity(row),
+      usage: unknownQuantities ? null : quantities.usage,
+      cost: unknownQuantities ? null : quantities.cost,
+      status: payloadStatus,
       needs_reconciliation: settled ? true : null,
       settle_reason: settled ? row.settleReason || null : null,
       error: row.errorClass

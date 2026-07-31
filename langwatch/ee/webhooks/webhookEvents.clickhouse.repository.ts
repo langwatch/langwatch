@@ -9,6 +9,52 @@ import {
 
 const SPEND_TABLE = "gateway_spend" as const;
 
+/**
+ * The row statuses an emitted-type filter selects: completed covers the
+ * confirmed and failed outcomes, settled is its own stream. Admitted rows
+ * are in-flight requests, never emitted events, so they are always
+ * excluded. An unknown type contributes no status, which yields an empty
+ * page (forward-compatible probing).
+ */
+function rowStatusesFor(types?: string[]): string[] {
+  if (!types) return ["confirmed", "failed", "settled"];
+  const statusesOfType = (type: string): string[] => {
+    if (type === "gateway.request.completed") return ["confirmed", "failed"];
+    if (type === "gateway.request.settled") return ["settled"];
+    return [];
+  };
+  return [...new Set(types.flatMap(statusesOfType))];
+}
+
+/** The optional WHERE fragments and the parameters they bind: the time
+ *  window, then the cursor position. Order matters only for readability of
+ *  the generated SQL. */
+function pageFilters(params: {
+  fromMs?: number;
+  toMs?: number;
+  cursor?: string | null;
+}): { clauses: string[]; queryParams: Record<string, number | string> } {
+  const clauses: string[] = [];
+  const queryParams: Record<string, number | string> = {};
+  if (params.fromMs !== undefined) {
+    clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+    queryParams.fromMs = params.fromMs;
+  }
+  if (params.toMs !== undefined) {
+    clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+    queryParams.toMs = params.toMs;
+  }
+  const decoded = params.cursor ? decodeCursor(params.cursor) : null;
+  if (decoded) {
+    clauses.push(
+      "AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+    );
+    queryParams.cursorOccurredAtMs = decoded.occurredAtMs;
+    queryParams.cursorRequestId = decoded.gatewayRequestId;
+  }
+  return { clauses, queryParams };
+}
+
 export interface EmittedEventsPage {
   rows: SpendEventRow[];
   /** Opaque continuation: pass back to read the next page; null at the end. */
@@ -51,33 +97,11 @@ export class WebhookEventsClickHouseRepository {
   }): Promise<EmittedEventsPage> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
 
-    // The emitted-type filter maps to row statuses: completed covers the
-    // confirmed and failed outcomes, settled is its own stream. Admitted
-    // rows are in-flight and never emitted, so they are always excluded.
-    const statusesFor = (t: string): string[] =>
-      t === "gateway.request.completed"
-        ? ["confirmed", "failed"]
-        : t === "gateway.request.settled"
-          ? ["settled"]
-          : [];
-    const statuses = types
-      ? [...new Set(types.flatMap(statusesFor))]
-      : ["confirmed", "failed", "settled"];
+    const statuses = rowStatusesFor(types);
     if (statuses.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
 
-    const decoded = cursor ? decodeCursor(cursor) : null;
-    const cursorClause = decoded
-      ? `AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})`
-      : "";
-    const fromClause =
-      fromMs !== undefined
-        ? `AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})`
-        : "";
-    const toClause =
-      toMs !== undefined
-        ? `AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})`
-        : "";
+    const { clauses, queryParams } = pageFilters({ fromMs, toMs, cursor });
 
     const result = await client.query({
       query: `
@@ -85,23 +109,14 @@ export class WebhookEventsClickHouseRepository {
         FROM ${SPEND_TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
           AND Status IN {statuses:Array(String)}
-          ${fromClause}
-          ${toClause}
-          ${cursorClause}
+          ${clauses.join("\n          ")}
         ORDER BY OccurredAt DESC, GatewayRequestId DESC
         LIMIT {limit:UInt32}
       `,
       query_params: {
         tenantIds,
         statuses,
-        ...(fromMs !== undefined ? { fromMs } : {}),
-        ...(toMs !== undefined ? { toMs } : {}),
-        ...(decoded
-          ? {
-              cursorOccurredAtMs: decoded.occurredAtMs,
-              cursorRequestId: decoded.gatewayRequestId,
-            }
-          : {}),
+        ...queryParams,
         limit,
       },
       format: "JSONEachRow",

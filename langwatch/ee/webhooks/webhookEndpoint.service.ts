@@ -536,45 +536,82 @@ export class WebhookEndpointService {
       return;
     }
 
-    // A streak starts at the FIRST failure and is never restarted by a
-    // concurrent one: the conditional update only writes failingSince where
-    // it is currently null.
+    const failingSince = await this.openFailureStreak({
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+      knownFailingSince: endpoint.failingSince,
+      now,
+    });
+    await this.autoDisableIfStreakExpired({
+      organizationId: params.organizationId,
+      endpoint,
+      failingSince,
+      now,
+    });
+  }
+
+  /**
+   * Open (or keep) the endpoint's failure streak and answer when it
+   * started.
+   *
+   * A streak starts at the FIRST failure and is never restarted by a
+   * concurrent one: the conditional update only writes failingSince where
+   * it is currently null. If that write lost the race (read null, wrote
+   * nothing), another attempt owns the start, so it is read back rather
+   * than assumed.
+   */
+  private async openFailureStreak(params: {
+    organizationId: string;
+    endpointId: string;
+    knownFailingSince: Date | null;
+    now: Date;
+  }): Promise<Date> {
     const started = await this.deps.prisma.webhookEndpoint.updateMany({
       where: {
         id: params.endpointId,
         organizationId: params.organizationId,
         failingSince: null,
       },
-      data: { failingSince: now },
+      data: { failingSince: params.now },
     });
     await this.deps.prisma.webhookEndpoint.updateMany({
       where: { id: params.endpointId, organizationId: params.organizationId },
-      data: { lastFailureAt: now },
+      data: { lastFailureAt: params.now },
     });
 
-    // The 72h threshold must judge the streak start that actually
-    // persisted. If the conditional write lost a race (read null, wrote
-    // nothing), another attempt owns the start; read it back.
-    let failingSince = endpoint.failingSince ?? now;
-    if (endpoint.failingSince === null && started.count === 0) {
-      const fresh = await this.deps.prisma.webhookEndpoint.findFirst({
-        where: { id: params.endpointId, organizationId: params.organizationId },
-        select: { failingSince: true },
-      });
-      failingSince = fresh?.failingSince ?? now;
+    if (params.knownFailingSince !== null || started.count > 0) {
+      return params.knownFailingSince ?? params.now;
     }
+    const fresh = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+      select: { failingSince: true },
+    });
+    return fresh?.failingSince ?? params.now;
+  }
+
+  /**
+   * The 72h auto-disable, judged against the streak start that actually
+   * persisted. The disable is a compare-and-set on status, so exactly one
+   * of any concurrent failing attempts flips it, and only that one
+   * notifies.
+   */
+  private async autoDisableIfStreakExpired(params: {
+    organizationId: string;
+    endpoint: { id: string; url: string };
+    failingSince: Date;
+    now: Date;
+  }): Promise<void> {
+    const { organizationId, endpoint, failingSince, now } = params;
     if (
       now.getTime() - failingSince.getTime() <
       WEBHOOK_AUTO_DISABLE_AFTER_MS
     ) {
       return;
     }
-    // The disable is a compare-and-set on status, so exactly one of any
-    // concurrent failing attempts flips it, and only that one notifies.
     const flipped = await this.deps.prisma.webhookEndpoint.updateMany({
       where: {
-        id: params.endpointId,
-        organizationId: params.organizationId,
+        id: endpoint.id,
+        organizationId,
         status: "ACTIVE",
       },
       data: {
@@ -587,22 +624,22 @@ export class WebhookEndpointService {
 
     logger.warn(
       {
-        organizationId: params.organizationId,
-        endpointId: params.endpointId,
+        organizationId,
+        endpointId: endpoint.id,
         failingSince: failingSince.toISOString(),
       },
       "webhook endpoint auto-disabled after 72h of consecutive failures",
     );
     try {
       await this.deps.notifyAutoDisabled?.({
-        organizationId: params.organizationId,
-        endpointId: params.endpointId,
+        organizationId,
+        endpointId: endpoint.id,
         url: endpoint.url,
         failingSince,
       });
     } catch (error) {
       logger.error(
-        { endpointId: params.endpointId, error },
+        { endpointId: endpoint.id, error },
         "webhook auto-disable notification failed",
       );
     }

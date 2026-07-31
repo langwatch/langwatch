@@ -88,12 +88,17 @@ function buildDefinition(d: WebhookDeliveryProcessDeps) {
   ) as ProcessDefinition<WebhookDeliveryState>;
 }
 
-function envelopeFor(
-  requestId: string,
-  eventType: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): ProcessEventEnvelope {
+function envelopeFor({
+  requestId,
+  eventType,
+  data,
+  occurredAt,
+}: {
+  requestId: string;
+  eventType: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): ProcessEventEnvelope {
   return {
     eventId: `${eventType}:${requestId}`,
     eventType,
@@ -106,10 +111,11 @@ function envelopeFor(
 }
 
 function admittedEnvelope(requestId: string): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-    {
+    eventType: GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+    occurredAt: T0,
+    data: {
       gateway_request_id: requestId,
       occurred_at: T0,
       organization_id: organization.id,
@@ -126,15 +132,15 @@ function admittedEnvelope(requestId: string): ProcessEventEnvelope {
       pod_id: "pod-1",
       pod_seq: 1,
     },
-    T0,
-  );
+  });
 }
 
 function confirmedEnvelope(requestId: string): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-    {
+    eventType: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+    occurredAt: T0 + 3000,
+    data: {
       gateway_request_id: requestId,
       occurred_at: T0 + 3000,
       tenantId: project.id,
@@ -150,15 +156,15 @@ function confirmedEnvelope(requestId: string): ProcessEventEnvelope {
       rate_version: "catalog@2026-07-26",
       duration_ms: 3878,
     },
-    T0 + 3000,
-  );
+  });
 }
 
 function failedEnvelope(requestId: string): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_FAILED_EVENT_TYPE,
-    {
+    eventType: GATEWAY_SPEND_FAILED_EVENT_TYPE,
+    occurredAt: T0 + 1500,
+    data: {
       gateway_request_id: requestId,
       occurred_at: T0 + 1500,
       tenantId: project.id,
@@ -174,27 +180,33 @@ function failedEnvelope(requestId: string): ProcessEventEnvelope {
       },
       duration_ms: 1509,
     },
-    T0 + 1500,
-  );
+  });
 }
 
 function settledEnvelope(requestId: string): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-    {
+    eventType: GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+    occurredAt: T0 + 600_000,
+    data: {
       gateway_request_id: requestId,
       occurred_at: T0 + 600_000,
       tenantId: project.id,
       reason: "confirmation_deadline_expired",
     },
-    T0 + 600_000,
-  );
+  });
 }
 
+/** A revision conflict here means the test raced its own setup, not that
+ *  the subject misbehaved, so it fails on the spot with the event that hit
+ *  it rather than as a puzzling assertion further down. */
 async function consume(envelope: ProcessEventEnvelope): Promise<void> {
   const result = await service.handleEvent({ envelope, now: clock });
-  expect(result.outcome).not.toBe("revisionConflict");
+  if (result.outcome === "revisionConflict") {
+    throw new Error(
+      `process manager hit a revision conflict consuming ${envelope.eventType} for ${envelope.processKey}`,
+    );
+  }
 }
 
 async function drainOutbox(passes = 6): Promise<void> {
