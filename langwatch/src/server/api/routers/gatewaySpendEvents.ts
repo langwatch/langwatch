@@ -36,7 +36,9 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         virtualKeyId: z.string().optional(),
         endUserId: z.string().optional(),
         model: z.string().optional(),
-        status: z.enum(["success", "error"]).optional(),
+        status: z
+          .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
+          .optional(),
         cursor: z
           .object({
             occurredAtMs: z.number().int(),

@@ -55,7 +55,9 @@ const spendEventsQuerySchema = z.object({
   end_user_id: z.string().min(1).max(256).optional(),
   project_id: z.string().min(1).max(100).optional(),
   model: z.string().min(1).max(200).optional(),
-  status: z.enum(["success", "error"]).optional(),
+  status: z
+    .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
+    .optional(),
 });
 
 const END_USER_WINDOWS = {
@@ -156,7 +158,7 @@ secured
           window: query.window,
           from: new Date(fromMs).toISOString(),
           to: new Date(toMs).toISOString(),
-          cost: { total_usd: rollup.spendUsd },
+          cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
           request_count: rollup.requestCount,
           usage: {
             input_tokens: rollup.tokensInput,

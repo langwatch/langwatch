@@ -33,7 +33,7 @@ export const GATEWAY_SPEND_PROCESSING_EVENT_TYPES = [
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 ] as const;
 
-export const GATEWAY_SPEND_EVENT_VERSION_LATEST = 1;
+export const GATEWAY_SPEND_EVENT_VERSION_LATEST = "2026-07-29" as const;
 
 /**
  * Schema-snapshot version of the gatewaySpend fold (calendar date). The

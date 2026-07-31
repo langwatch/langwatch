@@ -58,7 +58,13 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
         nano_usd: row.costNanoUsd,
         rate_version: row.rateVersion || null,
       },
-      status: row.status === "confirmed" ? "success" : "error",
+      status:
+        row.status === "confirmed"
+          ? "success"
+          : row.status === "failed"
+            ? "error"
+            : row.status,
+      needs_reconciliation: row.needsReconciliation ? true : null,
       error: row.errorClass
         ? { class: row.errorClass, http_status: row.httpStatus || null }
         : null,
