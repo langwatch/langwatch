@@ -32,7 +32,11 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { axisLabelProps, buildAxisLabels, truncateLabel } from "./chartAxisLabels";
+import {
+  axisLabelProps,
+  buildAxisLabels,
+  truncateLabel,
+} from "./chartAxisLabels";
 
 import type { BatchComparisonColumn } from "./types";
 

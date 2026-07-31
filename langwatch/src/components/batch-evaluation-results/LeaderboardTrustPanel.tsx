@@ -20,8 +20,8 @@ import { LuCheck, LuInfo, LuTriangleAlert } from "react-icons/lu";
 
 import type { BTLeaderboard } from "./computeBTLeaderboard";
 import {
-  VERBOSITY_NOTABLE_RATIO,
   type JudgeIndependence,
+  VERBOSITY_NOTABLE_RATIO,
   type VerbosityProfile,
 } from "./computeJudgeBiasChecks";
 import type { SampleAdequacy } from "./computeSampleAdequacy";

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  computeLeaderboardVerdict,
-  findCheaperTiedAlternative,
-} from "../computeLeaderboardVerdict";
 import type {
   BTLeaderboard,
   BTLeaderboardEntry,
 } from "../computeBTLeaderboard";
+import {
+  computeLeaderboardVerdict,
+  findCheaperTiedAlternative,
+} from "../computeLeaderboardVerdict";
 import type { VariantMetrics } from "../computeVariantMetrics";
 
 const makeEntry = ({

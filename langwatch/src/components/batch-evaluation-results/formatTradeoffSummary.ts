@@ -118,7 +118,8 @@ export const formatTradeoffSummary = ({
     droppableIds,
     headline: `${droppableIds.length} variants are beaten outright and can be dropped: ${joinWords(
       droppableIds.map(
-        (id) => `${nameOf(id)} (by ${joinWords(dominance.dominatedBy[id]!.map(nameOf))})`,
+        (id) =>
+          `${nameOf(id)} (by ${joinWords(dominance.dominatedBy[id]!.map(nameOf))})`,
       ),
     )}.`,
   };

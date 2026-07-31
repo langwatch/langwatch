@@ -97,8 +97,8 @@ describe("computeBTLeaderboard", () => {
     expect(result.entries[0]!.score).toBeCloseTo(0, 6);
     expect(result.entries[1]!.score).toBeCloseTo(0, 6);
     // Tie weight present in the matrix.
-    expect(result.winMatrix["A"]!["B"]).toBe(10);
-    expect(result.winMatrix["B"]!["A"]).toBe(10);
+    expect(result.winMatrix.A!.B).toBe(10);
+    expect(result.winMatrix.B!.A).toBe(10);
   });
 
   it("flags variants with no losses as degenerate and still ranks them", () => {
@@ -136,10 +136,10 @@ describe("computeBTLeaderboard", () => {
       variantIds: ["A", "B", "C"],
       bootstrapSamples: 0,
     });
-    expect(result.winMatrix["A"]!["B"]).toBe(2);
-    expect(result.winMatrix["A"]!["C"]).toBe(2);
-    expect(result.winMatrix["B"]!["A"]).toBe(1);
-    expect(result.winMatrix["B"]!["C"]).toBe(1);
+    expect(result.winMatrix.A!.B).toBe(2);
+    expect(result.winMatrix.A!.C).toBe(2);
+    expect(result.winMatrix.B!.A).toBe(1);
+    expect(result.winMatrix.B!.C).toBe(1);
     expect(result.comparisonCount).toBe(3);
   });
 
@@ -275,7 +275,7 @@ describe("computeBTLeaderboard", () => {
     // on N comparisons" and what it actually ranked on, so counting a row that
     // contributed no evidence overstated the run to the reader.
     expect(result.comparisonCount).toBe(1);
-    expect(result.winMatrix["A"]!["B"]).toBe(1);
+    expect(result.winMatrix.A!.B).toBe(1);
     const aEntry = result.entries.find((e) => e.variantId === "A")!;
     const bEntry = result.entries.find((e) => e.variantId === "B")!;
     expect(aEntry.wins + bEntry.wins).toBe(1);
@@ -292,10 +292,10 @@ describe("computeBTLeaderboard", () => {
       bootstrapSamples: 0,
     });
     // Only the 2-way tie contributes.
-    expect(result.winMatrix["A"]!["B"]).toBe(0.5);
-    expect(result.winMatrix["B"]!["A"]).toBe(0.5);
-    expect(result.winMatrix["A"]!["C"]).toBe(0);
-    expect(result.winMatrix["C"]!["A"]).toBe(0);
+    expect(result.winMatrix.A!.B).toBe(0.5);
+    expect(result.winMatrix.B!.A).toBe(0.5);
+    expect(result.winMatrix.A!.C).toBe(0);
+    expect(result.winMatrix.C!.A).toBe(0);
   });
 });
 

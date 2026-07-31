@@ -14,7 +14,11 @@ import { areDistinguishable } from "../scoreSeparation";
  * @see specs/experiments/comparison-leaderboard.feature
  */
 
-const entry = (variantId: string, score: number, scoreCI: [number, number] | null) =>
+const entry = (
+  variantId: string,
+  score: number,
+  scoreCI: [number, number] | null,
+) =>
   ({
     variantId,
     wins: 5,
@@ -130,7 +134,10 @@ describe("areDistinguishable", () => {
     it("gives the same answer", () => {
       const a = entry("a", 60, [-20, 140]);
       const b = entry("b", 20, [-60, 100]);
-      const differenceCI = { a: { b: [12, 68] as [number, number] }, b: { a: [-68, -12] as [number, number] } };
+      const differenceCI = {
+        a: { b: [12, 68] as [number, number] },
+        b: { a: [-68, -12] as [number, number] },
+      };
 
       expect(areDistinguishable({ a, b, differenceCI })).toBe(
         areDistinguishable({ a: b, b: a, differenceCI }),
@@ -216,7 +223,9 @@ describe("computeBTLeaderboard — the difference intervals it produces", () => 
             const A = ranked[i]!;
             const B = ranked[j]!;
             const byOverlap =
-              !!A.scoreCI && !!B.scoreCI && !intervalsOverlap(A.scoreCI, B.scoreCI);
+              !!A.scoreCI &&
+              !!B.scoreCI &&
+              !intervalsOverlap(A.scoreCI, B.scoreCI);
             if (!byOverlap) continue;
             expect(
               areDistinguishable({
@@ -242,11 +251,19 @@ describe("computeBTLeaderboard — the difference intervals it produces", () => 
           for (let j = i + 1; j < ranked.length; j++) {
             const A = ranked[i]!;
             const B = ranked[j]!;
-            if (!!A.scoreCI && !!B.scoreCI && !intervalsOverlap(A.scoreCI, B.scoreCI)) {
+            if (
+              !!A.scoreCI &&
+              !!B.scoreCI &&
+              !intervalsOverlap(A.scoreCI, B.scoreCI)
+            ) {
               byOverlap++;
             }
             if (
-              areDistinguishable({ a: A, b: B, differenceCI: lb.scoreDifferenceCI })
+              areDistinguishable({
+                a: A,
+                b: B,
+                differenceCI: lb.scoreDifferenceCI,
+              })
             ) {
               byDifference++;
             }

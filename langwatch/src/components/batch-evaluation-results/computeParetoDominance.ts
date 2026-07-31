@@ -44,12 +44,8 @@ import type {
   BTLeaderboardEntry,
   ScoreDifferenceCI,
 } from "./computeBTLeaderboard";
-import {
-  MIN_PRICED_ROWS,
-  type VariantMetrics,
-} from "./computeVariantMetrics";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
-
 
 export type TradeoffDimension = "quality" | "cost" | "speed";
 
@@ -78,7 +74,6 @@ export type ParetoDominance = {
 
 /** -1 when `b` is better, +1 when `a` is better, 0 when the run cannot tell. */
 type Comparison = -1 | 0 | 1;
-
 
 const compareQuality = ({
   a,
@@ -132,7 +127,11 @@ export const computeParetoDominance = ({
     b: BTLeaderboardEntry,
   ): Comparison => {
     if (dimension === "quality") {
-      return compareQuality({ a, b, differenceCI: leaderboard.scoreDifferenceCI });
+      return compareQuality({
+        a,
+        b,
+        differenceCI: leaderboard.scoreDifferenceCI,
+      });
     }
 
     // The paired per-row difference, when the run produced one. This is the
@@ -145,7 +144,7 @@ export const computeParetoDominance = ({
         ? metrics?.costDifferenceCI
         : metrics?.durationDifferenceCI;
     const paired = differences?.[b.variantId];
-    if (paired && paired.every((bound) => Number.isFinite(bound))) {
+    if (paired?.every((bound) => Number.isFinite(bound))) {
       // Lower is better, so a is better when the whole interval is below zero.
       if (paired[1] < 0) return 1;
       if (paired[0] > 0) return -1;

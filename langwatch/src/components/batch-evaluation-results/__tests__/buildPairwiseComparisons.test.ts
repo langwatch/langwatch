@@ -26,11 +26,14 @@ describe("buildPairwiseComparisons", () => {
     });
 
     expect(buildPairwiseComparisons(column)).toEqual([
-      { candidates: ["variant-a", "variant-b", "variant-c"], winner: "variant-a" },
+      {
+        candidates: ["variant-a", "variant-b", "variant-c"],
+        winner: "variant-a",
+      },
     ]);
   });
 
-  it("maps a genuine tie to winner: \"tie\"", () => {
+  it('maps a genuine tie to winner: "tie"', () => {
     const column = columnWith({
       0: {
         rowIndex: 0,
@@ -45,7 +48,7 @@ describe("buildPairwiseComparisons", () => {
     ]);
   });
 
-  it("maps an unresolved label to winner: null, not \"tie\"", () => {
+  it('maps an unresolved label to winner: null, not "tie"', () => {
     const column = columnWith({
       0: {
         rowIndex: 0,

@@ -56,7 +56,11 @@ describe("formatTradeoffSummary", () => {
         dominance: dominance({
           dominatedBy: { a: [], b: ["a"] },
           edges: [
-            { winnerId: "a", loserId: "b", strictlyBetterOn: ["cost", "speed"] },
+            {
+              winnerId: "a",
+              loserId: "b",
+              strictlyBetterOn: ["cost", "speed"],
+            },
           ],
         }),
       })!;
@@ -200,7 +204,11 @@ describe("formatTradeoffSummary — 'the rest' has to exist", () => {
           dimensions: ["quality", "cost", "speed"],
           dominatedBy: { a: [], b: ["a"] },
           edges: [
-            { winnerId: "a", loserId: "b", strictlyBetterOn: ["quality", "cost"] },
+            {
+              winnerId: "a",
+              loserId: "b",
+              strictlyBetterOn: ["quality", "cost"],
+            },
           ],
         }),
       })!;

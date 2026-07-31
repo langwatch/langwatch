@@ -89,8 +89,7 @@ export const comparabilityOf = ({
   const gb = index[b];
   if (ga === undefined || gb === undefined) return "incomparable";
   if (ga === gb) return "same-group";
-  return comparability.dominates[ga]?.[gb] ||
-    comparability.dominates[gb]?.[ga]
+  return comparability.dominates[ga]?.[gb] || comparability.dominates[gb]?.[ga]
     ? "dominated"
     : "incomparable";
 };
@@ -218,9 +217,7 @@ export const computeComparability = ({
 
   return {
     identifiable: components.length <= 1,
-    groups: components.map((component) =>
-      component.map((v) => variantIds[v]!),
-    ),
+    groups: components.map((component) => component.map((v) => variantIds[v]!)),
     dominates: reaches,
   };
 };

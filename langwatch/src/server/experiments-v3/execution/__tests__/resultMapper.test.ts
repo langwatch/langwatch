@@ -785,7 +785,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -811,7 +815,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).evaluatorId).toBe("eval-1");
@@ -854,7 +862,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -870,7 +882,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -880,7 +896,11 @@ describe("resultMapper", () => {
         payload: { message: "starting execution" },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -889,7 +909,11 @@ describe("resultMapper", () => {
         type: "done",
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -905,7 +929,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -931,7 +959,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).result.status).toBe("error");
@@ -1009,7 +1041,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent({ event, rowIndex: 0, targetNodes: targetNodes });
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       if (result?.type === "evaluator_result") {

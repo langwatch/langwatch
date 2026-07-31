@@ -8,10 +8,10 @@ import {
 import type { BTLeaderboard } from "./computeBTLeaderboard";
 import { winMatrixHasPairwiseDetail } from "./computeWinMatrixShape";
 import {
-  usePairwiseSort,
   type RankedEntry,
   type SortDir,
   type SortKey,
+  usePairwiseSort,
 } from "./usePairwiseSort";
 
 /**
@@ -251,7 +251,11 @@ function SortableHeader({
   onSort: (k: SortKey) => void;
 }) {
   const active = sortKey === col;
-  const ArrowIcon = !active ? LuArrowUpDown : sortDir === "asc" ? LuArrowUp : LuArrowDown;
+  const ArrowIcon = !active
+    ? LuArrowUpDown
+    : sortDir === "asc"
+      ? LuArrowUp
+      : LuArrowDown;
   return (
     // `aria-sort` on the header itself, not just a keyboard handler on the
     // control inside it: the arrow icon communicates the sort state visually,
@@ -259,7 +263,9 @@ function SortableHeader({
     // Keyboard reachability without it would let someone sort the table and
     // have no way to learn that they had.
     <Table.ColumnHeader
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      aria-sort={
+        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
+      }
     >
       <HStack
         gap={1}
@@ -280,16 +286,17 @@ function SortableHeader({
         _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
       >
         <Text>{label}</Text>
-        <Icon as={ArrowIcon} boxSize="12px" color={active ? "fg" : "fg.muted"} />
+        <Icon
+          as={ArrowIcon}
+          boxSize="12px"
+          color={active ? "fg" : "fg.muted"}
+        />
       </HStack>
     </Table.ColumnHeader>
   );
 }
 
-function formatScoreWithCI(
-  score: number,
-  ci: [number, number] | null,
-): string {
+function formatScoreWithCI(score: number, ci: [number, number] | null): string {
   const rounded = score.toFixed(2);
   if (!ci) return rounded;
   // A bootstrap over a handful of comparisons can return an unbounded
@@ -400,7 +407,11 @@ function WinMatrixHeatmap({
                 {ids.map((colId) => {
                   if (rowId === colId) {
                     return (
-                      <Table.Cell key={colId} textAlign="center" color="fg.muted">
+                      <Table.Cell
+                        key={colId}
+                        textAlign="center"
+                        color="fg.muted"
+                      >
                         —
                       </Table.Cell>
                     );

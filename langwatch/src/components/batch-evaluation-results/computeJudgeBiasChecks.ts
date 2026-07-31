@@ -21,7 +21,7 @@
  * panel — which costs more than the bias it was meant to catch.
  */
 
-import { extractOutputText, type BatchResultRow } from "./types";
+import { type BatchResultRow, extractOutputText } from "./types";
 
 export type VerbosityProfile = {
   /** Mean output length in characters, per variant. Null when unmeasurable. */

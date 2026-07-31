@@ -153,7 +153,11 @@ export function LeaderboardVerdictPanel({
 
 const TONES = {
   positive: { bg: "green.subtle", fg: "green.fg", border: "green.emphasized" },
-  caution: { bg: "orange.subtle", fg: "orange.fg", border: "orange.emphasized" },
+  caution: {
+    bg: "orange.subtle",
+    fg: "orange.fg",
+    border: "orange.emphasized",
+  },
   neutral: { bg: "bg.muted", fg: "fg", border: "border.emphasized" },
 } as const;
 
@@ -312,9 +316,9 @@ function ScoreBars({
       */}
       <Text fontSize="2xs" color="fg.muted">
         Bar marks the score, the shaded band the range it could plausibly be.
-        Two bands overlapping does not by itself mean the run failed to
-        separate them — that is judged on the gap between the two scores,
-        which is pinned down better than either score alone
+        Two bands overlapping does not by itself mean the run failed to separate
+        them — that is judged on the gap between the two scores, which is pinned
+        down better than either score alone
         {showTieShading
           ? ", and “tied for first” marks the variants it could not separate from the top scorer"
           : ""}

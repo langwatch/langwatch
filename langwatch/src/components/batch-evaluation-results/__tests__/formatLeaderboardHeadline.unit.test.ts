@@ -200,7 +200,9 @@ describe("formatLeaderboardHeadline — the mechanism it names must be the one u
       });
 
       expect(headline.detail).toContain("does not establish a winner");
-      expect(headline.detail).not.toContain("within each other's margin of error");
+      expect(headline.detail).not.toContain(
+        "within each other's margin of error",
+      );
     });
   });
 });

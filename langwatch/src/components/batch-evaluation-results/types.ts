@@ -794,9 +794,7 @@ const detectComparisonColumns = (
         rowIndex,
         winnerId,
         reasoning,
-        winnerOutput: winnerCell
-          ? extractOutputText(winnerCell.output)
-          : null,
+        winnerOutput: winnerCell ? extractOutputText(winnerCell.output) : null,
         candidateIds,
         isUnresolved,
       };

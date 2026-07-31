@@ -16,8 +16,7 @@
  */
 import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-
-import { useBTLeaderboard } from "./batch-evaluation-results/useBTLeaderboard";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   computeJudgeIndependence,
   computeVerbosityProfile,
@@ -27,21 +26,21 @@ import {
   findCheaperTiedAlternative,
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
-import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
-import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
-import { TradeoffSummaryLine } from "./batch-evaluation-results/TradeoffSummaryLine";
 import {
   DEFAULT_WARN_THRESHOLD,
   PairwiseLeaderboard,
 } from "./batch-evaluation-results/PairwiseLeaderboard";
+import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
+import { TradeoffSummaryLine } from "./batch-evaluation-results/TradeoffSummaryLine";
 import type {
   BatchComparisonColumn,
   BatchResultRow,
 } from "./batch-evaluation-results/types";
-import { useDrawer } from "~/hooks/useDrawer";
+import { useBTLeaderboard } from "./batch-evaluation-results/useBTLeaderboard";
+import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
 import { Drawer } from "./ui/drawer";
 
 export type ComparisonLeaderboardDrawerProps = {
@@ -162,20 +161,19 @@ export function ComparisonLeaderboardDrawer({
               subtitle="The ranking, and whether the run actually separates them."
               help={
                 <>
-                  Each verdict the judge gave is read as one matchup per pair
-                  of variants in it. Each variant gets a score from those,
-                  weighted by how strong its opponents were — so
-                  beating a good variant counts for more than beating a weak
-                  one. The score is chess-rating style: 0 is average for this
-                  group, and it is the GAP that means something, not the number.
-                  A 400-point gap is roughly 10:1 odds; 0 is a coin flip. The
-                  shaded band behind each bar is where that score could
-                  plausibly sit. Whether two variants actually differ is judged
-                  on the gap between them rather than on those two bands: every
-                  resample re-scores the whole field at once, so the scores
-                  move together and the gap is pinned down better than either
-                  score is on its own. Two bands can overlap and the run still
-                  tell those variants apart.
+                  Each verdict the judge gave is read as one matchup per pair of
+                  variants in it. Each variant gets a score from those, weighted
+                  by how strong its opponents were — so beating a good variant
+                  counts for more than beating a weak one. The score is
+                  chess-rating style: 0 is average for this group, and it is the
+                  GAP that means something, not the number. A 400-point gap is
+                  roughly 10:1 odds; 0 is a coin flip. The shaded band behind
+                  each bar is where that score could plausibly sit. Whether two
+                  variants actually differ is judged on the gap between them
+                  rather than on those two bands: every resample re-scores the
+                  whole field at once, so the scores move together and the gap
+                  is pinned down better than either score is on its own. Two
+                  bands can overlap and the run still tell those variants apart.
                 </>
               }
             >

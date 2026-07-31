@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { computeBTLeaderboard } from "../computeBTLeaderboard";
-import {
-  comparabilityOf,
-  computeComparability,
-} from "../computeComparability";
+import { comparabilityOf, computeComparability } from "../computeComparability";
 
 /**
  * @see specs/experiments/comparison-leaderboard.feature
@@ -189,9 +186,11 @@ describe("computeComparability", () => {
 
   describe("given trivial input", () => {
     it("handles an empty field", () => {
-      expect(
-        computeComparability({ winMatrix: {}, variantIds: [] }),
-      ).toEqual({ identifiable: true, groups: [], dominates: [] });
+      expect(computeComparability({ winMatrix: {}, variantIds: [] })).toEqual({
+        identifiable: true,
+        groups: [],
+        dominates: [],
+      });
     });
 
     it("calls a single variant identifiable", () => {

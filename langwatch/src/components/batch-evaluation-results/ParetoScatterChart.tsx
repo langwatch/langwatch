@@ -91,24 +91,28 @@ export function ParetoScatterChart({
   const data = useMemo(() => {
     const readMetric = (variantId: string, metric: ParetoAxis) => {
       const metrics = variantMetrics[variantId];
-      const stats = metric === "cost" ? metrics?.costStats : metrics?.durationStats;
+      const stats =
+        metric === "cost" ? metrics?.costStats : metrics?.durationStats;
       return stats?.avg ?? null;
     };
 
     const readMeanCI = (variantId: string, metric: ParetoAxis) => {
       const metrics = variantMetrics[variantId];
-      const ci = metric === "cost" ? metrics?.costMeanCI : metrics?.durationMeanCI;
-      return ci && ci.every((bound) => Number.isFinite(bound)) ? ci : null;
+      const ci =
+        metric === "cost" ? metrics?.costMeanCI : metrics?.durationMeanCI;
+      return ci?.every((bound) => Number.isFinite(bound)) ? ci : null;
     };
 
     return leaderboard.entries
       .map((entry, index) => {
         // Offsets, not bounds — recharts draws the bar relative to the point.
         // A non-finite bound means there is no interval to draw, and drawing
-        // nothing is the honest rendering of that.
+        // nothing is the honest rendering of that. Bound as a value rather
+        // than a boolean so the reader below can index it.
         const ci = entry.scoreCI;
-        const hasInterval =
-          ci !== null && ci.every((bound) => Number.isFinite(bound));
+        const scoreCI = ci?.every((bound) => Number.isFinite(bound))
+          ? ci
+          : null;
 
         const x = readMetric(entry.variantId, xAxisMetric);
         const xCI = readMeanCI(entry.variantId, xAxisMetric);
@@ -132,8 +136,11 @@ export function ParetoScatterChart({
           xCI,
           size: readMetric(entry.variantId, sizeMetric),
           dominated: (dominance.dominatedBy[entry.variantId]?.length ?? 0) > 0,
-          ciOffsets: hasInterval
-            ? ([entry.score - ci[0], ci[1] - entry.score] as [number, number])
+          ciOffsets: scoreCI
+            ? ([entry.score - scoreCI[0], scoreCI[1] - entry.score] as [
+                number,
+                number,
+              ])
             : undefined,
           color:
             targetColors?.[entry.variantId] ??
@@ -262,7 +269,9 @@ export function ParetoScatterChart({
                         </Text>
                       ) : null}
                       {point.dominated ? (
-                        <Text color="fg.muted">Beaten outright by another variant</Text>
+                        <Text color="fg.muted">
+                          Beaten outright by another variant
+                        </Text>
                       ) : null}
                     </VStack>
                   );

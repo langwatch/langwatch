@@ -35,8 +35,16 @@ describe("computeVerbosityProfile", () => {
       const profile = computeVerbosityProfile({
         variantIds: ["a", "b", "c"],
         rows: [
-          row(0, { a: "x".repeat(300), b: "y".repeat(100), c: "z".repeat(100) }),
-          row(1, { a: "x".repeat(300), b: "y".repeat(100), c: "z".repeat(100) }),
+          row(0, {
+            a: "x".repeat(300),
+            b: "y".repeat(100),
+            c: "z".repeat(100),
+          }),
+          row(1, {
+            a: "x".repeat(300),
+            b: "y".repeat(100),
+            c: "z".repeat(100),
+          }),
         ],
         leaderId: "a",
       });

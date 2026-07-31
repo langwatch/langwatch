@@ -16,10 +16,7 @@
  */
 
 import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
-import {
-  MIN_PRICED_ROWS,
-  type VariantMetrics,
-} from "./computeVariantMetrics";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
 export type LeaderboardVerdict = {
@@ -194,9 +191,10 @@ export const findCheaperTiedAlternative = ({
   // reader has no way to notice. When the cheapest IS the leader there is no
   // switch to make, and the dearest tied option is the right comparison —
   // that is the cost avoided by not reaching for the pricier alternative.
-  const baseline = cheapest.variantId === verdict.leaderId
-    ? priced.reduce((a, b) => (b.cost > a.cost ? b : a))
-    : priced.find((entry) => entry.variantId === verdict.leaderId);
+  const baseline =
+    cheapest.variantId === verdict.leaderId
+      ? priced.reduce((a, b) => (b.cost > a.cost ? b : a))
+      : priced.find((entry) => entry.variantId === verdict.leaderId);
   if (!baseline || baseline.cost <= 0) return null;
 
   const savingRatio = (baseline.cost - cheapest.cost) / baseline.cost;
@@ -212,8 +210,7 @@ export const findCheaperTiedAlternative = ({
   const pairedSaving =
     variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId];
   if (
-    pairedSaving &&
-    pairedSaving.every((bound) => Number.isFinite(bound)) &&
+    pairedSaving?.every((bound) => Number.isFinite(bound)) &&
     // cheapest minus baseline: a real saving sits entirely below zero.
     pairedSaving[1] >= 0
   ) {

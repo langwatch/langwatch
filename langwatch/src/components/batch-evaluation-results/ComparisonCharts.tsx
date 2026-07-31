@@ -20,13 +20,13 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "../analytics/ChartTooltip";
+import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
 import {
   axisLabelProps,
   buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
-import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
@@ -49,7 +49,13 @@ type MetricType =
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type: "cost" | "latency" | "score" | "passRate" | "comparison" | "leaderboard";
+  type:
+    | "cost"
+    | "latency"
+    | "score"
+    | "passRate"
+    | "comparison"
+    | "leaderboard";
   evaluatorId?: string;
 };
 
@@ -779,7 +785,9 @@ export const ComparisonCharts = ({
   }, [chartData, axis.maxLabelLength]);
   const formatAxisTick = (value: unknown): string => {
     const name = String(value);
-    return axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength);
+    return (
+      axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength)
+    );
   };
 
   // Height is shared by every chart in the row, including the WinRateCharts
@@ -1459,25 +1467,25 @@ export const ComparisonCharts = ({
                 comparisons (see availableMetrics above), so no extra gating
                 is needed here beyond visibleMetrics. */}
             {comparisonColumns?.map(
-                (column) =>
-                  visibleMetrics.has(
-                    `leaderboard_${column.evaluatorId}` as MetricType,
-                  ) && (
-                    <ComparisonLeaderboardChart
-                      key={`leaderboard-${column.evaluatorId}`}
-                      column={column}
-                      rows={comparisonRows ?? []}
-                      chartHeight={chartHeight}
-                      targetColors={targetColors}
-                      modelByTargetId={modelsFromRun.modelByTargetId}
-                      judgeModel={
-                        modelsFromRun.judgeModelByEvaluatorId[
-                          column.evaluatorId
-                        ] ?? null
-                      }
-                    />
-                  ),
-              )}
+              (column) =>
+                visibleMetrics.has(
+                  `leaderboard_${column.evaluatorId}` as MetricType,
+                ) && (
+                  <ComparisonLeaderboardChart
+                    key={`leaderboard-${column.evaluatorId}`}
+                    column={column}
+                    rows={comparisonRows ?? []}
+                    chartHeight={chartHeight}
+                    targetColors={targetColors}
+                    modelByTargetId={modelsFromRun.modelByTargetId}
+                    judgeModel={
+                      modelsFromRun.judgeModelByEvaluatorId[
+                        column.evaluatorId
+                      ] ?? null
+                    }
+                  />
+                ),
+            )}
 
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(

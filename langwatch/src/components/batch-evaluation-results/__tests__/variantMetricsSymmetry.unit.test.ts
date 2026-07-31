@@ -46,8 +46,16 @@ const nearlyEqual = (base: number, jitter: number[], durationBase: number) =>
 
 describe("computeVariantMetrics — paired difference intervals", () => {
   const rows = rowsWith({
-    a: nearlyEqual(0.002, [0.0001, -0.0002, 0.00005, -0.0001, 0.0003, -0.00015, 0.0002, -0.00005], 1000),
-    b: nearlyEqual(0.00205, [-0.0002, 0.0003, -0.00005, 0.0002, -0.0001, 0.00025, -0.0003, 0.0001], 1050),
+    a: nearlyEqual(
+      0.002,
+      [0.0001, -0.0002, 0.00005, -0.0001, 0.0003, -0.00015, 0.0002, -0.00005],
+      1000,
+    ),
+    b: nearlyEqual(
+      0.00205,
+      [-0.0002, 0.0003, -0.00005, 0.0002, -0.0001, 0.00025, -0.0003, 0.0001],
+      1050,
+    ),
   });
 
   describe("given a pair asked in both directions", () => {
@@ -108,7 +116,10 @@ describe("computeVariantMetrics — paired difference intervals", () => {
         ],
       });
 
-      const metrics = computeVariantMetrics({ variantIds: ["a", "b"], rows: sparse });
+      const metrics = computeVariantMetrics({
+        variantIds: ["a", "b"],
+        rows: sparse,
+      });
 
       expect(metrics.a!.costDifferenceCI.b).toBeUndefined();
     });

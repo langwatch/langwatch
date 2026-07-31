@@ -61,12 +61,7 @@ describe("buildAxisLabels", () => {
         16,
       );
 
-      expect(labels).toEqual([
-        "…warm",
-        "…warm-premium",
-        "…formal",
-        "…blunt",
-      ]);
+      expect(labels).toEqual(["…warm", "…warm-premium", "…formal", "…blunt"]);
     });
 
     it("needs no disambiguation suffixes", () => {

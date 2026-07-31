@@ -30,14 +30,14 @@ import {
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { useDrawer } from "~/hooks/useDrawer";
 import { axisLabelProps, buildAxisLabels } from "./chartAxisLabels";
-import { useBTLeaderboard } from "./useBTLeaderboard";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "./computeLeaderboardVerdict";
-import { useVariantMetrics } from "./useVariantMetrics";
 import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
 import type { BatchComparisonColumn, BatchResultRow } from "./types";
+import { useBTLeaderboard } from "./useBTLeaderboard";
+import { useVariantMetrics } from "./useVariantMetrics";
 import { VARIANT_COLORS } from "./WinRateChart";
 
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */

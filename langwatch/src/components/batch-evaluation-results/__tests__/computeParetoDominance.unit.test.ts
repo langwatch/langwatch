@@ -96,7 +96,10 @@ const differenceInterval = (
 };
 
 const metrics = (
-  byId: Record<string, { cost?: number | null; duration?: number | null; rows?: number }>,
+  byId: Record<
+    string,
+    { cost?: number | null; duration?: number | null; rows?: number }
+  >,
 ) => {
   const ids = Object.keys(byId);
   return Object.fromEntries(
@@ -116,7 +119,9 @@ const metrics = (
         {
           variantId,
           costStats:
-            m.cost === null || m.cost === undefined ? null : stats(m.cost, m.rows ?? 20),
+            m.cost === null || m.cost === undefined
+              ? null
+              : stats(m.cost, m.rows ?? 20),
           durationStats:
             m.duration === null || m.duration === undefined
               ? null
@@ -158,9 +163,9 @@ describe("computeParetoDominance", () => {
     });
 
     it("leaves only the winner on the front", () => {
-      expect(computeParetoDominance({ leaderboard, variantMetrics }).front).toEqual([
-        "a",
-      ]);
+      expect(
+        computeParetoDominance({ leaderboard, variantMetrics }).front,
+      ).toEqual(["a"]);
     });
   });
 

@@ -9,8 +9,8 @@
  */
 
 import {
-  computeComparability,
   type Comparability,
+  computeComparability,
 } from "./computeComparability";
 import { mulberry32 } from "./mulberry32";
 
@@ -174,7 +174,8 @@ export function computeBTLeaderboard({
   // reported "based on 60 comparisons" while ranking on fewer. Resolve first
   // and count what is left.
   const usable = comparisons.filter(
-    (c) => c.winner !== null && resolveComparison({ comparison: c, idx }) !== null,
+    (c) =>
+      c.winner !== null && resolveComparison({ comparison: c, idx }) !== null,
   );
 
   const W = buildWinMatrix(usable, idx, n);
@@ -200,7 +201,7 @@ export function computeBTLeaderboard({
   // because the isDegenerate variant that triggers it is excluded from the
   // ranking anyway. Callers are told via the trust panel.
   const smooth = hasDegenerate ? 0.5 : 0;
-  const { strength, converged } = fitBT({
+  const { strength, didConverge } = fitBT({
     W,
     smooth,
     maxIter: opts.maxIter,
@@ -227,8 +228,7 @@ export function computeBTLeaderboard({
     });
     scoreCI = bootstrapped.scoreCI;
     scoreDifferenceCI = bootstrapped.differenceCI;
-    bootstrapNonConvergence =
-      bootstrapped.nonConverged / opts.bootstrapSamples;
+    bootstrapNonConvergence = bootstrapped.nonConverged / opts.bootstrapSamples;
   }
 
   const entries: BTLeaderboardEntry[] = variantIds.map((id, i) => ({
@@ -268,7 +268,7 @@ export function computeBTLeaderboard({
     comparisonCount: usable.length,
     minMatchups,
     hasDegenerate,
-    didConverge: converged,
+    didConverge,
     comparability: computeComparability({ winMatrix, variantIds }),
     scoreDifferenceCI,
     bootstrapNonConvergence,
@@ -354,10 +354,13 @@ function resolveComparison({
   return { candIdxs, winner: wIdx };
 }
 
-function buildWinMatrixFromResolved(
-  resolved: (ResolvedComparison | null)[],
-  n: number,
-): number[][] {
+function buildWinMatrixFromResolved({
+  resolved,
+  n,
+}: {
+  resolved: (ResolvedComparison | null)[];
+  n: number;
+}): number[][] {
   const W: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
   for (const r of resolved) {
     if (!r) continue;
@@ -416,13 +419,13 @@ function fitBT({
   smooth: number;
   maxIter: number;
   tol: number;
-}): { strength: number[]; converged: boolean } {
+}): { strength: number[]; didConverge: boolean } {
   const n = W.length;
-  if (n === 0) return { strength: [], converged: true };
-  if (n === 1) return { strength: [1], converged: true };
+  if (n === 0) return { strength: [], didConverge: true };
+  if (n === 1) return { strength: [1], didConverge: true };
 
   let p = new Array(n).fill(1);
-  let converged = false;
+  let didConverge = false;
 
   for (let iter = 0; iter < maxIter; iter++) {
     const next = new Array(n).fill(0);
@@ -454,12 +457,12 @@ function fitBT({
     }
     p = next;
     if (delta < tol) {
-      converged = true;
+      didConverge = true;
       break;
     }
   }
 
-  return { strength: p, converged };
+  return { strength: p, didConverge };
 }
 
 /**
@@ -531,7 +534,7 @@ function bootstrapScoreCI({
       const r = Math.floor(rand() * m);
       resampled[k] = resolved[r]!;
     }
-    const Wb = buildWinMatrixFromResolved(resampled, n);
+    const Wb = buildWinMatrixFromResolved({ resolved: resampled, n });
     // Smoothing must be decided per replicate, not inherited from the full
     // dataset. A resample routinely contains a variant that happened to win
     // nothing, even when no variant is degenerate overall — and with smooth=0
@@ -539,13 +542,13 @@ function bootstrapScoreCI({
     // geometric-mean renormalisation throws its opponent to ~1e300, i.e.
     // +120000. The resulting interval is not merely wide, it is fabricated,
     // and it is finite, so downstream isFinite() guards let it through.
-    const { strength, converged } = fitBT({
+    const { strength, didConverge } = fitBT({
       W: Wb,
       smooth: smoothingFor(Wb, n),
       maxIter,
       tol,
     });
-    if (!converged) nonConverged++;
+    if (!didConverge) nonConverged++;
     for (let i = 0; i < n; i++) {
       scoreSamples[i]!.push(400 * Math.log10(strength[i] ?? 1));
     }
@@ -628,4 +631,3 @@ function quantile(sorted: number[], q: number): number {
   const frac = pos - lo;
   return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
 }
-

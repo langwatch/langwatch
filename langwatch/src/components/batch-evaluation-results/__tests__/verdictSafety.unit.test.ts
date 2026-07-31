@@ -64,7 +64,9 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
         bootstrapSamples: 0,
       });
 
-      expect(leaderboard.entries.filter((e) => !e.isDegenerate)).toHaveLength(1);
+      expect(leaderboard.entries.filter((e) => !e.isDegenerate)).toHaveLength(
+        1,
+      );
 
       const verdict = computeLeaderboardVerdict(leaderboard);
 
