@@ -42,6 +42,7 @@ import {
 } from "./run-history-transforms";
 import { ScenarioTabConnectedBadge } from "./ScenarioTabConnectedBadge";
 import { useAutoExpansion } from "./useAutoExpansion";
+import { useBatchRunReport } from "./useBatchRunReport";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
@@ -66,6 +67,12 @@ export function ExternalSetDetailPanel({
   connectedToLocalRun = false,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
+
+  // One instance for the whole list: the scope of a report is passed per call,
+  // so two rows can be producing one at the same time.
+  const { startReport, cancelReport, isReportRunning } = useBatchRunReport({
+    projectId: project?.id,
+  });
   const { openDrawer } = useDrawer();
   const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
   const runListRef = useRef<HTMLDivElement>(null);
@@ -329,6 +336,18 @@ export function ExternalSetDetailPanel({
                           isHighlighted={
                             highlightedBatchId === batchRun.batchRunId
                           }
+                          onExportReport={() =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId:
+                                batchRun.scenarioSetId ?? scenarioSetId,
+                              suiteName: scenarioSetId,
+                            })
+                          }
+                          onCancelReport={() =>
+                            cancelReport({ batchRunId: batchRun.batchRunId })
+                          }
+                          isReportRunning={isReportRunning(batchRun.batchRunId)}
                         />
                       );
                     })
