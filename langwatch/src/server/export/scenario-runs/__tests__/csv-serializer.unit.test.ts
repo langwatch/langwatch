@@ -1,7 +1,10 @@
 import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
 import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
@@ -119,7 +122,10 @@ describe("scenario run CSV serializers", () => {
   describe("when exporting in full mode", () => {
     it("writes one row per run when the run has no messages", () => {
       const csv = serializeRunsToFullCsv({
-        runs: [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
+        runs: [
+          buildRun({ scenarioRunId: "a" }),
+          buildRun({ scenarioRunId: "b" }),
+        ],
         includeHeader: true,
       });
 
@@ -506,9 +512,7 @@ describe("scenario run CSV serializers", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
-            messages: [
-              { role: "user", content },
-            ] as ExportableRun["messages"],
+            messages: [{ role: "user", content }] as ExportableRun["messages"],
           }),
         ],
         includeHeader: true,

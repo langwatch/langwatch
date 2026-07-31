@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
-import { api } from "~/utils/api";
 import type {
   ScenarioRunExportMode,
   ScenarioRunExportStatusFilter,
 } from "~/server/export/scenario-runs/types";
+import { api } from "~/utils/api";
 
 /**
  * Orchestrates the scenario run CSV export: dialog state, the streaming
@@ -39,10 +39,12 @@ export function useExportScenarioRuns({
    * X-Total-Runs. Counted in runs rather than written rows because criteria
    * mode emits several rows per run.
    */
-  const [progress, setProgress] = useState<{ exported: number; total: number }>({
-    exported: 0,
-    total: 0,
-  });
+  const [progress, setProgress] = useState<{ exported: number; total: number }>(
+    {
+      exported: 0,
+      total: 0,
+    },
+  );
   /**
    * Set from the X-Export-Id response header once the stream starts. The
    * server broadcasts progress over Redis rather than in the response body

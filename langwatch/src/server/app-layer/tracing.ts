@@ -54,9 +54,10 @@ export function traced<T extends object>(instance: T, className: string): T {
           this: unknown,
           ...args: unknown[]
         ) {
-          yield* (
-            value as (...a: unknown[]) => AsyncGenerator<unknown>
-          ).apply(this ?? target, args);
+          yield* (value as (...a: unknown[]) => AsyncGenerator<unknown>).apply(
+            this ?? target,
+            args,
+          );
         };
         wrapperCache.set(prop, generatorWrapper);
         return generatorWrapper;

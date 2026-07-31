@@ -128,8 +128,10 @@ export function serializeRunsToCriteriaCsv({
     const push = (criterion: string, met: boolean) =>
       rows.push([...core, text(criterion), String(met), ...tail]);
 
-    for (const criterion of run.results?.metCriteria ?? []) push(criterion, true);
-    for (const criterion of run.results?.unmetCriteria ?? []) push(criterion, false);
+    for (const criterion of run.results?.metCriteria ?? [])
+      push(criterion, true);
+    for (const criterion of run.results?.unmetCriteria ?? [])
+      push(criterion, false);
   }
   return unparse({ headers: criteriaHeaders(), rows, includeHeader });
 }

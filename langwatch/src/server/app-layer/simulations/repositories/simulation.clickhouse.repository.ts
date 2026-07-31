@@ -41,7 +41,8 @@ export const RUN_ID_CAP = 10000;
  * become unreachable for the rest of the sweep while the count still includes
  * them. Coalescing here means there is one definition and no fallback in TS.
  */
-const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+const EXPORT_SORT_KEY =
+  "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
 /**
  * Returns an IN-tuple dedup predicate for simulation_runs.
@@ -1322,10 +1323,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const lastRow = pageRows[pageRows.length - 1];
     const nextCursor =
       hasMore && lastRow
-        ? this.encodeExportCursor(
-            lastRow.ExportSortKey,
-            lastRow.ScenarioRunId,
-          )
+        ? this.encodeExportCursor(lastRow.ExportSortKey, lastRow.ScenarioRunId)
         : undefined;
 
     const now = Date.now();
@@ -1368,7 +1366,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       // buildDateFilter emits unqualified column names; the export queries read
       // through the `t` alias, so qualify them here.
       parts.push(
-        dateFilter.whereClause.replace(/^AND /, "").replace(/StartedAt/g, "t.StartedAt"),
+        dateFilter.whereClause
+          .replace(/^AND /, "")
+          .replace(/StartedAt/g, "t.StartedAt"),
       );
       Object.assign(params, dateFilter.params);
     }
@@ -1397,7 +1397,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
    * shared pair so neither payload carries a field named for the other's key.
    */
   private encodeExportCursor(ts: string, scenarioRunId: string): string {
-    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString("base64");
+    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString(
+      "base64",
+    );
   }
 
   private decodeExportCursor(

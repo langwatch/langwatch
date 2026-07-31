@@ -19,8 +19,8 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { getServerAuthSession } from "~/server/auth";
 import { auditLog } from "~/server/auditLog";
+import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
   ScenarioRunExportForbiddenError,
@@ -28,8 +28,8 @@ import {
 } from "~/server/export/scenario-runs/errors";
 import type { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import {
-  scenarioRunExportRequestSchema,
   type ScenarioRunExportRequest,
+  scenarioRunExportRequestSchema,
 } from "~/server/export/scenario-runs/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -125,10 +125,9 @@ secured
         broadcast,
       });
 
-      return new Response(
-        stream.pipeThrough(new CompressionStream("gzip")),
-        { headers },
-      );
+      return new Response(stream.pipeThrough(new CompressionStream("gzip")), {
+        headers,
+      });
     },
   );
 
