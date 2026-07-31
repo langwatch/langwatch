@@ -458,15 +458,27 @@ Feature: AI Gateway — Budgets
       top 5 virtual keys by spend, top 5 models by spend,
       and a reset countdown
 
-  @visual
-  Scenario: Budget list Scope column resolves target name with VK link
+  @integration
+  Scenario: Budget list Scope column renders the shared scope chip on one line
     Given budgets exist scoped to "organization acme-demo", "team platform",
       "project gateway-demo", "virtual_key prod-openai", and "principal user@acme.com"
     When I open the Budgets list
-    Then each row's Scope cell shows the scope-kind badge on top
-    And the scope-target name below (e.g. "acme-demo", "platform", "gateway-demo")
-    And VK-scope rows link to the VK detail page via an orange link
-    And a muted-parenthesised secondary (slug / displayPrefix / email) follows the name
+    Then each row's Scope cell is one line: the scope kind's icon and the target's name
+    And the identifier that used to follow the name in parentheses is only in the chip's tooltip
+
+  @integration
+  Scenario: Budget list links a virtual-key scope to that key
+    Given a budget scoped to "virtual_key prod-openai"
+    When I open the Budgets list
+    Then its Scope cell is a key chip naming "prod-openai"
+    And following it opens that key's detail page
+
+  @integration
+  Scenario: Budget list keeps the per-member marker on a group scope
+    Given a budget scoped to a group of 4 people
+    When I open the Budgets list
+    Then its Scope cell names the group and still marks the limit as per member
+    And the member count is in the chip's tooltip rather than on a second line
 
   @visual
   Scenario: Budget detail header surfaces Audit history even after archive

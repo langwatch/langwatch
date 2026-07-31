@@ -31,6 +31,10 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import {
+  VirtualKeyBudgetBar,
+  type VirtualKeyBudgetBarValue,
+} from "~/components/gateway/VirtualKeyBudgetBar";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
@@ -101,6 +105,13 @@ function VirtualKeysPage() {
     const map = new Map<string, string>();
     for (const row of spendQuery.data ?? []) {
       map.set(row.virtualKeyId, row.spentUsd);
+    }
+    return map;
+  }, [spendQuery.data]);
+  const budgetByKeyId = useMemo(() => {
+    const map = new Map<string, VirtualKeyBudgetBarValue>();
+    for (const row of spendQuery.data ?? []) {
+      if (row.budget) map.set(row.virtualKeyId, row.budget);
     }
     return map;
   }, [spendQuery.data]);
@@ -405,64 +416,73 @@ function VirtualKeysPage() {
                                 </Badge>
                               ) : vk.routingMode === "FALLBACK_ALL" ? (
                                 <Text fontSize="xs" color="fg.muted">
-                                  fallback: all providers
+                                  fallback
                                 </Text>
                               ) : (
                                 <Text fontSize="xs" color="fg.muted">
-                                  no fallback
+                                  {"—"}
                                 </Text>
                               )}
                             </Table.Cell>
                             <Table.Cell
                               onClick={(e) => e.stopPropagation()}
                               cursor="default"
+                              minWidth="140px"
                             >
-                              <Link
-                                className="group"
-                                href={usageHrefForKey(vk.id)}
-                                data-testid={`vk-spend-${vk.id}`}
-                                aria-label={`Usage for ${vk.name}, this month`}
-                                width="full"
-                              >
-                                <HStack
-                                  gap={1}
-                                  justify="space-between"
+                              <VStack align="stretch" gap={1.5} width="full">
+                                <Link
+                                  className="group"
+                                  href={usageHrefForKey(vk.id)}
+                                  data-testid={`vk-spend-${vk.id}`}
+                                  aria-label={`Usage for ${vk.name}, this month`}
                                   width="full"
                                 >
-                                  <Text
-                                    fontSize="sm"
-                                    fontVariantNumeric="tabular-nums"
-                                    color={
-                                      spendByKeyId.get(vk.id) &&
-                                      Number.parseFloat(
-                                        spendByKeyId.get(vk.id)!,
-                                      ) > 0
-                                        ? "fg"
-                                        : "fg.muted"
-                                    }
-                                    _groupHover={{
-                                      textDecoration: "underline",
-                                    }}
+                                  <HStack
+                                    gap={1}
+                                    justify="space-between"
+                                    width="full"
                                   >
-                                    {spendQuery.isLoading
-                                      ? "…"
-                                      : spendQuery.isError
-                                        ? "n/a"
-                                        : formatBudgetUsd(
-                                            spendByKeyId.get(vk.id) ?? "0",
-                                          )}
-                                  </Text>
-                                  <Box
-                                    as="span"
-                                    data-testid={`vk-spend-chart-${vk.id}`}
-                                    color="fg.muted"
-                                    aria-hidden
-                                    _groupHover={{ color: "fg" }}
-                                  >
-                                    <LineChart size={14} />
-                                  </Box>
-                                </HStack>
-                              </Link>
+                                    <Text
+                                      fontSize="sm"
+                                      fontVariantNumeric="tabular-nums"
+                                      color={
+                                        spendByKeyId.get(vk.id) &&
+                                        Number.parseFloat(
+                                          spendByKeyId.get(vk.id)!,
+                                        ) > 0
+                                          ? "fg"
+                                          : "fg.muted"
+                                      }
+                                      _groupHover={{
+                                        textDecoration: "underline",
+                                      }}
+                                    >
+                                      {spendQuery.isLoading
+                                        ? "…"
+                                        : spendQuery.isError
+                                          ? "n/a"
+                                          : formatBudgetUsd(
+                                              spendByKeyId.get(vk.id) ?? "0",
+                                            )}
+                                    </Text>
+                                    <Box
+                                      as="span"
+                                      data-testid={`vk-spend-chart-${vk.id}`}
+                                      color="fg.muted"
+                                      aria-hidden
+                                      _groupHover={{ color: "fg" }}
+                                    >
+                                      <LineChart size={14} />
+                                    </Box>
+                                  </HStack>
+                                </Link>
+                                {budgetByKeyId.has(vk.id) && (
+                                  <VirtualKeyBudgetBar
+                                    value={budgetByKeyId.get(vk.id)!}
+                                    virtualKeyId={vk.id}
+                                  />
+                                )}
+                              </VStack>
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (

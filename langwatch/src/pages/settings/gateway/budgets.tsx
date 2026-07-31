@@ -29,6 +29,10 @@ import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import {
+  ProviderScopeChips,
+  type ProviderScopeType,
+} from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
@@ -58,7 +62,7 @@ function useBudgetRows(organizationId: string | undefined) {
 }
 
 function BudgetsPage() {
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
   const canCreate = hasPermission("gatewayBudgets:create");
   const canUpdate = hasPermission("gatewayBudgets:update");
   const canDelete = hasPermission("gatewayBudgets:delete");
@@ -225,7 +229,6 @@ function BudgetsPage() {
                                 <ScopeCell
                                   scopeType={b.scopeType}
                                   scopeTarget={b.scopeTarget ?? null}
-                                  projectSlug={project?.slug ?? null}
                                   providerLabel={b.providerLabel ?? null}
                                 />
                                 {b.unreachableByAnyKey && (
@@ -455,69 +458,78 @@ type ScopeTarget = {
   memberCount?: number;
 };
 
+/**
+ * The one detail line the chip's tooltip carries: whatever identifies the
+ * target beyond its name (a slug, a key prefix) plus, for a group, how
+ * many people the limit is handed to.
+ */
+function scopeChipDetail(scopeTarget: ScopeTarget | null): string | undefined {
+  if (!scopeTarget) return undefined;
+  const parts: string[] = [];
+  if (scopeTarget.secondary) parts.push(scopeTarget.secondary);
+  if (typeof scopeTarget.memberCount === "number") {
+    parts.push(
+      `${scopeTarget.memberCount} ${
+        scopeTarget.memberCount === 1 ? "member" : "members"
+      }`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+/**
+ * One line: the same scope chip every other settings surface renders,
+ * plus the qualifiers that change what the limit means. A virtual-key
+ * target links to that key.
+ */
 function ScopeCell({
   scopeType,
   scopeTarget,
-  projectSlug,
   providerLabel,
 }: {
   scopeType: string;
   scopeTarget: ScopeTarget | null;
-  projectSlug: string | null;
   providerLabel?: string | null;
 }) {
-  const kindLabel =
-    scopeType === "GROUP" ? "group" : scopeType.toLowerCase().replace("_", " ");
-  const vkHref =
-    scopeTarget?.kind === "VIRTUAL_KEY"
-      ? `/settings/gateway/virtual-keys/${scopeTarget.id}`
-      : null;
   return (
-    <VStack align="start" gap={0.5}>
-      <HStack gap={1}>
-        <Badge colorPalette="gray">{kindLabel}</Badge>
-        {scopeType === "GROUP" && (
-          <Tooltip content="Each member of the group gets this limit individually.">
-            <Badge
-              colorPalette="cyan"
-              variant="subtle"
-              data-testid="budget-per-member-badge"
-            >
-              per member
-            </Badge>
-          </Tooltip>
-        )}
-        {providerLabel && (
-          <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
-            <Badge
-              colorPalette="blue"
-              variant="subtle"
-              data-testid="budget-provider-badge"
-            >
-              {providerLabel} only
-            </Badge>
-          </Tooltip>
-        )}
-      </HStack>
-      {scopeTarget && (
-        <HStack gap={1}>
-          {vkHref ? (
-            <Link href={vkHref} color="orange.600" fontSize="xs">
-              {scopeTarget.name}
-            </Link>
-          ) : (
-            <Text fontSize="xs" fontWeight="medium">
-              {scopeTarget.name}
-            </Text>
-          )}
-          {scopeTarget.secondary && (
-            <Text fontSize="2xs" color="fg.muted">
-              ({scopeTarget.secondary})
-            </Text>
-          )}
-        </HStack>
+    <HStack gap={1} wrap="wrap">
+      <ProviderScopeChips
+        scopes={[
+          {
+            scopeType: scopeType as ProviderScopeType,
+            scopeId: scopeTarget?.id ?? "",
+            name: scopeTarget?.name,
+            detail: scopeChipDetail(scopeTarget),
+            href:
+              scopeTarget && scopeType === "VIRTUAL_KEY"
+                ? `/settings/gateway/virtual-keys/${scopeTarget.id}`
+                : undefined,
+          },
+        ]}
+      />
+      {scopeType === "GROUP" && (
+        <Tooltip content="Each member of the group gets this limit individually.">
+          <Badge
+            colorPalette="cyan"
+            variant="subtle"
+            data-testid="budget-per-member-badge"
+          >
+            per member
+          </Badge>
+        </Tooltip>
       )}
-    </VStack>
+      {providerLabel && (
+        <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
+          <Badge
+            colorPalette="blue"
+            variant="subtle"
+            data-testid="budget-provider-badge"
+          >
+            {providerLabel} only
+          </Badge>
+        </Tooltip>
+      )}
+    </HStack>
   );
 }
 
