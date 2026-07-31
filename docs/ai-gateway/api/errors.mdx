@@ -31,10 +31,11 @@ Errors (like successes) always carry:
 | `type` | HTTP | When |
 |---|---|---|
 | `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
-| `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
+| `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
+| `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
-| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
+| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
 | `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
 | `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
@@ -54,9 +55,13 @@ Errors (like successes) always carry:
 
 These are *soft* signals on **successful** responses:
 
-- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is over its soft threshold. Multiple can be present.
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is at or over the 80 percent soft threshold. Multiple can be present.
 
 A `warn` breach never turns into an error envelope; it's only a header.
+
+## `end_user_required` (fail-closed attribution)
+
+When a virtual key carries an active [attributed-user budget template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) and a request arrives with **no end-user id** anywhere the gateway resolves one, the request is rejected with `error.code = "end_user_required"` rather than passing uncapped. Branch on the `code`: the fix is always on the request side, send the OpenAI `user` field or the `X-LangWatch-End-User-Id` header (`X-Litellm-End-User-Id` is accepted as an alias), and the error's `message` and `tips` name exactly that. It is terminal for the request as sent; do not retry without adding the id.
 
 ## Examples
 

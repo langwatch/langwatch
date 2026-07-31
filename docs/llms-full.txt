@@ -1866,10 +1866,11 @@ Errors (like successes) always carry:
 | `type` | HTTP | When |
 |---|---|---|
 | `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
-| `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
+| `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
+| `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
-| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
+| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
 | `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
 | `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
@@ -1889,9 +1890,13 @@ Errors (like successes) always carry:
 
 These are *soft* signals on **successful** responses:
 
-- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is over its soft threshold. Multiple can be present.
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is at or over the 80 percent soft threshold. Multiple can be present.
 
 A `warn` breach never turns into an error envelope; it's only a header.
+
+## `end_user_required` (fail-closed attribution)
+
+When a virtual key carries an active [attributed-user budget template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) and a request arrives with **no end-user id** anywhere the gateway resolves one, the request is rejected with `error.code = "end_user_required"` rather than passing uncapped. Branch on the `code`: the fix is always on the request side, send the OpenAI `user` field or the `X-LangWatch-End-User-Id` header (`X-Litellm-End-User-Id` is accepted as an alias), and the error's `message` and `tips` name exactly that. It is terminal for the request as sent; do not retry without adding the id.
 
 ## Examples
 
@@ -2159,13 +2164,22 @@ Response `200`:
 
 The previous secret keeps authenticating for a 24 h grace window so in-flight clients can roll over.
 
+### Disable / Enable
+
+```
+POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
+POST /virtual-keys/:id/enable
+```
+
+The reversible stop (`virtualKeys:update`): a disabled key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact; enable restores the key exactly as it was. Both are idempotent, audit-logged, and propagate to the gateway in seconds. Each transition emits a `gateway.virtual_key.disabled` / `gateway.virtual_key.enabled` [webhook event](/features/webhooks#family-gateway). See [Virtual Keys → Disable and enable](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
+
 ### Revoke
 
 ```
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets.
+Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets and discards any rotation grace. One-way; for a reversible stop use disable.
 
 ## Budgets
 
@@ -2176,7 +2190,7 @@ GET /budgets
 GET /budgets?scope_type=VIRTUAL_KEY,PRINCIPAL
 ```
 
-Returns every non-archived budget in your organization across all six scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+Returns every non-archived budget in your organization across all seven scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`, `ATTRIBUTED_USER`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
 
 Response:
 
@@ -2222,14 +2236,16 @@ Body:
 ```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP
+    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP, ATTRIBUTED_USER
     "project_id": "proj_..."   // the id field depends on scope.kind:
                                // organization_id | team_id | project_id |
-                               // virtual_key_id | principal_user_id | group_id
+                               // virtual_key_id | principal_user_id | group_id;
+                               // ATTRIBUTED_USER takes exactly one of
+                               // anchor_virtual_key_id | anchor_project_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
-  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
+  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL | MANUAL
   "limit_usd": 5000,           // or "5000.00"
   "on_breach": "BLOCK",        // or WARN
   "timezone": "Europe/Amsterdam",
@@ -2237,7 +2253,7 @@ Body:
 }
 ```
 
-`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`.
+`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `ATTRIBUTED_USER` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `MANUAL` windows accrue until an explicit [reset](#reset-period). See [Budgets](/ai-gateway/budgets) for semantics.
 
 ### Update
 
@@ -2246,6 +2262,24 @@ PATCH /budgets/:id
 ```
 
 Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope and window are immutable after create.
+
+### Reset period
+
+```
+POST /budgets/:id/reset
+POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
+```
+
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `MANUAL` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+
+### End-user spend
+
+```
+GET /end-users/:end_user_id/spend
+GET /end-users/:end_user_id/spend?anchor_virtual_key_id=vk_...
+```
+
+Current spend and the applicable per-end-user cap for one external end-user id, resolved against the organization's attributed-user templates (`gatewayBudgets:view`). The pair a rebilling platform polls at period close. Response rows: `{budget_id, anchor_id, window, on_breach, limit_usd, spent_usd, period_started_at}`; empty when no template applies. See [Billing & spend events](/ai-gateway/billing-events#per-end-user-spend).
 
 ### Archive
 
@@ -2360,6 +2394,13 @@ DELETE /cache-rules/:id
 ```
 
 Requires `gatewayCacheRules:delete`. Soft archive: sets `archivedAt`. The rule stops matching new requests. Returns the archived row (200, not 204) so scripts can confirm the `archivedAt` timestamp.
+
+## Webhooks and billing surfaces
+
+Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
+
+- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
+- `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
 
 ## Errors
 
