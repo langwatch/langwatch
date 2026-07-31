@@ -24,7 +24,7 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
-import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/trace-processing/table";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,

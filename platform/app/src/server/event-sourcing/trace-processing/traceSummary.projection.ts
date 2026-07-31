@@ -37,6 +37,8 @@ import {
   presentAnnotationIds,
   spanContainsAi,
   spanType as spanTypeOf,
+  stampModelMetadata,
+  stripModelStamp,
   topicKey,
 } from "./spanDerivation";
 import type { TraceSummariesRow, traceSummariesTable } from "./table";
@@ -609,6 +611,9 @@ export function deriveTraceSummaryView(
     ]);
   }
 
+  const models = orderedModels(state.modelUsage);
+  stampModelMetadata(attributes, models);
+
   return {
     traceId: state.traceId,
     occurredAt: state.occurredAt,
@@ -620,7 +625,7 @@ export function deriveTraceSummaryView(
     containsErrorStatus: state.containsErrorStatus,
     containsOKStatus: state.containsOKStatus,
     errorMessage: state.errorMessage?.message ?? null,
-    models: orderedModels(state.modelUsage),
+    models,
     blockedByGuardrail: state.blockedByGuardrail,
     containsAi: state.containsAi,
     containsPrompt: state.containsPrompt,
@@ -694,7 +699,7 @@ export const traceSummaryRowMapping: RowMapping<
 
   fromRow(row) {
     const base = initTraceSummaryState();
-    const attributes = decodeAttributes(row.AttributesJson);
+    const attributes = stripModelStamp(decodeAttributes(row.AttributesJson));
     return {
       ...base,
       traceId: row.TraceId,

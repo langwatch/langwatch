@@ -225,6 +225,7 @@ function assertMountIsLegal(projection: string, mount: Mount): Mount {
 interface IngestSignals {
   readonly origin: string | null;
   readonly sdkLanguage: string | null;
+  readonly sdkFramework: string | null;
   readonly platform: string | null;
 }
 
@@ -233,10 +234,14 @@ function ingestSignalsFromSpan(data: CanonicalSpan): IngestSignals {
     data.attributes["langwatch.origin"] ??
     data.resourceAttributes["langwatch.origin"];
   const sdkLanguage = data.resourceAttributes["telemetry.sdk.language"];
+  const sdkFramework =
+    data.resourceAttributes["langwatch.sdk.framework"] ??
+    data.attributes["langwatch.sdk.framework"];
   const platform = data.resourceAttributes["langwatch.platform"];
   return {
     origin: typeof origin === "string" ? origin : null,
     sdkLanguage: typeof sdkLanguage === "string" ? sdkLanguage : null,
+    sdkFramework: typeof sdkFramework === "string" ? sdkFramework : null,
     platform: typeof platform === "string" ? platform : null,
   };
 }
@@ -255,6 +260,18 @@ export interface ProjectMetadataPorts {
     id: string;
     data: { firstMessage: boolean; integrated: boolean; language: string };
   }): Promise<void>;
+  /** The PostHog distinct_id the browser identifies the admin with. */
+  resolveOrgAdmin(tenantId: string): Promise<{ userId: string | null }>;
+  /**
+   * Tracks the `first_trace_integrated` product-analytics milestone.
+   * The composition root binds this to PostHog; the pipeline stays IO-free.
+   */
+  trackFirstTraceIntegrated(params: {
+    userId: string;
+    projectId: string;
+    sdkLanguage: string;
+    sdkFramework: string;
+  }): void;
 }
 
 async function applyProjectMetadata(
@@ -281,6 +298,19 @@ async function applyProjectMetadata(
       integrated: isOptimizationStudio ? project.integrated : true,
       language,
     },
+  });
+
+  // Track the milestone only on the firstMessage transition, and only after
+  // the write commits. A failed write retries on the project's next trace
+  // instead of dropping the event.
+  if (project.firstMessage) return;
+  const { userId } = await ports.resolveOrgAdmin(tenantId);
+  if (!userId) return;
+  ports.trackFirstTraceIntegrated({
+    userId,
+    projectId: tenantId,
+    sdkLanguage: signals.sdkLanguage ?? "unknown",
+    sdkFramework: signals.sdkFramework ?? "unknown",
   });
 }
 

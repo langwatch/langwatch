@@ -7,17 +7,19 @@
  * `GatewayBudgetService.create(prisma)` bare on one surface while the
  * other passes the repo is how REST came to serve stale PG spend for the
  * same budgets the UI showed live (issue #6248).
+ *
+ * Resolution goes through the app-layer tenant resolver, not the legacy
+ * per-module client. Only that path carries the private-endpoint map. A
+ * private-endpoint org therefore never reads the shared server.
  */
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayVirtualKeySpendRepository } from "./virtualKeySpend.clickhouse.repository";
 
 async function resolveClient(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
+  const client = await clickHouseForProject(projectId);
   if (!client) {
     throw new Error(
       `ClickHouse enabled but no client for project ${projectId}`,

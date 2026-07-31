@@ -8,7 +8,7 @@ Feature: Project becomes integrated after first trace ingestion
   # in `platform/app/src/server/event-sourcing/pipelines/trace-processing/`
   # for the project.firstMessage projection.
 
-  @integration
+  @unit
   Scenario: Project marks as integrated after first trace ingestion
     Given a project with firstMessage set to false
     And the project uses event-sourcing ingestion

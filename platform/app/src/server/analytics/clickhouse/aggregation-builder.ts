@@ -5,7 +5,7 @@
  * into complete ClickHouse SQL queries.
  */
 
-import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/trace-processing/spanDerivation";
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";

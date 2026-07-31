@@ -19,6 +19,26 @@ import { canonicalSpan, createFakeClient, TRACE_ID } from "./fixtures";
 
 const ctx = { now: Date.now(), tenantId: "tenant-1" };
 
+/** Complete fake ProjectMetadataPorts. Override single ports per test. */
+function fakeMetadataPorts(
+  overrides: Partial<{
+    getById: ReturnType<typeof vi.fn>;
+    updateMetadata: ReturnType<typeof vi.fn>;
+    resolveOrgAdmin: ReturnType<typeof vi.fn>;
+    trackFirstTraceIntegrated: ReturnType<typeof vi.fn>;
+  }> = {},
+) {
+  return {
+    getById: vi
+      .fn()
+      .mockResolvedValue({ firstMessage: false, integrated: false }),
+    updateMetadata: vi.fn().mockResolvedValue(undefined),
+    resolveOrgAdmin: vi.fn().mockResolvedValue({ userId: "admin-1" }),
+    trackFirstTraceIntegrated: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("the trace-processing composition", () => {
   describe("given the projections this pipeline mounts", () => {
     /** @scenario "A projection declares the events it subscribes to" */
@@ -566,15 +586,12 @@ describe("the trace-processing composition", () => {
       });
     });
 
-    /** @scenario a project's first real ingest completes onboarding */
+    /** @scenario Project marks as integrated after first trace ingestion */
     it("projectMetadata marks a project onboarded on its first real ingest", async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
+      const ports = fakeMetadataPorts();
       const built = createTraceProcessingPipeline({
         client: createFakeClient(),
-        projectMetadata: {
-          getById: async () => ({ firstMessage: false, integrated: false }),
-          updateMetadata,
-        },
+        projectMetadata: ports,
       });
 
       await built.subscribers.projectMetadata!.handle(
@@ -587,7 +604,7 @@ describe("the trace-processing composition", () => {
         },
         ctx,
       );
-      expect(updateMetadata).toHaveBeenCalledWith({
+      expect(ports.updateMetadata).toHaveBeenCalledWith({
         id: "tenant-1",
         data: { firstMessage: true, integrated: true, language: "python" },
       });
@@ -595,13 +612,10 @@ describe("the trace-processing composition", () => {
 
     /** @scenario a seeded sample trace never completes onboarding */
     it("projectMetadata ignores a seeded sample trace", async () => {
-      const updateMetadata = vi.fn().mockResolvedValue(undefined);
+      const ports = fakeMetadataPorts();
       const built = createTraceProcessingPipeline({
         client: createFakeClient(),
-        projectMetadata: {
-          getById: async () => ({ firstMessage: false, integrated: false }),
-          updateMetadata,
-        },
+        projectMetadata: ports,
       });
 
       await built.subscribers.projectMetadata!.handle(
@@ -614,7 +628,129 @@ describe("the trace-processing composition", () => {
         },
         ctx,
       );
-      expect(updateMetadata).not.toHaveBeenCalled();
+      expect(ports.updateMetadata).not.toHaveBeenCalled();
+    });
+
+    /** @scenario First trace tracks the PostHog integration milestone against the org admin */
+    it("projectMetadata tracks first_trace_integrated against the org admin", async () => {
+      const ports = fakeMetadataPorts();
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+        projectMetadata: ports,
+      });
+
+      await built.subscribers.projectMetadata!.handle(
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({
+            spanId: "s1",
+            resourceAttributes: {
+              "telemetry.sdk.language": "python",
+              "langwatch.sdk.framework": "langgraph",
+            },
+          }),
+        },
+        ctx,
+      );
+      // The event carries only the SDK properties and the project id.
+      expect(ports.trackFirstTraceIntegrated).toHaveBeenCalledTimes(1);
+      expect(ports.trackFirstTraceIntegrated).toHaveBeenCalledWith({
+        userId: "admin-1",
+        projectId: "tenant-1",
+        sdkLanguage: "python",
+        sdkFramework: "langgraph",
+      });
+    });
+
+    /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
+    it("projectMetadata reports unknown SDK properties when attributes are absent", async () => {
+      const ports = fakeMetadataPorts();
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+        projectMetadata: ports,
+      });
+
+      await built.subscribers.projectMetadata!.handle(
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({ spanId: "s1" }),
+        },
+        ctx,
+      );
+      expect(ports.trackFirstTraceIntegrated).toHaveBeenCalledWith({
+        userId: "admin-1",
+        projectId: "tenant-1",
+        sdkLanguage: "unknown",
+        sdkFramework: "unknown",
+      });
+    });
+
+    /** @scenario PostHog integration milestone is skipped when the project has no org admin */
+    it("projectMetadata does not track the milestone when no admin resolves", async () => {
+      const ports = fakeMetadataPorts({
+        resolveOrgAdmin: vi.fn().mockResolvedValue({ userId: null }),
+      });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+        projectMetadata: ports,
+      });
+
+      await built.subscribers.projectMetadata!.handle(
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({ spanId: "s1" }),
+        },
+        ctx,
+      );
+      expect(ports.updateMetadata).toHaveBeenCalledTimes(1);
+      expect(ports.trackFirstTraceIntegrated).not.toHaveBeenCalled();
+    });
+
+    /** @scenario PostHog integration milestone fires only on the firstMessage transition */
+    it("projectMetadata does not track the milestone for an already-integrated project", async () => {
+      const ports = fakeMetadataPorts({
+        getById: vi
+          .fn()
+          .mockResolvedValue({ firstMessage: true, integrated: false }),
+      });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+        projectMetadata: ports,
+      });
+
+      await built.subscribers.projectMetadata!.handle(
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({ spanId: "s1" }),
+        },
+        ctx,
+      );
+      // firstMessage was already true: the metadata write still repairs
+      // `integrated`, but the milestone must not fire again.
+      expect(ports.updateMetadata).toHaveBeenCalledTimes(1);
+      expect(ports.trackFirstTraceIntegrated).not.toHaveBeenCalled();
+    });
+
+    /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
+    it("projectMetadata does not track the milestone when the metadata write throws", async () => {
+      const ports = fakeMetadataPorts({
+        updateMetadata: vi.fn().mockRejectedValue(new Error("pg down")),
+      });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+        projectMetadata: ports,
+      });
+
+      await expect(
+        built.subscribers.projectMetadata!.handle(
+          {
+            type: "lw.obs.trace.span_received",
+            data: canonicalSpan({ spanId: "s1" }),
+          },
+          ctx,
+        ),
+      ).rejects.toThrow("pg down");
+      expect(ports.trackFirstTraceIntegrated).not.toHaveBeenCalled();
     });
 
     /** @scenario every real ingest re-asserts the project's clustering schedule */

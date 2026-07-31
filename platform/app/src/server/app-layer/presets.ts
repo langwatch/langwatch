@@ -41,7 +41,7 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { getPostHogInstance } from "~/server/posthog";
+import { getPostHogInstance, trackServerEvent } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -1024,6 +1024,26 @@ export function initializeDefaultApp(options?: {
     trace: {
       summaryCache: foldCache("trace_summaries"),
       analyticsCache: foldCache("trace_analytics"),
+      projectMetadata: {
+        getById: (tenantId) => projects.getById(tenantId),
+        updateMetadata: (params) => projects.updateMetadata(params),
+        resolveOrgAdmin: (tenantId) => projects.resolveOrgAdmin(tenantId),
+        trackFirstTraceIntegrated: ({
+          userId,
+          projectId,
+          sdkLanguage,
+          sdkFramework,
+        }) =>
+          trackServerEvent({
+            userId,
+            event: "first_trace_integrated",
+            properties: {
+              sdk_language: sdkLanguage,
+              sdk_framework: sdkFramework,
+            },
+            projectId,
+          }),
+      },
     },
     enterprise: {
       prisma,

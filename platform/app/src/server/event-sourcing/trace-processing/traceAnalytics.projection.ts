@@ -29,6 +29,8 @@ import {
   orderedModels,
   presentAnnotationIds,
   spanType as spanTypeOf,
+  stampModelMetadata,
+  stripModelStamp,
   topicKey,
 } from "./spanDerivation";
 import type { TraceAnalyticsRow, traceAnalyticsTable } from "./table";
@@ -320,6 +322,8 @@ export function deriveTraceAnalyticsView(
   const origin = resolveOrigin(state.origin);
   if (origin !== null) attributes[ORIGIN_ATTR] = origin;
   const annotationIds = presentAnnotationIds(state.annotations);
+  const models = orderedModels(state.modelUsage);
+  stampModelMetadata(attributes, models);
 
   return {
     traceId: state.traceId,
@@ -333,7 +337,7 @@ export function deriveTraceAnalyticsView(
     conversationId: attributes[THREAD_ID_ATTR] ?? null,
     customerId: attributes[CUSTOMER_ID_ATTR] ?? null,
     origin,
-    models: orderedModels(state.modelUsage),
+    models,
     labels: [...state.labels],
     hasError: state.hasError,
     hasAnnotation: annotationIds.length > 0,
@@ -427,9 +431,9 @@ export const traceAnalyticsRowMapping: RowMapping<
         sync: null,
       },
       attributes: new Map(
-        Object.entries(decodeAttributes(row.AttributesJson)).map(
-          ([key, value]) => [key, { value, spanId: "" }],
-        ),
+        Object.entries(
+          stripModelStamp(decodeAttributes(row.AttributesJson)),
+        ).map(([key, value]) => [key, { value, spanId: "" }]),
       ),
       labels: new Set(row.Labels),
     };

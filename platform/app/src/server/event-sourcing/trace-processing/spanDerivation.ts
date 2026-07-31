@@ -358,6 +358,60 @@ export function attributeValues(
   return out;
 }
 
+export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
+export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
+export const MODEL_METADATA_STAMPED_MARKER =
+  "langwatch.reserved.model_metadata_stamped";
+
+/**
+ * Stamp `metadata.model` (primary) and `metadata.models` (full set) from the
+ * fold's model ranking. Call this at view derivation, never on state.
+ *
+ * A user-provided value wins. State attributes hold only span-contributed
+ * values: the accumulators skip `langwatch.reserved.*` keys, and `fromRow`
+ * strips a marker-owned stamp. A present key therefore proves user intent,
+ * in any delivery order.
+ *
+ * The marker tells the read side that we stamped these values. The mapper
+ * hides it (`trace-summary.mapper.ts`), and `stripModelStamp` keys on it.
+ */
+export function stampModelMetadata(
+  attributes: Record<string, string>,
+  models: readonly string[],
+): void {
+  if (models.length === 0) return;
+  if (
+    attributes[STAMPED_MODEL_ATTRIBUTE] !== undefined ||
+    attributes[STAMPED_MODELS_ATTRIBUTE] !== undefined
+  ) {
+    return;
+  }
+  attributes[STAMPED_MODEL_ATTRIBUTE] = models[0]!;
+  attributes[STAMPED_MODELS_ATTRIBUTE] = JSON.stringify([...models]);
+  attributes[MODEL_METADATA_STAMPED_MARKER] = "true";
+}
+
+/**
+ * Remove a marker-owned stamp from read-back attributes. Call this in
+ * `fromRow` before the values seed state.
+ *
+ * The read-back owner has an empty span id, and an empty id beats every
+ * real span in `mergeAttribute`. A stale stamp left in state would
+ * therefore beat a user's later `metadata.model` forever. Stripping keeps
+ * the invariant: state carries user values only, and the next write
+ * re-derives the stamp from the reseeded model ranking.
+ */
+export function stripModelStamp(
+  attributes: Record<string, string>,
+): Record<string, string> {
+  if (attributes[MODEL_METADATA_STAMPED_MARKER] !== "true") return attributes;
+  const out = { ...attributes };
+  delete out[STAMPED_MODEL_ATTRIBUTE];
+  delete out[STAMPED_MODELS_ATTRIBUTE];
+  delete out[MODEL_METADATA_STAMPED_MARKER];
+  return out;
+}
+
 const AI_SPAN_TYPE_KEY = "langwatch.span.type";
 const AI_SPAN_TYPES = new Set([
   "llm",

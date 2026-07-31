@@ -183,3 +183,37 @@ export const traceAnalyticsTable = defineTable({
   },
 });
 export type TraceAnalyticsRow = TableRow<typeof traceAnalyticsTable.columns>;
+
+/**
+ * Rows with a version below this stamp passed the old write-gate. That gate
+ * blocked every dimension-only state, so the whole generation counts as
+ * signal. Version stamps are ISO dates. A lexicographic compare orders them
+ * correctly.
+ */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT =
+  "2026-07-27" as const;
+
+/**
+ * Apply this filter in every reader that counts a row here as a trace.
+ * Today that is one place: `dedupedSlim` in slim-timeseries-query.ts.
+ * Do NOT apply it in the fold read-back.
+ *
+ * The always-write store puts dimension-only states on this table: a topic,
+ * an annotation, a rename, with no span behind them. The old write-gate
+ * dropped those states. Without this filter, every aggregate counts such a
+ * row as a trace.
+ *
+ * The doors cover every row generation on the deployed table:
+ * - `EarliestSpanStartMs > 0`: any span-bearing row, from either writer.
+ *   This fold does not subscribe to log contributions. A row it writes with
+ *   no span extent is therefore dimension-only.
+ * - `SpanCount > 0` and the reserved log-record-count attribute: only the
+ *   retired main-side fold wrote these columns. These doors keep its rows
+ *   visible, including logs-only traces.
+ * - The version door: it admits every pre-gate-removal row, per above.
+ */
+export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
+  `(SpanCount > 0` +
+  ` OR EarliestSpanStartMs > 0` +
+  ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
+  ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
