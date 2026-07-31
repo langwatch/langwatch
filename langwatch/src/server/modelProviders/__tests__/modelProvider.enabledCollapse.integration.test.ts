@@ -16,6 +16,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
 
@@ -81,31 +82,26 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      await prisma.modelProvider.deleteMany({
-        where: {
-          OR: [
-            {
-              scopes: {
-                some: { scopeType: "PROJECT", scopeId: projectId },
-              },
+      await cleanupTestRows(prisma, [
+        [
+          "modelProvider",
+          { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
+        ],
+        [
+          "modelProvider",
+          {
+            scopes: {
+              some: { scopeType: "ORGANIZATION", scopeId: organizationId },
             },
-            {
-              scopes: {
-                some: {
-                  scopeType: "ORGANIZATION",
-                  scopeId: organizationId,
-                },
-              },
-            },
-          ],
-        },
-      });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.user.deleteMany({ where: { id: orgAdminUserId } });
-      await prisma.project.deleteMany({ where: { id: projectId } });
-      await prisma.team.deleteMany({ where: { id: teamId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
+          },
+        ],
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["user", { id: orgAdminUserId }],
+        ["project", { id: projectId }],
+        ["team", { id: teamId }],
+        ["organization", { id: organizationId }],
+      ]);
     });
 
     function service() {

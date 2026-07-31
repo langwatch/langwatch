@@ -8,7 +8,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// ComparisonCharts reads the leaderboard rollout flag, which reaches for the
+// organization context and tRPC. Neither is mounted here, and none of these
+// tests are about the leaderboard.
+vi.mock("../useShowComparisonLeaderboard", () => ({
+  useShowComparisonLeaderboard: () => false,
+}));
 
 import {
   ComparisonCharts,

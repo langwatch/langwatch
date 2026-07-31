@@ -19,6 +19,20 @@ export interface TriggerOptions<E extends Event = Event> {
   dedup?: DeduplicationStrategy<E>;
   dedupId?: (event: E) => string;
   when?: (event: E) => boolean;
+  /**
+   * Domain key for the subscriber's GroupQueue group. Default is
+   * per-aggregate (`<aggregateType>:<aggregateId>`), which maximizes
+   * parallelism — and means dedup bounds how fast jobs are BORN, not how many
+   * run at once: jobs staged across successive dedup windows land in
+   * different groups and dispatch concurrently. A subscriber whose handler is
+   * expensive and idempotent per tenant (a sweep that evaluates current
+   * state) should key by tenant so queued deliveries serialize in one lane
+   * instead of stacking into a parallel storm (2026-07-31: ~85 concurrent
+   * trigger sweeps for one tenant where the 5s debounce intended 0.2/s).
+   * The queue prefixes `<tenantId>/subscriber/<name>/` around this key, so
+   * tenant scoping holds regardless.
+   */
+  groupKeyFn?: (event: E) => string;
 }
 
 export interface TriggerContext<State = unknown> {

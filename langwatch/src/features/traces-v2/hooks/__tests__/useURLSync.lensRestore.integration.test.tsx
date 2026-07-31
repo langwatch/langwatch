@@ -15,6 +15,11 @@
  * specs/traces-v2/data-layer.feature ("Shared URL restores full state").
  */
 import { render } from "@testing-library/react";
+// `useURLSync` reads React Router's own `useLocation()` now (see the
+// push-driven-navigation effect), which throws outside a Router context.
+// `BrowserRouter`, not `MemoryRouter`, so it reads the SAME
+// `window.location` this file drives directly via `window.history`.
+import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const selectLensMock = vi.fn();
@@ -61,6 +66,14 @@ vi.mock("../../stores/filterStore", () => ({
 import { useURLSync } from "../useURLSync";
 
 function Harness() {
+  return (
+    <BrowserRouter>
+      <HookMount />
+    </BrowserRouter>
+  );
+}
+
+function HookMount() {
   useURLSync();
   return null;
 }

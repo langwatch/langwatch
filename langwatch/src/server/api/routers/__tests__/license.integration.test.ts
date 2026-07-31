@@ -42,6 +42,7 @@ import {
   GARBAGE_DATA,
   VALID_LICENSE_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
@@ -111,9 +112,9 @@ describe("License Router Integration", () => {
     });
 
     // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: adminUser.id },
-    });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId, userId: adminUser.id }],
+    ]);
     await prisma.roleBinding.create({
       data: {
         id: `rb-lic-admin-${nanoid(8)}`,
@@ -152,9 +153,9 @@ describe("License Router Integration", () => {
     });
 
     // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: memberUser.id },
-    });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId, userId: memberUser.id }],
+    ]);
     await prisma.roleBinding.create({
       data: {
         id: `rb-lic-member-${nanoid(8)}`,
@@ -187,23 +188,22 @@ describe("License Router Integration", () => {
 
   afterAll(async () => {
     // Cleanup
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.organization.deleteMany({
-      where: { slug: testOrgSlug },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: [
-            "license-router-admin@test.com",
-            "license-router-member@test.com",
-          ],
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { slug: testOrgSlug }],
+      [
+        "user",
+        {
+          email: {
+            in: [
+              "license-router-admin@test.com",
+              "license-router-member@test.com",
+            ],
+          },
         },
-      },
-    });
+      ],
+    ]);
   });
 
   afterEach(async () => {

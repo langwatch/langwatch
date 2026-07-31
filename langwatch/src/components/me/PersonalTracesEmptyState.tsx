@@ -15,6 +15,7 @@ import { Bot, KeyRound, Webhook } from "lucide-react";
 import type React from "react";
 import { Link } from "~/components/ui/link";
 import { IntegratePaneShell } from "~/features/traces-v2/components/TracesPage/IntegratePaneShell";
+import { API_KEYS_SETTINGS_PATH } from "~/pages/settings/api-keys/apiKeyAnchor";
 
 /** Anchor ids the offers scroll to — set on the matching /me sections. */
 export const PERSONAL_AI_TOOLS_ANCHOR = "me-ai-tools";
@@ -123,7 +124,7 @@ export function PersonalTracesEmptyState({
       title: "Create an API key",
       description: "Authenticate the LangWatch SDK or your own integration.",
       ...(projectSlug
-        ? { href: `/${projectSlug}/settings/api-keys` }
+        ? { href: API_KEYS_SETTINGS_PATH }
         : { onClick: () => scrollToId(PERSONAL_TRACE_INGEST_ANCHOR) }),
     },
   ];

@@ -16,6 +16,7 @@ import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as batchRunReportApp } from "../app/api/export/batch-run-report/[[...route]]/app";
+import { app as exportScenarioRunsApp } from "../app/api/export/scenario-runs/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
@@ -127,6 +128,7 @@ export function createApiRouter() {
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", batchRunReportApp);
+  api.route("/", exportScenarioRunsApp);
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);

@@ -607,6 +607,7 @@
                 ]
               },
               "ai-gateway/model-naming",
+              "ai-gateway/parameter-mapping",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
@@ -1315,7 +1316,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785478464",
+      "source": "/ci/cache/busted/1785491410",
       "destination": "/"
     },
     {

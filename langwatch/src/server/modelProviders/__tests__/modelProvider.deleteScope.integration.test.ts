@@ -22,6 +22,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
@@ -143,30 +144,21 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(
-        Boolean,
-      );
-      await prisma.modelProvider
-        .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
-        .catch(() => {});
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId: orgId } })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
-        .catch(() => {});
-      await prisma.project
-        .deleteMany({ where: { id: { in: projectIds } } })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({ where: { id: { in: [teamId, otherTeamId] } } })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { id: { in: [orgId, otherOrgId] } } })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({ where: { email: `del-org-admin-${ns}@example.com` } })
-        .catch(() => {});
+      await cleanupTestRows(prisma, [
+        // ModelProvider's tenancy guard takes a literal organizationId,
+        // not an in-list, so one entry per organization.
+        ["modelProvider", { organizationId: orgId }],
+        ["modelProvider", { organizationId: otherOrgId }],
+        ["roleBinding", { organizationId: orgId }],
+        ["organizationUser", { organizationId: { in: [orgId, otherOrgId] } }],
+        [
+          "project",
+          { id: { in: [projectAId, siblingProjectId, otherProjectId] } },
+        ],
+        ["team", { id: { in: [teamId, otherTeamId] } }],
+        ["organization", { id: { in: [orgId, otherOrgId] } }],
+        ["user", { email: `del-org-admin-${ns}@example.com` }],
+      ]);
     });
 
     describe("given an ORGANIZATION-scoped provider viewed from a project in that org", () => {

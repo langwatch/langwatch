@@ -24,6 +24,7 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { prisma } from "../../../db";
@@ -138,50 +139,22 @@ describe("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns organizationId as its first statement; if it threw
-    // before that, Vitest still runs this afterAll, and Prisma treats an
-    // undefined filter value as "no filter" — every deleteMany below would
-    // match the whole table instead of just this run's rows.
-    if (!organizationId) return;
-
-    // First, and without a `.catch`: the bindings hold an FK to CustomRole, so
-    // a failure here would otherwise resurface as a confusing error on the
-    // customRole cleanup below, or vanish into a swallowed one.
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.teamUser
-      .deleteMany({
-        where: {
-          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
-        },
-      })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
-      })
-      .catch(() => {});
-    await prisma.customRole
-      .deleteMany({
-        where: {
-          organization: { slug: `--test-org-${testNamespace}` },
-        },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organization: { slug: `--test-org-${testNamespace}` } },
-      })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({
-        where: { slug: `--test-org-${testNamespace}` },
-      })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: { email: `test-${testNamespace}@example.com` },
-      })
-      .catch(() => {});
+    // Literal ids rather than namespace filters: the org and team tenancy
+    // guards refuse a relation predicate, and the roles the tests create
+    // carry this org anyway. The bindings hold an FK to CustomRole, so
+    // they go first.
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      // The suite's own tests create invites and teams, so everything is
+      // swept by organization rather than by the ids beforeAll captured.
+      ["organizationInvite", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["customRole", { organizationId }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { email: `test-${testNamespace}@example.com` }],
+    ]);
   });
 
   function createCaller() {

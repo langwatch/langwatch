@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -123,41 +124,15 @@ describe("Feature: Groups REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.groupMembership
-      .deleteMany({
-        where: { group: { organizationId: testOrganization.id } },
-      })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.group
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.apiKey
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: { id: { in: [userId, secondUserId] } },
-      })
-      .catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["groupMembership", { group: { organizationId: testOrganization.id } }],
+      ["roleBinding", { organizationId: testOrganization.id }],
+      ["group", { organizationId: testOrganization.id }],
+      ["apiKey", { organizationId: testOrganization.id }],
+      ["organizationUser", { organizationId: testOrganization.id }],
+      ["team", { organizationId: testOrganization.id }],
+      ["user", { id: { in: [userId, secondUserId] } }],
+    ]);
     await prisma.organization
       .delete({
         where: { id: testOrganization.id },

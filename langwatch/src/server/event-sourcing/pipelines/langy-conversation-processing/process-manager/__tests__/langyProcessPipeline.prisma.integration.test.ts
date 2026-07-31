@@ -15,6 +15,7 @@ import {
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import { langyConversationProcess } from "../langyConversationProcess";
 import {
@@ -93,9 +94,11 @@ function lifecycle() {
 
 afterEach(async () => {
   const where = { processName: LANGY_CONVERSATION_PROCESS_NAME, projectId };
-  await prisma.processManagerOutbox.deleteMany({ where });
-  await prisma.processManagerInbox.deleteMany({ where });
-  await prisma.processManagerInstance.deleteMany({ where });
+  await cleanupTestRows(prisma, [
+    ["processManagerOutbox", where],
+    ["processManagerInbox", where],
+    ["processManagerInstance", where],
+  ]);
 });
 
 function buildLangyManager(ports: LangyEffectPorts) {

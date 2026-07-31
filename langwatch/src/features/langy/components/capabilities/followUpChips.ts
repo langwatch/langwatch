@@ -42,6 +42,7 @@ import {
   buildAutomationHref,
   readTraceSearchQuery,
   type TraceSearchQuery,
+  type UnstatedWindow,
 } from "../../logic/traceExplorerLink";
 import {
   buildSurfaceHref,
@@ -93,6 +94,7 @@ const DESTINATION_BY_FEATURE: Record<
   (args: {
     projectSlug: string | null;
     search: TraceSearchQuery;
+    unstatedWindow?: UnstatedWindow;
   }) => string | null
 > = {
   triggers: buildAutomationHref,
@@ -138,7 +140,12 @@ export function deriveFollowUpChips({
   const chips: FollowUpChip[] = [];
   for (const suggestion of suggestions) {
     const build = DESTINATION_BY_FEATURE[suggestion.featureId];
-    const carriedHref = build ? build({ projectSlug, search }) : null;
+    // `search` was read off a settled `langwatch trace search` call above, so an
+    // absent window here is the CLI's own last-24h default rather than an
+    // unknown one — the alert must match the traces the card just showed.
+    const carriedHref = build
+      ? build({ projectSlug, search, unstatedWindow: "cli-last-24h" })
+      : null;
     if (carriedHref) {
       chips.push({
         id: suggestion.id,

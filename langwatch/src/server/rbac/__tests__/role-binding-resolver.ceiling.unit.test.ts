@@ -1,4 +1,8 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   resolveApiKeyPermission,
@@ -50,6 +54,11 @@ function makePrisma({
   apiKeyBindings = [] as BindingRecord[],
   userBindings = [] as BindingRecord[],
   groupBindings = [] as BindingRecord[],
+  /** Org role of the owner, or null for "not a legacy-membership user". */
+  legacyOrgRole = null as OrganizationUserRole | null,
+  legacyTeamRole = null as TeamUserRole | null,
+  /** Organization the legacy team actually belongs to. */
+  legacyTeamOrgId = ORG_ID as string,
 } = {}) {
   const findMany = vi.fn(
     async ({ where }: { where: Record<string, unknown> }) => {
@@ -62,8 +71,36 @@ function makePrisma({
 
   return {
     prisma: {
-      roleBinding: { findMany },
-      teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
+      roleBinding: {
+        findMany,
+        // Step 4's legacy fallback gate. Defaulted to "this user holds
+        // bindings", which switches the fallback off, so the cases above stay
+        // decisions about the binding path alone.
+        count: vi.fn().mockResolvedValue(legacyOrgRole === null ? 1 : 0),
+      },
+      teamUser: {
+        // Answers according to the where-clause, so a query that fails to
+        // constrain the team to this organization is visible rather than
+        // silently satisfied by a fixture that ignores its own filter.
+        findFirst: vi.fn(async ({ where }: any) => {
+          if (!legacyTeamRole) return null;
+          const wantsOrg = where?.team?.organizationId;
+          if (wantsOrg !== undefined && wantsOrg !== legacyTeamOrgId) {
+            return null;
+          }
+          return { role: legacyTeamRole };
+        }),
+      },
+      user: {
+        findFirst: vi.fn().mockResolvedValue(
+          legacyOrgRole === null
+            ? null
+            : {
+                orgMemberships: [{ role: legacyOrgRole }],
+                groupMemberships: [],
+              },
+        ),
+      },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
     } as unknown as Parameters<typeof resolveApiKeyPermission>[0]["prisma"],
     findMany,
@@ -231,6 +268,74 @@ describe("resolveApiKeyPermission()", () => {
 
         await expect(resolve({ prisma, userId: null })).resolves.toBe(false);
       });
+    });
+  });
+  describe("given an owner whose access predates the RoleBinding migration", () => {
+    /**
+     * The population this fallback exists for is DEFINED by holding zero
+     * RoleBindings, so step 3 returns false for every permission it is asked
+     * about. Fixing only the mint-side ceiling therefore fixed nothing: the
+     * key minted successfully and then every request made with it was refused
+     * here — the failure moved from mint time to the first tool call, after
+     * the turn had already started streaming.
+     */
+    /** @scenario "A key minted from legacy membership works at request time" */
+    it("permits the request its legacy role covers", async () => {
+      const { prisma } = makePrisma({
+        apiKeyBindings: [teamBinding(TeamUserRole.ADMIN)],
+        // No user bindings anywhere — the whole point.
+        userBindings: [],
+        legacyOrgRole: OrganizationUserRole.MEMBER,
+        legacyTeamRole: TeamUserRole.ADMIN,
+      });
+
+      await expect(resolve({ prisma })).resolves.toBe(true);
+    });
+
+    it("still refuses what that legacy role does not cover", async () => {
+      const { prisma } = makePrisma({
+        apiKeyBindings: [teamBinding(TeamUserRole.ADMIN)],
+        userBindings: [],
+        legacyOrgRole: OrganizationUserRole.MEMBER,
+        // VIEWER is read-only, so it cannot carry `project:update`.
+        legacyTeamRole: TeamUserRole.VIEWER,
+      });
+
+      await expect(resolve({ prisma })).resolves.toBe(false);
+    });
+
+    it("caps an EXTERNAL member by their organization role, not their team role", async () => {
+      const { prisma } = makePrisma({
+        apiKeyBindings: [teamBinding(TeamUserRole.ADMIN)],
+        userBindings: [],
+        legacyOrgRole: OrganizationUserRole.EXTERNAL,
+        legacyTeamRole: TeamUserRole.ADMIN,
+      });
+
+      await expect(resolve({ prisma })).resolves.toBe(false);
+    });
+  });
+  describe("given a legacy row on a team belonging to a different organization", () => {
+    /**
+     * The membership gate proves the USER belongs to the org being asked
+     * about; it says nothing about the TEAM. `loadScopeResolution` constrains
+     * the team too (`team: { organizationId }`), and this function's docstring
+     * claims to use the same predicate — so a claimed parity that does not
+     * hold is exactly the defect class this fallback was rewritten to remove.
+     *
+     * Unreachable today, since both callers derive the scope from a validated
+     * project or team. Pinned so it stays that way.
+     */
+    it("grants nothing from the other organization's role", async () => {
+      const { prisma } = makePrisma({
+        apiKeyBindings: [teamBinding(TeamUserRole.ADMIN)],
+        userBindings: [],
+        legacyOrgRole: OrganizationUserRole.MEMBER,
+        legacyTeamRole: TeamUserRole.ADMIN,
+        legacyTeamOrgId: "some-other-org",
+      });
+
+      await expect(resolve({ prisma })).resolves.toBe(false);
     });
   });
 });

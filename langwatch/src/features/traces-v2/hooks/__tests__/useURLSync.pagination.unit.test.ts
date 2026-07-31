@@ -11,12 +11,20 @@
  * specs/traces-v2/trace-drawer-shell.feature (drawer dismissal).
  */
 import { act, renderHook } from "@testing-library/react";
+// `useURLSync` reads React Router's own `useLocation()` now (see the
+// push-driven-navigation effect), which throws outside a Router context.
+// `BrowserRouter`, not `MemoryRouter`, so it reads the SAME `window.location`
+// this file drives directly via `window.history`/`popstate`.
+import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
 import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
 import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
+
+const renderURLSync = () =>
+  renderHook(() => useURLSync(), { wrapper: BrowserRouter });
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
@@ -68,7 +76,7 @@ describe("useURLSync pagination across browser history navigation", () => {
   describe("given the table is on the third batch of a keyset-paged list", () => {
     describe("when popstate fires on an unchanged fragment (the drawer's own entry)", () => {
       it("keeps the page and its cursors", () => {
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => seedThirdPage());
 
         act(() => popState());
@@ -82,7 +90,7 @@ describe("useURLSync pagination across browser history navigation", () => {
 
     describe("when popstate fires on a fragment carrying a different query", () => {
       it("applies the fragment and drops the cursors it no longer addresses", () => {
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => seedThirdPage());
 
         act(() => {
@@ -107,7 +115,7 @@ describe("useURLSync pagination across browser history navigation", () => {
         window.history.replaceState(null, "", "/");
         seedThirdPage();
 
-        renderHook(() => useURLSync());
+        renderURLSync();
 
         expect(pagination()).toEqual({ page: 1, pageCursors: { 1: null } });
       });
@@ -116,7 +124,7 @@ describe("useURLSync pagination across browser history navigation", () => {
     describe("when popstate fires on a fragment naming a different lens", () => {
       it("applies the lens and drops the cursors", () => {
         window.history.replaceState(null, "", "/#errors");
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => seedThirdPage());
 
         act(() => {
@@ -135,7 +143,7 @@ describe("useURLSync pagination across browser history navigation", () => {
         // the default lens to an empty body, so the two strings differ while
         // the bar state they denote is identical. Only the newest entry ever
         // gets rewritten, so this asymmetry is permanent.
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => seedThirdPage());
 
         act(() => {
@@ -155,7 +163,7 @@ describe("useURLSync pagination across browser history navigation", () => {
         // `#all-traces` and an empty fragment are the same bar state — the
         // writer collapses the default lens with no overrides to `""`.
         window.history.replaceState(null, "", "/");
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => seedThirdPage());
 
         act(() => {
@@ -178,7 +186,7 @@ describe("useURLSync pagination across browser history navigation", () => {
         // The entry we land on denotes the default window, so restoring the
         // pagination without restoring the window leaves the user on a range
         // no history entry ever held.
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => {
           window.history.replaceState(null, "", "/#all-traces?preset=7d");
           selectSevenDayRange();

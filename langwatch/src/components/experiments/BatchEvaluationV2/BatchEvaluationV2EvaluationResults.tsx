@@ -54,9 +54,10 @@ export const useBatchEvaluationResults = ({
 
   useEffect(() => {
     if (isFinished) {
-      setTimeout(() => {
+      const stopRefetchingTimeout = setTimeout(() => {
         setKeepRefetching(false);
       }, 2_000);
+      return () => clearTimeout(stopRefetchingTimeout);
     } else {
       setKeepRefetching(true);
     }

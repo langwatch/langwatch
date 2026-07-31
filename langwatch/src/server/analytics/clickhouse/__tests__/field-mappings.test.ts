@@ -229,6 +229,35 @@ describe("field-mappings", () => {
       });
       expect(join).not.toContain("StartTime");
     });
+
+    it("applies the eval time filter to BOTH the evaluation_runs subquery and its dedup inner", () => {
+      const filter =
+        "AND ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY " +
+        "AND UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
+      const join = buildJoinClause({
+        table: "evaluation_runs",
+        evalTimeFilter: filter,
+      });
+      // The dedup inner GROUP BY is the scan that walks partitions — a bound
+      // only on the outer subquery would leave the full-history scan in place.
+      const occurrences = join.split(filter).length - 1;
+      expect(occurrences).toBe(2);
+    });
+
+    it("leaves the evaluation_runs JOIN unbounded when no eval filter is passed", () => {
+      const join = buildJoinClause({ table: "evaluation_runs" });
+      expect(join).not.toContain("ScheduledAt >=");
+      expect(join).not.toContain("UpdatedAt >= {");
+    });
+
+    it("ignores the eval time filter for stored_spans", () => {
+      const filter = "AND ScheduledAt >= {startDate:DateTime64(3)}";
+      const join = buildJoinClause({
+        table: "stored_spans",
+        evalTimeFilter: filter,
+      });
+      expect(join).not.toContain("ScheduledAt");
+    });
   });
 
   describe("qualifiedColumn", () => {

@@ -1,5 +1,5 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { Markdown } from "./Markdown";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
@@ -90,8 +90,13 @@ export function HoverableBigText({
     );
   };
 
-  // Check on every rerender
-  setTimeout(checkOverflow, 100);
+  // Re-measure after every render, once the browser has laid the box out.
+  // The handle is cleared on unmount and before the next render's probe, so a
+  // pending measurement can never run against a torn-down document.
+  useEffect(() => {
+    const timeout = setTimeout(checkOverflow, 100);
+    return () => clearTimeout(timeout);
+  });
 
   return (
     <>

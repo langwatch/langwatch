@@ -30,9 +30,10 @@ const LatestComponentVersionCheck = ({
   useEffect(() => {
     if (currentVersion) {
       // Small timeout to ensure the DOM has updated
-      setTimeout(() => {
+      const updateInternalsTimeout = setTimeout(() => {
         updateNodeInternals(node.id);
       }, 0);
+      return () => clearTimeout(updateInternalsTimeout);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentVersion]);

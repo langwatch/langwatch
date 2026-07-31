@@ -13,6 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "~/utils/testUtils";
 import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
 import { SchedulerRegistry } from "../scheduler.registry";
@@ -61,11 +62,11 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  await prisma.scheduledJob.deleteMany({ where: { projectId } });
+  await cleanupTestRows(prisma, [["scheduledJob", { projectId }]]);
 });
 
 afterAll(async () => {
-  await prisma.scheduledJob.deleteMany({ where: { projectId } });
+  await cleanupTestRows(prisma, [["scheduledJob", { projectId }]]);
 });
 
 describe("SchedulerService (real Postgres, no Redis)", () => {

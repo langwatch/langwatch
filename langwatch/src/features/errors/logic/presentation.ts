@@ -607,6 +607,15 @@ const presentations = {
     describe: () =>
       "Browser monitoring is sending faster than we accept. It will resume on its own.",
   },
+  scenario_run_export_unauthenticated: {
+    title: "Log in to export simulation runs",
+    describe: () =>
+      "Your session has expired. Log in and try the export again.",
+  },
+  scenario_run_export_forbidden: {
+    title: "You can't export this project's simulation runs",
+    describe: () => "Ask an admin for access to simulations on this project.",
+  },
   scenario_set_limit_exceeded: {
     title: "You've hit the simulation set limit",
     describe: () => "Delete an existing set, or upgrade your plan.",
@@ -1536,6 +1545,11 @@ const presentations = {
   engine_error: {
     title: "The run couldn't be set up",
     describe: () => "Check the workflow and its dataset, then try again.",
+  },
+  unsupported_parameter: {
+    title: "That provider can't honor one of your parameters",
+    describe: () =>
+      "Remove the parameter named in the message, or pick a model that supports it.",
   },
 } satisfies Record<
   AppErrorCode | GoErrorCode | NodeErrorCode,

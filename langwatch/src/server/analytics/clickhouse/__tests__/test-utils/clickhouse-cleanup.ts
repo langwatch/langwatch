@@ -32,3 +32,26 @@ export async function deleteEvaluationRunsByTenant({
     query_params: { tenantId },
   });
 }
+
+/**
+ * Delete every `trace_summaries` row for a tenant, synchronously.
+ *
+ * `cleanupTestData` covers this table too, but issues the mutation without
+ * waiting for it. That is fine as teardown and not as setup: a fixture that
+ * asserts on exact counts has to know the table is empty before it seeds, or a
+ * previous run's surviving rows join this one and inflate every count.
+ */
+export async function deleteTraceSummariesByTenant({
+  client,
+  tenantId,
+}: {
+  client: ClickHouseClient | null | undefined;
+  tenantId: string;
+}): Promise<void> {
+  if (!client) return;
+
+  await client.exec({
+    query: `ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String} SETTINGS mutations_sync = 1`,
+    query_params: { tenantId },
+  });
+}

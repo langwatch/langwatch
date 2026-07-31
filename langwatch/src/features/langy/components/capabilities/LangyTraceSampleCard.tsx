@@ -83,7 +83,13 @@ export function LangyTraceSampleCard({
 }: CapabilityCardInput) {
   const parsed = parseTraceSearch(output);
   const search = readTraceSearchQuery(input);
-  const explorerHref = buildTraceExplorerHref({ projectSlug, search });
+  const explorerHref = buildTraceExplorerHref({
+    projectSlug,
+    search,
+    // This card renders a `langwatch trace search` result, so a search that
+    // named no window really did cover the CLI's last-24h default.
+    unstatedWindow: "cli-last-24h",
+  });
 
   // Hydrate the result's REFERENCES through the product's own API with the
   // viewer's session — the stored output is only the fallback below.
@@ -148,6 +154,7 @@ export function LangyTraceSampleCard({
                     search,
                     traceId: trace.id,
                     traceTimestamp: trace.startedAt,
+                    unstatedWindow: "cli-last-24h",
                   }) ?? undefined
                 }
                 primary={trace.input ?? trace.id}
@@ -311,6 +318,7 @@ function HydratedTraceSampleCard({
                 search,
                 traceId: row.id,
                 traceTimestamp: row.timestamp ?? null,
+                unstatedWindow: "cli-last-24h",
               }) ?? undefined
             }
             primary={row.primary ?? row.id}
