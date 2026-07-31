@@ -245,6 +245,17 @@ describe("BatchRunReportService.generate() without the analysis", () => {
 
       expect(model.meta.withAnalysis).toBe(false);
       expect(model.integrity.notes.join(" ")).toContain("without Langy");
+
+      // The questions only Langy can answer should point at how to get them
+      // answered, not report an outage nobody caused.
+      const gaps = model.sections
+        .filter((it) => it.questionId.startsWith("future."))
+        .map((it) => it.gap ?? "");
+      expect(gaps.length).toBeGreaterThan(0);
+      for (const gap of gaps) {
+        expect(gap).toContain("Export this run again with Langy");
+        expect(gap).not.toContain("was not available");
+      }
     });
   });
 });

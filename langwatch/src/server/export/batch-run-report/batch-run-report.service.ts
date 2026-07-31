@@ -106,6 +106,7 @@ export class BatchRunReportService {
             questions: QUESTION_REGISTRY,
             draft: null,
             verdicts: null,
+            withAnalysis: false,
           }),
         };
 

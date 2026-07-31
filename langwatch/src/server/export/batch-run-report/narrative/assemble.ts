@@ -75,11 +75,14 @@ export function assembleSections({
   questions,
   draft,
   verdicts,
+  withAnalysis = true,
 }: {
   evidence: ReportEvidence;
   questions: QuestionDescriptor[];
   draft: DraftReport | null;
   verdicts: VerifierOutcome | null;
+  /** False when the reader chose the figures and skipped Langy entirely. */
+  withAnalysis?: boolean;
 }): AssembleResult {
   const index = buildCitationIndex({ evidence });
   const answersById = new Map(
@@ -151,7 +154,11 @@ export function assembleSections({
 
     const gap =
       computed.length === 0 && written.length === 0
-        ? gapReasonFor({ answer: answersById.get(descriptor.id), draft })
+        ? gapReasonFor({
+            answer: answersById.get(descriptor.id),
+            draft,
+            withAnalysis,
+          })
         : null;
 
     return toSection({ descriptor, computed, written, gap });
@@ -185,12 +192,19 @@ function toSection({
 function gapReasonFor({
   answer,
   draft,
+  withAnalysis,
 }: {
   answer: DraftAnswer | undefined;
   draft: DraftReport | null;
+  withAnalysis: boolean;
 }): string {
   if (draft === null) {
-    return "This question needs Langy's analysis, which was not available for this report.";
+    // The three future.* questions are the ones that cannot be computed, so
+    // this note is where a reader of an instant export learns what waiting
+    // would buy them — and where a reader of a failed one learns it broke.
+    return withAnalysis
+      ? "This question needs Langy's analysis, which was not available for this report."
+      : "Only Langy can answer this one. Export this run again with Langy to get it.";
   }
   if (answer?.declined && answer.declinedReason) {
     return answer.declinedReason;
