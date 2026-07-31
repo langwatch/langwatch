@@ -30,8 +30,12 @@ const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hou
  * SQL for a trace's bundled (non-billed) cost. Prefers the fold-time per-span
  * NonBilledCost column; rows folded before it existed (NULL) fall back to the
  * legacy all-or-nothing langwatch.cost.non_billable boolean. Always non-null.
+ *
+ * Exported for the aggregation builder's grouped (CTE/dedup) path, which
+ * materializes this exact expression as a per-trace CTE column and rewrites
+ * metric expressions against it (see `dedupSubstitutions()` in aggregation-builder.ts).
  */
-function nonBilledCostExpression(ts: string): string {
+export function nonBilledCostExpression(ts: string): string {
   return `coalesce(${ts}.NonBilledCost, if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0), 0)`;
 }
 

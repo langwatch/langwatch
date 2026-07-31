@@ -44,6 +44,7 @@ function build({
   aud = audience({ admins: true }),
   piiChoice = "inherit" as PiiChoice,
   piiEntities = [] as string[],
+  piiExceptPatterns = [] as string[],
   secretsChoice = "inherit" as SecretsChoice,
   secretsPatterns = [] as string[],
   customAttributes = [] as CustomAttributeFormRow[],
@@ -52,6 +53,7 @@ function build({
   aud?: AudienceFormState;
   piiChoice?: PiiChoice;
   piiEntities?: string[];
+  piiExceptPatterns?: string[];
   secretsChoice?: SecretsChoice;
   secretsPatterns?: string[];
   customAttributes?: CustomAttributeFormRow[];
@@ -61,6 +63,7 @@ function build({
     audience: aud,
     piiChoice,
     piiEntities,
+    piiExceptPatterns,
     secretsChoice,
     secretsPatterns,
     customAttributes,
@@ -83,7 +86,7 @@ function resolved(
   });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
-    pii: { level: "essential", entities: [] },
+    pii: { level: "essential", entities: [], exceptPatterns: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: [],
     ...overrides,
@@ -348,7 +351,9 @@ describe("inheritFormState", () => {
 });
 
 describe("inheritedBaselineForScope", () => {
-  const team = resolved({ pii: { level: "strict", entities: [] } });
+  const team = resolved({
+    pii: { level: "strict", entities: [], exceptPatterns: [] },
+  });
   const org = resolved({ secrets: { enabled: false, customPatterns: [] } });
 
   it("resolves a project to its team baseline", () => {
@@ -442,5 +447,44 @@ describe("audience selection", () => {
       });
       expect(selectionToAudience(audienceToSelection(state))).toEqual(state);
     });
+  });
+});
+
+describe("PII exception patterns in the rule form", () => {
+  it("lands trimmed exception patterns in the config", () => {
+    const config = build({
+      piiChoice: "essential",
+      piiExceptPatterns: [" 00\\d{12} ", "", "orders@acme\\.example"],
+    });
+    expect(config.pii).toEqual({
+      level: "essential",
+      exceptPatterns: ["00\\d{12}", "orders@acme\\.example"],
+    });
+  });
+
+  it("drops exceptions when the level is disabled", () => {
+    const config = build({
+      piiChoice: "disabled",
+      piiExceptPatterns: ["00\\d{12}"],
+    });
+    expect(config.pii).toEqual({ level: "disabled" });
+  });
+
+  it("round-trips through configToFormState", () => {
+    const config = build({
+      piiChoice: "strict",
+      piiExceptPatterns: ["00\\d{12}"],
+    });
+    const state = configToFormState(config);
+    expect(state.piiExceptPatterns).toEqual(["00\\d{12}"]);
+    expect(buildRuleConfig(state)).toEqual(config);
+  });
+
+  it("counts exceptions in the rule summary", () => {
+    expect(
+      ruleSummary(
+        build({ piiChoice: "essential", piiExceptPatterns: ["a", "b"] }),
+      ),
+    ).toContain("2 PII exceptions");
   });
 });

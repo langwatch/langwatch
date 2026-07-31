@@ -115,7 +115,8 @@ spec:
         - name: workspace
           emptyDir: {{- toYaml .Values.workspaceVolume | nindent 12 }}
         - name: tmp
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.scratchSizeLimit }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}
       {{- end }}

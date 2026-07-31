@@ -208,6 +208,44 @@ export interface FoldProjectionOptions {
    */
   refoldOnStoreMiss?: boolean;
   /**
+   * Treat an ABSENT store read as authoritative: fold from `init()` without
+   * the unwindowed fallback read and without the `event_log` re-fold.
+   *
+   * **Defaults to false. Declaring it is a two-part claim about the FOLD, and
+   * both parts must actually hold:**
+   *
+   * 1. **A committed state always has a row.** The store never declines a
+   *    write (no persistability gate — carry the verdict on the row, via a
+   *    flag column or a filter derived from columns the row already has, e.g.
+   *    `TRACE_ANALYTICS_HAS_SIGNAL_SQL`, instead of in the row's absence) and
+   *    never writes a row its own read cannot address. Only then does "no
+   *    row" prove "nothing was ever committed".
+   * 2. **The declared `readWindow` covers every live row.** The distance
+   *    between an incoming event's business time and the row's partition
+   *    anchor is bounded well inside `widthMs` — for the analytics folds this
+   *    is measured, not assumed: 30 days of
+   *    `es_fold_read_window_fallback_total{outcome="recovered"}` = 0 across
+   *    230k+ windowed misses at ±7 days. Watch that counter after adopting;
+   *    a single `recovered` means the claim is wrong and this option is
+   *    overwriting live rows with partial state.
+   *
+   * What it buys: the per-new-aggregate miss stops costing an unpruned
+   * fallback scan of the backing table plus a full `event_log` re-fold —
+   * which at ~350 misses/min was the dominant driver of ClickHouse S3 GET
+   * traffic — and starts costing exactly one windowed, pruned read.
+   *
+   * An `undecodable` miss (row FOUND, version refused) is NOT covered: it
+   * still re-folds under `refoldOnStoreMiss`, because there a complete row
+   * exists and folding from `init()` would launder a partial state past the
+   * version gate.
+   *
+   * Rollback: set `ES_FOLD_TRUST_ABSENT_MISS=0` (env) to restore the fallback
+   * read + re-fold behaviour everywhere without a code change.
+   *
+   * @default false
+   */
+  trustAbsentMiss?: boolean;
+  /**
    * Re-fold the aggregate's whole history from the event log when an event
    * arrives having occurred BEFORE the persisted checkpoint. Defaults to true.
    *

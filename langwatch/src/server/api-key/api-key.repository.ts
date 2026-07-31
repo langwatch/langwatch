@@ -148,6 +148,27 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * The display name of one key the caller already holds an id for, scoped to
+   * an organization so an id from another org resolves to nothing.
+   *
+   * Selects only the two display fields on purpose. This backs a read that is
+   * broader than key administration, so it must not be able to hand back the
+   * lookup id, the hashed secret, the owner, or the role bindings.
+   */
+  async findNameByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ name: string; revokedAt: Date | null } | null> {
+    return this.prisma.apiKey.findFirst({
+      where: { id, organizationId },
+      select: { name: true, revokedAt: true },
+    });
+  }
+
   async findAllByUser({
     userId,
     organizationId,

@@ -25,6 +25,10 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
+      # Set on the pod too (not just the SA) for policies that check the pod
+      # spec field rather than the ServiceAccount. ClickHouse never calls the
+      # Kubernetes API.
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -79,11 +83,18 @@ spec:
         - name: clickhouse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # readOnlyRootFilesystem is intentionally omitted — ClickHouse writes
-          # to paths outside the data PVC (e.g. /tmp, format schemas) and would
-          # crashloop under a read-only root.
+          # Read-only root: ch-config only writes into config.d/users.d (both
+          # emptyDir mounts) and ClickHouse data lives on the PVC. The few
+          # remaining writable paths (server logs and /tmp) are emptyDir-mounted
+          # below, so the image layer itself never needs to be writable.
           securityContext:
+            # The image already runs as uid 101 via its USER directive; pin it
+            # explicitly so it matches Keeper/backup and satisfies runAsUser /
+            # MustRunAs policies that read the pod spec.
+            runAsUser: 101
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           ports:
@@ -230,15 +241,37 @@ spec:
               mountPath: /etc/clickhouse-server/config.d
             - name: users-d
               mountPath: /etc/clickhouse-server/users.d
+            # Writable scratch so the container runs read-only root: server
+            # logs and /tmp. (config.d/users.d above are also writable
+            # emptyDirs, which is where ch-config renders config; everything
+            # else ClickHouse writes — preprocessed_configs, status, uuid,
+            # format_schemas, user_files, tmp, access — is under
+            # /var/lib/clickhouse on the PVC.)
+            - name: ch-logs
+              mountPath: /var/log/clickhouse-server
+            - name: tmp
+              mountPath: /tmp
             - name: secrets
               mountPath: /mnt/secrets
               readOnly: true
 
       volumes:
         - name: config-d
-          emptyDir: {}
+          # Holds rendered config only (ch-config writes here); bounded like
+          # every other scratch volume, so nothing is node-backed without a limit.
+          emptyDir:
+            sizeLimit: 64Mi
         - name: users-d
-          emptyDir: {}
+          # Holds rendered config only (ch-config writes here); bounded like
+          # every other scratch volume, so nothing is node-backed without a limit.
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: ch-logs
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.logsSizeLimit }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
         - name: secrets
           secret:
             secretName: {{ include "clickhouse-serverless.secretName" . }}
