@@ -480,6 +480,13 @@ async function spawnScenarioChildProcess(
       LANGWATCH_API_KEY: telemetry.apiKey,
       LANGWATCH_ENDPOINT: telemetry.endpoint,
       SCENARIO_HEADLESS: "true",
+      // The SDK auto-saves a JSON transcript of every red-team run under
+      // `<cwd>/redteam-reports/<timestamp>/`. That is a convenience for someone
+      // running scenarios from a terminal; here the child's cwd is the deployed
+      // package root, so it would be one new directory per run on the worker's
+      // disk, holding conversation content the platform already stores and
+      // nothing ever reads or prunes. Set the variable to opt back in locally.
+      SCENARIO_REDTEAM_REPORT: process.env.SCENARIO_REDTEAM_REPORT ?? "0",
       OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
       [SCENARIO_LOG_CONTEXT_ENV]: logContext,
       ...tlsEnv,
