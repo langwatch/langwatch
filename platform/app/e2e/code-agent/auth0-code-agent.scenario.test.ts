@@ -20,7 +20,7 @@
 //   - OPENAI_API_KEY in the environment (judge + user simulator)
 //
 // RUN:
-//   cd langwatch/e2e/code-agent
+//   cd platform/app/e2e/code-agent
 //   NLP_SERVICE_URL=http://127.0.0.1:5599 npx vitest run auth0-code-agent.scenario.test.ts --reporter=verbose
 
 import { readFileSync } from "node:fs";

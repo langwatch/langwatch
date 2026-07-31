@@ -1,7 +1,7 @@
 # Test environment with isolated ports
 # Infrastructure services only - run Next.js app locally
 #
-# Usage (from agentic-e2e-tests/ directory):
+# Usage (from tests/agentic-e2e/ directory):
 #   docker compose up -d
 #   cd ../../platform/app && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
 #   cd ../../tests/agentic-e2e && pnpm test

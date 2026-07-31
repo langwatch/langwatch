@@ -419,7 +419,7 @@ function readConfig(): Record<string, unknown> {
 beforeAll(async () => {
   if (!fs.existsSync(cliPath)) {
     throw new Error(
-      `CLI not built at ${cliPath} — run \`pnpm build\` in typescript-sdk/ before this suite`,
+      `CLI not built at ${cliPath} — run \`pnpm build\` in sdks/typescript/ before this suite`,
     );
   }
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lw-gov-e2e-"));

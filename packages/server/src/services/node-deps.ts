@@ -169,7 +169,7 @@ export async function ensureLangwatchDeps(
 		// also pull the TypeScript SDK, the skills compiler and the e2e suites,
 		// none of which the server ever runs. The trailing `...` selects the
 		// app AND everything it depends on, which is how the workspace members
-		// under packages/ and mcp-server/ still get installed.
+		// under packages/ and mcp/typescript/ still get installed.
 		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
 			...pnpm.args,
 			...workspaceInstallArgs(rootDir, { prod: false }),
