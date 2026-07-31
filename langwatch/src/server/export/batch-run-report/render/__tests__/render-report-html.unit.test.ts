@@ -19,11 +19,14 @@ import {
  *
  * Case-insensitive because this is the injection guard: HTML tag names are
  * case-insensitive to a browser, so a case-sensitive scan would run `<SCRIPT>`
- * happily and report the document clean.
+ * happily and report the document clean. The closing tag allows trailing
+ * whitespace for the same reason - a browser ends the script at `</script >`,
+ * and a scan that does not would read the rest of the document as script body
+ * and find one element where there are two.
  */
 function soleScriptBody(html: string): string | null {
   const matches = [
-    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi),
+    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script\s*>/gi),
   ];
   return matches.length === 1 ? (matches[0]?.[1] ?? null) : null;
 }
