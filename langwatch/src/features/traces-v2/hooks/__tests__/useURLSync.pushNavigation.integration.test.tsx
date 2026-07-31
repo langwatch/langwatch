@@ -90,6 +90,34 @@ describe("useURLSync applying a same-route push while already mounted", () => {
     });
   });
 
+  describe("given the writer moved the fragment behind React Router's back", () => {
+    /** @scenario Following the link while I am already looking at traces */
+    it("still applies a push to the fragment the router thinks it is already on", async () => {
+      // The write effect moves the fragment with a raw `history.replaceState`,
+      // which React Router never sees — so its own `location.hash` goes stale
+      // as soon as the user edits a filter. A guard comparing that stale copy
+      // reads "unchanged" for a push back to the original fragment and drops
+      // it, which is exactly the dead button this file exists to pin.
+      window.history.replaceState(null, "", "/#all-traces?q=%22first%22");
+      render(<Harness />);
+      expect(barState().queryText).toBe('"first"');
+
+      // The user edits the query: the store moves and the writer rewrites the
+      // fragment, but React Router's location still reads `q="first"`.
+      await act(async () => {
+        useFilterStore.getState().applyQueryText('"second"');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      });
+      expect(window.location.hash).toContain("second");
+
+      // Now follow a link back to the ORIGINAL fragment. To React Router this
+      // is a no-op navigation; to the page it is a real one.
+      act(() => pushHash!("#all-traces?q=%22first%22"));
+
+      expect(barState().queryText).toBe('"first"');
+    });
+  });
+
   describe("given a same-route push just applied a new bar state", () => {
     /** @scenario The link survives long enough to be read */
     it("is not replaced by the write-back effect a moment later", async () => {

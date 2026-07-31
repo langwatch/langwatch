@@ -244,12 +244,22 @@ function explorerFragment(search: TraceSearchQuery): string {
   if (search.startDate !== undefined && search.endDate !== undefined) {
     fragmentParams.set("from", String(search.startDate));
     fragmentParams.set("to", String(search.endDate));
-  } else {
-    // The search still covered a window even though the agent named none — see
-    // CLI_DEFAULT_WINDOW_PRESET. Saying nothing here is not neutral: it hands
-    // the user to the Explorer's 30d default and changes the answer.
+  } else if (search.startDate === undefined && search.endDate === undefined) {
+    // NEITHER bound named: the search covered the CLI's own default window and
+    // we can say so exactly — see CLI_DEFAULT_WINDOW_PRESET. Saying nothing here
+    // is not neutral; it hands the user the Explorer's 30d default instead.
     fragmentParams.set("preset", CLI_DEFAULT_WINDOW_PRESET);
   }
+  // Exactly ONE bound named falls through deliberately, carrying no window at
+  // all. The CLI defaults the two ends INDEPENDENTLY (`search.ts`: absent start
+  // → now-24h, absent end → now), so a half-named window is [namedStart, now] or
+  // [now-24h, namedEnd] — neither of which is the 24h default. Claiming 24h for
+  // `--start-date` three months back would NARROW a link to a hundredth of what
+  // the agent searched, and a link that narrows is the one failure this module
+  // must not produce: a lost filter shows the user a superset they can see
+  // through, an invented one hides rows they came to find. We cannot reconstruct
+  // the missing end without knowing when the search ran, so we assert nothing
+  // and let the Explorer's own default stand.
   const fragmentQuery = fragmentParams.toString();
   return fragmentQuery
     ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}`

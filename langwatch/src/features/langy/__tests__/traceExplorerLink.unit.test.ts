@@ -366,6 +366,35 @@ describe("buildTraceExplorerHref", () => {
         expect(params.get("from")).toBeNull();
         expect(params.get("to")).toBeNull();
       });
+
+      it("does not claim the 24h default either, which would NARROW the link", () => {
+        // The CLI defaults the two ends independently, so `--start-date` with
+        // no end is [thatStart, now] — not the 24h window. Stamping 24h on a
+        // start three months back would cut the link to a fraction of what the
+        // agent searched, hiding rows the user came to find. Carrying no window
+        // is the safe direction: the Explorer's own default is a superset.
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: { query: "x", startDate: 1750000000000 },
+          })!,
+        );
+
+        expect(params.get("preset")).toBeNull();
+      });
+
+      it("says nothing about the window when only the end is known", () => {
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: { query: "x", endDate: 1750086400000 },
+          })!,
+        );
+
+        expect(params.get("preset")).toBeNull();
+        expect(params.get("from")).toBeNull();
+        expect(params.get("to")).toBeNull();
+      });
     });
 
     describe("when the agent named no window at all", () => {

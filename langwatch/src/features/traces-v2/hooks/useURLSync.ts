@@ -427,22 +427,72 @@ export function useURLSync(): void {
   // change that denotes the state the store already holds (e.g. the trace
   // drawer's own query-string-only navigation) is still a no-op.
   //
-  // Gated on the hash ACTUALLY changing, not just this effect running: every
-  // effect fires once on mount regardless of its deps, and firing here too
-  // would call `applyFromFragment` a second time back-to-back with the mount
-  // effect — with `isFirstApply` now (wrongly) false. That's not a harmless
-  // repeat: a bare URL's "say nothing about the window" is only a no-op on
-  // the FIRST apply (see `resolveTimeRange`); a second, spurious "not-first"
-  // apply of the exact same bare URL reads as a real return-with-no-opinion
-  // and snaps a time range the user had already chosen back to the default.
+  // Gated on the fragment ACTUALLY changing, not just this effect running:
+  // every effect fires once on mount regardless of its deps, and firing here
+  // too would call `applyFromFragment` a second time back-to-back with the
+  // mount effect — with `isFirstApply` now (wrongly) false. That's not a
+  // harmless repeat: a bare URL's "say nothing about the window" is only a
+  // no-op on the FIRST apply (see `resolveTimeRange`); a second, spurious
+  // "not-first" apply of the exact same bare URL reads as a real
+  // return-with-no-opinion and snaps a time range the user had already chosen
+  // back to the default.
+  //
+  // Deliberately NOT gated on the fragment having changed. Two earlier attempts
+  // at that guard were both wrong, for the same underlying reason:
+  //
+  //   comparing `location.hash`        the writer above moves the fragment with
+  //                                    a RAW `history.replaceState`, which
+  //                                    React Router never observes — so its
+  //                                    copy goes stale the moment a filter is
+  //                                    edited, and the guard compares against a
+  //                                    value the page left behind.
+  //
+  //   comparing `window.location.hash` closer, but the ref only advances when
+  //                                    THIS effect applies. The writer moves the
+  //                                    real fragment without telling it, so the
+  //                                    ref still holds the pre-edit value; a push
+  //                                    back to that value reads as "unchanged".
+  //
+  // Both let the same sequence through: type a query, then follow a link back to
+  // the fragment you started on, and the deep link is silently dropped —
+  // reinstating the dead button this change exists to fix. No cache of "what the
+  // fragment was" can be trusted while something else mutates it unobserved.
+  //
+  // So don't keep one. `applyFromFragment` already decides correctly on its own:
+  // it reads `window.location.hash` live, and its in-sync check turns a fragment
+  // denoting the state the store already holds into a no-op — the same guard the
+  // `popstate` path above has always relied on. `location.key` is the trigger
+  // because it changes on every navigation React Router performs, including a
+  // push to a URL identical to the current one.
+  //
+  // The mount run is the one that must be skipped: every effect fires once on
+  // mount, and a second apply back-to-back with the mount effect would run with
+  // `isFirstApply` wrongly false. A bare URL's "say nothing about the window" is
+  // only a no-op on the FIRST apply (see `resolveTimeRange`); a spurious
+  // "not-first" apply of that same bare URL reads as a real
+  // return-with-no-opinion and snaps a time range the user already chose back to
+  // the default.
   const location = useLocation();
-  const lastAppliedHash = useRef(location.hash);
+  const hasSeenInitialLocation = useRef(false);
+  // Held behind a ref so the effect below can depend on `location.key` ALONE.
+  // `applyFromFragment` is a `useCallback` over store actions, and a store whose
+  // actions are not referentially stable across renders (any test double
+  // returning a fresh `vi.fn()` per selector call, for one) changes its identity
+  // every render. With it in the dep array, a plain re-render — no navigation at
+  // all — re-ran the apply and clobbered a lens the user had just picked.
+  // Navigation is the only thing that should re-read the fragment.
+  const applyFromFragmentRef = useRef(applyFromFragment);
+  useEffect(() => {
+    applyFromFragmentRef.current = applyFromFragment;
+  });
   useEffect(() => {
     if (!hasAppliedFragment.current) return;
-    if (location.hash === lastAppliedHash.current) return;
-    lastAppliedHash.current = location.hash;
-    applyFromFragment();
-  }, [location.hash, applyFromFragment]);
+    if (!hasSeenInitialLocation.current) {
+      hasSeenInitialLocation.current = true;
+      return;
+    }
+    applyFromFragmentRef.current();
+  }, [location.key]);
 
   // Coalesce URL writes on a 150ms timer. `replaceState` itself is cheap,
   // but `computeOverrides`/`buildFragment` allocate per char, and effect
