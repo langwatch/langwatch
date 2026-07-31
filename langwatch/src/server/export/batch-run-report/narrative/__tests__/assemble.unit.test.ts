@@ -40,7 +40,9 @@ function writtenBlocksOf(
   sections: ReturnType<typeof assemble>["sections"],
   questionId: string,
 ): Block[] {
-  return sections.find((it) => it.questionId === questionId)?.written ?? [];
+  return (
+    sections.find((entry) => entry.questionId === questionId)?.written ?? []
+  );
 }
 
 describe("assembleSections() coverage of the registry", () => {
@@ -50,8 +52,8 @@ describe("assembleSections() coverage of the registry", () => {
       const { sections } = assemble({ draft: { answers: [] } });
 
       expect(sections).toHaveLength(QUESTION_REGISTRY.length);
-      expect(sections.map((it) => it.questionId)).toEqual(
-        QUESTION_REGISTRY.map((it) => it.id),
+      expect(sections.map((entry) => entry.questionId)).toEqual(
+        QUESTION_REGISTRY.map((entry) => entry.id),
       );
     });
 
@@ -59,7 +61,7 @@ describe("assembleSections() coverage of the registry", () => {
     it("marks a question with no computed content as a gap rather than dropping it", () => {
       const { sections } = assemble({ draft: { answers: [] } });
       const proposals = sections.find(
-        (it) => it.questionId === "future.scenario",
+        (entry) => entry.questionId === "future.scenario",
       );
 
       expect(proposals).toBeDefined();
@@ -71,13 +73,15 @@ describe("assembleSections() coverage of the registry", () => {
     /** @scenario A report still downloads when no model is configured */
     it("keeps every computed section and gaps only the written-only ones", () => {
       const { sections } = assemble({ draft: null });
-      const outcome = sections.find((it) => it.questionId === "past.outcome");
+      const outcome = sections.find(
+        (entry) => entry.questionId === "past.outcome",
+      );
 
       expect(sections).toHaveLength(QUESTION_REGISTRY.length);
       expect(outcome?.computed.length).toBeGreaterThan(0);
       expect(outcome?.gap).toBeNull();
       expect(
-        sections.find((it) => it.questionId === "future.prompt")?.gap,
+        sections.find((entry) => entry.questionId === "future.prompt")?.gap,
       ).toBeTruthy();
     });
   });
@@ -87,7 +91,7 @@ describe("assembleSections() coverage of the registry", () => {
     it("explains why instead of leaving the section empty", () => {
       const { sections } = assemble({ draft: null });
       const regressions = sections.find(
-        (it) => it.questionId === "past.regressions",
+        (entry) => entry.questionId === "past.regressions",
       );
 
       expect(regressions?.gap).toContain("No earlier run");
@@ -158,7 +162,7 @@ describe("assembleSections() admission of statements", () => {
         ],
       };
       const ids = collectClaims(assemble({ draft }).sections).map(
-        (it) => it.id,
+        (entry) => entry.id,
       );
 
       const { sections, integrity } = assemble({
@@ -167,7 +171,9 @@ describe("assembleSections() admission of statements", () => {
       });
       const claims = collectClaims(sections);
 
-      expect(claims.map((it) => it.text)).toEqual(["Confirmed statement."]);
+      expect(claims.map((entry) => entry.text)).toEqual([
+        "Confirmed statement.",
+      ]);
       expect(integrity.claimsDroppedUnconfirmed).toBe(1);
     });
   });
@@ -295,7 +301,7 @@ describe("assembleSections() proposals", () => {
         },
       });
       const block = writtenBlocksOf(sections, "future.scenario").find(
-        (it) => it.kind === "artifacts",
+        (entry) => entry.kind === "artifacts",
       );
 
       expect(block?.kind === "artifacts" && block.artifacts[0]?.body).toContain(
@@ -329,7 +335,7 @@ describe("assembleSections() proposals", () => {
 
       expect(writtenBlocksOf(sections, "future.scenario")).toEqual([]);
       expect(
-        sections.find((it) => it.questionId === "future.scenario")?.gap,
+        sections.find((entry) => entry.questionId === "future.scenario")?.gap,
       ).toBeTruthy();
     });
   });

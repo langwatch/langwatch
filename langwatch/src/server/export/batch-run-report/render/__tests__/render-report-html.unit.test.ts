@@ -19,14 +19,14 @@ import {
  *
  * Case-insensitive because this is the injection guard: HTML tag names are
  * case-insensitive to a browser, so a case-sensitive scan would run `<SCRIPT>`
- * happily and report the document clean. The closing tag allows trailing
- * whitespace for the same reason - a browser ends the script at `</script >`,
- * and a scan that does not would read the rest of the document as script body
- * and find one element where there are two.
+ * happily and report the document clean. The closing tag allows anything up
+ * to the `>` for the same reason: a browser ends the script at `</script >`
+ * and at `</script foo>`, and a scan that does not would read the rest of the
+ * document as script body and find one element where there are two.
  */
 function soleScriptBody(html: string): string | null {
   const matches = [
-    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script\s*>/gi),
+    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script[^>]*>/gi),
   ];
   return matches.length === 1 ? (matches[0]?.[1] ?? null) : null;
 }
@@ -151,7 +151,10 @@ describe("Feature: Run report — determinism", () => {
           makeSection({ computed: EVERY_BLOCK, written: EVERY_BLOCK }),
         ],
       });
-      expect(renderReportHtml({ model })).toBe(renderReportHtml({ model }));
+      const first = renderReportHtml({ model });
+      const second = renderReportHtml({ model });
+
+      expect(second).toBe(first);
     });
 
     /** @scenario The same run produces the same report twice */

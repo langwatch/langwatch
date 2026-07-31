@@ -17,17 +17,15 @@ export function buildEvidenceBlock({
   evidence: ReportEvidence;
   transcripts: SelectedTranscript[];
 }): string {
+  // The filter is what stops a section that produced nothing from leaving a
+  // blank line behind, so the separators the sections would otherwise need are
+  // never written in the first place.
   return [
     ...runSection(evidence),
-    "",
     ...criteriaSection(evidence),
-    "",
     ...failureGroupsSection(evidence),
-    "",
     ...trendSection(evidence),
-    "",
     ...scenariosSection(evidence),
-    "",
     ...conversationsSection({ evidence, transcripts }),
   ]
     .filter((line) => line !== "")

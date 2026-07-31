@@ -88,7 +88,7 @@ describe("resolveClaims()", () => {
         claim("c", [{ kind: "signature", signatureId: "s_known" }]),
       ]);
 
-      expect(result.kept.map((it) => it.id)).toEqual(["a", "b", "c"]);
+      expect(result.kept.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
     });
   });
 
@@ -136,7 +136,7 @@ describe("resolveClaims()", () => {
         claim("invented", [{ kind: "signature", signatureId: "s_nope" }]),
       ]);
 
-      expect(result.kept.map((it) => it.id)).toEqual(["good"]);
+      expect(result.kept.map((entry) => entry.id)).toEqual(["good"]);
       expect(result.droppedUncited).toBe(1);
       expect(result.droppedUnresolvable).toBe(1);
     });

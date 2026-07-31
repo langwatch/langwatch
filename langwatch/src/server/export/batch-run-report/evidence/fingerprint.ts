@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { FailureSignature } from "../report.types";
 
 /**
  * Stable identities for the things a report talks about.
@@ -101,7 +102,7 @@ export function signatureIdFor({
   unmetCriteria,
   errorShape,
 }: {
-  kind: string;
+  kind: FailureSignature["kind"];
   unmetCriteria: string[];
   errorShape: string | null;
 }): string {
