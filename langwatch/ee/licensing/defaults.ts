@@ -52,7 +52,7 @@ export function resolvePlanDefaults(
     maxDashboards: plan.maxDashboards ?? DEFAULT_LIMIT,
     maxCustomGraphs: plan.maxCustomGraphs ?? DEFAULT_LIMIT,
     maxAutomations: plan.maxAutomations ?? DEFAULT_LIMIT,
-    webhookEndpoints: plan.webhookEndpoints ?? false,
+    webhookEndpointsEnabled: plan.webhookEndpointsEnabled ?? false,
     usageUnit: KNOWN_USAGE_UNITS.includes(plan.usageUnit as any)
       ? plan.usageUnit!
       : "traces",

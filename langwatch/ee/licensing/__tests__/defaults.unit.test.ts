@@ -170,7 +170,7 @@ describe("resolvePlanDefaults", () => {
       maxProjects: resolved.maxProjects,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       maxWorkflows: resolved.maxWorkflows,
-      webhookEndpoints: resolved.webhookEndpoints,
+      webhookEndpointsEnabled: resolved.webhookEndpointsEnabled,
       maxPrompts: resolved.maxPrompts,
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
@@ -186,5 +186,31 @@ describe("resolvePlanDefaults", () => {
     };
 
     expect(allFields).toEqual(resolved);
+  });
+
+  it("defaults the webhook entitlement to false and honors an explicit true", () => {
+    const withoutFlag = resolvePlanDefaults({
+      type: "TEST",
+      name: "Test",
+      maxMembers: 1,
+      maxProjects: 1,
+      maxMessagesPerMonth: 1000,
+      maxWorkflows: 10,
+      canPublish: false,
+    });
+    // A paid feature must never leak by default.
+    expect(withoutFlag.webhookEndpointsEnabled).toBe(false);
+
+    const withFlag = resolvePlanDefaults({
+      type: "TEST",
+      name: "Test",
+      maxMembers: 1,
+      maxProjects: 1,
+      maxMessagesPerMonth: 1000,
+      maxWorkflows: 10,
+      canPublish: false,
+      webhookEndpointsEnabled: true,
+    });
+    expect(withFlag.webhookEndpointsEnabled).toBe(true);
   });
 });

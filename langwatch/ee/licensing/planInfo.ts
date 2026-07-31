@@ -41,7 +41,7 @@ export type PlanInfo = {
    * feature: absent/false on free, PRO, and GROWTH plans; enterprise
    * licenses and subscriptions carry true.
    */
-  webhookEndpoints?: boolean;
+  webhookEndpointsEnabled?: boolean;
   usageUnit?: string;
   userPrice?: {
     USD: number;

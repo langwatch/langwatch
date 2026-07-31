@@ -51,7 +51,7 @@ const planLimitsSchema = z.object({
     .int()
     .positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
-  webhookEndpoints: z.boolean().optional(),
+  webhookEndpointsEnabled: z.boolean().optional(),
   usageUnit: z.enum(["traces", "events"]),
 });
 
@@ -188,7 +188,7 @@ export const licenseRouter = createTRPCRouter({
           maxAgents: plan.maxAgents,
           maxExperiments: plan.maxExperiments,
           canPublish: plan.canPublish,
-          webhookEndpoints: plan.webhookEndpoints,
+          webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
           usageUnit: plan.usageUnit,
         },
       };
