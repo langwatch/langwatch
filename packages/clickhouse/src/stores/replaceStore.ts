@@ -121,13 +121,27 @@ export interface ClickHouseReplacingArgs<State, Columns extends ColumnMap> {
   /**
    * Bounds the read on a sort-key column that leads the key columns, so a
    * time-leading key is a seek rather than a tenant-range scan. A windowed miss
-   * always retries unwindowed before reporting `absent`, because reporting a row
+   * retries unwindowed before reporting `absent`, because reporting a row
    * that exists outside the window as absent is the silent population-wide reset
-   * ADR-107 decision 9 exists to prevent.
+   * ADR-107 decision 9 exists to prevent. `trustAbsentMiss` waives that retry
+   * for folds that can prove they do not need it.
    */
   readonly readWindow?: {
     readonly column: string;
     readonly lookbackMs: number;
+    /**
+     * Trust a windowed absence: report `absent` without the unwindowed
+     * retry. Declare this only when two facts hold. First, the executor
+     * writes state on every delivery, so absence proves genesis. Second,
+     * the aggregate's whole lifetime fits inside `lookbackMs`, so a live
+     * row cannot sit outside the window. The retry is a tenant-range
+     * scan on a time-leading key; production measured it at ~290/min
+     * with zero recoveries beyond a 7-day window (#6347). An undecodable
+     * row is a refusal, never an absence. It keeps the full path.
+     */
+    readonly trustAbsentMiss?: boolean;
+    /** Called once per trusted absence. Wire a counter to keep the saving visible. */
+    readonly onTrustedAbsentMiss?: () => void;
   };
   /** @default createRowCodec() */
   readonly codec?: WireCodec;
@@ -271,15 +285,21 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
     foldKey: string,
     context: StoreContext,
   ): Promise<StateRead<State>> => {
-    // A windowed miss is not an answer: the row may simply be older than the
-    // window, and reporting that as absent would refold the aggregate from
-    // genesis and overwrite it.
+    // A windowed miss is not an answer by default: the row may simply be
+    // older than the window, and reporting that as absent would refold the
+    // aggregate from genesis and overwrite it. A fold that declares
+    // `trustAbsentMiss` has ruled that out (see the option's contract), so
+    // its windowed miss IS the answer and the retry scan never runs.
     let result = await queryRow(
       foldKey,
       context,
       windowedReadSql !== undefined,
     );
     if (!result.rows[0] && windowedReadSql !== undefined) {
+      if (args.readWindow?.trustAbsentMiss) {
+        args.readWindow.onTrustedAbsentMiss?.();
+        return { kind: "absent" };
+      }
       result = await queryRow(foldKey, context, false);
     }
     const row = result.rows[0];

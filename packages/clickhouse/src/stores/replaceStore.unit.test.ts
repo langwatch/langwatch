@@ -1125,4 +1125,67 @@ describe("given clickhouseReplacing() with a declared read window", () => {
     expect(client.queryCalls).toHaveLength(1);
     expect(result).toEqual({ kind: "undecodable", storedVersion: "v0-legacy" });
   });
+
+  function buildTrustingStore(
+    client: ClickHouseClient,
+    onTrustedAbsentMiss?: () => void,
+  ) {
+    return clickhouseReplacing<FoldState, typeof windowedTable.columns>({
+      client,
+      table: windowedTable,
+      version: EXPECTED_VERSION,
+      key: "AggregateId",
+      stateVersionColumn: "StateVersion",
+      state: FOLD_STATE,
+      readWindow: {
+        column: "AcceptedAt",
+        lookbackMs: 30 * 24 * 60 * 60 * 1000,
+        trustAbsentMiss: true,
+        onTrustedAbsentMiss,
+      },
+    });
+  }
+
+  /** @scenario a trusted windowed absence folds from init with a single read */
+  it("reports a trusted windowed miss absent without the unwindowed retry", async () => {
+    let skipped = 0;
+    const client = createFakeClient({ query: async () => ({ rows: [] }) });
+    const store = buildTrustingStore(client, () => skipped++);
+
+    const result = await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(1);
+    expect(resolveIdentifiers(client.queryCalls[0]!)).toContain("windowFrom");
+    expect(result).toEqual({ kind: "absent" });
+    expect(skipped).toBe(1);
+  });
+
+  /** @scenario a trusted store still refuses a row it cannot decode */
+  it("keeps reporting undecodable, uncounted, when the windowed query finds a refused row", async () => {
+    let skipped = 0;
+    const client = createFakeClient({
+      query: async () => storedRow({ stateVersion: "v0-legacy" }),
+    });
+    const store = buildTrustingStore(client, () => skipped++);
+
+    const result = await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(1);
+    expect(result).toEqual({ kind: "undecodable", storedVersion: "v0-legacy" });
+    expect(skipped).toBe(0);
+  });
+
+  /** @scenario absence is only trusted where it is declared */
+  it("keeps the unwindowed retry for a windowed store that does not declare trust", async () => {
+    const client = createFakeClient({ query: async () => ({ rows: [] }) });
+    const store = buildWindowedStore(client);
+
+    const result = await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(2);
+    expect(resolveIdentifiers(client.queryCalls[1]!)).not.toContain(
+      "windowFrom",
+    );
+    expect(result).toEqual({ kind: "absent" });
+  });
 });

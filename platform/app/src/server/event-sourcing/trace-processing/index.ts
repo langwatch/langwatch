@@ -594,6 +594,13 @@ function buildStores(deps: TraceProcessingPipelineDeps) {
   });
   assertMountIsLegal("traceSummary", traceSummaryMount(summaryStore));
 
+  // Counts every skipped fallback scan, so a drifting window stays visible.
+  const trustedAbsent = deps.metrics?.counter({
+    name: "es_fold_absent_miss_trusted_total",
+    help: "Absent windowed reads a trusting fold answered from init(), skipping the unwindowed fallback scan",
+    labelNames: ["projection"],
+  });
+
   const analyticsStore = clickhouseReplacing({
     client: deps.client,
     table: traceAnalyticsTable,
@@ -604,7 +611,18 @@ function buildStores(deps: TraceProcessingPipelineDeps) {
     cache: deps.analyticsCache ?? noFoldStateCache<TraceAnalyticsState>(),
     retentionDays: DEFAULT_RETENTION_DAYS,
     // Deployed `ORDER BY (TenantId, OccurredAt, TraceId)` is time-leading.
-    readWindow: { column: "OccurredAt", lookbackMs: ANALYTICS_READ_WINDOW_MS },
+    readWindow: {
+      column: "OccurredAt",
+      lookbackMs: ANALYTICS_READ_WINDOW_MS,
+      // Sound here on the store option's two conditions: the executor writes
+      // on every delivery, and a trace's spans arrive well inside the 7-day
+      // window (a 30-day production measurement found zero recoveries beyond
+      // 7 days on any fold, #6347). The fold-state cache covers backdated
+      // seeder traffic within a process.
+      trustAbsentMiss: true,
+      onTrustedAbsentMiss: () =>
+        trustedAbsent?.inc({ projection: "traceAnalytics" }),
+    },
   });
   assertMountIsLegal("traceAnalytics", traceAnalyticsMount(analyticsStore));
 

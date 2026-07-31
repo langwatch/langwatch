@@ -227,6 +227,31 @@ Feature: A table is declared once, and the declaration is checked against what i
     Then it does not retry unwindowed
     And it reports undecodable rather than absent
 
+  # Trusting absence. The retry above exists because "no row" is ambiguous
+  # for a fold whose row may sit outside the window. A fold whose executor
+  # writes on every delivery and whose aggregates live inside the window has
+  # no such ambiguity: an in-window absence proves genesis, and the retry is
+  # a tenant-range scan that recovers nothing.
+
+  Scenario: a trusted windowed absence folds from init with a single read
+    Given a fold that declares its aggregates live inside the read window
+    And a windowed read that finds nothing
+    When the store decides whether the aggregate is absent
+    Then it reports absent without the unwindowed retry
+    And the skipped retry is counted, so the saving stays visible
+
+  Scenario: a trusted store still refuses a row it cannot decode
+    Given a fold that trusts a windowed absence
+    And a windowed read that found a row it could not decode
+    When the store handles the refusal
+    Then it reports undecodable without any retry
+    And the refusal is not counted as a trusted absence
+
+  Scenario: absence is only trusted where it is declared
+    Given a fold with a read window and no trust declaration
+    When a windowed read finds nothing
+    Then the unwindowed retry still runs
+
   # Not yet implemented — the IN-tuple GROUP BY/max(UpdatedAt) dedup pattern is
   # a query convention applied by hand at each call site; no reusable query
   # builder in packages/clickhouse implements or enforces it.
