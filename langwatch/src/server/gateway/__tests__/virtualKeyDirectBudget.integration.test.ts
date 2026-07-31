@@ -39,12 +39,22 @@ const VK_STANDALONE_ID = `vk_vkb_standalone_${suffix}`;
 const VK_BOTH_ID = `vk_vkb_both_${suffix}`;
 /** Covered only by the project budget: no cap of its own. */
 const VK_INHERITED_ID = `vk_vkb_inherited_${suffix}`;
+/**
+ * A neighbouring pair with identical budgets, one used and one not. They
+ * exist to prove the bar reads its own bucket: same org, same project,
+ * same window, same limit, so a prefix match or a scope-level read would
+ * hand the unused one its neighbour's money.
+ */
+const VK_NEIGHBOUR_USED_ID = `vk_vkb_neighbour_used_${suffix}`;
+const VK_NEIGHBOUR_UNUSED_ID = `vk_vkb_neighbour_unused_${suffix}`;
 
 const BUDGET_DAILY_ID = `bdg-vkb-daily-${suffix}`;
 const BUDGET_STANDALONE_ID = `bdg-vkb-standalone-${suffix}`;
 const BUDGET_BOTH_MANAGED_ID = `bdg-vkb-both-managed-${suffix}`;
 const BUDGET_BOTH_STANDALONE_ID = `bdg-vkb-both-standalone-${suffix}`;
 const BUDGET_PROJECT_ID = `bdg-vkb-project-${suffix}`;
+const BUDGET_NEIGHBOUR_USED_ID = `bdg-vkb-neigh-used-${suffix}`;
+const BUDGET_NEIGHBOUR_UNUSED_ID = `bdg-vkb-neigh-unused-${suffix}`;
 
 /**
  * Midday UTC of the current day. Anchoring both the debits and the read
@@ -184,6 +194,8 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
     await createVirtualKey(VK_STANDALONE_ID, "standalone-key");
     await createVirtualKey(VK_BOTH_ID, "both-key");
     await createVirtualKey(VK_INHERITED_ID, "inherited-key");
+    await createVirtualKey(VK_NEIGHBOUR_USED_ID, "neighbour-used");
+    await createVirtualKey(VK_NEIGHBOUR_UNUSED_ID, "neighbour-unused");
 
     await createBudget({
       id: BUDGET_DAILY_ID,
@@ -222,6 +234,19 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
       window: "MONTH",
       limitUsd: "500.00",
     });
+    for (const [id, scopeId] of [
+      [BUDGET_NEIGHBOUR_USED_ID, VK_NEIGHBOUR_USED_ID],
+      [BUDGET_NEIGHBOUR_UNUSED_ID, VK_NEIGHBOUR_UNUSED_ID],
+    ] as const) {
+      await createBudget({
+        id,
+        scopeType: "VIRTUAL_KEY",
+        scopeId,
+        window: "DAY",
+        limitUsd: "5.00",
+        managedByVirtualKeyId: scopeId,
+      });
+    }
 
     // The founder's shape: $2.50 spent on the key this month, $0.50 of it
     // today, against a $1.00 daily cap.
@@ -270,6 +295,17 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
       amountUsd: "9.0000",
       occurredAt: NOW,
     });
+    // Only the used half of the neighbouring pair ever spends. The unused
+    // half is left with a budget and no traffic at all.
+    await debit({
+      budgetId: BUDGET_NEIGHBOUR_USED_ID,
+      scope: "VIRTUAL_KEY",
+      scopeId: VK_NEIGHBOUR_USED_ID,
+      window: "DAY",
+      virtualKeyId: VK_NEIGHBOUR_USED_ID,
+      amountUsd: "1.2500",
+      occurredAt: NOW,
+    });
   }, 120_000);
 
   afterAll(async () => {
@@ -305,7 +341,12 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
     VK_STANDALONE_ID,
     VK_BOTH_ID,
     VK_INHERITED_ID,
+    VK_NEIGHBOUR_USED_ID,
+    VK_NEIGHBOUR_UNUSED_ID,
   ];
+
+  /** Keys the fixture never sends a debit for, in any period. */
+  const neverUsedKeyIds = () => [VK_INHERITED_ID, VK_NEIGHBOUR_UNUSED_ID];
 
   const load = () =>
     loadDirectBudgetsForKeys({
@@ -373,6 +414,45 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
     expect(both?.budgetId).toBe(BUDGET_BOTH_MANAGED_ID);
     expect(both?.window).toBe("DAY");
     expect(Number(both?.periodSpentUsd)).toBeCloseTo(0.75, 6);
+  });
+
+  /** @scenario "A key covered by several budgets is not counted once per budget" */
+  it("reads only its own bucket when a neighbouring key has an identical budget", async () => {
+    const budgets = await load();
+    const used = budgets.get(VK_NEIGHBOUR_USED_ID);
+    const unused = budgets.get(VK_NEIGHBOUR_UNUSED_ID);
+
+    // Both keys exist with the same $5.00/day cap, in the same project.
+    expect(used?.budgetId).toBe(BUDGET_NEIGHBOUR_USED_ID);
+    expect(unused?.budgetId).toBe(BUDGET_NEIGHBOUR_UNUSED_ID);
+    expect(Number(used?.limitUsd)).toBeCloseTo(5, 6);
+    expect(Number(unused?.limitUsd)).toBeCloseTo(5, 6);
+
+    // Only one of them spent. A prefix match, or a read at the project's
+    // scope rather than the key's bucket, would give the other one this
+    // money too.
+    expect(Number(used?.periodSpentUsd)).toBeCloseTo(1.25, 6);
+    expect(unused?.periodSpentUsd).toBe("0.000000");
+  });
+
+  /**
+   * The incoherence the founder caught in QA: a key that has never served
+   * a request cannot have spent anything, so a bar above zero on such a
+   * key is a bug in the read, not a display quirk. Pinned as a failure
+   * condition rather than left to a screenshot to catch.
+   *
+   * @scenario "A key with no budget still reports what it spent"
+   */
+  it("never reports spend on a key that has never been used", async () => {
+    const budgets = await load();
+    for (const keyId of neverUsedKeyIds()) {
+      const row = budgets.get(keyId);
+      if (!row) continue; // no direct budget: no bar to be wrong about
+      expect(
+        Number(row.periodSpentUsd),
+        `key ${keyId} has never been used but its budget bar reads ${row.periodSpentUsd}`,
+      ).toBe(0);
+    }
   });
 
   /** @scenario "A budget whose spend cannot be totalled says so instead of showing zero" */
