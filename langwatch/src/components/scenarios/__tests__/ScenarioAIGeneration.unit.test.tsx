@@ -154,10 +154,10 @@ describe("useScenarioGeneration", () => {
     await act(async () => {
       try {
         await result.current.generate({
-        prompt: "test prompt",
-        currentScenario: null,
-        redTeam: false,
-      });
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch {
         // Expected to throw
       }
@@ -178,10 +178,10 @@ describe("useScenarioGeneration", () => {
     await act(async () => {
       try {
         await result.current.generate({
-        prompt: "test prompt",
-        currentScenario: null,
-        redTeam: false,
-      });
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch (error) {
         thrownError = error as Error;
       }
@@ -202,10 +202,10 @@ describe("useScenarioGeneration", () => {
     await act(async () => {
       try {
         await result.current.generate({
-        prompt: "test prompt",
-        currentScenario: null,
-        redTeam: false,
-      });
+          prompt: "test prompt",
+          currentScenario: null,
+          redTeam: false,
+        });
       } catch (error) {
         thrownError = error as Error;
       }

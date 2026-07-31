@@ -193,7 +193,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           }
         : null;
 
-      const scenario = await generate({ prompt: input, currentScenario, redTeam });
+      const scenario = await generate({
+        prompt: input,
+        currentScenario,
+        redTeam,
+      });
 
       // Update form with generated data (defensive defaults for unexpected API responses)
       form.setValue("name", scenario.name ?? "");

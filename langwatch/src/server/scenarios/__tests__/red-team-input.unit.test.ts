@@ -108,7 +108,9 @@ describe("the red-team write contract", () => {
 
   describe("given an objective but no strategy", () => {
     it("raises nothing, since that is simply a standard scenario", () => {
-      expect(redTeamStateIssue({ redTeamTarget: "extract the code" })).toBeNull();
+      expect(
+        redTeamStateIssue({ redTeamTarget: "extract the code" }),
+      ).toBeNull();
     });
   });
 
@@ -311,7 +313,9 @@ describe("the red-team write contract", () => {
     it("refuses an attack plan and a planning prompt past the cap", () => {
       expect(
         schema.safeParse({
-          redTeamConfig: { attackPlan: "x".repeat(RED_TEAM_MAX_PLAN_LENGTH + 1) },
+          redTeamConfig: {
+            attackPlan: "x".repeat(RED_TEAM_MAX_PLAN_LENGTH + 1),
+          },
         }).success,
       ).toBe(false);
       expect(
