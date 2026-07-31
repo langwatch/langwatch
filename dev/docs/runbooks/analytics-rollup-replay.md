@@ -53,21 +53,24 @@ surface (`getReplayStatus`, `getReplayHistory`, `cancelReplay`). The map-path
 replay appends increments per event; because the migration left the tables
 empty, appending reconstructs exact totals. Do not run the replay twice
 concurrently and do not re-run it after a successful pass without truncating
-first (the table's contract is replay-rebuilds-truncate-first, see 00038).
+first (both tables' contract is replay-rebuilds-truncate-first, see 00038 for
+the trace rollup and 00040 for the evaluation rollup).
 
 ## How to verify
 
-Row counts must be identical on every replica once replication catches up
-(query each replica directly, not through the load balancer):
+The logical totals must be identical on every replica once replication
+catches up. Compare SUMS, not raw row counts: the table is an
+AggregatingMergeTree, so each replica may hold a different merge state
+(different physical row counts) while the summed values agree.
 
 ```sql
-SELECT hostName(), count(), sum(SpanCount)
+SELECT hostName(), sum(SpanCount), sum(TraceCount), round(sum(CostSum), 6)
 FROM clusterAllReplicas('langwatch', currentDatabase(), 'trace_analytics_rollup')
 GROUP BY hostName();
 ```
 
 Same shape for `evaluation_analytics_rollup` with `EvalCount`. Every replica
-must report the same numbers; divergence means the table is still on a plain
+must report the same sums; divergence means the table is still on a plain
 engine somewhere (check `SELECT engine FROM system.tables WHERE name = 'trace_analytics_rollup'`
 on each replica, all must say `ReplicatedAggregatingMergeTree`).
 

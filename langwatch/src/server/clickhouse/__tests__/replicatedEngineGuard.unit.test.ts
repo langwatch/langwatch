@@ -36,9 +36,11 @@ const GOOSE_SOURCE = readFileSync(
 );
 
 /**
- * The body of buildMigrationEnvVars, so the provisioning assertion below can
- * only be satisfied by an actual key in the vars object, never by a mention
- * in a comment or another function.
+ * The source of buildMigrationEnvVars with its comments removed, so the
+ * provisioning assertion below is scoped to that function and a mention in a
+ * comment (anywhere) or elsewhere in the file cannot satisfy it. Text-based
+ * on purpose: the function is a flat object literal, and the assertion's
+ * `^\s*NAME:` shape matches only key positions in it.
  */
 const ENV_VARS_BODY = (() => {
   const start = GOOSE_SOURCE.indexOf("function buildMigrationEnvVars");
@@ -46,7 +48,12 @@ const ENV_VARS_BODY = (() => {
     throw new Error("buildMigrationEnvVars not found in goose.ts");
   }
   const end = GOOSE_SOURCE.indexOf("\n}", start);
-  return GOOSE_SOURCE.slice(start, end);
+  if (end < 0) {
+    throw new Error("buildMigrationEnvVars closing brace not found");
+  }
+  return GOOSE_SOURCE.slice(start, end)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
 })();
 
 const APPROVED_ENGINE_PATTERNS: { name: string; pattern: RegExp }[] = [
