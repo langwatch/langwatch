@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  countRunOutcomes,
+  passRateFrom,
+} from "~/server/scenarios/run-outcome-summary";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { buildPassRateFact, wilsonInterval } from "../confidence";
 
 /**
@@ -140,5 +145,47 @@ describe("buildPassRateFact()", () => {
     it("draws a conclusion from it", () => {
       expect(fact.tooFewToConclude).toBe(false);
     });
+  });
+});
+
+describe("the report's rate against the run history's own", () => {
+  /**
+   * The report is read away from the screen, so it has nothing to be checked
+   * against except the screen it came from. Both derive the rate from the same
+   * counts; this runs them over the same runs and insists they land on the
+   * same number, so a change to one that is not made to the other fails here
+   * rather than in front of a reader holding two figures.
+   *
+   * @scenario The report never disagrees with the screen
+   */
+  it.each([
+    [[ScenarioRunStatus.SUCCESS, ScenarioRunStatus.FAILED]],
+    [
+      [
+        ScenarioRunStatus.SUCCESS,
+        ScenarioRunStatus.SUCCESS,
+        ScenarioRunStatus.FAILED,
+        ScenarioRunStatus.STALLED,
+        ScenarioRunStatus.CANCELLED,
+      ],
+    ],
+    [[ScenarioRunStatus.SUCCESS, ScenarioRunStatus.STALLED]],
+    [[ScenarioRunStatus.FAILED, ScenarioRunStatus.CANCELLED]],
+    [
+      [
+        ScenarioRunStatus.SUCCESS,
+        ScenarioRunStatus.IN_PROGRESS,
+        ScenarioRunStatus.QUEUED,
+      ],
+    ],
+  ])("states the same rate as the run history for %j", (statuses) => {
+    const counts = countRunOutcomes({ statuses });
+
+    const fact = buildPassRateFact({
+      passedCount: counts.passedCount,
+      settledCount: counts.settledCount,
+    });
+
+    expect(fact.value).toBe(passRateFrom({ counts }));
   });
 });

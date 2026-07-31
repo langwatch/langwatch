@@ -98,6 +98,13 @@ export function buildPassRateFact({
         : null;
 
   return {
+    // Must equal `passRateFrom()`, the function the run-history rows use. It is
+    // not called here because its other branch answers a question this one has
+    // already answered above (nothing settled), and reaching for it would mean
+    // fabricating the rest of a counts object to get at one division. The
+    // agreement is held by a test that runs both over the same inputs, because
+    // the one thing this report must never do is state a rate different from
+    // the row it was exported from.
     value: (passedCount / settledCount) * 100,
     ci95,
     settled: settledCount,
