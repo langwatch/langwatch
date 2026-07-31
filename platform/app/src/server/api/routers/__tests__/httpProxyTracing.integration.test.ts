@@ -20,24 +20,30 @@ vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
   ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
 }));
 
-// Mock getApp().traces.recordSpan to capture the OTLP span the route records.
+// Mock the span-ingest seam to capture the OTLP envelope the route submits.
 // Mock both path forms used across the codebase — relative (matches the
 // httpProxyTracing.ts import) and tsconfig-alias. vi.mock is hoisted so the
 // shared mock fn lives in vi.hoisted() to be visible to both factories.
 const { mockScheduleTrace } = vi.hoisted(() => ({
-  mockScheduleTrace: vi.fn().mockResolvedValue(undefined),
+  mockScheduleTrace: vi.fn().mockResolvedValue({ status: "collected" }),
 }));
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     traces: {
-      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+      collection: {
+        ingestNormalizedSpan: (...args: unknown[]) =>
+          mockScheduleTrace(...args),
+      },
     },
   }),
 }));
 vi.mock("../../../app-layer/app", () => ({
   getApp: () => ({
     traces: {
-      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+      collection: {
+        ingestNormalizedSpan: (...args: unknown[]) =>
+          mockScheduleTrace(...args),
+      },
     },
   }),
 }));
@@ -53,14 +59,14 @@ type OtlpSpan = {
   endTimeUnixNano: string;
   status: { code: number; message?: string };
 };
-type RecordSpanArgs = {
+type IngestedSpanArgs = {
   tenantId: string;
   span: OtlpSpan;
   resource: { attributes: OtlpAttr[] } | null;
 };
 
-function recordSpanArgs(): RecordSpanArgs {
-  return mockScheduleTrace.mock.calls[0]![0] as RecordSpanArgs;
+function ingestedSpanArgs(): IngestedSpanArgs {
+  return mockScheduleTrace.mock.calls[0]![0] as IngestedSpanArgs;
 }
 
 function findAttr(
@@ -71,7 +77,7 @@ function findAttr(
 }
 
 function resourceAttr(key: string): string | undefined {
-  return findAttr(recordSpanArgs().resource?.attributes, key)?.stringValue;
+  return findAttr(ingestedSpanArgs().resource?.attributes, key)?.stringValue;
 }
 
 type CollectorJobFacade = {
@@ -88,7 +94,7 @@ type CollectorJobFacade = {
 };
 
 function getTraceJob(): CollectorJobFacade {
-  const args = recordSpanArgs();
+  const args = ingestedSpanArgs();
   const span = args.span;
   const inputJson = findAttr(span.attributes, "langwatch.input")?.stringValue;
   const outputJson = findAttr(span.attributes, "langwatch.output")?.stringValue;

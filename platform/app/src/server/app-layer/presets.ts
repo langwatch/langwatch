@@ -31,7 +31,6 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import { prismaOutbox } from "~/server/event-sourcing/adapters/prismaOutbox";
 import { prismaProcessStore } from "~/server/event-sourcing/adapters/prismaProcessStore";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -229,13 +228,10 @@ import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.pri
 import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/repositories/topic-clustering-status.repository";
 import { TopicService } from "./topic-clustering/topic.service";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
-import {
-  CanonicalizeSpanAttributesService,
-  canonicalizeSpan,
-} from "./traces/canonicalisation";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
+import { createCanonicalSpanRecorder } from "./traces/ingest/canonicalSpanRecorder";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -248,7 +244,6 @@ import { NullTraceListRepository } from "./traces/repositories/trace-list.reposi
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
-import { SpanNormalizationPipelineService } from "./traces/span-normalization.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import {
@@ -1156,35 +1151,17 @@ export function initializeDefaultApp(options?: {
     queueSimulationRun: commands.simulations.queueRun,
   });
 
-  const spanNormalization = new SpanNormalizationPipelineService(
-    new CanonicalizeSpanAttributesService(),
-  );
-
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
       // `recordSpan` accepts a `CanonicalSpan`, never the OTLP envelope the
       // edge assembles: decoding and canonicalisation are the trust boundary
-      // ADR-105 decision 7 puts upstream of the command. Handing the envelope
-      // straight over left `spanReceived`'s `(d) => d.traceId` resolver reading
-      // an absent field, so every event committed with an empty `AggregateId`
-      // and neither aggregate-scoped fold could key a row.
-      recordSpan: async (data) => {
-        const normalized = spanNormalization.normalizeSpanReceived(
-          data.tenantId,
-          data.span,
-          data.resource,
-          data.instrumentationScope,
-        );
-        const span = canonicalizeSpan({
-          normalized,
-          piiRedactionLevel:
-            data.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL,
-          occurredAt: data.occurredAt,
-          acceptedAt: Date.now(),
-        });
-        await commands.traces.recordSpan(span, { tenantId: span.tenantId });
-      },
+      // ADR-105 decision 7 puts upstream of the command.
+      recordSpan: createCanonicalSpanRecorder({
+        recordSpan: async (span) => {
+          await commands.traces.recordSpan(span, { tenantId: span.tenantId });
+        },
+      }),
       // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
       // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
       // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and

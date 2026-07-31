@@ -49,6 +49,21 @@ Feature: HTTP Agent Test Tracing
     Then the trace metadata includes the user ID
 
   # ============================================================================
+  # Ingestion
+  #
+  # The test span goes in through the same seam every customer span uses. It
+  # used to be handed straight to the trace pipeline instead, in the wire shape
+  # the pipeline does not accept, so the span was never attributed to its trace
+  # and the trace reached no read model — recorded, and readable nowhere.
+  # ============================================================================
+
+  @unit
+  Scenario: The test span is recorded against the trace it belongs to
+    When I execute an HTTP agent test
+    Then the recorded span is attributed to the test's trace
+    And the trace is written to the traces read model
+
+  # ============================================================================
   # Request details captured in trace
   #
   # The remaining @unimplemented "request details" scenarios assert on
