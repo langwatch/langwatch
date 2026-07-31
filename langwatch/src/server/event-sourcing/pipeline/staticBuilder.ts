@@ -376,6 +376,13 @@ export class StaticPipelineBuilderWithNameAndType<
             };
           })(),
           delay: spec.delay ?? 0,
+          // Reactor payloads wrap the event; adapt the spec's event-shaped
+          // key so fold/map subscribers get the same lane semantics as raw
+          // ones instead of a silently dropped option.
+          groupKeyFn: spec.groupKeyFn
+            ? (payload: { event: Event; foldState: unknown }) =>
+                spec.groupKeyFn!(payload.event as EventType)
+            : undefined,
         },
         // Pre-enqueue rejection: a filtered event never pays serialization.
         shouldReact: passes,

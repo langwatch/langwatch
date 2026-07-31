@@ -31,4 +31,25 @@ describe("graphTriggerActivityGroupKey", () => {
       "graph-trigger-activity:project_x",
     );
   });
+
+  describe("when the trace and evaluation pipelines wake the sweep for one tenant", () => {
+    it("both land in the same final lane — the group id carries no pipeline segment", () => {
+      // A sweep evaluates ALL of the tenant's graph triggers regardless of
+      // which event kind (span vs evaluation) woke it, so the two pipelines'
+      // registrations must converge on one serialized lane per tenant.
+      const fromTrace = {
+        tenantId: "project_x",
+        aggregateId: "trace_1",
+        type: "lw.obs.trace.span_received",
+      } as never;
+      const fromEvaluation = {
+        tenantId: "project_x",
+        aggregateId: "eval_1",
+        type: "lw.obs.evaluation.completed",
+      } as never;
+      expect(graphTriggerActivityGroupKey(fromTrace)).toBe(
+        graphTriggerActivityGroupKey(fromEvaluation),
+      );
+    });
+  });
 });
