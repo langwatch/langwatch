@@ -266,7 +266,7 @@ export async function ensureEphemeralAccount(params: {
 
   const cfg = load();
   const stored = cfg.ephemeral_account;
-  if (stored && stored.control_plane_url === endpoint) {
+  if (stored?.control_plane_url === endpoint) {
     return { provisioned: fromStored(stored), reused: true };
   }
 
