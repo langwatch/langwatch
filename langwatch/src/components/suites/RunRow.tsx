@@ -15,6 +15,7 @@ import {
   FileText,
   MoreVertical,
   Square,
+  Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
@@ -52,6 +53,8 @@ type RunRowDataProps = {
   isHighlighted?: boolean;
   /** Produces the run report for this batch. Absent when it cannot be scoped. */
   onExportReport?: () => void;
+  /** Export with Langy's written analysis, which takes a minute or two. */
+  onExportReportWithLangy?: () => void;
   /** Stops the report currently being produced for this batch. */
   onCancelReport?: () => void;
   /** Whether a report is being produced for THIS batch, not for any other. */
@@ -152,6 +155,7 @@ function RunRowData({
   cancellingJobId,
   isHighlighted = false,
   onExportReport,
+  onExportReportWithLangy,
   onCancelReport,
   isReportRunning = false,
   reportStage = null,
@@ -362,6 +366,10 @@ function RunRowData({
                 </Box>
               </Menu.Trigger>
               <Menu.Content>
+                {/* Instant first. Everything except Langy computes in under a
+                    millisecond, so most exports should not be paying a minute
+                    for a paragraph nobody asked for — and the computed report
+                    is a whole document, not a degraded one. */}
                 <Menu.Item
                   value="export-report"
                   disabled={isReportRunning}
@@ -372,16 +380,37 @@ function RunRowData({
                   }}
                   data-testid="export-report-menu-item"
                 >
-                  <FileText size={14} />
-                  <Text>Export report</Text>
+                  <Zap size={14} />
+                  <Text>Instant export</Text>
                   <Box flex={1} />
-                  {/* The wait costs money and time, so the size of the job is
-                      on the menu item, not in a toast after the click. */}
+                  {/* The size of the job is on the menu item, not in a toast
+                      after the click. */}
                   <Text fontSize="xs" color="fg.muted">
                     {summary.totalCount}{" "}
                     {summary.totalCount === 1 ? "scenario" : "scenarios"}
                   </Text>
                 </Menu.Item>
+                {onExportReportWithLangy && (
+                  <Menu.Item
+                    value="export-report-langy"
+                    disabled={isReportRunning}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      if (isReportRunning) return;
+                      onExportReportWithLangy();
+                    }}
+                    data-testid="export-report-langy-menu-item"
+                  >
+                    <FileText size={14} />
+                    <Text>Export with Langy</Text>
+                    <Box flex={1} />
+                    {/* Said before the click, because it is the whole
+                        difference between the two items. */}
+                    <Text fontSize="xs" color="fg.muted">
+                      a minute or two
+                    </Text>
+                  </Menu.Item>
+                )}
               </Menu.Content>
             </Menu.Root>
           )}

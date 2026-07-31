@@ -119,6 +119,7 @@ function generate(service: ReturnType<typeof makeService>) {
       scenarioSetId: "set_1",
       batchRunId: "batch_1",
       suiteName: "Checkout suite",
+      withAnalysis: true,
     },
     generatedAt: GENERATED_AT,
   });
@@ -199,6 +200,51 @@ describe("BatchRunReportService.generate() history", () => {
       expect(requestedBatchIds).toEqual(["batch_before"]);
       expect(requestedBatchIds).not.toContain("batch_after");
       expect(requestedBatchIds).not.toContain("batch_1");
+    });
+  });
+});
+
+describe("BatchRunReportService.generate() without the analysis", () => {
+  describe("when the analysis was not asked for", () => {
+    /** @scenario I can take the figures without waiting for the analysis */
+    it("produces the figures without calling a model at all", async () => {
+      const service = makeService();
+
+      const model = await service.generate({
+        request: {
+          projectId: "project_1",
+          scenarioSetId: "set_1",
+          batchRunId: "batch_1",
+          suiteName: "Checkout suite",
+          withAnalysis: false,
+        },
+        generatedAt: GENERATED_AT,
+      });
+
+      expect(generateObjectMock).not.toHaveBeenCalled();
+      expect(model.tier).toBe("figures_only");
+      expect(model.headline.counts.totalCount).toBe(2);
+      expect(
+        model.sections.find((it) => it.questionId === "past.outcome")?.computed
+          .length,
+      ).toBeGreaterThan(0);
+    });
+
+    /** @scenario A report exported without the analysis does not read as a failure */
+    it("records the choice so the report does not report a failure", async () => {
+      const model = await makeService().generate({
+        request: {
+          projectId: "project_1",
+          scenarioSetId: "set_1",
+          batchRunId: "batch_1",
+          suiteName: "Checkout suite",
+          withAnalysis: false,
+        },
+        generatedAt: GENERATED_AT,
+      });
+
+      expect(model.meta.withAnalysis).toBe(false);
+      expect(model.integrity.notes.join(" ")).toContain("without Langy");
     });
   });
 });

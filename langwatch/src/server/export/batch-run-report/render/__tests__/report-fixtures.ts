@@ -48,6 +48,7 @@ export function makeModel(overrides: Partial<ReportModel> = {}): ReportModel {
       suiteName: "Checkout suite",
       batchRunId: "batch-1",
       generatedAt: "2026-07-29 10:00 UTC",
+      withAnalysis: true,
     },
     tier: "verified",
     summary: {
@@ -219,6 +220,7 @@ export function makeMarkupNameModel(name: string): ReportModel {
       suiteName: name,
       batchRunId: "batch-1",
       generatedAt: "2026-07-29 10:00 UTC",
+      withAnalysis: true,
     },
     sections: [
       makeSection({

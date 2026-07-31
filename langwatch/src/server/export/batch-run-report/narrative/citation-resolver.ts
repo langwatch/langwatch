@@ -137,34 +137,43 @@ export function humaniseRunIds({
  * report. It costs the citation here instead, and a claim left with none is
  * dropped by the rule that was already there.
  */
-export function toCitation(draft: {
+type DraftCitation = {
   kind: string;
   runId?: string;
   criterionId?: string;
   signatureId?: string;
   turnIndex?: number;
   path?: string;
-}): Citation | null {
-  switch (draft.kind) {
-    case "run":
-      return draft.runId ? { kind: "run", runId: draft.runId } : null;
-    case "criterion":
-      return draft.criterionId
-        ? { kind: "criterion", criterionId: draft.criterionId }
-        : null;
-    case "signature":
-      return draft.signatureId
-        ? { kind: "signature", signatureId: draft.signatureId }
-        : null;
-    case "turn":
-      return draft.runId && draft.turnIndex !== undefined
-        ? { kind: "turn", runId: draft.runId, turnIndex: draft.turnIndex }
-        : null;
-    case "stat":
-      return draft.path ? { kind: "stat", path: draft.path } : null;
-    default:
-      return null;
-  }
+};
+
+/**
+ * What each kind of citation needs before it points at anything.
+ *
+ * One entry per kind, each returning null when its own required fields are
+ * missing, so adding a kind is one entry rather than one more branch.
+ */
+const CITATION_BUILDERS: Record<
+  string,
+  (draft: DraftCitation) => Citation | null
+> = {
+  run: (draft) => (draft.runId ? { kind: "run", runId: draft.runId } : null),
+  criterion: (draft) =>
+    draft.criterionId
+      ? { kind: "criterion", criterionId: draft.criterionId }
+      : null,
+  signature: (draft) =>
+    draft.signatureId
+      ? { kind: "signature", signatureId: draft.signatureId }
+      : null,
+  turn: (draft) =>
+    draft.runId && draft.turnIndex !== undefined
+      ? { kind: "turn", runId: draft.runId, turnIndex: draft.turnIndex }
+      : null,
+  stat: (draft) => (draft.path ? { kind: "stat", path: draft.path } : null),
+};
+
+export function toCitation(draft: DraftCitation): Citation | null {
+  return CITATION_BUILDERS[draft.kind]?.(draft) ?? null;
 }
 
 export function resolveClaims({

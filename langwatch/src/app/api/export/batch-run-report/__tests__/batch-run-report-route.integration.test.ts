@@ -46,6 +46,7 @@ function reportModel(overrides: Record<string, unknown> = {}) {
       suiteName: "Checkout",
       batchRunId: "batch_1",
       generatedAt: "2026-07-29T12:00:00.000Z",
+      withAnalysis: true,
     },
     tier: "figures_only",
     headline: {

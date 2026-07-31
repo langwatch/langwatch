@@ -63,6 +63,16 @@ const TIER_NOTES: Readonly<Record<ReportTier, string | null>> = {
     "Langy could not write the analysis this time. Everything below is computed directly from the run data.",
 };
 
+/**
+ * What a figures-only report says when nobody asked for an analysis.
+ *
+ * The same tier reached deliberately and reached by failure, and a reader told
+ * the wrong one either goes looking for a fault that never happened or misses
+ * one that did.
+ */
+const EXPORTED_WITHOUT_LANGY =
+  "Exported without Langy. Every figure below is computed directly from the run data.";
+
 const SEVERITY_TONES: Readonly<Record<Severity, Tone>> = {
   critical: "fail",
   high: "fail",
@@ -496,10 +506,17 @@ function renderHeadline(model: ReportModel): string {
 // Document
 // ============================================================================
 
-function renderTierBanner(tier: ReportTier): string {
-  const note = TIER_NOTES[tier];
+function renderTierBanner(tier: ReportTier, withAnalysis: boolean): string {
+  const note =
+    tier === "figures_only" && !withAnalysis
+      ? EXPORTED_WITHOUT_LANGY
+      : TIER_NOTES[tier];
+  const label =
+    tier === "figures_only" && !withAnalysis
+      ? "Without Langy"
+      : TIER_BADGES[tier];
   const badge = `<p><span class="badge badge-${escapeAttr(tier)}">${escapeHtml(
-    TIER_BADGES[tier],
+    label,
   )}</span></p>`;
   return note === null
     ? badge
@@ -514,7 +531,7 @@ function renderHeader(model: ReportModel): string {
     `<p class="meta"><span>${escapeHtml(meta.suiteName)}</span>`,
     `<span>Run ${escapeHtml(meta.batchRunId)}</span>`,
     `<span>Generated ${escapeHtml(meta.generatedAt)}</span></p>`,
-    renderTierBanner(model.tier),
+    renderTierBanner(model.tier, model.meta.withAnalysis),
     "</header>",
   ].join("");
 }
@@ -525,17 +542,36 @@ function renderHeader(model: ReportModel): string {
  * Always rendered, including when nothing was dropped: a footer that appears
  * only when something went wrong teaches a reader to skip it.
  */
-function renderIntegrity(integrity: ReportIntegrity): string {
-  const dropped = [
-    `${integrity.claimsDroppedUncited} statements removed for citing nothing`,
-    `${integrity.claimsDroppedUnresolvable} statements removed for citing something that is not in this run`,
-    `${integrity.claimsDroppedUnconfirmed} statements removed because the second reading could not confirm them`,
-  ];
+function renderIntegrity({
+  integrity,
+  withAnalysis,
+}: {
+  integrity: ReportIntegrity;
+  withAnalysis: boolean;
+}): string {
   const notes = integrity.notes.map((note) => `<li>${escapeHtml(note)}</li>`);
+
+  // A report with no analysis in it has nothing to account for. Printing the
+  // sieve's three zeroes there reads as "Langy wrote this and none of it was
+  // cut", which is the opposite of what happened.
+  const method = withAnalysis
+    ? [
+        "<p>The figures are computed from this run’s data with no AI involved. The written analysis is Langy’s, and every sentence of it is traced back to the run before it is allowed into the file.</p>",
+        `<ul>${[
+          `${integrity.claimsDroppedUncited} statements removed for citing nothing`,
+          `${integrity.claimsDroppedUnresolvable} statements removed for citing something that is not in this run`,
+          `${integrity.claimsDroppedUnconfirmed} statements removed because the second reading could not confirm them`,
+        ]
+          .map((line) => `<li>${escapeHtml(line)}</li>`)
+          .join("")}</ul>`,
+      ]
+    : [
+        "<p>Every figure here is computed from this run’s data with no AI involved. Nothing in this file was written by Langy.</p>",
+      ];
+
   return [
     "<h2>How this report was produced</h2>",
-    "<p>The figures are computed from this run’s data with no AI involved. The written analysis is Langy’s, and every sentence of it is traced back to the run before it is allowed into the file.</p>",
-    `<ul>${dropped.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`,
+    ...method,
     notes.length === 0 ? "" : `<ul>${notes.join("")}</ul>`,
   ].join("");
 }
@@ -567,7 +603,10 @@ function renderBody(model: ReportModel): string {
     renderHeadline(model),
     CONTROLS,
     renderTierGroups(model.sections),
-    `<footer>${renderIntegrity(model.integrity)}</footer>`,
+    `<footer>${renderIntegrity({
+      integrity: model.integrity,
+      withAnalysis: model.meta.withAnalysis,
+    })}</footer>`,
     "</main>",
     `<script>${REPORT_SCRIPT}</script>`,
     "</body>",

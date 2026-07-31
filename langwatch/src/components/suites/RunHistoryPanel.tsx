@@ -532,6 +532,18 @@ export function RunHistoryPanel({
                               batchRunId: batchRun.batchRunId,
                               scenarioSetId: reportSetId,
                               suiteName,
+                              withAnalysis: false,
+                            })
+                        : undefined
+                    }
+                    onExportReportWithLangy={
+                      reportSetId
+                        ? () =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId: reportSetId,
+                              suiteName,
+                              withAnalysis: true,
                             })
                         : undefined
                     }

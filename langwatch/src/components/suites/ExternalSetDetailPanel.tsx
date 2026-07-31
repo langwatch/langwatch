@@ -344,6 +344,16 @@ export function ExternalSetDetailPanel({
                               scenarioSetId:
                                 batchRun.scenarioSetId ?? scenarioSetId,
                               suiteName: scenarioSetId,
+                              withAnalysis: false,
+                            })
+                          }
+                          onExportReportWithLangy={() =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId:
+                                batchRun.scenarioSetId ?? scenarioSetId,
+                              suiteName: scenarioSetId,
+                              withAnalysis: true,
                             })
                           }
                           onCancelReport={() =>

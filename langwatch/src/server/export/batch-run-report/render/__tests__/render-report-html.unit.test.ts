@@ -171,6 +171,48 @@ describe("Feature: Run report — what survived being produced", () => {
       expect(html).toContain("Agent skipped the confirmation step");
       expect(html).toContain("Refunds held.");
     });
+
+    /** @scenario A report whose analysis failed still says so */
+    it("names it as a failure, because the analysis was asked for", () => {
+      expect(html).toContain("Langy could not write the analysis");
+      expect(html).not.toContain("Exported without Langy");
+    });
+  });
+
+  /**
+   * The same tier is reached two ways, and the reader acts differently on each:
+   * told a failure happened when none did, they go looking for a fault; told
+   * nothing when one did, they read a thinner report than they asked for.
+   */
+  describe("when the analysis was never asked for", () => {
+    const html = renderReportHtml({
+      model: {
+        ...makeFiguresOnlyModel(),
+        meta: { ...makeFiguresOnlyModel().meta, withAnalysis: false },
+      },
+    });
+
+    /** @scenario A report exported without the analysis does not read as a failure */
+    it("says it was exported without the analysis rather than that it failed", () => {
+      expect(html).toContain("Exported without Langy");
+      expect(html).not.toContain("Langy could not write the analysis");
+    });
+
+    /** @scenario I can take the figures without waiting for the analysis */
+    it("still carries every computed figure", () => {
+      expect(html).toContain("Agent skipped the confirmation step");
+      expect(html).toContain("Refunds held.");
+    });
+
+    /**
+     * "0 statements removed" reads as "Langy wrote this and none of it was
+     * cut" — the opposite of what happened when she was never called.
+     */
+    /** @scenario A report exported without the analysis does not read as a failure */
+    it("does not account for a sieve that never ran", () => {
+      expect(html).not.toContain("statements removed");
+      expect(html).toContain("Nothing in this file was written by Langy");
+    });
   });
 
   describe("when the second reading could not be completed", () => {

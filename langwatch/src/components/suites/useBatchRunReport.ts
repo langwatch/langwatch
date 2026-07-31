@@ -27,6 +27,8 @@ interface StartReportInput {
   scenarioSetId: string;
   /** Only used to name the file when the server does not. */
   suiteName?: string;
+  /** False exports the computed report alone, without waiting on Langy. */
+  withAnalysis?: boolean;
 }
 
 interface UseBatchRunReportReturn {
@@ -273,7 +275,12 @@ export function useBatchRunReport({
   }, []);
 
   const startReport = useCallback(
-    ({ batchRunId, scenarioSetId, suiteName }: StartReportInput) => {
+    ({
+      batchRunId,
+      scenarioSetId,
+      suiteName,
+      withAnalysis = true,
+    }: StartReportInput) => {
       if (!projectId) {
         toaster.create({
           title: "Couldn't build the report",
@@ -294,7 +301,12 @@ export function useBatchRunReport({
       void fetch(`${BATCH_RUN_REPORT_DOWNLOAD_PATH}?stream=1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, scenarioSetId, batchRunId }),
+        body: JSON.stringify({
+          projectId,
+          scenarioSetId,
+          batchRunId,
+          withAnalysis,
+        }),
         signal: controller.signal,
       })
         .then((response) =>

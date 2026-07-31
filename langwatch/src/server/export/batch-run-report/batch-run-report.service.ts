@@ -15,7 +15,6 @@ import type {
   ReportEvidence,
   ReportModel,
   ReportProgress,
-  ReportStage,
   ReportTier,
 } from "./report.types";
 
@@ -89,13 +88,26 @@ export class BatchRunReportService {
     const { evidence, evidenceBlock } = await this.readEvidence(request);
 
     onProgress("measuring");
-    const { draft, verdicts, unchecked } = await this.runModelPasses({
-      request,
-      evidence,
-      evidenceBlock,
-      abortSignal,
-      onProgress,
-    });
+    // Asked for without Langy: the computed half is the whole document, so
+    // nothing waits on a model that was never going to be called.
+    const { draft, verdicts, unchecked } = request.withAnalysis
+      ? await this.runModelPasses({
+          request,
+          evidence,
+          evidenceBlock,
+          abortSignal,
+          onProgress,
+        })
+      : {
+          draft: null,
+          verdicts: null,
+          unchecked: assembleSections({
+            evidence,
+            questions: QUESTION_REGISTRY,
+            draft: null,
+            verdicts: null,
+          }),
+        };
 
     onProgress("rendering");
 
@@ -109,7 +121,9 @@ export class BatchRunReportService {
       : unchecked;
 
     const tier = resolveTier({ draft, verdicts });
-    integrity.notes.push(...buildNotes({ evidence, tier }));
+    integrity.notes.push(
+      ...buildNotes({ evidence, tier, askedForAnalysis: request.withAnalysis }),
+    );
 
     return {
       meta: {
@@ -117,6 +131,7 @@ export class BatchRunReportService {
         suiteName: request.suiteName ?? request.scenarioSetId,
         batchRunId: request.batchRunId,
         generatedAt,
+        withAnalysis: request.withAnalysis,
       },
       tier,
       summary: buildRunSummary({ evidence }),
@@ -319,15 +334,19 @@ function resolveTier({
 function buildNotes({
   evidence,
   tier,
+  askedForAnalysis,
 }: {
   evidence: ReportEvidence;
   tier: ReportTier;
+  askedForAnalysis: boolean;
 }): string[] {
   const notes: string[] = [];
 
   if (tier === "figures_only") {
     notes.push(
-      "Langy did not write an analysis for this report, so it contains the figures only.",
+      askedForAnalysis
+        ? "Langy did not write an analysis for this report, so it contains the figures only."
+        : "This report was exported without Langy, so it contains the figures only. Every one of them is computed from the run.",
     );
   }
   if (tier === "unchecked") {

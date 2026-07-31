@@ -392,6 +392,32 @@ Feature: Run report
   Scenario: Questions are grouped into what happened, what is true now, and what to do next
 
   # ============================================================================
+  # Choosing whether to wait for the analysis
+  # ============================================================================
+  # The figures are ready in a fraction of a second; the written analysis takes
+  # a minute or two. Whoever only wants the numbers should not be made to wait
+  # for prose they were never going to read.
+
+  @unit
+  Scenario: I can take the figures without waiting for the analysis
+    When I export a report without the analysis
+    Then the file downloads with the figures for the run
+    And no analysis is written
+
+  @unit
+  Scenario: A report exported without the analysis does not read as a failure
+    When I export a report without the analysis
+    Then it says the report was exported without the analysis
+    And it does not say the analysis could not be written
+
+  @unit
+  Scenario: A report whose analysis failed still says so
+    Given I asked for the analysis
+    And the analysis cannot be completed
+    When I export a report
+    Then it says the analysis could not be written
+
+  # ============================================================================
   # It always downloads
   # ============================================================================
 

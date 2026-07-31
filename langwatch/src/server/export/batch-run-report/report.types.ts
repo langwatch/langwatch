@@ -23,6 +23,17 @@ export const batchRunReportRequestSchema = z.object({
    * untrusted text: escaped when rendered, stripped when it reaches a filename.
    */
   suiteName: z.string().max(200).optional(),
+  /**
+   * Whether Langy writes the analysis, or the report is figures only.
+   *
+   * Defaults to true so an existing caller keeps the whole document. The
+   * difference is not a detail: computing everything else takes under a
+   * millisecond and Langy's two passes take a minute or two, so this is the
+   * only thing standing between an instant report and a long wait — and the
+   * computed half is a complete document on its own, which is why declining is
+   * offered rather than merely tolerated as a degraded tier.
+   */
+  withAnalysis: z.boolean().default(true),
 });
 export type BatchRunReportRequest = z.infer<typeof batchRunReportRequestSchema>;
 
@@ -396,6 +407,14 @@ export interface ReportModel {
     batchRunId: string;
     /** Passed in, never read from the clock, so the same run renders the same file. */
     generatedAt: string;
+    /**
+     * Whether Langy was asked for an analysis at all.
+     *
+     * A figures-only report has two very different causes — nobody asked, or
+     * she was asked and could not — and telling a reader the wrong one either
+     * invents a failure or hides one.
+     */
+    withAnalysis: boolean;
   };
   tier: ReportTier;
   summary: RunSummary;
