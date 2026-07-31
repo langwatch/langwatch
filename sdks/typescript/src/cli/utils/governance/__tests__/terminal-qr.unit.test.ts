@@ -64,6 +64,60 @@ describe("rendering the code", () => {
     });
   });
 
+  describe("given a URL", () => {
+    it("draws every module the encoder produced, the right way up", async () => {
+      // The half-block packing is the part that can silently go wrong: an
+      // off-by-one in the row pairing, or an inverted mapping, still renders
+      // something QR-shaped that no camera will read. Unpacking the drawing
+      // back into modules and comparing against the encoder's own matrix is
+      // what catches that — a visual check never would.
+      const { create } = await import("qrcode");
+      const { modules } = create(URL, { errorCorrectionLevel: "L" });
+
+      const rendered = await renderQr(URL);
+      // eslint-disable-next-line no-control-regex
+      const grid = rendered!.replace(/\[[0-9;]*m/g, "").split("\n");
+
+      const quiet = 4;
+      const width = modules.size + quiet * 2;
+      expect(grid[0]).toHaveLength(width);
+      expect(grid).toHaveLength(Math.ceil(width / 2));
+
+      const darkAt = (row: number, col: number): boolean => {
+        const glyph = grid[Math.floor((row + quiet) / 2)]![col + quiet]!;
+        const upperHalf = (row + quiet) % 2 === 0;
+        return glyph === "█" || glyph === (upperHalf ? "▀" : "▄");
+      };
+
+      for (let row = 0; row < modules.size; row++) {
+        for (let col = 0; col < modules.size; col++) {
+          const expected = modules.data[row * modules.size + col] === 1;
+          if (darkAt(row, col) !== expected) {
+            throw new Error(
+              `module (${row},${col}) drawn ${darkAt(row, col) ? "dark" : "light"}, encoder says ${expected ? "dark" : "light"}`,
+            );
+          }
+        }
+      }
+    });
+
+    it("surrounds the symbol with the quiet zone a scanner needs to find it", async () => {
+      const rendered = await renderQr(URL);
+      // eslint-disable-next-line no-control-regex
+      const grid = rendered!.replace(/\[[0-9;]*m/g, "").split("\n");
+
+      // Two character rows top and bottom is four module rows; a scanner that
+      // cannot find the border does not attempt the symbol at all.
+      expect(grid[0]!.trim()).toBe("");
+      expect(grid[1]!.trim()).toBe("");
+      expect(grid[grid.length - 1]!.trim()).toBe("");
+      for (const line of grid) {
+        expect(line.slice(0, 4)).toBe("    ");
+        expect(line.slice(-4)).toBe("    ");
+      }
+    });
+  });
+
   describe("given an input the encoder cannot handle", () => {
     it("returns null instead of throwing", async () => {
       // Provisioning has already created a real account by this point; a QR
