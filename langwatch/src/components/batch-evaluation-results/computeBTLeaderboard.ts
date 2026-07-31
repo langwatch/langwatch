@@ -185,11 +185,11 @@ export function computeBTLeaderboard({
   // the way to 50/50 while a pair with thirty barely moves. On unequal sample
   // sizes that reorders healthy variants: measured 545 flips across 4000 such
   // matrices between eps=1e-4 and the eps=0.5 used here. The trigger is a
-  // isDegenerate variant elsewhere in the field, which is why the reordering can
+  // degenerate variant elsewhere in the field, which is why the reordering can
   // involve two variants that have nothing to do with it.
   //
   // Kept because the alternative — no finite fit at all — is worse, and
-  // because the isDegenerate variant that triggers it is excluded from the
+  // because the degenerate variant that triggers it is excluded from the
   // ranking anyway. Callers are told via the trust panel.
   const smooth = hasDegenerate ? 0.5 : 0;
   const { strength, didConverge } = fitBT({
@@ -285,7 +285,7 @@ function buildEntries({
 }
 
 /**
- * Sort by score desc, but push isDegenerate variants to the bottom so a
+ * Sort by score desc, but push degenerate variants to the bottom so a
  * smoothed +∞-ish "always wins" variant doesn't dominate the table.
  */
 function byScoreDegenerateLast(
