@@ -361,9 +361,21 @@ class SelectBestCompareEvaluator(
 
         if winner1 == winner2:
             # Same winner both times (including both "tie") — agreement.
+            #
+            # Phrased to match what actually varied, for the same reason the
+            # disagreement branch below is. At a pinned temperature the only
+            # difference between the two calls was candidate order, so
+            # surviving it is a statement about order. Above 0 the sampling
+            # varied too — which makes the agreement STRONGER, not weaker, but
+            # it is no longer a claim about order specifically.
+            confirmation = (
+                "Confirmed under order swap."
+                if self._effective_temperature() == 0.0
+                else "Confirmed on a second call with the candidate order reversed."
+            )
             return {
                 "winner": winner1,
-                "reasoning": f"Confirmed under order swap. {verdict1['reasoning']}",
+                "reasoning": f"{confirmation} {verdict1['reasoning']}",
                 "cost": total_cost,
             }
 
@@ -398,19 +410,26 @@ class SelectBestCompareEvaluator(
             f"({verdict2['reasoning']}). {cause}"
         )
 
-        # `allow_tie=False` means the caller does not accept "tie" as an
-        # answer, and `_judge` honours that by leaving it out of `winner_enum`.
-        # Returning it from here anyway would hand back a value the config
-        # forbids — and one that downstream aggregation reads as real 0.5/0.5
-        # evidence rather than as an absent verdict.
+        # No winner, regardless of `allow_tie`.
         #
-        # Deliberately NOT "fall back to winner1": the disagreement IS the
-        # finding. Order-sensitivity is exactly what swap_and_reconcile exists
-        # to detect, so picking the original-order winner would return the
-        # artefact we just demonstrated, silently. "Could not determine" and
-        # "they tied" are different claims; only one of them is true here.
+        # "They tied" and "we could not get a stable answer" are different
+        # claims, and only the second one is true here. The distinction is not
+        # cosmetic: a tie is real evidence, scored 0.5/0.5 into the pairwise
+        # tally that feeds the Bradley-Terry fit, so returning one from a
+        # reconciliation failure feeds the ranking a measurement the run never
+        # made. An absent verdict has to contribute nothing.
+        #
+        # This used to hinge on `allow_tie`, which made the evaluator state the
+        # objection itself and then act against it on the default path: with
+        # ties disabled it correctly refused to invent one, and with ties
+        # enabled — the default — it invented one anyway.
+        #
+        # Deliberately NOT "fall back to winner1" either: the disagreement IS
+        # the finding. Order-sensitivity is exactly what swap_and_reconcile
+        # exists to detect, so returning the original-order winner would hand
+        # back the artefact just demonstrated, silently.
         return {
-            "winner": "tie" if self.settings.allow_tie else None,
+            "winner": None,
             "reasoning": details,
             "cost": total_cost,
         }

@@ -630,8 +630,15 @@ def test_custom_prompt_with_unknown_braces_does_not_crash():
         "Rubric: score out of {10\n"  # stray literal brace -> ValueError under str.format
         "Candidates:\n{candidates}"
     )
+    # One judge call, so the outcome turns on prompt RENDERING and nothing
+    # else. With reconciliation on, the mock answers slot "A" for both calls —
+    # a different real candidate each time, since the order is reversed — so
+    # the row would be skipped as order-sensitive and this test would be
+    # reporting on reconciliation rather than on braces.
     evaluator = SelectBestCompareEvaluator(
-        settings=SelectBestCompareSettings(prompt=custom_prompt)
+        settings=SelectBestCompareSettings(
+            prompt=custom_prompt, swap_and_reconcile=False
+        )
     )
     entry = _make_entry(num_candidates=3)
 
@@ -700,17 +707,60 @@ def test_swap_and_reconcile_agreement_sums_cost_and_keeps_call_one_reasoning():
     assert result.label == "variant_1"
     assert result.score == 1.0
     assert result.details is not None
-    assert "Confirmed under order swap." in result.details
+    # The default judge is a gpt-5-family model, which forces temperature 1.0,
+    # so the two calls differed in candidate order AND in sampling. The
+    # agreement is if anything stronger for that — but it is no longer a claim
+    # about order specifically, and the copy must not make one.
+    assert (
+        "Confirmed on a second call with the candidate order reversed."
+        in result.details
+    )
     assert "variant_1 handles the edge case" in result.details
     assert result.cost is not None
     assert result.cost.amount == pytest.approx(0.0002 + 0.0003)
 
 
-def test_swap_and_reconcile_disagreement_becomes_tie_with_informative_details():
+def test_swap_and_reconcile_agreement_claims_order_only_when_temperature_is_pinned():
+    """A judge that can be pinned to temperature 0 differs between the two
+    calls ONLY in candidate order, so surviving it is a statement about order
+    and the copy is allowed to say so."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            randomize_order=False, model="openai/gpt-4.1", temperature=0.0
+        )
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_1 handles the edge case", "B"),
+        _mock_completion_response("variant_1 still wins reversed", "B"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.label == "variant_1"
+    assert result.details is not None
+    assert "Confirmed under order swap." in result.details
+
+
+def test_swap_and_reconcile_disagreement_is_skipped_with_informative_details():
     """First call (original order) names one candidate; reversed order names
-    a different one — a genuine order-sensitive verdict. The final result
-    must be a tie (not a guess at which direction was right), and the
-    reasoning must name both original picks, not just say they disagreed."""
+    a different one — a genuine order-sensitive verdict.
+
+    Skipped, NOT scored a tie, and this is the default path (`allow_tie` is
+    True). "They tied" and "we could not get a stable answer" are different
+    claims and only the second is true: a tie is real evidence, scored 0.5/0.5
+    into the pairwise tally behind the leaderboard, so reporting one here
+    feeds the ranking a measurement that was never made.
+
+    Nor is it a guess at which direction was right — the reasoning has to name
+    both original picks rather than just saying they disagreed."""
     evaluator = SelectBestCompareEvaluator(
         settings=SelectBestCompareSettings(randomize_order=False)
     )
@@ -733,8 +783,10 @@ def test_swap_and_reconcile_disagreement_becomes_tie_with_informative_details():
         result = evaluator.evaluate(entry)
 
     assert mock_completion.call_count == 2
-    assert result.label == "tie"
-    assert result.score == 0.5
+    assert result.status == "skipped"
+    # Neither of the two ways of pretending there was an answer.
+    assert getattr(result, "label", None) != "tie"
+    assert getattr(result, "score", None) is None
     assert result.details is not None
     # The reasoning must be genuinely informative — naming both picks and
     # both original reasonings, not just "verdicts disagreed".
@@ -745,18 +797,15 @@ def test_swap_and_reconcile_disagreement_becomes_tie_with_informative_details():
 
 
 def test_swap_and_reconcile_disagreement_with_allow_tie_false_is_skipped():
-    """Disagreement under order swap, with ties explicitly disabled.
+    """The same outcome with ties explicitly disabled — the point being that
+    it IS the same outcome.
 
-    `_judge` already honours allow_tie=False by leaving "tie" out of the
-    winner enum, so neither individual call can return it. Reconciliation must
-    honour it too: returning "tie" from the disagreement branch would hand
-    back a value the settings forbid, and one that downstream aggregation
-    reads as real 0.5/0.5 evidence rather than as an absent verdict.
-
-    Skipped rather than defaulted to the first call's winner. The
-    order-sensitivity IS the finding — swap_and_reconcile exists to detect it
-    — so picking the original-order pick would return the artefact we just
-    demonstrated, silently."""
+    A reconciliation failure is an absent verdict, which is not a thing
+    `allow_tie` has an opinion about; it decides whether the JUDGE may call
+    two candidates equivalent. Branching on it here made the evaluator state
+    the objection and then act against it on the default path. This case is
+    kept alongside the default-settings one above so that any future change
+    that re-couples them fails."""
     evaluator = SelectBestCompareEvaluator(
         settings=SelectBestCompareSettings(
             randomize_order=False, allow_tie=False
@@ -816,7 +865,12 @@ def test_swap_and_reconcile_both_calls_tie_stays_tie():
     assert result.label == "tie"
     assert result.score == 0.5
     assert result.details is not None
-    assert "Confirmed under order swap." in result.details
+    # A tie the JUDGE declared twice is a real finding and stays scored — it
+    # is only a RECONCILIATION failure that has no verdict to report.
+    assert (
+        "Confirmed on a second call with the candidate order reversed."
+        in result.details
+    )
 
 
 def test_swap_and_reconcile_false_makes_exactly_one_call():
