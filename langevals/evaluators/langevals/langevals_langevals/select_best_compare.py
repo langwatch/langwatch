@@ -203,12 +203,12 @@ class SelectBestCompareSettings(LLMEvaluatorSettings):
     swap_and_reconcile: bool = Field(
         default=True,
         description=(
-            "Call the judge twice per row — once in the (possibly shuffled) "
-            "candidate order, once with that order fully reversed — and treat "
-            "a disagreement between the two calls as a tie rather than "
-            "guessing. Roughly doubles judge-call cost per row but measurably "
-            "reduces order-sensitive verdicts (literature: swapping candidate "
-            "order alone flips 10-30% of verdicts on contested rows)."
+            "Check each row twice, the second time with the candidate order "
+            "reversed, and record no result for that row when the two "
+            "disagree — rather than a tie, which would claim the candidates "
+            "are equally good. Doubles judge-call cost per row (literature: "
+            "swapping candidate order alone flips 10-30% of verdicts on "
+            "contested rows)."
         ),
     )
 
@@ -246,8 +246,8 @@ class SelectBestCompareEvaluator(
     against a reference answer. The judge sees every candidate at once and
     explains why the winner is better. Candidate order is shuffled so that a
     candidate's position never sways the verdict, and by default each row is
-    checked twice — once more with the order reversed — treating any
-    disagreement between the two checks as a tie rather than guessing.
+    checked twice — once more with the order reversed — recording no result
+    for that row when the two checks disagree, rather than guessing.
     """
 
     name = "Comparison"

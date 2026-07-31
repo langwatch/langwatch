@@ -126,6 +126,7 @@ describe("experimentResultsCommand()", () => {
 
   describe("given an experiment slug", () => {
     describe("when no run id is given", () => {
+      /** @scenario "User views the latest run of an experiment as a table" */
       it("resolves the latest run and fetches its results", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         await experimentResultsCommand({ experimentSlug: "doc-qa" });
@@ -141,6 +142,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when --run-id pins a specific run", () => {
+      /** @scenario "User pins a specific run by id" */
       it("uses that run id and does not look up the latest", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         await experimentResultsCommand({
@@ -156,6 +158,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when no runs exist for the experiment", () => {
+      /** @scenario "User requests an experiment with no runs" */
       it("exits with code 1", async () => {
         mockListRuns.mockResolvedValue({ runs: [] });
         await expect(
@@ -166,6 +169,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when format is json", () => {
+      /** @scenario "User pipes the full payload as JSON" */
       it("applies filters and dumps the matching payload to stdout", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         const result = await experimentResultsCommand({
@@ -190,6 +194,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when filter is failed", () => {
+      /** @scenario "User filters the table to only failed rows" */
       it("prints only failing rows", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         const result = await experimentResultsCommand({
@@ -212,6 +217,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when an evaluator name is provided", () => {
+      /** @scenario "User narrows the table to a specific evaluator" */
       it("narrows the column set to that evaluator", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
         const result = await experimentResultsCommand({
@@ -252,6 +258,7 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run still in progress", () => {
     describe("when invoked in table mode", () => {
+      /** @scenario "User views a run that is still running" */
       it("prints a partial-results banner", async () => {
         mockGetRunResults.mockResolvedValue({
           ...sampleResults,
@@ -318,6 +325,7 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run with a Comparison evaluator", () => {
     describe("when the results are returned", () => {
+      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
       it("keeps the verdicts that belong to no single target", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
@@ -355,6 +363,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when --limit drops some rows", () => {
+      /** @scenario "Comparison verdicts follow the rows that survive filtering" */
       it("reports verdicts only for the rows still shown", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
@@ -374,6 +383,7 @@ describe("experimentResultsCommand()", () => {
     });
 
     describe("when --evaluator names a different evaluator", () => {
+      /** @scenario "Narrowing to one evaluator excludes the comparison" */
       it("excludes the comparison", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
@@ -454,6 +464,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
   });
 
   describe("given only the comparison failed", () => {
+    /** @scenario "A row whose only failure is the comparison is still a failed row" */
     it("still surfaces the row under --filter failed", async () => {
       // The failure filter walks the dataset join, and a comparison verdict
       // has no dataset entry to hang off — so a row that failed ONLY on the

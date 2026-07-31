@@ -7,7 +7,7 @@ Feature: CLI evaluation results command
     Given I have a valid API key configured
     And the LangWatch API is reachable
 
-  @integration @unimplemented
+  @unit
   Scenario: User views the latest run of an experiment as a table
     Given an experiment whose latest run has several rows
     When I run `langwatch experiment results <experiment>`
@@ -17,14 +17,14 @@ Feature: CLI evaluation results command
     And the table is truncated to the default row limit
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: User pins a specific run by id
     Given an experiment with more than one run
     When I run `langwatch experiment results <experiment> --run-id <runId>`
     Then the CLI shows results from the run identified by the provided run id
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: A row whose only failure is the comparison is still a failed row
     Given every target on a row produced output and passed its own evaluations
     But the comparison judging that row errored
@@ -32,20 +32,21 @@ Feature: CLI evaluation results command
     Then that row is shown
     And the comparison's failure is shown with it
 
+  @unit
   Scenario: User filters the table to only failed rows
     Given an experiment whose latest run has both passing and failing rows
     When I run `langwatch experiment results <experiment> --filter failed`
     Then the CLI prints only rows that errored or failed an evaluation
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: User narrows the table to a specific evaluator
     Given an experiment whose latest run has multiple evaluators
     When I run `langwatch experiment results <experiment> --evaluator quality`
     Then the table only displays the "quality" evaluator's column
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: User pipes the full payload as JSON
     When I run `langwatch experiment results <experiment> --format json`
     Then the CLI writes the full results payload as JSON to stdout
@@ -60,7 +61,7 @@ Feature: CLI evaluation results command
   # comparison, which made the omission read as "the judge produced nothing"
   # rather than "the CLI dropped it".
 
-  @integration @unimplemented
+  @unit
   Scenario: A comparison verdict reaches the CLI even though it belongs to no single target
     Given an experiment whose latest run includes a Comparison evaluator over several targets
     When I run `langwatch experiment results <experiment>`
@@ -68,14 +69,14 @@ Feature: CLI evaluation results command
     And each verdict names the winning target and the judge's reasoning
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: Comparison verdicts follow the rows that survive filtering
     Given an experiment whose latest run includes a Comparison evaluator
     When I run `langwatch experiment results <experiment> --limit 5`
     Then the output includes comparison verdicts only for the rows shown
     And no verdict is reported for a row that was filtered out
 
-  @integration @unimplemented
+  @unit
   Scenario: Narrowing to one evaluator excludes the comparison
     Given an experiment whose latest run includes both a Comparison evaluator and a scoring evaluator
     When I run `langwatch experiment results <experiment> --evaluator quality`
@@ -83,7 +84,7 @@ Feature: CLI evaluation results command
     # The filter names one evaluator; honouring it matters more than
     # surfacing the comparison.
 
-  @integration @unimplemented
+  @unit
   Scenario: User views a run that is still running
     Given an experiment whose latest run has not finished yet but has logged some rows
     When I run `langwatch experiment results <experiment>`
@@ -91,7 +92,7 @@ Feature: CLI evaluation results command
     And the CLI notes that the run is still in progress and the results are partial
     And the CLI exits with status 0
 
-  @integration @unimplemented
+  @unit
   Scenario: User requests an experiment with no runs
     Given an experiment that has never been run
     When I run `langwatch experiment results <experiment>`
