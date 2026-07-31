@@ -83,12 +83,23 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
       const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter(
         (id) => id.length > 0,
       );
-      const vks = vkIds.length
-        ? await ctx.prisma.virtualKey.findMany({
-            where: { id: { in: vkIds }, projectId: input.projectId },
-            select: { id: true, name: true },
-          })
-        : [];
+      // VirtualKey is ORG-scoped post-collapse (no projectId column); the
+      // ids come from this project's own tenant-filtered spend rows, and
+      // the org fence keeps a foreign id from resolving to a name.
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      const vks =
+        vkIds.length && project?.team
+          ? await ctx.prisma.virtualKey.findMany({
+              where: {
+                id: { in: vkIds },
+                organizationId: project.team.organizationId,
+              },
+              select: { id: true, name: true },
+            })
+          : [];
       const virtualKeyNames = Object.fromEntries(
         vks.map((vk) => [vk.id, vk.name]),
       );

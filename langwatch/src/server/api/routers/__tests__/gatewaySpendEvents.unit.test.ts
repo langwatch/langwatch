@@ -84,6 +84,11 @@ function buildCaller() {
     publiclyShared: false,
   });
   ctx.prisma = {
+    project: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue({ team: { organizationId: "org_1" } }),
+    },
     virtualKey: {
       findMany: vi
         .fn()
