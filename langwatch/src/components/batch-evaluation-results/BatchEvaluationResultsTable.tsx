@@ -229,7 +229,7 @@ export const GroupRowsButton = ({
           <Text truncate>{value ? `Grouped by ${value}` : "Group rows"}</Text>
         </Button>
       </PopoverTrigger>
-      <PopoverContent width="240px">
+      <PopoverContent width="240px" data-testid="group-by-row-dropdown">
         <PopoverArrow />
         <PopoverBody>
           <HStack gap={1.5} align="center" marginBottom={2}>
