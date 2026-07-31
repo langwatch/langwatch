@@ -3,6 +3,7 @@ import {
   type MapEventHandlers,
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
+import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "../schemas/constants";
 import {
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
@@ -51,6 +52,9 @@ export class SessionMetricSeriesMapProjection
   constructor(deps: { store: AppendStore<SessionMetricSeriesRecord> }) {
     super();
     this.store = deps.store;
+    this.options = {
+      coalesceMaxBatch: CODING_AGENT_MAP_COALESCE_MAX_BATCH,
+    };
   }
 
   mapCodingAgentSessionMetricFactsContributed(
