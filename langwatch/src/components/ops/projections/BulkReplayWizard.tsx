@@ -37,6 +37,7 @@ export function BulkReplayWizard({
     new Set(),
   );
   const [description, setDescription] = useState("");
+  const [fullRebuild, setFullRebuild] = useState(false);
 
   const projectionsQuery = api.ops.listProjections.useQuery();
   const statusQuery = useReplayStatus();
@@ -158,6 +159,7 @@ export function BulkReplayWizard({
       projectionNames: [...selectedProjections],
       since,
       tenantIds: allTenants ? [] : tenantIds,
+      fullRebuild,
       description: description || "Manual replay",
     });
   }
@@ -425,6 +427,24 @@ export function BulkReplayWizard({
                         rows={2}
                       />
                     </Box>
+                    <Box>
+                      <Checkbox
+                        checked={fullRebuild}
+                        onCheckedChange={(e) => setFullRebuild(!!e.checked)}
+                      >
+                        <Text textStyle="sm">Rebuild from scratch</Text>
+                      </Checkbox>
+                      <Text
+                        textStyle="xs"
+                        color="fg.muted"
+                        marginTop={1}
+                        marginLeft={6}
+                      >
+                        For targets that were truncated or swapped empty. Off,
+                        the run resumes and skips whatever an earlier run
+                        finished.
+                      </Text>
+                    </Box>
                     <HStack gap={2}>
                       <Button
                         size="sm"
@@ -433,7 +453,9 @@ export function BulkReplayWizard({
                         loading={startReplayMutation.isPending}
                         onClick={handleStartReplay}
                       >
-                        Start Full Replay
+                        {fullRebuild
+                          ? "Start Full Rebuild"
+                          : "Start Full Replay"}
                       </Button>
                       <Button
                         size="sm"

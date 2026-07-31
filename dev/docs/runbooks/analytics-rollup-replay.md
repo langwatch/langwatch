@@ -44,17 +44,49 @@ permission required). One run covers both projections:
   // ISO timestamp at or before the oldest retention window still served.
   // Epoch is safe: discovery is bounded by what event_log still holds.
   "since": "1970-01-01T00:00:00.000Z",
+  // Required here. See "Why fullRebuild" below.
+  "fullRebuild": true,
   "description": "rebuild analytics rollups after Replicated-engine conversion (00065/00066)"
 }
 ```
 
+The ops projections page runs the same thing: tick "Rebuild from scratch"
+before starting the replay.
+
 Replay progress, history and cancellation are available on the same ops
 surface (`getReplayStatus`, `getReplayHistory`, `cancelReplay`). The map-path
 replay appends increments per event; because the migration left the tables
-empty, appending reconstructs exact totals. Do not run the replay twice
-concurrently and do not re-run it after a successful pass without truncating
-first (both tables' contract is replay-rebuilds-truncate-first, see 00038 for
-the trace rollup and 00040 for the evaluation rollup).
+empty, appending reconstructs exact totals.
+
+### Why fullRebuild
+
+A replay records every aggregate it finishes in a Redis completed set, and a
+run that fails or is cancelled leaves those entries behind on purpose so a
+plain re-run resumes instead of repeating work. Discovery skips whatever is
+in that set.
+
+That is the wrong default here. If any earlier replay of these projections
+finished some tenants and then stopped, its completed entries are still there
+while 00065/00066 have swapped the tables empty underneath them. A plain
+`startReplay` would report a clean run and leave those tenants with no
+pre-deploy history at all, with nothing in the result to say so.
+
+`fullRebuild` clears the selected projections' markers under the replay lock,
+before discovery, so the run covers every discovered aggregate. It is only
+safe against empty tables: these are append projections, so replaying an
+aggregate whose rows are still in place double counts it.
+
+### If the rebuild fails partway
+
+Re-run it with `fullRebuild` OFF. The markers the failed run left behind now
+describe rows it actually wrote, so the resume picks up exactly where it
+stopped. Running a second `fullRebuild` over a half-populated table double
+counts everything the first pass wrote.
+
+Reach for `fullRebuild` again only after truncating both tables (their
+contract is replay-rebuilds-truncate-first, see 00038 for the trace rollup and
+00040 for the evaluation rollup). Do not run two replays concurrently; the ops
+lock rejects the second one.
 
 ## How to verify
 

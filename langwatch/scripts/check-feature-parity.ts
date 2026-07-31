@@ -363,7 +363,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/poison-group-park-guard.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/producer-append-coalescing.feature",
-  "specs/event-sourcing/projection-replay.feature",
   "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
   "specs/event-sourcing/work-conserving-fair-dispatch.feature",
