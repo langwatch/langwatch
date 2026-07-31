@@ -117,7 +117,12 @@ const setup = ({
     listStoredObjectsPage: vi.fn(async (projectId, request) =>
       pageById(rows.get(projectId) ?? [], request),
     ),
-    listDatasetsPage: vi.fn(async (request) => pageById(datasetRows, request)),
+    listDatasetsPage: vi.fn(async (projectId, request) =>
+      pageById(
+        datasetRows.filter((dataset) => dataset.projectId === projectId),
+        request,
+      ),
+    ),
   };
   const migration = new ObjectStorageMigration({
     source,
@@ -336,6 +341,57 @@ describe("Feature: Object storage provider parity and migration", () => {
       /reads.*paused|read traffic/i,
     );
     expect(state.history).toEqual([]);
+  });
+
+  /** @scenario A dataset already stored at the destination does not abort the copy */
+  it("A dataset already stored at the destination does not abort the copy", async () => {
+    const state = setup({
+      datasets: [
+        {
+          id: "dataset-on-destination",
+          projectId: "project-1",
+          contentLayout: "s3_jsonl",
+          status: "ready",
+          chunkCount: 1,
+        },
+      ],
+    });
+    const row = seedStoredObject(state);
+    // The chunk exists ONLY at the destination — uploaded while that
+    // provider was briefly the active backend (#6323 posture).
+    state.destinationDriver.objects.set(
+      state.destination.datasetChunkUri("project-1", "dataset-on-destination", 0),
+      Buffer.from("chunk-at-destination"),
+    );
+
+    const report = await state.migration.copy();
+
+    expect(report.skippedVerified).toBe(1);
+    expect(report.copied).toBe(1);
+    expect(
+      state.destinationDriver.objects.has(
+        state.destination.storedObjectUri(row.project_id, row.sha256),
+      ),
+    ).toBe(true);
+  });
+
+  /** @scenario A dataset already stored at the destination does not abort the copy */
+  it("blocks when a chunk is missing from both providers", async () => {
+    const state = setup({
+      datasets: [
+        {
+          id: "dataset-lost",
+          projectId: "project-1",
+          contentLayout: "s3_jsonl",
+          status: "ready",
+          chunkCount: 1,
+        },
+      ],
+    });
+
+    await expect(state.migration.copy()).rejects.toThrow(
+      /missing from both providers/,
+    );
   });
 
   /** @scenario A dataset with no usable chunk count is reported rather than aborting the run */

@@ -83,6 +83,14 @@ Feature: Object storage provider parity and migration
     Then finalization is refused before any destination address is published
 
   @integration
+  Scenario: A dataset already stored at the destination does not abort the copy
+    Given a dataset whose chunks exist only at the destination provider
+    When the operator runs the copy phase
+    Then those chunks are counted as already verified
+    And the remaining eligible data still migrates
+    But a chunk missing from both providers blocks the migration
+
+  @integration
   Scenario: A dataset with no usable chunk count is reported rather than aborting the run
     Given an abandoned upload left a dataset with no chunk count
     When the operator runs the migration plan

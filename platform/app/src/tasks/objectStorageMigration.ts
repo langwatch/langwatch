@@ -43,8 +43,16 @@ export interface MigrationInventory {
     projectId: string,
     request: MigrationPageRequest,
   ): Promise<StoredObject[]>;
-  /** Includes archived datasets: they remain recoverable customer data. */
-  listDatasetsPage(request: MigrationPageRequest): Promise<MigrationDataset[]>;
+  /**
+   * Includes archived datasets: they remain recoverable customer data.
+   * Per-project like the stored-objects page: the Prisma multitenancy
+   * middleware rejects any Dataset query without a projectId, so a global
+   * page shape is unimplementable against the real database.
+   */
+  listDatasetsPage(
+    projectId: string,
+    request: MigrationPageRequest,
+  ): Promise<MigrationDataset[]>;
 }
 
 export type MigrationPageRequest = {
@@ -239,6 +247,22 @@ export class ObjectStorageMigration {
           dataset.id,
           index,
         );
+        // A chunk can already live ONLY at the destination: a dataset
+        // uploaded while the destination provider was briefly active (the
+        // backend-flip posture #6323 documents), or a previous reverse
+        // migration. Chunks carry no recorded digest, so there is no source
+        // to verify against — presence at the destination is the strongest
+        // available check, and aborting here would deny the operator every
+        // other copy this run could safely make.
+        if (!(await this.deps.source.driver.exists(sourceUri))) {
+          if (await this.deps.destination.driver.exists(destinationUri)) {
+            report.skippedVerified += 1;
+            continue;
+          }
+          throw new MigrationBlockedError(
+            `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
+          );
+        }
         const result = await copyVerified({
           source: this.deps.source,
           sourceUri,
@@ -342,6 +366,17 @@ export class ObjectStorageMigration {
           dataset.id,
           index,
         );
+        // Mirror of the copy loop's already-at-destination tolerance: a
+        // chunk with no source copy has no digest to compare, so presence at
+        // the destination is the strongest check available (#6323).
+        if (!(await this.deps.source.driver.exists(sourceUri))) {
+          if (await this.deps.destination.driver.exists(destinationUri)) {
+            continue;
+          }
+          throw new MigrationBlockedError(
+            `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
+          );
+        }
         const sourceBytes = await readAll(
           await this.deps.source.driver.get(sourceUri),
         );
@@ -424,10 +459,13 @@ export class ObjectStorageMigration {
   private async *datasets(
     scope: EligibleScope,
   ): AsyncGenerator<MigrationDataset> {
-    for await (const dataset of paginate((request) =>
-      this.deps.inventory.listDatasetsPage(request),
-    )) {
-      if (scope.eligibleProjectIds.has(dataset.projectId)) yield dataset;
+    // Iterated per eligible project (sorted for a stable, resumable order):
+    // BYOC projects are excluded by never being asked for, and every page
+    // query is tenant-scoped as the data layer requires.
+    for (const projectId of [...scope.eligibleProjectIds].sort()) {
+      yield* paginate((request) =>
+        this.deps.inventory.listDatasetsPage(projectId, request),
+      );
     }
   }
 
