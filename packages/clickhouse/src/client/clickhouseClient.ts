@@ -98,7 +98,7 @@ const noopMetrics: Metrics = {
  * knows what query it ran and who is waiting on it.
  */
 export class ClickHouseOperationError extends Error {
-  readonly operation: "query" | "insert" | "stream";
+  readonly operation: "query" | "insert" | "stream" | "command";
   readonly tenantId: string;
   readonly queryId: string;
   readonly table?: string;
@@ -107,7 +107,7 @@ export class ClickHouseOperationError extends Error {
   constructor(
     message: string,
     context: {
-      operation: "query" | "insert" | "stream";
+      operation: "query" | "insert" | "stream" | "command";
       tenantId: string;
       queryId: string;
       table?: string;
@@ -144,6 +144,13 @@ export interface ClickHouseRawInsert {
   readonly queryId: string;
 }
 
+export interface ClickHouseRawCommand {
+  readonly sql: string;
+  readonly params?: Record<string, unknown>;
+  readonly settings?: Record<string, string | number>;
+  readonly queryId: string;
+}
+
 export interface ClickHouseQueryResult {
   readonly rows: unknown[][];
   readonly header?: { readonly names: string[]; readonly types: string[] };
@@ -162,6 +169,17 @@ export interface ClickHouseTransport {
   query(request: ClickHouseRawQuery): Promise<ClickHouseQueryResult>;
   stream(request: ClickHouseRawQuery): AsyncIterable<unknown[][]>;
   insert(request: ClickHouseRawInsert): Promise<void>;
+  /**
+   * A statement that returns no rows — `ALTER`, `OPTIMIZE`, `KILL MUTATION`.
+   *
+   * Separate from {@link query} rather than folded into it, because the two
+   * differ in what they may send as much as in what they return: `query`
+   * attaches `READ_SETTINGS` to govern how result cells are encoded, and a
+   * statement with no result set has no such encoding to govern. Sending them
+   * anyway is not merely redundant — a ClickHouse user under a `readonly`
+   * profile rejects any client-supplied setting outright.
+   */
+  command(request: ClickHouseRawCommand): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -306,6 +324,18 @@ function createNodeTransport(config: {
         values: request.rows,
         format: INSERT_FORMAT,
         columns: request.columns as unknown as [string, ...string[]],
+        clickhouse_settings: request.settings,
+        query_id: request.queryId,
+      });
+    },
+
+    async command(request) {
+      await driver.command({
+        query: request.sql,
+        query_params: request.params,
+        // Only what the caller asked for. No `READ_SETTINGS` — see the
+        // transport interface for why a statement with no result set must not
+        // carry output-format settings.
         clickhouse_settings: request.settings,
         query_id: request.queryId,
       });
@@ -519,6 +549,42 @@ export interface ClickHouseClient {
     rows: unknown[][];
     columns: readonly string[];
     target: WriteTarget;
+    /**
+     * Additional server settings for this write, applied *beneath*
+     * {@link DURABLE_INSERT_SETTINGS} — the three durability settings are
+     * merged last and always win, so this cannot be used to reach
+     * `wait_for_async_insert: 0` or to re-enable `input_format_skip_unknown_fields`
+     * (ADR-098, ADR-104 §6). It exists for settings that govern how the wire
+     * cells are *parsed* rather than whether the write is durable, the live
+     * case being `date_time_input_format: "best_effort"` for a caller that
+     * sends an ISO-8601 timestamp string a stock server's `basic` parser
+     * rejects.
+     */
+    settings?: Record<string, string | number>;
+  }): Promise<void>;
+  /**
+   * A statement that returns no rows — `ALTER … DELETE`, `ALTER … UPDATE`,
+   * `OPTIMIZE`, `KILL MUTATION`, `MODIFY TTL`.
+   *
+   * Never retried, and that is the whole reason it is its own method rather
+   * than a `query` whose result is discarded. Retry safety for a write is
+   * decided by the destination table's merge strategy, and a statement like
+   * this has no destination row to reason about: re-sending an
+   * `ALTER … UPDATE` that timed out starts a *second* mutation over the same
+   * range while the first is still running. `Operation`'s `ddl` kind carries
+   * that refusal (`retryPolicy.ts`), so a caller cannot opt into a retry here
+   * by mistake.
+   *
+   * `tenantId` routes and bulkheads the statement exactly as it does for a
+   * read, and does not scope it — a mutation still needs its own `WHERE
+   * TenantId = …`, and needs it more than a read does, because the failure
+   * mode is deleting another tenant's rows rather than showing them.
+   */
+  command(options: {
+    tenantId: string;
+    sql: string;
+    params?: Record<string, unknown>;
+    settings?: Record<string, string | number>;
   }): Promise<void>;
   close(): Promise<void>;
 }
@@ -574,7 +640,7 @@ export function createClickHouseClient(
 
   async function runWithRetry<T>(args: {
     operation: Operation;
-    label: "query" | "insert" | "stream";
+    label: "query" | "insert" | "stream" | "command";
     tenantId: string;
     table?: string;
     attempt: (queryId: string) => Promise<T>;
@@ -726,7 +792,26 @@ export function createClickHouseClient(
               table: options.table,
               rows: options.rows,
               columns: options.columns,
-              settings: DURABLE_INSERT_SETTINGS,
+              // Durability last: a caller's settings may add to the write but
+              // may never weaken it.
+              settings: { ...options.settings, ...DURABLE_INSERT_SETTINGS },
+              queryId,
+            }),
+        }),
+      );
+    },
+
+    async command(options) {
+      return bulkhead.run(options.tenantId, () =>
+        runWithRetry({
+          operation: { kind: "ddl" },
+          label: "command",
+          tenantId: options.tenantId,
+          attempt: (queryId) =>
+            transport.command({
+              sql: options.sql,
+              params: options.params,
+              settings: options.settings,
               queryId,
             }),
         }),

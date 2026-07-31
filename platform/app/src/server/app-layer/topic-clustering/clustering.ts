@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -8,13 +7,14 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { getApp } from "../app";
+import type { TenantClickHouseClient } from "../clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "../clients/clickhouse/tenant-resolver";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -128,8 +128,12 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  const clickhouse = await getClickHouseClientForProject(projectId);
-
+  // This runs on a worker, outside the composition root, so it takes the
+  // ambient accessor rather than an injected resolver (ADR-104). It already
+  // resolves the project's organisation to pick the endpoint and binds the
+  // project as the tenant, so there is nothing to wrap here. `null` means only
+  // that this process has no ClickHouse at all.
+  const clickhouse = await clickHouseForProject(projectId);
   if (!clickhouse) {
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
@@ -300,7 +304,7 @@ export async function fetchCountsFromClickHouse({
   clickhouse,
   projectId,
 }: {
-  clickhouse: ClickHouseClient;
+  clickhouse: TenantClickHouseClient;
   projectId: string;
 }): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -323,8 +327,13 @@ export async function fetchCountsFromClickHouse({
   // version cleared its topic (latest TopicId = NULL) would otherwise fold to
   // an older non-null TopicId and be over-counted. The boolean expression is
   // non-nullable, so the fold reads the true latest version.
-  const result = await clickhouse.query({
-    query: `
+  const rows = await clickhouse.query<{
+    total: string;
+    recent: string;
+    assigned: string;
+  }>({
+    table: "trace_summaries",
+    sql: `
       SELECT
         toString(count(*)) AS total,
         toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
@@ -339,15 +348,9 @@ export async function fetchCountsFromClickHouse({
         GROUP BY TenantId, TraceId
       )
     `,
-    query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
-    format: "JSONEachRow",
+    params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
   });
 
-  const rows = (await result.json()) as Array<{
-    total: string;
-    recent: string;
-    assigned: string;
-  }>;
   const row = rows[0];
 
   return {
@@ -358,7 +361,7 @@ export async function fetchCountsFromClickHouse({
 }
 
 export async function fetchTracesFromClickHouse(
-  clickhouse: ClickHouseClient,
+  clickhouse: TenantClickHouseClient,
   projectId: string,
   isIncrementalProcessing: boolean,
   topicIds: string[],
@@ -432,8 +435,15 @@ export async function fetchTracesFromClickHouse(
     ? `HAVING ${pageHaving.join(" AND ")}`
     : "";
 
-  const result = await clickhouse.query({
-    query: `
+  const rawRows = await clickhouse.query<{
+    TraceId: string;
+    ComputedInput: string;
+    TopicId: string | null;
+    SubTopicId: string | null;
+    OccurredAtMs: string;
+  }>({
+    table: "trace_summaries",
+    sql: `
       WITH page AS (
         SELECT TraceId
         FROM trace_summaries
@@ -465,7 +475,7 @@ export async function fetchTracesFromClickHouse(
           GROUP BY TenantId, TraceId
         )
     `,
-    query_params: {
+    params: {
       tenantId: projectId,
       fetchWindowStartMs,
       topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
@@ -474,7 +484,6 @@ export async function fetchTracesFromClickHouse(
         ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] }
         : {}),
     },
-    format: "JSONEachRow",
     // The outer query reads ComputedInput (a potentially large payload) for the
     // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
     // dedup still resolves the latest version per trace, and peak memory scales
@@ -483,16 +492,8 @@ export async function fetchTracesFromClickHouse(
     // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
     // latency-critical path, so cap the read streams to keep peak memory well
     // under the per-query limit; the returned rows are unchanged.
-    clickhouse_settings: { max_threads: 2 },
+    settings: { max_threads: 2 },
   });
-
-  const rawRows = (await result.json()) as Array<{
-    TraceId: string;
-    ComputedInput: string;
-    TopicId: string | null;
-    SubTopicId: string | null;
-    OccurredAtMs: string;
-  }>;
 
   // Reapply the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
   // dropped its outer ORDER BY to avoid the top-N memory buffer (see above), so

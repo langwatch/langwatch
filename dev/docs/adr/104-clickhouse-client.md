@@ -146,22 +146,39 @@ table. Until all three are established for a named table, `append` on plain
 `ReplacingMergeTree` keyed per record already is, on the structural argument
 above, independently of whether server-side dedup is ever adopted.
 
-### 3. A select retries transport failures and nothing else
+### 3. A select is never retried
 
-Retryable: connection reset, socket hangup, `ECONNREFUSED`, `ENOTFOUND`,
-`EPIPE`, and HTTP 502/503/504 from a proxy in front of the endpoint. These
-describe a request that did not reach a working server.
+> **Amended 2026-07-31.** As first written this decision retried a select on
+> transport failures. It no longer retries a select at all. The rest of the
+> section is the original reasoning for why the *deterministic* server-side
+> failures were already excluded; the amendment extends that refusal to the
+> transport class as well. See ADR-109 decision 4, which is the live statement.
 
 Not retryable, ever: `MEMORY_LIMIT_EXCEEDED`, `TIMEOUT_EXCEEDED`, and every
 query error. Retrying a query that exhausted the server's memory cap exhausts it
 again on identical input, and does so while holding a connection the rest of the
-process needs. `TIMEOUT_EXCEEDED` is server-side and equally deterministic; a
-socket-level timeout is a transport class and is retried, which is why the two
-are distinguished by code rather than by matching `/timeout/i` on the message.
+process needs. `TIMEOUT_EXCEEDED` is server-side and equally deterministic.
 
-`Too many simultaneous queries` stays retryable — it is genuinely a transient
-admission-control rejection — but is subject to the bulkhead below rather than
-being the only thing standing between a hot tenant and pool exhaustion.
+Also not retryable, as of the amendment: connection reset, socket hangup,
+`ECONNREFUSED`, `ENOTFOUND`, `EPIPE`, and HTTP 502/503/504. These do describe a
+request that never reached a working server, and repeating one corrupts
+nothing — so the original decision retried them. What that reasoning left out is
+who pays. The retry holds a pooled connection and a per-tenant bulkhead slot for
+up to three further request timeouts, during the exact window in which the
+endpoint is unhealthy and every other reader is failing the same way; the client
+turns a blip into a backlog that outlives it. And a read, unlike an insert,
+always has a caller waiting — a request, a panel — which is the right place to
+choose between a narrower query, a stale answer and a visible failure. An insert
+has no such caller, which is why the retry budget goes there and only there.
+
+`Too many simultaneous queries` is likewise no longer retried here. It remains a
+transient admission-control rejection, and the bulkhead below is what keeps a hot
+tenant from provoking it; for a background writer it continues to be retried by
+the job layer (`errorHandling.classifyClickHouseError`), which is where a retry
+can afford to wait.
+
+`isTransientTransportError` is retained and exported: the insert path still needs
+it, and the transport class is still the only class an insert retries.
 
 ### 4. Tenancy is a routing input, and the bulkhead is per tenant
 
@@ -342,9 +359,12 @@ performance bug with good ergonomics.
   the shared one.
 - **Reads through the composition root gain `max_bytes_before_external_group_by`
   for the first time**, so a large `GROUP BY` spills instead of failing.
-- **A memory-exhausting read now fails on the first attempt.** Latency on that
-  class of failure drops by up to the full backoff, and 3 pool slots per
-  failing read are no longer consumed.
+- **Every failing read now fails on the first attempt** (decision 3 as
+  amended), not only the memory-exhausting one. Latency on a failing read drops
+  by up to the full backoff, and no read consumes more than one pool slot. The
+  cost is that a read which would have survived a single-packet blip now
+  surfaces to its caller instead; that is the trade the amendment makes
+  deliberately, and the caller — not the client — decides what to do about it.
 - **Queries become correlatable.** A `query_id` and a span exist per call, and
   pool saturation is a metric rather than an inference.
 - **This is a large mechanical migration.** 89 call sites resolve a client

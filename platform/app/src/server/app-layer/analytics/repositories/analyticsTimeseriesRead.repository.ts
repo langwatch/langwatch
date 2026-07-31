@@ -24,7 +24,7 @@ import { createLogger } from "@langwatch/observability";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { SeriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { buildEvalRollupTimeseriesQuery } from "../query-builders/eval-rollup-timeseries-query";
 import { buildEvalSlimTimeseriesQuery } from "../query-builders/eval-slim-timeseries-query";
@@ -57,14 +57,32 @@ class AnalyticsTimeseriesClickHouseReadRepository
   implements AnalyticsTimeseriesReadRepository
 {
   private readonly logger: ReturnType<typeof createLogger>;
+  private readonly resolveClient: ClickHouseClientResolver;
+  private readonly builder: TimeseriesBuilder;
+  private readonly table: string;
+  private readonly targetLabel: string;
 
-  constructor(
-    private readonly resolveClient: ClickHouseClientResolver,
-    private readonly builder: TimeseriesBuilder,
-    private readonly targetLabel: string,
-  ) {
+  /**
+   * `table` is the ClickHouse table this destination reads, and is what labels
+   * the client's duration/count metrics. `targetLabel` is the human-facing name
+   * in the logger and the guard messages. They are separate arguments rather
+   * than one derived from the other because they differ in more than spelling:
+   * a future destination could read a table whose name says nothing useful on a
+   * dashboard, and deriving either from the other would make renaming one
+   * silently rename the other.
+   */
+  constructor(args: {
+    resolveClient: ClickHouseClientResolver;
+    builder: TimeseriesBuilder;
+    table: string;
+    targetLabel: string;
+  }) {
+    this.resolveClient = args.resolveClient;
+    this.builder = args.builder;
+    this.table = args.table;
+    this.targetLabel = args.targetLabel;
     this.logger = createLogger(
-      `langwatch:app-layer:analytics:${targetLabel}-read-repository`,
+      `langwatch:app-layer:analytics:${args.targetLabel}-read-repository`,
     );
   }
 
@@ -81,13 +99,12 @@ class AnalyticsTimeseriesClickHouseReadRepository
     const { sql, params: queryParams } = this.builder(params.builderInput);
 
     try {
-      const result = await client.query({
-        query: sql,
-        query_params: queryParams,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      const rows = await client.query<AnalyticsTimeseriesRow>({
+        table: this.table,
+        sql,
+        params: queryParams,
+        settings: ANALYTICS_CLICKHOUSE_SETTINGS,
       });
-      const rows = (await result.json()) as AnalyticsTimeseriesRow[];
       return parseTimeseriesRows({
         rows,
         series: params.series,
@@ -114,39 +131,43 @@ class AnalyticsTimeseriesClickHouseReadRepository
 export function createTraceSlimReadRepo(
   resolveClient: ClickHouseClientResolver,
 ): AnalyticsTimeseriesReadRepository {
-  return new AnalyticsTimeseriesClickHouseReadRepository(
+  return new AnalyticsTimeseriesClickHouseReadRepository({
     resolveClient,
-    buildSlimTimeseriesQuery,
-    "trace-analytics",
-  );
+    builder: buildSlimTimeseriesQuery,
+    table: "trace_analytics",
+    targetLabel: "trace-analytics",
+  });
 }
 
 export function createTraceRollupReadRepo(
   resolveClient: ClickHouseClientResolver,
 ): AnalyticsTimeseriesReadRepository {
-  return new AnalyticsTimeseriesClickHouseReadRepository(
+  return new AnalyticsTimeseriesClickHouseReadRepository({
     resolveClient,
-    buildRollupTimeseriesQuery,
-    "trace-analytics-rollup",
-  );
+    builder: buildRollupTimeseriesQuery,
+    table: "trace_analytics_rollup",
+    targetLabel: "trace-analytics-rollup",
+  });
 }
 
 export function createEvalSlimReadRepo(
   resolveClient: ClickHouseClientResolver,
 ): AnalyticsTimeseriesReadRepository {
-  return new AnalyticsTimeseriesClickHouseReadRepository(
+  return new AnalyticsTimeseriesClickHouseReadRepository({
     resolveClient,
-    buildEvalSlimTimeseriesQuery,
-    "evaluation-analytics",
-  );
+    builder: buildEvalSlimTimeseriesQuery,
+    table: "evaluation_analytics",
+    targetLabel: "evaluation-analytics",
+  });
 }
 
 export function createEvalRollupReadRepo(
   resolveClient: ClickHouseClientResolver,
 ): AnalyticsTimeseriesReadRepository {
-  return new AnalyticsTimeseriesClickHouseReadRepository(
+  return new AnalyticsTimeseriesClickHouseReadRepository({
     resolveClient,
-    buildEvalRollupTimeseriesQuery,
-    "evaluation-analytics-rollup",
-  );
+    builder: buildEvalRollupTimeseriesQuery,
+    table: "evaluation_analytics_rollup",
+    targetLabel: "evaluation-analytics-rollup",
+  });
 }

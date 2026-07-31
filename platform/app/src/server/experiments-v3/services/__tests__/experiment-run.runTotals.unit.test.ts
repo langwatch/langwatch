@@ -15,10 +15,17 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getClickHouseClientForProjectMock = vi.fn();
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: (...args: unknown[]) =>
-    getClickHouseClientForProjectMock(...args),
+const clickHouseForProjectMock = vi.fn();
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: (...args: unknown[]) =>
+    clickHouseForProjectMock(...args),
+}));
+
+const resolveRawClientMock = vi.fn();
+vi.mock("~/server/app-layer/clients/clickhouse/shared", () => ({
+  getSharedAppClickHouseClient: () => ({
+    resolveClient: (...args: unknown[]) => resolveRawClientMock(...args),
+  }),
 }));
 
 import { ExperimentRunService } from "../experiment-run.service";
@@ -59,13 +66,30 @@ function routeQuery(
   throw new Error(`stub ClickHouse client got an unrouted query:\n${sql}`);
 }
 
+/**
+ * Two clients, because the service uses two.
+ *
+ * Everything hand-written goes through the tenant client, which answers with
+ * decoded row objects. `deriveExperimentRunTotals` decodes its own rows, so it
+ * takes the RAW client and answers in the wire shape — positional rows plus a
+ * header. Every test here leaves `totals` empty, and an empty `rows` short
+ * circuits that decode, so no header is needed; a test that wants real totals
+ * has to supply positional rows and a header the `ch.uint64()` codec accepts.
+ * Routing stays shared so an unrouted query still fails loudly on either path.
+ */
 function stubClickHouse(tables: StubTables) {
   const client = {
-    query: vi.fn(async ({ query }: { query: string }) => ({
-      json: async () => routeQuery(query, tables),
+    query: vi.fn(async ({ sql }: { sql: string }) => routeQuery(sql, tables)),
+  };
+  clickHouseForProjectMock.mockResolvedValue(client);
+
+  const rawClient = {
+    query: vi.fn(async ({ sql }: { sql: string }) => ({
+      rows: routeQuery(sql, tables).map((row) => Object.values(row)),
     })),
   };
-  getClickHouseClientForProjectMock.mockResolvedValue(client);
+  resolveRawClientMock.mockReturnValue(rawClient);
+
   return client;
 }
 
@@ -162,7 +186,13 @@ function emptyTables(): StubTables {
 }
 
 function makeService() {
-  return new ExperimentRunService({} as any);
+  // The totals path resolves the project's organisation to route the raw
+  // client, so the stub prisma has to answer that one lookup.
+  return new ExperimentRunService({
+    project: {
+      findUnique: async () => ({ team: { organizationId: "org-1" } }),
+    },
+  } as any);
 }
 
 async function readRunSummary() {
@@ -175,7 +205,7 @@ async function readRunSummary() {
 
 describe("experiment run totals", () => {
   beforeEach(() => {
-    getClickHouseClientForProjectMock.mockReset();
+    clickHouseForProjectMock.mockReset();
   });
 
   describe("given a run whose items were recorded without costs", () => {
@@ -316,7 +346,7 @@ describe("experiment run totals", () => {
         expect(summary.datasetCost).toBeCloseTo(0.04, 8);
         expect(summary.evaluationsCost).toBeCloseTo(0.002, 8);
         const queried = client.query.mock.calls.map(
-          ([args]) => (args as { query: string }).query,
+          ([args]) => (args as { sql: string }).sql,
         );
         expect(queried.some((q) => q.includes("FROM trace_summaries"))).toBe(
           false,

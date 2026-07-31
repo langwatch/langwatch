@@ -86,6 +86,9 @@ export function createFakeClient(
         rows: options.rows,
       });
     },
+    async command(): Promise<void> {
+      throw new Error("not used by these tests");
+    },
     async close() {
       // Nothing to release: there is no real connection behind this fake.
     },

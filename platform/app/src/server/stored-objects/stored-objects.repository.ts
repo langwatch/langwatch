@@ -13,7 +13,6 @@ import {
   replacing,
   type TableRow,
 } from "@langwatch/clickhouse";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
@@ -118,11 +117,6 @@ function fromRow(row: Row): StoredObject {
 export class StoredObjectsRepository {
   constructor(
     private readonly resolveClient: (tenantId: string) => ClickHouseClient,
-    // ADR-104: the new client exposes query/insert/stream only, no DDL or
-    // mutation execution. deleteByProject/deleteByIds issue
-    // `ALTER TABLE ... DELETE`, which has no home there yet, so they keep
-    // resolving the legacy client. See the migration report.
-    private readonly legacyResolveClient?: ClickHouseClientResolver,
   ) {}
 
   /** Inserts a single stored_objects row. */
@@ -288,14 +282,15 @@ export class StoredObjectsRepository {
    * bytes from the storage backend before invoking this method.
    */
   async deleteByProject({ projectId }: { projectId: string }): Promise<void> {
-    const client = await this.requireLegacyClient(projectId);
-    await client.exec({
-      query: `
+    const client = this.resolveClient(projectId);
+    await client.command({
+      tenantId: projectId,
+      sql: `
         ALTER TABLE ${table.name}
         DELETE WHERE project_id = {projectId:String}
       `,
-      query_params: { projectId },
-      clickhouse_settings: { mutations_sync: "1" },
+      params: { projectId },
+      settings: { mutations_sync: "1" },
     });
   }
 
@@ -312,27 +307,16 @@ export class StoredObjectsRepository {
     ids: string[];
   }): Promise<void> {
     if (ids.length === 0) return;
-    const client = await this.requireLegacyClient(projectId);
-    await client.exec({
-      query: `
+    const client = this.resolveClient(projectId);
+    await client.command({
+      tenantId: projectId,
+      sql: `
         ALTER TABLE ${table.name}
         DELETE WHERE project_id = {projectId:String}
           AND id IN ({ids:Array(String)})
       `,
-      query_params: { projectId, ids },
-      clickhouse_settings: { mutations_sync: "1" },
+      params: { projectId, ids },
+      settings: { mutations_sync: "1" },
     });
-  }
-
-  // ADR-104: the new client has no DDL/mutation method (query/insert/stream
-  // only), so the two `ALTER TABLE ... DELETE` mutations above stay on the
-  // legacy client until one grows there. See the migration report.
-  private async requireLegacyClient(projectId: string) {
-    if (!this.legacyResolveClient) {
-      throw new Error(
-        "StoredObjectsRepository delete methods require a legacy client resolver — the new ClickHouse client has no DDL/mutation method (ADR-104)",
-      );
-    }
-    return this.legacyResolveClient(projectId);
   }
 }

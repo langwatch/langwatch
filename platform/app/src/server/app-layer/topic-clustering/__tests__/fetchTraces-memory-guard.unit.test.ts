@@ -10,8 +10,8 @@
  * ORDER BY / LIMIT top-N buffer holding every ComputedInput at once).
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 import { fetchTracesFromClickHouse } from "../clustering";
 
@@ -19,22 +19,22 @@ describe("topicClustering page fetch memory guard", () => {
   describe("when the page of traces is fetched", () => {
     async function capturePageFetchQuery() {
       const captured: Array<{
-        query: string;
-        clickhouse_settings?: Record<string, unknown>;
+        sql: string;
+        settings?: Record<string, unknown>;
       }> = [];
       const clickhouse = {
-        query: async (params: {
-          query: string;
-          clickhouse_settings?: Record<string, unknown>;
+        query: async (request: {
+          sql: string;
+          settings?: Record<string, unknown>;
         }) => {
-          captured.push(params);
-          return { json: async () => [] };
+          captured.push(request);
+          return [];
         },
-      } as unknown as ClickHouseClient;
+      } as unknown as TenantClickHouseClient;
 
       await fetchTracesFromClickHouse(clickhouse, "project-1", false, [], []);
 
-      const pageFetch = captured.find((c) => c.query.includes("ComputedInput"));
+      const pageFetch = captured.find((c) => c.sql.includes("ComputedInput"));
       expect(pageFetch).toBeDefined();
       return pageFetch!;
     }
@@ -42,7 +42,7 @@ describe("topicClustering page fetch memory guard", () => {
     it("caps the ComputedInput read to a small max_threads", async () => {
       const pageFetch = await capturePageFetchQuery();
 
-      const maxThreads = pageFetch.clickhouse_settings?.max_threads;
+      const maxThreads = pageFetch.settings?.max_threads;
       expect(typeof maxThreads).toBe("number");
       expect(maxThreads).toBeGreaterThanOrEqual(1);
       expect(maxThreads).toBeLessThanOrEqual(4);
@@ -55,7 +55,7 @@ describe("topicClustering page fetch memory guard", () => {
       // because ORDER BY ... LIMIT buffers full rows (every ComputedInput at
       // once). Ordering is reapplied in JS over the small result set instead —
       // so the page CTE's ORDER BY must be the only one in the query.
-      expect(pageFetch.query.match(/ORDER BY/gi)).toHaveLength(1);
+      expect(pageFetch.sql.match(/ORDER BY/gi)).toHaveLength(1);
     });
   });
 });

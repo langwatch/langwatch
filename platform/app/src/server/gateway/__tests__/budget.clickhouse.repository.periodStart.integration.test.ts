@@ -20,6 +20,7 @@ import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -103,7 +104,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
     });
 
     repo = new GatewayBudgetClickHouseRepository(async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await clickHouseForProject(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     });

@@ -5,10 +5,8 @@
  */
 import { z } from "zod";
 
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
@@ -17,7 +15,7 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function resolveClient(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
+  const client = await clickHouseForProject(projectId);
   if (!client) {
     throw new Error(
       `ClickHouse enabled but no client for project ${projectId}`,

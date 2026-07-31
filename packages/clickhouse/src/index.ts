@@ -21,6 +21,7 @@ export type {
   ClickHouseClient,
   ClickHouseClientConfig,
   ClickHouseQueryResult,
+  ClickHouseRawCommand,
   ClickHouseRawInsert,
   ClickHouseRawQuery,
   ClickHouseTransport,

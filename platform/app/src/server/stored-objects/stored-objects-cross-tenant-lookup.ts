@@ -19,13 +19,27 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
+import { allClickHouseTargets } from "~/server/app-layer/clients/clickhouse/shared";
 
 const tracer = getLangWatchTracer(
   "langwatch.stored-objects.cross-tenant-lookup",
 );
 
 const TABLE_NAME = "stored_objects";
+
+/**
+ * The routing string this fan-out passes as `tenantId`.
+ *
+ * Every other caller passes a project or organisation id, because the client
+ * routes and bulkheads on it. This one has no tenant by construction — the
+ * whole point of the lookup is that the owning project is not yet known — and
+ * routing has already happened anyway: `allClickHouseTargets()` hands back one
+ * client per endpoint, so the value here only names the bulkhead slot and
+ * labels the span. Borrowing a real tenant's id would make this traffic queue
+ * against that customer's reads and report itself as theirs; a constant of its
+ * own keeps the fan-out in one slot of its own on each endpoint.
+ */
+const CROSS_TENANT_LOOKUP_ROUTING_KEY = "__stored_object_owner_lookup__";
 
 /**
  * Thrown when no instance returned a hit AND at least one instance failed.
@@ -86,7 +100,7 @@ export async function resolveStoredObjectOwner({
       },
     },
     async (span) => {
-      const instances = await getAllClickHouseInstances();
+      const instances = allClickHouseTargets();
       if (instances.length === 0) {
         throw new Error(
           "ClickHouse is not configured — cannot resolve owner project for stored object",
@@ -94,20 +108,20 @@ export async function resolveStoredObjectOwner({
       }
       span.setAttribute("clickhouse.instances_searched", instances.length);
 
-      const lookups = instances.map(async ({ client, target }) => {
-        const result = await client.query({
-          query: `
+      const lookups = instances.map(async ({ client, label }) => {
+        const { rows } = await client.query({
+          tenantId: CROSS_TENANT_LOOKUP_ROUTING_KEY,
+          sql: `
             SELECT project_id
             FROM ${TABLE_NAME}
             WHERE id = {id:String}
             LIMIT 1
           `,
-          query_params: { id },
-          format: "JSONEachRow",
+          params: { id },
         });
-        const rows = await result.json<{ project_id: string }>();
-        return rows.length > 0
-          ? { projectId: rows[0]!.project_id, target }
+        const projectId = rows[0]?.[0];
+        return typeof projectId === "string"
+          ? { projectId, target: label }
           : null;
       });
 
@@ -121,7 +135,7 @@ export async function resolveStoredObjectOwner({
             hit = r.value;
           }
         } else {
-          failedTargets.push(instances[index]!.target);
+          failedTargets.push(instances[index]!.label);
         }
       });
 

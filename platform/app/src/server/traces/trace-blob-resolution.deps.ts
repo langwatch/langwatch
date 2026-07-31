@@ -1,28 +1,47 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  getSharedAppClickHouseClient,
+  isClickHouseEnabled,
+} from "~/server/app-layer/clients/clickhouse/shared";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { createClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import {
-  type ClickHouseClientResolver,
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 import { createS3Client } from "~/server/storage";
 import type { BlobResolutionDeps } from "./trace.service";
 
 /**
+ * The resolver behind {@link defaultResolveClickHouseClient}, built on first
+ * use and then held.
+ *
+ * Lazily rather than at module load for two reasons: the process-wide client
+ * throws when `CLICKHOUSE_URL` is unset, and this module is imported by request
+ * paths that never touch ClickHouse; and the resolver carries the
+ * projectId → organizationId memo, which is only worth anything if the same
+ * instance answers every call.
+ */
+let sharedResolveClickHouseClient: ClickHouseClientResolver | null = null;
+
+/**
  * Default ClickHouse client resolver: given a tenantId (projectId), returns the
- * right ClickHouse client. Identical to the closure `presets.ts` builds at the
- * composition root — kept here so both the request layer and the app layer
+ * client bound to that tenant. Identical to the resolver `presets.ts` builds at
+ * the composition root — kept here so both the request layer and the app layer
  * construct {@link BlobResolutionDeps} from one definition.
  */
 const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
   tenantId: string,
-): Promise<ClickHouseClient> => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) {
-    throw new Error("ClickHouse not available for this tenant");
+) => {
+  if (!sharedResolveClickHouseClient) {
+    const client = getSharedAppClickHouseClient();
+    if (!client) {
+      throw new Error("ClickHouse not available for this tenant");
+    }
+    sharedResolveClickHouseClient = createClickHouseClientResolver({
+      client,
+      prisma,
+    });
   }
-  return client;
+  return await sharedResolveClickHouseClient(tenantId);
 };
 
 /**

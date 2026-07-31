@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import {
   buildScopeConditions,
   type ClickHouseFilterQueryParams,
@@ -66,9 +66,7 @@ export class FilterService {
           );
         }
 
-        const clickHouseClient = await getClickHouseClientForProject(
-          input.projectId,
-        );
+        const clickHouseClient = await clickHouseForProject(input.projectId);
         if (!clickHouseClient) {
           span.setAttribute("clickhouse.available", false);
           throw new Error(
@@ -118,9 +116,10 @@ export class FilterService {
           const actualKey = input.key?.replaceAll("·", ".") ?? "";
           const actualSubkey = input.subkey?.replaceAll("·", ".") ?? "";
 
-          const result = await clickHouseClient.query({
-            query: sqlQuery,
-            query_params: {
+          const rows = await clickHouseClient.query<unknown>({
+            table: filterDef.tableName,
+            sql: sqlQuery,
+            params: {
               tenantId: input.projectId,
               query: input.query ?? "",
               key: actualKey,
@@ -129,11 +128,9 @@ export class FilterService {
               endDate: input.endDate,
               ...scopeParams,
             },
-            format: "JSONEachRow",
           });
 
-          const rows = await result.json();
-          const filterOptions = filterDef.extractResults(rows as unknown[]);
+          const filterOptions = filterDef.extractResults(rows);
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);
           return filterOptions;

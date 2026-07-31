@@ -3,7 +3,9 @@ import type { ClickHouseClient as EventSourcingClickHouseClient } from "@langwat
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getSharedAppClickHouseClient } from "~/server/app-layer/clients/clickhouse/shared";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { parseClickHouseDateTime } from "~/server/clickhouse/dateTime";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
@@ -79,49 +81,8 @@ interface TraceDerivedRunCost {
   pricedItemCount: number;
 }
 
-type ProjectClickHouseClient = NonNullable<
-  Awaited<ReturnType<typeof getClickHouseClientForProject>>
->;
-
-/**
- * `deriveExperimentRunTotals` speaks `@langwatch/clickhouse`'s client
- * contract; this service holds the tenant-routed `@clickhouse/client`
- * instance instead, because private per-org ClickHouse routing
- * (`getClickHouseClientForProject`) lives only there. Adapts the one method
- * totals.ts calls.
- *
- * Reads `JSONEachRow`, matching every other query in this file, and turns
- * each row object into an array in the SELECT list's own order — the same
- * order `Object.values` walks a JSON-parsed object's string keys in. No
- * `header` is returned, so the codec's header/type cross-check (meant for the
- * real `WithNamesAndTypes` wire format) simply does not run; column identity
- * still comes from the SELECT list itself.
- */
-function asTotalsClient(
-  raw: ProjectClickHouseClient,
-): EventSourcingClickHouseClient {
-  return {
-    async query({ sql, params }) {
-      const resultSet = await raw.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-        clickhouse_settings: { output_format_json_quote_64bit_integers: 1 },
-      });
-      const objects = (await resultSet.json()) as Record<string, unknown>[];
-      return { rows: objects.map((row) => Object.values(row)) };
-    },
-    stream() {
-      throw new Error("not used by deriveExperimentRunTotals");
-    },
-    async insert() {
-      throw new Error("not used by deriveExperimentRunTotals");
-    },
-    async close() {
-      // Lifecycle belongs to getClickHouseClientForProject.
-    },
-  };
-}
+/** The tenant-bound client every hand-written query in this service uses. */
+type ProjectClickHouseClient = TenantClickHouseClient;
 
 /** The buffered CH-string range `computeOccurredAtRangeForRuns` produces,
  * as the `Date` bound `deriveExperimentRunTotals` takes. */
@@ -216,6 +177,60 @@ export class ExperimentRunService {
     return new ExperimentRunService(prisma);
   }
 
+  /** `projectId → organizationId`, for {@link totalsClientFor}. */
+  private readonly organizationIdByProject = new Map<string, string>();
+
+  /**
+   * The RAW `@langwatch/clickhouse` client, which is what
+   * `deriveExperimentRunTotals` takes — not the tenant client the rest of this
+   * service uses.
+   *
+   * They are not interchangeable, and the difference is load-bearing rather
+   * than stylistic. The tenant client decodes rows for the caller, and part of
+   * that decode converts a quoted 64-bit column back to `number` so the
+   * hand-written SQL in this file keeps reading what the driver used to hand
+   * it. `totals.ts` declares those same columns as `ch.uint64()`, whose codec
+   * parses a **string** into a `bigint`; hand it a `number` and every totals
+   * read fails. So totals keeps the undecoded client and does its own decoding,
+   * which is the arrangement it was written for.
+   *
+   * Routing needs the ORGANISATION id — that is the private-endpoint key — and
+   * the tenant client carries the project id, because that is the tenant. So
+   * the lookup happens here. It duplicates the memo
+   * `createClickHouseClientResolver` already keeps; the honest fix is for the
+   * resolver to expose the organisation it resolved, and this should collapse
+   * into that when it does.
+   *
+   * Refuses rather than falling back for an unresolvable project, matching
+   * `clickHouseForProject`: on a deployment with private instances the shared
+   * endpoint is another customer's server.
+   */
+  private async totalsClientFor(
+    projectId: string,
+  ): Promise<EventSourcingClickHouseClient> {
+    const app = getSharedAppClickHouseClient();
+    if (!app) {
+      throw new Error(`ClickHouse is not available for project ${projectId}`);
+    }
+
+    let organizationId = this.organizationIdByProject.get(projectId);
+    if (organizationId === undefined) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      if (!project) {
+        throw new Error(
+          `Cannot resolve ClickHouse client: project "${projectId}" not found. Refusing to fall back to shared client to prevent data leakage.`,
+        );
+      }
+      organizationId = project.team.organizationId;
+      this.organizationIdByProject.set(projectId, organizationId);
+    }
+
+    return app.resolveClient(organizationId);
+  }
+
   /**
    * Emit a warning when the oldest run being queried is older than
    * `WARN_OLD_RUN_AGE_MS`. Pairs with `OCCURRED_AT_BUFFER_MS`: if old-run
@@ -268,7 +283,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -286,8 +301,10 @@ export class ExperimentRunService {
 
         try {
           // Fetch run summaries
-          const runsResult = await clickHouseClient.query({
-            query: `
+          const runRows =
+            await clickHouseClient.query<ClickHouseExperimentRunRow>({
+              table: "experiment_runs",
+              sql: `
               SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
@@ -302,15 +319,11 @@ export class ExperimentRunService {
               ORDER BY t.CreatedAt DESC
               LIMIT 10000
             `,
-            query_params: {
-              tenantId: projectId,
-              experimentIds,
-            },
-            format: "JSONEachRow",
-          });
-
-          const runRows =
-            (await runsResult.json()) as ClickHouseExperimentRunRow[];
+              params: {
+                tenantId: projectId,
+                experimentIds,
+              },
+            });
 
           if (runRows.length === 0) {
             return {};
@@ -371,7 +384,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -382,8 +395,10 @@ export class ExperimentRunService {
           return {};
         }
 
-        const result = await clickHouseClient.query({
-          query: `
+        const rows =
+          await clickHouseClient.query<ClickHouseExperimentRunAggregateRow>({
+            table: "experiment_runs",
+            sql: `
             SELECT
               ExperimentId,
               count() AS runsCount,
@@ -400,15 +415,11 @@ export class ExperimentRunService {
             )
             GROUP BY ExperimentId
           `,
-          query_params: {
-            tenantId: projectId,
-            experimentIds,
-          },
-          format: "JSONEachRow",
-        });
-
-        const rows =
-          (await result.json()) as ClickHouseExperimentRunAggregateRow[];
+            params: {
+              tenantId: projectId,
+              experimentIds,
+            },
+          });
 
         return rows.reduce<Record<string, ExperimentRunAggregate>>(
           (acc, row) => {
@@ -446,7 +457,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -456,24 +467,26 @@ export class ExperimentRunService {
         const offset = (page - 1) * pageSize;
 
         try {
-          const countResult = await clickHouseClient.query({
-            query: `
+          const countRows = await clickHouseClient.query<ClickHouseCountRow>({
+            table: "experiment_runs",
+            sql: `
               SELECT uniqExact(RunId) AS totalHits
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
             `,
-            query_params: {
+            params: {
               tenantId: projectId,
               experimentId,
             },
-            format: "JSONEachRow",
           });
-          const countRows = (await countResult.json()) as ClickHouseCountRow[];
+
           const totalHits = Number(countRows[0]?.totalHits ?? 0);
 
-          const runsResult = await clickHouseClient.query({
-            query: `
+          const runRows =
+            await clickHouseClient.query<ClickHouseExperimentRunRow>({
+              table: "experiment_runs",
+              sql: `
               SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
@@ -489,17 +502,13 @@ export class ExperimentRunService {
               LIMIT {pageSize:UInt32}
               OFFSET {offset:UInt32}
             `,
-            query_params: {
-              tenantId: projectId,
-              experimentId,
-              pageSize,
-              offset,
-            },
-            format: "JSONEachRow",
-          });
-
-          const runRows =
-            (await runsResult.json()) as ClickHouseExperimentRunRow[];
+              params: {
+                tenantId: projectId,
+                experimentId,
+                pageSize,
+                offset,
+              },
+            });
 
           if (runRows.length === 0) {
             return { runs: [], totalHits };
@@ -576,7 +585,7 @@ export class ExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           // Deliberately `null`, not `throw` — see method JSDoc above for
           // why this method diverges from the rest of the class.
@@ -595,8 +604,10 @@ export class ExperimentRunService {
           // only the surviving version instead of across every version of the
           // run. The IN-tuple form stays the right choice for the multi-run list
           // reads (listRuns) and for experiment_run_items below.
-          const runResult = await clickHouseClient.query({
-            query: `
+          const runRows =
+            await clickHouseClient.query<ClickHouseExperimentRunRow>({
+              table: "experiment_runs",
+              sql: `
               SELECT ${RUN_COLUMNS}
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
@@ -611,16 +622,13 @@ export class ExperimentRunService {
                 )
               LIMIT 1
             `,
-            query_params: {
-              tenantId: projectId,
-              experimentId,
-              runId,
-            },
-            format: "JSONEachRow",
-          });
+              params: {
+                tenantId: projectId,
+                experimentId,
+                runId,
+              },
+            });
 
-          const runRows =
-            (await runResult.json()) as ClickHouseExperimentRunRow[];
           const runRecord = runRows[0];
 
           if (!runRecord) {
@@ -653,8 +661,10 @@ export class ExperimentRunService {
           // pattern resolves dedup using only lightweight key columns and the
           // ReplacingMergeTree version column (OccurredAt). See
           // trace-dedup-oom-safety.unit.test.ts for the rationale.
-          const itemsResult = await clickHouseClient.query({
-            query: `
+          const itemRows =
+            await clickHouseClient.query<ClickHouseExperimentRunItemRow>({
+              table: "experiment_run_items",
+              sql: `
               SELECT ${RUN_ITEM_COLUMNS}
               FROM experiment_run_items
               WHERE TenantId = {tenantId:String}
@@ -682,18 +692,14 @@ export class ExperimentRunService {
                 )
               ORDER BY RowIndex ASC, ResultType ASC
             `,
-            query_params: {
-              tenantId: projectId,
-              experimentId,
-              runId,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
-          });
-
-          const itemRows =
-            (await itemsResult.json()) as ClickHouseExperimentRunItemRow[];
+              params: {
+                tenantId: projectId,
+                experimentId,
+                runId,
+                minOccurredAt: occurredAtRange.minOccurredAt,
+                maxOccurredAt: occurredAtRange.maxOccurredAt,
+              },
+            });
 
           // Enrich target items with costs from trace_summaries.
           // The SDK doesn't send costs in recordTargetResult, but the
@@ -762,7 +768,7 @@ export class ExperimentRunService {
   }): Promise<ExperimentRunTotals | undefined> {
     const runRef = { experimentId, runId };
     const totals = await deriveExperimentRunTotals({
-      client: asTotalsClient(clickHouseClient),
+      client: await this.totalsClientFor(projectId),
       tenantId: projectId,
       runs: [runRef],
       occurredAtRange: toTotalsOccurredAtRange(occurredAtRange),
@@ -816,7 +822,7 @@ export class ExperimentRunService {
     // One query for the whole page's progress (ADR-103 decision 1) — never
     // one per run.
     const totalsByExperimentRun = await deriveExperimentRunTotals({
-      client: asTotalsClient(clickHouseClient),
+      client: await this.totalsClientFor(projectId),
       tenantId: projectId,
       runs: runRows.map((r) => ({
         experimentId: r.ExperimentId,
@@ -834,8 +840,10 @@ export class ExperimentRunService {
     // pattern resolves dedup using only lightweight key columns and the
     // ReplacingMergeTree version column (OccurredAt). See
     // trace-dedup-oom-safety.unit.test.ts for the rationale.
-    const breakdownResult = await clickHouseClient.query({
-      query: `
+    const breakdownRows =
+      await clickHouseClient.query<ClickHouseEvaluatorBreakdownRow>({
+        table: "experiment_run_items",
+        sql: `
         SELECT
           ExperimentId,
           RunId,
@@ -871,17 +879,13 @@ export class ExperimentRunService {
         GROUP BY ExperimentId, RunId, EvaluatorId
         LIMIT 10000
       `,
-      query_params: {
-        tenantId: projectId,
-        runPairs,
-        minOccurredAt: occurredAtRange.minOccurredAt,
-        maxOccurredAt: occurredAtRange.maxOccurredAt,
-      },
-      format: "JSONEachRow",
-    });
-
-    const breakdownRows =
-      (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
+        params: {
+          tenantId: projectId,
+          runPairs,
+          minOccurredAt: occurredAtRange.minOccurredAt,
+          maxOccurredAt: occurredAtRange.maxOccurredAt,
+        },
+      });
 
     // Group breakdown by (ExperimentId, RunId) — runIds are not unique
     // across experiments, so a composite key is required to avoid mixing
@@ -909,8 +913,9 @@ export class ExperimentRunService {
     //
     // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
     // the breakdown query above — see comment there for the rationale.
-    const costResult = await clickHouseClient.query({
-      query: `
+    const costRows = await clickHouseClient.query<ClickHouseRunAggregateRow>({
+      table: "experiment_run_items",
+      sql: `
         SELECT
           ExperimentId,
           RunId,
@@ -947,16 +952,13 @@ export class ExperimentRunService {
         GROUP BY ExperimentId, RunId
         LIMIT 10000
       `,
-      query_params: {
+      params: {
         tenantId: projectId,
         runPairs,
         minOccurredAt: occurredAtRange.minOccurredAt,
         maxOccurredAt: occurredAtRange.maxOccurredAt,
       },
-      format: "JSONEachRow",
     });
-
-    const costRows = (await costResult.json()) as ClickHouseRunAggregateRow[];
 
     // Same composite key as breakdownByExperimentRun.
     const aggregateByExperimentRun = new Map<
@@ -1052,8 +1054,9 @@ export class ExperimentRunService {
     // Group the run's target items by the trace they produced. Only the
     // lightweight key columns are read — the dedup resolves on
     // (key columns, OccurredAt), never on the heavy payload columns.
-    const groupResult = await clickHouseClient.query({
-      query: `
+    const groupRows = await clickHouseClient.query<ClickHouseRunTraceGroupRow>({
+      table: "experiment_run_items",
+      sql: `
         SELECT
           ExperimentId,
           RunId,
@@ -1088,17 +1091,14 @@ export class ExperimentRunService {
         GROUP BY ExperimentId, RunId, TraceId
         LIMIT 10000
       `,
-      query_params: {
+      params: {
         tenantId: projectId,
         runPairs,
         minOccurredAt: occurredAtRange.minOccurredAt,
         maxOccurredAt: occurredAtRange.maxOccurredAt,
       },
-      format: "JSONEachRow",
     });
 
-    const groupRows =
-      (await groupResult.json()) as ClickHouseRunTraceGroupRow[];
     const pricedGroups = groupRows.filter(
       (row) => toCount(row.costlessCount) > 0,
     );
@@ -1166,8 +1166,12 @@ export class ExperimentRunService {
     const costByTraceId = new Map<string, number>();
     if (traceIds.length === 0) return costByTraceId;
 
-    const traceCostResult = await clickHouseClient.query({
-      query: `
+    const traceCostRows = await clickHouseClient.query<{
+      TraceId: string;
+      TotalCost: number | null;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           TraceId,
           TotalCost
@@ -1184,19 +1188,13 @@ export class ExperimentRunService {
             GROUP BY TenantId, TraceId
           )
       `,
-      query_params: {
+      params: {
         tenantId: projectId,
         traceIds,
         minOccurredAt: occurredAtRange.minOccurredAt,
         maxOccurredAt: occurredAtRange.maxOccurredAt,
       },
-      format: "JSONEachRow",
     });
-
-    const traceCostRows = await traceCostResult.json<{
-      TraceId: string;
-      TotalCost: number | null;
-    }>();
 
     for (const row of traceCostRows) {
       if (row.TotalCost !== null && row.TotalCost > 0) {

@@ -109,7 +109,20 @@ than the format it is serialised into.
 rather than being dropped, which is what makes decision 1's parity test
 meaningful.
 
-**Whether a write may be retried is a property of the engine, not of the
+**Only a write is ever retried.** A read is not, and neither is DDL. A read
+corrupts nothing when repeated, so its refusal is not about duplicate safety: a
+failed read has already consumed a slot in a pool of 25 behind a per-tenant
+bulkhead, and re-issuing it holds that slot for up to three more request
+timeouts while the condition that broke the connection is still in force — the
+mechanism by which a brief ClickHouse blip becomes a queue of reads that
+outlives it. A read also always has a caller waiting, and that caller is better
+placed than the client to decide whether a narrower query, a cached answer or a
+visible failure beats another thirty seconds. A write has no such caller; its
+retry is the only thing between a transient blip and lost data. DDL is refused
+because a repeated `CREATE`/`ALTER` is not idempotent and is not a decision this
+client may take on its own — the migration runner owns it.
+
+**Whether a write may be retried is then a property of the engine, not of the
 caller.** A `replace` write is retryable — the version column resolves a
 duplicate. An `append` write is retryable only when its sort key already carries
 per-record identity, so a duplicate insert collapses at merge; a plain

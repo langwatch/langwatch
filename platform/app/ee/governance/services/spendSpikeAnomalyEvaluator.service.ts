@@ -32,10 +32,10 @@
  * follow-up (per the license-split decision — alert destinations
  * are ee/-only).
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import { PROJECT_KIND } from "./governanceProject.service";
@@ -245,7 +245,7 @@ export class SpendSpikeAnomalyEvaluator {
       };
     }
 
-    const ch = await getClickHouseClientForOrganization(rule.organizationId);
+    const ch = clickHouseForOrganization(rule.organizationId);
     if (!ch) {
       return {
         ruleId: rule.id,
@@ -370,15 +370,19 @@ export class SpendSpikeAnomalyEvaluator {
    *     not apply.
    */
   private async queryGovernanceKpis(input: {
-    ch: ClickHouseClient;
+    ch: TenantClickHouseClient;
     tenantId: string;
     windowStart: Date;
     windowEnd: Date;
     baselineStart: Date;
     sourceFilter: { sql: string; params: Record<string, unknown> };
   }): Promise<{ currentSpend: number; baselineSpend: number }> {
-    const result = await input.ch.query({
-      query: `
+    const rows = await input.ch.query<{
+      currentSpend: number | string | null;
+      baselineSpend: number | string | null;
+    }>({
+      table: "governance_kpis",
+      sql: `
         SELECT
           sumIf(SpendUsd, HourBucket >= fromUnixTimestamp64Milli({windowStartMs:UInt64})) AS currentSpend,
           sumIf(SpendUsd, HourBucket < fromUnixTimestamp64Milli({windowStartMs:UInt64}) AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})) AS baselineSpend
@@ -394,19 +398,14 @@ export class SpendSpikeAnomalyEvaluator {
           GROUP BY TenantId, SourceId, HourBucket, TraceId, EventId
         )
       `,
-      query_params: {
+      params: {
         tenantId: input.tenantId,
         windowStartMs: input.windowStart.getTime(),
         windowEndMs: input.windowEnd.getTime(),
         baselineStartMs: input.baselineStart.getTime(),
         ...input.sourceFilter.params,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      currentSpend: number | string | null;
-      baselineSpend: number | string | null;
-    }>;
     const row = rows[0];
     return {
       currentSpend: Number(row?.currentSpend ?? 0),

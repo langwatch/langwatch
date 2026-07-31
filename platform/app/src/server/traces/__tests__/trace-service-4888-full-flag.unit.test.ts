@@ -55,9 +55,8 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: () => Promise.resolve({ query: mockClickHouseQuery }),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -129,26 +128,18 @@ const PREVIEW_OUTPUT = "x".repeat(IO_PREVIEW_BYTES) + "…";
  */
 function setupGetTracesWithSpansMocks(tenantId = PROJECT_ID_A) {
   mockClickHouseQuery
-    .mockResolvedValueOnce({
-      json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
-    })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSummaryRow(TRACE_ID, {
-            computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-          }),
-        ]),
-    })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSpanRowWithEventRef(TRACE_ID, "span-1", {
-            tenantId,
-            previewOutput: PREVIEW_OUTPUT,
-          }),
-        ]),
-    });
+    .mockResolvedValueOnce([{ fromMs: 1_000_000, toMs: 2_000_000 }])
+    .mockResolvedValueOnce([
+      makeSummaryRow(TRACE_ID, {
+        computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+      }),
+    ])
+    .mockResolvedValueOnce([
+      makeSpanRowWithEventRef(TRACE_ID, "span-1", {
+        tenantId,
+        previewOutput: PREVIEW_OUTPUT,
+      }),
+    ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,26 +507,18 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
   function setupJoinedFetch() {
     mockClickHouseQuery
       // resolve (min/max OccurredAt) for the hint-less path
-      .mockResolvedValueOnce({
-        json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
-      })
-      .mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([
-            makeSummaryRow(TRACE_ID_CH, {
-              computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-            }),
-          ]),
-      })
-      .mockResolvedValueOnce({
-        json: () =>
-          Promise.resolve([
-            makeSpanRowWithEventRef(TRACE_ID_CH, "span-1", {
-              tenantId: PROJECT_ID_CH,
-              previewOutput: PREVIEW_OUTPUT,
-            }),
-          ]),
-      });
+      .mockResolvedValueOnce([{ fromMs: 1_000_000, toMs: 2_000_000 }])
+      .mockResolvedValueOnce([
+        makeSummaryRow(TRACE_ID_CH, {
+          computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+        }),
+      ])
+      .mockResolvedValueOnce([
+        makeSpanRowWithEventRef(TRACE_ID_CH, "span-1", {
+          tenantId: PROJECT_ID_CH,
+          previewOutput: PREVIEW_OUTPUT,
+        }),
+      ]);
   }
 
   function makeEventRefBlobStore(contents: Record<string, string>): {

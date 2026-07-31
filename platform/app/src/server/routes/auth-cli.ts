@@ -55,11 +55,9 @@ import {
   hasProjectPermission,
 } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { getServerAuthSession } from "~/server/auth";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -1072,7 +1070,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
 function chRepoOrUndefined(): GatewayBudgetClickHouseRepository | undefined {
   if (!isClickHouseEnabled()) return undefined;
   return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
+    const client = await clickHouseForProject(projectId);
     if (!client) {
       throw new Error(
         `ClickHouse enabled but no client for project ${projectId}`,

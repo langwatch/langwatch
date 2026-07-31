@@ -11,8 +11,8 @@
  * on how a real ClickHouse container round-trips an epoch timestamp; the
  * companion integration test covers the real-CH partition-pruning behavior.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
 
 const heavyRow = {
@@ -31,11 +31,11 @@ const heavyRow = {
 function makeRepo(responder: (sql: string) => unknown[]) {
   const queries: string[] = [];
   const client = {
-    query: vi.fn(async ({ query }: { query: string }) => {
-      queries.push(query);
-      return { json: async () => responder(query) };
+    query: vi.fn(async ({ sql }: { sql: string }) => {
+      queries.push(sql);
+      return responder(sql);
     }),
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   return {
     repo: new TraceSummaryClickHouseRepository(async () => client),
     queries,

@@ -8,7 +8,6 @@ import {
   type TableRow,
 } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import type {
@@ -191,11 +190,6 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     // dspy_steps is a traces-category retention table. Without a resolver the
     // tenant's policy can't be read, so rows fall back to the platform default.
     private readonly retentionResolver: RetentionPolicyResolver | null = null,
-    // ADR-104: the new client exposes query/insert/stream only, no DDL or
-    // mutation execution. deleteByExperiment issues `ALTER TABLE ... DELETE`,
-    // which has no home there yet, so it keeps resolving the legacy client.
-    // Unreachable from any caller in `src` today (checked at migration time).
-    private readonly legacyResolveClient?: ClickHouseClientResolver,
   ) {}
 
   private async resolveTracesRetentionDays(tenantId: string): Promise<number> {
@@ -417,16 +411,12 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     tenantId: string,
     experimentId: string,
   ): Promise<void> {
-    if (!this.legacyResolveClient) {
-      throw new Error(
-        "DspyStepClickHouseRepository.deleteByExperiment requires a legacy client resolver — the new ClickHouse client has no DDL/mutation method (ADR-104)",
-      );
-    }
     try {
-      const client = await this.legacyResolveClient(tenantId);
+      const client = this.resolveClient(tenantId);
       await client.command({
-        query: `DELETE FROM ${table.name} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
-        query_params: { tenantId, experimentId },
+        tenantId,
+        sql: `DELETE FROM ${table.name} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+        params: { tenantId, experimentId },
       });
     } catch (error) {
       const errorMessage =

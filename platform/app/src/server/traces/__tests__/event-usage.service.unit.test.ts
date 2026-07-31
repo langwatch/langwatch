@@ -7,7 +7,7 @@ const mockQueryBillableEventsByProjectApprox = vi.fn();
 const mockGetBillingMonth = vi.fn().mockReturnValue("2026-03");
 const mockIsClickHouseEnabled = vi.fn();
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+vi.mock("~/server/app-layer/clients/clickhouse/shared", () => ({
   isClickHouseEnabled: () => mockIsClickHouseEnabled(),
 }));
 

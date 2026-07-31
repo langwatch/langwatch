@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import type { SeriesInputType } from "~/server/analytics/registry";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import { ClickHouseLegacyAnalyticsShim } from "~/server/app-layer/analytics/repositories/legacy.shim";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HALF_DAY_MS = 12 * 60 * 60 * 1000;
@@ -332,7 +333,7 @@ export const readAnalyticsPageNumbers = async ({
   currentStartMs,
   endMs,
 }: {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   tenantId: string;
   evaluatorId: string;
   metric: AnalyticsPageMetric;

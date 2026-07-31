@@ -1,5 +1,5 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 const promClientMocks = vi.hoisted(() => ({
   constructedGaugeNames: [] as string[],
@@ -171,10 +171,8 @@ describe("ClickHouse metrics", () => {
 
     it("does not throw when started", () => {
       const mockClient = {
-        query: vi.fn().mockResolvedValue({
-          json: vi.fn().mockResolvedValue({ data: [] }),
-        }),
-      } as unknown as ClickHouseClient;
+        query: vi.fn().mockResolvedValue([]),
+      } as unknown as TenantClickHouseClient;
 
       expect(() =>
         metrics.startStorageStatsCollection(mockClient, 60000),
@@ -183,10 +181,8 @@ describe("ClickHouse metrics", () => {
 
     it("is idempotent - calling twice does not create duplicate intervals", () => {
       const mockClient = {
-        query: vi.fn().mockResolvedValue({
-          json: vi.fn().mockResolvedValue({ data: [] }),
-        }),
-      } as unknown as ClickHouseClient;
+        query: vi.fn().mockResolvedValue([]),
+      } as unknown as TenantClickHouseClient;
 
       metrics.startStorageStatsCollection(mockClient, 60000);
       metrics.startStorageStatsCollection(mockClient, 60000);
@@ -205,27 +201,24 @@ describe("ClickHouse metrics", () => {
 
   describe("collectStorageStats", () => {
     it("queries system.parts for table stats", async () => {
-      const mockResult = {
-        json: vi.fn().mockResolvedValue({
-          data: [
-            {
-              table: "traces",
-              total_rows: "100",
-              total_bytes: "1024",
-              parts_count: "2",
-            },
-          ],
-        }),
-      };
       const mockClient = {
-        query: vi.fn().mockResolvedValue(mockResult),
-      } as unknown as ClickHouseClient;
+        query: vi.fn().mockResolvedValue([
+          {
+            table: "traces",
+            // UInt64 aggregates reach the collector already converted to
+            // numbers by the tenant client's wire decode.
+            total_rows: 100,
+            total_bytes: 1024,
+            parts_count: 2,
+          },
+        ]),
+      } as unknown as TenantClickHouseClient;
 
       await metrics.collectStorageStats(mockClient);
 
       expect(mockClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("system.parts"),
+          sql: expect.stringContaining("system.parts"),
         }),
       );
     });
@@ -240,40 +233,27 @@ describe("ClickHouse metrics", () => {
 
       describe("when system.backup_log returns data", () => {
         it("queries system.backup_log for backup status", async () => {
-          const partsResult = {
-            json: vi.fn().mockResolvedValue({ data: [] }),
-          };
-          const backupResult = {
-            json: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  status: "BACKUP_CREATED",
-                  cnt: "3",
-                  last_success_time: "2024-01-15 10:00:00",
-                  last_success_size: "1073741824",
-                },
-              ],
-            }),
-          };
-          const diskResult = {
-            json: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  name: "default",
-                  total_space: "322122547200",
-                  free_space: "214748364800",
-                  used_space: "107374182400",
-                },
-              ],
-            }),
-          };
           const mockClient = {
             query: vi
               .fn()
-              .mockResolvedValueOnce(partsResult)
-              .mockResolvedValueOnce(backupResult)
-              .mockResolvedValueOnce(diskResult),
-          } as unknown as ClickHouseClient;
+              .mockResolvedValueOnce([])
+              .mockResolvedValueOnce([
+                {
+                  status: "BACKUP_CREATED",
+                  cnt: 3,
+                  last_success_time: "2024-01-15 10:00:00",
+                  last_success_size: 1073741824,
+                },
+              ])
+              .mockResolvedValueOnce([
+                {
+                  name: "default",
+                  total_space: 322122547200,
+                  free_space: 214748364800,
+                  used_space: 107374182400,
+                },
+              ]),
+          } as unknown as TenantClickHouseClient;
 
           await metrics.collectStorageStats(mockClient);
 
@@ -281,12 +261,12 @@ describe("ClickHouse metrics", () => {
           expect(mockClient.query).toHaveBeenCalledTimes(3);
           expect(mockClient.query).toHaveBeenCalledWith(
             expect.objectContaining({
-              query: expect.stringContaining("system.backup_log"),
+              sql: expect.stringContaining("system.backup_log"),
             }),
           );
           expect(mockClient.query).toHaveBeenCalledWith(
             expect.objectContaining({
-              query: expect.stringContaining("system.disks"),
+              sql: expect.stringContaining("system.disks"),
             }),
           );
         });
@@ -294,18 +274,13 @@ describe("ClickHouse metrics", () => {
 
       describe("when system.backup_log query fails", () => {
         it("handles system.backup_log query failure gracefully", async () => {
-          const partsResult = {
-            json: vi.fn().mockResolvedValue({ data: [] }),
-          };
           const mockClient = {
             query: vi
               .fn()
-              .mockResolvedValueOnce(partsResult)
+              .mockResolvedValueOnce([])
               .mockRejectedValueOnce(new Error("system.backup_log not enabled"))
-              .mockResolvedValueOnce({
-                json: vi.fn().mockResolvedValue({ data: [] }),
-              }),
-          } as unknown as ClickHouseClient;
+              .mockResolvedValueOnce([]),
+          } as unknown as TenantClickHouseClient;
 
           // Should not throw — backup errors are handled gracefully
           await expect(
@@ -318,7 +293,7 @@ describe("ClickHouse metrics", () => {
     it("handles query errors gracefully", async () => {
       const mockClient = {
         query: vi.fn().mockRejectedValue(new Error("Connection failed")),
-      } as unknown as ClickHouseClient;
+      } as unknown as TenantClickHouseClient;
 
       // Should not throw
       await expect(
@@ -440,26 +415,15 @@ describe("ClickHouse metrics", () => {
   });
 
   describe("given system.backup_log failure logging", () => {
-    const buildMockClient = (backupShouldFail: () => boolean) => {
-      const partsResult = { json: vi.fn().mockResolvedValue({ data: [] }) };
-      const successfulBackupResult = {
-        json: vi.fn().mockResolvedValue({ data: [] }),
-      };
-      const diskResult = { json: vi.fn().mockResolvedValue({ data: [] }) };
-      return {
-        query: vi.fn(async ({ query }: { query: string }) => {
-          if (query.includes("system.parts")) return partsResult;
-          if (query.includes("system.backup_log")) {
-            if (backupShouldFail()) {
-              throw new Error("system.backup_log not enabled");
-            }
-            return successfulBackupResult;
+    const buildMockClient = (backupShouldFail: () => boolean) =>
+      ({
+        query: vi.fn(async ({ sql }: { sql: string }) => {
+          if (sql.includes("system.backup_log") && backupShouldFail()) {
+            throw new Error("system.backup_log not enabled");
           }
-          if (query.includes("system.disks")) return diskResult;
-          return { json: vi.fn().mockResolvedValue({ data: [] }) };
+          return [];
         }),
-      } as unknown as ClickHouseClient;
-    };
+      }) as unknown as TenantClickHouseClient;
 
     const countCallsMatching = (
       calls: unknown[][],
@@ -538,7 +502,7 @@ describe("ClickHouse metrics", () => {
 
         expect(client.query).not.toHaveBeenCalledWith(
           expect.objectContaining({
-            query: expect.stringContaining("system.backup_log"),
+            sql: expect.stringContaining("system.backup_log"),
           }),
         );
       });

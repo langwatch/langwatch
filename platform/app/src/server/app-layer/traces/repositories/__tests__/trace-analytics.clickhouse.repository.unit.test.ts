@@ -32,6 +32,7 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import {
   capturingInsertClient,
@@ -256,8 +257,8 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(seen[0]?.query_params?.from).toBe(1_750_000_000_000);
-        expect(seen[0]?.query_params?.to).toBe(1_750_000_345_679);
+        expect(seen[0]?.params?.from).toBe(1_750_000_000_000);
+        expect(seen[0]?.params?.to).toBe(1_750_000_345_679);
       });
 
       it("bounds the outer scope only, leaving the dedup subquery unwindowed", async () => {
@@ -272,7 +273,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        const query = seen[0]?.query ?? "";
+        const query = seen[0]?.sql ?? "";
         const innerScopeStart = query.indexOf("IN (");
         const outerScope = query.slice(0, innerScopeStart);
         const innerScope = query.slice(
@@ -303,7 +304,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         expect(
           await windowedReadCount({ table: TABLE, outcome: "unwindowed" }),
         ).toBe(before + 1);
-        expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
+        expect(seen[0]?.sql).not.toContain("fromUnixTimestamp64Milli");
       });
     });
   });
@@ -312,16 +313,16 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 /**
  * The write half of the migration window (ADR-066).
  *
- * `wrapWithDefaultSettings` proxies only `.query`, so an insert carries exactly
- * the settings the repository passes and nothing else. ClickHouse defaults
- * `input_format_skip_unknown_fields` ON, and the workers Deployment overrides
- * the entrypoint so it never runs migrations — they run in the app pod's boot,
- * and the two roll concurrently. Without the explicit 0, a worker writing before
- * migration 00056 applies gets HTTP 200 with the new columns dropped and the row
- * stamped at the CURRENT projection version, so it later passes the store's
- * version gate and decodes as all-defaults with no rebuild path.
+ * The guard against ClickHouse silently dropping a column the table does not
+ * have yet — `input_format_skip_unknown_fields: 0` — is no longer this
+ * repository's to pass: the package client merges its durability settings last
+ * and refuses to let a caller weaken them, so the guarantee holds for every
+ * write without a call site restating it. What the repository still chooses is
+ * the write TARGET, which is what decides whether a failed insert may be
+ * re-sent, and `trace_analytics` is a ReplacingMergeTree — a duplicate collapses
+ * onto the same sort key at merge, so the write is retryable.
  */
-describe("TraceAnalyticsClickHouseRepository insert settings", () => {
+describe("TraceAnalyticsClickHouseRepository write target", () => {
   const ROW: TraceAnalyticsRow = {
     tenantId: TENANT_ID,
     traceId: TRACE_ID,
@@ -361,9 +362,9 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     earliestSpanStartMs: 1_750_000_000_000,
   };
 
-  describe("given a table that predates the row's columns", () => {
+  describe("given the slim analytics table", () => {
     describe("when a single row is upserted", () => {
-      it("refuses to let ClickHouse silently drop an unknown column", async () => {
+      it("declares the write retryable", async () => {
         const { client, inserts } = capturingInsertClient();
         const repository = new TraceAnalyticsClickHouseRepository(
           async () => client,
@@ -371,14 +372,13 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
 
         await repository.upsert(ROW);
 
-        expect(inserts[0]?.clickhouse_settings).toMatchObject({
-          input_format_skip_unknown_fields: 0,
-        });
+        expect(inserts[0]?.table).toBe(TABLE);
+        expect(inserts[0]?.target).toEqual(writeTargetFor(TABLE));
       });
     });
 
     describe("when a batch is upserted", () => {
-      it("refuses to let ClickHouse silently drop an unknown column", async () => {
+      it("declares the write retryable", async () => {
         const { client, inserts } = capturingInsertClient();
         const repository = new TraceAnalyticsClickHouseRepository(
           async () => client,
@@ -386,9 +386,8 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
 
         await repository.upsertBatch([{ row: ROW }]);
 
-        expect(inserts[0]?.clickhouse_settings).toMatchObject({
-          input_format_skip_unknown_fields: 0,
-        });
+        expect(inserts[0]?.table).toBe(TABLE);
+        expect(inserts[0]?.target).toEqual(writeTargetFor(TABLE));
       });
     });
   });

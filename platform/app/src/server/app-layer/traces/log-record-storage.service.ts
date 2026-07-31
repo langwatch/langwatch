@@ -1,13 +1,11 @@
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { CanonicalLogRecordClickHouseRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.clickhouse.repository";
 import {
   type CanonicalLogRecordRepository,
   NullCanonicalLogRecordRepository,
 } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
-import {
-  type ClickHouseClientResolver,
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { LogRecordStorageClickHouseRepository } from "./repositories/log-record-storage.clickhouse.repository";
 import {
   type LogRecordStorageRepository,
@@ -86,7 +84,7 @@ export function createDefaultLogRecordStorageService(): LogRecordStorageService 
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId,
   ) => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await clickHouseForProject(tenantId);
     if (!client) {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     }

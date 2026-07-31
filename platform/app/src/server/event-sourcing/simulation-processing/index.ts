@@ -159,10 +159,16 @@ const messageRowMapping = deriveAppendMapping<
 });
 
 export interface SimulationBroadcastPorts {
+  /**
+   * `eventType` is the one channel this pipeline publishes on, stated as the
+   * literal rather than as `string`. The adapter behind this port accepts a
+   * closed union of channel names, and a port that promised to pass any string
+   * could not be satisfied by it.
+   */
   broadcastToTenant(
     tenantId: string,
     payload: string,
-    eventType: string,
+    eventType: "simulation_updated",
   ): Promise<void>;
 }
 

@@ -8,10 +8,8 @@
  */
 
 import { z } from "zod";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayBudgetNotFoundError } from "~/server/gateway/errors";
@@ -27,7 +25,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 function chRepoOrUndefined() {
   if (!isClickHouseEnabled()) return undefined;
   return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
+    const client = await clickHouseForProject(projectId);
     if (!client) {
       throw new Error(
         `ClickHouse enabled but no client for project ${projectId}`,

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getClickHouseClientForProjectMock = vi.hoisted(() => vi.fn());
+const clickHouseForProjectMock = vi.hoisted(() => vi.fn());
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: getClickHouseClientForProjectMock,
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: clickHouseForProjectMock,
 }));
 
 import { EvaluationService } from "../evaluation.service";
@@ -18,16 +18,11 @@ describe("EvaluationService.getEvaluationInputs", () => {
       /** @scenario A single evaluation's inputs can be fetched without scanning the trace */
       it("keys the read by EvaluationId (not TraceId) and parses the blob", async () => {
         const query = vi.fn(
-          async (_args: {
-            query: string;
-            query_params: Record<string, unknown>;
-          }) => ({
-            json: async () => [
-              { Inputs: '{"input":"hello","output":"world"}' },
-            ],
-          }),
+          async (_args: { sql: string; params: Record<string, unknown> }) => [
+            { Inputs: '{"input":"hello","output":"world"}' },
+          ],
         );
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        clickHouseForProjectMock.mockResolvedValue({ query });
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
@@ -39,10 +34,10 @@ describe("EvaluationService.getEvaluationInputs", () => {
 
         // The read must prune by the sort key (EvaluationId), never fall back
         // to a TraceId scan that can't prune granules.
-        const sql = query.mock.calls[0]?.[0]?.query ?? "";
+        const sql = query.mock.calls[0]?.[0]?.sql ?? "";
         expect(sql).toContain("EvaluationId = {evaluationId:String}");
         expect(sql).not.toContain("TraceId");
-        expect(query.mock.calls[0]?.[0]?.query_params).toMatchObject({
+        expect(query.mock.calls[0]?.[0]?.params).toMatchObject({
           tenantId: "project_test",
           evaluationId: "eval-1",
         });
@@ -53,10 +48,8 @@ describe("EvaluationService.getEvaluationInputs", () => {
   describe("given the evaluation recorded no inputs", () => {
     describe("when its inputs are requested", () => {
       it("returns null", async () => {
-        const query = vi.fn(async () => ({
-          json: async () => [{ Inputs: null }],
-        }));
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        const query = vi.fn(async () => [{ Inputs: null }]);
+        clickHouseForProjectMock.mockResolvedValue({ query });
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
@@ -77,7 +70,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
             "Query memory limit exceeded: would use 4.00 GiB, maximum: 3.50 GiB: (while reading column Inputs)",
           );
         });
-        getClickHouseClientForProjectMock.mockResolvedValue({ query });
+        clickHouseForProjectMock.mockResolvedValue({ query });
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
@@ -93,7 +86,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
   describe("given ClickHouse is not enabled for the project", () => {
     describe("when its inputs are requested", () => {
       it("returns null without querying", async () => {
-        getClickHouseClientForProjectMock.mockResolvedValue(null);
+        clickHouseForProjectMock.mockResolvedValue(null);
 
         const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({

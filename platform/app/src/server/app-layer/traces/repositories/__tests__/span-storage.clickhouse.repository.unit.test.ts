@@ -240,7 +240,7 @@ describe("given a requested span-read limit", () => {
 
 describe("SpanStorageClickHouseRepository single-trace reads", () => {
   function repoWithSpyClient() {
-    const query = vi.fn().mockResolvedValue({ json: async () => [] });
+    const query = vi.fn().mockResolvedValue([]);
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
     })) as unknown as ConstructorParameters<
@@ -261,7 +261,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
         occurredAtMs: Date.now(),
       });
 
-      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      const settings = query.mock.calls[0]?.[0]?.settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
     });
 
@@ -273,7 +273,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
         occurredAtMs: Date.now(),
       });
 
-      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      const settings = query.mock.calls[0]?.[0]?.settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
     });
 
@@ -286,7 +286,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
         occurredAtMs: Date.now(),
       });
 
-      const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
+      const settings = query.mock.calls[0]?.[0]?.settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
     });
   });
@@ -328,9 +328,9 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
   function repoWithSpyClient(pages: SpanSummaryQueryRow[][] = [[]]) {
     const query = vi.fn();
     for (const rows of pages) {
-      query.mockResolvedValueOnce({ json: async () => rows });
+      query.mockResolvedValueOnce(rows);
     }
-    query.mockResolvedValue({ json: async () => [] });
+    query.mockResolvedValue([]);
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
     })) as unknown as ConstructorParameters<
@@ -353,7 +353,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
         occurredAtMs: Date.now(),
       });
 
-      expect(query.mock.calls[0]?.[0]?.query_params?.limit).toBe(3);
+      expect(query.mock.calls[0]?.[0]?.params?.limit).toBe(3);
       expect(page.rows.map((r) => r.spanId)).toEqual(["s-1", "s-2"]);
       expect(page.hasMore).toBe(true);
     });
@@ -391,7 +391,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
         occurredAtMs: Date.now(),
       });
 
-      const sql = query.mock.calls[0]?.[0]?.query as string;
+      const sql = query.mock.calls[0]?.[0]?.sql as string;
       expect(sql).toContain(
         "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})",
       );
@@ -416,7 +416,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
         occurredAtMs: Date.now(),
       });
 
-      const sql = query.mock.calls[0]?.[0]?.query as string;
+      const sql = query.mock.calls[0]?.[0]?.sql as string;
       const dedupSubquery = sql.slice(
         sql.indexOf("(TenantId, TraceId, SpanId, UpdatedAt) IN ("),
       );
@@ -459,11 +459,11 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       });
 
       const call = query.mock.calls[0]?.[0];
-      expect(call?.query as string).toContain(
+      expect(call?.sql as string).toContain(
         "StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})",
       );
-      expect(call?.query as string).not.toContain("StartTime <=");
-      expect(call?.query_params?.pageFromMs).toBe(
+      expect(call?.sql as string).not.toContain("StartTime <=");
+      expect(call?.params?.pageFromMs).toBe(
         occurredAtMs - 2 * 24 * 60 * 60 * 1000,
       );
     });
@@ -479,7 +479,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       });
 
       expect(query).toHaveBeenCalledTimes(2);
-      expect(query.mock.calls[1]?.[0]?.query as string).not.toContain(
+      expect(query.mock.calls[1]?.[0]?.sql as string).not.toContain(
         "pageFromMs",
       );
       expect(page.rows.map((r) => r.spanId)).toEqual(["s-1"]);
@@ -489,7 +489,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
 
 describe("SpanStorageClickHouseRepository bounded light readers", () => {
   function repoWithSpyClient() {
-    const query = vi.fn().mockResolvedValue({ json: async () => [] });
+    const query = vi.fn().mockResolvedValue([]);
     const repo = new SpanStorageClickHouseRepository((async () => ({
       query,
     })) as unknown as ConstructorParameters<
@@ -510,7 +510,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
       const { repo, query } = repoWithSpyClient();
       await repo.getSpanSummaryByTraceId(byTrace);
 
-      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+      expect(query.mock.calls[0]?.[0]?.sql as string).toContain(
         `LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`,
       );
     });
@@ -521,7 +521,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
       const { repo, query } = repoWithSpyClient();
       await repo.findLangwatchSignalsByTraceId(byTrace);
 
-      const sql = query.mock.calls[0]?.[0]?.query as string;
+      const sql = query.mock.calls[0]?.[0]?.sql as string;
       expect(sql).toContain(`LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`);
       // The signals subquery selects only SpanId + mapKeys(SpanAttributes);
       // ordering by the StartTimeMs alias (which it never computes) makes
@@ -540,7 +540,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
         sinceUpdatedAtMs: Date.now(),
       });
 
-      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+      expect(query.mock.calls[0]?.[0]?.sql as string).toContain(
         `LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}`,
       );
     });
@@ -557,12 +557,12 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
         sinceUpdatedAtMs: 1_700_000_000_000,
       });
 
-      const sql = query.mock.calls[0]?.[0]?.query as string;
+      const sql = query.mock.calls[0]?.[0]?.sql as string;
       expect(sql).toContain(
         "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})",
       );
       expect(sql).not.toContain("StartTime > fromUnixTimestamp64Milli");
-      expect(query.mock.calls[0]?.[0]?.query_params).toMatchObject({
+      expect(query.mock.calls[0]?.[0]?.params).toMatchObject({
         sinceUpdatedAtMs: 1_700_000_000_000,
       });
     });
@@ -575,7 +575,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
         sinceUpdatedAtMs: 0,
       });
 
-      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+      expect(query.mock.calls[0]?.[0]?.sql as string).toContain(
         "toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs",
       );
     });
@@ -590,7 +590,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
         sinceStartTimeMs: Date.now(),
       });
 
-      expect(query.mock.calls[0]?.[0]?.query as string).toContain(
+      expect(query.mock.calls[0]?.[0]?.sql as string).toContain(
         `LIMIT ${MAX_DERIVATION_SPANS}`,
       );
     });

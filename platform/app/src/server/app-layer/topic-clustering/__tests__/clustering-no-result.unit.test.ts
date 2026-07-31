@@ -14,12 +14,21 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { assignTopicMock, recordTopicsMock, stagedLangevalsFetchMock } =
-  vi.hoisted(() => ({
-    assignTopicMock: vi.fn(),
-    recordTopicsMock: vi.fn(),
-    stagedLangevalsFetchMock: vi.fn(),
-  }));
+const {
+  assignTopicMock,
+  recordTopicsMock,
+  stagedLangevalsFetchMock,
+  clickHouseForProjectMock,
+} = vi.hoisted(() => ({
+  assignTopicMock: vi.fn(),
+  recordTopicsMock: vi.fn(),
+  stagedLangevalsFetchMock: vi.fn(),
+  clickHouseForProjectMock: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: clickHouseForProjectMock,
+}));
 
 const mockClickHouseQuery = vi.fn();
 
@@ -36,10 +45,6 @@ vi.mock("~/server/db", () => ({
     },
     cost: { create: vi.fn() },
   },
-}));
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
 }));
 
 // The deployment shape that triggers the bug: no clustering endpoint at all.
@@ -67,11 +72,16 @@ vi.mock("~/server/api/routers/modelProviders.utils", () => ({
   prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-5-mini" }),
 }));
 
+// One object across every `getApp()` call, not a fresh one per call: a test
+// that stubs a service on it has to be stubbing the same instance the code
+// under test will read from.
+const appMock = {
+  traces: { assignTopic: assignTopicMock },
+  topicClustering: { recordTopics: recordTopicsMock },
+};
+
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({
-    traces: { assignTopic: assignTopicMock },
-    topicClustering: { recordTopics: recordTopicsMock },
-  })),
+  getApp: vi.fn(() => appMock),
 }));
 
 vi.mock("~/server/metrics", () => ({
@@ -82,7 +92,6 @@ vi.mock("../../../langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { clusterTopicsForProject, storeResults } from "../clustering";
 
@@ -115,7 +124,7 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.project.findUnique).mockResolvedValue(
       makeProject() as any,
     );
-    vi.mocked(getClickHouseClientForProject).mockResolvedValue({
+    clickHouseForProjectMock.mockResolvedValue({
       query: mockClickHouseQuery,
     } as any);
   });
@@ -123,13 +132,10 @@ describe("clusterTopicsForProject", () => {
   describe("given the clustering service endpoint is not configured", () => {
     describe("when a batch page of clusterable traces is run", () => {
       beforeEach(() => {
-        mockClickHouseQuery.mockResolvedValueOnce({
-          json: () =>
-            Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-        });
-        mockClickHouseQuery.mockResolvedValueOnce({
-          json: () => Promise.resolve(usableTraceRows(12)),
-        });
+        mockClickHouseQuery.mockResolvedValueOnce([
+          { total: "100", recent: "100", assigned: "0" },
+        ]);
+        mockClickHouseQuery.mockResolvedValueOnce(usableTraceRows(12));
       });
 
       it("deletes no topics", async () => {

@@ -147,33 +147,45 @@ remains is stage, claim, settle, retry.
 is the correction that matters most about this decision, because the first
 draft of it read as though the substrate were free to choose its own keys. It is
 not. The operator surface — `app-layer/ops/repositories/queue.redis.repository.ts`,
-`ops/queue.service.ts`, `api/routers/ops.ts` and the `GroupsCard`/`BlockedCard`
-components — survived the engine's deletion and reads Redis **directly**, by key,
-without going through any port:
+`ops/queue.service.ts`, `api/routers/ops.ts` and the ops dashboard components —
+reads Redis **directly**, by key, without going through any port:
 
 ```
-<queue>:gq:ready                     zset of ready group ids
-<queue>:gq:blocked                   zset of blocked groups
-<queue>:gq:dlq                       zset of dead-lettered groups
-<queue>:gq:stats:total-pending       the pending counter the dashboard graphs
-<queue>:gq:parked-tenants            set of tenants with parked groups
-<queue>:gq:parked:<tenantId>         zset of that tenant's parked groups
-<queue>:gq:group:<groupId>:jobs      zset of the group's staged jobs
-<queue>:gq:group:<groupId>:active    the in-flight marker
-<queue>:gq:group:<groupId>:data      the group's job bodies
+groupqueue:lanes                     set of every lane ever staged into
+groupqueue:tenant-inflight:<tenant>  zset of that tenant's leased lanes
+<groupKey>:z                         zset of the lane's staged jobs
+<groupKey>:h                         hash of job headers by sequence
+<groupKey>:b                         hash of job bodies by sequence
+<groupKey>:seq                       the lane-local sequence counter
+<groupKey>:lease                     the live lease (token + expiresAt)
+<groupKey>:ready                     the retry backoff deadline
+<groupKey>:parked                    the park reason, present only while parked
 ```
 
-A substrate that renders different keys does not fail a test — it silently
-blanks every operator view during the incident the views exist for. So the
-layout above is part of this decision, and the `unblockGroup` / `drainGroup` /
-`moveToDlq` operations the ops repository already implements against it stay
-callable.
+`<groupKey>` is decision 2's rendered key, hash-tagged, and every suffix lands
+in the same slot because Redis Cluster hashes only the first `{…}` —
+`packages/groupqueue/src/redis/laneKeys.ts` is the single renderer. A substrate
+that renders different keys does not fail a test; it silently blanks every
+operator view during the incident the views exist for. So the layout above is
+part of this decision, and the `unparkLane` / `unparkAll` / `drainLane` /
+`drainTenant` operations the ops repository implements against it stay callable.
 
 **An operator-recovery surface is not a kill switch.** Decision 13 shrinks the
-kill switch to one predicate, and that is right — but unblocking a group,
-draining it, moving it to the DLQ and reading queue depth are recovery
-operations an operator performs *during* an incident, and they are neither
-retired nor replaced by a boolean. They are the reason the layout is a contract.
+kill switch to one predicate, and that is right — but unparking a lane,
+draining it and reading lane depth are recovery operations an operator performs
+*during* an incident, and they are neither retired nor replaced by a boolean.
+They are the reason the layout is a contract.
+
+> **Correction (2026-07-31).** This block previously documented the *old*
+> plane's layout — `<queue>:gq:ready|blocked|dlq|parked-tenants` and
+> `<queue>:gq:group:<groupId>:*` — and named `unblockGroup` / `moveToDlq` as
+> contract operations. None of those keys are rendered by the plane this ADR
+> describes, and the blocked set, the DLQ and the per-pipeline / per-tenant
+> pause keys have no substrate at all. The ops dashboard was still written
+> against the old vocabulary and white-screened; it now reads the layout above.
+> Anything a dashboard cannot read from these keys — throughput, latency,
+> failure rates — leaves the plane through the `Metrics` port in decision 13 and
+> is scraped, not stored, so it is absent from the console rather than zeroed.
 
 ### 5. One scheduler policy — fairness, soft caps and parking are one loop
 
@@ -497,4 +509,7 @@ the string version paid.
 - `specs/event-sourcing/payload-cost-and-spool.feature` — decisions 9 and 10.
 - `specs/event-sourcing/process-manager.feature` — decision 11.
 - `specs/event-sourcing/replay.feature` — decision 12.
+- `specs/ops/ops-dashboard-lane-vocabulary.feature` — what the operator console
+  may show, and why the rate and dead-letter tiles are gone rather than zeroed.
+- `packages/groupqueue/src/redis/laneKeys.ts` — decision 4's key renderer.
 - ADR-107, ADR-109, ADR-110.

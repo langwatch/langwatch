@@ -11,7 +11,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
+import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesInputType } from "~/server/analytics/registry";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { ClickHouseLegacyAnalyticsShim } from "../repositories/legacy.shim";
 
 vi.mock("~/server/analytics/clickhouse/aggregation-builder", () => ({
@@ -22,9 +24,17 @@ vi.mock("~/server/analytics/clickhouse/aggregation-builder", () => ({
 
 const buildTimeseriesQueryMock = vi.mocked(buildTimeseriesQuery);
 
+/**
+ * The app-layer client hands back decoded, named rows — no `ResultSet`, no
+ * `.json()` — so the double returns the array directly.
+ */
+const query = vi.fn().mockResolvedValue([]);
 const fakeClient = {
-  query: vi.fn().mockResolvedValue({ json: async () => [] }),
-};
+  tenantId: "project-1",
+  query,
+  insert: vi.fn(),
+  queryWindowed: vi.fn(),
+} as unknown as TenantClickHouseClient;
 
 function makeInput(
   overrides: Partial<TimeseriesInputType> = {},
@@ -48,10 +58,11 @@ function makeInput(
 }
 
 describe("ClickHouseLegacyAnalyticsShim", () => {
-  const shim = new ClickHouseLegacyAnalyticsShim(async () => fakeClient as any);
+  const shim = new ClickHouseLegacyAnalyticsShim(async () => fakeClient);
 
   beforeEach(() => {
     buildTimeseriesQueryMock.mockClear();
+    query.mockClear();
   });
 
   describe("when the request carries negateFilters", () => {
@@ -85,6 +96,19 @@ describe("ClickHouseLegacyAnalyticsShim", () => {
           projectId: "project-1",
           filters: { "metadata.labels": ["prod"] },
           timeZone: "UTC",
+        }),
+      );
+    });
+  });
+
+  describe("when the query reaches the client", () => {
+    it("sends the builder's SQL and the analytics settings", async () => {
+      await shim.run(makeInput());
+
+      expect(query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sql: "SELECT 1",
+          settings: ANALYTICS_CLICKHOUSE_SETTINGS,
         }),
       );
     });

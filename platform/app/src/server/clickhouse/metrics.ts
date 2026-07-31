@@ -1,6 +1,8 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { Counter, Gauge, Histogram, register } from "prom-client";
+// Type-only: this module is imported BY the tenant client (for the query
+// counters below), so a value import would close the cycle at runtime.
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -301,17 +303,23 @@ const MONITORED_TABLES = [
  * Absent" alert despite backups being healthy. system.backup_log is a persistent
  * system table that retains entries across restarts.
  */
-async function collectBackupStats(client: ClickHouseClient): Promise<void> {
+async function collectBackupStats(
+  client: TenantClickHouseClient,
+): Promise<void> {
   try {
+    // `cnt` and `last_success_size` are UInt64 on the wire. The client asks the
+    // server to quote 64-bit integers and the tenant wrapper converts them back
+    // to `number` from the result header, so they arrive here exactly as the
+    // driver path delivered them — hence no parseInt.
     interface BackupStats {
       status: string;
-      cnt: string;
+      cnt: number;
       last_success_time: string;
-      last_success_size: string;
+      last_success_size: number;
     }
 
-    const backupResult = await client.query({
-      query: `
+    const backupRows = await client.query<BackupStats>({
+      sql: `
         SELECT
           status,
           count() as cnt,
@@ -322,18 +330,16 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
       `,
     });
 
-    const backupRows = await backupResult.json<BackupStats>();
-
     ensureBackupStatusTotal().reset();
-    for (const row of backupRows.data) {
-      setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
+    for (const row of backupRows) {
+      setClickHouseBackupStatusCount(row.status, Number(row.cnt));
 
       if (row.status === "BACKUP_CREATED" && row.last_success_time) {
         const ts = new Date(row.last_success_time).getTime() / 1000;
         if (!isNaN(ts) && ts > 0) {
           setClickHouseBackupLastSuccessTimestamp(ts);
         }
-        const size = parseInt(row.last_success_size, 10);
+        const size = Number(row.last_success_size);
         if (!isNaN(size)) {
           setClickHouseBackupLastSizeBytes(size);
         }
@@ -371,18 +377,20 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
  * Should be called periodically (e.g., every 15 seconds).
  */
 export async function collectStorageStats(
-  client: ClickHouseClient,
+  client: TenantClickHouseClient,
 ): Promise<void> {
   try {
+    // The three aggregates are UInt64; see collectBackupStats for why they
+    // arrive as numbers rather than quoted strings.
     interface TableStats {
       table: string;
-      total_rows: string;
-      total_bytes: string;
-      parts_count: string;
+      total_rows: number;
+      total_bytes: number;
+      parts_count: number;
     }
 
-    const result = await client.query({
-      query: `
+    const rows = await client.query<TableStats>({
+      sql: `
         SELECT
           table,
           sum(rows) as total_rows,
@@ -394,10 +402,8 @@ export async function collectStorageStats(
           AND table IN ({tables:Array(String)})
         GROUP BY table
       `,
-      query_params: { tables: MONITORED_TABLES },
+      params: { tables: MONITORED_TABLES },
     });
-
-    const rows = await result.json<TableStats>();
 
     // Reset before repopulating (mirrors the per-disk gauges below). Without
     // this, a table that TTL-drops to zero active parts — or is simply absent
@@ -409,10 +415,10 @@ export async function collectStorageStats(
     clickhouseTableRows.reset();
     clickhouseTableBytes.reset();
     clickhouseTableParts.reset();
-    for (const row of rows.data) {
-      setClickHouseTableRows(row.table, parseInt(row.total_rows, 10));
-      setClickHouseTableBytes(row.table, parseInt(row.total_bytes, 10));
-      setClickHouseTableParts(row.table, parseInt(row.parts_count, 10));
+    for (const row of rows) {
+      setClickHouseTableRows(row.table, Number(row.total_rows));
+      setClickHouseTableBytes(row.table, Number(row.total_bytes));
+      setClickHouseTableParts(row.table, Number(row.parts_count));
     }
 
     // Backup status only exists where backups are configured (the production
@@ -431,13 +437,13 @@ export async function collectStorageStats(
     try {
       interface DiskStats {
         name: string;
-        total_space: string;
-        free_space: string;
-        used_space: string;
+        total_space: number;
+        free_space: number;
+        used_space: number;
       }
 
-      const diskResult = await client.query({
-        query: `
+      const diskRows = await client.query<DiskStats>({
+        sql: `
           SELECT
             name,
             total_space,
@@ -447,15 +453,13 @@ export async function collectStorageStats(
         `,
       });
 
-      const diskRows = await diskResult.json<DiskStats>();
-
       clickhouseDiskTotalBytes.reset();
       clickhouseDiskUsedBytes.reset();
       clickhouseDiskFreeBytes.reset();
-      for (const row of diskRows.data) {
-        setClickHouseDiskTotalBytes(row.name, parseInt(row.total_space, 10));
-        setClickHouseDiskUsedBytes(row.name, parseInt(row.used_space, 10));
-        setClickHouseDiskFreeBytes(row.name, parseInt(row.free_space, 10));
+      for (const row of diskRows) {
+        setClickHouseDiskTotalBytes(row.name, Number(row.total_space));
+        setClickHouseDiskUsedBytes(row.name, Number(row.used_space));
+        setClickHouseDiskFreeBytes(row.name, Number(row.free_space));
       }
     } catch (diskError) {
       logger.debug(
@@ -475,7 +479,7 @@ let storageStatsInterval: ReturnType<typeof setInterval> | null = null;
  * Collects stats every 15 seconds by default.
  */
 export function startStorageStatsCollection(
-  client: ClickHouseClient,
+  client: TenantClickHouseClient,
   intervalMs = 15000,
 ): void {
   if (storageStatsInterval) {

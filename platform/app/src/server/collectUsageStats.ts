@@ -1,5 +1,8 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { getSharedAppClickHouseClient } from "~/server/app-layer/clients/clickhouse/shared";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { prisma } from "~/server/db";
 
 export async function collectUsageStats(instanceId: string) {
@@ -68,7 +71,7 @@ export async function collectUsageStats(instanceId: string) {
     }),
   ]);
 
-  const clickhouse = await getClickHouseClientForOrganization(organizationId);
+  const clickhouse = clickHouseForOrganization(organizationId);
 
   const totalTraces = await getTraceCount(projects, clickhouse);
   const totalScenarioEvents = await getScenariosCount(projects, clickhouse);
@@ -91,9 +94,29 @@ export async function collectUsageStats(instanceId: string) {
   };
 }
 
+/**
+ * The ClickHouse an organisation's usage is counted on, or null when this
+ * deployment has none.
+ *
+ * The organisation is the routing key — an organisation pinned to a private
+ * endpoint is counted on its own server — and also the tenant this client acts
+ * as, because the counts below span every project the organisation owns rather
+ * than one project's data.
+ */
+function clickHouseForOrganization(
+  organizationId: string,
+): TenantClickHouseClient | null {
+  const shared = getSharedAppClickHouseClient();
+  if (!shared) return null;
+  return tenantClickHouseClient({
+    client: shared.resolveClient(organizationId),
+    tenantId: organizationId,
+  });
+}
+
 async function getTraceCount(
   projects: Array<{ id: string }>,
-  clickhouse: ClickHouseClient | null,
+  clickhouse: TenantClickHouseClient | null,
 ): Promise<number> {
   if (!clickhouse || projects.length === 0) return 0;
   return getChTraceCount(
@@ -103,26 +126,25 @@ async function getTraceCount(
 }
 
 async function getChTraceCount(
-  clickhouse: ClickHouseClient,
+  clickhouse: TenantClickHouseClient,
   projectIds: string[],
 ): Promise<number> {
-  const result = await clickhouse.query({
-    query: `
+  const rows = await clickhouse.query<{ Total: string }>({
+    table: "trace_summaries",
+    sql: `
       SELECT toString(count(DISTINCT TraceId)) AS Total
       FROM trace_summaries
       WHERE TenantId IN ({projectIds:Array(String)})
     `,
-    query_params: { projectIds },
-    format: "JSONEachRow",
+    params: { projectIds },
   });
 
-  const rows = (await result.json()) as Array<{ Total: string }>;
   return parseInt(rows[0]?.Total ?? "0", 10);
 }
 
 async function getScenariosCount(
   projects: Array<{ id: string }>,
-  clickhouse: ClickHouseClient | null,
+  clickhouse: TenantClickHouseClient | null,
 ): Promise<number> {
   if (!clickhouse || projects.length === 0) return 0;
   return getChScenariosCount(
@@ -132,11 +154,12 @@ async function getScenariosCount(
 }
 
 async function getChScenariosCount(
-  clickhouse: ClickHouseClient,
+  clickhouse: TenantClickHouseClient,
   projectIds: string[],
 ): Promise<number> {
-  const result = await clickhouse.query({
-    query: `
+  const rows = await clickhouse.query<{ Total: string }>({
+    table: "simulation_runs",
+    sql: `
       SELECT toString(count()) AS Total
       FROM simulation_runs AS t
       WHERE t.TenantId IN ({projectIds:Array(String)})
@@ -148,10 +171,8 @@ async function getChScenariosCount(
           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
         )
     `,
-    query_params: { projectIds },
-    format: "JSONEachRow",
+    params: { projectIds },
   });
 
-  const rows = (await result.json()) as Array<{ Total: string }>;
   return parseInt(rows[0]?.Total ?? "0", 10);
 }

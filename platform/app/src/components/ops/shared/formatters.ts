@@ -1,10 +1,3 @@
-export function formatRate(value: number): string {
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  if (value >= 100) return value.toFixed(0);
-  if (value >= 10) return value.toFixed(1);
-  return value.toFixed(2);
-}
-
 export function formatCount(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;

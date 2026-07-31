@@ -21,7 +21,7 @@ import { env as nodeProcessEnv } from "node:process";
 
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { register } from "prom-client";
 /**
  * The RMT version stamp. The IN-tuple dedup read depends on the repo-wide
@@ -73,10 +73,10 @@ function rowWith(over: Partial<CodingAgentSessionRow>): CodingAgentSessionRow {
 function makeRepository() {
   const captured: Array<{ UpdatedAt: Date }> = [];
   const client = {
-    insert: async (args: { values: Array<{ UpdatedAt: Date }> }) => {
-      captured.push(...args.values);
+    insert: async (args: { rows: Array<{ UpdatedAt: Date }> }) => {
+      captured.push(...args.rows);
     },
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   const repository = new CodingAgentSessionClickHouseRepository(
     async () => client,
   );
@@ -168,8 +168,8 @@ describe("CodingAgentSessionClickHouseRepository version stamp", () => {
 describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
   function repositoryReturning(record: Record<string, unknown>) {
     const client = {
-      query: async () => ({ json: async () => [record] }),
-    } as unknown as ClickHouseClient;
+      query: async () => [record],
+    } as unknown as TenantClickHouseClient;
     return new CodingAgentSessionClickHouseRepository(async () => client);
   }
 
@@ -246,12 +246,11 @@ describe("CodingAgentSessionClickHouseRepository DateTime64 decode", () => {
  */
 function orderingClient(
   rows: Array<Record<string, unknown>>,
-): ClickHouseClient {
+): TenantClickHouseClient {
   return {
-    query: async (params: { query: string }) => ({
-      json: async () => applyOrderBy(rows, params.query).slice(0, 1),
-    }),
-  } as unknown as ClickHouseClient;
+    query: async (params: { sql: string }) =>
+      applyOrderBy(rows, params.sql).slice(0, 1),
+  } as unknown as TenantClickHouseClient;
 }
 
 /**
@@ -317,7 +316,7 @@ function evaluate(
 function tiedVersions(
   stale: Record<string, unknown>,
   fresh: Record<string, unknown>,
-): ClickHouseClient {
+): TenantClickHouseClient {
   const base = {
     TenantId: "tenant-1",
     SessionId: "sess-1",
@@ -337,7 +336,7 @@ function tiedVersions(
   ]);
 }
 
-const read = (client: ClickHouseClient) =>
+const read = (client: TenantClickHouseClient) =>
   new CodingAgentSessionClickHouseRepository(
     async () => client,
   ).findBySessionIdWithApplied({ tenantId: "tenant-1", sessionId: "sess-1" });
@@ -518,21 +517,21 @@ function inScope(
  * drifted session reappears as its stale in-window version.
  */
 function listClient(rows: Array<Record<string, unknown>>): {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   lastQuery: () => string;
 } {
   let sent = "";
   const client = {
     query: async (args: {
-      query: string;
-      query_params: Record<string, unknown>;
+      sql: string;
+      params: Record<string, unknown>;
     }) => {
-      sent = args.query;
-      const { inner, outer } = splitScopes(args.query);
+      sent = args.sql;
+      const { inner, outer } = splitScopes(args.sql);
 
       const latest = new Map<string, number>();
       for (const row of rows) {
-        if (!inScope(row, inner, args.query_params)) continue;
+        if (!inScope(row, inner, args.params)) continue;
         const key = `${String(row.TenantId)}\u0000${String(row.SessionId)}`;
         latest.set(
           key,
@@ -541,7 +540,7 @@ function listClient(rows: Array<Record<string, unknown>>): {
       }
 
       const selected = rows
-        .filter((row) => inScope(row, outer, args.query_params))
+        .filter((row) => inScope(row, outer, args.params))
         .filter(
           (row) =>
             latest.get(
@@ -549,11 +548,11 @@ function listClient(rows: Array<Record<string, unknown>>): {
             ) === millis(row.UpdatedAt),
         )
         .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
-        .slice(0, Number(args.query_params.limit));
+        .slice(0, Number(args.params.limit));
 
-      return { json: async () => selected };
+      return selected;
     },
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
 
   return { client, lastQuery: () => sent };
 }
@@ -587,7 +586,7 @@ function version({
 }
 
 const listRecent = (
-  client: ClickHouseClient,
+  client: TenantClickHouseClient,
   userId?: string,
 ): Promise<CodingAgentSessionRow[]> =>
   new CodingAgentSessionClickHouseRepository(async () => client).findManyRecent(
@@ -920,7 +919,7 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
           query: async () => {
             throw new Error("clickhouse unavailable");
           },
-        } as unknown as ClickHouseClient;
+        } as unknown as TenantClickHouseClient;
 
         await expect(listRecent(failing)).rejects.toThrow(
           "clickhouse unavailable",

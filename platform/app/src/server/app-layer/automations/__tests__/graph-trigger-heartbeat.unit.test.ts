@@ -1,6 +1,6 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   decideGraphTriggerHeartbeat,
   defaultCandidateSources,
@@ -90,20 +90,18 @@ function makePrismaStub(perProjectOpenTriggers: Record<string, string[]>): {
 function makeClickHouseStub(
   maxOccurredAtMsByProject: Record<string, number | null>,
 ): {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   callsByProject: Record<string, number>;
 } {
   const callsByProject: Record<string, number> = {};
   const client = {
-    query: vi.fn(async (params: { query_params: { tenantId: string } }) => {
-      const projectId = params.query_params.tenantId;
+    query: vi.fn(async (params: { params: { tenantId: string } }) => {
+      const projectId = params.params.tenantId;
       callsByProject[projectId] = (callsByProject[projectId] ?? 0) + 1;
       const ms = maxOccurredAtMsByProject[projectId];
-      return {
-        json: async () => [{ lastMs: ms ?? null }],
-      };
+      return [{ lastMs: ms ?? null }];
     }),
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   return { client, callsByProject };
 }
 

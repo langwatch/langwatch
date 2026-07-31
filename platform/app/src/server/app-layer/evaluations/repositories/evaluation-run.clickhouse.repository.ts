@@ -2,7 +2,8 @@ import { validateTenantId } from "@langwatch/clickhouse";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -123,9 +124,8 @@ export class EvaluationRunClickHouseRepository
 
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: [record],
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -175,9 +175,8 @@ export class EvaluationRunClickHouseRepository
 
       await client.insert({
         table: TABLE_NAME,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: records,
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -207,19 +206,18 @@ export class EvaluationRunClickHouseRepository
     evaluationId: string,
   ): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      scheduledAtMs: string | number | null;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND EvaluationId = {evaluationId:String}
       `,
-      query_params: { tenantId, evaluationId },
-      format: "JSONEachRow",
+      params: { tenantId, evaluationId },
     });
-    const rows = (await result.json()) as Array<{
-      scheduledAtMs: string | number | null;
-    }>;
     const raw = rows[0]?.scheduledAtMs;
     if (raw === null || raw === undefined) return undefined;
     // argMax over no matching rows yields the epoch default (0); treat that —
@@ -285,8 +283,9 @@ export class EvaluationRunClickHouseRepository
           ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
           : "";
 
-      const result = await client.query({
-        query: `
+      const rows = await client.query<ClickHouseEvaluationRunRecord>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             t.ProjectionId AS ProjectionId,
             t.TenantId AS TenantId,
@@ -328,7 +327,7 @@ export class EvaluationRunClickHouseRepository
             ${partitionPredicate}
           LIMIT 1
         `,
-        query_params:
+        params:
           scheduledAtMs !== undefined
             ? {
                 tenantId,
@@ -337,10 +336,8 @@ export class EvaluationRunClickHouseRepository
                 scheduledAtTo: scheduledAtMs + slackMs,
               }
             : { tenantId, evaluationId },
-        format: "JSONEachRow",
       });
 
-      const rows = await result.json<ClickHouseEvaluationRunRecord>();
       const row = rows[0];
       if (!row) return null;
 
@@ -367,8 +364,9 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
+      const rows = await client.query<ClickHouseEvaluationRunRecord>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             ProjectionId,
             TenantId,
@@ -410,11 +408,9 @@ export class EvaluationRunClickHouseRepository
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
+        params: { tenantId, traceId },
       });
 
-      const rows = await result.json<ClickHouseEvaluationRunRecord>();
       // Dedup is enforced by the IN-tuple subquery on (EvaluationId, max(UpdatedAt))
       // — heavy columns (Inputs/Details/ErrorDetails) are only materialized for
       // the surviving rows, not for every duplicate.
@@ -443,9 +439,23 @@ export class EvaluationRunClickHouseRepository
     );
 
     try {
+      interface SlimRow {
+        EvaluationId: string;
+        EvaluatorId: string;
+        EvaluatorType: string;
+        EvaluatorName: string | null;
+        TraceId: string | null;
+        IsGuardrail: number;
+        Status: string;
+        Score: number | null;
+        Passed: number | null;
+        Label: string | null;
+      }
+
       const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
+      const rows = await client.query<SlimRow>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             EvaluationId,
             EvaluatorId,
@@ -471,24 +481,8 @@ export class EvaluationRunClickHouseRepository
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceIds, since },
-        format: "JSONEachRow",
+        params: { tenantId, traceIds, since },
       });
-
-      interface SlimRow {
-        EvaluationId: string;
-        EvaluatorId: string;
-        EvaluatorType: string;
-        EvaluatorName: string | null;
-        TraceId: string | null;
-        IsGuardrail: number;
-        Status: string;
-        Score: number | null;
-        Passed: number | null;
-        Label: string | null;
-      }
-
-      const rows = await result.json<SlimRow>();
 
       const byTrace: Record<string, EvalSummary[]> = {};
 

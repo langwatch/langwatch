@@ -12,9 +12,9 @@
  * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
@@ -32,10 +32,8 @@ vi.mock("../governanceProject.service", () => ({
 
 function stubChClient(rows: Array<{ sourceId: string; spanCount: number }>) {
   return {
-    query: vi.fn(async () => ({
-      json: vi.fn(async () => rows),
-    })),
-  } as unknown as ClickHouseClient;
+    query: vi.fn(async () => rows),
+  } as unknown as TenantClickHouseClient;
 }
 
 describe("QuarantineFillEvaluator", () => {
@@ -152,7 +150,7 @@ describe("QuarantineFillEvaluator", () => {
       query: vi.fn(async () => {
         throw new Error("clickhouse explode");
       }),
-    } as unknown as ClickHouseClient;
+    } as unknown as TenantClickHouseClient;
     const evaluator = QuarantineFillEvaluator.create({
       prisma: fakePrisma,
       clickHouseClient: ch,
@@ -167,9 +165,9 @@ describe("QuarantineFillEvaluator", () => {
   });
 
   it("coerces stringified spanCount values from CH", async () => {
-    // ClickHouse JSONEachRow may return integers as strings depending
-    // on the column type. Number() coercion happens at the service
-    // boundary — the consumer sees a real number.
+    // ClickHouse may hand back an integer as a string depending on the
+    // column type. Number() coercion happens at the service boundary —
+    // the consumer sees a real number.
     const ch = stubChClient([
       // @ts-expect-error testing string-shaped count
       { sourceId: "is-typed-str", spanCount: "75" },

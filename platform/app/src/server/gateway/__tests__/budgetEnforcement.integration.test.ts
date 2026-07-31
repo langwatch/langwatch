@@ -17,6 +17,7 @@
 import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -198,7 +199,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     });
 
     const resolveClient = async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await clickHouseForProject(tenantId);
       if (!client) throw new Error("no ClickHouse client in test environment");
       return client;
     };

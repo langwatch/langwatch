@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  type ClickHouseRawCommand,
   type ClickHouseRawInsert,
   type ClickHouseRawQuery,
   type ClickHouseTransport,
@@ -22,6 +23,7 @@ function memoryLimitExceededError(): Error {
 interface FakeTransport extends ClickHouseTransport {
   readonly queryCalls: ClickHouseRawQuery[];
   readonly insertCalls: ClickHouseRawInsert[];
+  readonly commandCalls: ClickHouseRawCommand[];
 }
 
 function createFakeTransport(
@@ -32,14 +34,20 @@ function createFakeTransport(
     ) => Promise<{ rows: unknown[][] }>;
     stream?: (request: ClickHouseRawQuery) => AsyncIterable<unknown[][]>;
     insert?: (request: ClickHouseRawInsert, callIndex: number) => Promise<void>;
+    command?: (
+      request: ClickHouseRawCommand,
+      callIndex: number,
+    ) => Promise<void>;
   } = {},
 ): FakeTransport {
   const queryCalls: ClickHouseRawQuery[] = [];
   const insertCalls: ClickHouseRawInsert[] = [];
+  const commandCalls: ClickHouseRawCommand[] = [];
 
   return {
     queryCalls,
     insertCalls,
+    commandCalls,
     async query(request) {
       queryCalls.push(request);
       if (overrides.query)
@@ -55,6 +63,11 @@ function createFakeTransport(
       insertCalls.push(request);
       if (overrides.insert)
         return overrides.insert(request, insertCalls.length - 1);
+    },
+    async command(request) {
+      commandCalls.push(request);
+      if (overrides.command)
+        return overrides.command(request, commandCalls.length - 1);
     },
     async close() {},
   };
@@ -90,9 +103,9 @@ describe("given createClickHouseClient()", () => {
     vi.useRealTimers();
   });
 
-  describe("when a select fails once with a transport error then succeeds", () => {
-    it("retries and returns the second attempt's result", async () => {
-      vi.useFakeTimers();
+  describe("when a select fails with a transport error", () => {
+    /** @scenario a select is never retried by the client */
+    it("throws on the first attempt rather than re-issuing the read", async () => {
       const transport = createFakeTransport({
         query: async (_request, callIndex) => {
           if (callIndex === 0) throw connectionResetError();
@@ -101,12 +114,10 @@ describe("given createClickHouseClient()", () => {
       });
       const client = createClickHouseClient({ url: "http://ch", transport });
 
-      const resultPromise = client.query({ tenantId: "t1", sql: "SELECT 1" });
-      await vi.runAllTimersAsync();
-      const result = await resultPromise;
-
-      expect(result.rows).toEqual([["ok"]]);
-      expect(transport.queryCalls).toHaveLength(2);
+      await expect(
+        client.query({ tenantId: "t1", sql: "SELECT 1" }),
+      ).rejects.toThrow();
+      expect(transport.queryCalls).toHaveLength(1);
     });
   });
 
@@ -222,9 +233,8 @@ describe("given createClickHouseClient()", () => {
     it("grows the backoff ceiling and jitters it rather than using a fixed delay", async () => {
       vi.useFakeTimers();
       const transport = createFakeTransport({
-        query: async (_request, callIndex) => {
+        insert: async (_request, callIndex) => {
           if (callIndex < 3) throw connectionResetError();
-          return { rows: [] };
         },
       });
       const client = createClickHouseClient({
@@ -234,7 +244,13 @@ describe("given createClickHouseClient()", () => {
       });
       const setTimeoutSpy = vi.spyOn(global, "setTimeout");
 
-      const resultPromise = client.query({ tenantId: "t1", sql: "SELECT 1" });
+      const resultPromise = client.insert({
+        tenantId: "t1",
+        table: "trace_analytics",
+        rows: [[1]],
+        columns: ["value"],
+        target: REPLACING,
+      });
       await vi.runAllTimersAsync();
       await resultPromise;
 
@@ -367,6 +383,51 @@ describe("given createClickHouseClient()", () => {
       });
     });
 
+    describe("when the caller supplies its own settings", () => {
+      it("carries them through alongside the durability settings", async () => {
+        const transport = createFakeTransport();
+        const client = createClickHouseClient({ url: "http://ch", transport });
+
+        await client.insert({
+          tenantId: "t1",
+          table: "trace_analytics",
+          rows: [[1]],
+          columns: ["value"],
+          target: REPLACING,
+          settings: { date_time_input_format: "best_effort" },
+        });
+
+        expect(transport.insertCalls[0]?.settings).toMatchObject({
+          date_time_input_format: "best_effort",
+          wait_for_async_insert: 1,
+        });
+      });
+
+      /** @scenario a durable write resolves only once the block has landed */
+      it("refuses to let them weaken durability", async () => {
+        const transport = createFakeTransport();
+        const client = createClickHouseClient({ url: "http://ch", transport });
+
+        await client.insert({
+          tenantId: "t1",
+          table: "trace_analytics",
+          rows: [[1]],
+          columns: ["value"],
+          target: REPLACING,
+          settings: {
+            wait_for_async_insert: 0,
+            input_format_skip_unknown_fields: 1,
+          },
+        });
+
+        expect(transport.insertCalls[0]?.settings).toMatchObject({
+          async_insert: 1,
+          wait_for_async_insert: 1,
+          input_format_skip_unknown_fields: 0,
+        });
+      });
+    });
+
     it("skips the transport call entirely for an empty batch", async () => {
       const transport = createFakeTransport();
       const client = createClickHouseClient({ url: "http://ch", transport });
@@ -380,6 +441,42 @@ describe("given createClickHouseClient()", () => {
       });
 
       expect(transport.insertCalls).toHaveLength(0);
+    });
+  });
+
+  describe("given a command", () => {
+    it("sends only the caller's settings, never the read-format ones", async () => {
+      const transport = createFakeTransport();
+      const client = createClickHouseClient({ url: "http://ch", transport });
+
+      await client.command({
+        tenantId: "t1",
+        sql: "ALTER TABLE t DELETE WHERE TenantId = {tenantId:String}",
+        params: { tenantId: "t1" },
+        settings: { mutations_sync: 1 },
+      });
+
+      expect(transport.commandCalls).toHaveLength(1);
+      expect(transport.commandCalls[0]?.settings).toEqual({
+        mutations_sync: 1,
+      });
+      expect(transport.commandCalls[0]?.params).toEqual({ tenantId: "t1" });
+    });
+
+    describe("when it fails with a transport error", () => {
+      it("does not retry, because a re-sent mutation starts a second one", async () => {
+        const transport = createFakeTransport({
+          command: async () => {
+            throw connectionResetError();
+          },
+        });
+        const client = createClickHouseClient({ url: "http://ch", transport });
+
+        await expect(
+          client.command({ tenantId: "t1", sql: "OPTIMIZE TABLE t" }),
+        ).rejects.toThrow();
+        expect(transport.commandCalls).toHaveLength(1);
+      });
     });
   });
 

@@ -15,8 +15,13 @@
  * mixed-deploy read of a pre-00054 row whose body omits the column entirely.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { CODING_AGENT_SESSION_STATE_VERSION } from "~/server/event-sourcing/coding-agent-processing/codingAgentSession.projection";
 import {
   startTestContainers,
@@ -27,7 +32,11 @@ import type { CodingAgentSessionRow } from "../coding-agent-session.repository";
 import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session.repository";
 import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series.repository";
 
+/** The driver client, kept for the raw inserts and the cleanup DDL. */
 let ch: ClickHouseClient;
+let packageClient: ReturnType<typeof createClickHouseClient>;
+/** What the repositories under test take. */
+let tenantClient: TenantClickHouseClient;
 let sessions: CodingAgentSessionClickHouseRepository;
 let traceSessions: CodingAgentTraceSessionClickHouseRepository;
 let metricSeries: SessionMetricSeriesClickHouseRepository;
@@ -149,11 +158,17 @@ function sessionRow(
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
-  traceSessions = new CodingAgentTraceSessionClickHouseRepository(
-    async () => ch,
+  packageClient = createClickHouseClient({ url: containers.clickHouseUrl });
+  tenantClient = tenantClickHouseClient({ client: packageClient, tenantId });
+  sessions = new CodingAgentSessionClickHouseRepository(
+    async () => tenantClient,
   );
-  metricSeries = new SessionMetricSeriesClickHouseRepository(async () => ch);
+  traceSessions = new CodingAgentTraceSessionClickHouseRepository(
+    async () => tenantClient,
+  );
+  metricSeries = new SessionMetricSeriesClickHouseRepository(
+    async () => tenantClient,
+  );
 }, 60_000);
 
 afterAll(async () => {
@@ -169,6 +184,7 @@ afterAll(async () => {
       });
     }
   }
+  await packageClient?.close();
   await stopTestContainers();
 });
 
@@ -371,7 +387,8 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     // Array(String). This is distinct from the case above, where `toRecord`
     // still writes AppliedEventIds: []; here the field never leaves the writer,
     // exercising the column default and the mapper's asStringArray fallback
-    // directly. Inserted through the same client the repository resolves.
+    // directly. Written straight through the driver, into the same database
+    // the repository reads from.
     await ch.insert({
       table: "coding_agent_sessions",
       values: [

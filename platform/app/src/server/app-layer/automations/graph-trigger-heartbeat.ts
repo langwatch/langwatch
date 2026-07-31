@@ -30,8 +30,8 @@ import {
   getMetricSource,
 } from "~/server/app-layer/analytics/routing/field-availability";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
@@ -441,7 +441,7 @@ async function loadProjectRecency({
   // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),
   // bounded on the partition column (OccurredAt) for partition pruning.
   // TenantId is the first WHERE predicate per multitenancy rules.
-  const query = `
+  const sql = `
     SELECT max(toUnixTimestamp64Milli(OccurredAt)) AS lastMs
     FROM (
       SELECT OccurredAt
@@ -458,14 +458,11 @@ async function loadProjectRecency({
     )
   `;
   try {
-    const result = await client.query({
-      query,
-      query_params: { tenantId: projectId, startMs },
-      format: "JSONEachRow",
+    const rows = await client.query<{ lastMs: string | number | null }>({
+      table,
+      sql,
+      params: { tenantId: projectId, startMs },
     });
-    const rows = (await result.json()) as Array<{
-      lastMs: string | number | null;
-    }>;
     const row = rows[0];
     if (!row || row.lastMs === null || row.lastMs === undefined) {
       return { projectId, source, lastOccurredAtMs: null };
@@ -503,7 +500,7 @@ export function defaultGraphTriggerHeartbeatDeps({
     triggers,
     prisma,
     resolveClickHouseClient: async (tenantId) => {
-      const client = await getClickHouseClientForProject(tenantId);
+      const client = await clickHouseForProject(tenantId);
       if (!client) {
         throw new Error(`ClickHouse not available for tenant ${tenantId}`);
       }

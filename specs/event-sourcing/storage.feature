@@ -71,6 +71,12 @@ Feature: A table is declared once, and the declaration is checked against what i
     Then the mount is refused
     And the refusal explains that a per-write identifier would stop rows combining at all
 
+  Scenario: a select is never retried by the client
+    Given a read that fails on a transport error, which corrupts nothing if repeated
+    When the client decides whether to retry
+    Then it does not, and the failure reaches the caller on the first attempt
+    And the reason given is that only writes are retried, not that the error was fatal
+
   Scenario: a replace write is retryable because the version column resolves a duplicate
     Given a replace store whose write is retried after a transport failure
     When both attempts land

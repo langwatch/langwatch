@@ -20,22 +20,26 @@ import {
 } from "recharts";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 
+/**
+ * Lane state over time.
+ *
+ * Every series here is a count the collector sampled off the lane keys. There
+ * are no rate series: throughput and failure rates leave the dispatch plane
+ * through its scraped `Metrics` port (ADR-108) and are not in Redis, so there
+ * is nothing here to plot them from. Depth rising while leases stay flat is the
+ * shape an operator is looking for.
+ */
+
 const COLORS = {
-  staged: { stroke: "#06b6d4", fill: "#06b6d4" },
-  completed: { stroke: "#22c55e", fill: "#22c55e" },
-  failed: { stroke: "#ef4444", fill: "#ef4444" },
-  pending: "#a78bfa",
-  blocked: "#f97316",
-  parked: "#eab308",
+  pending: { stroke: "#06b6d4", fill: "#06b6d4" },
+  leased: "#22c55e",
+  parked: "#ef4444",
 };
 
 interface ChartPoint {
   timestamp: number;
-  staged: number;
-  completed: number;
-  failed: number;
   pending: number;
-  blocked: number;
+  leased: number;
   parked: number;
 }
 
@@ -47,22 +51,18 @@ const BUCKET_OPTIONS = [
   { label: "1m", ms: 60_000 },
 ];
 
-/** Downsample raw 2s points into averaged buckets. bucketMs=0 means raw. */
+/** Downsample raw 2s samples into averaged buckets. bucketMs=0 means raw. */
 function downsample(
   raw: DashboardData["throughputHistory"],
   bucketMs: number,
 ): ChartPoint[] {
   if (raw.length === 0) return [];
 
-  // Raw mode — no aggregation
   if (bucketMs <= 0) {
     return raw.map((point) => ({
       timestamp: point.timestamp,
-      staged: point.ingestedPerSec,
-      completed: point.completedPerSec,
-      failed: point.failedPerSec,
       pending: point.pendingCount,
-      blocked: point.blockedCount,
+      leased: point.leasedCount,
       parked: point.parkedCount,
     }));
   }
@@ -73,22 +73,16 @@ function downsample(
     const bucketKey = Math.floor(point.timestamp / bucketMs) * bucketMs;
     const existing = buckets.get(bucketKey);
     if (existing) {
-      existing.sum.staged += point.ingestedPerSec;
-      existing.sum.completed += point.completedPerSec;
-      existing.sum.failed += point.failedPerSec;
       existing.sum.pending += point.pendingCount;
-      existing.sum.blocked += point.blockedCount;
+      existing.sum.leased += point.leasedCount;
       existing.sum.parked += point.parkedCount;
       existing.count++;
     } else {
       buckets.set(bucketKey, {
         sum: {
           timestamp: bucketKey,
-          staged: point.ingestedPerSec,
-          completed: point.completedPerSec,
-          failed: point.failedPerSec,
           pending: point.pendingCount,
-          blocked: point.blockedCount,
+          leased: point.leasedCount,
           parked: point.parkedCount,
         },
         count: 1,
@@ -100,11 +94,8 @@ function downsample(
   for (const [, { sum, count }] of buckets) {
     result.push({
       timestamp: sum.timestamp,
-      staged: sum.staged / count,
-      completed: sum.completed / count,
-      failed: sum.failed / count,
       pending: Math.round(sum.pending / count),
-      blocked: Math.round(sum.blocked / count),
+      leased: Math.round(sum.leased / count),
       parked: Math.round(sum.parked / count),
     });
   }
@@ -130,9 +121,7 @@ function formatTimeWithSeconds(ts: number): string {
 
 function formatAxisValue(v: number): string {
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
-  if (v === 0) return "0";
-  if (Number.isInteger(v)) return v.toString();
-  return v.toFixed(1);
+  return v.toString();
 }
 
 /** Build evenly-spaced tick values at clean minute intervals */
@@ -178,13 +167,6 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length || label == null) return null;
 
-  const rates = payload.filter(
-    (p) => p.name !== "Pending" && p.name !== "Blocked" && p.name !== "Parked",
-  );
-  const counts = payload.filter(
-    (p) => p.name === "Pending" || p.name === "Blocked" || p.name === "Parked",
-  );
-
   return (
     <Box
       bg="bg.panel"
@@ -198,7 +180,7 @@ function CustomTooltip({
       <Text textStyle="xs" color="fg.muted" marginBottom={1}>
         {formatTimeWithSeconds(label)}
       </Text>
-      {rates.map((entry) => (
+      {payload.map((entry) => (
         <HStack key={entry.name} justify="space-between" gap={3}>
           <HStack gap={1.5}>
             <Box
@@ -210,46 +192,23 @@ function CustomTooltip({
             <Text textStyle="xs">{entry.name}</Text>
           </HStack>
           <Text textStyle="xs" fontFamily="mono" fontWeight="medium">
-            {entry.value.toFixed(1)}/s
+            {entry.value.toLocaleString()}
           </Text>
         </HStack>
       ))}
-      {counts.length > 0 && counts.some((c) => c.value > 0) && (
-        <>
-          <Box height="1px" bg="border" marginY={1} />
-          {counts.map((entry) => (
-            <HStack key={entry.name} justify="space-between" gap={3}>
-              <HStack gap={1.5}>
-                <Box width="6px" height="2px" bg={entry.color} />
-                <Text textStyle="xs">{entry.name}</Text>
-              </HStack>
-              <Text textStyle="xs" fontFamily="mono">
-                {entry.value.toLocaleString()}
-              </Text>
-            </HStack>
-          ))}
-        </>
-      )}
     </Box>
   );
 }
 
-function CustomLegend({ showCounts }: { showCounts: boolean }) {
+function CustomLegend() {
   const items = [
-    { name: "Staged/s", color: COLORS.staged.stroke, type: "area" as const },
     {
-      name: "Completed/s",
-      color: COLORS.completed.stroke,
+      name: "Pending jobs",
+      color: COLORS.pending.stroke,
       type: "area" as const,
     },
-    { name: "Failed/s", color: COLORS.failed.stroke, type: "area" as const },
-    ...(showCounts
-      ? [
-          { name: "Pending", color: COLORS.pending, type: "line" as const },
-          { name: "Blocked", color: COLORS.blocked, type: "line" as const },
-          { name: "Parked", color: COLORS.parked, type: "line" as const },
-        ]
-      : []),
+    { name: "Leased lanes", color: COLORS.leased, type: "line" as const },
+    { name: "Parked lanes", color: COLORS.parked, type: "line" as const },
   ];
 
   return (
@@ -276,7 +235,7 @@ function CustomLegend({ showCounts }: { showCounts: boolean }) {
   );
 }
 
-export function ThroughputChart({ data }: { data: DashboardData }) {
+export function LaneDepthChart({ data }: { data: DashboardData }) {
   const stableYMaxRef = useRef(1);
   const [bucketMs, setBucketMs] = useState(5_000);
 
@@ -290,12 +249,10 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
   const yMax = useMemo(() => {
     if (chartData.length === 0) return 1;
     let max = 0;
-    for (const p of chartData) {
-      max = Math.max(max, p.staged, p.completed, p.failed);
-    }
-    // Use niceMax for clean axis values, with 30% headroom
+    for (const p of chartData) max = Math.max(max, p.pending);
+    // Use niceMax for clean axis values, with 30% headroom. Only move the axis
+    // on a significant change, so a jittery series does not rescale every tick.
     const target = niceMax(max * 1.3);
-    // Only update if the new target is significantly different (avoid jitter)
     if (
       target > stableYMaxRef.current * 1.2 ||
       target < stableYMaxRef.current * 0.5
@@ -305,20 +262,11 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
     return stableYMaxRef.current;
   }, [chartData]);
 
-  const hasCountData = useMemo(() => {
-    return chartData.some(
-      (p) => p.pending > 0 || p.blocked > 0 || p.parked > 0,
-    );
-  }, [chartData]);
-
   const yMaxRight = useMemo(() => {
-    if (!hasCountData) return 10;
     let max = 0;
-    for (const p of chartData) {
-      max = Math.max(max, p.pending, p.blocked, p.parked);
-    }
+    for (const p of chartData) max = Math.max(max, p.leased, p.parked);
     return max <= 0 ? 10 : niceMax(max * 1.3);
-  }, [chartData, hasCountData]);
+  }, [chartData]);
 
   if (chartData.length < 2) {
     return (
@@ -337,7 +285,7 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
     <VStack align="stretch" gap={0}>
       <HStack justify="space-between" paddingX={1} paddingBottom={1}>
         <Text textStyle="xs" color="fg.muted" fontStyle="italic">
-          events/s
+          jobs staged
         </Text>
         <HStack gap={0.5}>
           {BUCKET_OPTIONS.map((opt) => (
@@ -355,51 +303,25 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             </Button>
           ))}
         </HStack>
-        {hasCountData && (
-          <Text textStyle="xs" color="fg.muted" fontStyle="italic">
-            count
-          </Text>
-        )}
+        <Text textStyle="xs" color="fg.muted" fontStyle="italic">
+          lanes
+        </Text>
       </HStack>
       <ResponsiveContainer width="100%" height={280}>
         <AreaChart
           data={chartData}
-          margin={{ top: 8, right: hasCountData ? 4 : 12, bottom: 4, left: -8 }}
+          margin={{ top: 8, right: 4, bottom: 4, left: -8 }}
         >
           <defs>
-            <linearGradient id="gradStaged" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="gradPendingJobs" x1="0" y1="0" x2="0" y2="1">
               <stop
                 offset="0%"
-                stopColor={COLORS.staged.fill}
+                stopColor={COLORS.pending.fill}
                 stopOpacity={0.2}
               />
               <stop
                 offset="100%"
-                stopColor={COLORS.staged.fill}
-                stopOpacity={0.02}
-              />
-            </linearGradient>
-            <linearGradient id="gradCompleted" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor={COLORS.completed.fill}
-                stopOpacity={0.2}
-              />
-              <stop
-                offset="100%"
-                stopColor={COLORS.completed.fill}
-                stopOpacity={0.02}
-              />
-            </linearGradient>
-            <linearGradient id="gradFailed" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="0%"
-                stopColor={COLORS.failed.fill}
-                stopOpacity={0.25}
-              />
-              <stop
-                offset="100%"
-                stopColor={COLORS.failed.fill}
+                stopColor={COLORS.pending.fill}
                 stopOpacity={0.02}
               />
             </linearGradient>
@@ -422,7 +344,7 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             tickLine={false}
           />
           <YAxis
-            yAxisId="rate"
+            yAxisId="jobs"
             tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
             axisLine={false}
             tickLine={false}
@@ -431,19 +353,17 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             allowDataOverflow
             tickFormatter={formatAxisValue}
           />
-          {hasCountData && (
-            <YAxis
-              yAxisId="count"
-              orientation="right"
-              tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
-              axisLine={false}
-              tickLine={false}
-              width={40}
-              domain={[0, yMaxRight]}
-              allowDataOverflow
-              tickFormatter={formatAxisValue}
-            />
-          )}
+          <YAxis
+            yAxisId="lanes"
+            orientation="right"
+            tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+            axisLine={false}
+            tickLine={false}
+            width={40}
+            domain={[0, yMaxRight]}
+            allowDataOverflow
+            tickFormatter={formatAxisValue}
+          />
           <Tooltip
             content={<CustomTooltip />}
             cursor={{
@@ -454,83 +374,46 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             }}
           />
           <Area
-            yAxisId="rate"
-            type="monotone"
-            dataKey="staged"
-            stroke={COLORS.staged.stroke}
-            fill="url(#gradStaged)"
-            strokeWidth={1.5}
-            name="Staged/s"
-            isAnimationActive={false}
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-          />
-          <Area
-            yAxisId="rate"
-            type="monotone"
-            dataKey="completed"
-            stroke={COLORS.completed.stroke}
-            fill="url(#gradCompleted)"
-            strokeWidth={1.5}
-            name="Completed/s"
-            isAnimationActive={false}
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-          />
-          <Area
-            yAxisId="rate"
-            type="monotone"
-            dataKey="failed"
-            stroke={COLORS.failed.stroke}
-            fill="url(#gradFailed)"
-            strokeWidth={1.5}
-            name="Failed/s"
-            isAnimationActive={false}
-            dot={false}
-            activeDot={{ r: 3, strokeWidth: 0 }}
-          />
-          <Line
-            yAxisId={hasCountData ? "count" : "rate"}
+            yAxisId="jobs"
             type="monotone"
             dataKey="pending"
-            stroke={COLORS.pending}
-            strokeWidth={1}
-            strokeOpacity={0.6}
-            strokeDasharray="4 3"
-            dot={false}
-            activeDot={{ r: 2, strokeWidth: 0 }}
-            name="Pending"
+            stroke={COLORS.pending.stroke}
+            fill="url(#gradPendingJobs)"
+            strokeWidth={1.5}
+            name="Pending jobs"
             isAnimationActive={false}
+            dot={false}
+            activeDot={{ r: 3, strokeWidth: 0 }}
           />
           <Line
-            yAxisId={hasCountData ? "count" : "rate"}
+            yAxisId="lanes"
             type="monotone"
-            dataKey="blocked"
-            stroke={COLORS.blocked}
+            dataKey="leased"
+            stroke={COLORS.leased}
             strokeWidth={1}
-            strokeOpacity={0.6}
+            strokeOpacity={0.7}
             strokeDasharray="4 3"
             dot={false}
             activeDot={{ r: 2, strokeWidth: 0 }}
-            name="Blocked"
+            name="Leased lanes"
             isAnimationActive={false}
           />
           <Line
-            yAxisId={hasCountData ? "count" : "rate"}
+            yAxisId="lanes"
             type="monotone"
             dataKey="parked"
             stroke={COLORS.parked}
             strokeWidth={1}
-            strokeOpacity={0.6}
+            strokeOpacity={0.7}
             strokeDasharray="4 3"
             dot={false}
             activeDot={{ r: 2, strokeWidth: 0 }}
-            name="Parked"
+            name="Parked lanes"
             isAnimationActive={false}
           />
         </AreaChart>
       </ResponsiveContainer>
-      <CustomLegend showCounts={hasCountData} />
+      <CustomLegend />
     </VStack>
   );
 }

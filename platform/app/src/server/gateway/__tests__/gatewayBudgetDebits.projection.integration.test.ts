@@ -38,6 +38,8 @@ import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/
 import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getSharedAppClickHouseClient } from "~/server/app-layer/clients/clickhouse/shared";
+import { tenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { prisma } from "~/server/db";
 import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
 import type { CanonicalSpan } from "~/server/event-sourcing/trace-processing/schema";
@@ -125,13 +127,13 @@ function gatewaySpan({
 
 /** The test-container ClickHouse, resolved for any tenant. */
 function testClickHouseRepository(): GatewayBudgetClickHouseRepository {
-  return new GatewayBudgetClickHouseRepository(async () => {
-    const { getTestClickHouseClient } = await import(
-      "~/test-utils/integration/testContainers"
-    );
-    const client = getTestClickHouseClient();
-    if (!client) throw new Error("Test CH client not initialised");
-    return client;
+  return new GatewayBudgetClickHouseRepository(async (tenantId) => {
+    const app = getSharedAppClickHouseClient();
+    if (!app) throw new Error("Test CH client not initialised");
+    return tenantClickHouseClient({
+      client: app.resolveClient(tenantId),
+      tenantId,
+    });
   });
 }
 

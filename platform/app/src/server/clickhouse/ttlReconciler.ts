@@ -1,6 +1,13 @@
-import { createClient } from "@clickhouse/client";
-
 import { createLogger } from "@langwatch/observability";
+import { parsePrivateClickHouseUrls } from "~/server/app-layer/clients/clickhouse/private-endpoints";
+import {
+  getInfrastructureClickHouseClient,
+  getSharedAppClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/shared";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 import { parseConnectionUrl } from "./goose";
 
@@ -328,6 +335,70 @@ interface TableEngineInfo {
 export const TIERED_STORAGE_POLICY = "local_primary";
 
 /**
+ * The routing string the reconciler passes as `tenantId`.
+ *
+ * It acts on the deployment rather than on a tenant, and the endpoint has
+ * already been chosen by {@link resolveEndpointClient}, so this only names the
+ * bulkhead slot the DDL occupies and labels its metrics. Borrowing a real
+ * tenant's id would queue schema work against that customer's reads and report
+ * it as theirs.
+ */
+const TTL_RECONCILER_ROUTING_KEY = "__ttl_reconciler__";
+
+/**
+ * The client for the endpoint a connection URL names.
+ *
+ * Only two endpoints can be meant, and both are already reachable through the
+ * one client the deployment builds: `CLICKHOUSE_URL` — the shared endpoint —
+ * and any organisation pinned to its own by `CLICKHOUSE_URL__<label>__<orgId>`.
+ * A private URL is matched back to the organisation that declared it and
+ * resolved through the same router every other caller routes on, rather than by
+ * standing up a second client configured differently from the first (ADR-104
+ * §1).
+ *
+ * Anything else is refused rather than connected to: this runs DDL, and a URL
+ * the deployment never declared is not an endpoint whose schema we should be
+ * rewriting. The refusal never quotes the URL — a ClickHouse connection URL
+ * carries the endpoint's credentials.
+ */
+function resolveEndpointClient(connectionUrl: string): TenantClickHouseClient {
+  const bind = (
+    client: Parameters<typeof tenantClickHouseClient>[0]["client"],
+  ) => tenantClickHouseClient({ client, tenantId: TTL_RECONCILER_ROUTING_KEY });
+
+  if (connectionUrl === process.env.CLICKHOUSE_URL) {
+    const shared = getInfrastructureClickHouseClient();
+    if (!shared) {
+      throw new Error(
+        "Cannot reconcile TTL: no ClickHouse client is available in this process.",
+      );
+    }
+    return bind(shared);
+  }
+
+  // The private endpoints are resolved through the shared client's router, so
+  // this deployment has to have one. A deployment that declares only private
+  // endpoints and no CLICKHOUSE_URL cannot reach them from here.
+  if (!process.env.CLICKHOUSE_URL) {
+    throw new Error(
+      "Cannot reconcile TTL on a private ClickHouse endpoint: CLICKHOUSE_URL is not set, so this process has no client to route through.",
+    );
+  }
+
+  const organizationId = [...parsePrivateClickHouseUrls()].find(
+    ([, url]) => url === connectionUrl,
+  )?.[0];
+  const app = getSharedAppClickHouseClient();
+  if (!app || organizationId === undefined) {
+    throw new Error(
+      "Cannot reconcile TTL: the connection URL matches neither CLICKHOUSE_URL nor any organisation's CLICKHOUSE_URL__ endpoint.",
+    );
+  }
+
+  return bind(app.resolveClient(organizationId));
+}
+
+/**
  * Reconciles TTL settings for all managed ClickHouse tables.
  *
  * Compares current TTL (from system.tables metadata) against desired values
@@ -354,149 +425,155 @@ export async function reconcileTTL(
     process.env.CLICKHOUSE_COLD_STORAGE_ENABLED === "true";
 
   const config = parseConnectionUrl(connectionUrl, options.database);
-  const client = createClient({ url: config.databaseUrl });
+  // The process-wide client, never closed here: it is shared with every other
+  // caller on this endpoint, so reconciliation borrows it rather than standing
+  // up and tearing down a connection of its own.
+  const client = resolveEndpointClient(connectionUrl);
 
-  try {
-    // Fetch current engine metadata + storage policy for all managed tables
-    const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
-    const result = await client.query({
-      query: `SELECT name, engine_full, storage_policy FROM system.tables WHERE database = {database:String} AND name IN {tables:Array(String)}`,
-      query_params: { database: config.database, tables: tableNames },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as TableEngineInfo[];
+  // Fetch current engine metadata + storage policy for all managed tables
+  const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
+  const rows = await client.query<TableEngineInfo>({
+    table: "system.tables",
+    sql: `SELECT name, engine_full, storage_policy FROM system.tables WHERE database = {database:String} AND name IN {tables:Array(String)}`,
+    params: { database: config.database, tables: tableNames },
+  });
 
-    const tableInfoByName = new Map(rows.map((r) => [r.name, r]));
+  const tableInfoByName = new Map(rows.map((r) => [r.name, r]));
 
-    let updatedCount = 0;
-    let skippedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
 
-    for (const tableConfig of TABLE_TTL_CONFIG) {
-      const tableInfo = tableInfoByName.get(tableConfig.table);
-      if (!tableInfo) {
+  for (const tableConfig of TABLE_TTL_CONFIG) {
+    const tableInfo = tableInfoByName.get(tableConfig.table);
+    if (!tableInfo) {
+      if (options.verbose) {
+        logger.info(
+          { table: tableConfig.table },
+          "Table not found, skipping TTL reconciliation",
+        );
+      }
+      continue;
+    }
+
+    // TTL volume routing (`TO VOLUME 'cold'`) only works on tables using the
+    // tiered storage policy. Tables on 'default' policy don't have a cold volume,
+    // but they CAN still have retention DELETE TTL. Likewise, when the operator
+    // disables cold-storage management we still need to install retention TTL,
+    // so collapse to the retention-only branch in both cases.
+    if (
+      tableInfo.storage_policy !== TIERED_STORAGE_POLICY ||
+      !coldStorageEnabled
+    ) {
+      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+      if (
+        retentionTTLExpr &&
+        (RETENTION_MANAGED_TABLES as readonly string[]).includes(
+          tableConfig.table,
+        ) &&
+        !hasRetentionTTL(tableInfo.engine_full)
+      ) {
+        // No ON CLUSTER: whenever a cluster is configured the database uses
+        // the Replicated engine (enforced in goose.ts), which auto-replicates
+        // DDL to every replica via Keeper. Adding ON CLUSTER on a table inside
+        // a Replicated DB is rejected: "It's not initial query. ON CLUSTER is
+        // not allowed for Replicated database (INCORRECT_QUERY)".
+        const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
         if (options.verbose) {
           logger.info(
             { table: tableConfig.table },
-            "Table not found, skipping TTL reconciliation",
+            "Applying retention-only TTL (no cold storage)",
           );
         }
-        continue;
-      }
-
-      // TTL volume routing (`TO VOLUME 'cold'`) only works on tables using the
-      // tiered storage policy. Tables on 'default' policy don't have a cold volume,
-      // but they CAN still have retention DELETE TTL. Likewise, when the operator
-      // disables cold-storage management we still need to install retention TTL,
-      // so collapse to the retention-only branch in both cases.
-      if (
-        tableInfo.storage_policy !== TIERED_STORAGE_POLICY ||
-        !coldStorageEnabled
-      ) {
-        const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-        if (
-          retentionTTLExpr &&
-          (RETENTION_MANAGED_TABLES as readonly string[]).includes(
-            tableConfig.table,
-          ) &&
-          !hasRetentionTTL(tableInfo.engine_full)
-        ) {
-          // No ON CLUSTER: whenever a cluster is configured the database uses
-          // the Replicated engine (enforced in goose.ts), which auto-replicates
-          // DDL to every replica via Keeper. Adding ON CLUSTER on a table inside
-          // a Replicated DB is rejected: "It's not initial query. ON CLUSTER is
-          // not allowed for Replicated database (INCORRECT_QUERY)".
-          const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${retentionTTLExpr} SETTINGS materialize_ttl_after_modify = 0`;
-          if (options.verbose) {
-            logger.info(
-              { table: tableConfig.table },
-              "Applying retention-only TTL (no cold storage)",
-            );
-          }
-          await client.command({ query: alterQuery });
-          updatedCount++;
-        } else {
-          if (options.verbose) {
-            logger.info(
-              { table: tableConfig.table, policy: tableInfo.storage_policy },
-              `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping cold-storage TTL`,
-            );
-          }
-          skippedCount++;
-        }
-        continue;
-      }
-
-      const engineFull = tableInfo.engine_full;
-
-      const desiredDays = resolveHotDays(tableConfig);
-      const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
-
-      const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const isManaged = (
-        RETENTION_MANAGED_TABLES as readonly string[]
-      ).includes(tableConfig.table);
-      // Whether the cold TTL alone is enough to skip this run — i.e. nothing
-      // has changed in the cold-TTL space. For managed tables we must still
-      // run when retention TTL is missing from the table (first-time apply).
-      const retentionMissing =
-        isManaged && retentionTTLExpr && !hasRetentionTTL(engineFull);
-
-      if (
-        !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
-        !retentionMissing
-      ) {
-        skippedCount++;
+        // `SETTINGS materialize_ttl_after_modify = 0` stays inside the
+        // statement rather than moving to `settings`: a statement-level
+        // setting and a request-level one are not the same thing, and the
+        // inline form is the one known to make this ALTER metadata-only.
+        await client.command({
+          table: tableConfig.table,
+          sql: alterQuery,
+        });
+        updatedCount++;
+      } else {
         if (options.verbose) {
-          logger.debug(
-            { table: tableConfig.table, days: currentDays },
-            "TTL already in sync",
+          logger.info(
+            { table: tableConfig.table, policy: tableInfo.storage_policy },
+            `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping cold-storage TTL`,
           );
         }
-        continue;
+        skippedCount++;
       }
-
-      const coldTTLExpr = buildDesiredTTLExpression({
-        config: tableConfig,
-        days: desiredDays,
-      });
-
-      // MODIFY TTL replaces the whole expression atomically, so for managed
-      // tables we ALWAYS re-emit retentionTTLExpr — even when it's already
-      // present — otherwise a hot-days bump silently drops the retention
-      // DELETE clause from the table.
-      const ttlClauses = [
-        coldTTLExpr,
-        isManaged && retentionTTLExpr ? retentionTTLExpr : null,
-      ]
-        .filter(Boolean)
-        .join(",\n  ");
-
-      // No ON CLUSTER — see note in the retention-only branch above: a
-      // Replicated DB auto-replicates this DDL, and ON CLUSTER on a table inside
-      // it is rejected with INCORRECT_QUERY.
-      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
-
-      if (options.verbose) {
-        logger.info(
-          {
-            table: tableConfig.table,
-            from: currentDays,
-            to: desiredDays,
-            retentionTTL: isManaged && !!retentionTTLExpr,
-          },
-          "Updating TTL",
-        );
-      }
-
-      await client.command({ query: alterQuery });
-      updatedCount++;
+      continue;
     }
 
-    logger.info(
-      { updated: updatedCount, skipped: skippedCount },
-      "TTL reconciliation complete",
+    const engineFull = tableInfo.engine_full;
+
+    const desiredDays = resolveHotDays(tableConfig);
+    const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
+
+    const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
+    const isManaged = (RETENTION_MANAGED_TABLES as readonly string[]).includes(
+      tableConfig.table,
     );
-  } finally {
-    await client.close();
+    // Whether the cold TTL alone is enough to skip this run — i.e. nothing
+    // has changed in the cold-TTL space. For managed tables we must still
+    // run when retention TTL is missing from the table (first-time apply).
+    const retentionMissing =
+      isManaged && retentionTTLExpr && !hasRetentionTTL(engineFull);
+
+    if (
+      !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
+      !retentionMissing
+    ) {
+      skippedCount++;
+      if (options.verbose) {
+        logger.debug(
+          { table: tableConfig.table, days: currentDays },
+          "TTL already in sync",
+        );
+      }
+      continue;
+    }
+
+    const coldTTLExpr = buildDesiredTTLExpression({
+      config: tableConfig,
+      days: desiredDays,
+    });
+
+    // MODIFY TTL replaces the whole expression atomically, so for managed
+    // tables we ALWAYS re-emit retentionTTLExpr — even when it's already
+    // present — otherwise a hot-days bump silently drops the retention
+    // DELETE clause from the table.
+    const ttlClauses = [
+      coldTTLExpr,
+      isManaged && retentionTTLExpr ? retentionTTLExpr : null,
+    ]
+      .filter(Boolean)
+      .join(",\n  ");
+
+    // No ON CLUSTER — see note in the retention-only branch above: a
+    // Replicated DB auto-replicates this DDL, and ON CLUSTER on a table inside
+    // it is rejected with INCORRECT_QUERY.
+    const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\` MODIFY TTL ${ttlClauses} SETTINGS materialize_ttl_after_modify = 0`;
+
+    if (options.verbose) {
+      logger.info(
+        {
+          table: tableConfig.table,
+          from: currentDays,
+          to: desiredDays,
+          retentionTTL: isManaged && !!retentionTTLExpr,
+        },
+        "Updating TTL",
+      );
+    }
+
+    // Inline SETTINGS again — see the retention-only branch above.
+    await client.command({ table: tableConfig.table, sql: alterQuery });
+    updatedCount++;
   }
+
+  logger.info(
+    { updated: updatedCount, skipped: skippedCount },
+    "TTL reconciliation complete",
+  );
 }

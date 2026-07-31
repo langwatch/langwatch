@@ -75,20 +75,16 @@ function makeMockChClient({
       .fn()
       .mockImplementation(
         async ({
-          query,
-          query_params,
+          sql,
+          params,
         }: {
-          query: string;
-          query_params?: Record<string, unknown>;
+          sql: string;
+          params?: Record<string, unknown>;
         }) => {
-          sqlCaptures.push(query);
-          paramCaptures.push(query_params ?? {});
-          // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
-          // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
-          // production code's `response.data` access works.
-          return {
-            json: async () => ({ data: rows, meta: [], rows: rows.length }),
-          };
+          sqlCaptures.push(sql);
+          paramCaptures.push(params ?? {});
+          // The tenant client hands back decoded, column-named rows directly.
+          return rows;
         },
       ),
   };

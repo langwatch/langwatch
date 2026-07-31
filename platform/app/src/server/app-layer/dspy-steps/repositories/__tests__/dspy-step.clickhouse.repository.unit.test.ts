@@ -288,37 +288,29 @@ describe("DspyStepClickHouseRepository", () => {
   });
 
   describe("deleteByExperiment", () => {
-    it("throws when no legacy client resolver is wired", async () => {
-      const { repo } = setup(null);
-
-      await expect(
-        repo.deleteByExperiment("project-1", "exp-1"),
-      ).rejects.toThrow(/legacy client resolver/);
-    });
-
-    /** @scenario DELETE mutations stay on the legacy client (ADR-104 gap) */
-    it("issues the DELETE through the legacy client when wired", async () => {
+    it("issues the DELETE as a command, scoped by TenantId", async () => {
       const command = vi.fn().mockResolvedValue(undefined);
-      const legacyResolveClient = vi.fn().mockResolvedValue({ command });
       const insert = vi.fn().mockResolvedValue(undefined);
       const query = vi.fn().mockResolvedValue({ rows: [] });
-      const resolveClient = vi
-        .fn()
-        .mockReturnValue({ insert, query } as unknown as ClickHouseClient);
-      const repo = new DspyStepClickHouseRepository(
-        resolveClient,
-        null,
-        legacyResolveClient,
-      );
+      const resolveClient = vi.fn().mockReturnValue({
+        insert,
+        query,
+        command,
+      } as unknown as ClickHouseClient);
+      const repo = new DspyStepClickHouseRepository(resolveClient, null);
 
       await repo.deleteByExperiment("project-1", "exp-1");
 
-      expect(legacyResolveClient).toHaveBeenCalledWith("project-1");
-      expect(command).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query_params: { tenantId: "project-1", experimentId: "exp-1" },
-        }),
-      );
+      expect(resolveClient).toHaveBeenCalledWith("project-1");
+      expect(command).toHaveBeenCalledOnce();
+      const request = command.mock.calls[0]![0];
+      expect(request.tenantId).toBe("project-1");
+      expect(request.sql).toContain("TenantId = {tenantId:String}");
+      expect(request.sql).toContain("ExperimentId = {experimentId:String}");
+      expect(request.params).toEqual({
+        tenantId: "project-1",
+        experimentId: "exp-1",
+      });
     });
   });
 });

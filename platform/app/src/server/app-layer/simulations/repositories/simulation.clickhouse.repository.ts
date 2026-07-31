@@ -371,6 +371,43 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return mapClickHouseRowToScenarioRunData(row);
   }
 
+  /**
+   * One light column off the run's latest version — see
+   * {@link SimulationRepository.findRunStatus} for why it is its own read.
+   *
+   * `ORDER BY UpdatedAt DESC LIMIT 1` rather than the IN-tuple dedup the list
+   * reads use: this is a primary-key point lookup (the sort key is
+   * `(TenantId, ScenarioRunId)`) projecting a single small column, so the
+   * versions of one run are all it ever orders, and zero rows is the answer
+   * "nothing is stored yet" rather than a row to filter out afterwards.
+   *
+   * No partition predicate on purpose. The caller holds a run id and nothing
+   * else — no window to prune to — and a run queued either side of a week
+   * boundary has to be found anyway. Missing the row here does not read as
+   * "not found and therefore cheap", it reads as "never dispatched", so the
+   * cost of the wider index scan is the price of not running the scenario
+   * twice.
+   */
+  async findRunStatus({
+    projectId,
+    scenarioRunId,
+  }: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<string | null> {
+    const rows = await this.queryRows<{ Status: string }>(
+      `SELECT Status
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ScenarioRunId = {scenarioRunId:String}
+       ORDER BY UpdatedAt DESC
+       LIMIT 1`,
+      { tenantId: projectId, scenarioRunId },
+    );
+
+    return rows[0]?.Status ?? null;
+  }
+
   async getBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
