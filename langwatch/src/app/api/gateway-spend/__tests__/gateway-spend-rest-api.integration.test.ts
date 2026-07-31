@@ -34,7 +34,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
-        webhookEndpoints: planHasWebhookEndpoints,
+        webhookEndpointsEnabled: planHasWebhookEndpoints,
       }),
     },
   }),
@@ -244,6 +244,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   }, 120_000);
 
   afterAll(async () => {
+    // A failed beforeAll leaves the fixtures unset; surfacing the original
+    // failure beats a TypeError from teardown.
+    if (!organization?.id) return;
     if (chClient) {
       for (const tenant of [project?.id, foreignProject?.id]) {
         if (!tenant) continue;
@@ -251,26 +254,26 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           .command({
             query: `ALTER TABLE gateway_spend_events DELETE WHERE TenantId = '${tenant}'`,
           })
-          .catch(() => {});
+          ;
       }
     }
     for (const org of [organization, foreignOrganization]) {
       if (!org) continue;
       await prisma.roleBinding
         .deleteMany({ where: { organizationId: org.id } })
-        .catch(() => {});
+        ;
       await prisma.apiKey
         .deleteMany({ where: { organizationId: org.id } })
-        .catch(() => {});
+        ;
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: org.id } })
-        .catch(() => {});
+        ;
     }
     await prisma.project
       .deleteMany({
         where: { id: { in: [project?.id ?? "", foreignProject?.id ?? ""] } },
       })
-      .catch(() => {});
+      ;
     await prisma.team
       .deleteMany({
         where: {
@@ -279,15 +282,15 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           },
         },
       })
-      .catch(() => {});
-    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+      ;
+    await prisma.user.delete({ where: { id: userId } });
     await prisma.organization
       .deleteMany({
         where: {
           id: { in: [organization?.id ?? "", foreignOrganization?.id ?? ""] },
         },
       })
-      .catch(() => {});
+      ;
     await stopTestContainers();
   });
 
@@ -374,8 +377,14 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     const res = await app.request("/api/gateway/v1/spend-events?limit=200", {
       headers: headers(),
     });
-    const body = (await res.json()) as { data: Array<{ id: string }> };
-    expect(body.data.map((e) => e.id)).not.toContain(`${ns}-foreign`);
+    // Envelope ids are type-suffixed, so the fence must assert on the raw
+    // join key or it can never fail.
+    const body = (await res.json()) as {
+      data: Array<{ data: { gateway_request_id: string } }>;
+    };
+    expect(
+      body.data.map((e) => e.data.gateway_request_id),
+    ).not.toContain(`${ns}-foreign`);
   });
 
   /** @scenario A garbled cursor is refused, not silently reset */

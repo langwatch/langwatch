@@ -4,6 +4,7 @@
  * ClickHouse-disabled degrade, and RBAC denial.
  */
 import type { PrismaClient } from "@prisma/client";
+import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
@@ -44,7 +45,7 @@ vi.mock("~/server/gateway/spendEvents.clickhouse.repository", () => ({
   },
 }));
 
-const SPEND_ROW = {
+const SPEND_ROW: SpendEventRow = {
   tenantId: PROJECT_ID,
   gatewayRequestId: "req_1",
   organizationId: "org_1",
@@ -61,7 +62,12 @@ const SPEND_ROW = {
   tokensCacheWrite: 0,
   tokensReasoning: 0,
   costUsd: "0.001200",
-  status: "success" as const,
+  status: "confirmed" as const,
+  requestType: "chat",
+  costNanoUsd: 4_200_000,
+  rateVersion: "catalog@2026-07-26",
+  needsReconciliation: false,
+  settleReason: "",
   errorClass: "",
   httpStatus: 200,
   labels: [],

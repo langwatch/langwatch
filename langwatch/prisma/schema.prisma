@@ -945,6 +945,8 @@ model WebhookEndpointDelivery {
 
   @@index([endpointId, firedAt])
   @@index([organizationId, firedAt])
+  @@index([firedAt])
+  @@index([endpointId, dispatchId])
 }
 
 enum ExperimentType {

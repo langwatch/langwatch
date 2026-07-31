@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
@@ -52,6 +53,8 @@ export interface AggregateProcessManager {
  * "state machine" shown is the definition surface plus the instance's current
  * position — its state JSON, revision, and next wake.
  */
+const logger = createLogger("langwatch:ops:manager-explorer");
+
 export class ManagerExplorerService {
   constructor(private readonly store: ProcessStore) {}
 
@@ -119,11 +122,20 @@ export class ManagerExplorerService {
     projectId: string;
     processKey: string;
     messageKeyPrefix?: string;
+    /** Actor id for the audit trail; the operation re-emits customer-bound
+     *  deliveries, so who pressed the button matters. */
+    requestedBy: string;
   }): Promise<{ requeued: number }> {
+    const { requestedBy, ...rest } = params;
     const requeued = await this.store.requeueDeadMessages({
-      ...params,
+      ...rest,
       now: Date.now(),
     });
+    // Intentionally retain these opaque operational IDs for the audit trail.
+    logger.info(
+      { ...rest, requestedBy, requeued },
+      "ops requeue of dead outbox messages",
+    );
     return { requeued };
   }
 }

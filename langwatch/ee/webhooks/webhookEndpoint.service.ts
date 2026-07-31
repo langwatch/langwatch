@@ -213,7 +213,7 @@ export class WebhookEndpointService {
     return { endpoint: toView(endpoint), secret };
   }
 
-  async list(params: {
+  async getAll(params: {
     organizationId: string;
   }): Promise<WebhookEndpointView[]> {
     const endpoints = await this.deps.prisma.webhookEndpoint.findMany({
@@ -330,6 +330,26 @@ export class WebhookEndpointService {
     });
   }
 
+  /**
+   * The delivery executor's endpoint read: the endpoint when it is
+   * deliverable (ACTIVE, not archived, owned by the org), else null. The
+   * liveness predicate lives here and only here.
+   */
+  async getDeliverable(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView | null> {
+    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: params.endpointId,
+        organizationId: params.organizationId,
+        status: "ACTIVE",
+        archivedAt: null,
+      },
+    });
+    return endpoint ? toView(endpoint) : null;
+  }
+
   /** Decrypted signing secret for the delivery path and test sends. */
   async getSigningSecret(params: {
     organizationId: string;
@@ -343,7 +363,7 @@ export class WebhookEndpointService {
    * ACTIVE endpoints of the org, for the delivery scan's subscription
    * matching. Reads are frequent and small; no caching until measured.
    */
-  async listActiveByOrganization(params: {
+  async getActiveByOrganization(params: {
     organizationId: string;
   }): Promise<WebhookEndpointView[]> {
     const endpoints = await this.deps.prisma.webhookEndpoint.findMany({
@@ -392,6 +412,13 @@ export class WebhookEndpointService {
     now?: Date;
   }): Promise<void> {
     const now = params.now ?? new Date();
+    // The (endpoint, org) pairing is verified before anything is written,
+    // so a caller bug cannot file one tenant's delivery log under another.
+    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+    });
+    if (!endpoint) return;
+
     await this.deps.prisma.webhookEndpointDelivery.create({
       data: {
         organizationId: params.organizationId,
@@ -412,64 +439,73 @@ export class WebhookEndpointService {
     });
 
     if (params.outcome === "success") {
-      await this.deps.prisma.webhookEndpoint.update({
-        where: { id: params.endpointId },
+      await this.deps.prisma.webhookEndpoint.updateMany({
+        where: { id: params.endpointId, organizationId: params.organizationId },
         data: { lastSuccessAt: now, failingSince: null },
       });
       return;
     }
 
-    const endpoint = await this.deps.prisma.webhookEndpoint.findUnique({
-      where: { id: params.endpointId },
+    // A streak starts at the FIRST failure and is never restarted by a
+    // concurrent one: the conditional update only writes failingSince where
+    // it is currently null.
+    await this.deps.prisma.webhookEndpoint.updateMany({
+      where: {
+        id: params.endpointId,
+        organizationId: params.organizationId,
+        failingSince: null,
+      },
+      data: { failingSince: now },
     });
-    if (!endpoint) return;
+    await this.deps.prisma.webhookEndpoint.updateMany({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+      data: { lastFailureAt: now },
+    });
 
     const failingSince = endpoint.failingSince ?? now;
-    const shouldAutoDisable =
-      endpoint.status === "ACTIVE" &&
-      now.getTime() - failingSince.getTime() >= WEBHOOK_AUTO_DISABLE_AFTER_MS;
-
-    await this.deps.prisma.webhookEndpoint.update({
-      where: { id: params.endpointId },
+    if (now.getTime() - failingSince.getTime() < WEBHOOK_AUTO_DISABLE_AFTER_MS) {
+      return;
+    }
+    // The disable is a compare-and-set on status, so exactly one of any
+    // concurrent failing attempts flips it, and only that one notifies.
+    const flipped = await this.deps.prisma.webhookEndpoint.updateMany({
+      where: {
+        id: params.endpointId,
+        organizationId: params.organizationId,
+        status: "ACTIVE",
+      },
       data: {
-        lastFailureAt: now,
-        failingSince,
-        ...(shouldAutoDisable
-          ? {
-              status: "DISABLED",
-              disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
-              disabledAt: now,
-            }
-          : {}),
+        status: "DISABLED",
+        disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
+        disabledAt: now,
       },
     });
+    if (flipped.count !== 1) return;
 
-    if (shouldAutoDisable) {
-      logger.warn(
-        {
-          organizationId: params.organizationId,
-          endpointId: params.endpointId,
-          failingSince: failingSince.toISOString(),
-        },
-        "webhook endpoint auto-disabled after 72h of consecutive failures",
+    logger.warn(
+      {
+        organizationId: params.organizationId,
+        endpointId: params.endpointId,
+        failingSince: failingSince.toISOString(),
+      },
+      "webhook endpoint auto-disabled after 72h of consecutive failures",
+    );
+    try {
+      await this.deps.notifyAutoDisabled?.({
+        organizationId: params.organizationId,
+        endpointId: params.endpointId,
+        url: endpoint.url,
+        failingSince,
+      });
+    } catch (error) {
+      logger.error(
+        { endpointId: params.endpointId, error },
+        "webhook auto-disable notification failed",
       );
-      try {
-        await this.deps.notifyAutoDisabled?.({
-          organizationId: params.organizationId,
-          endpointId: params.endpointId,
-          url: endpoint.url,
-          failingSince,
-        });
-      } catch (error) {
-        logger.error(
-          { endpointId: params.endpointId, error },
-          "webhook auto-disable notification failed",
-        );
-      }
     }
   }
 
-  async listDeliveries(params: {
+  async getDeliveries(params: {
     organizationId: string;
     endpointId: string;
     limit?: number;

@@ -764,7 +764,6 @@ export function initializeDefaultApp(options?: {
   const webhookEndpointService = new WebhookEndpointService({ prisma });
   const webhookDelivery = clickhouseEnabled
     ? {
-        prisma,
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
         getPlan: (organizationId: string) =>

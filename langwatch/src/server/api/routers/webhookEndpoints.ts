@@ -11,6 +11,10 @@ import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  assertWebhookEndpointsEntitled,
+  WebhookEndpointsNotEntitledError,
+} from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
@@ -19,7 +23,6 @@ import {
   WebhookEndpointService,
   WebhookEndpointValidationError,
 } from "@ee/webhooks/webhookEndpoint.service";
-import { getApp } from "~/server/app-layer/app";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -28,7 +31,7 @@ const endpointInput = orgInput.extend({ endpointId: z.string() });
 
 /**
  * Enterprise gate for the whole surface, mirroring the REST app: the org's
- * active plan must carry `webhookEndpoints`. Runs after the RBAC check so
+ * active plan must carry `webhookEndpointsEnabled`. Runs after the RBAC check so
  * membership is already established.
  */
 const requireWebhooksPlan = async ({
@@ -38,15 +41,13 @@ const requireWebhooksPlan = async ({
   input: { organizationId: string };
   next: () => any;
 }) => {
-  const plan = await getApp().planProvider.getActivePlan({
-    organizationId: input.organizationId,
-  });
-  if (plan.webhookEndpoints !== true) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "Webhook endpoints are an enterprise feature; this organization's plan does not include them.",
-    });
+  try {
+    await assertWebhookEndpointsEntitled(input.organizationId);
+  } catch (error) {
+    if (error instanceof WebhookEndpointsNotEntitledError) {
+      throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+    }
+    throw error;
   }
   return next();
 };
@@ -83,7 +84,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
-      service(ctx.prisma).list({ organizationId: input.organizationId }),
+      service(ctx.prisma).getAll({ organizationId: input.organizationId }),
     ),
 
   deliveries: protectedProcedure
@@ -92,7 +93,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
       translating(() =>
-        service(ctx.prisma).listDeliveries({
+        service(ctx.prisma).getDeliveries({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
           limit: input.limit,

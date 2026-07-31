@@ -86,7 +86,7 @@ describe("webhookEndpointsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    getActivePlan.mockResolvedValue({ webhookEndpoints: true });
+    getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: true });
   });
 
   /** @scenario Read procedures require the view scope and mutations the manage scope */
@@ -120,8 +120,8 @@ describe("webhookEndpointsRouter", () => {
   });
 
   /** @scenario Sessions of organizations without the plan flag are refused */
-  it("refuses every procedure when the plan lacks webhookEndpoints", async () => {
-    getActivePlan.mockResolvedValue({ webhookEndpoints: false });
+  it("refuses every procedure when the plan lacks the entitlement", async () => {
+    getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: false });
     const caller = buildCaller(buildMockPrisma());
     await expect(caller.list({ organizationId: ORG_ID })).rejects.toThrow(
       /enterprise feature/i,
@@ -129,7 +129,7 @@ describe("webhookEndpointsRouter", () => {
   });
 
   /** @scenario The session surface returns the secret only from create and roll mutations */
-  it("returns the secret from create but never from list", async () => {
+  it("returns the secret from create and roll but never from list", async () => {
     const caller = buildCaller(buildMockPrisma());
     const created = await caller.create({
       organizationId: ORG_ID,
@@ -142,6 +142,13 @@ describe("webhookEndpointsRouter", () => {
     const flat = JSON.stringify(listed);
     expect(flat).not.toContain("whsec_");
     expect(flat).not.toContain("secret");
+
+    const rolled = await caller.rollSecret({
+      organizationId: ORG_ID,
+      endpointId: created.endpoint.id,
+    });
+    expect(rolled.secret).toMatch(/^whsec_/);
+    expect(rolled.secret).not.toBe(created.secret);
   });
 
   /** @scenario Unknown event selectors surface as a bad request in the session surface */

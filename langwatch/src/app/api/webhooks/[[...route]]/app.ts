@@ -10,9 +10,12 @@ import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import {
   WebhookEventsClickHouseRepository,
 } from "@ee/webhooks/webhookEvents.clickhouse.repository";
-import { spendRowToEnvelope } from "@ee/webhooks/envelope";
+import {
+  assertWebhookEndpointsEntitled,
+  WebhookEndpointsNotEntitledError,
+} from "@ee/webhooks/entitlement";
+import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
-import { getApp } from "~/server/app-layer/app";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
@@ -35,21 +38,25 @@ const eventsRepository = new WebhookEventsClickHouseRepository(
     return client;
   },
 );
+const eventsService = new WebhookEventsService({
+  prisma,
+  repository: eventsRepository,
+});
 
 /**
- * Enterprise gate for the whole surface: the org's active plan must carry
- * `webhookEndpoints`. Runs after the org auth chain so the organization is
+ * Enterprise gate for the whole surface, delegating to the one shared
+ * entitlement check. Runs after the org auth chain so the organization is
  * on the context.
  */
 async function requireWebhookPlan(c: Context, next: Next): Promise<void> {
   const organization = c.get("organization") as Organization;
-  const plan = await getApp().planProvider.getActivePlan({
-    organizationId: organization.id,
-  });
-  if (plan.webhookEndpoints !== true) {
-    throw new ForbiddenError(
-      "Webhook endpoints are an enterprise feature; this organization's plan does not include them.",
-    );
+  try {
+    await assertWebhookEndpointsEntitled(organization.id);
+  } catch (error) {
+    if (error instanceof WebhookEndpointsNotEntitledError) {
+      throw new ForbiddenError(error.message);
+    }
+    throw error;
   }
   await next();
 }
@@ -159,7 +166,7 @@ secured
     describeRoute({ description: "List the organization's webhook endpoints" }),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const list = await endpoints.list({ organizationId: organization.id });
+      const list = await endpoints.getAll({ organizationId: organization.id });
       return c.json({ data: list.map(endpointResponse) });
     },
   );
@@ -195,15 +202,26 @@ secured
       const endpointId = c.req.param("id");
       const body = c.req.valid("json");
 
-      let endpoint = await endpoints.update({
-        organizationId: organization.id,
-        endpointId,
-        url: body.url,
-        enabledEvents: body.enabled_events,
-        maxBatchSize: body.max_batch_size,
-        maxBatchDelayMs: body.max_batch_delay_ms,
-        maxInFlight: body.max_in_flight,
-      });
+      const hasFieldUpdate =
+        body.url !== undefined ||
+        body.enabled_events !== undefined ||
+        body.max_batch_size !== undefined ||
+        body.max_batch_delay_ms !== undefined ||
+        body.max_in_flight !== undefined;
+      let endpoint = hasFieldUpdate
+        ? await endpoints.update({
+            organizationId: organization.id,
+            endpointId,
+            url: body.url,
+            enabledEvents: body.enabled_events,
+            maxBatchSize: body.max_batch_size,
+            maxBatchDelayMs: body.max_batch_delay_ms,
+            maxInFlight: body.max_in_flight,
+          })
+        : await endpoints.getById({
+            organizationId: organization.id,
+            endpointId,
+          });
       if (body.status === "DISABLED" && endpoint.status === "ACTIVE") {
         endpoint = await endpoints.disable({
           organizationId: organization.id,
@@ -261,7 +279,7 @@ secured
     requireWebhookPlan,
     describeRoute({
       description:
-        "Send a signed test event through the full delivery path and return the receiver's response status",
+        "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
     }),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -318,6 +336,9 @@ secured
           },
         });
       } catch (error) {
+        // The full message goes to the delivery log for the operator; the
+        // response carries a sanitized summary so internal dispatch wording
+        // and transport details never reach the caller verbatim.
         await endpoints.recordDeliveryAttempt({
           organizationId: organization.id,
           endpointId,
@@ -335,7 +356,7 @@ secured
             delivered: false,
             response_status: null,
             error:
-              error instanceof Error ? error.message.slice(0, 500) : "failed",
+              "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
           },
         });
       }
@@ -355,7 +376,7 @@ secured
     async (c) => {
       const organization = c.get("organization") as Organization;
       const { limit } = c.req.valid("query");
-      const rows = await endpoints.listDeliveries({
+      const rows = await endpoints.getDeliveries({
         organizationId: organization.id,
         endpointId: c.req.param("id"),
         limit,
@@ -423,7 +444,7 @@ secured
           type: t.type,
           family: t.family,
           schema_version: t.schemaVersion,
-          emitting: t.emitting,
+          is_emitting: t.isEmitting,
           description: t.description,
         })),
       });
@@ -443,26 +464,18 @@ secured
     async (c) => {
       const organization = c.get("organization") as Organization;
       const query = c.req.valid("query");
-
-      const projects = await prisma.project.findMany({
-        where: { team: { organizationId: organization.id } },
-        select: { id: true },
-      });
-      // The repository maps emitted types to row statuses and serves an
-      // empty page for unknown types, so consumers can probe
-      // forward-compatibly without an error.
-      const page = await eventsRepository.readEmittedEventsPage({
-        tenantIds: projects.map((p) => p.id),
+      // The service maps emitted types to row statuses and serves an empty
+      // page for unknown types, so consumers can probe forward-compatibly
+      // without an error.
+      const page = await eventsService.getEmittedEvents({
+        organizationId: organization.id,
         fromMs: query.from,
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
         types: query.type !== undefined ? [query.type] : undefined,
       });
-      return c.json({
-        data: page.rows.map(spendRowToEnvelope),
-        next_cursor: page.nextCursor,
-      });
+      return c.json({ data: page.events, next_cursor: page.nextCursor });
     },
   );
 

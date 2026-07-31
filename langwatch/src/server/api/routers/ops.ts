@@ -394,12 +394,13 @@ export const opsRouter = createTRPCRouter({
         messageKeyPrefix: z.string().min(1).max(500).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       return requireOps().managerExplorer.requeueDeadMessages({
         processName: input.processName,
         projectId: input.tenantId,
         processKey: input.processKey,
         messageKeyPrefix: input.messageKeyPrefix,
+        requestedBy: ctx.session.user.id,
       });
     }),
 

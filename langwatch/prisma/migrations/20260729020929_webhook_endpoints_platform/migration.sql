@@ -54,3 +54,11 @@ ALTER TABLE "WebhookEndpoint" ADD CONSTRAINT "WebhookEndpoint_organizationId_fke
 
 -- AddForeignKey
 ALTER TABLE "WebhookEndpointDelivery" ADD CONSTRAINT "WebhookEndpointDelivery_endpointId_fkey" FOREIGN KEY ("endpointId") REFERENCES "WebhookEndpoint"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Down (manual): reverses in dependency order; run only to roll back this
+-- migration.
+--   ALTER TABLE "WebhookEndpointDelivery" DROP CONSTRAINT "WebhookEndpointDelivery_endpointId_fkey";
+--   ALTER TABLE "WebhookEndpoint" DROP CONSTRAINT "WebhookEndpoint_organizationId_fkey";
+--   DROP TABLE "WebhookEndpointDelivery";
+--   DROP TABLE "WebhookEndpoint";
+--   DROP TYPE "WebhookEndpointStatus";

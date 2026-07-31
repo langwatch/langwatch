@@ -2,7 +2,6 @@
 
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { PlanInfo } from "../../licensing/planInfo";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
@@ -212,7 +211,6 @@ export const flushEndpointSchema = z.object({
 export type FlushEndpointPayload = z.infer<typeof flushEndpointSchema>;
 
 export interface WebhookDeliveryProcessDeps {
-  prisma: PrismaClient;
   processStore: ProcessStore;
   endpoints: WebhookEndpointService;
   /** Resolves the org's active plan for the enterprise gate. */
@@ -425,7 +423,7 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
     }
 
     const plan = await deps.getPlan(organizationId);
-    if (plan.webhookEndpoints !== true) return;
+    if (plan.webhookEndpointsEnabled !== true) return;
 
     // Settled requests are their own event type: an endpoint subscribed
     // only to completed never receives one, and a family or match-all
@@ -435,7 +433,7 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
         ? "gateway.request.settled"
         : "gateway.request.completed";
     const endpoints = (
-      await deps.endpoints.listActiveByOrganization({ organizationId })
+      await deps.endpoints.getActiveByOrganization({ organizationId })
     ).filter((e) => eventMatches(e.enabledEvents, eventType));
     if (endpoints.length === 0) return;
 
@@ -468,34 +466,16 @@ export function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
     payload: FlushEndpointPayload,
     _context: IntentContext,
   ): Promise<void> => {
-    const endpoint = await deps.prisma.webhookEndpoint.findFirst({
-      where: {
-        id: payload.endpointId,
-        organizationId: payload.organizationId,
-      },
+    const endpoint = await deps.endpoints.getDeliverable({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
     });
     if (!endpoint) return;
     await flushEndpointStream({
       deps,
       organizationId: payload.organizationId,
       projectId: payload.projectId,
-      endpoint: {
-        id: endpoint.id,
-        organizationId: endpoint.organizationId,
-        url: endpoint.url,
-        enabledEvents: endpoint.enabledEvents,
-        status: endpoint.status,
-        disabledReason: endpoint.disabledReason,
-        disabledAt: endpoint.disabledAt,
-        failingSince: endpoint.failingSince,
-        lastSuccessAt: endpoint.lastSuccessAt,
-        lastFailureAt: endpoint.lastFailureAt,
-        maxBatchSize: endpoint.maxBatchSize,
-        maxBatchDelayMs: endpoint.maxBatchDelayMs,
-        maxInFlight: endpoint.maxInFlight,
-        createdAt: endpoint.createdAt,
-        updatedAt: endpoint.updatedAt,
-      },
+      endpoint,
     });
   };
 }
@@ -560,15 +540,14 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     payload: SendBatchPayload,
     context: IntentContext,
   ): Promise<void> => {
-    const endpoint = await deps.prisma.webhookEndpoint.findFirst({
-      where: {
-        id: payload.endpointId,
-        organizationId: payload.organizationId,
-      },
+    // The service's deliverable read owns the liveness predicate. A deleted
+    // or disabled endpoint drains its queue without POSTing: the spend
+    // record keeps the events, re-enable plus replay covers the gap.
+    const endpoint = await deps.endpoints.getDeliverable({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
     });
-    // A deleted or disabled endpoint drains its queue without POSTing: the
-    // spend record keeps the events, re-enable plus replay covers the gap.
-    if (!endpoint || endpoint.status !== "ACTIVE" || endpoint.archivedAt) {
+    if (!endpoint) {
       logger.info(
         { endpointId: payload.endpointId, batchId: payload.batchId },
         "webhook batch dropped: endpoint disabled or gone (replay covers the gap)",

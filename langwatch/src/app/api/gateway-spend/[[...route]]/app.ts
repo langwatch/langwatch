@@ -2,8 +2,11 @@ import type { Organization } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import type { Context, Next } from "hono";
 import { z } from "zod";
+import {
+  assertWebhookEndpointsEntitled,
+  WebhookEndpointsNotEntitledError,
+} from "@ee/webhooks/entitlement";
 import { spendRowToEnvelope } from "@ee/webhooks/envelope";
-import { getApp } from "~/server/app-layer/app";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
@@ -35,13 +38,15 @@ const spendEvents = new GatewaySpendEventsRepository(async (tenantId) => {
  */
 async function requireBillingPlan(c: Context, next: Next): Promise<void> {
   const organization = c.get("organization") as Organization;
-  const plan = await getApp().planProvider.getActivePlan({
-    organizationId: organization.id,
-  });
-  if (plan.webhookEndpoints !== true) {
-    throw new ForbiddenError(
-      "The billing events API is an enterprise feature; this organization's plan does not include it.",
-    );
+  try {
+    await assertWebhookEndpointsEntitled(organization.id);
+  } catch (error) {
+    if (error instanceof WebhookEndpointsNotEntitledError) {
+      throw new ForbiddenError(
+        "The billing events API is an enterprise feature; this organization's plan does not include it.",
+      );
+    }
+    throw error;
   }
   await next();
 }

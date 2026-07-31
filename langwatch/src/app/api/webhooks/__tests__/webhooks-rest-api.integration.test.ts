@@ -18,7 +18,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
-        webhookEndpoints: planHasWebhookEndpoints,
+        webhookEndpointsEnabled: planHasWebhookEndpoints,
       }),
     },
   }),
@@ -82,25 +82,20 @@ describe("Feature: Webhook endpoints REST API", () => {
   });
 
   afterAll(async () => {
+    if (!organization?.id) return;
     await prisma.webhookEndpointDelivery
-      .deleteMany({ where: { organizationId: organization.id } })
-      .catch(() => {});
+      .deleteMany({ where: { organizationId: organization.id } });
     await prisma.webhookEndpoint
-      .deleteMany({ where: { organizationId: organization.id } })
-      .catch(() => {});
+      .deleteMany({ where: { organizationId: organization.id } });
     await prisma.roleBinding
-      .deleteMany({ where: { organizationId: organization.id } })
-      .catch(() => {});
+      .deleteMany({ where: { organizationId: organization.id } });
     await prisma.apiKey
-      .deleteMany({ where: { organizationId: organization.id } })
-      .catch(() => {});
+      .deleteMany({ where: { organizationId: organization.id } });
     await prisma.organizationUser
-      .deleteMany({ where: { organizationId: organization.id } })
-      .catch(() => {});
-    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+      .deleteMany({ where: { organizationId: organization.id } });
+    await prisma.user.delete({ where: { id: userId } });
     await prisma.organization
-      .delete({ where: { id: organization.id } })
-      .catch(() => {});
+      .delete({ where: { id: organization.id } });
   });
 
   it("returns 401 without an api key", async () => {
@@ -236,6 +231,62 @@ describe("Feature: Webhook endpoints REST API", () => {
     }
   });
 
+  it("archives an endpoint and hides it from reads", async () => {
+    planHasWebhookEndpoints = true;
+    const createRes = await app.request("/api/webhooks/v1/endpoints", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        url: "https://example.com/hooks/archive-me",
+        enabled_events: ["gateway.request.completed"],
+      }),
+    });
+    const { data } = (await createRes.json()) as { data: { id: string } };
+
+    const deleteRes = await app.request(
+      `/api/webhooks/v1/endpoints/${data.id}`,
+      { method: "DELETE", headers: headers() },
+    );
+    expect(deleteRes.status).toBe(200);
+
+    const getRes = await app.request(
+      `/api/webhooks/v1/endpoints/${data.id}`,
+      { headers: headers() },
+    );
+    expect(getRes.status).toBe(404);
+  });
+
+  it("serves the health report for an endpoint", async () => {
+    planHasWebhookEndpoints = true;
+    const createRes = await app.request("/api/webhooks/v1/endpoints", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        url: "https://example.com/hooks/health-probe",
+        enabled_events: ["gateway.request.completed"],
+      }),
+    });
+    const { data } = (await createRes.json()) as { data: { id: string } };
+
+    const res = await app.request(
+      `/api/webhooks/v1/endpoints/${data.id}/health`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        status: string;
+        oldest_undelivered_age_ms: number | null;
+        dlq_depth: number;
+        sends_per_minute: number;
+      };
+    };
+    expect(body.data.status).toBe("ACTIVE");
+    expect(body.data.oldest_undelivered_age_ms).toBeNull();
+    expect(body.data.dlq_depth).toBe(0);
+    expect(body.data.sends_per_minute).toBe(0);
+  });
+
   it("serves the event-type catalog for the subscription UI", async () => {
     planHasWebhookEndpoints = true;
     const res = await app.request("/api/webhooks/v1/event-types", {
@@ -243,11 +294,11 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      data: Array<{ type: string; family: string; emitting: boolean }>;
+      data: Array<{ type: string; family: string; is_emitting: boolean }>;
     };
     const completed = body.data.find(
       (t) => t.type === "gateway.request.completed",
     );
-    expect(completed).toMatchObject({ family: "gateway", emitting: true });
+    expect(completed).toMatchObject({ family: "gateway", is_emitting: true });
   });
 });

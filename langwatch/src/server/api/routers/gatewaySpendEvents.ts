@@ -78,7 +78,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
       );
       const vks = vkIds.length
         ? await ctx.prisma.virtualKey.findMany({
-            where: { id: { in: vkIds } },
+            where: { id: { in: vkIds }, projectId: input.projectId },
             select: { id: true, name: true },
           })
         : [];

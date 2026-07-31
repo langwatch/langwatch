@@ -70,6 +70,7 @@ export function normalizeStatusFilter(
 ): SpendEventStatus | undefined {
   if (status === "success") return "confirmed";
   if (status === "error") return "failed";
+  if (status === "") return undefined;
   if (
     status === "admitted" ||
     status === "confirmed" ||
@@ -78,21 +79,38 @@ export function normalizeStatusFilter(
   ) {
     return status;
   }
-  return undefined;
+  // An unknown non-empty token is a caller bug: throwing beats silently
+  // dropping the filter on a surface that feeds downstream billers.
+  throw new Error(
+    `Unknown spend status filter "${status}"; expected success, error, admitted, confirmed, failed, or settled`,
+  );
+}
+
+/** Parse a summed Int64 nano-USD value, refusing silent float rounding:
+ *  ClickHouse serializes Int64 as a string, and past 2^53 a Number would
+ *  quietly lose integer precision on a money figure. */
+export function parseSummedNanoUsd(value: unknown): number {
+  const asBig = BigInt(String(value ?? 0));
+  if (asBig > BigInt(Number.MAX_SAFE_INTEGER) || asBig < 0n) {
+    throw new Error(
+      `Summed nano-USD value ${asBig} exceeds the safe integer range`,
+    );
+  }
+  return Number(asBig);
 }
 
 function nanoToUsdString(nano: number): string {
   return (nano / NANO_USD_PER_USD).toFixed(6);
 }
 
-const ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
+export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
           TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
 
-function mapRow(r: Record<string, unknown>): SpendEventRow {
+export function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
   const nano = Number(r.CostNanoUSD ?? 0);
   const status = String(r.Status) as SpendEventStatus;
   return {
@@ -230,7 +248,7 @@ export class GatewaySpendEventsRepository {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT ${ROW_COLUMNS}, SettleReason, PodId, PodSeq,
+        SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -246,7 +264,7 @@ export class GatewaySpendEventsRepository {
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
       return null;
     }
-    const row = mapRow(r);
+    const row = mapSpendEventRow(r);
     const hasUsage =
       row.status === "confirmed" ||
       row.status === "failed" ||
@@ -348,7 +366,7 @@ export class GatewaySpendEventsRepository {
 
     const result = await client.query({
       query: `
-        SELECT ${ROW_COLUMNS}
+        SELECT ${SPEND_ROW_COLUMNS}
         FROM ${TABLE} FINAL
         WHERE ${conditions.join(" AND ")}
         ORDER BY OccurredAt DESC, GatewayRequestId DESC
@@ -358,7 +376,7 @@ export class GatewaySpendEventsRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapRow);
+    const rows = raw.map(mapSpendEventRow);
     const last = rows[rows.length - 1];
     return {
       rows,
@@ -389,7 +407,7 @@ export class GatewaySpendEventsRepository {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT ${ROW_COLUMNS}
+        SELECT ${SPEND_ROW_COLUMNS}
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
@@ -401,7 +419,7 @@ export class GatewaySpendEventsRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    return raw.map(mapRow);
+    return raw.map(mapSpendEventRow);
   }
 
   /**
@@ -475,7 +493,7 @@ export class GatewaySpendEventsRepository {
 
     const result = await client.query({
       query: `
-        SELECT ${ROW_COLUMNS}, EventTimestamp
+        SELECT ${SPEND_ROW_COLUMNS}, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
           ${clauses.join("\n          ")}
@@ -486,7 +504,7 @@ export class GatewaySpendEventsRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapRow);
+    const rows = raw.map(mapSpendEventRow);
     const last = raw[raw.length - 1];
     return {
       rows,
@@ -570,7 +588,7 @@ export class GatewaySpendEventsRepository {
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
     return raw.map((r) => {
-      const nano = Number(r.CostNanoUSD ?? 0);
+      const nano = parseSummedNanoUsd(r.CostNanoUSD);
       return {
         key: String(r.GroupKey ?? ""),
         eventCount: Number(r.EventCount ?? 0),
@@ -651,7 +669,7 @@ export class GatewaySpendEventsRepository {
     const raw = (await result.json()) as Array<Record<string, unknown>>;
     const row = raw[0];
     if (!row) return empty;
-    const nano = Number(row.SpendNanoUSD ?? 0);
+    const nano = parseSummedNanoUsd(row.SpendNanoUSD);
     return {
       spendUsd: nanoToUsdString(nano),
       spendNanoUsd: nano,

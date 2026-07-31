@@ -60,7 +60,7 @@ function fakeStore(
     markFailed: vi.fn(),
     findDueWakes: vi.fn(),
     deleteDispatchedBefore: vi.fn(),
-    requeueDeadMessages: vi.fn().mockResolvedValue(0),
+    requeueDeadMessages: vi.fn().mockResolvedValue(3),
     ...overrides,
   } as unknown as ProcessStore;
 }
@@ -187,6 +187,32 @@ describe("ManagerExplorerService", () => {
           sourceEventId: "evt-1",
         });
       });
+    });
+  });
+});
+
+describe("given dead outbox messages for one endpoint stream", () => {
+  describe("when the operator requeues them", () => {
+    it("forwards the scope and prefix, stamps now, and returns the count", async () => {
+      const store = fakeStore();
+      const service = new ManagerExplorerService(store as never);
+      const result = await service.requeueDeadMessages({
+        processName: "webhookDelivery",
+        projectId: "project-1",
+        processKey: "endpoint:whep_1",
+        messageKeyPrefix: "send:whep_1:",
+        requestedBy: "user_ops",
+      });
+      expect(result).toEqual({ requeued: 3 });
+      expect(store.requeueDeadMessages).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processName: "webhookDelivery",
+          projectId: "project-1",
+          processKey: "endpoint:whep_1",
+          messageKeyPrefix: "send:whep_1:",
+          now: expect.any(Number),
+        }),
+      );
     });
   });
 });

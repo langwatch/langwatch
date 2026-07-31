@@ -23,6 +23,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (!organization?.id) return;
   await prisma.webhookEndpointDelivery.deleteMany({
     where: { organizationId: organization.id },
   });
@@ -47,7 +48,7 @@ describe("webhook endpoint service", () => {
     expect(endpoint).not.toHaveProperty("secret");
     expect(endpoint).not.toHaveProperty("secretEncrypted");
 
-    const listed = await service.list({ organizationId: organization.id });
+    const listed = await service.getAll({ organizationId: organization.id });
     for (const row of listed) {
       expect(row).not.toHaveProperty("secret");
       expect(row).not.toHaveProperty("secretEncrypted");
@@ -177,7 +178,7 @@ describe("webhook endpoint service", () => {
       error: "HTTP 502",
       response: { body: "bad gateway" },
     });
-    const deliveries = await service.listDeliveries({
+    const deliveries = await service.getDeliveries({
       organizationId: organization.id,
       endpointId: endpoint.id,
     });

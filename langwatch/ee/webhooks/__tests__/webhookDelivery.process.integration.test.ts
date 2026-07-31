@@ -288,11 +288,10 @@ beforeEach(() => {
   store = new InMemoryProcessStore();
   clock = Date.now();
   deps = {
-    prisma,
     processStore: store,
     endpoints,
     getPlan: async () =>
-      ({ webhookEndpoints: true }) as Awaited<
+      ({ webhookEndpointsEnabled: true }) as Awaited<
         ReturnType<WebhookDeliveryProcessDeps["getPlan"]>
       >,
     now: () => clock,
@@ -372,6 +371,7 @@ describe("webhook delivery via the transactional inbox", () => {
       endpointId,
       enabledEvents: ["gateway.*"],
     });
+    try {
     const requestId = `req-${nanoid(8)}`;
     await consume(admittedEnvelope(requestId));
     await consume(settledEnvelope(requestId));
@@ -389,11 +389,13 @@ describe("webhook delivery via the transactional inbox", () => {
     expect(body.batch[0]!.data.settle_reason).toBe(
       "confirmation_deadline_expired",
     );
-    await endpoints.update({
-      organizationId: organization.id,
-      endpointId,
-      enabledEvents: ["gateway.request.completed"],
-    });
+    } finally {
+      await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        enabledEvents: ["gateway.request.completed"],
+      });
+    }
   });
 
   /** @scenario A late confirmation supersedes the settled event */
@@ -403,6 +405,7 @@ describe("webhook delivery via the transactional inbox", () => {
       endpointId,
       enabledEvents: ["gateway.*"],
     });
+    try {
     const requestId = `req-${nanoid(8)}`;
     await consume(admittedEnvelope(requestId));
     await consume(settledEnvelope(requestId));
@@ -428,11 +431,13 @@ describe("webhook delivery via the transactional inbox", () => {
     expect(completed.data.gateway_request_id).toBe(requestId);
     const cost = completed.data.cost as { nano_usd: number };
     expect(cost.nano_usd).toBeGreaterThan(0);
-    await endpoints.update({
-      organizationId: organization.id,
-      endpointId,
-      enabledEvents: ["gateway.request.completed"],
-    });
+    } finally {
+      await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        enabledEvents: ["gateway.request.completed"],
+      });
+    }
   });
 
   /** @scenario A completed-only subscription never receives settlements */
@@ -505,7 +510,7 @@ describe("webhook delivery via the transactional inbox", () => {
     expect(sends[0]!.status).toBe("pending");
     expect(sends[0]!.attempts).toBeGreaterThanOrEqual(1);
 
-    const deliveries = await endpoints.listDeliveries({
+    const deliveries = await endpoints.getDeliveries({
       organizationId: organization.id,
       endpointId,
     });

@@ -132,19 +132,22 @@ describe("webhook emitted-events listing", () => {
 
   /** @scenario The events listing pages the organization's emitted events */
   it("pages envelope rows newest first with a continuation cursor", async () => {
+    // Its own window, disjoint from the settled/admitted fixtures above,
+    // so cross-test rows can never satisfy these assertions.
+    const windowStart = baseTime + 100_000;
     const ids = [1, 2, 3].map((i) => `req-page-${i}-${nanoid(6)}`);
     await spendRepo.upsertFromFold(
       ids.map((id, i) => ({
         tenantId,
         gatewayRequestId: id,
-        state: state(baseTime + i * 1000),
+        state: state(windowStart + i * 1000),
       })),
     );
 
     const first = await eventsRepo.readEmittedEventsPage({
       tenantIds: [tenantId],
-      fromMs: baseTime - 1,
-      toMs: baseTime + 60_000,
+      fromMs: windowStart - 1,
+      toMs: windowStart + 60_000,
       limit: 2,
     });
     expect(first.rows).toHaveLength(2);
@@ -155,15 +158,16 @@ describe("webhook emitted-events listing", () => {
 
     const second = await eventsRepo.readEmittedEventsPage({
       tenantIds: [tenantId],
-      fromMs: baseTime - 1,
-      toMs: baseTime + 60_000,
+      fromMs: windowStart - 1,
+      toMs: windowStart + 60_000,
       cursor: first.nextCursor,
       limit: 2,
     });
-    const seen = new Set([
+    const seen = [
       ...first.rows.map((r) => r.gatewayRequestId),
       ...second.rows.map((r) => r.gatewayRequestId),
-    ]);
-    for (const id of ids) expect(seen.has(id)).toBe(true);
+    ];
+    // Exact set: the disjoint window makes leakage a failure, not noise.
+    expect(seen.sort()).toEqual([...ids].sort());
   });
 });

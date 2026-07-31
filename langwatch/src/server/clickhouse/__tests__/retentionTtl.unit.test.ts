@@ -154,6 +154,6 @@ describe("gateway_spend retention exemption", () => {
     expect(migration).toContain(
       "TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE",
     );
-    expect(migration).not.toContain("_retention_days UInt16");
+    expect(migration).not.toContain("_retention_days");
   });
 });

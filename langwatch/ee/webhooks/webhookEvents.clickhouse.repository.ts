@@ -1,59 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import {
+  mapSpendEventRow,
+  SPEND_ROW_COLUMNS,
+  type SpendEventRow,
+} from "~/server/gateway/spendEvents.clickhouse.repository";
 
 const SPEND_TABLE = "gateway_spend" as const;
-
-const logger = createLogger("langwatch:webhooks:events-repository");
 
 export interface EmittedEventsPage {
   rows: SpendEventRow[];
   /** Opaque continuation: pass back to read the next page; null at the end. */
   nextCursor: string | null;
-}
-
-const SPEND_COLUMNS = `
-  TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
-  PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
-  TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-  TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
-  HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
-  DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
-
-function mapSpendRow(r: Record<string, unknown>): SpendEventRow {
-  const nano = Number(r.CostNanoUSD ?? 0);
-  return {
-    tenantId: String(r.TenantId),
-    gatewayRequestId: String(r.GatewayRequestId),
-    organizationId: String(r.OrganizationId),
-    teamId: "",
-    virtualKeyId: String(r.VirtualKeyId),
-    principalUserId: String(r.PrincipalUserId),
-    endUserId: String(r.EndUserId),
-    traceId: String(r.TraceId),
-    model: String(r.Model),
-    providerKey: String(r.ProviderKey),
-    requestType: String(r.RequestType ?? ""),
-    tokensInput: Number(r.TokensInput),
-    tokensOutput: Number(r.TokensOutput),
-    tokensCacheRead: Number(r.TokensCacheRead),
-    tokensCacheWrite: Number(r.TokensCacheWrite),
-    tokensReasoning: Number(r.TokensReasoning),
-    costNanoUsd: nano,
-    costUsd: (nano / 1_000_000_000).toFixed(6),
-    rateVersion: String(r.RateVersion ?? ""),
-    status: String(r.Status) as SpendEventRow["status"],
-    errorClass: String(r.ErrorClass),
-    httpStatus: Number(r.HttpStatus),
-    needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
-    settleReason: String(r.SettleReason ?? ""),
-    labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
-    metadata: String(r.Metadata ?? ""),
-    durationMs: Number(r.DurationMS),
-    occurredAt: new Date(Number(r.OccurredAtMs)),
-  };
 }
 
 /**
@@ -122,7 +81,7 @@ export class WebhookEventsClickHouseRepository {
 
     const result = await client.query({
       query: `
-        SELECT ${SPEND_COLUMNS}
+        SELECT ${SPEND_ROW_COLUMNS}
         FROM ${SPEND_TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
           AND Status IN {statuses:Array(String)}
@@ -148,7 +107,7 @@ export class WebhookEventsClickHouseRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapSpendRow);
+    const rows = raw.map(mapSpendEventRow);
     const last = rows[rows.length - 1];
     return {
       rows,
