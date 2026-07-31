@@ -1,60 +1,107 @@
 /**
- * tRPC router for /gateway/usage. Read-only — historical spend from
- * the ClickHouse `gateway_budget_ledger_events` table (populated by the
- * trace-fold reactor), grouped by scope / model / day.
+ * tRPC router for /gateway/usage. Read-only — historical spend from the
+ * ClickHouse `trace_summaries` cost path, the same source the keys table's
+ * "Spent this month" column reads, grouped by key / model / day.
+ *
+ * Org-scoped, like the virtual-keys router: usage reads span every project
+ * of the organization because traces land in a key's trace destination,
+ * not in whichever project the viewer has selected. Visibility follows the
+ * same membership rule as the keys table, so the page and the table agree
+ * on which keys exist and what they spent.
  */
+import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import {
   chRepoOrUndefined,
   spendRepoOrUndefined,
 } from "~/server/gateway/clickhouseRepos";
+import { VirtualKeyNotFoundError } from "~/server/gateway/errors";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
+import {
+  isVisibleToMembership,
+  loadMembershipSet,
+} from "~/server/gateway/virtualKey.authz";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
-import { checkProjectPermission } from "../rbac";
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+function usageService(prisma: PrismaClient) {
+  return GatewayUsageService.create({
+    prisma,
+    chRepo: chRepoOrUndefined(),
+    spendRepo: spendRepoOrUndefined(),
+  });
+}
+
 export const gatewayUsageRouter = createTRPCRouter({
+  // Membership-based like virtualKeys.list: the summary totals the keys
+  // the caller can see, so its numbers reconcile with the table a click
+  // arrives from. A non-member sees no keys and gets an empty summary.
   summary: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        organizationId: z.string(),
         fromDate: z.string().datetime(),
         toDate: z.string().datetime(),
       }),
     )
-    .use(checkProjectPermission("gatewayUsage:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create({
-        prisma: ctx.prisma,
-        chRepo: chRepoOrUndefined(),
-        spendRepo: spendRepoOrUndefined(),
-      });
-      return service.summary(input.projectId, {
-        fromDate: new Date(input.fromDate),
-        toDate: new Date(input.toDate),
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      const keys = (
+        await VirtualKeyService.create(ctx.prisma).getAll(input.organizationId)
+      ).filter((vk) => isVisibleToMembership(membership, vk.scopes));
+      return usageService(ctx.prisma).summary({
+        organizationId: input.organizationId,
+        virtualKeyIds: keys.map((k) => k.id),
+        window: {
+          fromDate: new Date(input.fromDate),
+          toDate: new Date(input.toDate),
+        },
       });
     }),
 
   summaryForVirtualKey: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        organizationId: z.string(),
         virtualKeyId: z.string(),
         fromDate: z.string().datetime(),
         toDate: z.string().datetime(),
       }),
     )
-    .use(checkProjectPermission("virtualKeys:view"))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create({
-        prisma: ctx.prisma,
-        chRepo: chRepoOrUndefined(),
-        spendRepo: spendRepoOrUndefined(),
-      });
-      return service.summaryForVirtualKey(input.projectId, input.virtualKeyId, {
-        fromDate: new Date(input.fromDate),
-        toDate: new Date(input.toDate),
+      // Same visibility rule as virtualKeys.get: a key the caller can't
+      // see is indistinguishable from one that doesn't exist.
+      const vk = await VirtualKeyService.create(ctx.prisma).getById(
+        input.virtualKeyId,
+        input.organizationId,
+      );
+      if (!vk) {
+        throw new VirtualKeyNotFoundError();
+      }
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      if (!isVisibleToMembership(membership, vk.scopes)) {
+        throw new VirtualKeyNotFoundError();
+      }
+      return usageService(ctx.prisma).summaryForVirtualKey({
+        organizationId: input.organizationId,
+        virtualKeyId: input.virtualKeyId,
+        window: {
+          fromDate: new Date(input.fromDate),
+          toDate: new Date(input.toDate),
+        },
       });
     }),
 });

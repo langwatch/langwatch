@@ -371,6 +371,30 @@ Feature: AI Gateway — Budgets
     Then the total, the per-day split and the per-model split all come from the same source
     # A total that disagrees with its own breakdown is worse than either.
 
+  @integration
+  Scenario: Spend that lands in the key's trace project is visible from anywhere in the organization
+    Given an organization-scoped key whose traces land in its trace project
+    When its usage is read while another project is selected
+    Then the Usage page reports the same spend the keys table shows
+    # Traces carry the tenant of the key's trace destination (for org- and
+    # team-scoped keys, the governance project), not of whichever project
+    # the viewer happens to have selected. Usage reads span the
+    # organization's projects for exactly the reason the spend column does;
+    # reading one project is how the page said "No usage" under a table
+    # full of spend.
+
+  @integration
+  Scenario: Changing the window or clearing the key filter keeps the browser on the usage page
+    Given the usage page is open filtered to one key
+    When the key filter is cleared or a different window is picked
+    Then the browser is still on the gateway usage page
+    And only the query string changed
+    # The filter controls rebuild their URL from the resolved route
+    # pattern. When the pattern resolver had no literal entry for the
+    # usage page, the /settings wildcard won and the rebuilt URL collapsed
+    # to the bare settings root, dropping the person out of the page they
+    # were filtering.
+
   # ============================================================================
   # Making a budget that cannot work visible
   # ============================================================================
