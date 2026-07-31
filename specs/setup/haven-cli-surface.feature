@@ -22,9 +22,11 @@ Feature: haven CLI surface
     And "--json" emits the same report machine-readably
     And no other command or subcommand is named "status"
 
+  # Where bare haven lands is specced in haven-lifecycle-usability.feature
+  # ("Bare haven opens this worktree's stack when it is up").
   @integration @unimplemented
   Scenario: Bare haven opens the hub
-    Given a terminal
+    Given a terminal, in a worktree with no stack of its own running
     When the developer runs "haven"
     Then the interactive hub shows every stack with health, RAM, and actions
     And in agent mode or a pipe the same invocation prints the plain status report instead

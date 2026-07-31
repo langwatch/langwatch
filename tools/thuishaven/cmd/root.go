@@ -6,6 +6,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -48,17 +49,23 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	}
 
 	d := wire(logger, isAgent)
+	d.agentAsked = agentWasAsked(hasAgentFlag)
 
 	// SIGINT/SIGTERM cancel the context. Supervisors hard-kill child process
 	// groups immediately; command cleanup then deregisters routes and resources.
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Bare `haven`: the interactive hub in a terminal, the plain stack list when
-	// driven by an agent/pipe.
+	// Bare `haven`: this worktree's own stack when it is up, the interactive hub
+	// otherwise, and the plain stack list when driven by an agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
 			return d.orch.Status(true, d.worktree)
+		}
+		// You ran haven from a worktree whose stack is live: the thing you came to
+		// look at is that stack, not the fleet. `f` in the view still opens the hub.
+		if slug, live := d.orch.LiveStackForWorktree(d.params); live {
+			return attachToStack(ctx, d, attachTarget{slug: slug})
 		}
 		return runHub(ctx, d)
 	}
@@ -91,6 +98,9 @@ type deps struct {
 	worktree string
 	lwDir    string
 	isAgent  bool
+	// agentAsked is isAgent minus the "stdout is not a terminal" inference — see
+	// agentWasAsked. Only `haven switch` reads it.
+	agentAsked bool
 }
 
 // wire builds every adapter and injects them into the application core. It is the
@@ -297,10 +307,7 @@ func rejectRemovedSelectionEnv() error {
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
 // non-terminal stdout — unless FORCE_COLOR asks us to keep color under a pipe.
 func resolveAgent() bool {
-	if os.Getenv("HAVEN_AGENT") == "1" {
-		return true
-	}
-	if os.Getenv("NO_COLOR") != "" {
+	if agentWasAsked(false) {
 		return true
 	}
 	if os.Getenv("FORCE_COLOR") != "" {
@@ -308,6 +315,29 @@ func resolveAgent() bool {
 	}
 	fi, err := os.Stdout.Stat()
 	return err != nil || fi.Mode()&os.ModeCharDevice == 0
+}
+
+// agentWasAsked is agent mode ASKED for — the flag, HAVEN_AGENT, or NO_COLOR —
+// as opposed to inferred from a non-terminal stdout.
+//
+// One command needs the distinction. `haven switch` exists to be used inside
+// `cd "$(haven switch)"`, where stdout is a pipe by construction: there, a
+// captured stdout means "a shell is reading my answer", not "no human is
+// watching". Everything else is right to conflate the two.
+func agentWasAsked(hasFlag bool) bool {
+	return hasFlag || os.Getenv("HAVEN_AGENT") == "1" || os.Getenv("NO_COLOR") != ""
+}
+
+// terminalAttached reports whether a human is on the other end of the terminal
+// rather than of stdout — stdin to type into and stderr to draw on, which is all
+// an interactive picker needs when its answer goes down a pipe.
+func terminalAttached() bool {
+	return isCharDevice(os.Stdin) && isCharDevice(os.Stderr)
+}
+
+func isCharDevice(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 func havenHome() string {
@@ -436,51 +466,68 @@ func runHavenUpIn(ctx context.Context, dir string, untrustedCheckout bool) error
 	return cmd.Run()
 }
 
-// runSwitch resolves a worktree by name and prints its directory. A process
-// cannot change its parent shell's cwd, so the actual cd happens in the shell
-// function `haven shell-init` emits — this command just answers "where".
-func runSwitch(d deps, inv invocation) error {
+// runSwitch resolves a worktree — by name, or by picking one — and prints its
+// directory on stdout. A process cannot change its parent shell's cwd, so the
+// actual cd happens in the shell function `haven shell-init` emits; this
+// command only ever answers "where", which is why the answer is the whole of
+// stdout and everything else it says goes to stderr.
+func runSwitch(ctx context.Context, d deps, inv invocation) error {
+	targets := d.orch.SwitchTargets(d.worktree)
 	if inv.has("--list") {
-		for _, t := range d.orch.SwitchTargets(d.worktree) {
+		for _, t := range targets {
 			fmt.Println(t.Name)
 		}
 		return nil
 	}
-	query := ""
 	if len(inv.args) > 0 {
-		query = inv.args[0]
-	}
-	if query == "" {
-		fmt.Println("Switchable worktrees (● = up):")
-		for _, t := range d.orch.SwitchTargets(d.worktree) {
-			mark := " "
-			if t.IsUp {
-				mark = "●"
-			}
-			fmt.Printf("  %s %-28s %s\n", mark, t.Name, t.Dir)
+		dir, err := d.orch.ResolveSwitch(d.worktree, inv.args[0])
+		if err != nil {
+			return err
 		}
-		fmt.Println("\nTo make `haven switch <name>` cd your shell, add to ~/.zshrc:")
-		fmt.Println(`  eval "$(haven shell-init)"`)
+		fmt.Println(dir)
 		return nil
 	}
-	dir, err := d.orch.ResolveSwitch(d.worktree, query)
-	if err != nil {
-		return err
+	if len(targets) == 0 {
+		return fmt.Errorf("no stacks or worktrees to switch to")
 	}
-	fmt.Println(dir)
+	// No name: pick one. The picker draws on stderr and answers on stdout, so it
+	// works exactly the same whether a shell is capturing the answer or not.
+	if !d.agentAsked && terminalAttached() {
+		return pickSwitchTarget(ctx, targets)
+	}
+	printSwitchTargets(os.Stdout, targets)
 	return nil
 }
 
+// printSwitchTargets is the plain list an agent or a pipe gets instead of the
+// picker: up stacks first, marked, with the directory that would be printed.
+func printSwitchTargets(w io.Writer, targets []app.SwitchTarget) {
+	fmt.Fprintln(w, "Switchable worktrees (● = up):")
+	for _, t := range targets {
+		mark := " "
+		if t.IsUp {
+			mark = "●"
+		}
+		fmt.Fprintf(w, "  %s %-28s %s\n", mark, t.Name, t.Dir)
+	}
+	fmt.Fprintln(w, "\nTo make `haven switch` cd your shell, add to ~/.zshrc:")
+	fmt.Fprintln(w, `  eval "$(haven shell-init)"`)
+}
+
 // shellInitScript is what `eval "$(haven shell-init)"` installs: a haven()
-// wrapper that turns `haven switch <name>` into a real cd, plus zsh completion
-// of the worktree names.
+// wrapper that turns `haven switch` — picked or named — into a real cd, plus
+// zsh completion of the worktree names. Flags are handed straight through, so
+// `haven switch --list` still prints names rather than being cd'd into.
 const shellInitScript = `haven() {
   case "$1" in
     switch)
       shift
-      if [ $# -eq 0 ]; then command haven switch; return; fi
+      case "$1" in
+        -*) command haven switch "$@"; return ;;
+      esac
       local dir
       dir="$(command haven switch "$@")" || return
+      [ -n "$dir" ] || return
       cd "$dir"
       ;;
     *) command haven "$@" ;;
@@ -589,11 +636,27 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
-	if err := runUpViewer(ctx, st.slug, preferredGroup(rest), d.sessionActions(st.slug)); err != nil {
+	return attachToStack(ctx, d, attachTarget{slug: st.slug, preferred: preferredGroup(rest)})
+}
+
+// attachToStack opens the attached view on an already-running stack and acts on
+// how it closed. The view is a window, not a leash, so closing it means one of
+// three things and each has its own next step: detach and say how to come back,
+// report the shutdown `d` performed, or hand over to the fleet hub.
+func attachToStack(ctx context.Context, d deps, at attachTarget) error {
+	exit, err := runUpViewer(ctx, at, d.sessionActions(ctx, at.slug))
+	if err != nil {
 		return err
 	}
-	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)
-	fmt.Printf("  logs:   haven logs -t   ·   attach again: haven up   ·   stop: haven down\n")
+	switch exit {
+	case viewerDowned:
+		fmt.Printf("stack %q stopped — its databases are kept   ·   start it again: haven up\n", at.slug)
+	case viewerToHub:
+		return runHub(ctx, d)
+	case viewerDetached:
+		fmt.Printf("detached — stack %q keeps running in the background\n", at.slug)
+		fmt.Printf("  logs:   haven logs -t   ·   attach again: haven   ·   stop: haven down\n")
+	}
 	return nil
 }
 

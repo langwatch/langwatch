@@ -31,9 +31,13 @@ Shared, machine-wide (one daemon, all worktrees):
 
 .localhost resolves to 127.0.0.1 natively (no /etc/hosts, no DNS, no sudo).
 
-Bare "haven" opens the interactive hub: every stack with health, branch, RAM
+Bare "haven" run where this worktree's own stack is up attaches that stack's
+live view — the same screen "haven up" leaves you on, with "f" for the fleet.
+Anywhere else it opens the interactive hub: every stack with health, branch, RAM
 footprint, and actions on the selected one (git view, down, destroy). Agents
 and pipes get the plain stack list instead.
+
+Timestamps are always on your own clock, not the capture's UTC.
 
 One name per command, one meaning per flag — there are no aliases.
 
@@ -145,7 +149,8 @@ EXAMPLES
     haven play 4913              # run PR #4913 in a throwaway sandbox: own databases,
                                  # trust-gated authors; quitting destroys all of it
     haven play                   # pick an open PR to play (terminal only)
-    haven                        # the hub: every stack + actions (git/down/destroy)
+    haven                        # this worktree's stack if it's up, else the hub
+                                 # (in the view: d stops it, f opens the fleet)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
     haven db seed demo           # reseed in place: past onboarding + sample data (drops nothing)
     haven db reset demo          # the same from a fresh database (confirmed)
@@ -155,10 +160,15 @@ EXAMPLES
     haven up --watch             # air hot-reload for gateway + nlp
     haven up --detach            # background with no view; haven logs -t to tail
     haven restart nlp            # bounce one Go service without hot reload
+    haven restart                # bounce every supervised service in place
+    haven restart --unhealthy    # bounce only the ones that stopped answering
+    haven restart --unhealthy -t # ...and watch them come back
     haven logs                   # recent output from every service, interleaved
     haven logs nlp -t            # tail one service live
+    haven logs -n 2000           # more history than the default 200 lines
     haven logs --level warn --since 10m   # only recent warnings and errors
     haven down                   # stop the stack, keep the databases
     haven down --all             # stop everything haven runs on this machine
+    haven switch                 # pick a worktree (up stacks first) and cd there
     haven switch otel            # print the otel-* worktree's dir (cd via shell-init)
 `

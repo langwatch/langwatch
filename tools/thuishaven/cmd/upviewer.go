@@ -34,51 +34,85 @@ const viewerAllGroup = "all"
 const sessionGroup = "session"
 
 // sessionActions is the viewer's window onto the live stack: a cheap snapshot
-// it refreshes on a slow tick, and a bounce it fires on `r`/`a`. Kept as plain
-// callbacks (like the hub's Actions) so the viewer never reaches for the
-// orchestrator directly.
+// it refreshes on a slow tick, a bounce it fires on `r`/`a`, and the shutdown
+// `d` confirms. Kept as plain callbacks (like the hub's Actions) so the viewer
+// never reaches for the orchestrator directly. Down is nil where stopping the
+// stack from the view would be wrong — the play sandbox, whose teardown is its
+// quit contract.
 type sessionActions struct {
 	Snapshot func() app.SessionReport
 	Restart  func(name string) (string, error)
+	Down     func() error
 }
 
-// runUpViewer opens the viewer on a stack's log files until quit or ctx
-// cancel. preferred, when non-empty, names the group to land on as soon as it
-// appears — `haven up +langy` should open looking at langy.
-func runUpViewer(ctx context.Context, slug, preferred string, session sessionActions) error {
-	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
-	m.preferred = preferred
+// viewerExit is why the attached view closed, and so what the caller does next.
+// The view is a window onto a background stack, so "closed" is not one thing:
+// detaching leaves the stack running, `d` stops it, and `f` hands over to the
+// fleet hub.
+type viewerExit int
+
+const (
+	viewerDetached viewerExit = iota
+	viewerDowned
+	viewerToHub
+)
+
+// attachTarget is what the attached view opens on: the stack, and the log group
+// to land on as soon as it appears — `haven up +langy` should open looking at
+// langy, while bare `haven` has no such preference.
+type attachTarget struct {
+	slug      string
+	preferred string
+}
+
+// runUpViewer opens the viewer on a stack's log files until quit or ctx cancel.
+func runUpViewer(ctx context.Context, at attachTarget, session sessionActions) (viewerExit, error) {
+	m := newViewerModel(at.slug, stackLogPath(at.slug), filepath.Join(havenHome(), "logs", at.slug))
+	m.preferred = at.preferred
 	m.enableDashboard(session, false)
 	return runViewer(ctx, m)
 }
 
 // runPlayViewer is the same view over a play sandbox, with the opposite quit
 // contract in its banner: quitting `haven play` destroys the sandbox, it never
-// detaches.
+// detaches. Every way out of this view is that same teardown, so its exit
+// reason carries no information and is discarded.
 func runPlayViewer(ctx context.Context, slug string, session sessionActions) error {
 	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
 	m.banner = fmt.Sprintf("\x1b[1m haven play\x1b[0m \x1b[2m· %s · EPHEMERAL sandbox · q quits and DESTROYS it (databases, containers, checkout)\x1b[0m\n", slug)
 	m.enableDashboard(session, true)
-	return runViewer(ctx, m)
+	_, err := runViewer(ctx, m)
+	return err
 }
 
 // sessionActions adapts the orchestrator to the dashboard's callback surface —
-// the same shape the hub uses. Snapshot is the cheap live probe; Restart is the
-// quiet bounce that returns a summary instead of printing into the alt-screen.
-func (d deps) sessionActions(slug string) sessionActions {
+// the same shape the hub uses. Snapshot is the cheap live probe, Restart the
+// quiet bounce that returns a summary instead of printing into the alt-screen,
+// and Down the same stop the hub's `d` performs, databases kept.
+func (d deps) sessionActions(ctx context.Context, slug string) sessionActions {
 	return sessionActions{
 		Snapshot: func() app.SessionReport { return d.orch.SessionSnapshot(slug) },
 		Restart:  func(name string) (string, error) { return d.orch.RestartStackQuiet(slug, name) },
+		Down:     func() error { return d.orch.DownStack(ctx, slug) },
 	}
 }
 
-func runViewer(ctx context.Context, m *viewerModel) error {
+func runViewer(ctx context.Context, m *viewerModel) (viewerExit, error) {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx))
-	_, err := p.Run()
-	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean quit
-		return nil
+	out, err := p.Run()
+	// Ctrl-C via the signal context is a clean quit, and it is the interrupt
+	// rather than whatever bubbletea reported that decides so — a detach must
+	// not exit non-zero.
+	if ctx.Err() != nil {
+		return viewerDetached, nil //nolint:nilerr // an interrupted view detached; that is success
 	}
-	return err
+	if err != nil {
+		return viewerDetached, err
+	}
+	if final, ok := out.(*viewerModel); ok {
+		return final.exit, nil
+	}
+	return viewerDetached, nil
 }
 
 type viewerTickMsg struct{}
@@ -89,6 +123,10 @@ type restartDoneMsg struct {
 	summary string
 	err     error
 }
+
+// downDoneMsg carries the shutdown's outcome back the same way. A clean one
+// closes the view: there is no longer a stack to be a window onto.
+type downDoneMsg struct{ err error }
 
 type viewerModel struct {
 	slug     string
@@ -115,6 +153,12 @@ type viewerModel struct {
 	toast         string // transient action feedback
 	toastTTL      int    // refresh ticks the toast still shows for
 	tickN         int    // refresh counter, so the snapshot polls on a slow beat
+	// confirmDown is the modal y/n in front of `d`. Unlike the toast it does not
+	// expire: a prompt that vanished on a timer would leave the next keypress
+	// meaning something else than what the screen said.
+	confirmDown bool
+	// exit is why the view closed, read by the caller once the program ends.
+	exit viewerExit
 
 	width, height int
 }
@@ -167,15 +211,26 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.snap = m.session.Snapshot()
 		}
 		return m, nil
+	case downDoneMsg:
+		if msg.err != nil {
+			m.setToast("down failed: " + msg.err.Error())
+			return m, nil
+		}
+		m.exit = viewerDowned
+		return m, tea.Quit
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
 	}
 	return m, nil
 }
 
-// handleKey routes a keypress: dashboard row actions first when the session tab
-// is showing, then the tab-navigation and quit bindings shared by every tab.
+// handleKey routes a keypress: the shutdown confirmation while it is open,
+// then dashboard row actions when the session tab is showing, then the
+// tab-navigation and quit bindings shared by every tab.
 func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
+	if m.confirmDown {
+		return m.handleDownConfirm(s)
+	}
 	if m.onDashboard() {
 		switch s {
 		case "up", "k":
@@ -195,6 +250,20 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 			return m, m.restartSelected()
 		case "a":
 			return m, m.restartAll()
+		case "d":
+			m.askDown()
+			return m, nil
+		case "f":
+			// The way to the fleet hub. Bare `haven` opens this view when the
+			// worktree's own stack is up, so without it the cross-worktree view
+			// would have no way in from a live worktree. Like the other stack
+			// actions it lives on the dashboard tab, where the footer names it, and
+			// never on a play sandbox, where leaving means destroying.
+			if !m.canLeaveForHub() {
+				return m, nil
+			}
+			m.exit = viewerToHub
+			return m, tea.Quit
 		}
 	}
 	switch s {
@@ -273,6 +342,43 @@ func (m *viewerModel) openSelectedLogs() {
 			return
 		}
 	}
+}
+
+// canLeaveForHub reports whether `f` may hand this view over to the fleet hub:
+// only a real session, and never a play sandbox (leaving one destroys it).
+func (m *viewerModel) canLeaveForHub() bool { return m.session != nil && !m.destroyOnQuit }
+
+// canDown reports whether `d` is offered here — a wired shutdown, and not the
+// play sandbox, whose teardown is its quit contract rather than an action.
+func (m *viewerModel) canDown() bool {
+	return m.session != nil && m.session.Down != nil && !m.destroyOnQuit
+}
+
+// askDown arms the shutdown confirmation. Stopping the stack is the one action
+// in this view that outlives it, so it asks first — the same y/n gate the hub
+// puts in front of its own `d`, and the same promise about the databases.
+func (m *viewerModel) askDown() {
+	if !m.canDown() {
+		return
+	}
+	m.confirmDown = true
+	m.toast = ""
+}
+
+// handleDownConfirm answers the y/n prompt. Anything but y cancels, so a
+// mistyped key can never stop a stack.
+func (m *viewerModel) handleDownConfirm(s string) (tea.Model, tea.Cmd) {
+	m.confirmDown = false
+	if s != "y" && s != "Y" {
+		m.setToast("still running — nothing was stopped")
+		return m, nil
+	}
+	if !m.canDown() {
+		return m, nil
+	}
+	down := m.session.Down
+	m.setToast("stopping " + m.slug + "…")
+	return m, func() tea.Msg { return downDoneMsg{err: down()} }
 }
 
 func (m *viewerModel) restartSelected() tea.Cmd {
@@ -524,7 +630,10 @@ func (m *viewerModel) dashboardBody() string {
 	b.WriteString("\n \x1b[1mSHARED\x1b[0m\n")
 	b.WriteString(" " + m.serversLine() + "\n")
 
-	if m.toast != "" {
+	switch {
+	case m.confirmDown:
+		fmt.Fprintf(&b, "\n \x1b[7m shut %s down? its databases are kept · y/n \x1b[0m\n", m.slug)
+	case m.toast != "":
 		b.WriteString("\n \x1b[7m " + m.toast + " \x1b[0m\n")
 	}
 
@@ -594,11 +703,18 @@ func (m *viewerModel) serversLine() string {
 }
 
 func (m *viewerModel) footerHint() string {
+	hint := "→/tab logs · 1-9 jump"
+	if m.canDown() {
+		hint += " · d down (keeps data)"
+	}
+	if m.canLeaveForHub() {
+		hint += " · f fleet"
+	}
 	quit := "q detaches (stack keeps running)"
 	if m.destroyOnQuit {
 		quit = "\x1b[31mq quits and DESTROYS the sandbox\x1b[0m"
 	}
-	return "\x1b[2m→/tab logs · 1-9 jump · " + quit + "\x1b[0m"
+	return "\x1b[2m" + hint + " · " + quit + "\x1b[0m"
 }
 
 // headerBlock is the wordmark and ASCII harbour at the top of tab one: a

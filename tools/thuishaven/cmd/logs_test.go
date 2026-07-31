@@ -138,6 +138,91 @@ func TestFilterLogLines(t *testing.T) {
 	})
 }
 
+// The sink stamps every line in UTC and time.Parse hands it back in UTC, so
+// formatting it as-is reported live output as hours old anywhere but Britain in
+// winter — which reads as a stale capture rather than as a timezone.
+//
+// @scenario "Timestamps are on the reader's own clock"
+func TestFormatLogLineUsesTheLocalClock(t *testing.T) {
+	// A fixed zone rather than the test machine's: the assertion has to fail on a
+	// UTC CI box too, or it pins nothing.
+	amsterdam := time.FixedZone("CEST", 2*60*60)
+	instant := time.Date(2026, 7, 30, 23, 37, 33, 0, time.UTC)
+
+	t.Run("given a line captured in UTC and a reader two hours ahead", func(t *testing.T) {
+		t.Run("when the line is rendered", func(t *testing.T) {
+			got := formatLogLineIn(logLine{ts: instant, service: "app", text: "hello"}, true, amsterdam)
+			if !strings.HasPrefix(got, "01:37:33") {
+				t.Errorf("rendered %q, want the reader's 01:37:33 — a UTC column reads as hours-old output", got)
+			}
+		})
+	})
+
+	t.Run("given the same line and a reader in UTC", func(t *testing.T) {
+		t.Run("when the line is rendered", func(t *testing.T) {
+			got := formatLogLineIn(logLine{ts: instant, service: "app", text: "hello"}, true, time.UTC)
+			if !strings.HasPrefix(got, "23:37:33") {
+				t.Errorf("rendered %q, want 23:37:33", got)
+			}
+		})
+	})
+}
+
+// @scenario "How much history is a flag, and the clipping is stated"
+func TestLogLineLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		raw     string
+		want    int
+		wantErr bool
+	}{
+		{name: "unset falls back to the default window", raw: "", want: logsTailLines},
+		{name: "a count is used as given", raw: "50", want: 50},
+		{name: "zero means every line the bounded read produced", raw: "0", want: 0},
+		{name: "a negative count is refused", raw: "-3", wantErr: true},
+		{name: "a non-number is refused", raw: "lots", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := logLineLimit(tc.raw)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("logLineLimit(%q) = %d, want an error", tc.raw, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("logLineLimit(%q): %v", tc.raw, err)
+			}
+			if got != tc.want {
+				t.Errorf("logLineLimit(%q) = %d, want %d", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+// `haven restart -t` follows from where the captures stood before the bounce,
+// so it shows the restart rather than replaying the history that preceded it.
+// @scenario "Restarting can stay attached to what comes next"
+func TestLogEndOffsetsRecordEveryCapturesEnd(t *testing.T) {
+	dir := t.TempDir()
+	writeLog(t, dir, "app", stamp(time.Now())+" before the bounce")
+	writeLog(t, dir, "nlp", stamp(time.Now())+" also before")
+
+	offsets := logEndOffsets(dir)
+	if len(offsets) != 2 {
+		t.Fatalf("offsets = %v, want one per capture", offsets)
+	}
+	for svc, off := range offsets {
+		info, err := os.Stat(filepath.Join(dir, svc+".log"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if off != info.Size() {
+			t.Errorf("%s offset = %d, want the file's end %d", svc, off, info.Size())
+		}
+	}
+}
+
 // @scenario "Logs outlive the stack"
 func TestReadLogTailsIncludesRotatedGeneration(t *testing.T) {
 	dir := t.TempDir()

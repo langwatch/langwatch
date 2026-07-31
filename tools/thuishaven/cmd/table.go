@@ -157,9 +157,12 @@ func flagHint(spec commandSpec) string {
 // fails with a one-line pointer; it never keeps working silently (ADR-064:
 // clean break, no compatibility layer).
 var removed = map[string]string{
-	"ls":            "haven status",
-	"list":          "haven status",
-	"doctor":        "haven status",
+	"ls":   "haven status",
+	"list": "haven status",
+	// doctor was two questions wearing one name. "What is wrong?" is `haven
+	// status`; "fix what is wrong" is `haven restart --unhealthy`, which bounces
+	// exactly the services that stopped answering (add -t to watch them come back).
+	"doctor":        "haven status to see what is wrong, haven restart --unhealthy to bounce just those services",
 	"watch":         "haven status (or bare `haven` for the live hub)",
 	"hub":           "haven (bare)",
 	"ps":            "haven",
@@ -238,19 +241,15 @@ var table = []commandSpec{
 	},
 	{
 		name:    "restart",
-		summary: "bounce one supervised service (or all) without tearing the stack down",
+		summary: "bounce this stack's services in place: all of them, one, or only the unhealthy ones",
 		args:    "[service]",
 		maxArgs: 1,
 		flags: []flagSpec{
+			{long: "--unhealthy", summary: "bounce only the services whose port stopped answering"},
+			{long: "--tail", short: "-t", summary: "then stream what the bounced services print"},
 			{long: "--rebuild", summary: "rebuild the image first (haven restart langy --rebuild)"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			name := ""
-			if len(inv.args) > 0 {
-				name = inv.args[0]
-			}
-			return d.orch.Restart(ctx, d.params, name, inv.has("--rebuild"))
-		},
+		run: runRestartCmd,
 	},
 	{
 		name:    "logs",
@@ -259,6 +258,7 @@ var table = []commandSpec{
 		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--tail", short: "-t", summary: "stream live"},
+			{long: "--lines", short: "-n", takesValue: true, value: "<count>", summary: "how much history to print (default 200, 0 for all)"},
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
@@ -345,13 +345,13 @@ var table = []commandSpec{
 	},
 	{
 		name:    "switch",
-		summary: "print a worktree's dir by name (a real cd with haven shell-init)",
+		summary: "print a worktree's dir — by name, or picked from a list, up stacks first",
 		args:    "[name]",
 		maxArgs: 1,
 		flags: []flagSpec{
 			{long: "--list", summary: "names only, for shell completion"},
 		},
-		run: func(_ context.Context, d deps, inv invocation) error { return runSwitch(d, inv) },
+		run: runSwitch,
 	},
 	{
 		name:    "shell-init",

@@ -361,3 +361,137 @@ func TestEscDoesNotDestroyAPlaySandbox(t *testing.T) {
 		})
 	})
 }
+
+// downModel is dashModel with the shutdown action wired — the shape the `up`
+// path injects and the play path deliberately does not.
+func downModel(t *testing.T, down func() error) *viewerModel {
+	t.Helper()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	snap := app.SessionReport{
+		Found: true, Live: true, Slug: "feat-x",
+		Services: []app.SessionServiceStatus{{Name: "app", Restartable: true}},
+	}
+	m.enableDashboard(sessionActions{
+		Snapshot: func() app.SessionReport { return snap },
+		Down:     down,
+	}, false)
+	return m
+}
+
+// Stopping the stack is the one action in this view that outlives it, so it
+// asks first — the same y/n gate the hub puts in front of its own `d`.
+// @scenario "The stack can be stopped from the attached view"
+func TestDashboardDownConfirms(t *testing.T) {
+	t.Run("given the dashboard tab with a wired shutdown", func(t *testing.T) {
+		t.Run("when d is pressed, nothing has stopped yet", func(t *testing.T) {
+			called := false
+			m := downModel(t, func() error { called = true; return nil })
+			m.handleKey("d")
+			if !m.confirmDown {
+				t.Fatal("d did not arm the confirmation")
+			}
+			if called {
+				t.Error("d stopped the stack without asking")
+			}
+			if !strings.Contains(m.View(), "y/n") {
+				t.Errorf("the prompt is not on screen:\n%s", m.View())
+			}
+		})
+
+		t.Run("when the confirmation is answered with y, the stack is stopped and the view closes", func(t *testing.T) {
+			called := false
+			m := downModel(t, func() error { called = true; return nil })
+			m.handleKey("d")
+			_, cmd := m.handleKey("y")
+			if cmd == nil {
+				t.Fatal("y did not dispatch the shutdown")
+			}
+			msg, ok := cmd().(downDoneMsg)
+			if !ok || msg.err != nil {
+				t.Fatalf("want a clean downDoneMsg, got %#v", msg)
+			}
+			if !called {
+				t.Error("the shutdown action was never called")
+			}
+			if _, quit := m.Update(msg); quit == nil {
+				t.Error("a clean shutdown must close the view — there is no stack left to watch")
+			}
+			if m.exit != viewerDowned {
+				t.Errorf("exit = %v, want viewerDowned so the caller says the stack stopped", m.exit)
+			}
+		})
+
+		t.Run("when the confirmation is answered with anything else, nothing stops", func(t *testing.T) {
+			called := false
+			m := downModel(t, func() error { called = true; return nil })
+			m.handleKey("d")
+			m.handleKey("n")
+			if called {
+				t.Error("a key other than y stopped the stack")
+			}
+			if m.confirmDown {
+				t.Error("the prompt is still armed after being answered")
+			}
+		})
+
+		// While the prompt is up, every other key answers it. A tab switch that
+		// left it armed would make the next keypress mean something the screen
+		// no longer says.
+		t.Run("when another key is pressed while the prompt is up, it answers the prompt", func(t *testing.T) {
+			m := downModel(t, func() error { return nil })
+			m.handleKey("d")
+			before := m.selected
+			m.handleKey("tab")
+			if m.selected != before {
+				t.Error("tab switched tabs while the shutdown prompt was open")
+			}
+			if m.confirmDown {
+				t.Error("the prompt survived a keypress")
+			}
+		})
+	})
+
+	// A play sandbox is torn down by quitting, not by an action; offering `d`
+	// there would be a second, differently-worded way to destroy it.
+	t.Run("given the play viewer", func(t *testing.T) {
+		m := newViewerModel("play-42", "", "")
+		m.enableDashboard(sessionActions{Down: func() error { return nil }}, true)
+		if m.canDown() {
+			t.Error("the play sandbox offers d — its teardown is the quit contract")
+		}
+		m.handleKey("d")
+		if m.confirmDown {
+			t.Error("d armed a shutdown on a play sandbox")
+		}
+	})
+}
+
+// Bare `haven` opens this view when the worktree's stack is up, so the fleet
+// hub needs a way in from here or it becomes unreachable from a live worktree.
+// @scenario "Bare haven opens this worktree's stack when it is up"
+func TestViewerHandsOverToTheFleetHub(t *testing.T) {
+	t.Run("given the up viewer", func(t *testing.T) {
+		m := downModel(t, func() error { return nil })
+		_, cmd := m.handleKey("f")
+		if cmd == nil {
+			t.Fatal("f did not close the view")
+		}
+		if msg := cmd(); msg != (tea.QuitMsg{}) {
+			t.Errorf("f returned %T, want tea.Quit", msg)
+		}
+		if m.exit != viewerToHub {
+			t.Errorf("exit = %v, want viewerToHub", m.exit)
+		}
+		if !strings.Contains(m.View(), "f fleet") {
+			t.Errorf("the footer does not name f:\n%s", m.View())
+		}
+	})
+
+	t.Run("given the play viewer, where leaving destroys the sandbox", func(t *testing.T) {
+		m := newViewerModel("play-42", "", "")
+		m.enableDashboard(sessionActions{}, true)
+		if _, cmd := m.handleKey("f"); cmd != nil {
+			t.Error("f closed a play viewer — leaving one destroys it, so it is not a navigation key")
+		}
+	})
+}

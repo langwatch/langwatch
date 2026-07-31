@@ -139,7 +139,11 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	if err := app.WritePlayRecord(havenHome(), rec); err != nil {
 		return fmt.Errorf("recording the sandbox launcher: %w", err)
 	}
-	if err := runPlayViewer(ctx, rec.Slug, d.sessionActions(rec.Slug)); err != nil {
+	// A sandbox has exactly one way out — quitting the view tears it down — so it
+	// is handed the session surface without the shutdown action `up` offers.
+	actions := d.sessionActions(ctx, rec.Slug)
+	actions.Down = nil
+	if err := runPlayViewer(ctx, rec.Slug, actions); err != nil {
 		return err
 	}
 	return teardown()

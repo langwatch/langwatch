@@ -54,6 +54,27 @@ Feature: haven lifecycle usability
     Then every locally-run service is bounced
     And baseline fallbacks and the shared database servers are untouched
 
+  # "What is wrong?" and "fix what is wrong" were one word (doctor) that only
+  # ever answered the first. They are `haven status` and this. Bound by
+  # app/restart_test.go and cmd/restart_test.go.
+  @unit
+  Scenario: Restarting is one verb with three scopes
+    When the developer runs "haven restart --unhealthy"
+    Then only the supervised services whose port stopped answering are bounced
+    And a stack where everything answers is told so and left alone
+    And a baseline fallback or shared database server is never bounced, however dead it looks
+    And a service with no port to probe is left alone rather than bounced on a guess
+    And naming a service as well is refused, because the two name different target sets
+    And "haven doctor" fails naming both halves of what it used to mean
+
+  # Bound by cmd/logs_test.go and cmd/restart_test.go.
+  @unit
+  Scenario: Restarting can stay attached to what comes next
+    When the developer runs "haven restart -t"
+    Then the bounce happens and its output streams until interrupted
+    And the stream starts where the captures stood before the bounce, not at the start of their history
+    And "-t" means tail here exactly as it does on "haven logs"
+
   @unit
   Scenario: Up in a terminal never holds the stack hostage
     When the developer runs "haven up" in a terminal
@@ -101,6 +122,31 @@ Feature: haven lifecycle usability
     And "a" bounces every service
     And a managed service refuses with a toast instead of a restart
 
+  # The one action in the attached view that outlives it, so it asks first —
+  # the same y/n gate, and the same promise about the databases, as the hub's
+  # own "d". Bound by cmd/upviewer_test.go.
+  @unit
+  Scenario: The stack can be stopped from the attached view
+    Given the dashboard tab is showing
+    When the developer presses "d"
+    Then the view asks to confirm and states that the databases are kept
+    And only "y" stops the stack — any other key cancels it
+    And a stopped stack closes the view, which reports the stop instead of a detach
+    And the play sandbox never offers it, because quitting is already its teardown
+
+  # Bare haven used to always mean the fleet. In a worktree whose own stack is
+  # up, the thing you came to look at is that stack. Bound by app/restart_test.go
+  # (which stack is live) and cmd/upviewer_test.go (the way back).
+  @unit
+  Scenario: Bare haven opens this worktree's stack when it is up
+    Given this worktree's stack is running
+    When the developer runs bare "haven" in a terminal
+    Then that stack's attached view opens, as if they had run "haven up"
+    And a registered stack whose launcher has died is not treated as up
+    And a worktree with no stack of its own still opens the fleet hub
+    And "f" in the attached view crosses over to the fleet hub
+    And the play sandbox never offers it, because leaving one destroys it
+
   # The attached viewer takes the alt-screen, so it can only ever be for a human
   # terminal. Everything else streams plainly, and because that path never
   # backgrounds the launcher the stack is this process's own children.
@@ -130,3 +176,15 @@ Feature: haven lifecycle usability
     Then the shell changes directory to that worktree
     And a prefix matching several worktrees names them all rather than picking one
     And a name matching none lists what there is
+
+  # A process cannot cd its parent shell, so the answer has to leave through
+  # stdout — which means stdout is a pipe in every real use and the picker has
+  # to draw somewhere else. Bound by app/switch_test.go and cmd/root_test.go.
+  @unit
+  Scenario: Switching to a worktree without knowing its name
+    When the developer runs "haven switch" with no name in a terminal
+    Then a picker lists every worktree with the live stacks first
+    And choosing one prints its directory as the whole of stdout
+    And the picker itself is drawn on stderr, so "cd $(haven switch)" works with no setup
+    And quitting without choosing prints nothing and fails nothing
+    And an agent or a pipe with no terminal gets the plain list instead

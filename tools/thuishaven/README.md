@@ -56,22 +56,27 @@ One name per command, one meaning per flag, no aliases (ADR-064). The daily
 surface is six verbs; `db` and `clean` are the only destructive nouns.
 
 ```text
-haven            the hub: every stack + actions on the selected one (agents/pipes
-                 get the plain status report)
+haven            this worktree's own stack when it is up — the same attached view
+                 haven up leaves you on — and the fleet hub anywhere else
+                 (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
-                 switch between "all" and per-service logs, q detaches (the stack
-                 keeps running; haven down stops it). +svc/-svc picks services and
+                 switch between "all" and per-service logs, d stops the stack
+                 (databases kept), f opens the fleet, q detaches (the stack keeps
+                 running). +svc/-svc picks services and
                  sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
                  app + nlp + gateway, langy off. -w watches the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
-haven restart    bounce one supervised service (or all) in place; `restart obs`
-                 bounces the observability stack; `restart langy --rebuild`
-                 re-images first
+haven restart    bounce this stack's supervised services in place: all of them,
+                 one by name, or `--unhealthy` for only the ones whose port
+                 stopped answering; -t then streams what they print next.
+                 `restart obs` bounces the observability stack; `restart langy
+                 --rebuild` re-images first
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
+                 -n <count> sets how much history (default 200, 0 for all),
                  --since 10m windows, --level warn filters severity,
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,
@@ -94,8 +99,9 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  after it discloses that the code runs as you, from this
                  shell's environment (--allow-untrusted in agent mode)
 haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
-haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
-                 it becomes a real cd, tab-completed
+haven switch     print a worktree's dir — named, or picked from a list with the
+                 live stacks first; with `eval "$(haven shell-init)"` it becomes
+                 a real cd, tab-completed
 haven shell-init emit that shell function + completion
 haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
@@ -121,15 +127,39 @@ ever dropped silently.
 **Logs.** The supervisor captures every service's output to per-service,
 size-capped files whether the stack runs attached or detached — so `haven
 logs` works from any terminal, filters by plain argument, and still reads
-after a crash or a `down`.
+after a crash or a `down`. Lines are captured in UTC and **rendered on your own
+clock**, so a line printed a second ago reads as a second ago. A plain `haven
+logs` shows the newest 200 lines and says so when it clipped; `-n <count>`
+(or `-n 0`) asks for more.
 
-**The hub.** Bare `haven` opens the interactive fleet view:
-every stack with its liveness, branch, service health, and RAM footprint.
-Actions run on the selected stack — enter/`g` opens its git view (and returns
-to the hub on quit), `d` shuts it down keeping its databases, and `x` destroys
-the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
-directory deleted, confirmed by typing the stack's name. The primary checkout
-and the worktree haven runs from can never be destroyed.
+If a stack looks quiet, check whether the observability stack is up: while it
+is, haven holds the app's console at `warn` (`LW_OBS_CONSOLE_LEVEL`) because the
+full info/debug stream is in Grafana. That is a floor on what is *captured*, not
+a filter in `haven logs` — see `dev/docs/best_practices/local-observability.md`.
+
+**Where bare `haven` lands.** Run it in a worktree whose own stack is up and it
+attaches that stack's live view — the screen you came to look at, the same one
+`haven up` leaves you on. Run it anywhere else and it opens the interactive
+fleet view: every stack with its liveness, branch, service health, and RAM
+footprint. `f` inside the attached view crosses from one to the other.
+
+In the fleet view, actions run on the selected stack — enter/`g` opens its git
+view (and returns to the hub on quit), `d` shuts it down keeping its databases,
+and `x` destroys the worktree entirely: stack stopped, ClickHouse + Postgres
+databases dropped, directory deleted, confirmed by typing the stack's name. The
+primary checkout and the worktree haven runs from can never be destroyed. In the
+attached view, `d` is the same shutdown for the stack you are watching, `r`/`a`
+bounce a service or all of them, and `q` merely detaches.
+
+**Restarting, and healing.** One verb, three scopes. `haven restart` bounces
+every supervised child of this worktree's stack in place; `haven restart nlp`
+bounces one; `haven restart --unhealthy` bounces only the children whose port
+has stopped answering, and prints that nothing needed it when the stack is
+healthy. Add `-t` to any of them to stay attached to what the bounced services
+print next — it follows from where the captures stood *before* the bounce, so
+you see the restart rather than a replay of the history that led to it. There is
+no `haven doctor`: it was two questions wearing one name, and they are `haven
+status` (what is wrong) and `haven restart --unhealthy` (fix it).
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
@@ -164,6 +194,23 @@ access; anyone without it (including commits with no GitHub account) stops
 play for an explicit default-no confirmation, and in agent mode only
 `--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
 record and finishes the teardown.
+
+**Moving between worktrees.** A process cannot change its parent shell's
+directory, so `haven switch` answers *where* and the shell does the moving. Bare
+`haven switch` in a terminal opens a picker — every worktree, live stacks first,
+`●` for the ones that are up — and prints the chosen directory on stdout; naming
+one (`haven switch otel`, unique prefix or substring) skips the picker. The
+picker draws on stderr precisely so the answer can travel down a pipe:
+
+```bash
+cd "$(haven switch)"                 # works with no setup at all
+eval "$(haven shell-init)"           # …or install the wrapper, once
+```
+
+With the wrapper in `~/.zshrc`, `haven switch` (picked) and `haven switch <name>`
+both become a real `cd`, tab-completed from `haven switch --list`; flags are
+handed straight through, so `--list` still just prints names. Agents and pipes
+with no terminal get the plain list instead of the picker.
 
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current
