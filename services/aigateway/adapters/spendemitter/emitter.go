@@ -20,21 +20,21 @@ func NewEmitter(spool *Spool) *Emitter { return &Emitter{spool: spool} }
 func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 	payload := AdmittedPayload{
 		GatewayRequestID: a.GatewayRequestID,
-		OccurredAt:       a.OccurredAt.UTC(),
+		OccurredAtUnixMs: a.OccurredAt.UTC().UnixMilli(),
 		OrganizationID:   a.OrganizationID,
 		ProjectID:        a.ProjectID,
 		VirtualKeyID:     a.VirtualKeyID,
 		EndUserID:        a.EndUserID,
+		TraceID:          a.TraceID,
 		Model:            a.Model,
 		RequestType:      a.RequestType,
 		Labels:           a.Labels,
 	}
-	// The echo is caller-controlled; invalid bytes inside a RawMessage would
-	// invalidate the WHOLE record's JSON, losing the admission for a bad
-	// header. Validate here and drop only the echo.
+	// The echo is caller-controlled; ship it only when it is valid JSON so
+	// a bad header costs the echo, never the admission.
 	if a.MetadataJSON != "" {
 		if json.Valid([]byte(a.MetadataJSON)) {
-			payload.Metadata = json.RawMessage(a.MetadataJSON)
+			payload.Metadata = a.MetadataJSON
 		} else {
 			slog.Warn("spend emitter dropped an invalid metadata echo",
 				"gateway_request_id", a.GatewayRequestID)
@@ -46,7 +46,8 @@ func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 func (e *Emitter) ConfirmSpend(o pipeline.SpendOutcome) {
 	e.append(CommandConfirm, ConfirmedPayload{
 		GatewayRequestID: o.GatewayRequestID,
-		OccurredAt:       o.OccurredAt.UTC(),
+		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
+		ProjectID:        o.ProjectID,
 		Usage: usageFromDomain(
 			o.Usage.PromptTokens,
 			o.Usage.CompletionTokens,
@@ -67,7 +68,8 @@ func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 	}
 	e.append(CommandFail, FailedPayload{
 		GatewayRequestID: o.GatewayRequestID,
-		OccurredAt:       o.OccurredAt.UTC(),
+		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
+		ProjectID:        o.ProjectID,
 		Error:            errPayload,
 		Usage: usageFromDomain(
 			o.Usage.PromptTokens,

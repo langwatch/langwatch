@@ -9,6 +9,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // SpendAdmission records that a request entered the gateway, before any
@@ -20,10 +21,13 @@ type SpendAdmission struct {
 	ProjectID        string
 	VirtualKeyID     string
 	EndUserID        string
-	Model            string
-	RequestType      string
-	Labels           []string
-	MetadataJSON     string
+	// TraceID joins the spend record to the request's trace without
+	// depending on the span pipeline having delivered it.
+	TraceID      string
+	Model        string
+	RequestType  string
+	Labels       []string
+	MetadataJSON string
 }
 
 // SpendError is the full error taxonomy token plus the HTTP status the
@@ -39,11 +43,14 @@ type SpendError struct {
 type SpendOutcome struct {
 	GatewayRequestID string
 	OccurredAt       time.Time
-	Err              *SpendError
-	Usage            domain.Usage
-	Model            string
-	ModelProviderID  string
-	Duration         time.Duration
+	// ProjectID is the ingest tenancy key; every record ships it because
+	// the control plane rejects tenantless records per item.
+	ProjectID       string
+	Err             *SpendError
+	Usage           domain.Usage
+	Model           string
+	ModelProviderID string
+	Duration        time.Duration
 }
 
 // SpendEmitter receives spend lifecycle records. Implementations must
@@ -97,6 +104,16 @@ func Spend(emit SpendEmitter) Interceptor {
 	}
 }
 
+// traceIDFrom returns the active trace id, or empty when no span is
+// recording: an all-zeros id must never masquerade as a join key.
+func traceIDFrom(ctx context.Context) string {
+	sc := trace.SpanFromContext(ctx).SpanContext()
+	if !sc.HasTraceID() {
+		return ""
+	}
+	return sc.TraceID().String()
+}
+
 func admissionFor(ctx context.Context, call *Call, at time.Time) SpendAdmission {
 	return SpendAdmission{
 		GatewayRequestID: call.Meta.GatewayRequestID(),
@@ -105,6 +122,7 @@ func admissionFor(ctx context.Context, call *Call, at time.Time) SpendAdmission 
 		ProjectID:        call.Bundle.ProjectID,
 		VirtualKeyID:     call.Bundle.VirtualKeyID,
 		EndUserID:        ResolveEndUser(ctx, call),
+		TraceID:          traceIDFrom(ctx),
 		Model:            call.Request.Model,
 		RequestType:      string(call.Request.Type),
 		Labels:           call.Bundle.Config.VKTags,
@@ -141,6 +159,7 @@ func outcomeFor(call *Call, start time.Time, usage domain.Usage, spendErr *Spend
 	return SpendOutcome{
 		GatewayRequestID: call.Meta.GatewayRequestID(),
 		OccurredAt:       time.Now(),
+		ProjectID:        call.Bundle.ProjectID,
 		Err:              spendErr,
 		Usage:            usage,
 		Model:            model,

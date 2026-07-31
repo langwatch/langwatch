@@ -14,7 +14,6 @@ package spendemitter
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // Command names accepted by the control plane's spend-command ingest.
@@ -49,17 +48,22 @@ type UsagePayload struct {
 // (resolution has not run yet when a request is admitted); the resolved
 // model and the dispatched provider identity travel on the outcome payload.
 type AdmittedPayload struct {
-	GatewayRequestID string            `json:"gateway_request_id"`
-	OccurredAt       time.Time         `json:"occurred_at"`
-	OrganizationID   string            `json:"organization_id"`
-	ProjectID        string            `json:"project_id"`
-	VirtualKeyID     string            `json:"virtual_key_id"`
-	EndUserID        string            `json:"end_user_id,omitempty"`
-	Model            string            `json:"model"`
-	ModelProviderID  string            `json:"model_provider_id,omitempty"`
-	Labels           []string          `json:"labels,omitempty"`
-	Metadata         json.RawMessage   `json:"metadata,omitempty"`
-	RequestType      string            `json:"request_type,omitempty"`
+	GatewayRequestID string   `json:"gateway_request_id"`
+	// Unix epoch MILLISECONDS: the ingest schema types occurred_at as a
+	// bounded integer, never an RFC3339 string.
+	OccurredAtUnixMs int64    `json:"occurred_at"`
+	OrganizationID   string   `json:"organization_id"`
+	ProjectID        string   `json:"project_id"`
+	VirtualKeyID     string   `json:"virtual_key_id"`
+	EndUserID        string   `json:"end_user_id,omitempty"`
+	TraceID          string   `json:"trace_id,omitempty"`
+	Model            string   `json:"model"`
+	ModelProviderID  string   `json:"model_provider_id,omitempty"`
+	Labels           []string `json:"labels,omitempty"`
+	// The caller's metadata echo as its raw JSON TEXT (a string on the
+	// wire), matching the ingest schema's string-typed field.
+	Metadata    string `json:"metadata,omitempty"`
+	RequestType string `json:"request_type,omitempty"`
 }
 
 // ConfirmedPayload records a served request's real quantities. Model and
@@ -67,7 +71,8 @@ type AdmittedPayload struct {
 // after dispatch; the projection applies them absolutely on receipt.
 type ConfirmedPayload struct {
 	GatewayRequestID string       `json:"gateway_request_id"`
-	OccurredAt       time.Time    `json:"occurred_at"`
+	OccurredAtUnixMs int64        `json:"occurred_at"`
+	ProjectID        string       `json:"project_id"`
 	Usage            UsagePayload `json:"usage"`
 	RateVersion      string       `json:"rate_version,omitempty"`
 	Model            string       `json:"model,omitempty"`
@@ -80,7 +85,8 @@ type ConfirmedPayload struct {
 // limit, policy), which admit-then-fail so blocked traffic is visible.
 type FailedPayload struct {
 	GatewayRequestID string       `json:"gateway_request_id"`
-	OccurredAt       time.Time    `json:"occurred_at"`
+	OccurredAtUnixMs int64        `json:"occurred_at"`
+	ProjectID        string       `json:"project_id"`
 	Error            ErrorPayload `json:"error"`
 	Usage            UsagePayload `json:"usage"`
 	Model            string       `json:"model,omitempty"`

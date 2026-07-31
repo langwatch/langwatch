@@ -72,8 +72,12 @@ func TestContractAdmittedPayload(t *testing.T) {
 	assert.Equal(t, "proj_x", payload["project_id"])
 	assert.Equal(t, "vk_lw_01", payload["virtual_key_id"])
 	assert.Equal(t, "d7dcef1e-0755", payload["end_user_id"])
-	assert.Equal(t, "2026-07-27T14:03:07.604Z", payload["occurred_at"])
-	assert.Equal(t, map[string]any{"call_site": "executive_summary"}, payload["metadata"])
+	// The ingest schema types occurred_at as unix epoch MILLISECONDS and
+	// metadata as the raw JSON TEXT (a string). These two assertions ARE
+	// the cross-service wire contract; an RFC3339 string or an inlined
+	// object here means every admission gets rejected at the control plane.
+	assert.Equal(t, float64(at.UnixMilli()), payload["occurred_at"])
+	assert.Equal(t, `{"call_site":"executive_summary"}`, payload["metadata"])
 	assert.Equal(t, []any{"customer:acme-172"}, payload["labels"])
 }
 
@@ -86,6 +90,7 @@ func TestContractConfirmedPayload(t *testing.T) {
 	e.ConfirmSpend(pipeline.SpendOutcome{
 		GatewayRequestID: "req_2",
 		OccurredAt:       time.Date(2026, 7, 27, 14, 3, 11, 0, time.UTC),
+		ProjectID:        "proj_x",
 		Usage: domain.Usage{
 			PromptTokens:        869,
 			CompletionTokens:    207,
@@ -110,6 +115,9 @@ func TestContractConfirmedPayload(t *testing.T) {
 	assert.EqualValues(t, 0, usage["reasoning_tokens"])
 	assert.EqualValues(t, 3878, payload["duration_ms"])
 	assert.Equal(t, "mp_1", payload["model_provider_id"])
+	// Tenancy rides every record: the ingest route rejects (silently, from
+	// the drainer's point of view) any outcome without its project.
+	assert.Equal(t, "proj_x", payload["project_id"])
 	_, hasCost := payload["cost"]
 	assert.False(t, hasCost, "rating happens in the pipeline; cost never travels")
 }

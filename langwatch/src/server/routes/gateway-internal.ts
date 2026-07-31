@@ -1007,6 +1007,12 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     const projectId = wire.project_id;
     if (typeof projectId !== "string" || projectId.length === 0) {
       rejected.push({ index, code: "missing_project_id" });
+      // Every reject path logs: a silent per-record drop looks like a
+      // healthy 200 from the emitter's side and loses billing records.
+      logger.warn(
+        { command: record.command, index },
+        "spend command record rejected: missing project_id",
+      );
       return;
     }
     const { project_id: _projectId, ...rest } = wire;
