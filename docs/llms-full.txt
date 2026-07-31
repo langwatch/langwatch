@@ -722,6 +722,12 @@ A few things to keep in mind:
 - **Retention applies to the underlying data, regardless of references.** If another object — for example a dataset or an evaluation — references an event that has since been deleted, that reference will point to data that no longer exists.
 - **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
 
+## Billing records are exempt
+
+[Gateway spend records](/ai-gateway/billing-events), the per-request billing events platforms use to rebill their own customers, are deliberately **outside** tenant retention. They keep a **fixed 13-month** lifetime regardless of any policy configured here.
+
+Retention policies are customer-shrinkable to weeks and can rewrite existing data retroactively; billing records are invoiceable evidence and must survive both. Shortening your trace retention never deletes spend records, and no policy can extend or shorten their 13-month window. The practical effect: your billing reconciliation window is always 13 months, even when operational traces are kept for far less, and a spend event remains queryable after its underlying trace has aged out (only the trace drill-through is gone).
+
 ## Self-hosted and hybrid instances
 
 Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
@@ -7907,70 +7913,45 @@ If you're curious about the platform side:
 # FILE: ./ai-gateway/governance/retention.mdx
 
 ---
-title: Per-origin retention
-description: Each IngestionSource picks a retention class — `thirty_days` (default, operational), `one_year` (compliance baseline), or `seven_years` (regulated industry). ClickHouse TTL policy honours the class, system-derived from the origin attribute. Same storage, different lifetimes.
+title: Retention
+description: How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
 sidebarTitle: Retention
+keywords: retention, governance data, TTL, billing records, compliance evidence
 ---
 
-LangWatch governance data lives in the same `recorded_spans` + `log_records` tables as every other trace your platform stores. What differs is **retention** — how long the data sticks around before it ages out. Every governance IngestionSource picks one of three retention classes; the trace pipeline writes the class as a denormalised column on each row, and ClickHouse TTL deletes per class.
+Governance data (gateway traces, activity events, audit-relevant spans and log records) lives in the same stores as every other trace your platform ingests, and its lifetime is governed by the same mechanism: **tenant retention policies**. One system, one answer to "how long do we keep it".
 
-## The three classes
+## Tenant retention policies
 
-| `IngestionSource.retentionClass` | Window | Use case |
-|---|---|---|
-| `thirty_days` (default) | 30 days | Day-to-day debugging, dashboards, SOC 2 / ISO 27001 baseline |
-| `one_year` | 1 year | SOC 2 audit window, GDPR right-to-be-forgotten window, EU AI Act general-purpose tier logging |
-| `seven_years` | 7 years | HIPAA-most-uses, financial audit windows, long-form regulated-industry retention |
+Retention is configured per scope under **Settings > Data Retention**: an organization default, overridable per team and per project, most-specific wins. Periods are set in weeks, months, or years; deletion is partition-aligned (whole weeks) and enforced by the storage layer, not by an application worker that could be skipped. Policies can optionally apply retroactively to already-stored data. Configuring retention is an Enterprise capability; other plans use the platform default window.
 
-The `retentionClass` is set at the IngestionSource and stored on the Postgres `IngestionSource` row. It is **system-derived per source**, never user-supplied at OTLP ingest. Customer admins pick the class once at composer time + the receiver stamps `langwatch.governance.retention_class = <class>` on every span / log_record produced by that source.
+The full mechanics, including how deletion works and the self-hosted notes, live on [Platform → Data Retention](/platform/data-retention). Everything there applies to governance-origin data unchanged: a project holding gateway traffic follows its project policy, or its team's, or the organization default.
 
-## Org plan ceiling
+<Note>
+An earlier design attached a per-source retention class to each governance ingestion source. That mechanism was dropped before it shipped anywhere it could be relied on: retention is per organization, team, and project scope, not per source. If your compliance notes reference `retentionClass`, map them to scoped retention policies.
+</Note>
 
-The composer offers all three classes in the dropdown today; backend service-layer enforcement gates the upper tiers behind enterprise plans:
+## What is deliberately exempt: billing records
 
-- **Free / open-source self-host**: `thirty_days` only
-- **Team plan**: `thirty_days`, `one_year`
-- **Enterprise plan**: all three (`thirty_days`, `one_year`, `seven_years`)
+[Spend records](/ai-gateway/billing-events) are **not** governed by tenant retention. They keep a **fixed 13-month** lifetime, declared in their own table definition, exempt from retention policies and from storage tiering configuration, and the exemption is pinned by a unit test.
 
-If a non-Enterprise admin attempts to mint an IngestionSource with `seven_years`, the API responds with a 403 + a clear "upgrade your plan to enable long-form retention" message. The CLI surfaces the same message with an upsell URL.
+The reason is the direction of the risk: tenant retention is customer-shrinkable to weeks and can rewrite existing data retroactively. Billing records are invoiceable evidence; a 35-day tenant policy must never hard-delete the rows a rebilling customer reconciles invoices against. So the billing ledger sits outside the tenant map with its own fixed window, and 13 months is the reconciliation and replay contract stated in the [billing docs](/ai-gateway/billing-events#retention).
 
-## How the TTL works (under the hood)
+The same doctrine covers LangWatch's own usage-metering ledgers. The knock-on worth knowing: trace data and billing data age out independently. A spend event whose underlying trace has aged out of a short tenant window still exists and still reconciles; only the drill-through to the trace is gone.
 
-The trace pipeline's map projections (`spanStorage.mapProjection.ts`, `logRecordStorage.mapProjection.ts`) read `langwatch.governance.retention_class` from each span / log_record's attributes and denormalise it into a `RetentionClass LowCardinality(String) DEFAULT ''` column on `stored_spans` + `stored_log_records`. ClickHouse TTL policy applies per-class:
+## What this means for an auditor
 
-```sql
-TTL StartTime + INTERVAL 30 DAY DELETE WHERE RetentionClass = 'thirty_days',
-    StartTime + INTERVAL 1 YEAR DELETE WHERE RetentionClass = 'one_year',
-    StartTime + INTERVAL 7 YEAR DELETE WHERE RetentionClass = 'seven_years'
-```
-
-Application-origin spans (no `langwatch.governance.retention_class` attribute) keep current default retention behaviour — `RetentionClass = ''` doesn't match any of the per-class TTL clauses, so application traces are unaffected.
-
-### SaaS / cold-storage installs
-
-For installs with `CLICKHOUSE_COLD_STORAGE_ENABLED=true` (LangWatch SaaS, dedicated dataplanes), the `ttlReconciler` extends the per-class DELETE TTL with a cold-storage MOVE TTL into a single combined `MODIFY TTL` clause. Per-class retention enforcement works identically across both install modes (self-hosted no-cold + SaaS with cold).
-
-## What this means for compliance
-
-For an SOC 2 / GDPR / HIPAA auditor asking about retention:
-
-- **The retention class on each IngestionSource is system-derived, not user-supplied per event** — meaning a malicious user cannot arbitrarily extend retention beyond their org's plan ceiling
-- **Deletion is enforced by the storage layer** (ClickHouse TTL), not by an application worker that could be skipped
-- **The `event_log` foundation provides non-repudiation** even after derived rows age out — see [Compliance architecture](/ai-gateway/governance/compliance-architecture) for the full mechanism set
-- **Application traces are unaffected** by governance retention classes — the policies are explicit per-row, not per-table
-
-## Changing a source's retention class
-
-A source admin can change `retentionClass` via the composer's edit flow. The change applies prospectively — new spans land with the new class; existing rows retain their original class until aged out. There is no retroactive re-class operation; that would risk silently shortening compliance evidence retention.
-
-If you need to extend retention on existing rows (e.g. an EU AI Act audit comes in mid-stream and you want the prior 6 months at `one_year` instead of `thirty_days`), contact your account rep — the operation requires manual data plane intervention.
+- **Deletion is storage-enforced** (partition-aligned TTL), not best-effort application cleanup.
+- **Scope policies are explicit and auditable**: who set which window on which scope is in the audit log.
+- **Billing evidence survives tenant shortening**: financial records keep their 13-month window regardless of how tight operational trace retention is set.
+- **Longer windows are a plan capability**: extended retention beyond the plan default is Enterprise, priced by stored volume (see [Pricing](/pricing)).
 
 ## Cross-references
 
-- [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — pulling governance events into your SIEM for additional retention or cross-correlation
-- [Ingestion sources](/ai-governance/ingestion-sources/index) — composer flow + per-platform setup
-- [ADR-018: governance unified observability substrate](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md) — the architecture decision record
+- [Platform → Data Retention](/platform/data-retention): the policy mechanics, configuration, and deletion behavior.
+- [Billing & spend events → Retention](/ai-gateway/billing-events#retention): the 13-month billing contract.
+- [Self-hosting compliance](/self-hosting/compliance): which retention capabilities sit on which license tier.
+- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export): exporting governance events to your SIEM for retention beyond LangWatch.
 
 ---
 
