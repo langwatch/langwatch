@@ -155,10 +155,23 @@ export default function OptimizationStudio() {
 
   // The effect below clears the request it just handled, so its own dependency
   // flips mid-flight and an effect-scoped cleanup would cut the expand
-  // animation short. The frame is tracked on a ref and cancelled on unmount.
+  // animation short. The frame is tracked on a ref instead, cancelled on
+  // unmount and whenever a fresh request arrives.
   const expandFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // A new request supersedes whatever the last one was still animating
+    // towards. Without this an in-flight expand keeps resizing the panel back
+    // up while a "closed" request is collapsing it. The cleared request that
+    // this effect writes at the end is not a new one, so it must not cancel.
+    if (
+      openResultsPanelRequest !== undefined &&
+      expandFrameRef.current !== null
+    ) {
+      window.cancelAnimationFrame(expandFrameRef.current);
+      expandFrameRef.current = null;
+    }
+
     if (openResultsPanelRequest === "evaluations") {
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);

@@ -181,10 +181,13 @@ export function BatchEvaluationV2({
  * the deadline out for as long as the churn lasts, which is exactly the case
  * it exists to stop.
  */
-function useKeepFetchingWhileRunIsMissing(
-  isRunMissing: boolean,
-  setKeepFetching: (keepFetching: boolean) => void,
-) {
+function useKeepFetchingWhileRunIsMissing({
+  isRunMissing,
+  setKeepFetching,
+}: {
+  isRunMissing: boolean;
+  setKeepFetching: (isKeepFetching: boolean) => void;
+}) {
   const deadlineRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -250,10 +253,10 @@ export const useBatchEvaluationState = ({
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
 
-  useKeepFetchingWhileRunIsMissing(
-    !!selectedRunId && !selectedRun,
+  useKeepFetchingWhileRunIsMissing({
+    isRunMissing: !!selectedRunId && !selectedRun,
     setKeepFetching,
-  );
+  });
 
   const setSelectedRunId_ = useCallback(
     (runId: string) => {
