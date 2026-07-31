@@ -13,9 +13,9 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import {
-  budgetDescription,
   type BudgetOverviewItemView,
   BudgetOverviewList,
+  budgetDescription,
   isBudgetBreached,
   isBudgetNearLimit,
 } from "~/components/me/BudgetOverviewList";
