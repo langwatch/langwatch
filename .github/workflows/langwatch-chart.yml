@@ -159,6 +159,11 @@ jobs:
           install: "@langwatch/web..."
       - name: Generate required files
         run: pnpm start:prepare:files
+      # The integration config's globalSetup runs ClickHouse migrations via
+      # goose before any test file executes, helm-backed or not.
+      - name: Install Goose migration tool
+        working-directory: .
+        run: bash .github/scripts/install-goose.sh
       - name: Run helm behavioral suites
         env:
           # Turns a silent helm-unavailable skip into a hard failure — this
