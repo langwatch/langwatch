@@ -2,6 +2,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { ClickHouseLogger } from "./clickhouseLogger";
+import { getClickHouseMaxOpenConnections } from "./connectionPool";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:client");
@@ -62,7 +63,7 @@ function getClickHouseClient(): ClickHouseClient | null {
       clickhouse_settings: {
         date_time_input_format: "best_effort",
       },
-      max_open_connections: 25,
+      max_open_connections: getClickHouseMaxOpenConnections(),
       keep_alive: {
         enabled: true,
         idle_socket_ttl: 1500,

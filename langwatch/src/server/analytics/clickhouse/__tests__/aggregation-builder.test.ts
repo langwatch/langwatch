@@ -175,6 +175,45 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
+    // The query windows on trace OccurredAt, but evaluation_runs partitions on
+    // ScheduledAt (UpdatedAt on older deployments) — an OccurredAt filter prunes
+    // nothing there, so an unbounded JOIN subquery walks the tenant's ENTIRE
+    // evaluation history across every partition, including S3-tiered cold ones.
+    // Measured in production at ~900 executions / 6,400s of query time per
+    // 30min on a single worker pod before the bound existed.
+    it("bounds the evaluation_runs JOIN subquery on both candidate partition columns", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          {
+            metric:
+              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as const,
+            key: "my-evaluator",
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // NULL-safe: legacy deployments carry ScheduledAt Nullable(DateTime64(3)),
+      // where a bare `ScheduledAt >= x` evaluates NULL for NULL rows and
+      // silently drops those evaluations from every graph.
+      expect(result.sql).toContain(
+        "(ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY)",
+      );
+      // Table-qualified: trace_summaries also has UpdatedAt, and a bare
+      // identifier would silently resolve against the outer scope.
+      expect(result.sql).toContain(
+        "evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY",
+      );
+      // The bound must reach the dedup inner scan too — it appears once in the
+      // outer subquery WHERE and once inside the IN-tuple dedup subquery.
+      const scheduledBounds =
+        result.sql.split("ScheduledAt >= {previousStart:DateTime64(3)}")
+          .length - 1;
+      expect(scheduledBounds).toBeGreaterThanOrEqual(2);
+    });
+
     // @regression issue #3088: When timeScale is "full" (summary widgets) with mixed eval and
     // trace metrics, the previous routing fell through to buildSubqueryTimeseriesQuery which
     // still joined evaluation_runs directly and inflated sum(ts.TotalCost) by the number of
