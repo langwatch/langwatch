@@ -51,6 +51,10 @@ func (e *UpstreamError) Error() string {
 const (
 	ErrInvalidAPIKey    = herr.Code("invalid_api_key")
 	ErrBudgetExceeded   = herr.Code("budget_exceeded")
+	// A per-end-user budget template is active on this key and the request
+	// carried no end-user id: fail closed, a cap evadable by omitting a
+	// field is not a cap.
+	ErrEndUserRequired = herr.Code("end_user_required")
 	ErrRateLimited      = herr.Code("rate_limited")
 	ErrGuardrailBlocked = herr.Code("guardrail_blocked")
 	// ErrGuardrailUpstreamUnavailable means the guardrail could not be
