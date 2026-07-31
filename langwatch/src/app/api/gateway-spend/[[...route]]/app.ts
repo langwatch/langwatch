@@ -8,6 +8,14 @@ import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
+import {
+  budgetPeriodFloorMs,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+} from "~/server/gateway/budgetResolution.service";
 import { validator as zValidator } from "~/server/api/validation";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -222,6 +230,80 @@ secured
         toMs,
         virtualKeyId: query.virtual_key_id,
       });
+      // The applicable caps: every attributed-user template in the org
+      // (optionally narrowed by anchor), each with its CURRENT PERIOD
+      // spend from the budget ledger, boundary-aware. This is the pair a
+      // rebilling platform polls at period close; the usage rollup above
+      // is the billing-events view of the same user over the asked window.
+      const templates = await prisma.gatewayBudget.findMany({
+        where: {
+          organizationId: organization.id,
+          scopeType: "ATTRIBUTED_USER",
+          archivedAt: null,
+          ...(query.virtual_key_id ? { scopeId: query.virtual_key_id } : {}),
+        },
+      });
+      let caps: Array<Record<string, unknown>> = [];
+      if (templates.length > 0 && tenantIds.length > 0) {
+        const boundaries = await prisma.gatewayBudgetBucketBoundary.findMany({
+          where: {
+            organizationId: organization.id,
+            budgetId: { in: templates.map((t) => t.id) },
+          },
+        });
+        const boundaryByKey = new Map(
+          boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),
+        );
+        const budgetCH = new GatewayBudgetClickHouseRepository(
+          async (projectId) => {
+            const client = await getClickHouseClientForProject(projectId);
+            if (!client) throw new Error("clickhouse unavailable");
+            return client;
+          },
+        );
+        const targets = templates.map((t) => {
+          const bucketScopeId = bucketScopeIdFor(
+            t,
+            attributedUserBucketScopeId(t.scopeId, endUserId),
+          );
+          const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
+          const floors = [
+            budgetPeriodFloorMs(t),
+            bucketBoundary?.periodStartedAt.getTime(),
+          ].filter((n): n is number => typeof n === "number");
+          return {
+            budgetId: t.id,
+            scope: t.scopeType,
+            scopeId: bucketScopeId,
+            window: t.window,
+            match: "exact" as const,
+            periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
+          };
+        });
+        const spends = await budgetCH.getSpendForTargetsAcrossTenants(
+          tenantIds,
+          targets,
+        );
+        const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
+        caps = templates.map((t) => {
+          const bucketScopeId = bucketScopeIdFor(
+            t,
+            attributedUserBucketScopeId(t.scopeId, endUserId),
+          );
+          const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
+          return {
+            budget_id: t.id,
+            anchor_id: t.scopeId,
+            window: t.window,
+            on_breach: t.onBreach,
+            limit_usd: t.limitUsd.toString(),
+            spent_usd: spentByBudget.get(t.id) ?? "0",
+            period_started_at: (
+              bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt
+            ).toISOString(),
+          };
+        });
+      }
       return c.json({
         data: {
           end_user_id: endUserId,
@@ -237,7 +319,7 @@ secured
             cache_creation_input_tokens: rollup.tokensCacheWrite,
             reasoning_tokens: rollup.tokensReasoning,
           },
-          cap: null,
+          caps,
         },
       });
     },
