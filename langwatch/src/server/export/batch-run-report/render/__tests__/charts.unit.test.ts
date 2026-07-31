@@ -93,6 +93,18 @@ describe("Feature: Run report — the trend sparkline", () => {
       expect(spark).toContain('points="0.00,12.00 50.00,17.00 100.00,6.00"');
     });
 
+    /**
+     * A line with no scale is decoration: the same picture serves a fall from
+     * 90% and one from 30%.
+     *
+     * @scenario The report shows how this run compares with the ones before it
+     */
+    it("says in words what the line is of, and where it starts and ends", () => {
+      expect(spark).toContain("Pass rate over the last 2 runs and this one");
+      expect(spark).toContain("50.0% then");
+      expect(spark).toContain("80.0% now");
+    });
+
     /** @scenario Printing the report produces a clean document */
     it("repeats the rates in a table", () => {
       expect(spark).toContain("<td>batch-1</td><td>50.0%</td>");

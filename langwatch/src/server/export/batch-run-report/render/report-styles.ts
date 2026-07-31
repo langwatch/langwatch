@@ -178,6 +178,25 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .tone-muted { color: var(--muted); }
 .tone-neutral { color: var(--neutral); }
 .chart { display: block; max-width: 100%; height: auto; margin: 0.5rem 0; }
+.spark { margin: 1.25rem 0 0; padding: 0; max-width: 32rem; }
+.spark-caption {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+/* Held to a band. Stretched to the page it becomes a hero graphic, which is
+   more weight than a four-point line has any claim to. */
+.spark-chart { height: 3.5rem; width: 100%; }
+.spark-ends {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+.spark-now { font-weight: 600; color: var(--ink-soft); }
 .chart .fill-pass { fill: var(--pass); }
 .chart .fill-fail { fill: var(--fail); }
 .chart .fill-warn { fill: var(--warn); }

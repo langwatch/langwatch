@@ -249,6 +249,16 @@ Feature: Run report
   # asking something shorter, and should not have to infer it from a pass rate
   # or scroll through failure groups to find it.
 
+  # The identifier belongs in the citation under a sentence, not in the sentence.
+  # A page where some lines read as prose and others as database keys is one a
+  # reader stops trusting halfway down.
+  @unit
+  Scenario: The report reads without knowing the system
+    Given the analysis refers to a run by its identifier
+    When I export a report
+    Then the sentence names the scenario instead
+    And the identifier is still shown as the citation beneath it
+
   @unit
   Scenario: The summary is readable without knowing the system
     Given a run has finished

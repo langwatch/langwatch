@@ -12,7 +12,11 @@
 import { describe, expect, it } from "vitest";
 import { evidenceFixture } from "../../__tests__/evidence-fixture";
 import type { Citation, Claim } from "../../report.types";
-import { buildCitationIndex, resolveClaims } from "../citation-resolver";
+import {
+  buildCitationIndex,
+  humaniseRunIds,
+  resolveClaims,
+} from "../citation-resolver";
 
 function claim(id: string, citations: Citation[]): Claim {
   return { id, text: `statement ${id}`, citations };
@@ -115,5 +119,52 @@ describe("resolveClaims()", () => {
       expect(result.droppedUncited).toBe(1);
       expect(result.droppedUnresolvable).toBe(1);
     });
+  });
+});
+
+describe("humaniseRunIds()", () => {
+  const evidence = evidenceFixture();
+
+  /**
+   * The id is not lost — it is in the citation under the sentence, which is
+   * where a reader who wants it looks. In the prose it is the same string
+   * twice, and the half nobody can read.
+   *
+   * @scenario The report reads without knowing the system
+   */
+  it("names the scenario a run belongs to instead of its id", () => {
+    const text = humaniseRunIds({
+      text: "run_1 failed while run_2 passed.",
+      evidence,
+    });
+
+    expect(text).toBe("Refund escalation failed while Happy path passed.");
+    expect(text).not.toContain("run_1");
+  });
+
+  /** @scenario The report reads without knowing the system */
+  it("leaves a sentence naming no run untouched", () => {
+    expect(humaniseRunIds({ text: "Two scenarios failed.", evidence })).toBe(
+      "Two scenarios failed.",
+    );
+  });
+
+  /**
+   * Substituting the shorter id first would leave the rest of the longer one
+   * stranded on the page.
+   *
+   * @scenario The report reads without knowing the system
+   */
+  it("replaces the longest matching id first", () => {
+    const nested = evidenceFixture({
+      runs: [
+        { ...evidence.runs[0]!, runId: "run_1", scenarioName: "Short" },
+        { ...evidence.runs[1]!, runId: "run_10", scenarioName: "Long" },
+      ],
+    });
+
+    expect(humaniseRunIds({ text: "run_10 failed.", evidence: nested })).toBe(
+      "Long failed.",
+    );
   });
 });

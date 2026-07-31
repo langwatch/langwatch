@@ -158,14 +158,27 @@ export function sparkline({ points }: { points: SparkPoint[] }): string {
   const current = coordinates[coordinates.length - 1] ?? "";
   const [currentX = "0", currentY = "0"] = current.split(",");
   const currentPoint = points[points.length - 1];
+  const first = points[0];
+  const earlier = points.length - 1;
   const title = `Pass rate across ${points.length} runs, ending at ${formatRate(currentPoint?.value ?? 0)}`;
 
   return [
-    `<svg class="chart" viewBox="0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}" preserveAspectRatio="none" role="img">`,
+    '<figure class="spark">',
+    // Said in words above the line, because a line on its own is decoration:
+    // it carries no scale, and a reader cannot tell what it is of.
+    `<figcaption class="spark-caption">Pass rate over the last ${earlier === 1 ? "run" : `${earlier} runs`} and this one</figcaption>`,
+    `<svg class="chart spark-chart" viewBox="0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}" preserveAspectRatio="none" role="img">`,
     `<title>${escapeHtml(title)}</title>`,
     `<polyline class="spark-line" points="${coordinates.join(" ")}"></polyline>`,
     `<circle class="spark-current" cx="${currentX}" cy="${currentY}" r="1.6"></circle>`,
     "</svg>",
+    // The ends of the line, so its shape has a scale attached to it. Without
+    // these the same picture serves a fall from 90% and one from 30%.
+    '<p class="spark-ends">',
+    `<span>${escapeHtml(formatRate(first?.value ?? 0))} then</span>`,
+    `<span class="spark-now">${escapeHtml(formatRate(currentPoint?.value ?? 0))} now</span>`,
+    "</p>",
+    "</figure>",
     hiddenTable({
       caption: "Pass rate by run",
       columns: ["Run", "Pass rate"],

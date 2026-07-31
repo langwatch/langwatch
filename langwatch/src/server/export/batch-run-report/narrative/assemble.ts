@@ -13,7 +13,11 @@ import type {
   ReportSection,
   Severity,
 } from "../report.types";
-import { buildCitationIndex, resolveClaims } from "./citation-resolver";
+import {
+  buildCitationIndex,
+  humaniseRunIds,
+  resolveClaims,
+} from "./citation-resolver";
 import type { DraftAnswer, DraftReport } from "./narrative-pass";
 import type { VerifierOutcome } from "./verifier-pass";
 
@@ -98,7 +102,9 @@ export function assembleSections({
   }): Claim[] => {
     const identified: Claim[] = claims.map((claim, position) => ({
       id: `${questionId}#${offset + position}`,
-      text: claim.text,
+      // Before anything reads it: the id belongs in the citation, not in the
+      // sentence, where it is unreadable and already present underneath.
+      text: humaniseRunIds({ text: claim.text, evidence }),
       citations: claim.citations,
     }));
 

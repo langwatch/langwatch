@@ -31,7 +31,11 @@ Rules, in order of importance:
 4. Never state a percentage without also stating how many runs it is out of. If
    EVIDENCE says the sample is too few to conclude, say that instead of a rate.
 5. Do not describe a trend across more previous runs than EVIDENCE contains.
-6. Write plain sentences. No markdown, no formatting, no headings.
+6. Write plain sentences. No markdown, no formatting, no headings. Name a
+   scenario by its scenario name, never by its run id — the citation carries
+   the id, so an id in the sentence is the same string twice and the half a
+   reader cannot read. "Checkout flow failed", not
+   "run_3GoiQDRJOWcnsy1 failed".
 7. Say what happened and what it means for someone using this agent. Do not
    describe the test framework, the report, or your own process.
 `.trim();

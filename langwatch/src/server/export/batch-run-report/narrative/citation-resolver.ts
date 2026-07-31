@@ -98,6 +98,37 @@ export interface ResolutionResult {
   droppedUnresolvable: number;
 }
 
+/**
+ * Swaps run ids out of a sentence for the scenario each one ran.
+ *
+ * The model is asked to name scenarios rather than ids and mostly does, but
+ * "mostly" leaves a page where some sentences read as prose and others as
+ * database keys. The id is not lost: it is in the citation underneath, which is
+ * where a reader who wants it looks. In the sentence it is the same string
+ * twice over, and the half nobody can read.
+ *
+ * Longest id first, so one id that contains another cannot be half-replaced.
+ */
+export function humaniseRunIds({
+  text,
+  evidence,
+}: {
+  text: string;
+  evidence: ReportEvidence;
+}): string {
+  const byLongestId = [...evidence.runs].sort(
+    (a, b) => b.runId.length - a.runId.length,
+  );
+
+  return byLongestId.reduce(
+    (sentence, run) =>
+      run.scenarioName && run.scenarioName !== run.runId
+        ? sentence.split(run.runId).join(run.scenarioName)
+        : sentence,
+    text,
+  );
+}
+
 export function resolveClaims({
   claims,
   index,
