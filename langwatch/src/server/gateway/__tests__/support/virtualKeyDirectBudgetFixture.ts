@@ -309,9 +309,15 @@ export async function seedFixture(chRepo: GatewayBudgetClickHouseRepository) {
   await seedSpend(chRepo);
 }
 
-export async function teardownFixture(
-  clickhouse: { command: (args: unknown) => Promise<unknown> } | null,
-) {
+/** Just the slice of the ClickHouse client the teardown needs. */
+type CommandRunner = {
+  command: (args: {
+    query: string;
+    query_params?: Record<string, unknown>;
+  }) => Promise<unknown>;
+};
+
+export async function teardownFixture(clickhouse: CommandRunner | null) {
   if (clickhouse) {
     // The rollup is a materialized-view target, so the source delete does
     // not cascade; both tables need the sweep.

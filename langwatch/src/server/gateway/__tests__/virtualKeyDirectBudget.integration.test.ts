@@ -67,7 +67,7 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await teardownFixture(getTestClickHouseClient() as never);
+    await teardownFixture(getTestClickHouseClient());
     await stopTestContainers();
   }, 120_000);
 
