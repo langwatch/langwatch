@@ -131,7 +131,7 @@ The principle is general; these are the components it lands on. Note that only t
 | Component | Kind | Lever |
 |---|---|---|
 | `codingAgentSession` fold | CH fold, lossy row, refolds `event_log` | **Pillar 1 adopter #1** — the component on fire |
-| `codingAgentTraceSessions`, `sessionMetricSeries` | map projections (append-only) | None — append stores, not read-modify-write; leave as-is |
+| `codingAgentTraceSessions`, `sessionMetricSeries` | map projections (append-only) | ~~None — append stores, not read-modify-write; leave as-is~~ **Amended 2026-07-31:** append maps DO coalesce (see amendment below) — shipped in langwatch#6407 at 256 |
 | `codingAgentSpanFactsDispatch` (+ log / metric) subscribers | event producers | None from this ADR — but move the coding-agent-name gate **before enqueue** so non-agent spans never mint jobs |
 | `contributeSpanFacts` command | producer | None |
 
@@ -143,6 +143,29 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 |---|---|---|
 | `recordTriggerMatch` command | producer — one `TRIGGER_MATCH_RECORDED` per match (un-coalesced at incident time) | **Pillar 2 adopter #1 — shipped** (append coalescing on the count+byte-bounded drain) |
 | `triggerSettlement` | ADR-052 process manager, Postgres outbox state | None — evolves state incrementally from a PM store, never refolds `event_log`; its backlog is pure `event_log`-stall *symptom*, not a cause |
+
+### Amendment (2026-07-31): per-item map jobs are a drain floor — append maps coalesce too
+
+The original table left append-only maps alone because this ADR's enemy was
+`event_log` traffic, and an append map touches none. The 2026-07-30/31 backlog
+exposed a second cost axis the table missed: **queue-job overhead**. A map keyed
+per item (`span:${event.id}`, `rollup:${event.id}`, `billing:${event.id}`)
+pays one full GroupQueue job — claim, handler, event-append flush wait
+(~900 ms measured p50), one insert, ack — *per queued element*. Under backlog
+the cheap work burns off and these per-item processors set the drain floor:
+measured 2026-07-31, they held ~480 of ~1,030 busy fleet slots while four
+unrelated job types converged on the same ~4.7 s duration (the signature of
+shared overhead, not work — pods sat at 24–34% CPU).
+
+The amendment: **an append map whose group can back up adopts the metric-map
+shape** — shard-keyed lanes (`shardIndexFor`, bounded lane count) +
+`coalesceMaxBatch` + `bulkAppend` — so a backed-up lane drains N events per
+job instead of one. Adopters: coding-agent maps (langwatch#6407, 256),
+`spanStorage` (this change: `span-map:<lane>` pinned by span id, which also
+*fixes* an ordering hole — the per-event key let two deliveries of the same
+span run in parallel). Remaining: `traceAnalyticsRollup` and
+`orgBillableEventsMeter` (needs a billing idempotency review), then the
+`recordSpan` producer under Pillar 2's existing rule.
 
 ## Adopters & sequencing
 

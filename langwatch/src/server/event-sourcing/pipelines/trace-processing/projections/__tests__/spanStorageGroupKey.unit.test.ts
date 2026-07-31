@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import {
+  SPAN_STORAGE_MAP_SHARD_COUNT,
+  spanStorageMapGroupKey,
+  TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+} from "../spanStorageGroupKey";
+import { SpanStorageMapProjection } from "../spanStorage.mapProjection";
+
+/**
+ * spanStorage previously grouped by `span:${event.id}` — the EVENT id — so
+ * every delivery was its own single-event group: coalescing had nothing to
+ * batch (the O(n²) drain floor measured in the 2026-07-31 backlog), and two
+ * deliveries of the SAME span could run in parallel with no ordering
+ * guarantee. Shard keys fix both: same span → same lane (serialized), and a
+ * backed-up lane drains in coalesced bites through the store's bulkAppend.
+ */
+describe("spanStorage shard group key", () => {
+  const event = (spanId: string, id = `evt_${spanId}`) =>
+    ({ id, metadata: { spanId, traceId: "trace_1" } }) as never;
+
+  describe("when the same span is delivered twice", () => {
+    it("routes both deliveries to the same lane", () => {
+      expect(spanStorageMapGroupKey(event("span_a", "evt_1"))).toBe(
+        spanStorageMapGroupKey(event("span_a", "evt_2")),
+      );
+    });
+  });
+
+  describe("when many distinct spans arrive", () => {
+    it("distributes across multiple lanes, all within the shard count", () => {
+      const lanes = new Set<string>();
+      for (let i = 0; i < 500; i++) {
+        const key = spanStorageMapGroupKey(event(`span_${i}`));
+        expect(key).toMatch(/^span-map:\d+$/);
+        const lane = Number(key.split(":")[1]);
+        expect(lane).toBeGreaterThanOrEqual(0);
+        expect(lane).toBeLessThan(SPAN_STORAGE_MAP_SHARD_COUNT);
+        lanes.add(key);
+      }
+      // 500 spans over 128 lanes: overwhelmingly many lanes populated.
+      expect(lanes.size).toBeGreaterThan(64);
+    });
+  });
+
+  describe("when the event carries no span id in metadata", () => {
+    it("falls back to the event id, still deterministic", () => {
+      const bare = { id: "evt_only", metadata: {} } as never;
+      expect(spanStorageMapGroupKey(bare)).toBe(spanStorageMapGroupKey(bare));
+      expect(spanStorageMapGroupKey(bare)).toMatch(/^span-map:\d+$/);
+    });
+  });
+
+  describe("when the projection is constructed", () => {
+    it("declares the shard key and the coalesce ceiling", () => {
+      const projection = new SpanStorageMapProjection({ store: {} as never });
+      expect(projection.options.coalesceMaxBatch).toBe(
+        TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+      );
+      expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBeGreaterThan(1);
+      // Guard against regressing to the per-event key.
+      expect(
+        projection.options.groupKeyFn(event("span_x", "evt_unique")),
+      ).not.toContain("evt_unique");
+      expect(projection.options.groupKeyFn(event("span_x"))).toBe(
+        spanStorageMapGroupKey(event("span_x")),
+      );
+    });
+  });
+});
