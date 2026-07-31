@@ -33,6 +33,10 @@ vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
     hasProjectPermission(...args)) as never,
 }));
 vi.mock("~/server/db", () => ({ prisma: {} }));
+const checkReportRateLimit = vi.fn();
+vi.mock("~/server/export/batch-run-report/report-rate-limit", () => ({
+  checkReportRateLimit: (...args: unknown[]) => checkReportRateLimit(...args),
+}));
 
 const BODY = {
   projectId: "project_1",
@@ -111,6 +115,10 @@ beforeEach(() => {
   getServerAuthSession.mockResolvedValue({ user: { id: "user_1" } });
   hasProjectPermission.mockResolvedValue(true);
   auditLog.mockResolvedValue(undefined);
+  checkReportRateLimit.mockResolvedValue({
+    isAllowed: true,
+    retryAfterSeconds: 0,
+  });
   generate.mockResolvedValue(reportModel());
 });
 
@@ -305,6 +313,57 @@ describe("POST /api/export/batch-run-report/download?stream=1", () => {
 
       expect(response.status).toBe(403);
       expect(generate).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * Only the analysed path costs anything worth limiting: two model calls over
+ * up to twenty-four transcripts, running for a minute or more. The instant
+ * one is arithmetic, and refusing it would be friction with nothing behind it.
+ */
+describe("POST /api/export/batch-run-report/download rate limiting", () => {
+  describe("when the limit is reached and Langy was asked for", () => {
+    it("refuses with Retry-After and produces nothing", async () => {
+      checkReportRateLimit.mockResolvedValue({
+        isAllowed: false,
+        retryAfterSeconds: 42,
+      });
+
+      const response = await post({ ...BODY, withAnalysis: true });
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("42");
+      expect(generate).not.toHaveBeenCalled();
+      expect(auditLog).not.toHaveBeenCalled();
+    });
+
+    it("points at the export that is not limited", async () => {
+      checkReportRateLimit.mockResolvedValue({
+        isAllowed: false,
+        retryAfterSeconds: 5,
+      });
+
+      const body = (await post({ ...BODY, withAnalysis: true }).then((r) =>
+        r.json(),
+      )) as { error: string };
+
+      expect(body.error).toContain("instant export");
+    });
+  });
+
+  describe("when the analysis was not asked for", () => {
+    it("is never limited", async () => {
+      checkReportRateLimit.mockResolvedValue({
+        isAllowed: false,
+        retryAfterSeconds: 42,
+      });
+
+      const response = await post({ ...BODY, withAnalysis: false });
+
+      expect(response.status).toBe(200);
+      expect(checkReportRateLimit).not.toHaveBeenCalled();
+      expect(generate).toHaveBeenCalled();
     });
   });
 });

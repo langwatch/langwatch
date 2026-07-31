@@ -29,6 +29,7 @@ import {
   batchRunReportRequestSchema,
   type ReportModel,
 } from "~/server/export/batch-run-report/report.types";
+import { checkReportRateLimit } from "~/server/export/batch-run-report/report-rate-limit";
 import { ExportUnauthenticatedError } from "~/server/export/errors";
 import type { ReportStage } from "~/shared/scenario-run-report/report-stages";
 import type { NextRequest } from "~/types/next-stubs";
@@ -68,6 +69,29 @@ secured
           { error: "You do not have permission to access this endpoint." },
           { status: 403 },
         );
+      }
+
+      // Only the analysed path is limited. The instant one is arithmetic and
+      // returns in a fraction of a second; this one is two model calls over up
+      // to twenty-four transcripts, and nothing else stops a forty-row run
+      // history becoming forty concurrent pairs of them.
+      if (request.withAnalysis) {
+        const rateLimit = await checkReportRateLimit({
+          userId: session.user.id,
+          projectId: request.projectId,
+        });
+        if (!rateLimit.isAllowed) {
+          return c.json(
+            {
+              error:
+                "Too many reports with Langy in the last minute. The instant export is not limited.",
+            },
+            {
+              status: 429,
+              headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+            },
+          );
+        }
       }
 
       // A report bundles conversation transcripts and a model's reading of
