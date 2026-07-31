@@ -111,6 +111,12 @@ afterAll(async () => {
     await ch.exec({
       query: `ALTER TABLE simulation_runs DELETE WHERE TenantId IN ({tenantId:String}, {otherTenantId:String})`,
       query_params: { tenantId, otherTenantId },
+      // Wait for the mutation to finish rather than firing it and moving on.
+      // Integration files share one ClickHouse and run in sequence, so a DELETE
+      // still rewriting parts when the next file starts perturbs its reads —
+      // observed as a sibling repository suite failing only when run after this
+      // one.
+      clickhouse_settings: { mutations_sync: 2 },
     });
   }
   await stopTestContainers();
@@ -246,6 +252,83 @@ describe("scenario run export sweep (integration)", () => {
       expect(otherRuns.map((run) => run.scenarioRunId)).toEqual([
         otherProjectRunId,
       ]);
+    });
+  });
+
+  describe("given a run whose StartedAt moved between versions", () => {
+    /**
+     * The projection opens a run with StartedAt null — persisted as CreatedAt —
+     * and only sets the real value when the started event lands. So a run can
+     * have an early provisional timestamp inside the window and a corrected one
+     * outside it.
+     *
+     * Deduplicating with the date filter inside the subquery picks the newest
+     * version *within the range*, which here is the stale one: it would export
+     * a run as IN_PROGRESS with no messages long after it finished. The latest
+     * version has to be chosen first, and the range applied to that.
+     */
+    it("judges the range on the latest version, not the newest in-range one", async () => {
+      const runId = `run-moved-${nanoid()}`;
+      const setId = `set-moved-${nanoid()}`;
+      // Both rows are versions of ONE run, so every field of the dedup key —
+      // tenant, set, batch, run — has to match. A fresh BatchRunId would make
+      // them two unrelated runs and the test would prove nothing.
+      const batchRunId = `batch-moved-${nanoid()}`;
+      const scenarioId = `scenario-moved-${nanoid()}`;
+      const provisional = new Date(now - 10 * DAY_MS);
+      const corrected = new Date(now - 40 * DAY_MS);
+
+      await insertRows(ch, [
+        // Written first: no started event yet, so StartedAt fell back to
+        // CreatedAt and lands inside a "last 30 days" window.
+        makeInsertRow({
+          ScenarioRunId: runId,
+          ScenarioSetId: setId,
+          BatchRunId: batchRunId,
+          ScenarioId: scenarioId,
+          Status: "IN_PROGRESS",
+          StartedAt: provisional,
+          CreatedAt: provisional,
+          UpdatedAt: provisional,
+          FinishedAt: null,
+        }),
+        // The started event arrived and corrected StartedAt to its real value,
+        // which is outside that window.
+        makeInsertRow({
+          ScenarioRunId: runId,
+          ScenarioSetId: setId,
+          BatchRunId: batchRunId,
+          ScenarioId: scenarioId,
+          Status: "SUCCESS",
+          StartedAt: corrected,
+          CreatedAt: provisional,
+          UpdatedAt: new Date(now),
+          FinishedAt: new Date(now - 39 * DAY_MS),
+        }),
+      ]);
+
+      const inWindow = await sweep({
+        projectId: tenantId,
+        scenarioSetId: setId,
+        startDate: now - 30 * DAY_MS,
+        endDate: now,
+        limit: 100,
+      });
+
+      // The run's real StartedAt is 40 days ago, so it is out of range —
+      // rather than in range wearing its stale IN_PROGRESS snapshot.
+      expect(inWindow.map((run) => run.scenarioRunId)).not.toContain(runId);
+
+      const widerWindow = await sweep({
+        projectId: tenantId,
+        scenarioSetId: setId,
+        startDate: now - 60 * DAY_MS,
+        endDate: now,
+        limit: 100,
+      });
+      const found = widerWindow.find((run) => run.scenarioRunId === runId);
+      expect(found).toBeDefined();
+      expect(found!.status).toBe(ScenarioRunStatus.SUCCESS);
     });
   });
 

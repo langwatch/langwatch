@@ -165,8 +165,10 @@ export function serializeRunsToFullCsv({
         String(index),
         text(stringOrEmpty(m.role)),
         text(messageContent(m.content)),
-        stringOrEmpty(m.id),
-        stringOrEmpty(m.trace_id),
+        // Message ids and trace ids are SDK-supplied too, so they get the same
+        // treatment as the identifiers in the tail block.
+        text(stringOrEmpty(m.id)),
+        text(stringOrEmpty(m.trace_id)),
         ...tail,
       ]);
     });
@@ -207,16 +209,26 @@ function buildCriteriaListValues(run: ExportableRun): string[] {
   ];
 }
 
+/**
+ * Identifiers go through `text()` like any prose field.
+ *
+ * They read as machine-generated and safe, but only some of them are: a set
+ * id, scenario id, batch id and target reference all arrive from the SDK as
+ * arbitrary strings, so `=cmd|…` is a value a caller can choose. A formula
+ * evaluates the same whichever column it lands in, and neutralising a cell
+ * that never needed it costs a leading apostrophe on an id no spreadsheet
+ * would have parsed as a number anyway.
+ */
 function buildTailValues(run: ExportableRun): string[] {
   const target = extractTarget(run.metadata);
   return [
-    run.scenarioRunId,
-    run.scenarioId,
-    run.batchRunId,
-    run.scenarioSetId,
-    target.targetType,
-    target.targetReferenceId,
-    target.simulationSuiteId,
+    text(run.scenarioRunId),
+    text(run.scenarioId),
+    text(run.batchRunId),
+    text(run.scenarioSetId),
+    text(target.targetType),
+    text(target.targetReferenceId),
+    text(target.simulationSuiteId),
     jsonArray(collectTraceIds(run)),
   ];
 }

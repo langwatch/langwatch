@@ -1219,7 +1219,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    const { whereClause, params } = this.buildExportFilters({
+    const { stableClause, dateClause, params } = this.buildExportFilters({
       scenarioSetId,
       scenarioId,
       startDate,
@@ -1230,9 +1230,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       `SELECT toString(count()) AS Total
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
-         ${whereClause}
+         ${stableClause}
+         ${dateClause}
          AND t.ArchivedAt IS NULL
-         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}`,
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}`,
       { tenantId: projectId, ...params },
     );
 
@@ -1280,7 +1281,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const validatedLimit = Math.min(Math.max(1, limit), 500);
     const decoded = cursor ? this.decodeExportCursor(cursor) : null;
 
-    const { whereClause, params } = this.buildExportFilters({
+    const { stableClause, dateClause, params } = this.buildExportFilters({
       scenarioSetId,
       scenarioId,
       startDate,
@@ -1301,10 +1302,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
-         ${whereClause}
+         ${stableClause}
+         ${dateClause}
          ${cursorPredicate}
          AND t.ArchivedAt IS NULL
-         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(whereClause)}`)}
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}
        ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
@@ -1340,8 +1342,29 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }
 
   /**
-   * Shared WHERE fragment for the export sweep and its count, so the two can
+   * Shared WHERE fragments for the export sweep and its count, so the two can
    * never drift and report a total the sweep does not produce.
+   *
+   * Returned in two halves because only one of them may go inside the dedup
+   * subquery:
+   *
+   *   stable — ScenarioSetId and ScenarioId. A run cannot move between sets or
+   *     scenarios, and ScenarioSetId is part of the dedup key already, so
+   *     narrowing on these picks the same version either way. Keeping them in
+   *     the subquery is what stops it grouping the whole tenant.
+   *
+   *   date — StartedAt, which IS mutable across versions: the projection opens
+   *     a run with StartedAt null (persisted as CreatedAt) and only sets the
+   *     real value when the started event lands. Inside the subquery it would
+   *     make max(UpdatedAt) the newest version *within the range* rather than
+   *     the newest version, so a run whose corrected timestamp moved out of the
+   *     window would export its stale earlier snapshot — old status, missing
+   *     messages — instead of being excluded. It belongs only in the outer
+   *     query, applied to whichever version actually won.
+   *
+   * The cost is that the subquery no longer prunes partitions by date. That is
+   * the trade: an export that is cheaper but occasionally wrong around a range
+   * boundary is not worth having.
    *
    * Note the pass/fail filter is deliberately absent: STALLED is derived from
    * timestamps by resolveRunStatus at map time, not stored in the table, so it
@@ -1357,34 +1380,37 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     scenarioId?: string;
     startDate?: number;
     endDate?: number;
-  }): { whereClause: string; params: Record<string, string | string[]> } {
-    const parts: string[] = [];
+  }): {
+    stableClause: string;
+    dateClause: string;
+    params: Record<string, string | string[]>;
+  } {
+    const stableParts: string[] = [];
     const params: Record<string, string | string[]> = {};
 
-    const dateFilter = buildDateFilter({ startDate, endDate });
-    if (dateFilter.whereClause) {
-      // buildDateFilter emits unqualified column names; the export queries read
-      // through the `t` alias, so qualify them here.
-      parts.push(
-        dateFilter.whereClause
-          .replace(/^AND /, "")
-          .replace(/StartedAt/g, "t.StartedAt"),
-      );
-      Object.assign(params, dateFilter.params);
-    }
-
     if (scenarioSetId) {
-      parts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
+      stableParts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
       params.exportSetIds = expandSetIdFilter(scenarioSetId);
     }
 
     if (scenarioId) {
-      parts.push("t.ScenarioId = {exportScenarioId:String}");
+      stableParts.push("t.ScenarioId = {exportScenarioId:String}");
       params.exportScenarioId = scenarioId;
     }
 
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    let dateClause = "";
+    if (dateFilter.whereClause) {
+      // buildDateFilter emits unqualified column names; the export queries read
+      // through the `t` alias, so qualify them here.
+      dateClause = dateFilter.whereClause.replace(/StartedAt/g, "t.StartedAt");
+      Object.assign(params, dateFilter.params);
+    }
+
     return {
-      whereClause: parts.length > 0 ? `AND ${parts.join(" AND ")}` : "",
+      stableClause:
+        stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
+      dateClause,
       params,
     };
   }

@@ -436,6 +436,60 @@ describe("scenario run CSV serializers", () => {
       expect(parse(csv)[0]!.criterion).toBe(`'${DANGEROUS}`);
     });
 
+    /**
+     * Identifiers look machine-generated and safe, but a scenario set id, run
+     * id, batch id and target reference all arrive from the SDK as arbitrary
+     * strings — so a caller can choose one. A formula in the id column
+     * evaluates exactly like one in the prose column.
+     */
+    it("neutralizes identifiers, which callers also control", () => {
+      const rows = parse(
+        serializeRunsToFullCsv({
+          runs: [
+            buildRun({
+              scenarioRunId: "=cmd|' /C calc'!A0",
+              scenarioSetId: "+SUM(A1:A9)",
+              batchRunId: "@import",
+              metadata: {
+                langwatch: {
+                  targetType: "http",
+                  targetReferenceId: "-1+1",
+                  simulationSuiteId: "suite_7",
+                },
+              },
+            }),
+          ],
+          includeHeader: true,
+        }),
+      );
+
+      const row = rows[0]!;
+      expect(row.run_scenario_run_id).toBe("'=cmd|' /C calc'!A0");
+      expect(row.run_scenario_set_id).toBe("'+SUM(A1:A9)");
+      expect(row.run_batch_run_id).toBe("'@import");
+      expect(row.run_target_reference_id).toBe("'-1+1");
+      // Untouched, because it never started with a formula character.
+      expect(row.run_simulation_suite_id).toBe("suite_7");
+    });
+
+    it("neutralizes message and trace ids, which the SDK also supplies", () => {
+      const rows = parse(
+        serializeRunsToFullCsv({
+          runs: [
+            buildRun({
+              messages: [
+                { role: "user", content: "hi", id: "=1+1", trace_id: "@evil" },
+              ] as unknown as ExportableRun["messages"],
+            }),
+          ],
+          includeHeader: true,
+        }),
+      );
+
+      expect(rows[0]!.message_id).toBe("'=1+1");
+      expect(rows[0]!.message_trace_id).toBe("'@evil");
+    });
+
     it("leaves ordinary text and negative numbers alone", () => {
       const csv = serializeRunsToFullCsv({
         runs: [buildRun({ name: "Refund Request", durationInMs: -1 })],

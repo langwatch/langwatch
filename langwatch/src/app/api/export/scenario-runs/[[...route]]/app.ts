@@ -13,6 +13,8 @@
  * @see specs/scenarios/scenario-run-export.feature
  */
 
+import { Readable } from "node:stream";
+import { createGzip } from "node:zlib";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -125,11 +127,31 @@ secured
         broadcast,
       });
 
-      return new Response(stream.pipeThrough(new CompressionStream("gzip")), {
-        headers,
-      });
+      return new Response(gzipped(stream), { headers });
     },
   );
+
+/**
+ * Gzips a stream while letting backpressure reach its producer.
+ *
+ * `pipeThrough(new CompressionStream("gzip"))` does not: the transform drains
+ * whatever it is piped from without bound, so a paused reader still leaves the
+ * producer running flat out. Measured on this route's own shape — one read,
+ * then stop — a raw pull-driven source is asked for 2 more pages, the same
+ * source through CompressionStream for ~65,000. That is the whole export in
+ * memory for one slow client.
+ *
+ * zlib through Node's stream plumbing honours the pipe's high-water mark, so
+ * read-ahead is bounded in bytes (~800KB here) rather than in pages, and a
+ * bigger page simply means fewer of them buffered.
+ */
+function gzipped(
+  source: ReadableStream<Uint8Array>,
+): ReadableStream<Uint8Array> {
+  const gzip = createGzip();
+  Readable.fromWeb(source as Parameters<typeof Readable.fromWeb>[0]).pipe(gzip);
+  return Readable.toWeb(gzip) as ReadableStream<Uint8Array>;
+}
 
 /**
  * Drives the export generator into a ReadableStream, broadcasting progress as
@@ -163,23 +185,34 @@ function buildExportStream({
       "export_progress",
     );
 
+  const runs = service
+    .exportRuns({ request, signal, total: totalCount })
+    [Symbol.asyncIterator]();
+
+  // One page per pull() rather than the whole sweep in start().
+  //
+  // start() runs to completion regardless of controller.desiredSize, so it
+  // would keep querying and enqueuing for a slow client until the whole export
+  // sat in the pod's memory — a full-mode file is every transcript in the
+  // project. pull() is called only when the stream wants more, so a consumer
+  // that stops reading stops the sweep, and gzip's own buffering no longer
+  // hides the producer from backpressure.
   return new ReadableStream({
-    async start(controller) {
+    async pull(controller) {
       try {
-        for await (const { chunk, progress } of service.exportRuns({
-          request,
-          signal,
-          total: totalCount,
-        })) {
-          controller.enqueue(encoder.encode(chunk));
-          publish({
-            type: "progress",
-            exported: progress.exported,
-            total: progress.total,
-          });
+        const next = await runs.next();
+        if (next.done) {
+          publish({ type: "done" });
+          controller.close();
+          return;
         }
-        publish({ type: "done" });
-        controller.close();
+        const { chunk, progress } = next.value;
+        controller.enqueue(encoder.encode(chunk));
+        publish({
+          type: "progress",
+          exported: progress.exported,
+          total: progress.total,
+        });
       } catch (error) {
         logger.error(
           { error, projectId: request.projectId },
@@ -188,6 +221,17 @@ function buildExportStream({
         publish({ type: "error", message: "Export failed" });
         controller.error(error);
       }
+    },
+
+    // The client went away — closed the tab, hit Cancel, lost the connection.
+    // Returning the generator runs its `finally`, so the sweep stops instead of
+    // paging ClickHouse to exhaustion for a download nobody is reading.
+    async cancel(reason) {
+      logger.info(
+        { projectId: request.projectId, exportId, reason },
+        "Scenario run export cancelled by the consumer",
+      );
+      await runs.return?.(undefined);
     },
   });
 }

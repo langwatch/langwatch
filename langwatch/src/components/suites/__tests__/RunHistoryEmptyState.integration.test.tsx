@@ -146,6 +146,30 @@ describe("<RunHistoryPanel/>", () => {
     });
   });
 
+  describe("given no runs on the loaded pages but more still to fetch", () => {
+    /**
+     * The loaded pages are not the whole history. Filter to a scenario whose
+     * runs sit further back and the fetched pages hold none of them, while the
+     * server-side sweep would return every one — so a zero count here means
+     * "not yet" rather than "none", and disabling the export would refuse a
+     * request that would have produced a file.
+     */
+    it("keeps Export CSV enabled, because the sweep may still match", () => {
+      mockGetSuiteRunData.mockReturnValue({
+        data: { runs: [], scenarioSetIds: {}, hasMore: true, changed: true },
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeEnabled();
+    });
+  });
+
   describe("given a suite with at least one run", () => {
     beforeEach(() => {
       mockGetSuiteRunData.mockReturnValue({

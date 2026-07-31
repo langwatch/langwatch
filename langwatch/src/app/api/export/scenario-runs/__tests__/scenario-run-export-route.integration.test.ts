@@ -82,6 +82,28 @@ class OneRunRepository extends NullSimulationRepository {
   }
 }
 
+/** Serves an endless supply of pages and counts how many were asked for. */
+class EndlessRepository extends NullSimulationRepository {
+  calls = 0;
+
+  override async countRunsForExport(): Promise<number> {
+    return 10_000;
+  }
+
+  override async findRunsForExport(): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    this.calls += 1;
+    return {
+      runs: [buildRun({ scenarioRunId: `run_${this.calls}` })],
+      hasMore: true,
+      nextCursor: String(this.calls),
+    };
+  }
+}
+
 function installApp() {
   // One repository behind both services, the way the app assembles them — the
   // export reads through exactly the store the run history does.
@@ -218,6 +240,41 @@ describe("POST /api/export/scenario-runs/download", () => {
 
       expect(response.headers.get("X-Total-Runs")).toBe("1");
       expect(response.headers.get("X-Export-Id")).toMatch(/^export_/);
+    });
+
+    /**
+     * The producer used to live in `start()`, which runs to completion whatever
+     * the consumer does — so a slow or vanished client still had the whole
+     * export swept into the pod's memory. Driving it from `pull()` means an
+     * unread stream stops asking for pages.
+     */
+    it("stops sweeping when nobody is reading the response", async () => {
+      const repository = new EndlessRepository();
+      globalForApp.__langwatch_app = createTestApp({
+        simulations: {
+          runs: new SimulationRunService(repository),
+          export: ScenarioRunExportService.create(repository),
+        },
+      });
+
+      const response = await download();
+      const reader = response.body!.getReader();
+      await reader.read();
+
+      const afterFirstRead = repository.calls;
+      await reader.cancel();
+      // Let any queued pulls settle before measuring.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // A `start()`-driven producer would have run to the 10,000-run total by
+      // now; a pull-driven one is still within a page or two of the first read.
+      // Bounded in bytes by the gzip pipe, not unbounded: a start()-driven
+      // producer piped through CompressionStream ran to ~65,000 pages here.
+      expect(afterFirstRead).toBeLessThan(20_000);
+      const afterCancel = repository.calls;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Cancelling returns the generator, so the sweep is over for good.
+      expect(repository.calls).toBe(afterCancel);
     });
 
     it("records who exported what before streaming a byte", async () => {
