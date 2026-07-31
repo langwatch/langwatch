@@ -35,6 +35,7 @@ import {
   MAX_PREDICATE_DEPTH,
   MAX_TIME_RANGE_DAYS,
   normaliseWhere,
+  type LwqlComparison,
   type LwqlLiteral,
   type LwqlOrderBy,
   type LwqlPredicate,
@@ -166,9 +167,7 @@ const coerce = (
   }
 };
 
-const isComparison = (
-  node: LwqlPredicate,
-): node is { field: string; op: string; value?: LwqlLiteral | LwqlLiteral[] } =>
+const isComparison = (node: LwqlPredicate): node is LwqlComparison =>
   typeof node === "object" && node !== null && "field" in node;
 
 const compilePredicate = (

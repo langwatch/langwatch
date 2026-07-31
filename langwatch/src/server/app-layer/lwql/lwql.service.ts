@@ -6,8 +6,9 @@
  * Anything that decides what a caller may read lives here or below.
  */
 
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "@langwatch/observability";
+import type { ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 
 import { ENTITIES, fieldNames, gatedFieldNames } from "./catalog";
 import { compile, type CompiledQuery } from "./compiler";
@@ -19,15 +20,16 @@ import { parseLwql } from "./parser";
 const logger = createLogger("langwatch:app-layer:lwql");
 
 /**
- * Resolves the caller's content-visibility cutoff.
+ * Resolves the caller's content-visibility cutoff for a project.
  *
- * Mirrors `VisibilityWindowService.getVisibilityCutoffMs`: `null` means the plan
- * has no window and nothing is gated. Injected rather than imported so the
- * service stays testable without a plan store.
+ * `null` means the plan has no window and nothing is gated. Production wiring
+ * passes `getVisibilityCutoffMsForProject`, which already fails closed on plan
+ * errors; injected rather than imported so the service stays testable without a
+ * plan store.
  */
-export type VisibilityCutoffResolver = (args: {
-  organizationId: string;
-}) => Promise<number | null>;
+export type VisibilityCutoffResolver = (
+  projectId: string,
+) => Promise<number | null>;
 
 export interface LwqlRequest {
   /** SQL-like text. Mutually exclusive with `ir`. */
@@ -38,7 +40,6 @@ export interface LwqlRequest {
 
 export interface LwqlExecutionOptions {
   projectId: string;
-  organizationId: string;
   /** Validate and compile, but do not execute. Powers the dry-run endpoint. */
   dryRun?: boolean;
   /**
@@ -70,16 +71,24 @@ export interface LwqlResult {
  * ClickHouse guardrails. The query surface is caller-driven, so a single
  * expensive query must not be able to degrade the cluster for other tenants.
  */
-const LWQL_CLICKHOUSE_SETTINGS = {
+const LWQL_CLICKHOUSE_SETTINGS: ClickHouseSettings = {
   max_execution_time: 30,
-  max_result_rows: 100_000,
-  max_bytes_before_external_group_by: "0",
-  readonly: "1",
-} as const;
+  max_result_rows: "100000",
+  // `readonly: 2` permits SELECT and settings changes but no writes — a
+  // server-side backstop behind the language's own read-only guarantee.
+  readonly: "2",
+};
 
 export class LwqlService {
   constructor(
-    private readonly resolveClient: ClickHouseClientResolver,
+    /**
+     * Resolves a per-tenant client. May return null when ClickHouse is not
+     * provisioned for a project, which the caller reports as unavailable
+     * rather than treating as an empty result.
+     */
+    private readonly resolveClient: (
+      projectId: string,
+    ) => Promise<ClickHouseClient | null>,
     private readonly resolveVisibilityCutoff: VisibilityCutoffResolver,
   ) {}
 
@@ -127,12 +136,14 @@ export class LwqlService {
    * that would silently ungate content for every free-tier caller for the
    * duration of the outage.
    */
-  private async resolveGating(organizationId: string): Promise<GatingContext> {
+  private async resolveGating(projectId: string): Promise<GatingContext> {
     try {
-      return { cutoffMs: await this.resolveVisibilityCutoff({ organizationId }) };
+      return { cutoffMs: await this.resolveVisibilityCutoff(projectId) };
     } catch (error) {
+      // Defence in depth: the production resolver already fails closed, but a
+      // resolver that throws must never read as "no window" here either.
       logger.warn(
-        { error, organizationId },
+        { error, projectId },
         "visibility cutoff resolution failed; gating content closed",
       );
       return { cutoffMs: Date.now() };
@@ -144,7 +155,7 @@ export class LwqlService {
     options: LwqlExecutionOptions,
   ): Promise<CompiledQuery> {
     const ir = this.toIr(request, options.now);
-    const gating = await this.resolveGating(options.organizationId);
+    const gating = await this.resolveGating(options.projectId);
     return compile(ir, {
       projectId: options.projectId,
       gating,
