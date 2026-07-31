@@ -28,6 +28,7 @@ import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
+import { createCanonicalSpanRecorder } from "../src/server/app-layer/traces/ingest/canonicalSpanRecorder";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/trace-processing/schema";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
@@ -78,10 +79,10 @@ assertLocalUrl("CLICKHOUSE_URL", process.env.CLICKHOUSE_URL);
  * REST collector route runs, then enqueues through the production producer.
  */
 async function dispatchDeepTrace({
-  app,
+  recordSpan,
   trace,
 }: {
-  app: ReturnType<typeof initializeDefaultApp>;
+  recordSpan: ReturnType<typeof createCanonicalSpanRecorder>;
   trace: TraceFixture;
 }): Promise<void> {
   const payload = buildCollectorPayload({
@@ -106,17 +107,14 @@ async function dispatchDeepTrace({
   });
   for (const rawSpan of payload.spans) {
     const span = spanValidatorSchema.parse(rawSpan);
-    await app.traces.recordSpan(
-      {
-        tenantId: PROJECT_ID,
-        span: CollectorSpanUtils.convertSpanToOtlp(span),
-        resource,
-        instrumentationScope: { name: MASS_METRICS_SCOPE },
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-        occurredAt: span.timestamps.started_at,
-      },
-      { tenantId: PROJECT_ID },
-    );
+    await recordSpan({
+      tenantId: PROJECT_ID,
+      span: CollectorSpanUtils.convertSpanToOtlp(span),
+      resource,
+      instrumentationScope: { name: MASS_METRICS_SCOPE },
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+      occurredAt: span.timestamps.started_at,
+    });
   }
 }
 
@@ -418,8 +416,19 @@ async function main(): Promise<void> {
     );
 
     const app = initializeDefaultApp({ processRole: "web" });
+    // Not `ingestNormalizedSpan`: that seam stamps occurredAt with the wall
+    // clock and backdating is the whole point of this path. What it shares is
+    // the canonicalising recorder — the command takes a `CanonicalSpan`, and an
+    // envelope handed over verbatim leaves the event's trace id unresolved, so
+    // every seeded span commits with an empty aggregate id and no fold can key
+    // a row.
+    const recordSpan = createCanonicalSpanRecorder({
+      recordSpan: async (span) => {
+        await app.traces.recordSpan(span, { tenantId: span.tenantId });
+      },
+    });
     for (const trace of deep) {
-      await dispatchDeepTrace({ app, trace });
+      await dispatchDeepTrace({ recordSpan, trace });
     }
     console.log("   deep trace history dispatched as pipeline commands");
     await dispatchTimeline({ app, timeline });
