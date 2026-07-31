@@ -18,7 +18,21 @@ export type PromptsConfig = {
   prompts: Record<string, PromptDependency>;
 };
 
-export type RuntimeParameters = Record<string, unknown>;
+/**
+ * A JSON value: what runtime parameters actually persist and what the API
+ * schema declares (the spec's recursive JsonValue component). Structurally
+ * identical to the generated client's RecursiveJsonValue, so values flow
+ * between hand-written and generated types without casts.
+ */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type RuntimeParameters = Record<string, JsonValue>;
 
 export type MaterializedPrompt = {
   id: string;

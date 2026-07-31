@@ -99,7 +99,22 @@ export interface EndUserSpend {
     cache_creation_input_tokens: number;
     reasoning_tokens: number;
   };
-  cap: unknown;
+  /**
+   * The attributed-user template caps that apply to this end user, each
+   * with its boundary-aware current-period spend. Empty when the
+   * organization runs no templates; never null.
+   */
+  caps: EndUserCap[];
+}
+
+export interface EndUserCap {
+  budget_id: string;
+  anchor_id: string;
+  window: string;
+  on_breach: "BLOCK" | "WARN";
+  limit_usd: string;
+  spent_usd: string;
+  period_started_at: string;
 }
 
 export class SpendEventsApiError extends Error {

@@ -65,7 +65,7 @@
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "pnpm exec openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+    "generate:openapi-types": "pnpm exec openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts && node scripts/patch-generated-openapi.mjs",
     "generate:server-types": "./copy-types.sh"
   },
   "devDependencies": {
