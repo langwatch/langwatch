@@ -123,6 +123,9 @@ export function spendTargetsForBudgets(
           bucketSuffix: b.providerKey
             ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
             : null,
+          // MANUAL windows and mid-period resets move the boundary; the
+          // list must total the CURRENT period, same as enforcement does.
+          periodFloorMs: budgetPeriodFloorMs(b),
         }
       : {
           budgetId: b.id,
@@ -130,6 +133,7 @@ export function spendTargetsForBudgets(
           scopeId: bucketScopeIdFor(b, b.scopeId),
           window: b.window,
           match: "exact" as const,
+          periodFloorMs: budgetPeriodFloorMs(b),
         },
   );
 }

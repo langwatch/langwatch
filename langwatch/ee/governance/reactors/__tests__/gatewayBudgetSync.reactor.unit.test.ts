@@ -112,9 +112,9 @@ function mockDeps(
   resolved?: ResolvedBudgetStub[],
 ): {
   deps: GatewayBudgetSyncReactorDeps;
-  insertDebit: ReturnType<typeof vi.fn>;
+  insertDebitsForBudgets: ReturnType<typeof vi.fn>;
 } {
-  const insertDebit = vi.fn().mockResolvedValue(undefined);
+  const insertDebitsForBudgets = vi.fn().mockResolvedValue(undefined);
   return {
     deps: {
       prisma: {
@@ -139,10 +139,10 @@ function mockDeps(
         ),
       } as any,
       budgetCHRepository: {
-        insertDebit,
+        insertDebitsForBudgets,
       } as any,
     },
-    insertDebit,
+    insertDebitsForBudgets,
   };
 }
 
@@ -159,19 +159,19 @@ describe("gatewayBudgetSync reactor", () => {
 
   describe("when the trace lacks gateway attributes", () => {
     it("short-circuits without reading PG or writing CH", async () => {
-      const { deps, insertDebit } = mockDeps(null, null, []);
+      const { deps, insertDebitsForBudgets } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
       await reactor.handle(event, ctx(createFoldState({})));
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebitsForBudgets).not.toHaveBeenCalled();
       expect(deps.prisma.virtualKey.findUnique).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK is unknown", () => {
     it("logs + skips without writing to CH", async () => {
-      const { deps, insertDebit } = mockDeps(null, null, []);
+      const { deps, insertDebitsForBudgets } = mockDeps(null, null, []);
       const reactor = createGatewayBudgetSyncReactor(deps);
 
       await reactor.handle(
@@ -184,13 +184,13 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebitsForBudgets).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK belongs to a different org", () => {
     it("logs + skips without writing to CH", async () => {
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebitsForBudgets } = mockDeps(
         { id: "vk-1", organizationId: "org-other", principalUserId: null },
         {
           id: "project-1",
@@ -210,13 +210,13 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebitsForBudgets).not.toHaveBeenCalled();
     });
   });
 
   describe("when the VK has no applicable budgets", () => {
     it("skips the CH write — no rows to fold", async () => {
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebitsForBudgets } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -237,7 +237,7 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).not.toHaveBeenCalled();
+      expect(insertDebitsForBudgets).not.toHaveBeenCalled();
     });
   });
 
@@ -250,7 +250,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebitsForBudgets } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -271,8 +271,8 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      const rows = insertDebit.mock.calls[0]![0];
+      expect(insertDebitsForBudgets).toHaveBeenCalledTimes(1);
+      const rows = insertDebitsForBudgets.mock.calls[0]![0];
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         tenantId: "project-1",
@@ -301,7 +301,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebitsForBudgets } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: "user-1" },
         {
           id: "project-1",
@@ -336,8 +336,8 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      const rows = insertDebit.mock.calls[0]![0];
+      expect(insertDebitsForBudgets).toHaveBeenCalledTimes(1);
+      const rows = insertDebitsForBudgets.mock.calls[0]![0];
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         budgetId: "budget-grp",
@@ -357,7 +357,7 @@ describe("gatewayBudgetSync reactor", () => {
         window: "MONTH",
       } as GatewayBudget;
 
-      const { deps, insertDebit } = mockDeps(
+      const { deps, insertDebitsForBudgets } = mockDeps(
         { id: "vk-1", organizationId: "org-1", principalUserId: null },
         {
           id: "project-1",
@@ -381,8 +381,8 @@ describe("gatewayBudgetSync reactor", () => {
         ),
       );
 
-      expect(insertDebit).toHaveBeenCalledTimes(1);
-      expect(insertDebit.mock.calls[0]![0][0]).toMatchObject({
+      expect(insertDebitsForBudgets).toHaveBeenCalledTimes(1);
+      expect(insertDebitsForBudgets.mock.calls[0]![0][0]).toMatchObject({
         status: "BLOCKED_BY_GUARDRAIL",
         amountUsd: "0.0000000000",
       });

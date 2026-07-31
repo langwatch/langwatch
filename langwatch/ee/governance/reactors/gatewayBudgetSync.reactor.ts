@@ -240,7 +240,11 @@ export function createGatewayBudgetSyncReactor(
           }),
         );
 
-        await deps.budgetCHRepository.insertDebit(rows);
+        // Per-budget probe, NOT the whole-request one: the attributed-user
+        // process manager writes this request's per-user bucket row on its
+        // own clock, and a whole-request probe would let whichever writer
+        // lands second silently skip (tenant caps then never accrue).
+        await deps.budgetCHRepository.insertDebitsForBudgets(rows);
         if (deps.detectCrossings) {
           await deps.detectCrossings(
             rows.map((r) => ({
