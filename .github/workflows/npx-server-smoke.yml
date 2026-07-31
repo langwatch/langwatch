@@ -45,6 +45,14 @@ on:
       # validate — but it was missing from this list, so two packaging bugs
       # went out on a push that started no smoke run at all and looked green.
       - "dev/scripts/pack-npm.sh"
+      # The manifests of every workspace member the app resolves. Since
+      # ADR-076 they are all in one workspace and the app depends on the SDK
+      # with `workspace:*`, so their dependencies — and their lifecycle
+      # scripts — are part of what an npx install resolves and RUNS. A
+      # `prepare` hook in the SDK took the packed artifact down before it
+      # served a request, on a push this job did not watch.
+      - "sdks/typescript/package.json"
+      - "packages/*/package.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
