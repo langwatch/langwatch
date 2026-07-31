@@ -4,20 +4,19 @@
  * rollups, replay semantics, and the auth + plan gates.
  */
 
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
-  type Project,
-} from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
@@ -26,6 +25,7 @@ import {
   GatewaySpendEventsRepository,
   type SpendEventRow,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
 // tests flip this flag per scenario instead of booting the whole app.
@@ -250,47 +250,37 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     if (chClient) {
       for (const tenant of [project?.id, foreignProject?.id]) {
         if (!tenant) continue;
-        await chClient
-          .command({
-            query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenant}'`,
-          })
-          ;
+        await chClient.command({
+          query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenant}'`,
+        });
       }
     }
     for (const org of [organization, foreignOrganization]) {
       if (!org) continue;
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId: org.id } })
-        ;
-      await prisma.apiKey
-        .deleteMany({ where: { organizationId: org.id } })
-        ;
-      await prisma.organizationUser
-        .deleteMany({ where: { organizationId: org.id } })
-        ;
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: org.id },
+      });
+      await prisma.apiKey.deleteMany({ where: { organizationId: org.id } });
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: org.id },
+      });
     }
-    await prisma.project
-      .deleteMany({
-        where: { id: { in: [project?.id ?? "", foreignProject?.id ?? ""] } },
-      })
-      ;
-    await prisma.team
-      .deleteMany({
-        where: {
-          organizationId: {
-            in: [organization?.id ?? "", foreignOrganization?.id ?? ""],
-          },
+    await prisma.project.deleteMany({
+      where: { id: { in: [project?.id ?? "", foreignProject?.id ?? ""] } },
+    });
+    await prisma.team.deleteMany({
+      where: {
+        organizationId: {
+          in: [organization?.id ?? "", foreignOrganization?.id ?? ""],
         },
-      })
-      ;
+      },
+    });
     await prisma.user.delete({ where: { id: userId } });
-    await prisma.organization
-      .deleteMany({
-        where: {
-          id: { in: [organization?.id ?? "", foreignOrganization?.id ?? ""] },
-        },
-      })
-      ;
+    await prisma.organization.deleteMany({
+      where: {
+        id: { in: [organization?.id ?? "", foreignOrganization?.id ?? ""] },
+      },
+    });
     await stopTestContainers();
   });
 
@@ -374,17 +364,28 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         organizationId: foreignOrganization.id,
       },
     ]);
-    const res = await app.request(`/api/gateway/v1/spend-events?limit=200&from=${baseTime - 120_000}&to=${baseTime + 600_000}`, {
-      headers: headers(),
-    });
+    const res = await app.request(
+      `/api/gateway/v1/spend-events?limit=200&from=${baseTime - 120_000}&to=${baseTime + 600_000}`,
+      {
+        headers: headers(),
+      },
+    );
     // Envelope ids are type-suffixed, so the fence must assert on the raw
     // join key or it can never fail.
     const body = (await res.json()) as {
       data: Array<{ data: { gateway_request_id: string } }>;
     };
-    expect(
-      body.data.map((e) => e.data.gateway_request_id),
-    ).not.toContain(`${ns}-foreign`);
+    expect(body.data.map((e) => e.data.gateway_request_id)).not.toContain(
+      `${ns}-foreign`,
+    );
+  });
+
+  it("refuses an inverted time range", async () => {
+    const res = await app.request(
+      `/api/gateway/v1/spend-events?from=${baseTime + 10_000}&to=${baseTime}`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(422);
   });
 
   /** @scenario A garbled cursor is refused, not silently reset */
@@ -410,14 +411,16 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         costUsd: "0.030000",
         occurredAt: new Date(baseTime + 41_000),
       }),
+      // Nonzero on purpose: if the aggregation ever sums settled rows,
+      // the cost and token assertions below must fail, not coast on zero.
       spendRow(`${ns}-sum-settled`, {
         endUserId: u,
         status: "settled" as const,
         needsReconciliation: true,
         settleReason: "confirmation_deadline_expired",
-        costUsd: "0.000000",
-        tokensInput: 0,
-        tokensOutput: 0,
+        costUsd: "0.099000",
+        tokensInput: 7_777,
+        tokensOutput: 8_888,
         tokensCacheRead: 0,
         tokensCacheWrite: 0,
         occurredAt: new Date(baseTime + 42_000),
@@ -511,5 +514,4 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(Number(body.data.cost.total_usd)).toBeCloseTo(0.01, 6);
     expect(body.data.request_count).toBe(1);
   });
-
 });

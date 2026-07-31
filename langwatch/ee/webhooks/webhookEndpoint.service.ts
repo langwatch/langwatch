@@ -363,6 +363,79 @@ export class WebhookEndpointService {
    * ACTIVE endpoints of the org, for the delivery scan's subscription
    * matching. Reads are frequent and small; no caching until measured.
    */
+  /**
+   * The endpoint-row half of the health read: status, streak, and the
+   * last-outcome stamps. Includes disabled and failing endpoints, which is
+   * exactly what a health surface must show.
+   */
+  async getStatusSnapshot(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<{
+    status: "ACTIVE" | "DISABLED";
+    disabledReason: string | null;
+    failingSince: Date | null;
+    lastSuccessAt: Date | null;
+    lastFailureAt: Date | null;
+  } | null> {
+    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: params.endpointId,
+        organizationId: params.organizationId,
+        archivedAt: null,
+      },
+      select: {
+        status: true,
+        disabledReason: true,
+        failingSince: true,
+        lastSuccessAt: true,
+        lastFailureAt: true,
+      },
+    });
+    return endpoint;
+  }
+
+  /**
+   * Window rates from the delivery log. Counts aggregate over the WHOLE
+   * window (a capped read would saturate them); only the latency sample is
+   * capped, newest first, which is all a percentile needs.
+   */
+  async getDeliveryStats(params: {
+    organizationId: string;
+    endpointId: string;
+    since: Date;
+    sampleLimit: number;
+  }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
+    const where = {
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+      firedAt: { gt: params.since },
+    };
+    const [byOutcome, sample] = await Promise.all([
+      this.deps.prisma.webhookEndpointDelivery.groupBy({
+        by: ["outcome"],
+        where,
+        _count: { _all: true },
+      }),
+      this.deps.prisma.webhookEndpointDelivery.findMany({
+        where: { ...where, latencyMs: { not: null } },
+        select: { latencyMs: true },
+        orderBy: { firedAt: "desc" },
+        take: params.sampleLimit,
+      }),
+    ]);
+    const attempted = byOutcome.reduce((sum, g) => sum + g._count._all, 0);
+    const delivered =
+      byOutcome.find((g) => g.outcome === "success")?._count._all ?? 0;
+    return {
+      attempted,
+      delivered,
+      latencies: sample
+        .map((d) => d.latencyMs)
+        .filter((l): l is number => l !== null),
+    };
+  }
+
   async getActiveByOrganization(params: {
     organizationId: string;
   }): Promise<WebhookEndpointView[]> {
@@ -417,7 +490,15 @@ export class WebhookEndpointService {
     const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
       where: { id: params.endpointId, organizationId: params.organizationId },
     });
-    if (!endpoint) return;
+    if (!endpoint) {
+      // Deleted mid-flight is normal and must not fail the attempt, but a
+      // wrong pairing is a caller bug, so the discard leaves evidence.
+      logger.warn(
+        { endpointId: params.endpointId, dispatchId: params.dispatchId },
+        "delivery attempt discarded: endpoint not found in organization",
+      );
+      return;
+    }
 
     await this.deps.prisma.webhookEndpointDelivery.create({
       data: {
@@ -449,7 +530,7 @@ export class WebhookEndpointService {
     // A streak starts at the FIRST failure and is never restarted by a
     // concurrent one: the conditional update only writes failingSince where
     // it is currently null.
-    await this.deps.prisma.webhookEndpoint.updateMany({
+    const started = await this.deps.prisma.webhookEndpoint.updateMany({
       where: {
         id: params.endpointId,
         organizationId: params.organizationId,
@@ -462,8 +543,21 @@ export class WebhookEndpointService {
       data: { lastFailureAt: now },
     });
 
-    const failingSince = endpoint.failingSince ?? now;
-    if (now.getTime() - failingSince.getTime() < WEBHOOK_AUTO_DISABLE_AFTER_MS) {
+    // The 72h threshold must judge the streak start that actually
+    // persisted. If the conditional write lost a race (read null, wrote
+    // nothing), another attempt owns the start; read it back.
+    let failingSince = endpoint.failingSince ?? now;
+    if (endpoint.failingSince === null && started.count === 0) {
+      const fresh = await this.deps.prisma.webhookEndpoint.findFirst({
+        where: { id: params.endpointId, organizationId: params.organizationId },
+        select: { failingSince: true },
+      });
+      failingSince = fresh?.failingSince ?? now;
+    }
+    if (
+      now.getTime() - failingSince.getTime() <
+      WEBHOOK_AUTO_DISABLE_AFTER_MS
+    ) {
       return;
     }
     // The disable is a compare-and-set on status, so exactly one of any

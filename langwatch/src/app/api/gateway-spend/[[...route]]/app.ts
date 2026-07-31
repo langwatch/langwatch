@@ -1,27 +1,27 @@
-import type { Organization } from "@prisma/client";
-import { describeRoute } from "hono-openapi";
-import type { Context, Next } from "hono";
-import { z } from "zod";
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { spendRowToEnvelope } from "@ee/webhooks/envelope";
+import type { Organization } from "@prisma/client";
+import type { Context, Next } from "hono";
+import { describeRoute } from "hono-openapi";
+import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import {
-  GatewaySpendEventsRepository,
-  decodeSpendEventsCursor,
-} from "~/server/gateway/spendEvents.clickhouse.repository";
 import { prisma } from "~/server/db";
+import {
+  decodeSpendEventsCursor,
+  GatewaySpendEventsRepository,
+} from "~/server/gateway/spendEvents.clickhouse.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
-import { handleGatewaySpendApiError } from "./error-handler";
 import {
   END_USER_SPEND_DESCRIPTION,
   SPEND_EVENTS_PULL_DESCRIPTION,
 } from "./contract";
+import { handleGatewaySpendApiError } from "./error-handler";
 
 patchZodOpenapi();
 
@@ -51,21 +51,25 @@ async function requireBillingPlan(c: Context, next: Next): Promise<void> {
   await next();
 }
 
-const spendEventsQuerySchema = z.object({
-  // The reconciliation pull is a RANGED read by contract: without bounds
-  // the walk sorts the whole 13-month table under FINAL on every page.
-  from: z.coerce.number().int().positive(),
-  to: z.coerce.number().int().positive(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(200).optional().default(50),
-  virtual_key_id: z.string().min(1).max(100).optional(),
-  end_user_id: z.string().min(1).max(256).optional(),
-  project_id: z.string().min(1).max(100).optional(),
-  model: z.string().min(1).max(200).optional(),
-  status: z
-    .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
-    .optional(),
-});
+const spendEventsQuerySchema = z
+  .object({
+    // The reconciliation pull is a RANGED read by contract: without bounds
+    // the walk sorts the whole 13-month table under FINAL on every page.
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional().default(50),
+    virtual_key_id: z.string().min(1).max(100).optional(),
+    end_user_id: z.string().min(1).max(256).optional(),
+    project_id: z.string().min(1).max(100).optional(),
+    model: z.string().min(1).max(200).optional(),
+    status: z
+      .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
+      .optional(),
+  })
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 const END_USER_WINDOWS = {
   day: 24 * 60 * 60 * 1000,
@@ -85,9 +89,11 @@ async function orgTenantIds(
   organizationId: string,
   projectId?: string,
 ): Promise<string[]> {
+  // Ordered so downstream client routing by the first tenant is stable.
   const projects = await prisma.project.findMany({
     where: { team: { organizationId } },
     select: { id: true },
+    orderBy: { id: "asc" },
   });
   const ids = projects.map((p) => p.id);
   if (projectId !== undefined) {
@@ -108,44 +114,42 @@ const spendSummariesQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).optional().default(500),
 });
 
-secured
-  .access(requires("gatewaySpend:view"))
-  .get(
-    "/spend-summaries",
-    requireBillingPlan,
-    describeRoute({
-      description:
-        "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges.",
-    }),
-    zValidator("query", spendSummariesQuerySchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const query = c.req.valid("query");
-      const tenantIds = await orgTenantIds(organization.id, query.project_id);
-      const rows = await spendEvents.readSpendSummaries({
-        tenantIds,
-        groupBy: query.group_by,
-        fromMs: query.from,
-        toMs: query.to,
-        limit: query.limit,
-      });
-      return c.json({
-        data: rows.map((r) => ({
-          key: r.key,
-          event_count: r.eventCount,
-          settled_count: r.settledCount,
-          usage: {
-            input_tokens: r.tokensInput,
-            output_tokens: r.tokensOutput,
-            cache_read_input_tokens: r.tokensCacheRead,
-            cache_creation_input_tokens: r.tokensCacheWrite,
-            reasoning_tokens: r.tokensReasoning,
-          },
-          cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
-        })),
-      });
-    },
-  );
+secured.access(requires("gatewaySpend:view")).get(
+  "/spend-summaries",
+  requireBillingPlan,
+  describeRoute({
+    description:
+      "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges.",
+  }),
+  zValidator("query", spendSummariesQuerySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const query = c.req.valid("query");
+    const tenantIds = await orgTenantIds(organization.id, query.project_id);
+    const rows = await spendEvents.readSpendSummaries({
+      tenantIds,
+      groupBy: query.group_by,
+      fromMs: query.from,
+      toMs: query.to,
+      limit: query.limit,
+    });
+    return c.json({
+      data: rows.map((r) => ({
+        key: r.key,
+        event_count: r.eventCount,
+        settled_count: r.settledCount,
+        usage: {
+          input_tokens: r.tokensInput,
+          output_tokens: r.tokensOutput,
+          cache_read_input_tokens: r.tokensCacheRead,
+          cache_creation_input_tokens: r.tokensCacheWrite,
+          reasoning_tokens: r.tokensReasoning,
+        },
+        cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
+      })),
+    });
+  },
+);
 
 secured
   .access(requires("gatewaySpend:view"))
@@ -159,13 +163,13 @@ secured
       const query = c.req.valid("query");
       // A present-but-garbled cursor is a caller bug: refusing beats
       // silently restarting the walk, which would re-serve the whole range.
-      if (query.cursor !== undefined && !decodeSpendEventsCursor(query.cursor)) {
+      if (
+        query.cursor !== undefined &&
+        !decodeSpendEventsCursor(query.cursor)
+      ) {
         throw new BadRequestError("Invalid cursor.");
       }
-      const tenantIds = await orgTenantIds(
-        organization.id,
-        query.project_id,
-      );
+      const tenantIds = await orgTenantIds(organization.id, query.project_id);
       const page = await spendEvents.walkSpendEvents({
         tenantIds,
         fromMs: query.from,

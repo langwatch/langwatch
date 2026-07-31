@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  createListCollection,
   EmptyState,
   Heading,
   HStack,
@@ -13,13 +14,11 @@ import {
 } from "@chakra-ui/react";
 import { ReceiptText, X } from "lucide-react";
 import { useMemo, useState } from "react";
-
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
-import { createListCollection } from "@chakra-ui/react";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -71,9 +70,9 @@ function BillingEventsPage() {
   const [virtualKeyFilter, setVirtualKeyFilter] = useState("");
   const [endUserFilter, setEndUserFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "failed" | "admitted" | "settled">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "confirmed" | "failed" | "admitted" | "settled"
+  >("all");
   const [pages, setPages] = useState<SpendRow[][]>([]);
   const [cursor, setCursor] = useState<Cursor | undefined>(undefined);
 
@@ -218,19 +217,21 @@ function BillingEventsPage() {
         </Text>
       )}
 
-      {!query.isLoading && rows.length === 0 && !query.data?.clickHouseDisabled && (
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <ReceiptText />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No billing events</EmptyState.Title>
-            <EmptyState.Description>
-              Every gateway request lands here, budget or no budget.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      )}
+      {!query.isLoading &&
+        rows.length === 0 &&
+        !query.data?.clickHouseDisabled && (
+          <EmptyState.Root>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <ReceiptText />
+              </EmptyState.Indicator>
+              <EmptyState.Title>No billing events</EmptyState.Title>
+              <EmptyState.Description>
+                Every gateway request lands here, budget or no budget.
+              </EmptyState.Description>
+            </EmptyState.Content>
+          </EmptyState.Root>
+        )}
 
       {rows.length > 0 && (
         <Box width="full" overflowX="auto">

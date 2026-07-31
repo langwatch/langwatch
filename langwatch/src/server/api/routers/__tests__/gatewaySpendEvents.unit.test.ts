@@ -4,11 +4,10 @@
  * ClickHouse-disabled degrade, and RBAC denial.
  */
 import type { PrismaClient } from "@prisma/client";
-import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
+import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
+import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
 
 const PROJECT_ID = "project_1";
 

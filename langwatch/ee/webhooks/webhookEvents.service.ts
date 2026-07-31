@@ -25,9 +25,12 @@ export class WebhookEventsService {
     limit: number;
     types?: string[];
   }): Promise<{ events: WebhookEnvelope[]; nextCursor: string | null }> {
+    // Ordered so the repository's client routing by the first tenant is
+    // stable across calls.
     const projects = await this.deps.prisma.project.findMany({
       where: { team: { organizationId: params.organizationId } },
       select: { id: true },
+      orderBy: { id: "asc" },
     });
     const page = await this.deps.repository.readEmittedEventsPage({
       tenantIds: projects.map((p) => p.id),

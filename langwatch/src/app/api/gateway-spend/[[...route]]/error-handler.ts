@@ -1,5 +1,5 @@
-import { createLogger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handleError } from "../../middleware/error-handler";

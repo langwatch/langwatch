@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { Organization } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Organization } from "@prisma/client";
 import { prisma } from "~/server/db";
 import {
   WEBHOOK_AUTO_DISABLE_AFTER_MS,

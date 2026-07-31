@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  decodeSpendEventsCursor,
-  encodeSpendEventsCursor,
-} from "../spendEvents.clickhouse.repository";
-import {
   END_USER_SPEND_DESCRIPTION,
   SPEND_EVENTS_PULL_DESCRIPTION,
 } from "../../../app/api/gateway-spend/[[...route]]/contract";
+import {
+  decodeSpendEventsCursor,
+  encodeSpendEventsCursor,
+} from "../spendEvents.clickhouse.repository";
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   /** @scenario Cursor encoding round-trips every version and id pair */
@@ -27,13 +27,19 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(decodeSpendEventsCursor("")).toBeNull();
     expect(decodeSpendEventsCursor("%garbage%")).toBeNull();
     expect(
-      decodeSpendEventsCursor(Buffer.from(":no-ts", "utf8").toString("base64url")),
+      decodeSpendEventsCursor(
+        Buffer.from(":no-ts", "utf8").toString("base64url"),
+      ),
     ).toBeNull();
     expect(
-      decodeSpendEventsCursor(Buffer.from("NaN:id", "utf8").toString("base64url")),
+      decodeSpendEventsCursor(
+        Buffer.from("NaN:id", "utf8").toString("base64url"),
+      ),
     ).toBeNull();
     expect(
-      decodeSpendEventsCursor(Buffer.from("123:", "utf8").toString("base64url")),
+      decodeSpendEventsCursor(
+        Buffer.from("123:", "utf8").toString("base64url"),
+      ),
     ).toBeNull();
   });
 

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import {
+  assertValidDeliveryControls,
   WEBHOOK_BATCH_DELAY_BOUNDS_MS,
   WEBHOOK_IN_FLIGHT_BOUNDS,
   WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
   WebhookEndpointService,
   WebhookEndpointValidationError,
-  assertValidDeliveryControls,
 } from "../webhookEndpoint.service";
 
 describe("webhook delivery control bounds", () => {
@@ -27,9 +27,7 @@ describe("webhook delivery control bounds", () => {
       `between ${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.min} and ${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.max}`,
     );
 
-    expect(() =>
-      assertValidDeliveryControls({ maxBatchDelayMs: -1 }),
-    ).toThrow(
+    expect(() => assertValidDeliveryControls({ maxBatchDelayMs: -1 })).toThrow(
       `between ${WEBHOOK_BATCH_DELAY_BOUNDS_MS.min} and ${WEBHOOK_BATCH_DELAY_BOUNDS_MS.max}`,
     );
     expect(() =>

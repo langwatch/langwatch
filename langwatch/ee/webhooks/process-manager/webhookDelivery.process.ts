@@ -3,19 +3,12 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { PlanInfo } from "../../licensing/planInfo";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
-import type {
-  NewOutboxMessage,
-  ProcessStore,
-} from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import {
   assertWebhookDelivered,
   sendWebhook,
 } from "~/server/app-layer/automations/delivery/sendWebhook";
-import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -34,6 +27,13 @@ import {
   NANO_USD_PER_USD,
   rateSpendNanoUsd,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
+import type {
+  NewOutboxMessage,
+  ProcessStore,
+} from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
 import type {
@@ -77,6 +77,7 @@ const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 /** Maintenance cadence: the winner of the hourly CAS runs the sweeps. */
 const MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
 const MAINTENANCE_PROCESS_KEY = "maintenance";
+const MAINTENANCE_TENANT = "__webhook_maintenance__";
 /** In-process throttle so the hot deliver path checks the CAS row at most
  *  once a minute per pod. */
 let maintenanceLastCheckedMs = 0;
@@ -336,8 +337,9 @@ async function flushEndpointStream({
 
   const outstanding = (
     await deps.processStore.findMessagesByRef({ ref })
-  ).filter((m) => m.intentType === "sendBatch" && m.status === "pending")
-    .length;
+  ).filter(
+    (m) => m.intentType === "sendBatch" && m.status === "pending",
+  ).length;
 
   const messages: NewOutboxMessage[] = [];
   let inFlight = outstanding;
@@ -453,7 +455,7 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
       });
     }
 
-    await runMaintenanceIfDue(deps, payload.project_id);
+    await runMaintenanceIfDue(deps);
   };
 }
 
@@ -487,27 +489,29 @@ export function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
  */
 async function runMaintenanceIfDue(
   deps: WebhookDeliveryProcessDeps,
-  projectId: string,
 ): Promise<void> {
   const now = (deps.now ?? Date.now)();
   if (now - maintenanceLastCheckedMs < 60_000) return;
   maintenanceLastCheckedMs = now;
 
+  // Both sweeps below are global, so the CAS row must be too: a sentinel
+  // tenant keeps it one row total, not one per project, and exactly one
+  // pod per hour runs the sweeps across the whole install.
   const ref = {
     processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId,
+    projectId: MAINTENANCE_TENANT,
     processKey: MAINTENANCE_PROCESS_KEY,
   };
   try {
-    const existing = await deps.processStore.findByRef<{ lastRunMs: number }>(
-      { ref },
-    );
+    const existing = await deps.processStore.findByRef<{ lastRunMs: number }>({
+      ref,
+    });
     if (existing && now - existing.state.lastRunMs < MAINTENANCE_INTERVAL_MS) {
       return;
     }
     const claimed = await deps.processStore.commit({
       ref,
-      tenantId: projectId,
+      tenantId: MAINTENANCE_TENANT,
       sourceEventId: null,
       expectedRevision: existing?.revision ?? 0,
       state: { lastRunMs: now },

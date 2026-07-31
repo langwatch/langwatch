@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import {
-  WEBHOOK_EVENT_TYPES,
   eventMatches,
   isValidEventSelector,
+  WEBHOOK_EVENT_TYPES,
 } from "../eventRegistry";
 import {
   WebhookEndpointService,

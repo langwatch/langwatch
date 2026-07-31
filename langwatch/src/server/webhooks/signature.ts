@@ -50,7 +50,8 @@ export function verifyWebhookSignature({
   const parts = new Map<string, string>();
   for (const piece of header.split(",")) {
     const eq = piece.indexOf("=");
-    if (eq > 0) parts.set(piece.slice(0, eq).trim(), piece.slice(eq + 1).trim());
+    if (eq > 0)
+      parts.set(piece.slice(0, eq).trim(), piece.slice(eq + 1).trim());
   }
   const t = Number(parts.get("t"));
   const v1 = parts.get("v1");

@@ -5,8 +5,7 @@ export const ADMIT_SPEND_COMMAND_TYPE =
   "lw.gateway_request.admit_spend" as const;
 export const CONFIRM_SPEND_COMMAND_TYPE =
   "lw.gateway_request.confirm_spend" as const;
-export const FAIL_SPEND_COMMAND_TYPE =
-  "lw.gateway_request.fail_spend" as const;
+export const FAIL_SPEND_COMMAND_TYPE = "lw.gateway_request.fail_spend" as const;
 export const SETTLE_SPEND_COMMAND_TYPE =
   "lw.gateway_request.settle_spend" as const;
 

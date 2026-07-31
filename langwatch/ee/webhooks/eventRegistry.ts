@@ -94,7 +94,9 @@ export const WEBHOOK_EVENT_TYPES = [
 export type WebhookEventTypeName = (typeof WEBHOOK_EVENT_TYPES)[number]["type"];
 
 const KNOWN_TYPES = new Set<string>(WEBHOOK_EVENT_TYPES.map((t) => t.type));
-const KNOWN_FAMILIES = new Set<string>(WEBHOOK_EVENT_TYPES.map((t) => t.family));
+const KNOWN_FAMILIES = new Set<string>(
+  WEBHOOK_EVENT_TYPES.map((t) => t.family),
+);
 
 /**
  * Is `selector` a valid `enabledEvents` value: an exact registry type, a

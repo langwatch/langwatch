@@ -15,6 +15,15 @@ const parseInstant = (value: string, flag: string): number => {
   return parsed;
 };
 
+const parsePositiveInt = (value: string, flag: string): number => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    console.error(chalk.red(`Invalid ${flag} value: ${value}`));
+    process.exit(1);
+  }
+  return parsed;
+};
+
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
   from?: string;
@@ -23,7 +32,18 @@ export const spendSummaryCommand = async (options: {
   limit?: string;
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
-  const groupBy = options.groupBy === "end_user" ? "end_user" : "virtual_key";
+  // A typo must not silently become a virtual-key report on a billing
+  // reconciliation surface.
+  const groupByRaw = options.groupBy ?? "virtual_key";
+  if (groupByRaw !== "virtual_key" && groupByRaw !== "end_user") {
+    console.error(
+      chalk.red(
+        `Invalid --group-by value: ${groupByRaw} (expected virtual_key or end_user)`,
+      ),
+    );
+    process.exit(1);
+  }
+  const groupBy = groupByRaw;
   const now = Date.now();
   const fromMs =
     options.from !== undefined
@@ -39,7 +59,10 @@ export const spendSummaryCommand = async (options: {
       from: fromMs,
       to: toMs,
       projectId: options.project,
-      limit: options.limit !== undefined ? Number(options.limit) : undefined,
+      limit:
+        options.limit !== undefined
+          ? parsePositiveInt(options.limit, "--limit")
+          : undefined,
     });
     const settled = data.reduce((sum, row) => sum + row.settled_count, 0);
     spinner.succeed(

@@ -22,11 +22,18 @@ import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import {
+  admitSpendCommandDataSchema,
+  confirmSpendCommandDataSchema,
+  failSpendCommandDataSchema,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
@@ -43,13 +50,6 @@ import {
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { getApp } from "~/server/app-layer/app";
-import {
-  admitSpendCommandDataSchema,
-  confirmSpendCommandDataSchema,
-  failSpendCommandDataSchema,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 
@@ -924,7 +924,10 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     const sender = (
       pipeline.commands as Record<
         string,
-        { sendBatch?: (p: unknown[]) => Promise<unknown>; send: (p: unknown) => Promise<unknown> }
+        {
+          sendBatch?: (p: unknown[]) => Promise<unknown>;
+          send: (p: unknown) => Promise<unknown>;
+        }
       >
     )[name];
     if (!sender) {
@@ -949,8 +952,7 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
   }
 
   return c.json({
-    accepted:
-      parsed.data.records.length - rejected.length,
+    accepted: parsed.data.records.length - rejected.length,
     rejected,
   });
 });

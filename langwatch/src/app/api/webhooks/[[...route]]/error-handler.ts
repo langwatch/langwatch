@@ -1,11 +1,11 @@
-import { createLogger } from "@langwatch/observability";
-import { HandledError } from "@langwatch/handled-error";
-import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,
 } from "@ee/webhooks/webhookEndpoint.service";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handleError } from "../../middleware/error-handler";
 import {
   BadRequestError,

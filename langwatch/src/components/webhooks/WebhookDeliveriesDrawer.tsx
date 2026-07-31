@@ -118,7 +118,9 @@ export function WebhookDeliveriesDrawer({
                   <HStack gap={1}>
                     <Text color="fg.muted">Sends/min:</Text>
                     <Text>
-                      {health.data ? health.data.sendsPerMinute.toFixed(2) : "..."}
+                      {health.data
+                        ? health.data.sendsPerMinute.toFixed(2)
+                        : "..."}
                     </Text>
                   </HStack>
                   <HStack gap={1}>
@@ -126,7 +128,7 @@ export function WebhookDeliveriesDrawer({
                     <Text>
                       {health.data
                         ? health.data.successRate === null
-                          ? "-"
+                          ? "n/a"
                           : `${Math.round(health.data.successRate * 100)}%`
                         : "..."}
                     </Text>
@@ -136,7 +138,7 @@ export function WebhookDeliveriesDrawer({
                     <Text>
                       {health.data
                         ? health.data.p95LatencyMs === null
-                          ? "-"
+                          ? "n/a"
                           : `${health.data.p95LatencyMs}ms`
                         : "..."}
                     </Text>
@@ -158,7 +160,10 @@ export function WebhookDeliveriesDrawer({
                     </Text>
                   </HStack>
                   {endpoint.status === "DISABLED" && (
-                    <Badge colorPalette="red" data-testid="webhook-disabled-badge">
+                    <Badge
+                      colorPalette="red"
+                      data-testid="webhook-disabled-badge"
+                    >
                       disabled
                       {endpoint.disabledReason === "auto_failures_72h"
                         ? ": 72h of failures"

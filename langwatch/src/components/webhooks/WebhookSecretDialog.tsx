@@ -1,10 +1,4 @@
-import {
-  Alert,
-  Button,
-  Code,
-  HStack,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Code, HStack, VStack } from "@chakra-ui/react";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 

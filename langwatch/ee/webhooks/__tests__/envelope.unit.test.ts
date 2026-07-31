@@ -71,7 +71,12 @@ describe("spend event envelope", () => {
 
   it("nulls empty attribution and collapses garbage metadata to an empty object", () => {
     const envelope = spendRowToEnvelope(
-      row({ providerKey: "", principalUserId: "", endUserId: "", metadata: "{oops" }),
+      row({
+        providerKey: "",
+        principalUserId: "",
+        endUserId: "",
+        metadata: "{oops",
+      }),
     );
     expect(envelope.data.model_provider_id).toBeNull();
     expect(envelope.data.principal_user_id).toBeNull();
@@ -81,7 +86,11 @@ describe("spend event envelope", () => {
 
   it("shapes the error block from the rich class on failures", () => {
     const envelope = spendRowToEnvelope(
-      row({ status: "failed", errorClass: "upstream_rate_limited", httpStatus: 429 }),
+      row({
+        status: "failed",
+        errorClass: "upstream_rate_limited",
+        httpStatus: 429,
+      }),
     );
     expect(envelope.type).toBe("gateway.request.completed");
     expect(envelope.data.status).toBe("error");

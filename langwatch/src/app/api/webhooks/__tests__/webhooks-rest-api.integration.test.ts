@@ -1,15 +1,15 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-  type Organization,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
 // tests flip this flag per scenario instead of booting the whole app.
@@ -83,19 +83,23 @@ describe("Feature: Webhook endpoints REST API", () => {
 
   afterAll(async () => {
     if (!organization?.id) return;
-    await prisma.webhookEndpointDelivery
-      .deleteMany({ where: { organizationId: organization.id } });
-    await prisma.webhookEndpoint
-      .deleteMany({ where: { organizationId: organization.id } });
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId: organization.id } });
-    await prisma.apiKey
-      .deleteMany({ where: { organizationId: organization.id } });
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId: organization.id } });
+    await prisma.webhookEndpointDelivery.deleteMany({
+      where: { organizationId: organization.id },
+    });
+    await prisma.webhookEndpoint.deleteMany({
+      where: { organizationId: organization.id },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: organization.id },
+    });
+    await prisma.apiKey.deleteMany({
+      where: { organizationId: organization.id },
+    });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: organization.id },
+    });
     await prisma.user.delete({ where: { id: userId } });
-    await prisma.organization
-      .delete({ where: { id: organization.id } });
+    await prisma.organization.delete({ where: { id: organization.id } });
   });
 
   it("returns 401 without an api key", async () => {
@@ -125,7 +129,9 @@ describe("Feature: Webhook endpoints REST API", () => {
       headers: headers(),
     });
     expect(listRes.status).toBe(200);
-    const listed = (await listRes.json()) as { data: Array<Record<string, unknown>> };
+    const listed = (await listRes.json()) as {
+      data: Array<Record<string, unknown>>;
+    };
     for (const row of listed.data) {
       expect(row).not.toHaveProperty("secret");
       expect(row).not.toHaveProperty("secretEncrypted");
@@ -249,10 +255,9 @@ describe("Feature: Webhook endpoints REST API", () => {
     );
     expect(deleteRes.status).toBe(200);
 
-    const getRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      { headers: headers() },
-    );
+    const getRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+      headers: headers(),
+    });
     expect(getRes.status).toBe(404);
   });
 

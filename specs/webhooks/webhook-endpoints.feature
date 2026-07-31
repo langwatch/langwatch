@@ -166,7 +166,7 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the save is rejected
       And the error names the allowed range
 
-    @unit
+    @integration
     Scenario: Delivery controls are editable in the drawer within their bounds
       Given the endpoint drawer is open
       Then the batch size, batch delay, and in-flight controls show their defaults

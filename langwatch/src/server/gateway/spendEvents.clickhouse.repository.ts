@@ -465,7 +465,9 @@ export class GatewaySpendEventsRepository {
       params.cursorRequestId = decoded.gatewayRequestId;
     }
     if (fromMs !== undefined) {
-      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      clauses.push(
+        "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
       params.fromMs = fromMs;
     }
     if (toMs !== undefined) {
@@ -639,7 +641,9 @@ export class GatewaySpendEventsRepository {
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
     const vkClause =
-      virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
+      virtualKeyId !== undefined
+        ? "AND VirtualKeyId = {virtualKeyId:String}"
+        : "";
     const result = await client.query({
       query: `
         SELECT

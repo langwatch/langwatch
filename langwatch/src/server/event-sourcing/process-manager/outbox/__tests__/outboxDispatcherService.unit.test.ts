@@ -179,7 +179,6 @@ describe("OutboxDispatcherService", () => {
         expect(second.retried).toEqual([]);
         expect(handler).toHaveBeenCalledTimes(1);
       });
-
     });
 
     describe("when the handler throws a retryable-true error", () => {

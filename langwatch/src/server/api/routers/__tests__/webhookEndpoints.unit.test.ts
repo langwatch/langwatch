@@ -7,9 +7,8 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { webhookEndpointsRouter } from "../webhookEndpoints";
 import { createInnerTRPCContext } from "../../trpc";
+import { webhookEndpointsRouter } from "../webhookEndpoints";
 
 const ORG_ID = "org_1";
 
@@ -114,9 +113,7 @@ describe("webhookEndpointsRouter", () => {
         enabledEvents: ["gateway.request.completed"],
       }),
     ).rejects.toThrow("denied");
-    expect(
-      (prisma as any).webhookEndpoint.create,
-    ).not.toHaveBeenCalled();
+    expect((prisma as any).webhookEndpoint.create).not.toHaveBeenCalled();
   });
 
   /** @scenario Sessions of organizations without the plan flag are refused */

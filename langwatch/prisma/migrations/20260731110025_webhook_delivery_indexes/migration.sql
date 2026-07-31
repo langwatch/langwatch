@@ -2,7 +2,6 @@
 -- attempt grouping reads one batch's rows by (endpointId, dispatchId).
 CREATE INDEX "WebhookEndpointDelivery_firedAt_idx" ON "WebhookEndpointDelivery"("firedAt");
 
--- CreateIndex
 CREATE INDEX "WebhookEndpointDelivery_endpointId_dispatchId_idx" ON "WebhookEndpointDelivery"("endpointId", "dispatchId");
 
 -- Down (manual):

@@ -5,17 +5,17 @@ import {
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import type { SpendUsage } from "../schemas/commands";
 import {
-  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
   GATEWAY_SPEND_PIPELINE_NAME,
+  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
 import {
   type GatewaySpendAdmittedEvent,
-  gatewaySpendAdmittedEventSchema,
   type GatewaySpendConfirmedEvent,
-  gatewaySpendConfirmedEventSchema,
   type GatewaySpendFailedEvent,
-  gatewaySpendFailedEventSchema,
   type GatewaySpendSettledEvent,
+  gatewaySpendAdmittedEventSchema,
+  gatewaySpendConfirmedEventSchema,
+  gatewaySpendFailedEventSchema,
   gatewaySpendSettledEventSchema,
 } from "../schemas/events";
 import { rateSpendNanoUsd } from "../services/spend-rating.service";
@@ -159,7 +159,9 @@ export class GatewaySpendFoldProjection
     // A completion that raced ahead of its admission must not be downgraded,
     // and the outcome's RESOLVED model/provider identity must not be
     // overwritten by the admission's requested values: the rated cost was
-    // derived from the resolved identity.
+    // derived from the resolved identity. Settlement resolves no identity
+    // and an outcome may omit these fields, so each one sticks only when
+    // the resolved state actually carries a value.
     const outcomeResolved = state.status !== "" && state.status !== "admitted";
     return {
       ...state,
@@ -168,8 +170,11 @@ export class GatewaySpendFoldProjection
       virtualKeyId: d.virtual_key_id,
       principalUserId: d.principal_user_id,
       endUserId: d.end_user_id,
-      model: outcomeResolved ? state.model : d.model,
-      providerKey: outcomeResolved ? state.providerKey : d.model_provider_id,
+      model: outcomeResolved && state.model !== "" ? state.model : d.model,
+      providerKey:
+        outcomeResolved && state.providerKey !== ""
+          ? state.providerKey
+          : d.model_provider_id,
       traceId: d.trace_id,
       requestType: d.request_type,
       labels: d.labels,

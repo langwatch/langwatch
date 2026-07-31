@@ -23,7 +23,9 @@ const boundedMetadataJson = z
       try {
         const parsed: unknown = JSON.parse(raw);
         return (
-          typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          typeof parsed === "object" &&
+          parsed !== null &&
+          !Array.isArray(parsed)
         );
       } catch {
         return false;

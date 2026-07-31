@@ -7,22 +7,22 @@
  * rollSecret mutation responses; every read path returns endpoint views
  * without secret material.
  */
-import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
-import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
-import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointService,
   WebhookEndpointValidationError,
 } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+import type { PrismaClient } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -88,7 +88,11 @@ export const webhookEndpointsRouter = createTRPCRouter({
     ),
 
   deliveries: protectedProcedure
-    .input(endpointInput.extend({ limit: z.number().int().min(1).max(200).optional() }))
+    .input(
+      endpointInput.extend({
+        limit: z.number().int().min(1).max(200).optional(),
+      }),
+    )
     .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
@@ -134,6 +138,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
       translating(() =>
         new WebhookHealthService({
           prisma: ctx.prisma,
+          endpoints: new WebhookEndpointService({ prisma: ctx.prisma }),
           processStore: new PrismaProcessStore(ctx.prisma),
         }).health({
           organizationId: input.organizationId,

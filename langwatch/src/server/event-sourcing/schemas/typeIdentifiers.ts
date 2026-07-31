@@ -19,10 +19,6 @@ import {
 } from "../pipelines/automations/schemas/constants";
 import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
-  GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
-  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
-} from "../pipelines/gateway-spend-processing/schemas/constants";
-import {
   CODING_AGENT_PROCESSING_COMMAND_TYPES,
   CODING_AGENT_PROCESSING_EVENT_TYPES,
 } from "../pipelines/coding-agent-processing/schemas/constants";
@@ -34,6 +30,10 @@ import {
   EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
+import {
+  GATEWAY_SPEND_PROCESSING_COMMAND_TYPES,
+  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
+} from "../pipelines/gateway-spend-processing/schemas/constants";
 import {
   LOG_PROCESSING_COMMAND_TYPES,
   LOG_PROCESSING_EVENT_TYPES,

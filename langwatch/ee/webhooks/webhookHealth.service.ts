@@ -3,15 +3,20 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import {
-  WEBHOOK_DELIVERY_PROCESS_NAME,
   type EndpointStreamState,
+  WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "./process-manager/webhookDelivery.process";
-import { WebhookEndpointNotFoundError } from "./webhookEndpoint.service";
+import {
+  WebhookEndpointNotFoundError,
+  type WebhookEndpointService,
+} from "./webhookEndpoint.service";
 
 /** The last-hour window the rate figures aggregate over. */
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 /** Latency percentile sample cap: enough for a stable p95, bounded read. */
 const LATENCY_SAMPLE_LIMIT = 500;
+/** Per-chunk cap on the concurrent process-stream reads across projects. */
+const STREAM_READ_CONCURRENCY = 8;
 
 export interface WebhookEndpointHealth {
   status: "ACTIVE" | "DISABLED";
@@ -36,6 +41,10 @@ export interface WebhookEndpointHealth {
 
 export interface WebhookHealthDeps {
   prisma: PrismaClient;
+  endpoints: Pick<
+    WebhookEndpointService,
+    "getStatusSnapshot" | "getDeliveryStats"
+  >;
   processStore: ProcessStore;
   now?: () => number;
 }
@@ -54,29 +63,23 @@ export class WebhookHealthService {
     endpointId: string;
   }): Promise<WebhookEndpointHealth> {
     const now = (this.deps.now ?? Date.now)();
-    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
-      where: {
-        id: params.endpointId,
-        organizationId: params.organizationId,
-        archivedAt: null,
-      },
+    const endpoint = await this.deps.endpoints.getStatusSnapshot({
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
     });
     if (!endpoint) throw new WebhookEndpointNotFoundError();
 
-    const [deliveries, projects] = await Promise.all([
-      this.deps.prisma.webhookEndpointDelivery.findMany({
-        where: {
-          organizationId: params.organizationId,
-          endpointId: params.endpointId,
-          firedAt: { gt: new Date(now - RATE_WINDOW_MS) },
-        },
-        select: { outcome: true, latencyMs: true },
-        orderBy: { firedAt: "desc" },
-        take: LATENCY_SAMPLE_LIMIT,
+    const [stats, projects] = await Promise.all([
+      this.deps.endpoints.getDeliveryStats({
+        organizationId: params.organizationId,
+        endpointId: params.endpointId,
+        since: new Date(now - RATE_WINDOW_MS),
+        sampleLimit: LATENCY_SAMPLE_LIMIT,
       }),
       this.deps.prisma.project.findMany({
         where: { team: { organizationId: params.organizationId } },
         select: { id: true },
+        orderBy: { id: "asc" },
       }),
     ]);
 
@@ -88,35 +91,44 @@ export class WebhookHealthService {
           ? candidateMs
           : Math.min(oldestUndeliveredMs, candidateMs);
     };
-    for (const project of projects) {
-      const ref = {
-        processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-        projectId: project.id,
-        processKey: `endpoint:${params.endpointId}`,
-      };
-      const [instance, messages] = await Promise.all([
-        this.deps.processStore.findByRef<EndpointStreamState>({ ref }),
-        this.deps.processStore.findMessagesByRef({ ref }),
-      ]);
-      for (const entry of instance?.state.pending ?? []) {
-        consider(entry.appendedAtMs);
-      }
-      for (const message of messages) {
-        if (message.intentType !== "sendBatch") continue;
-        if (message.status === "dead") dlqDepth++;
-        if (message.status === "pending") consider(message.createdAt);
+    // Streams are per project; read them in bounded chunks so a large
+    // organization costs a few concurrent rounds, not one serial round
+    // trip per project.
+    for (let i = 0; i < projects.length; i += STREAM_READ_CONCURRENCY) {
+      const chunk = projects.slice(i, i + STREAM_READ_CONCURRENCY);
+      const reads = await Promise.all(
+        chunk.map(async (project) => {
+          const ref = {
+            processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+            projectId: project.id,
+            processKey: `endpoint:${params.endpointId}`,
+          };
+          const [instance, messages] = await Promise.all([
+            this.deps.processStore.findByRef<EndpointStreamState>({ ref }),
+            this.deps.processStore.findMessagesByRef({ ref }),
+          ]);
+          return { instance, messages };
+        }),
+      );
+      for (const { instance, messages } of reads) {
+        for (const entry of instance?.state.pending ?? []) {
+          consider(entry.appendedAtMs);
+        }
+        for (const message of messages) {
+          if (message.intentType !== "sendBatch") continue;
+          if (message.status === "dead") dlqDepth++;
+          if (message.status === "pending") consider(message.createdAt);
+        }
       }
     }
 
-    const attempted = deliveries.length;
-    const delivered = deliveries.filter((d) => d.outcome === "success").length;
-    const latencies = deliveries
-      .map((d) => d.latencyMs)
-      .filter((l): l is number => l !== null)
-      .sort((a, b) => a - b);
+    const { attempted, delivered } = stats;
+    const latencies = [...stats.latencies].sort((a, b) => a - b);
     const p95 =
       latencies.length > 0
-        ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * 0.95))]!
+        ? latencies[
+            Math.min(latencies.length - 1, Math.floor(latencies.length * 0.95))
+          ]!
         : null;
 
     return {
@@ -126,7 +138,9 @@ export class WebhookHealthService {
       lastSuccessAt: endpoint.lastSuccessAt,
       lastFailureAt: endpoint.lastFailureAt,
       oldestUndeliveredAgeMs:
-        oldestUndeliveredMs === null ? null : Math.max(0, now - oldestUndeliveredMs),
+        oldestUndeliveredMs === null
+          ? null
+          : Math.max(0, now - oldestUndeliveredMs),
       dlqDepth,
       sendsPerMinute: attempted / (RATE_WINDOW_MS / 60_000),
       successRate: attempted === 0 ? null : delivered / attempted,

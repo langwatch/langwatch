@@ -9,6 +9,7 @@
  * the pipeline's own applier.
  */
 
+import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -19,34 +20,33 @@ import {
   it,
   vi,
 } from "vitest";
-import type { Organization, Project, Team } from "@prisma/client";
 import { prisma } from "~/server/db";
-import {
-  InMemoryProcessStore,
-  ProcessManagerService,
-  type ProcessDefinition,
-} from "~/server/event-sourcing/process-manager";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import {
-  buildIntentHandlers,
-  buildProcessDefinition,
-} from "~/server/event-sourcing/process-manager/processRuntime";
-import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
-import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
-import { WebhookEndpointService } from "../webhookEndpoint.service";
-import { WebhookHealthService } from "../webhookHealth.service";
+import {
+  InMemoryProcessStore,
+  type ProcessDefinition,
+  ProcessManagerService,
+} from "~/server/event-sourcing/process-manager";
+import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
+import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
+import {
+  buildIntentHandlers,
+  buildProcessDefinition,
+} from "~/server/event-sourcing/process-manager/processRuntime";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  webhookDeliveryPM,
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
+  webhookDeliveryPM,
 } from "../process-manager/webhookDelivery.process";
+import { WebhookEndpointService } from "../webhookEndpoint.service";
+import { WebhookHealthService } from "../webhookHealth.service";
 
 vi.mock(
   "~/server/app-layer/automations/delivery/sendWebhook",
@@ -58,7 +58,9 @@ vi.mock(
     return { ...original, sendWebhook: vi.fn() };
   },
 );
+
 import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
+
 const sendWebhookMock = vi.mocked(sendWebhook);
 
 const ns = `webhook-pm-${nanoid(8)}`;
@@ -372,23 +374,27 @@ describe("webhook delivery via the transactional inbox", () => {
       enabledEvents: ["gateway.*"],
     });
     try {
-    const requestId = `req-${nanoid(8)}`;
-    await consume(admittedEnvelope(requestId));
-    await consume(settledEnvelope(requestId));
-    await drainOutbox();
+      const requestId = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(requestId));
+      await consume(settledEnvelope(requestId));
+      await drainOutbox();
 
-    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
-      batch: Array<{ id: string; type: string; data: Record<string, unknown> }>;
-    };
-    expect(body.batch[0]!.type).toBe("gateway.request.settled");
-    expect(body.batch[0]!.id).toBe(`${requestId}:settled`);
-    expect(body.batch[0]!.data.cost).toBeNull();
-    expect(body.batch[0]!.data.usage).toBeNull();
-    expect(body.batch[0]!.data.needs_reconciliation).toBe(true);
-    expect(body.batch[0]!.data.settle_reason).toBe(
-      "confirmation_deadline_expired",
-    );
+      expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
+        batch: Array<{
+          id: string;
+          type: string;
+          data: Record<string, unknown>;
+        }>;
+      };
+      expect(body.batch[0]!.type).toBe("gateway.request.settled");
+      expect(body.batch[0]!.id).toBe(`${requestId}:settled`);
+      expect(body.batch[0]!.data.cost).toBeNull();
+      expect(body.batch[0]!.data.usage).toBeNull();
+      expect(body.batch[0]!.data.needs_reconciliation).toBe(true);
+      expect(body.batch[0]!.data.settle_reason).toBe(
+        "confirmation_deadline_expired",
+      );
     } finally {
       await endpoints.update({
         organizationId: organization.id,
@@ -406,31 +412,37 @@ describe("webhook delivery via the transactional inbox", () => {
       enabledEvents: ["gateway.*"],
     });
     try {
-    const requestId = `req-${nanoid(8)}`;
-    await consume(admittedEnvelope(requestId));
-    await consume(settledEnvelope(requestId));
-    await drainOutbox();
-    await consume(confirmedEnvelope(requestId));
-    await drainOutbox();
+      const requestId = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(requestId));
+      await consume(settledEnvelope(requestId));
+      await drainOutbox();
+      await consume(confirmedEnvelope(requestId));
+      await drainOutbox();
 
-    expect(sendWebhookMock).toHaveBeenCalledTimes(2);
-    const bodies = sendWebhookMock.mock.calls.map(
-      (call) =>
-        (JSON.parse(call[0].body) as {
-          batch: Array<{ id: string; type: string; data: Record<string, unknown> }>;
-        }).batch[0]!,
-    );
-    const settled = bodies.find((b) => b.type === "gateway.request.settled")!;
-    const completed = bodies.find(
-      (b) => b.type === "gateway.request.completed",
-    )!;
-    expect(settled).toBeDefined();
-    expect(completed).toBeDefined();
-    expect(settled.id).not.toBe(completed.id);
-    expect(settled.data.gateway_request_id).toBe(requestId);
-    expect(completed.data.gateway_request_id).toBe(requestId);
-    const cost = completed.data.cost as { nano_usd: number };
-    expect(cost.nano_usd).toBeGreaterThan(0);
+      expect(sendWebhookMock).toHaveBeenCalledTimes(2);
+      const bodies = sendWebhookMock.mock.calls.map(
+        (call) =>
+          (
+            JSON.parse(call[0].body) as {
+              batch: Array<{
+                id: string;
+                type: string;
+                data: Record<string, unknown>;
+              }>;
+            }
+          ).batch[0]!,
+      );
+      const settled = bodies.find((b) => b.type === "gateway.request.settled")!;
+      const completed = bodies.find(
+        (b) => b.type === "gateway.request.completed",
+      )!;
+      expect(settled).toBeDefined();
+      expect(completed).toBeDefined();
+      expect(settled.id).not.toBe(completed.id);
+      expect(settled.data.gateway_request_id).toBe(requestId);
+      expect(completed.data.gateway_request_id).toBe(requestId);
+      const cost = completed.data.cost as { nano_usd: number };
+      expect(cost.nano_usd).toBeGreaterThan(0);
     } finally {
       await endpoints.update({
         organizationId: organization.id,
@@ -664,7 +676,11 @@ describe("webhook delivery via the transactional inbox", () => {
       // The receiver recovers; the retry ladder's next attempt succeeds and
       // frees the slot, and the wake flushes the accumulated three as ONE
       // batch: the climb toward the cap.
-      sendWebhookMock.mockResolvedValue({ status: 200, body: "ok", eventId: "x" });
+      sendWebhookMock.mockResolvedValue({
+        status: 200,
+        body: "ok",
+        eventId: "x",
+      });
       clock += 61_000;
       await drainOutbox(2);
       expect(await wakeEndpoint(endpointId)).toBe(true);
@@ -703,6 +719,7 @@ describe("webhook delivery via the transactional inbox", () => {
       clock += 30_000;
       const healthService = new WebhookHealthService({
         prisma,
+        endpoints,
         processStore: store,
         now: () => clock,
       });
@@ -746,13 +763,18 @@ describe("webhook delivery via the transactional inbox", () => {
           processNames: [WEBHOOK_DELIVERY_PROCESS_NAME],
         })
       ).filter((m) => m.messageKey === "send:fabricated-dead");
+      if (!leased) {
+        throw new Error(
+          "send:fabricated-dead was not in the leased page; raise the lease limit or drain the buffered messages first",
+        );
+      }
       await store.markFailed({
         identity: {
           processName: WEBHOOK_DELIVERY_PROCESS_NAME,
           projectId: project.id,
           messageKey: "send:fabricated-dead",
         },
-        leaseToken: leased!.leaseToken,
+        leaseToken: leased.leaseToken,
         now: clock + 1,
         nextAttemptAt: clock + 1000,
         dead: true,

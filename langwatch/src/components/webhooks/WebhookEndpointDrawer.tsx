@@ -8,14 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { WebhookEventType } from "@ee/webhooks/eventRegistry";
 import { useEffect, useMemo, useState } from "react";
-
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import type { RouterOutputs } from "~/utils/api";
-
-import type { WebhookEventType } from "@ee/webhooks/eventRegistry";
 
 type EventType = WebhookEventType;
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
@@ -109,7 +107,20 @@ export function WebhookEndpointDrawer({
     });
   };
 
-  const canSave = url.trim().length > 0 && selected.size > 0 && !isSaving;
+  // Mirrors the server bounds; NaN from a cleared field fails these too.
+  const controlsValid =
+    Number.isInteger(maxBatchSize) &&
+    maxBatchSize >= 1 &&
+    maxBatchSize <= 100 &&
+    Number.isInteger(maxBatchDelayMs) &&
+    maxBatchDelayMs >= 0 &&
+    maxBatchDelayMs <= 60000 &&
+    Number.isInteger(maxInFlight) &&
+    maxInFlight >= 1 &&
+    maxInFlight <= 8;
+
+  const canSave =
+    url.trim().length > 0 && selected.size > 0 && controlsValid && !isSaving;
 
   return (
     <Drawer.Root

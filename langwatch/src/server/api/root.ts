@@ -34,9 +34,8 @@ import { featureFlagRouter } from "./routers/featureFlag";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
-import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
-import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
+import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
@@ -84,6 +83,7 @@ import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
+import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
 import { workflowRouter } from "./routers/workflows";
 
 const coreRouters = {

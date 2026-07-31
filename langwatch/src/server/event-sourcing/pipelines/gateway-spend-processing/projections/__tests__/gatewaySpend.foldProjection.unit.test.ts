@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { createTenantId, EventUtils } from "~/server/event-sourcing";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -249,10 +249,7 @@ describe("gatewaySpend fold", () => {
       initial(),
     );
     expect(early.status).toBe("confirmed");
-    const afterAdmit = projection.handleGatewaySpendAdmitted(
-      admitted(),
-      early,
-    );
+    const afterAdmit = projection.handleGatewaySpendAdmitted(admitted(), early);
     expect(afterAdmit.status).toBe("confirmed");
     expect(afterAdmit.organizationId).toBe("org_1");
     // The resolved identity and the cost rated from it survive the late
@@ -260,6 +257,19 @@ describe("gatewaySpend fold", () => {
     expect(afterAdmit.model).toBe(early.model);
     expect(afterAdmit.providerKey).toBe(early.providerKey);
     expect(afterAdmit.costNanoUsd).toBe(early.costNanoUsd);
+  });
+
+  /** @scenario An outcome racing ahead of its admission keeps its status */
+  it("a settled arriving before admitted still adopts the admission's identity", () => {
+    const early = projection.handleGatewaySpendSettled(settled(), initial());
+    expect(early.status).toBe("settled");
+    // Settlement resolves no identity, so the late admission's requested
+    // model and provider must fill in rather than being pinned to "".
+    const afterAdmit = projection.handleGatewaySpendAdmitted(admitted(), early);
+    expect(afterAdmit.status).toBe("settled");
+    expect(afterAdmit.model).toBe("openai/gpt-5");
+    expect(afterAdmit.providerKey).not.toBe("");
+    expect(afterAdmit.needsReconciliation).toBe(true);
   });
 
   /** @scenario Partial usage on a failure still prices */

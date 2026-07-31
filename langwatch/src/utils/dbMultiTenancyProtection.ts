@@ -552,8 +552,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   // the retention prune use the raw-SQL tenancy opt-out instead.
   WebhookEndpoint: {
     validateWhere: (where) => {
-      const reason =
-        "requires a row id or organizationId in the where clause";
+      const reason = "requires a row id or organizationId in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,

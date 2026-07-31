@@ -27,23 +27,34 @@ export const updateWebhookCommand = async (
     );
     process.exit(1);
   }
+  // Number("abc") is NaN and JSON.stringify turns NaN into null, so loose
+  // parsing here would ship a null patch the server cannot bound-check.
+  const parseIntOption = (
+    value: string | undefined,
+    flag: string,
+  ): number | undefined => {
+    if (value === undefined) return undefined;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || value.trim() === "") {
+      console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
+      process.exit(1);
+    }
+    return parsed;
+  };
+  const maxBatchSize = parseIntOption(options.maxBatchSize, "--max-batch-size");
+  const maxBatchDelayMs = parseIntOption(
+    options.maxBatchDelay,
+    "--max-batch-delay",
+  );
+  const maxInFlight = parseIntOption(options.maxInFlight, "--max-in-flight");
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Updating webhook endpoint...").start();
   try {
     const endpoint = await service.update(id, {
       url: options.url,
-      maxBatchSize:
-        options.maxBatchSize !== undefined
-          ? Number(options.maxBatchSize)
-          : undefined,
-      maxBatchDelayMs:
-        options.maxBatchDelay !== undefined
-          ? Number(options.maxBatchDelay)
-          : undefined,
-      maxInFlight:
-        options.maxInFlight !== undefined
-          ? Number(options.maxInFlight)
-          : undefined,
+      maxBatchSize,
+      maxBatchDelayMs,
+      maxInFlight,
       enabledEvents: options.events !== undefined
         ? options.events.split(",").map((e) => e.trim()).filter(Boolean)
         : undefined,

@@ -1,7 +1,7 @@
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  webhookDeliveryPM,
   type WebhookDeliveryProcessDeps,
+  webhookDeliveryPM,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import { definePipeline } from "../..";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";

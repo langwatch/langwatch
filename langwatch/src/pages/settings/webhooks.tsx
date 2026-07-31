@@ -23,15 +23,14 @@ import {
   Webhook,
 } from "lucide-react";
 import { useState } from "react";
-
-import SettingsLayout from "~/components/SettingsLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
-import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
-import { WebhookSecretDialog } from "~/components/webhooks/WebhookSecretDialog";
+import SettingsLayout from "~/components/SettingsLayout";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
+import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
+import { WebhookSecretDialog } from "~/components/webhooks/WebhookSecretDialog";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -62,8 +61,7 @@ export default function WebhooksSettingsPage() {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { activePlan, isLoading: isPlanLoading } = useActivePlan();
   const organizationId = organization?.id ?? "";
-  const webhooksEnabled =
-    activePlan?.webhookEndpointsEnabled === true;
+  const webhooksEnabled = activePlan?.webhookEndpointsEnabled === true;
   const canManage = hasPermission("webhookEndpoints:manage");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -87,7 +85,11 @@ export default function WebhooksSettingsPage() {
 
   const refresh = () => void utils.webhookEndpoints.list.invalidate();
   const onError = (error: { message: string }) =>
-    toaster.create({ title: error.message, type: "error", meta: { closable: true } });
+    toaster.create({
+      title: error.message,
+      type: "error",
+      meta: { closable: true },
+    });
 
   const createMutation = api.webhookEndpoints.create.useMutation({
     onSuccess: ({ secret }) => {
@@ -108,6 +110,7 @@ export default function WebhooksSettingsPage() {
   const rollSecretMutation = api.webhookEndpoints.rollSecret.useMutation({
     onSuccess: ({ secret }) => {
       refresh();
+      setRollingSecret(null);
       setRevealedSecret(secret);
     },
     onError,
@@ -121,7 +124,10 @@ export default function WebhooksSettingsPage() {
     onError,
   });
   const archiveMutation = api.webhookEndpoints.archive.useMutation({
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      setDeleting(null);
+    },
     onError,
   });
 
@@ -146,8 +152,8 @@ export default function WebhooksSettingsPage() {
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
                 Webhook endpoints stream signed events (gateway billing,
-                budgets, key lifecycle) to your systems with durable retries
-                and delivery history. Available on Enterprise plans.
+                budgets, key lifecycle) to your systems with durable retries and
+                delivery history. Available on Enterprise plans.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -233,7 +239,11 @@ export default function WebhooksSettingsPage() {
                     <Table.Cell>
                       <Menu.Root>
                         <Menu.Trigger asChild>
-                          <Button variant="ghost" size="xs" aria-label="Actions">
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            aria-label="Actions"
+                          >
                             <MoreVertical size={14} />
                           </Button>
                         </Menu.Trigger>
@@ -365,11 +375,12 @@ export default function WebhooksSettingsPage() {
         loading={rollSecretMutation.isPending}
         onConfirm={() => {
           if (!rollingSecret) return;
+          // The dialog closes in onSuccess, so the loading state renders
+          // and a failure leaves it open instead of masquerading as done.
           rollSecretMutation.mutate({
             organizationId,
             endpointId: rollingSecret.id,
           });
-          setRollingSecret(null);
         }}
       />
       <ConfirmDialog
@@ -388,7 +399,6 @@ export default function WebhooksSettingsPage() {
             organizationId,
             endpointId: deleting.id,
           });
-          setDeleting(null);
         }}
       />
     </SettingsLayout>
