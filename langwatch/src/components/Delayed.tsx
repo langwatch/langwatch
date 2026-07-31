@@ -11,7 +11,8 @@ export function Delayed({
 }) {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
-    setTimeout(() => setIsMounted(true), delay);
+    const mountTimeout = setTimeout(() => setIsMounted(true), delay);
+    return () => clearTimeout(mountTimeout);
   }, [delay]);
 
   return isMounted ? (
