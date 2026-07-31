@@ -2280,12 +2280,7 @@ Moves the budget's period boundary to now and recomputes the next reset (`gatewa
 
 ### End-user spend
 
-```
-GET /end-users/:end_user_id/spend
-GET /end-users/:end_user_id/spend?anchor_virtual_key_id=vk_...
-```
-
-Current spend and the applicable per-end-user cap for one external end-user id, resolved against the organization's attributed-user templates (`gatewayBudgets:view`). The pair a rebilling platform polls at period close. Response rows: `{budget_id, anchor_id, window, on_breach, limit_usd, spent_usd, period_started_at}`; empty when no template applies. See [Billing & spend events](/ai-gateway/billing-events#per-end-user-spend).
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 
@@ -2956,25 +2951,44 @@ The read a rebilling platform polls at period close, or renders in its own UI ne
 GET /api/gateway/v1/end-users/:end_user_id/spend
 ```
 
-It resolves the [attributed-user budget templates](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) your organization runs and returns, per applicable template, the pair that matters: the user's current bucket spend and the cap it counts against.
+One call answers both halves of the question: what this user consumed over a window, and which caps that counts against.
 
 ```json
 {
-  "data": [
-    {
-      "budget_id": "bgt_01H...",
-      "anchor_id": "vk_01H...",
-      "window": "MONTH",
-      "on_breach": "BLOCK",
-      "limit_usd": "1",
-      "spent_usd": "0.412209",
-      "period_started_at": "2026-07-01T00:00:00.000Z"
-    }
-  ]
+  "data": {
+    "end_user_id": "d7dcef1e-0755-4ad1-b31a-c253fc27e8bf",
+    "window": "month",
+    "from": "2026-06-27T14:03:11.482Z",
+    "to": "2026-07-27T14:03:11.482Z",
+    "cost": { "total_usd": "0.412209", "nano_usd": 412209000 },
+    "request_count": 218,
+    "usage": {
+      "input_tokens": 184220,
+      "output_tokens": 41022,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "caps": [
+      {
+        "budget_id": "bgt_01H...",
+        "anchor_id": "vk_01H...",
+        "window": "MONTH",
+        "on_breach": "BLOCK",
+        "limit_usd": "25",
+        "spent_usd": "0.412209",
+        "period_started_at": "2026-07-01T00:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
-`anchor_virtual_key_id` narrows to one template when several anchors carry one. An empty `data` array means no attributed-user template applies to that user. This route is served on the gateway management surface (project API key, `gatewayBudgets:view`).
+- **The rollup** (`cost`, `request_count`, `usage`) reads the spend ledger over a **rolling** window: `window` is `day`, `week`, or `month` (last 24 hours, 7 days, or 30 days, defaulting to `month`), and explicit `from`/`to` in unix milliseconds override it.
+- **`caps`** is every [attributed-user template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) in your organization that applies to this user, each carrying its **current budget period** spend, boundary-aware, which is the figure enforcement uses. That period is the budget's own, so it will not match the rolling rollup above unless the two happen to align; the rollup is for showing usage, `caps` is for showing headroom. An empty array means no template applies to that user.
+- `virtual_key_id` narrows both the rollup and the caps to one anchor key.
+
+Served on the billing surface: organization API key, `gatewaySpend:view`.
 
 ## Replay
 
@@ -5552,7 +5566,7 @@ You run a platform whose customers consume LLMs through you, and you bill them f
 ## What you need
 
 - An Enterprise plan or license (webhooks and the billing APIs gate on it).
-- A backend API credential holding the gateway permissions (`virtualKeys:*`, `gatewayBudgets:*`) plus the org-tier billing permissions (`webhookEndpoints:manage`, `gatewaySpend:view`). See [RBAC](/ai-gateway/rbac).
+- **Two credentials**, because the surfaces are deliberately separated. A gateway key for provisioning (`virtualKeys:*`, `gatewayBudgets:*`), and an **organization** API key for the billing and webhook surfaces (`webhookEndpoints:manage`, `gatewaySpend:view`), whose permissions only an organization-scoped role can grant. The curls below show which one each call takes. See [RBAC](/ai-gateway/rbac).
 - A provider credential configured once at organization scope (**Settings > Model Providers**). Tenants never see it.
 
 The vocabulary used throughout: a **tenant** is your customer (one **virtual key** each); an **end user** is a person inside a tenant (no provisioning, attributed per request); a **spend event** is the metering record; an **envelope** is how events arrive at your webhook receiver.
@@ -5741,7 +5755,7 @@ Requests on the key are rejected with the distinct `virtual_key_disabled` error 
 The pair every tenant dashboard wants, current spend against the cap:
 
 - Per tenant: `GET /api/gateway/v1/budgets?scope_type=VIRTUAL_KEY` returns each budget with live `spent_usd` and `limit_usd`.
-- Per end user: `GET /api/gateway/v1/end-users/:id/spend` returns the user's bucket spend and the applicable template cap in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
+- Per end user: `GET /api/gateway/v1/end-users/:id/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
 
 ## Where to go deeper
 
@@ -10307,7 +10321,6 @@ Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalen
 | `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
 | `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
 | `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
-| `GET /api/gateway/v1/end-users/:id/spend` | `gatewayBudgets:view` |
 | `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
 | `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
 | `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
@@ -10320,6 +10333,7 @@ The billing and webhook surfaces authenticate with an **organization API key** a
 | `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
 | `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
 | `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
+| `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
 
 Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
@@ -13212,7 +13226,7 @@ Rotate a VK when you believe the secret may have leaked or as part of routine hy
 4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
 5. After the grace window ends, only the new secret works.
 
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation.
+Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation. Rotation emits `gateway.virtual_key.rotated` to your [webhook endpoints](/features/webhooks#family-gateway), so a provisioning backend can mirror the new secret while the previous one is still inside its grace window.
 
 ## Disable and enable: the reversible stop
 
@@ -35476,6 +35490,7 @@ Batches contain up to `max_batch_size` envelopes, possibly of mixed types within
 | `gateway.budget.threshold_crossed` | A budget crossed its 80 percent warn threshold inside the current period. Once per crossing per period. |
 | `gateway.budget.breached` | A budget reached its cap. Fires on `warn` budgets too; only `block` budgets also reject requests. Once per crossing per period. |
 | `gateway.virtual_key.created` | A virtual key was created. |
+| `gateway.virtual_key.rotated` | A virtual key's secret was rotated. The previous secret keeps working for its grace window, so a provisioning backend can mirror the change before the old one stops. |
 | `gateway.virtual_key.disabled` | A virtual key was disabled (reversible). |
 | `gateway.virtual_key.enabled` | A previously disabled virtual key was re-enabled. |
 | `gateway.virtual_key.revoked` | A virtual key was revoked (terminal). |
@@ -35677,7 +35692,9 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 ## The delivery log
 
-`GET /endpoints/:id/deliveries` lists recent attempts, newest first (default 50, max 200): the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs. Delivery log rows are retained for 30 days.
+`GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+
+The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
 ## Test fire
 

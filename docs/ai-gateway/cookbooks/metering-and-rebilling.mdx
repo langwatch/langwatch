@@ -14,7 +14,7 @@ You run a platform whose customers consume LLMs through you, and you bill them f
 ## What you need
 
 - An Enterprise plan or license (webhooks and the billing APIs gate on it).
-- A backend API credential holding the gateway permissions (`virtualKeys:*`, `gatewayBudgets:*`) plus the org-tier billing permissions (`webhookEndpoints:manage`, `gatewaySpend:view`). See [RBAC](/ai-gateway/rbac).
+- **Two credentials**, because the surfaces are deliberately separated. A gateway key for provisioning (`virtualKeys:*`, `gatewayBudgets:*`), and an **organization** API key for the billing and webhook surfaces (`webhookEndpoints:manage`, `gatewaySpend:view`), whose permissions only an organization-scoped role can grant. The curls below show which one each call takes. See [RBAC](/ai-gateway/rbac).
 - A provider credential configured once at organization scope (**Settings > Model Providers**). Tenants never see it.
 
 The vocabulary used throughout: a **tenant** is your customer (one **virtual key** each); an **end user** is a person inside a tenant (no provisioning, attributed per request); a **spend event** is the metering record; an **envelope** is how events arrive at your webhook receiver.
@@ -203,7 +203,7 @@ Requests on the key are rejected with the distinct `virtual_key_disabled` error 
 The pair every tenant dashboard wants, current spend against the cap:
 
 - Per tenant: `GET /api/gateway/v1/budgets?scope_type=VIRTUAL_KEY` returns each budget with live `spent_usd` and `limit_usd`.
-- Per end user: `GET /api/gateway/v1/end-users/:id/spend` returns the user's bucket spend and the applicable template cap in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
+- Per end user: `GET /api/gateway/v1/end-users/:id/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
 
 ## Where to go deeper
 

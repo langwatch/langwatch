@@ -117,7 +117,7 @@ Rotate a VK when you believe the secret may have leaked or as part of routine hy
 4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
 5. After the grace window ends, only the new secret works.
 
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation.
+Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation. Rotation emits `gateway.virtual_key.rotated` to your [webhook endpoints](/features/webhooks#family-gateway), so a provisioning backend can mirror the new secret while the previous one is still inside its grace window.
 
 ## Disable and enable: the reversible stop
 

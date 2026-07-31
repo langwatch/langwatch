@@ -274,12 +274,7 @@ Moves the budget's period boundary to now and recomputes the next reset (`gatewa
 
 ### End-user spend
 
-```
-GET /end-users/:end_user_id/spend
-GET /end-users/:end_user_id/spend?anchor_virtual_key_id=vk_...
-```
-
-Current spend and the applicable per-end-user cap for one external end-user id, resolved against the organization's attributed-user templates (`gatewayBudgets:view`). The pair a rebilling platform polls at period close. Response rows: `{budget_id, anchor_id, window, on_breach, limit_usd, spent_usd, period_started_at}`; empty when no template applies. See [Billing & spend events](/ai-gateway/billing-events#per-end-user-spend).
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 

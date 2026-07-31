@@ -92,6 +92,7 @@ Batches contain up to `max_batch_size` envelopes, possibly of mixed types within
 | `gateway.budget.threshold_crossed` | A budget crossed its 80 percent warn threshold inside the current period. Once per crossing per period. |
 | `gateway.budget.breached` | A budget reached its cap. Fires on `warn` budgets too; only `block` budgets also reject requests. Once per crossing per period. |
 | `gateway.virtual_key.created` | A virtual key was created. |
+| `gateway.virtual_key.rotated` | A virtual key's secret was rotated. The previous secret keeps working for its grace window, so a provisioning backend can mirror the change before the old one stops. |
 | `gateway.virtual_key.disabled` | A virtual key was disabled (reversible). |
 | `gateway.virtual_key.enabled` | A previously disabled virtual key was re-enabled. |
 | `gateway.virtual_key.revoked` | A virtual key was revoked (terminal). |
@@ -293,7 +294,9 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 ## The delivery log
 
-`GET /endpoints/:id/deliveries` lists recent attempts, newest first (default 50, max 200): the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs. Delivery log rows are retained for 30 days.
+`GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+
+The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
 ## Test fire
 

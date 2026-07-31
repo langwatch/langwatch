@@ -167,25 +167,44 @@ The read a rebilling platform polls at period close, or renders in its own UI ne
 GET /api/gateway/v1/end-users/:end_user_id/spend
 ```
 
-It resolves the [attributed-user budget templates](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) your organization runs and returns, per applicable template, the pair that matters: the user's current bucket spend and the cap it counts against.
+One call answers both halves of the question: what this user consumed over a window, and which caps that counts against.
 
 ```json
 {
-  "data": [
-    {
-      "budget_id": "bgt_01H...",
-      "anchor_id": "vk_01H...",
-      "window": "MONTH",
-      "on_breach": "BLOCK",
-      "limit_usd": "1",
-      "spent_usd": "0.412209",
-      "period_started_at": "2026-07-01T00:00:00.000Z"
-    }
-  ]
+  "data": {
+    "end_user_id": "d7dcef1e-0755-4ad1-b31a-c253fc27e8bf",
+    "window": "month",
+    "from": "2026-06-27T14:03:11.482Z",
+    "to": "2026-07-27T14:03:11.482Z",
+    "cost": { "total_usd": "0.412209", "nano_usd": 412209000 },
+    "request_count": 218,
+    "usage": {
+      "input_tokens": 184220,
+      "output_tokens": 41022,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "caps": [
+      {
+        "budget_id": "bgt_01H...",
+        "anchor_id": "vk_01H...",
+        "window": "MONTH",
+        "on_breach": "BLOCK",
+        "limit_usd": "25",
+        "spent_usd": "0.412209",
+        "period_started_at": "2026-07-01T00:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
-`anchor_virtual_key_id` narrows to one template when several anchors carry one. An empty `data` array means no attributed-user template applies to that user. This route is served on the gateway management surface (project API key, `gatewayBudgets:view`).
+- **The rollup** (`cost`, `request_count`, `usage`) reads the spend ledger over a **rolling** window: `window` is `day`, `week`, or `month` (last 24 hours, 7 days, or 30 days, defaulting to `month`), and explicit `from`/`to` in unix milliseconds override it.
+- **`caps`** is every [attributed-user template](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) in your organization that applies to this user, each carrying its **current budget period** spend, boundary-aware, which is the figure enforcement uses. That period is the budget's own, so it will not match the rolling rollup above unless the two happen to align; the rollup is for showing usage, `caps` is for showing headroom. An empty array means no template applies to that user.
+- `virtual_key_id` narrows both the rollup and the caps to one anchor key.
+
+Served on the billing surface: organization API key, `gatewaySpend:view`.
 
 ## Replay
 

@@ -109,7 +109,6 @@ Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalen
 | `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
 | `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
 | `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
-| `GET /api/gateway/v1/end-users/:id/spend` | `gatewayBudgets:view` |
 | `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
 | `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
 | `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
@@ -122,6 +121,7 @@ The billing and webhook surfaces authenticate with an **organization API key** a
 | `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
 | `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
 | `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
+| `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
 
 Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
