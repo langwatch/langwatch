@@ -126,6 +126,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
 
   describe("given a 2-run comparison whose rows carry city + difficulty metadata", () => {
     describe("when the user opens the Group rows by dropdown", () => {
+      /** @scenario "The Group rows by dropdown lists every metadata key from the dataset" */
       it("lists every metadata key discovered from the dataset entries", async () => {
         const user = userEvent.setup();
         renderTable();
@@ -144,6 +145,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         ).toBeInTheDocument();
       });
 
+      /** @scenario "Dropdown only offers keys present on the current runs' dataset entries" */
       it("does not list the input column as a grouping option", async () => {
         const user = userEvent.setup();
         renderTable();
@@ -161,6 +163,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       const renderGroupedByCity = () =>
         renderTable({ groupBy: "city" } as Partial<TableProps>);
 
+      /** @scenario "Rows group under metadata-value headers" */
       it("renders one header per distinct city value", () => {
         renderGroupedByCity();
         expect(screen.getByTestId("group-header-Berlin")).toBeInTheDocument();
@@ -176,6 +179,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         expect(within(berlinSection).queryByText("q2")).not.toBeInTheDocument();
       });
 
+      /** @scenario "Group headers show row count and per-run mean evaluator scores" */
       it("shows the row count on each group header", () => {
         renderGroupedByCity();
         expect(screen.getByTestId("group-count-Berlin")).toHaveTextContent("2");
@@ -204,6 +208,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
     });
 
     describe("when the user collapses a group", () => {
+      /** @scenario "Groups can be collapsed and expanded" */
       it("hides rows under that group but keeps the header visible", async () => {
         const user = userEvent.setup();
         renderTable({ groupBy: "city" } as Partial<TableProps>);
@@ -226,6 +231,35 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         ).not.toBeInTheDocument();
       });
     });
+
+    describe("when the user picks No grouping after grouping by city", () => {
+      /** @scenario "Choosing No grouping restores the flat row order" */
+      it("drops every group header and returns the rows to one flat list", async () => {
+        const user = userEvent.setup();
+        // Uncontrolled: the component owns the selection, so picking an option
+        // is the whole interaction. The URL half of this scenario belongs to
+        // BatchEvaluationResults, which owns that contract.
+        renderTable();
+
+        await user.click(screen.getByTestId("group-by-row-button"));
+        await user.click(screen.getByTestId("group-by-row-option-city"));
+        expect(screen.getByTestId("group-header-Berlin")).toBeInTheDocument();
+
+        await user.click(screen.getByTestId("group-by-row-button"));
+        await user.click(screen.getByTestId("group-by-row-option-none"));
+
+        expect(
+          screen.queryByTestId("group-header-Berlin"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("group-header-Lisbon"),
+        ).not.toBeInTheDocument();
+        // Every row is still present, just no longer sectioned.
+        for (const input of ["q0", "q1", "q2", "q3"]) {
+          expect(screen.getByText(input)).toBeInTheDocument();
+        }
+      });
+    });
   });
 
   describe("given rows whose city is missing on some entries", () => {
@@ -244,6 +278,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
     ];
 
     describe("when the user groups by city", () => {
+      /** @scenario "Rows with no value for the selected field fall into an Unspecified group" */
       it("collects missing-city rows under an Unspecified header at the end", () => {
         render(
           <ComparisonTable
