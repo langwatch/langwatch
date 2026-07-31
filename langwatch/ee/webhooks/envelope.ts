@@ -45,6 +45,7 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
       trace_id: row.traceId,
       model: row.model,
       model_provider_id: row.providerKey || null,
+      request_type: row.requestType || null,
       usage: {
         input_tokens: row.tokensInput,
         output_tokens: row.tokensOutput,
@@ -52,8 +53,18 @@ export function spendRowToEnvelope(row: SpendEventRow): WebhookEnvelope {
         cache_creation_input_tokens: row.tokensCacheWrite,
         reasoning_tokens: row.tokensReasoning,
       },
-      cost: { total_usd: row.costUsd },
-      status: row.status,
+      cost: {
+        total_usd: row.costUsd,
+        nano_usd: row.costNanoUsd,
+        rate_version: row.rateVersion || null,
+      },
+      status:
+        row.status === "confirmed"
+          ? "success"
+          : row.status === "failed"
+            ? "error"
+            : row.status,
+      needs_reconciliation: row.needsReconciliation ? true : null,
       error: row.errorClass
         ? { class: row.errorClass, http_status: row.httpStatus || null }
         : null,

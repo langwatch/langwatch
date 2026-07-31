@@ -37,8 +37,10 @@ type Cursor = NonNullable<SpendEventsPage["nextCursor"]>;
 const statusCollection = createListCollection({
   items: [
     { label: "All statuses", value: "all" },
-    { label: "Success", value: "success" },
-    { label: "Error", value: "error" },
+    { label: "Confirmed", value: "confirmed" },
+    { label: "Failed", value: "failed" },
+    { label: "Admitted", value: "admitted" },
+    { label: "Settled", value: "settled" },
   ],
 });
 
@@ -69,7 +71,7 @@ function BillingEventsPage() {
   const [virtualKeyFilter, setVirtualKeyFilter] = useState("");
   const [endUserFilter, setEndUserFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "success" | "error">(
+  const [statusFilter, setStatusFilter] = useState<"all" | "confirmed" | "failed" | "admitted" | "settled">(
     "all",
   );
   const [pages, setPages] = useState<SpendRow[][]>([]);
@@ -289,7 +291,7 @@ function BillingEventsPage() {
                     {formatCost(row.costUsd)}
                   </Table.Cell>
                   <Table.Cell>
-                    {row.status === "success" ? (
+                    {row.status === "confirmed" ? (
                       <Badge size="sm" colorPalette="green">
                         success
                       </Badge>

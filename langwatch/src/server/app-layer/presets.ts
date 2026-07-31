@@ -752,15 +752,12 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Billing spend export shares the ClickHouse gate with the budget sync:
-  // the spend table IS the billing record and has no PG fallback (a mutable
+  // The spend-command pipeline projects gateway_spend; it shares the
+  // ClickHouse gate because the spend record has no PG fallback (a mutable
   // counter is the failure mode this table exists to replace).
-  const billingExport = clickhouseEnabled
+  const gatewaySpend = clickhouseEnabled
     ? {
-        prisma,
-        spendEventsRepository: new GatewaySpendEventsRepository(
-          resolveClickHouseClient,
-        ),
+        repository: new GatewaySpendEventsRepository(resolveClickHouseClient),
       }
     : undefined;
 
@@ -1006,7 +1003,7 @@ export function initializeDefaultApp(options?: {
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
-    billingExport,
+    gatewaySpend,
     webhookDelivery,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and

@@ -26,7 +26,7 @@ export interface SpendEvent {
       cache_creation_input_tokens: number;
       reasoning_tokens: number;
     };
-    cost: { total_usd: string };
+    cost: { total_usd: string; nano_usd?: number; rate_version?: string | null };
     status: string;
     error: { class: string; http_status: number | null } | null;
     duration_ms: number;
@@ -45,7 +45,7 @@ export interface EndUserSpend {
   window: string;
   from: string;
   to: string;
-  cost: { total_usd: string };
+  cost: { total_usd: string; nano_usd?: number };
   request_count: number;
   usage: {
     input_tokens: number;

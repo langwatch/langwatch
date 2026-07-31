@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudgetLedgerStatus,
-  PrismaClient,
-} from "@prisma/client";
-import { parseGatewaySpans } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/gateway-spans.service";
+import type { GatewayBudgetLedgerStatus, PrismaClient } from "@prisma/client";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import {
-  type BudgetDebitRow,
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "~/server/event-sourcing/reactors/reactor.types";
+import type {
+  BudgetDebitRow,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import type {
@@ -114,8 +113,7 @@ export function createGatewayBudgetSyncReactor(
         // row on every request.
         const now = new Date();
         const shouldTouch =
-          !vk.lastUsedAt ||
-          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
+          !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
         logger.info(
           {
             projectId,
@@ -190,62 +188,24 @@ export function createGatewayBudgetSyncReactor(
           foldState.attributes["langwatch.model_provider_id"] ?? null;
 
         const resolved = await deps.budgetRepository.resolveForRequest(scopes);
-        if (resolved.length === 0) return;
+        const budgets = resolved.filter((r) =>
+          budgetAppliesToProvider(r.budget, dispatchedProviderKey),
+        );
+        if (budgets.length === 0) return;
 
-        // Per-REQUEST grain: the fold keeps one bookkeeping entry per gateway
-        // span (reserved attribute, survives the trace_summaries round-trip),
-        // so N calls folded under one client traceparent debit as N requests,
-        // each with its own id, cost, token classes and provider. Provider
-        // filtering runs per entry for the same reason: two requests under
-        // one traceparent can dispatch to different providers, and a
-        // provider-filtered budget must accrue exactly the requests that
-        // went to its provider. Traces folded before the entry list existed
-        // carry only the first-wins attributes; those fall back to the old
-        // whole-trace single row so a rolling deploy never drops debits.
-        const entries = parseGatewaySpans(foldState.attributes);
-        let rows: BudgetDebitRow[];
-        if (entries.length > 0) {
-          rows = entries.flatMap((entry) => {
-            const entryProviderKey = entry.modelProviderId || null;
-            return resolved
-              .filter((r) =>
-                budgetAppliesToProvider(r.budget, entryProviderKey),
-              )
-              .map(({ budget: b, bucketScopeId }) => ({
-                tenantId: projectId,
-                budgetId: b.id,
-                scope: b.scopeType,
-                scopeId: bucketScopeId,
-                window: b.window,
-                virtualKeyId: entry.virtualKeyId,
-                providerKey: entryProviderKey,
-                gatewayRequestId: entry.requestId,
-                amountUsd: formatDecimal(entry.costUsd),
-                tokensInput: entry.inputTokens,
-                tokensOutput: entry.outputTokens,
-                tokensCacheRead: entry.cacheReadTokens,
-                tokensCacheWrite: entry.cacheWriteTokens,
-                model: entry.model,
-                durationMs: entry.durationMs,
-                status: foldState.blockedByGuardrail
-                  ? ("BLOCKED_BY_GUARDRAIL" as const)
-                  : entry.status === "error"
-                    ? ("PROVIDER_ERROR" as const)
-                    : ("SUCCESS" as const),
-                occurredAt: new Date(entry.occurredAtMs),
-              }));
-          });
-        } else {
-          const budgets = resolved.filter((r) =>
-            budgetAppliesToProvider(r.budget, dispatchedProviderKey),
-          );
-          const amountUsd = formatDecimal(foldState.totalCost ?? 0);
-          const status: GatewayBudgetLedgerStatus = foldState.blockedByGuardrail
-            ? "BLOCKED_BY_GUARDRAIL"
-            : foldState.containsErrorStatus
-              ? "PROVIDER_ERROR"
-              : "SUCCESS";
-          rows = budgets.map(({ budget: b, bucketScopeId }) => ({
+        const amountUsd = formatDecimal(foldState.totalCost ?? 0);
+        const tokensInput = foldState.totalPromptTokenCount ?? 0;
+        const tokensOutput = foldState.totalCompletionTokenCount ?? 0;
+        const model = foldState.models[0] ?? "unknown";
+        const status: GatewayBudgetLedgerStatus = foldState.blockedByGuardrail
+          ? "BLOCKED_BY_GUARDRAIL"
+          : foldState.containsErrorStatus
+            ? "PROVIDER_ERROR"
+            : "SUCCESS";
+        const occurredAt = new Date(foldState.occurredAt);
+
+        const rows: BudgetDebitRow[] = budgets.map(
+          ({ budget: b, bucketScopeId }) => ({
             tenantId: projectId,
             budgetId: b.id,
             scope: b.scopeType,
@@ -255,30 +215,18 @@ export function createGatewayBudgetSyncReactor(
             providerKey: dispatchedProviderKey,
             gatewayRequestId,
             amountUsd,
-            tokensInput: foldState.totalPromptTokenCount ?? 0,
-            tokensOutput: foldState.totalCompletionTokenCount ?? 0,
+            tokensInput,
+            tokensOutput,
             tokensCacheRead: 0,
             tokensCacheWrite: 0,
-            model: foldState.models[0] ?? "unknown",
+            model,
             durationMs: Math.round(foldState.totalDurationMs ?? 0),
             status,
-            occurredAt: new Date(foldState.occurredAt),
-          }));
-        }
-        if (rows.length === 0) return;
-
-        await deps.budgetCHRepository.insertDebits(rows);
-
-        // Change-event payload: budgets that actually accrued, and the
-        // debited total summed once per request (row fan-out across budgets
-        // must not multiply it).
-        const debitedBudgetIds = [...new Set(rows.map((r) => r.budgetId))];
-        const amountByRequest = new Map(
-          rows.map((r) => [r.gatewayRequestId, Number(r.amountUsd)]),
+            occurredAt,
+          }),
         );
-        const amountUsd = formatDecimal(
-          [...amountByRequest.values()].reduce((sum, n) => sum + n, 0),
-        );
+
+        await deps.budgetCHRepository.insertDebit(rows);
 
         // EC4 — emit a BUDGET_UPDATED change event so the gateway's
         // /changes subscriber (services/aigateway/adapters/authresolver)
@@ -302,7 +250,7 @@ export function createGatewayBudgetSyncReactor(
             payload: {
               gatewayRequestId,
               virtualKeyId: vk.id,
-              budgetIds: debitedBudgetIds,
+              budgetIds: budgets.map((r) => r.budget.id),
               amountUsd,
             },
           });

@@ -1,30 +1,38 @@
 /**
- * Gateway spend events — the per-request billing record.
+ * Gateway spend, the per-request billing record, projected from the
+ * gateway_spend_processing command pipeline.
  *
- * One row per gateway request, written UNCONDITIONALLY by the billingExport
- * reactor (the budget ledger next door only gets rows when a budget
- * applies). Keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree;
- * replays collapse at merge time and the insert path probes first so the
- * scope-total-style double-count failure mode cannot recur here.
+ * One row per gateway REQUEST at its latest lifecycle status (admitted ->
+ * confirmed | failed | settled), keyed (TenantId, GatewayRequestId) on a
+ * ReplacingMergeTree whose version is the fold's monotonic updatedAt. The
+ * fold is the only writer; every read here is replacement-aware (FINAL)
+ * because RMT dedup is eventual and these reads back reconciliation.
  *
- * Reads are replacement-aware by construction (FINAL): RMT dedup is
- * eventual, and this table backs reconciliation reads where a transient
- * duplicate would double-bill downstream.
+ * Money: CostNanoUSD is integer nano-USD rated in the fold. The row's
+ * `costUsd` string is derived at the read boundary for response-shape
+ * stability; sums downstream should prefer the integer.
  *
- * See: migration 00060_create_gateway_spend_events.sql
+ * See: migration 00062_create_gateway_spend.sql
  */
 
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
+import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 
-const TABLE = "gateway_spend_events" as const;
+const TABLE = "gateway_spend" as const;
 
-const logger = createLogger("langwatch:gateway:spend-events-repository");
+const logger = createLogger("langwatch:gateway:spend-repository");
+
+export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
 export type SpendEventRow = {
   tenantId: string;
   gatewayRequestId: string;
   organizationId: string;
+  /** Not carried by the command pipeline; kept for response-shape
+   *  stability, always empty. */
   teamId: string;
   virtualKeyId: string;
   principalUserId: string;
@@ -32,43 +40,83 @@ export type SpendEventRow = {
   traceId: string;
   model: string;
   providerKey: string;
+  requestType: string;
   tokensInput: number;
   tokensOutput: number;
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
-  /** Fixed-point decimal string for CH Decimal(18,6). */
+  /** Integer nano-USD, the authoritative figure. */
+  costNanoUsd: number;
+  /** Fixed-point USD string derived from costNanoUsd (6 decimals). */
   costUsd: string;
-  status: "success" | "error";
+  rateVersion: string;
+  status: SpendEventStatus;
   errorClass: string;
   httpStatus: number;
+  needsReconciliation: boolean;
   labels: string[];
   metadata: string;
   durationMs: number;
   occurredAt: Date;
 };
 
-function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
+/** Legacy filter vocabulary ("success"/"error") maps onto the lifecycle
+ *  statuses so pre-pipeline API clients keep working. */
+export function normalizeStatusFilter(
+  status: string,
+): SpendEventStatus | undefined {
+  if (status === "success") return "confirmed";
+  if (status === "error") return "failed";
+  if (
+    status === "admitted" ||
+    status === "confirmed" ||
+    status === "failed" ||
+    status === "settled"
+  ) {
+    return status;
+  }
+  return undefined;
+}
+
+function nanoToUsdString(nano: number): string {
+  return (nano / NANO_USD_PER_USD).toFixed(6);
+}
+
+const ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
+          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
+          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
+          TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
+          HttpStatus, NeedsReconciliation, Labels, Metadata, DurationMS,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
+
+function mapRow(r: Record<string, unknown>): SpendEventRow {
+  const nano = Number(r.CostNanoUSD ?? 0);
+  const status = String(r.Status) as SpendEventStatus;
   return {
     tenantId: String(r.TenantId),
     gatewayRequestId: String(r.GatewayRequestId),
     organizationId: String(r.OrganizationId),
-    teamId: String(r.TeamId),
+    teamId: "",
     virtualKeyId: String(r.VirtualKeyId),
     principalUserId: String(r.PrincipalUserId),
     endUserId: String(r.EndUserId),
     traceId: String(r.TraceId),
     model: String(r.Model),
     providerKey: String(r.ProviderKey),
+    requestType: String(r.RequestType ?? ""),
     tokensInput: Number(r.TokensInput),
     tokensOutput: Number(r.TokensOutput),
     tokensCacheRead: Number(r.TokensCacheRead),
     tokensCacheWrite: Number(r.TokensCacheWrite),
     tokensReasoning: Number(r.TokensReasoning),
-    costUsd: String(r.CostUSD),
-    status: r.Status === "error" ? "error" : "success",
+    costNanoUsd: nano,
+    costUsd: nanoToUsdString(nano),
+    rateVersion: String(r.RateVersion ?? ""),
+    status,
     errorClass: String(r.ErrorClass),
     httpStatus: Number(r.HttpStatus),
+    needsReconciliation: Number(r.NeedsReconciliation ?? 0) === 1,
     labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
     metadata: String(r.Metadata ?? ""),
     durationMs: Number(r.DurationMS),
@@ -85,17 +133,163 @@ export interface SpendEventsPageFilters {
   virtualKeyId?: string;
   endUserId?: string;
   model?: string;
-  status?: "success" | "error";
+  status?: string;
 }
 
 export class GatewaySpendEventsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   /**
+   * Fold-store writer: one ReplacingMergeTree version per apply-batch
+   * commit. Absolute state in, absolute row out; the RMT version is the
+   * fold's monotonic updatedAt, so redelivered batches that re-set the
+   * same state replace rather than duplicate.
+   */
+  async upsertFromFold(
+    entries: Array<{
+      tenantId: string;
+      gatewayRequestId: string;
+      state: GatewaySpendState;
+    }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+    const tenantId = entries[0]!.tenantId;
+    if (entries.some((e) => e.tenantId !== tenantId)) {
+      throw new Error(
+        "GatewaySpendEventsRepository.upsertFromFold: entries span multiple tenants",
+      );
+    }
+    const client = await this.resolveClient(tenantId);
+    const records = entries.map(({ tenantId, gatewayRequestId, state }) => ({
+      TenantId: tenantId,
+      GatewayRequestId: gatewayRequestId,
+      OrganizationId: state.organizationId,
+      VirtualKeyId: state.virtualKeyId,
+      PrincipalUserId: state.principalUserId,
+      EndUserId: state.endUserId,
+      TraceId: state.traceId,
+      Model: state.model,
+      ProviderKey: state.providerKey,
+      RequestType: state.requestType,
+      Status: state.status === "" ? "admitted" : state.status,
+      ErrorClass: state.errorType,
+      HttpStatus: state.httpStatus,
+      NeedsReconciliation: state.needsReconciliation ? 1 : 0,
+      SettleReason: state.settleReason,
+      TokensInput: state.usage?.input_tokens ?? 0,
+      TokensOutput: state.usage?.output_tokens ?? 0,
+      TokensCacheRead: state.usage?.cache_read_input_tokens ?? 0,
+      TokensCacheWrite: state.usage?.cache_creation_input_tokens ?? 0,
+      TokensReasoning: state.usage?.reasoning_tokens ?? 0,
+      CostNanoUSD: state.costNanoUsd,
+      RateVersion: state.rateVersion,
+      Labels: state.labels,
+      Metadata: state.metadataJson,
+      PodId: state.podId,
+      PodSeq: state.podSeq,
+      DurationMS: state.durationMs,
+      OccurredAt: state.occurredAtMs || state.LastEventOccurredAt,
+      Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
+      CreatedAt: state.createdAt,
+      LastEventOccurredAt: state.LastEventOccurredAt,
+      EventTimestamp: state.updatedAt,
+    }));
+    try {
+      await client.insert({
+        table: TABLE,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        { tenantId, count: records.length, error },
+        "failed to upsert gateway spend rows",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Read-back for the fold store: the latest committed state for one
+   * request, or null. Only rows stamped with the CURRENT projection
+   * version decode; an older stamp reports a miss so the projection
+   * refolds that aggregate once from the log instead of trusting a shape
+   * it cannot fully decode.
+   */
+  async readForFold({
+    tenantId,
+    gatewayRequestId,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+  }): Promise<GatewaySpendState | null> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${ROW_COLUMNS}, SettleReason, PodId, PodSeq,
+               Version, CreatedAt, LastEventOccurredAt, EventTimestamp
+        FROM ${TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND GatewayRequestId = {gatewayRequestId:String}
+        LIMIT 1
+      `,
+      query_params: { tenantId, gatewayRequestId },
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const r = raw[0];
+    if (!r) return null;
+    if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
+      return null;
+    }
+    const row = mapRow(r);
+    const hasUsage =
+      row.status === "confirmed" ||
+      row.status === "failed" ||
+      row.tokensInput > 0 ||
+      row.tokensOutput > 0;
+    return {
+      status: row.status,
+      organizationId: row.organizationId,
+      virtualKeyId: row.virtualKeyId,
+      principalUserId: row.principalUserId,
+      endUserId: row.endUserId,
+      model: row.model,
+      providerKey: row.providerKey,
+      traceId: row.traceId,
+      requestType: row.requestType,
+      labels: row.labels,
+      metadataJson: row.metadata,
+      podId: String(r.PodId ?? ""),
+      podSeq: Number(r.PodSeq ?? 0),
+      usage: hasUsage
+        ? {
+            input_tokens: row.tokensInput,
+            output_tokens: row.tokensOutput,
+            cache_read_input_tokens: row.tokensCacheRead,
+            cache_creation_input_tokens: row.tokensCacheWrite,
+            reasoning_tokens: row.tokensReasoning,
+          }
+        : null,
+      rateVersion: row.rateVersion,
+      costNanoUsd: row.costNanoUsd,
+      errorType: row.errorClass,
+      httpStatus: row.httpStatus,
+      needsReconciliation: row.needsReconciliation,
+      settleReason: String(r.SettleReason ?? ""),
+      occurredAtMs: row.occurredAt.getTime(),
+      durationMs: row.durationMs,
+      createdAt: Number(r.CreatedAt ?? 0),
+      updatedAt: Number(r.EventTimestamp ?? 0),
+      LastEventOccurredAt: Number(r.LastEventOccurredAt ?? 0),
+    };
+  }
+
+  /**
    * Newest-first page read for the ledger UI. Keyset pagination on
    * (OccurredAt, GatewayRequestId) DESC so a page boundary never skips or
-   * repeats rows while inserts land; FINAL for the same no-transient-
-   * duplicates reason as readSpendEvents.
+   * repeats rows while inserts land.
    */
   async readSpendEventsPage({
     tenantId,
@@ -134,9 +328,12 @@ export class GatewaySpendEventsRepository {
       conditions.push("Model = {model:String}");
       params.model = filters.model;
     }
-    if (filters.status) {
+    const statusFilter = filters.status
+      ? normalizeStatusFilter(filters.status)
+      : undefined;
+    if (statusFilter) {
       conditions.push("Status = {status:String}");
-      params.status = filters.status;
+      params.status = statusFilter;
     }
     if (cursor) {
       conditions.push(
@@ -148,13 +345,7 @@ export class GatewaySpendEventsRepository {
 
     const result = await client.query({
       query: `
-        SELECT
-          TenantId, GatewayRequestId, OrganizationId, TeamId, VirtualKeyId,
-          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey,
-          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, toString(CostUSD) AS CostUSD, Status, ErrorClass,
-          HttpStatus, Labels, Metadata, DurationMS,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs
+        SELECT ${ROW_COLUMNS}
         FROM ${TABLE} FINAL
         WHERE ${conditions.join(" AND ")}
         ORDER BY OccurredAt DESC, GatewayRequestId DESC
@@ -164,7 +355,7 @@ export class GatewaySpendEventsRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    const rows = raw.map(mapSpendEventRow);
+    const rows = raw.map(mapRow);
     const last = rows[rows.length - 1];
     return {
       rows,
@@ -179,84 +370,7 @@ export class GatewaySpendEventsRepository {
   }
 
   /**
-   * Insert rows, skipping any gateway_request_id the table already has.
-   * At-least-once reactor delivery makes replays normal, not exceptional;
-   * the probe keeps them invisible to FINAL-less aggregate readers too.
-   * Returns how many rows were actually written (the metric the reactor
-   * publishes).
-   */
-  async insertSpendEvents(rows: SpendEventRow[]): Promise<number> {
-    if (rows.length === 0) return 0;
-    const tenantId = rows[0]!.tenantId;
-    if (rows.some((r) => r.tenantId !== tenantId)) {
-      throw new Error(
-        "GatewaySpendEventsRepository.insertSpendEvents: rows span multiple tenants",
-      );
-    }
-
-    const requestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT GatewayRequestId FROM ${TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {requestIds:Array(String)}`,
-      query_params: { tenantId, requestIds },
-      format: "JSONEachRow",
-    });
-    const seen = new Set(
-      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
-        (r) => r.GatewayRequestId,
-      ),
-    );
-    const fresh = rows.filter((r) => !seen.has(r.gatewayRequestId));
-    if (fresh.length === 0) return 0;
-
-    const records = fresh.map((r) => ({
-      TenantId: r.tenantId,
-      GatewayRequestId: r.gatewayRequestId,
-      OrganizationId: r.organizationId,
-      TeamId: r.teamId,
-      VirtualKeyId: r.virtualKeyId,
-      PrincipalUserId: r.principalUserId,
-      EndUserId: r.endUserId,
-      TraceId: r.traceId,
-      Model: r.model,
-      ProviderKey: r.providerKey,
-      TokensInput: r.tokensInput,
-      TokensOutput: r.tokensOutput,
-      TokensCacheRead: r.tokensCacheRead,
-      TokensCacheWrite: r.tokensCacheWrite,
-      TokensReasoning: r.tokensReasoning,
-      CostUSD: r.costUsd,
-      Status: r.status,
-      ErrorClass: r.errorClass,
-      HttpStatus: r.httpStatus,
-      Labels: r.labels,
-      Metadata: r.metadata,
-      DurationMS: r.durationMs,
-      OccurredAt: r.occurredAt.getTime(),
-      EventTimestamp: Date.now(),
-    }));
-
-    try {
-      await client.insert({
-        table: TABLE,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId, count: fresh.length, error },
-        "failed to insert gateway spend events",
-      );
-      throw error;
-    }
-    return fresh.length;
-  }
-
-  /**
-   * Replacement-aware read for tests and the reconciliation surface.
-   * FINAL costs a merge-on-read but this path is paged and off the hot
-   * path; correctness (no transient duplicates) wins.
+   * Replacement-aware range read for tests and internal consumers.
    */
   async readSpendEvents({
     tenantId,
@@ -289,14 +403,11 @@ export class GatewaySpendEventsRepository {
 
   /**
    * Org-wide cursor page for the reconciliation pull surface
-   * (GET /api/billing/v1/spend-events). Ordered ASCENDING by
-   * (EventTimestamp, GatewayRequestId): EventTimestamp is the insert-time
-   * replacement version, so rows folded late (minutes after their
-   * OccurredAt) still sort AFTER an in-flight cursor and are never skipped;
-   * ordering by OccurredAt would lose exactly those rows. `from`/`to`
-   * remain OccurredAt bounds (billing periods are request-time periods).
-   * One query serves every tenant of the org (rows never leave the org:
-   * the tenant list IS the org's project list, resolved by the caller).
+   * (GET /api/gateway/v1/spend-events). Ordered ASCENDING by
+   * (EventTimestamp, GatewayRequestId): EventTimestamp is the fold's
+   * replacement version, so rows written or restated late still sort AFTER
+   * an in-flight cursor and are never skipped. `from`/`to` remain
+   * OccurredAt bounds (billing periods are request-time periods).
    */
   async walkSpendEvents({
     tenantIds,
@@ -317,7 +428,7 @@ export class GatewaySpendEventsRepository {
     virtualKeyId?: string;
     endUserId?: string;
     model?: string;
-    status?: "success" | "error";
+    status?: string;
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
@@ -352,9 +463,11 @@ export class GatewaySpendEventsRepository {
       clauses.push("AND Model = {model:String}");
       params.model = model;
     }
-    if (status !== undefined) {
+    const statusFilter =
+      status !== undefined ? normalizeStatusFilter(status) : undefined;
+    if (statusFilter !== undefined) {
       clauses.push("AND Status = {status:String}");
-      params.status = status;
+      params.status = statusFilter;
     }
 
     const result = await client.query({
@@ -386,8 +499,10 @@ export class GatewaySpendEventsRepository {
 
   /**
    * Windowed rollup for one external end user across the org's tenants
-   * (GET /api/billing/v1/end-users/:id/spend). FINAL for the same reason
-   * as every read here: a transient RMT duplicate would double-bill.
+   * (GET /api/gateway/v1/end-users/:id/spend). Sums the integer nano
+   * column; the USD string is derived once from the summed integer.
+   * Admitted/settled rows carry zero quantities and zero cost, so
+   * including them keeps requestCount honest without touching money.
    */
   async readEndUserSpend({
     tenantIds,
@@ -403,6 +518,7 @@ export class GatewaySpendEventsRepository {
     virtualKeyId?: string;
   }): Promise<{
     spendUsd: string;
+    spendNanoUsd: number;
     requestCount: number;
     tokensInput: number;
     tokensOutput: number;
@@ -411,7 +527,8 @@ export class GatewaySpendEventsRepository {
     tokensReasoning: number;
   }> {
     const empty = {
-      spendUsd: "0",
+      spendUsd: "0.000000",
+      spendNanoUsd: 0,
       requestCount: 0,
       tokensInput: 0,
       tokensOutput: 0,
@@ -426,7 +543,7 @@ export class GatewaySpendEventsRepository {
     const result = await client.query({
       query: `
         SELECT
-          toString(sum(CostUSD)) AS SpendUSD,
+          sum(CostNanoUSD) AS SpendNanoUSD,
           count() AS RequestCount,
           sum(TokensInput) AS TokensInput,
           sum(TokensOutput) AS TokensOutput,
@@ -452,8 +569,10 @@ export class GatewaySpendEventsRepository {
     const raw = (await result.json()) as Array<Record<string, unknown>>;
     const row = raw[0];
     if (!row) return empty;
+    const nano = Number(row.SpendNanoUSD ?? 0);
     return {
-      spendUsd: String(row.SpendUSD ?? "0"),
+      spendUsd: nanoToUsdString(nano),
+      spendNanoUsd: nano,
       requestCount: Number(row.RequestCount ?? 0),
       tokensInput: Number(row.TokensInput ?? 0),
       tokensOutput: Number(row.TokensOutput ?? 0),
@@ -462,41 +581,6 @@ export class GatewaySpendEventsRepository {
       tokensReasoning: Number(row.TokensReasoning ?? 0),
     };
   }
-}
-
-const ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, TeamId, VirtualKeyId,
-          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey,
-          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, toString(CostUSD) AS CostUSD, Status, ErrorClass,
-          HttpStatus, Labels, Metadata, DurationMS,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
-
-function mapRow(r: Record<string, unknown>): SpendEventRow {
-  return {
-    tenantId: String(r.TenantId),
-    gatewayRequestId: String(r.GatewayRequestId),
-    organizationId: String(r.OrganizationId),
-    teamId: String(r.TeamId),
-    virtualKeyId: String(r.VirtualKeyId),
-    principalUserId: String(r.PrincipalUserId),
-    endUserId: String(r.EndUserId),
-    traceId: String(r.TraceId),
-    model: String(r.Model),
-    providerKey: String(r.ProviderKey),
-    tokensInput: Number(r.TokensInput),
-    tokensOutput: Number(r.TokensOutput),
-    tokensCacheRead: Number(r.TokensCacheRead),
-    tokensCacheWrite: Number(r.TokensCacheWrite),
-    tokensReasoning: Number(r.TokensReasoning),
-    costUsd: String(r.CostUSD),
-    status: r.Status === "error" ? "error" : "success",
-    errorClass: String(r.ErrorClass),
-    httpStatus: Number(r.HttpStatus),
-    labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
-    metadata: String(r.Metadata ?? ""),
-    durationMs: Number(r.DurationMS),
-    occurredAt: new Date(Number(r.OccurredAtMs)),
-  };
 }
 
 export interface SpendEventsCursor {
