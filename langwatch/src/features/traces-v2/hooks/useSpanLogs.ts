@@ -23,7 +23,12 @@ export function useSpanLogs() {
 
   // Observer only (`enabled: false` never fetches): the drawer scaffold
   // always runs the real header query, this just follows its cache entry.
-  const header = api.tracesV2.header.useQuery(queryArgs, { enabled: false });
+  // full: true matches useTraceHeader's own query key, or this would watch
+  // a cache slot the scaffold's query never populates.
+  const header = api.tracesV2.header.useQuery(
+    { ...queryArgs, full: true },
+    { enabled: false },
+  );
   const logRecordCount = Number(
     header.data?.attributes["langwatch.reserved.log_record_count"] ?? "0",
   );
