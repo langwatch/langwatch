@@ -1,5 +1,13 @@
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useMemo, useRef, useState } from "react";
-import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   Area,
   AreaChart,
@@ -59,14 +67,10 @@ function downsample(
     }));
   }
 
-  const buckets = new Map<
-    number,
-    { sum: ChartPoint; count: number }
-  >();
+  const buckets = new Map<number, { sum: ChartPoint; count: number }>();
 
   for (const point of raw) {
-    const bucketKey =
-      Math.floor(point.timestamp / bucketMs) * bucketMs;
+    const bucketKey = Math.floor(point.timestamp / bucketMs) * bucketMs;
     const existing = buckets.get(bucketKey);
     if (existing) {
       existing.sum.staged += point.ingestedPerSec;
@@ -253,12 +257,7 @@ function CustomLegend({ showCounts }: { showCounts: boolean }) {
       {items.map((item) => (
         <HStack key={item.name} gap={1}>
           {item.type === "area" ? (
-            <Box
-              width="6px"
-              height="6px"
-              borderRadius="full"
-              bg={item.color}
-            />
+            <Box width="6px" height="6px" borderRadius="full" bg={item.color} />
           ) : (
             <Box
               width="10px"
@@ -307,7 +306,9 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
   }, [chartData]);
 
   const hasCountData = useMemo(() => {
-    return chartData.some((p) => p.pending > 0 || p.blocked > 0 || p.parked > 0);
+    return chartData.some(
+      (p) => p.pending > 0 || p.blocked > 0 || p.parked > 0,
+    );
   }, [chartData]);
 
   const yMaxRight = useMemo(() => {
@@ -367,16 +368,40 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
         >
           <defs>
             <linearGradient id="gradStaged" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={COLORS.staged.fill} stopOpacity={0.2} />
-              <stop offset="100%" stopColor={COLORS.staged.fill} stopOpacity={0.02} />
+              <stop
+                offset="0%"
+                stopColor={COLORS.staged.fill}
+                stopOpacity={0.2}
+              />
+              <stop
+                offset="100%"
+                stopColor={COLORS.staged.fill}
+                stopOpacity={0.02}
+              />
             </linearGradient>
             <linearGradient id="gradCompleted" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={COLORS.completed.fill} stopOpacity={0.2} />
-              <stop offset="100%" stopColor={COLORS.completed.fill} stopOpacity={0.02} />
+              <stop
+                offset="0%"
+                stopColor={COLORS.completed.fill}
+                stopOpacity={0.2}
+              />
+              <stop
+                offset="100%"
+                stopColor={COLORS.completed.fill}
+                stopOpacity={0.02}
+              />
             </linearGradient>
             <linearGradient id="gradFailed" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={COLORS.failed.fill} stopOpacity={0.25} />
-              <stop offset="100%" stopColor={COLORS.failed.fill} stopOpacity={0.02} />
+              <stop
+                offset="0%"
+                stopColor={COLORS.failed.fill}
+                stopOpacity={0.25}
+              />
+              <stop
+                offset="100%"
+                stopColor={COLORS.failed.fill}
+                stopOpacity={0.02}
+              />
             </linearGradient>
           </defs>
           <CartesianGrid

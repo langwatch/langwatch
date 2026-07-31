@@ -5,8 +5,8 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
-import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptTabStrip } from "./PromptTabStrip";
+import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
 

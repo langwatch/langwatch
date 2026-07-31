@@ -109,6 +109,13 @@ describe("GET /api/experiments/runs/:runId/results archive visibility", () => {
       const res = await get("/api/experiments/runs/run_x/results");
 
       expect(res.status).toBe(404);
+      // `error` carries a CODE, never a sentence. This route already answered
+      // a FAILED run with the failure's code, then hand-rolled
+      // `c.json({ error: "Run not found" })` for every miss — so one field an
+      // API consumer branches on held a slug on one path and English on
+      // another. Both are codes now, and these 404s go through the boundary
+      // serializer like every other handled error.
+      expect(await res.json()).toMatchObject({ error: "run_not_found" });
       expect(findFirst).toHaveBeenCalledWith({
         where: {
           id: "experiment_ARCHIVED",
@@ -168,6 +175,7 @@ describe("GET /api/experiments/runs/:runId archive visibility", () => {
       const res = await get("/api/experiments/runs/run_status_x");
 
       expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({ error: "run_not_found" });
       expect(findFirst).toHaveBeenCalledWith({
         where: {
           id: "experiment_ARCHIVED",

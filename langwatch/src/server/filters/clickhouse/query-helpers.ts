@@ -91,7 +91,7 @@ export function extractStandardResults(rows: unknown[]): FilterOption[] {
  */
 export function buildScopeConditions(
   params: ClickHouseFilterQueryParams,
-  scopeParamPrefix: string = "scope",
+  scopeParamPrefix = "scope",
 ): { sql: string; params: Record<string, unknown> } {
   if (!params.scopeFilters || Object.keys(params.scopeFilters).length === 0) {
     return { sql: "", params: {} };

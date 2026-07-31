@@ -11,7 +11,13 @@
  * - Boolean field selector for traces.error
  * - Collapsing back when removing custom preconditions
  */
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -26,15 +32,17 @@ import {
   OnlineEvaluationDrawer,
 } from "../OnlineEvaluationDrawer";
 import {
-  state,
   mockEvaluators,
-  Wrapper,
   resetState,
+  state,
+  Wrapper,
 } from "./OnlineEvaluationDrawer.test-helpers.tsx";
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
 vi.mock("~/utils/compat/next-router", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createApiMock(),
@@ -83,7 +91,9 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
 
     // Select trace level
     await waitFor(() => {
-      expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: /Trace Level/i }),
+      ).toBeInTheDocument();
     });
     await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
     await vi.advanceTimersByTimeAsync(50);
@@ -203,9 +213,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       // Annotations: Has Annotation
       // Events: Event Type, Event Metrics Key, Event Details Key
       const fieldOptions = selectWithOptgroups!.querySelectorAll("option");
-      const optionTexts = Array.from(fieldOptions).map(
-        (o) => o.textContent,
-      );
+      const optionTexts = Array.from(fieldOptions).map((o) => o.textContent);
 
       expect(optionTexts).toContain("Input");
       expect(optionTexts).toContain("Output");
@@ -302,7 +310,11 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       const booleanSelect = updatedComboboxes.find((select) => {
         const options = select.querySelectorAll("option");
         const texts = Array.from(options).map((o) => o.textContent);
-        return texts.includes("true") && texts.includes("false") && texts.length === 2;
+        return (
+          texts.includes("true") &&
+          texts.includes("false") &&
+          texts.length === 2
+        );
       });
       expect(booleanSelect).toBeDefined();
     });

@@ -7,7 +7,10 @@ export type ModelProviderServiceMiddlewareVariables = {
   modelProviderService: ModelProviderService;
 };
 
-export const modelProviderServiceMiddleware: MiddlewareHandler = async (c, next) => {
+export const modelProviderServiceMiddleware: MiddlewareHandler = async (
+  c,
+  next,
+) => {
   c.set("modelProviderService", ModelProviderService.create(prisma));
   await next();
 };

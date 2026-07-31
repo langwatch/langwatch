@@ -158,8 +158,7 @@ export const createS3Client = async (projectId: string) => {
   // IRSA in production EKS deployments. This branch passes credentials
   // ONLY when an explicit access-key + secret pair is present, letting the
   // SDK fall back through its default chain for keyless modes.
-  const accessKeyId =
-    privateConfig?.accessKeyId ?? env.S3_ACCESS_KEY_ID;
+  const accessKeyId = privateConfig?.accessKeyId ?? env.S3_ACCESS_KEY_ID;
   const secretAccessKey =
     privateConfig?.secretAccessKey ?? env.S3_SECRET_ACCESS_KEY;
   const sessionToken = env.S3_SESSION_TOKEN;
@@ -176,8 +175,7 @@ export const createS3Client = async (projectId: string) => {
   const endpoint = privateConfig?.endpoint ?? env.S3_ENDPOINT;
   const isAwsEndpoint = !endpoint || endpoint.endsWith(".amazonaws.com");
   const region: string | undefined =
-    env.S3_REGION ??
-    (isAwsEndpoint && !hasExplicitKeys ? undefined : "auto");
+    env.S3_REGION ?? (isAwsEndpoint && !hasExplicitKeys ? undefined : "auto");
 
   const s3Client = new S3Client({
     ...(region !== undefined ? { region } : {}),

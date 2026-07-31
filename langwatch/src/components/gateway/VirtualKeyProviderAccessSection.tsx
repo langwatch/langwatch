@@ -1,19 +1,16 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-
-import { SmallLabel } from "../SmallLabel";
-import { ProviderRow } from "./VirtualKeyProviderRow";
 import { Checkbox } from "~/components/ui/checkbox";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-
+import { SmallLabel } from "../SmallLabel";
 import {
   buildScopeHierarchy,
-  type EligibleModelProvider,
   type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,
   type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
+import { ProviderRow } from "./VirtualKeyProviderRow";
 
 /**
  * Which providers a key may dispatch to.
@@ -47,8 +44,7 @@ export function providerAccessToConfig(
     providersAllowed: value.allProviders
       ? null
       : value.providerIds.filter((id) => eligibleIds.has(id)),
-    modelsAllowed:
-      value.modelsAllowed.length > 0 ? value.modelsAllowed : null,
+    modelsAllowed: value.modelsAllowed.length > 0 ? value.modelsAllowed : null,
   };
 }
 
@@ -245,4 +241,3 @@ export function VirtualKeyProviderAccessSection({
     </VStack>
   );
 }
-

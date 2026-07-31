@@ -15,11 +15,11 @@
  * measures 0x0).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
-import type { UIMessage } from "ai";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -54,8 +54,8 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-import { MessageContent } from "../components/MessageContent";
 import { LangyChoicesCard } from "../components/derived-cards/LangyChoicesCard";
+import { MessageContent } from "../components/MessageContent";
 
 afterEach(cleanup);
 
@@ -220,7 +220,11 @@ describe("given an answered question", () => {
       {
         role: "user",
         parts: [
-          { type: "langy-choice-selection", blockId: "q1", optionIds: ["prod"] },
+          {
+            type: "langy-choice-selection",
+            blockId: "q1",
+            optionIds: ["prod"],
+          },
           { type: "text", text: "Chose: Production agent" },
         ],
       } as unknown as UIMessage,
@@ -416,10 +420,9 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
     'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Live counts", "items": [';
 
   it("shows no card preview until a validating prefix exists", () => {
-    renderMessage(
-      assistantMessage([{ type: "text", text: statsFenceOpen }]),
-      { isStreaming: true },
-    );
+    renderMessage(assistantMessage([{ type: "text", text: statsFenceOpen }]), {
+      isStreaming: true,
+    });
     expect(screen.getByText(/Plotting/)).toBeDefined();
     expect(derivedFrames()).toHaveLength(0);
   });

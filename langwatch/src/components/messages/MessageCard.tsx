@@ -3,7 +3,6 @@ import {
   Badge,
   Box,
   HStack,
-  LinkOverlay,
   Skeleton,
   Spacer,
   Tag,
@@ -11,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Annotation, Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import {
   CheckCircle,
@@ -184,9 +183,7 @@ export function MessageCard({
                 />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown>
-                    {getExtractedInput(trace)}
-                  </Markdown>
+                  <Markdown>{getExtractedInput(trace)}</Markdown>
                 </Text>
               )}
             </RedactedField>
@@ -223,9 +220,7 @@ export function MessageCard({
                     value={stringifyIfObject(trace.output.value)}
                   />
                 ) : trace.output?.value ? (
-                  <Markdown>
-                    {getSlicedOutput(trace)}
-                  </Markdown>
+                  <Markdown>{getSlicedOutput(trace)}</Markdown>
                 ) : trace.lastGuardrail ? (
                   <HStack
                     align="start"

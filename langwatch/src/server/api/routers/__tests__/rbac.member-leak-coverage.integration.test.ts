@@ -31,13 +31,12 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
-import { prisma } from "../../../db";
-import { createTestApp } from "../../../app-layer/presets";
 import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -105,7 +104,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         // OrganizationService needs a PromptTagRepository but it's not
         // exercised by our tests — null-stub satisfies the constructor.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { seedForOrg: async () => { } } as any,
+        { seedForOrg: async () => {} } as any,
       ),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
@@ -114,7 +113,11 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
 
     // Org + 2 users + 1 regular team + 2 personal-workspace teams.
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `RBAC Leak Org ${ns}`, slug: `rbac-leak-${ns}` },
+      data: {
+        id: ORG_ID,
+        name: `RBAC Leak Org ${ns}`,
+        slug: `rbac-leak-${ns}`,
+      },
     });
 
     await prisma.user.create({
@@ -306,7 +309,11 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     await prisma.teamUser.deleteMany({
       where: {
         teamId: {
-          in: [REGULAR_TEAM_ID, ADMIN_PERSONAL_TEAM_ID, MEMBER_PERSONAL_TEAM_ID],
+          in: [
+            REGULAR_TEAM_ID,
+            ADMIN_PERSONAL_TEAM_ID,
+            MEMBER_PERSONAL_TEAM_ID,
+          ],
         },
       },
     });
@@ -429,16 +436,15 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         slug: regularTeamSlug,
         organizationId: ORG_ID,
       });
-      const adminMember = team.members.find(
-        (m) => m.userId === ADMIN_USER_ID,
-      );
+      const adminMember = team.members.find((m) => m.userId === ADMIN_USER_ID);
       expect(adminMember?.user.email).toBeNull();
     });
 
     it("organization.getOrganizationWithMembersAndTheirTeams as MEMBER nulls other members' emails", async () => {
-      const org = await memberCaller.organization.getOrganizationWithMembersAndTheirTeams(
-        { organizationId: ORG_ID },
-      );
+      const org =
+        await memberCaller.organization.getOrganizationWithMembersAndTheirTeams(
+          { organizationId: ORG_ID },
+        );
       const adminEntry = org.members.find((m) => m.user.id === ADMIN_USER_ID);
       const memberEntry = org.members.find((m) => m.user.id === MEMBER_USER_ID);
       expect(adminEntry?.user.email).toBeNull();
@@ -581,11 +587,12 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       // the test App. The test isn't asserting an email actually got
       // sent — just that the permission gate lets admin through and
       // the procedure returns its declared shape.
-      const result = await adminCaller.limits.checkAndSendUsageLimitNotification({
-        organizationId: ORG_ID,
-        currentMonthMessagesCount: 1,
-        maxMonthlyUsageLimit: 100,
-      });
+      const result =
+        await adminCaller.limits.checkAndSendUsageLimitNotification({
+          organizationId: ORG_ID,
+          currentMonthMessagesCount: 1,
+          maxMonthlyUsageLimit: 100,
+        });
       expect(result).toMatchObject({ sent: expect.any(Boolean) });
     });
   });

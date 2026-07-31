@@ -1,7 +1,5 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-
-import { CachedLuaScript } from "./cachedLuaScript";
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
@@ -9,6 +7,7 @@ import {
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
+import { CachedLuaScript } from "./cachedLuaScript";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1887,7 +1886,11 @@ export class GroupStagingScripts {
     nowMs: number;
     activeTtlSec: number;
   }): Promise<DispatchResult | null> {
-    const results = await this.dispatchBatch({ nowMs, activeTtlSec, maxJobs: 1 });
+    const results = await this.dispatchBatch({
+      nowMs,
+      activeTtlSec,
+      maxJobs: 1,
+    });
     return results[0] ?? null;
   }
 

@@ -7,27 +7,27 @@
  * commands, so the event log and every projection are exercised together.
  */
 import { PrismaClient } from "@prisma/client";
+import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
+import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
-import { seedDemoPlatform } from "../prisma/seed-demo-platform";
-import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
-import {
-  DAY_MS,
-  assertLocalUrl,
-  dateKey,
-  ingestTrace,
-  mulberry32,
-  utcDayStart,
-  type CollectorTarget,
-  type TraceFixture,
-} from "./seed-lib/seed-primitives";
 import {
   EXPERIMENT_ROWS,
   EXPERIMENT_VARIANTS,
   SCENARIO_FIXTURES,
 } from "./seed-lib/platform-fixtures";
+import {
+  assertLocalUrl,
+  type CollectorTarget,
+  DAY_MS,
+  dateKey,
+  ingestTrace,
+  mulberry32,
+  type TraceFixture,
+  utcDayStart,
+} from "./seed-lib/seed-primitives";
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";

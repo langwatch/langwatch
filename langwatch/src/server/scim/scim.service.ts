@@ -1,17 +1,22 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { generate } from "@langwatch/ksuid";
-import { UserService } from "../users/user.service";
 import { DepartmentService } from "@ee/governance/services/department/department.service";
+import { generate } from "@langwatch/ksuid";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+  type User,
+} from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { UserService } from "../users/user.service";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
-  type ScimUser,
-  type ScimListResponse,
-  type ScimError,
   type ScimCreateUserRequest,
+  type ScimError,
+  type ScimListResponse,
   type ScimPatchOperation,
   type ScimPatchRequest,
+  type ScimUser,
 } from "./scim.types";
 
 /**
@@ -128,18 +133,20 @@ export class ScimService {
     const existingUser = await this.userService.findByEmail({ email });
 
     if (existingUser) {
-      const existingMembership =
-        await this.prisma.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: existingUser.id,
-              organizationId,
-            },
+      const existingMembership = await this.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: existingUser.id,
+            organizationId,
           },
-        });
+        },
+      });
 
       if (existingMembership) {
-        return this.scimError({ status: "409", detail: "User already exists in this organization" });
+        return this.scimError({
+          status: "409",
+          detail: "User already exists in this organization",
+        });
       }
 
       try {
@@ -177,7 +184,9 @@ export class ScimService {
         costCenter: this.costCenterFromRequest(request),
       });
 
-      const reloadedUser = await this.userService.findById({ id: existingUser.id });
+      const reloadedUser = await this.userService.findById({
+        id: existingUser.id,
+      });
       if (!reloadedUser) {
         return this.scimError({ status: "404", detail: "User not found" });
       }
@@ -205,7 +214,10 @@ export class ScimService {
       });
     } catch (e) {
       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-        return this.scimError({ status: "409", detail: "User already exists in this organization" });
+        return this.scimError({
+          status: "409",
+          detail: "User already exists in this organization",
+        });
       }
       throw e;
     }
@@ -261,7 +273,9 @@ export class ScimService {
     };
 
     if (emailFilter) {
-      whereClause.user = { email: { equals: emailFilter, mode: 'insensitive' } };
+      whereClause.user = {
+        email: { equals: emailFilter, mode: "insensitive" },
+      };
     }
 
     const [memberships, totalCount] = await Promise.all([
@@ -380,7 +394,8 @@ export class ScimService {
         continue;
       }
 
-      if (operation.value == null || typeof operation.value !== "object") continue;
+      if (operation.value == null || typeof operation.value !== "object")
+        continue;
 
       const value = operation.value as Record<string, unknown>;
       const updates: { name?: string; email?: string } = {};
@@ -405,8 +420,14 @@ export class ScimService {
         }
       } else if ("name.givenName" in value || "name.familyName" in value) {
         // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
-        const given = typeof value["name.givenName"] === "string" ? value["name.givenName"] : null;
-        const family = typeof value["name.familyName"] === "string" ? value["name.familyName"] : null;
+        const given =
+          typeof value["name.givenName"] === "string"
+            ? value["name.givenName"]
+            : null;
+        const family =
+          typeof value["name.familyName"] === "string"
+            ? value["name.familyName"]
+            : null;
         const parts = [given, family].filter(Boolean);
         if (parts.length > 0) {
           updates.name = parts.join(" ");
@@ -486,7 +507,9 @@ export class ScimService {
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {
     if (request.name) {
-      const parts = [request.name.givenName, request.name.familyName].filter(Boolean);
+      const parts = [request.name.givenName, request.name.familyName].filter(
+        Boolean,
+      );
       if (parts.length > 0) {
         return parts.join(" ");
       }
@@ -494,7 +517,10 @@ export class ScimService {
     return request.userName.split("@")[0] ?? request.userName;
   }
 
-  private splitName(fullName: string): { givenName: string; familyName: string } {
+  private splitName(fullName: string): {
+    givenName: string;
+    familyName: string;
+  } {
     const spaceIndex = fullName.indexOf(" ");
     if (spaceIndex === -1) {
       return { givenName: fullName, familyName: "" };
@@ -511,7 +537,13 @@ export class ScimService {
     return match?.[1] ?? null;
   }
 
-  private scimError({ status, detail }: { status: string; detail: string }): ScimError {
+  private scimError({
+    status,
+    detail,
+  }: {
+    status: string;
+    detail: string;
+  }): ScimError {
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,

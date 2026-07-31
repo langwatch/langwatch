@@ -16,12 +16,7 @@
  * "renders the controls" case fail here.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -57,9 +52,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 function Harness({
   onMappingChange,
 }: {
-  onMappingChange:
-    | ((identifier: string, mapping: unknown) => void)
-    | undefined;
+  onMappingChange: ((identifier: string, mapping: unknown) => void) | undefined;
 }) {
   const form = useForm({ defaultValues: { name: "My Eval", settings: {} } });
   const controller = {
@@ -118,7 +111,9 @@ describe("Evaluator editor body — field-mapping render (issue #950)", () => {
     it("drives the mapping callback when a source is picked (store update)", async () => {
       const onMappingChange = vi.fn();
       const user = userEvent.setup();
-      render(<Harness onMappingChange={onMappingChange} />, { wrapper: Wrapper });
+      render(<Harness onMappingChange={onMappingChange} />, {
+        wrapper: Wrapper,
+      });
 
       // Open the picker for "contexts" and choose the dataset's "input" column.
       await user.click(screen.getByTestId("mapping-input-contexts"));

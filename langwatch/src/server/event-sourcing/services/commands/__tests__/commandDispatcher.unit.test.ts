@@ -12,11 +12,11 @@ import {
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
 import { ValidationError } from "../../errorHandling";
-import { processCommand, processCommandBatch } from "../commandDispatcher";
 import type {
   ProcessCommandBatchParams,
   ProcessCommandParams,
 } from "../commandDispatcher";
+import { processCommand, processCommandBatch } from "../commandDispatcher";
 
 // Mock the kill switch module
 vi.mock("../../../utils/killSwitch", () => ({
@@ -67,9 +67,7 @@ describe("processCommand", () => {
     };
   }
 
-  function createMockHandler(
-    events?: Event[],
-  ): CommandHandler<any, Event> {
+  function createMockHandler(events?: Event[]): CommandHandler<any, Event> {
     return {
       handle: vi.fn().mockResolvedValue(events ?? [makeValidEvent()]),
     };
@@ -198,9 +196,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ handler });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /non-array value/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/non-array value/);
     });
   });
 
@@ -286,10 +282,9 @@ describe("processCommand", () => {
 
       // storeEventsFn should receive the stringified tenantId
       const expectedTenantId = createTenantId("12345");
-      expect(storeEventsFn).toHaveBeenCalledWith(
-        expect.any(Array),
-        { tenantId: expectedTenantId },
-      );
+      expect(storeEventsFn).toHaveBeenCalledWith(expect.any(Array), {
+        tenantId: expectedTenantId,
+      });
     });
 
     it("passes validated payload (not raw) to getAggregateId", async () => {
@@ -454,9 +449,7 @@ describe("processCommandBatch", () => {
               ? {
                   success: false,
                   error: {
-                    issues: [
-                      { path: ["id"], message: "bad", code: "custom" },
-                    ],
+                    issues: [{ path: ["id"], message: "bad", code: "custom" }],
                   },
                 }
               : { success: true, data: p },

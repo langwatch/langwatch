@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, BookOpen, ExternalLink, ScrollText } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
-import { LangyFailureReference } from "./LangyFailureReference";
 import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
+import { LangyFailureReference } from "./LangyFailureReference";
 
 /**
  * A failed Langy tool call, separate from both assistant prose and raw JSON.
@@ -108,9 +108,21 @@ export function LangyToolErrorCard({
             </Text>
           ) : null}
           {presentation.tips?.length ? (
-            <VStack as="ul" align="stretch" gap={0.5} paddingLeft={4} margin={0}>
+            <VStack
+              as="ul"
+              align="stretch"
+              gap={0.5}
+              paddingLeft={4}
+              margin={0}
+            >
               {presentation.tips.map((tip) => (
-                <Text as="li" key={tip} textStyle="xs" color="fg.muted" lineHeight="1.45">
+                <Text
+                  as="li"
+                  key={tip}
+                  textStyle="xs"
+                  color="fg.muted"
+                  lineHeight="1.45"
+                >
                   {tip}
                 </Text>
               ))}

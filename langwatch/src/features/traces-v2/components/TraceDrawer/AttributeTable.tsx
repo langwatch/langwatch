@@ -15,6 +15,11 @@ import { compileAttributePattern } from "~/server/data-privacy/attributePatternM
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
+import {
+  API_KEY_ATTRIBUTE_LABEL,
+  API_KEY_ID_ATTRIBUTE,
+  ApiKeyAttributeValue,
+} from "./ApiKeyAttribute";
 import { AttributeValue } from "./AttributeValue";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
@@ -398,6 +403,22 @@ function CopyAllButton({ payload }: { payload: string }) {
   );
 }
 
+/**
+ * Per-key seam for the handful of attributes whose raw key/value pair reads as
+ * plumbing. A special-cased key can trim its label here and swap the generic
+ * `AttributeValue` cell for one that resolves the stored value into something
+ * an operator can act on; everything else falls through untouched.
+ */
+function attributeRowLabel(attrKey: string): string {
+  return attrKey === API_KEY_ID_ATTRIBUTE ? API_KEY_ATTRIBUTE_LABEL : attrKey;
+}
+
+function isApiKeyIdRow(attrKey: string, value: unknown): value is string {
+  return (
+    attrKey === API_KEY_ID_ATTRIBUTE && typeof value === "string" && !!value
+  );
+}
+
 function FlatRow({
   attrKey,
   value,
@@ -468,7 +489,7 @@ function FlatRow({
             ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
           }}
         >
-          {attrKey}
+          {attributeRowLabel(attrKey)}
         </Text>
       </Tooltip>
       <LabelResizeHandle onResize={onLabelResize} />
@@ -480,7 +501,11 @@ function FlatRow({
       <HStack flex={1} minWidth={0} gap={1.5}>
         {restriction ? <RestrictionMarker {...restriction} /> : null}
         <Box flex={1} minWidth={0}>
-          <AttributeValue attrKey={attrKey} value={value} />
+          {isApiKeyIdRow(attrKey, value) ? (
+            <ApiKeyAttributeValue apiKeyId={value} />
+          ) : (
+            <AttributeValue attrKey={attrKey} value={value} />
+          )}
         </Box>
       </HStack>
       <Button

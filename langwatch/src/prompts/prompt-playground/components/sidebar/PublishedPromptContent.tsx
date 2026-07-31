@@ -1,8 +1,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { OrganizationBadge } from "~/prompts/components/ui/OrganizationBadge";
+import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { PublishedPromptActions } from "./PublishedPromptActions";
-import { getDisplayHandle } from "~/prompts/utils/promptHandle";
 
 interface PublishedPromptContentProps {
   promptId: string;

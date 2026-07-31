@@ -28,7 +28,7 @@ describe("getStaticModelCosts", () => {
       for (const entry of costs) {
         expect(
           () => new RegExp(entry.regex),
-          `${entry.model} has invalid regex: ${entry.regex}`
+          `${entry.model} has invalid regex: ${entry.regex}`,
         ).not.toThrow();
       }
     });
@@ -44,7 +44,7 @@ describe("getStaticModelCosts", () => {
       for (const model of expectedModels) {
         expect(
           findByModel(model),
-          `${model} missing from registry`
+          `${model} missing from registry`,
         ).toBeDefined();
       }
     });
@@ -61,13 +61,13 @@ describe("getStaticModelCosts", () => {
 
     it("matches anthropic/claude-opus-4-5 with the vendor prefix", () => {
       expect(
-        matches("anthropic/claude-opus-4-5", "anthropic/claude-opus-4-5")
+        matches("anthropic/claude-opus-4-5", "anthropic/claude-opus-4-5"),
       ).toBe(true);
     });
 
     it("matches anthropic/claude-opus-4-5 without the vendor prefix", () => {
       expect(matches("anthropic/claude-opus-4-5", "claude-opus-4-5")).toBe(
-        true
+        true,
       );
     });
 
@@ -79,13 +79,13 @@ describe("getStaticModelCosts", () => {
   describe("dot/hyphen interchangeability in version numbers", () => {
     it("matches claude-opus-4-5 when sent with a dot separator", () => {
       expect(matches("anthropic/claude-opus-4-5", "claude-opus-4.5")).toBe(
-        true
+        true,
       );
     });
 
     it("matches claude-opus-4-6 when sent with a dot separator", () => {
       expect(matches("anthropic/claude-opus-4-6", "claude-opus-4.6")).toBe(
-        true
+        true,
       );
     });
 
@@ -148,7 +148,8 @@ describe("getStaticModelCosts", () => {
           "verylongvendor/abc",
         ]);
         expect(
-          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model
+          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))
+            ?.model,
         ).toBe("x/abc-def");
       });
     });

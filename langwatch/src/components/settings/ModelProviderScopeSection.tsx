@@ -97,10 +97,7 @@ export function ProviderScopeSection({
           ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId ?? "" }]
           : [{ scopeType: "PROJECT", scopeId: projectId ?? "" }];
 
-    if (
-      !hasOrgOrTeam &&
-      storedScopes.every((s) => s.scopeType === "PROJECT")
-    ) {
+    if (!hasOrgOrTeam && storedScopes.every((s) => s.scopeType === "PROJECT")) {
       return null;
     }
 
@@ -112,8 +109,8 @@ export function ProviderScopeSection({
           {summariseSelection(storedScopes)}
         </Text>
         <Text fontSize="xs" color="gray.500">
-          Scope is fixed after create. To change it, delete and recreate
-          at the new scope.
+          Scope is fixed after create. To change it, delete and recreate at the
+          new scope.
         </Text>
       </VStack>
     );

@@ -70,7 +70,12 @@ async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
  */
 async function insertTargetItem(
   ch: ClickHouseClient,
-  v: { experimentId: string; runId: string; traceId: string; rowIndex?: number },
+  v: {
+    experimentId: string;
+    runId: string;
+    traceId: string;
+    rowIndex?: number;
+  },
 ) {
   await ch.command({
     query: `

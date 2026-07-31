@@ -150,9 +150,7 @@ export class NullProjectRepository implements ProjectRepository {
     return null;
   }
 
-  async getTraceSharingConfig(
-    _id: string,
-  ): Promise<TraceSharingConfig | null> {
+  async getTraceSharingConfig(_id: string): Promise<TraceSharingConfig | null> {
     return null;
   }
 

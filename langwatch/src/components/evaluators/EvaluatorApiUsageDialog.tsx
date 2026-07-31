@@ -9,7 +9,6 @@ import {
 import type { Evaluator } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -46,7 +45,6 @@ export function EvaluatorApiUsageDialog({
   open,
   onClose,
 }: EvaluatorApiUsageDialogProps) {
-  const { project } = useOrganizationTeamProject();
   const [usageMode, setUsageMode] = useState<UsageMode>("online");
   const [language, setLanguage] = useState<Language>("python");
 
@@ -156,7 +154,9 @@ export function EvaluatorApiUsageDialog({
     "output": "output content"`;
     }
 
-    return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
+    return allFields
+      .map((field) => `"${field}": "your ${field}"`)
+      .join(",\n    ");
   };
 
   // ============================================================================

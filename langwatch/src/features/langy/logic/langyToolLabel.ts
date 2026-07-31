@@ -1,7 +1,7 @@
-import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
 import { githubStepOf } from "~/server/app-layer/langy/execution/githubCommand";
-import { resolveCapabilityProgress } from "../components/capabilities/capabilityRegistry";
+import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
 import { findSkill } from "~/shared/langy/langySkills";
+import { resolveCapabilityProgress } from "../components/capabilities/capabilityRegistry";
 
 /**
  * What a tool call is DOING, in human words.

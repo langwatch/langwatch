@@ -44,7 +44,10 @@ export interface ScenarioExecutionReactorHandle {
 export function createScenarioExecutionReactor(): ScenarioExecutionReactorHandle {
   let pool: ScenarioExecutionPool | null = null;
 
-  const reactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData> = {
+  const reactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  > = {
     name: "scenarioExecution",
     options: {
       runIn: ["worker"],
@@ -96,7 +99,10 @@ export function createScenarioExecutionReactor(): ScenarioExecutionReactorHandle
       });
 
       logger.debug(
-        { scenarioRunId: foldState.ScenarioRunId, batchRunId: foldState.BatchRunId },
+        {
+          scenarioRunId: foldState.ScenarioRunId,
+          batchRunId: foldState.BatchRunId,
+        },
         "Submitted scenario to execution pool",
       );
     },
@@ -104,6 +110,8 @@ export function createScenarioExecutionReactor(): ScenarioExecutionReactorHandle
 
   return {
     reactor,
-    setPool: (p) => { pool = p; },
+    setPool: (p) => {
+      pool = p;
+    },
   };
 }

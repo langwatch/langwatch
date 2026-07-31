@@ -1,11 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
-import type { Anomaly } from "./anomalyState";
-import { AnomalyStateStore } from "./anomalyState";
+import type { Anomaly, AnomalyStateStore } from "./anomalyState";
 import {
   ANOMALY_DETECTION_KILL_SWITCH_FLAG,
-  TenantRateTracker,
+  type TenantRateTracker,
 } from "./tenantRateTracker";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
@@ -199,10 +198,7 @@ export class AnomalyDetector {
     // Below thresholds: clear any active anomaly
     if (existing) {
       await this.deps.anomalyState.clear(tenantId, "rate_breaker");
-      logger.info(
-        { tenantId },
-        "Rate anomaly cleared — back below threshold",
-      );
+      logger.info({ tenantId }, "Rate anomaly cleared — back below threshold");
       return "cleared";
     }
     return "noop";
@@ -265,7 +261,13 @@ export class AnomalyDetector {
  * Linear-interpolated percentile. Returns 0 for empty input. Sorts a
  * defensive copy so the input array is not mutated.
  */
-export function percentile({ values, p }: { values: number[]; p: number }): number {
+export function percentile({
+  values,
+  p,
+}: {
+  values: number[];
+  p: number;
+}): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (p / 100) * (sorted.length - 1);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   explainLangyError,
+  isStaleLangyHistoryRead,
   KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
   readLangyStreamError,
@@ -54,6 +55,10 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // Sending faster than the per-user limit allows: without an entry here it
+      // fell into the generic default, which tells a throttled user Langy is
+      // broken and offers a retry into the same limit.
+      "langy_rate_limited",
       // Codex (sign-in-with-OpenAI): dead OAuth session / ChatGPT plan limit,
       // promoted off the agent-errored reason chain by exact reason code.
       "langy_codex_session_expired",
@@ -108,7 +113,10 @@ describe("explainLangyError", () => {
           }),
         );
         expect(presentation.kind).toBe("langy_codex_plan_limit");
-        expect(presentation.description).toContain("another model");
+        // The registry's words, not a second authoring at the call site.
+        expect(presentation.title).toBe(
+          "You've reached your OpenAI plan's limit",
+        );
         expect(presentation.action).toEqual({
           label: "Try again",
           kind: "retry",
@@ -152,12 +160,20 @@ describe("explainLangyError", () => {
 
   describe("given an agent failure whose reason chain carries the provider's message", () => {
     describe("when the failure is explained", () => {
-      /** @scenario A rejected model call shows the provider's own message on the card */
-      it("shows the provider's own message on the card, inside the friendly framing", () => {
-        // The langyagent LLM proxy captures the model provider's error body
-        // (an out-of-credits Anthropic account, the codex backend rejecting a
-        // model) with the prose in meta.message — the one channel the card is
-        // allowed to read (ADR-045). The same text the playground shows.
+      /** @scenario A rejected model call never recites the provider's own message */
+      it("keeps the provider's sentence off the card", () => {
+        // This test asserted the OPPOSITE until the leak was found, on the
+        // reasoning that a provider's error body is written for its caller and
+        // is therefore safe to show. It is written for whoever holds the KEY,
+        // and on a LangWatch-managed provider that is us: OpenAI answers a bad
+        // key with `Incorrect API key provided: sk-proj-…`, so the card was one
+        // 401 away from printing a platform credential. Masking it afterwards
+        // only covers the credential shapes someone enumerated.
+        //
+        // The message here is the benign out-of-credits one, deliberately: the
+        // rule is that NO upstream prose reaches the card, not that we filter
+        // the dangerous-looking ones. A test using a key-shaped fixture would
+        // still pass against a scrubber.
         const providerMessage =
           "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.";
         const presentation = explainLangyError(
@@ -174,8 +190,9 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("langy_agent_errored");
         expect(presentation.title).toBe("Langy's reply failed");
+        expect(presentation.description).not.toContain("credit balance");
         expect(presentation.description).toBe(
-          `The model provider rejected this reply: ${providerMessage} Your message is safe. Try again, or pick a different model from the composer.`,
+          "Langy hit an error while writing this reply. Your message is safe — try again.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",
@@ -183,7 +200,7 @@ describe("explainLangyError", () => {
         });
       });
 
-      it("reads the message from a NESTED reason too", () => {
+      it("keeps a NESTED reason's message off the card too", () => {
         const presentation = explainLangyError(
           domain({
             code: "langy_agent_errored",
@@ -200,7 +217,44 @@ describe("explainLangyError", () => {
             ],
           }),
         );
-        expect(presentation.description).toContain("model overloaded");
+        expect(presentation.description).not.toContain("model overloaded");
+      });
+    });
+  });
+
+  describe("given an agent failure whose reason chain names an out-of-allowance provider", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario An out-of-allowance model call is promoted by reason code, not by message */
+      it.each([
+        "insufficient_quota",
+        "billing_hard_limit_reached",
+      ])("promotes %s to the plan-limit card", (reasonCode) => {
+        // The meaning the old relay carried — "you have nothing left to
+        // spend" — survives as a discriminant rather than as the provider's
+        // sentence. `usage_limit_reached` and `codex_plan_limit` were already
+        // promoted; these two are the same situation reached through OpenAI's
+        // own API codes, and they were only ever explained by the prose.
+        //
+        // `meta.message` is populated and must still not appear: the copy is
+        // selected by the code and written in the registry.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                reasons: [{ kind: reasonCode }],
+                meta: { message: "You exceeded your current quota." },
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_codex_plan_limit");
+        expect(presentation.title).toBe(
+          "You've reached your OpenAI plan's limit",
+        );
+        expect(presentation.description).not.toContain("current quota");
       });
     });
   });
@@ -308,12 +362,12 @@ describe("explainLangyError", () => {
   });
 
   describe("given the worker stopped mid-reply", () => {
-    it("names the worker stopping specifically and offers a manual retry", () => {
+    it("names the stop specifically and offers a manual retry", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_worker_stopped", httpStatus: 503 }),
       );
 
-      expect(presentation.title).toBe("Langy's worker stopped");
+      expect(presentation.title).toBe("Langy stopped mid-reply");
       expect(presentation.description).toContain("safe");
       expect(presentation.render).toBe("card");
       expect(presentation.action).toEqual({
@@ -355,8 +409,42 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Langy is still replying");
       expect(presentation.action).toBeUndefined();
       // A wait, not a turn failure: a dismissable notice attached above the
-      // composer that keeps the user's draft — not a red history card (ADR-058).
+      // composer that keeps the user's draft — not a red history card (ADR-078).
       expect(presentation.render).toBe("composer-notice");
+    });
+  });
+
+  describe("given the sender tripped the per-user message limit", () => {
+    describe("when the refusal is explained", () => {
+      it("asks for patience without a retry, and never claims Langy is broken", () => {
+        const generic = explainLangyError(domain({ code: "some_new_kind" }));
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_rate_limited",
+            httpStatus: 429,
+            // The server puts its sentence here because `serialize()` drops the
+            // HandledError message; before this kind had copy, that sentence
+            // was the ONLY correct thing on an otherwise wrong card.
+            meta: { message: "Too many messages. Please slow down." },
+          }),
+        );
+
+        // The copy has to name THROTTLING, not just differ from the generic
+        // card: "Something went wrong" is exactly the wrong story for a
+        // message that was refused because it arrived too fast.
+        expect(presentation.title).toBe("You're sending messages too quickly");
+        expect(presentation.description).toContain("in a few seconds");
+        // ...and it has to say the draft survived, because it does — the notice
+        // rides above the composer with the message still in the box.
+        expect(presentation.description).toContain("still in the box");
+        expect(presentation.title).not.toBe(generic.title);
+        // A retry is the one action that makes throttling worse — it spends
+        // another request against the limit that just refused this one.
+        expect(presentation.action).toBeUndefined();
+        // A wait, not a turn failure: it rides above the composer and keeps the
+        // user's draft, rather than a red card in the transcript.
+        expect(presentation.render).toBe("composer-notice");
+      });
     });
   });
 
@@ -369,6 +457,104 @@ describe("explainLangyError", () => {
       expect(presentation.title).toBe("Something went wrong");
       expect(presentation.traceId).toBe("abc123");
       expect(presentation.action?.kind).toBe("retry");
+      expect(presentation.description).toContain("share the id below");
+    });
+
+    it("never prints `unknown` as if it were a domain code", () => {
+      // The card renders `code` ungated, so setting it here put the literal
+      // word "unknown" under the message — a mono line that names nothing,
+      // offered to the reader as the thing to quote to support.
+      const presentation = explainLangyError(domain({ code: "unknown" }));
+
+      expect(presentation.code).toBeUndefined();
+    });
+
+    describe("when the failure carries no trace id", () => {
+      it("stops at 'Try again' instead of promising details it has none of", () => {
+        // An untyped browser failure (`Error("Failed to fetch")`) resolves to
+        // `unknown` with no trace id, so there is nothing below the message at
+        // all — and the card was still telling the reader to share it.
+        const presentation = explainLangyError(domain({ code: "unknown" }));
+
+        expect(presentation.description).not.toContain("below");
+        expect(presentation.description).toContain("Try again.");
+      });
+    });
+  });
+});
+
+describe("isStaleLangyHistoryRead", () => {
+  /**
+   * The panel demotes a failed history read to a one-line footnote whenever
+   * there is content on screen, so a 3s poll blip mid-turn cannot wipe an
+   * answer that is still streaming. That rule asked only whether anything was
+   * visible, never which failure had arrived.
+   */
+  const readFailedWith = (code: string) =>
+    explainLangyError(domain({ code, httpStatus: 404 }));
+
+  describe("given the transcript is still on screen", () => {
+    describe("when the failure is one the next poll might clear", () => {
+      it("demotes it to the quiet line", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the conversation is gone", () => {
+      it("refuses to demote it", () => {
+        // Deleted from another tab: every poll from here on answers the same
+        // thing, and the engine still holds the messages. Demoted, the reader
+        // goes on reading a conversation that no longer exists, with no retry
+        // and no next step, forever.
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_found"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the conversation is someone else's", () => {
+      it("refuses to demote it", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("langy_conversation_not_owned"),
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given nothing is on screen to protect", () => {
+    describe("when even a transient failure arrives", () => {
+      it("lets it own the column", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: readFailedWith("clickhouse_unavailable"),
+            hasContentOnScreen: false,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given the read succeeded", () => {
+    describe("when there is no failure to explain at all", () => {
+      it("has nothing to say", () => {
+        expect(
+          isStaleLangyHistoryRead({
+            presentation: null,
+            hasContentOnScreen: true,
+          }),
+        ).toBe(false);
+      });
     });
   });
 });
@@ -453,7 +639,9 @@ describe("resolveLiveTurnError", () => {
         });
 
         expect(domain.code).toBe("unknown");
-        expect(domain.meta).toEqual({ error: "SSE Error" });
+        // `meta` is the contract for what the card renders, not a scratchpad:
+        // the raw transport message is logged by the caller instead.
+        expect(domain.meta).toEqual({});
       });
     });
   });

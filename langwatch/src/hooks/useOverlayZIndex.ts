@@ -21,8 +21,6 @@ export const OverlayDepthContext = createContext(0);
 export function useOverlayZIndex(): { zIndex: string; depth: number } {
   const parentDepth = useContext(OverlayDepthContext);
   const depth = parentDepth + 1;
-  const zIndex = String(
-    BASE_OVERLAY_Z_INDEX + depth * Z_INDEX_DEPTH_INCREMENT
-  );
+  const zIndex = String(BASE_OVERLAY_Z_INDEX + depth * Z_INDEX_DEPTH_INCREMENT);
   return { zIndex, depth };
 }

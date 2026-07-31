@@ -1,5 +1,5 @@
-import { TriggerAction } from "../enums";
 import { z } from "zod";
+import { TriggerAction } from "../enums";
 import type { PreviewEnvelope, SharedDef } from "./types";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;
@@ -49,7 +49,8 @@ export const slackActionParamsSchema = z
       } else if (!url.startsWith("https://hooks.slack.com/")) {
         ctx.addIssue({
           code: "custom",
-          message: "Expected a Slack incoming webhook URL (https://hooks.slack.com/…).",
+          message:
+            "Expected a Slack incoming webhook URL (https://hooks.slack.com/…).",
           path: ["slackWebhook"],
         });
       }

@@ -1,10 +1,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-import {
-  type LangyGithubInstallationRow,
-  type LangyGithubInstallationsRepository,
-  type LangyGithubRepositoryRef,
-  type UpsertLangyGithubInstallationInput,
+import type {
+  LangyGithubInstallationRow,
+  LangyGithubInstallationsRepository,
+  LangyGithubRepositoryRef,
+  UpsertLangyGithubInstallationInput,
 } from "./langy-github-installations.repository";
 
 function parseRepositories(
@@ -138,9 +138,9 @@ export class PrismaLangyGithubInstallationsRepository
         // Another request already committed this installationId first — the
         // unique index is the atomicity guarantee, not a check we ran
         // ourselves, so this read always sees the winner's committed row.
-        const existing = await this.prisma.langyGithubInstallation.findUnique(
-          { where: { installationId: input.installationId } },
-        );
+        const existing = await this.prisma.langyGithubInstallation.findUnique({
+          where: { installationId: input.installationId },
+        });
         if (existing) return { wasInserted: false, row: toRow(existing) };
       }
       throw error;

@@ -24,17 +24,9 @@
  * Used by the gateway-config materialiser to assemble the flat
  * `providers[]` array the Go dispatcher reads on every request.
  */
-import type {
-  ModelProvider,
-  PrismaClient,
-  Prisma,
-  Team,
-} from "@prisma/client";
+import type { ModelProvider, Prisma, PrismaClient, Team } from "@prisma/client";
 
-import type {
-  ScopeInput,
-  VirtualKeyWithScopes,
-} from "./virtualKey.repository";
+import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 /**
  * The two fields trace-project resolution actually reads. Narrower than
@@ -213,21 +205,25 @@ export async function resolveTraceProject(
     if (proj) return proj;
   }
 
-  const governanceProjects: Array<{ id: string; teamId: string; apiKey: string; team: Pick<Team, "organizationId"> }> =
-    await client.project.findMany({
-      where: {
-        kind: "internal_governance",
-        team: { organizationId: vk.organizationId },
-      },
-      select: {
-        id: true,
-        teamId: true,
-        apiKey: true,
-        team: { select: { organizationId: true } },
-      },
-      orderBy: { createdAt: "asc" },
-      take: 1,
-    });
+  const governanceProjects: Array<{
+    id: string;
+    teamId: string;
+    apiKey: string;
+    team: Pick<Team, "organizationId">;
+  }> = await client.project.findMany({
+    where: {
+      kind: "internal_governance",
+      team: { organizationId: vk.organizationId },
+    },
+    select: {
+      id: true,
+      teamId: true,
+      apiKey: true,
+      team: { select: { organizationId: true } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 1,
+  });
   const gov = governanceProjects[0];
   if (!gov) return null;
   return { id: gov.id, teamId: gov.teamId, apiKey: gov.apiKey };

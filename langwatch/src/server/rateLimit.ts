@@ -74,7 +74,11 @@ export async function rateLimit(opts: {
   const existing = memoryStore.get(key);
   if (!existing || existing.expiresAt <= now) {
     memoryStore.set(key, { count: 1, expiresAt: now + windowSeconds * 1000 });
-    return { allowed: 1 <= max, remaining: max - 1, resetAt: now + windowSeconds * 1000 };
+    return {
+      allowed: 1 <= max,
+      remaining: max - 1,
+      resetAt: now + windowSeconds * 1000,
+    };
   }
   existing.count += 1;
   return {

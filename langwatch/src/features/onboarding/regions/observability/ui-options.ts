@@ -1,7 +1,7 @@
 import type { IconData } from "../shared/types";
 import {
-  derivePlatformsForCategory,
   deriveFrameworksByPlatform,
+  derivePlatformsForCategory,
   type IntegrationCategory,
 } from "./codegen/registry";
 import type { Option as BaseOption, FrameworkKey, PlatformKey } from "./types";

@@ -123,8 +123,7 @@ describe("categoryPermissions()", () => {
         },
         {
           category: "Langy",
-          permissions:
-            "langy:view, langy:create, langy:update, langy:delete",
+          permissions: "langy:view, langy:create, langy:update, langy:delete",
         },
         {
           category: "Datasets",

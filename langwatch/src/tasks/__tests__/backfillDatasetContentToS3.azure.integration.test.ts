@@ -17,7 +17,16 @@
  * `dataset.repository.integration.test.ts`) for the Dataset/DatasetRecord
  * rows and the per-dataset advisory lock `migrateDatasetToS3` takes.
  */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const { mockEnv } = vi.hoisted(() => ({
   mockEnv: {} as Record<string, string | undefined>,
@@ -35,12 +44,15 @@ import { DatasetRecordRepository } from "../../server/datasets/dataset-record.re
 import { getDatasetStorage } from "../../server/datasets/dataset-storage";
 import {
   ensureAzuriteContainer,
+  type StartedAzurite,
   startAzurite,
   stopAzurite,
-  type StartedAzurite,
 } from "../../server/stored-objects/__tests__/azurite-test-support";
 import { resolveProjectStorageDestination } from "../../server/stored-objects/project-storage-destination";
-import { type BackfillDeps, migrateDatasetToS3 } from "../backfillDatasetContentToS3";
+import {
+  type BackfillDeps,
+  migrateDatasetToS3,
+} from "../backfillDatasetContentToS3";
 
 const CONTAINER = "datasets";
 

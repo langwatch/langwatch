@@ -61,7 +61,10 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
     # Live chat content goes to the LLM-span messages, not to compile vars; see scenario 4 for declared-variable fidelity.
     And "PromptApiService.get", "Prompt.compile", and the LLM span are three siblings under the same parent (the per-event-type root span for playground)
 
-  @integration @v1
+    # @unimplemented: the integration test that bound this was skipped from the
+    # day it landed and was removed with the other 22 permanently-skipped suites.
+    # Marked honestly rather than left bound to a test that never ran.
+  @integration @v1 @unimplemented
   Scenario: trace drawer surfaces "Open in Prompts" with the exact handle and version
     Given I have sent a chat message that produced the saved-version span pair
     When I open the trace details drawer for the resulting LLM span

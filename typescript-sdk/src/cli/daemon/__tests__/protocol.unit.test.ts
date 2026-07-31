@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { encodeFrame, FrameDecoder, type ServerFrame } from "../protocol";
+import {
+  type ClientFrame,
+  encodeFrame,
+  FrameDecoder,
+  type ServerFrame,
+} from "../protocol";
 
 describe("FrameDecoder", () => {
   describe("given a frame split across several socket reads", () => {
@@ -69,6 +74,40 @@ describe("FrameDecoder", () => {
       const decoder = new FrameDecoder<ServerFrame>(16);
 
       expect(() => decoder.push("x".repeat(64))).toThrow(/maximum size/);
+    });
+  });
+
+  describe("given a multi-byte character split across two socket reads", () => {
+    it("decodes it whole instead of resolving each half to U+FFFD", () => {
+      // A socket splits wherever it likes. Decoding each chunk independently
+      // turned a straddling UTF-8 sequence into two replacement characters —
+      // and because the surrounding JSON stayed well-formed, the frame parsed
+      // fine and shipped corrupted argv. `out`/`err` are base64 so they were
+      // safe; the `exec` frame carries raw strings, so `dataset records add
+      // --json '<non-ASCII>'` uploaded mangled records at exit 0.
+      const decoder = new FrameDecoder<ClientFrame>();
+      const payload = "漢字とカタカナ";
+      const frame = Buffer.from(
+        encodeFrame({
+          t: "exec",
+          args: ["dataset", "records", "add", "--json", payload],
+          cwd: "/tmp",
+          env: {},
+          colorLevel: 0,
+        }),
+        "utf8",
+      );
+      // Split inside the first multi-byte character.
+      const cut = frame.indexOf(Buffer.from(payload, "utf8")) + 1;
+
+      expect(decoder.push(frame.subarray(0, cut))).toEqual([]);
+      const frames = decoder.push(frame.subarray(cut));
+
+      expect(frames).toHaveLength(1);
+      const exec = frames[0];
+      expect(exec?.t).toBe("exec");
+      expect(exec?.t === "exec" ? exec.args[4] : undefined).toBe(payload);
+      expect(JSON.stringify(frames[0])).not.toContain("\uFFFD");
     });
   });
 });

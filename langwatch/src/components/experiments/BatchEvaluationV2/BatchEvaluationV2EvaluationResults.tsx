@@ -13,8 +13,8 @@ import numeral from "numeral";
 import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
+import { showErrorToast } from "~/features/errors";
 import { Menu } from "../../../components/ui/menu";
-import { toaster } from "../../../components/ui/toaster";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { api } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
@@ -190,13 +190,9 @@ export const useBatchEvaluationDownloadCSV = ({
     try {
       await downloadCSV_();
     } catch (error) {
-      toaster.create({
-        title: "Error Downloading CSV",
-        description: (error as any).toString(),
-        type: "error",
-        meta: {
-          closable: true,
-        },
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't download the CSV",
       });
       console.error(error);
     }

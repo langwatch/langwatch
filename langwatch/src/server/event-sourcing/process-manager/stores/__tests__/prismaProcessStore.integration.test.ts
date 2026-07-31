@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
-import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
+import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 
 const store = new PrismaProcessStore(prisma);
 let processName: string;

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { tracesRouter } from "../traces";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { tracesRouter } from "../traces";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks

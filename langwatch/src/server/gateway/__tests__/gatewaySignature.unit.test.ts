@@ -17,8 +17,7 @@ const VECTOR = {
   body: '{"key_presented":"vk-lw-01HZX","gateway_node_id":"gw-a"}',
   bodySha256:
     "ee1760159a23347bfefc6367dc8308be6d1a96c28fae184e17519f189de7d8a2",
-  signature:
-    "a73842ca249456600ab7752cc709e42c2b5ff2ca12f5b9f45f56ba873590c4e5",
+  signature: "a73842ca249456600ab7752cc709e42c2b5ff2ca12f5b9f45f56ba873590c4e5",
 };
 
 describe("gateway HMAC signature", () => {

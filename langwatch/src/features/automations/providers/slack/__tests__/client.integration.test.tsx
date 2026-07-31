@@ -22,9 +22,10 @@ vi.mock("~/components/ui/color-mode", () => ({
 }));
 /** Channels the mocked listSlackChannels mutation has "already loaded". Tests
  *  that care about the picker set this before rendering. */
-const listedChannels: { current: { id: string; name: string }[] | undefined } = {
-  current: undefined,
-};
+const listedChannels: { current: { id: string; name: string }[] | undefined } =
+  {
+    current: undefined,
+  };
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
 
@@ -47,8 +48,11 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  type SlackPreview,
+} from "@langwatch/automations/providers/slack";
 import slackClient, { type SlackSlice } from "../client";
-import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "@langwatch/automations/providers/slack";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   templateOptionsFor,

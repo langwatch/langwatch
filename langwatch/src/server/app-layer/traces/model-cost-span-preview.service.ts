@@ -1,3 +1,4 @@
+import { ValidationError } from "@langwatch/handled-error";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
@@ -7,7 +8,6 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
 import { compileSafeRegex } from "~/utils/safeRegex";
-import { ValidationError } from "@langwatch/handled-error";
 import type { SpanStorageService } from "./span-storage.service";
 
 /**

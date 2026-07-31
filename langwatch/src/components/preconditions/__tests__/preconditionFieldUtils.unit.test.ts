@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_PRECONDITION,
   getAllowedRulesForField,
   getFieldOptionsByCategory,
   getFieldValueType,
   isDefaultOnlyPrecondition,
   isRuleAllowedForField,
   RULE_LABELS,
-  DEFAULT_PRECONDITION,
 } from "../preconditionFieldUtils";
 
 describe("preconditionFieldUtils", () => {
@@ -39,10 +39,7 @@ describe("preconditionFieldUtils", () => {
 
     it("returns only fields with non-empty allowed rules", () => {
       const groups = getFieldOptionsByCategory();
-      const totalFields = groups.reduce(
-        (sum, g) => sum + g.fields.length,
-        0,
-      );
+      const totalFields = groups.reduce((sum, g) => sum + g.fields.length, 0);
       // Fields with non-empty rules: input, output, traces.origin, traces.error,
       // metadata.user_id, metadata.thread_id, metadata.customer_id, metadata.labels,
       // metadata.prompt_ids, metadata.value, spans.type, spans.model,
@@ -79,7 +76,12 @@ describe("preconditionFieldUtils", () => {
   describe("getAllowedRulesForField()", () => {
     it("returns all 4 rules for text fields like input", () => {
       const rules = getAllowedRulesForField("input");
-      expect(rules).toEqual(["is", "contains", "not_contains", "matches_regex"]);
+      expect(rules).toEqual([
+        "is",
+        "contains",
+        "not_contains",
+        "matches_regex",
+      ]);
     });
 
     it("returns only 'is' for enum fields like traces.origin", () => {
@@ -130,9 +132,7 @@ describe("preconditionFieldUtils", () => {
     });
 
     it("returns false for unknown field", () => {
-      expect(
-        isRuleAllowedForField("unknown.field" as any, "is"),
-      ).toBe(false);
+      expect(isRuleAllowedForField("unknown.field" as any, "is")).toBe(false);
     });
   });
 

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -9,7 +8,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertTriangle, Copy, Check, RotateCcw, Home } from "lucide-react";
+import { AlertTriangle, Check, Copy, Home, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 

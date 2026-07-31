@@ -13,6 +13,7 @@ import { LuKeyRound, LuX } from "react-icons/lu";
 
 import { ChangePasswordDialog } from "~/components/settings/ChangePasswordDialog";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
@@ -116,12 +117,9 @@ export function SignInMethodsSection() {
         meta: { closable: true },
       });
     } catch (error) {
-      toaster.create({
-        title: "Failed to remove sign-in method",
-        description:
-          error instanceof Error ? error.message : "Please try again",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't remove the sign-in method",
       });
     }
   };
@@ -161,16 +159,15 @@ export function SignInMethodsSection() {
     <VStack align="stretch" gap={3}>
       {hasSSOProvider && (
         <Text fontSize="xs" color="fg.muted">
-          You sign in via your company&apos;s SSO provider. Additional
-          sign-in methods can&apos;t be linked.
+          You sign in via your company&apos;s SSO provider. Additional sign-in
+          methods can&apos;t be linked.
         </Text>
       )}
 
       <VStack align="stretch" gap={1}>
         {accounts?.map((account) => {
           const credential = isCredentialAccount(account);
-          const removable =
-            !hasSSOProvider && (accounts?.length ?? 0) > 1;
+          const removable = !hasSSOProvider && (accounts?.length ?? 0) > 1;
           return (
             <HStack key={account.id} width="full" gap={2}>
               <LuKeyRound />

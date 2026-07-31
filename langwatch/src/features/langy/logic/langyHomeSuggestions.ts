@@ -89,7 +89,9 @@ export function selectLangySuggestions({
     evaluations: 2,
     traces: 1,
   };
-  const available = SUGGESTIONS.filter((suggestion) => met(suggestion.requires));
+  const available = SUGGESTIONS.filter((suggestion) =>
+    met(suggestion.requires),
+  );
   const ordered = available.toSorted(
     (a, b) => (rank[b.requires ?? ""] ?? 0) - (rank[a.requires ?? ""] ?? 0),
   );

@@ -35,9 +35,7 @@ import {
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
-const logger = createLogger(
-  "langwatch:gateway:budget-clickhouse-repository",
-);
+const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
 export type BudgetDebitRow = {
   tenantId: string;
@@ -621,11 +619,14 @@ function toLedgerEventRow(r: {
     virtualKeyId: r.virtualKeyId,
     amountUsd: r.amountUsd,
     model: r.model,
-    providerSlot: r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
+    providerSlot:
+      r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
     tokensInput: Number(r.tokensInput),
     tokensOutput: Number(r.tokensOutput),
     durationMs:
-      r.durationMs === null || r.durationMs === undefined || Number(r.durationMs) === 0
+      r.durationMs === null ||
+      r.durationMs === undefined ||
+      Number(r.durationMs) === 0
         ? null
         : Number(r.durationMs),
     status: ledgerStatusFromCH(r.status),

@@ -13,8 +13,8 @@ import {
   isEnvelope,
   readEnvelopeLease,
   readEnvelopeLeaseFromHeader,
-  readEnvelopeTieredRefFromHeader,
   readEnvelopeRetirement,
+  readEnvelopeTieredRefFromHeader,
   splitEnvelope,
 } from "./jobEnvelope";
 import { gqBlobReleaseGraceTotal } from "./metrics";

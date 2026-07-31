@@ -75,7 +75,13 @@ function OfferBody({
   );
 }
 
-const OfferCard: React.FC<Offer> = ({ icon, title, description, onClick, href }) => {
+const OfferCard: React.FC<Offer> = ({
+  icon,
+  title,
+  description,
+  onClick,
+  href,
+}) => {
   if (href) {
     return (
       <Link href={href} display="block" _hover={{ textDecoration: "none" }}>

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Regression pin for the post-merge dogfood P0 RBAC closure (commit
@@ -28,17 +28,13 @@ const PAGES_REQUIRING_ORG_MANAGE = [
 
 describe("legacy /settings admin pages", () => {
   describe("when guarded by withPermissionGuard", () => {
-    it.each(PAGES_REQUIRING_ORG_MANAGE)(
-      "%s requires organization:manage",
-      (filename) => {
-        const source = readFileSync(
-          join(__dirname, "..", filename),
-          "utf-8",
-        );
-        expect(source).toMatch(
-          /export default withPermissionGuard\("organization:manage"/,
-        );
-      },
-    );
+    it.each(
+      PAGES_REQUIRING_ORG_MANAGE,
+    )("%s requires organization:manage", (filename) => {
+      const source = readFileSync(join(__dirname, "..", filename), "utf-8");
+      expect(source).toMatch(
+        /export default withPermissionGuard\("organization:manage"/,
+      );
+    });
   });
 });

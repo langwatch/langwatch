@@ -8,11 +8,11 @@
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { extractPlatformUrl } from "~/utils/platformHref";
 import {
+  type CapabilityCardInput,
   extractPrimaryId,
   extractResourceName,
   extractToolText,
   summaryLines,
-  type CapabilityCardInput,
 } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 

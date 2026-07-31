@@ -30,7 +30,9 @@ const tenantId = `${tag}-project`;
 const baseMs = Date.now();
 const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
 
-function evalRow(over: Partial<EvaluationAnalyticsRow> = {}): EvaluationAnalyticsRow {
+function evalRow(
+  over: Partial<EvaluationAnalyticsRow> = {},
+): EvaluationAnalyticsRow {
   return {
     tenantId,
     evaluationId: `${tag}-e`,
@@ -116,7 +118,10 @@ describe("evaluation_analytics round-trip (migrations 00041 + 00056)", () => {
       // A higher updatedAtMs makes the second write the RMT-latest version
       // (the repo stamps UpdatedAt from row.updatedAtMs, not now()).
       await repo.upsertBatch([
-        { row: { ...row, score: 0.95, updatedAtMs: baseMs + 1000 }, retentionDays: 30 },
+        {
+          row: { ...row, score: 0.95, updatedAtMs: baseMs + 1000 },
+          retentionDays: 30,
+        },
       ]);
 
       const read = await repo.findByEvaluationIdWithApplied({

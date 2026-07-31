@@ -100,9 +100,9 @@ describe("resolveSeriesLabel", () => {
     });
 
     it("returns the fallback label for an unnamed matching series", () => {
-      expect(
-        resolveSeriesLabel(graph, "1/metadata.trace_id/cardinality"),
-      ).toBe("Series 2: metadata.trace_id / cardinality");
+      expect(resolveSeriesLabel(graph, "1/metadata.trace_id/cardinality")).toBe(
+        "Series 2: metadata.trace_id / cardinality",
+      );
     });
   });
 

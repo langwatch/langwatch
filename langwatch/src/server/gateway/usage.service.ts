@@ -282,10 +282,7 @@ export class GatewayUsageService {
       select: { id: true, name: true, displayPrefix: true },
     });
     return new Map(
-      keys.map((k) => [
-        k.id,
-        { name: k.name, displayPrefix: k.displayPrefix },
-      ]),
+      keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]),
     );
   }
 
@@ -295,7 +292,11 @@ export class GatewayUsageService {
   ): Promise<boolean> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+      select: {
+        id: true,
+        teamId: true,
+        team: { select: { organizationId: true } },
+      },
     });
     if (!project?.team) return false;
     const vk = await this.prisma.virtualKey.findFirst({
@@ -321,10 +322,7 @@ export class GatewayUsageService {
   }
 }
 
-function averagePerRequest(
-  totalUsd: Prisma.Decimal,
-  requests: number,
-): string {
+function averagePerRequest(totalUsd: Prisma.Decimal, requests: number): string {
   return requests > 0 ? totalUsd.div(requests).toFixed(6) : "0.000000";
 }
 

@@ -9,22 +9,23 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  OrganizationUserRole,
+  type OrganizationUserRole,
   RoleBindingScopeType,
-  TeamUserRole,
+  type TeamUserRole,
 } from "@prisma/client";
 import { X } from "lucide-react";
-import { Link } from "~/components/ui/link";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import {
   BindingInputRow,
-  roleBadgeColor,
-  scopeTypeLabel,
   type BindingInputRowHandle,
   type PendingBinding,
+  roleBadgeColor,
+  scopeTypeLabel,
 } from "./GroupBindingInputRow";
 import { OrganizationUserRoleField } from "./OrganizationUserRoleField";
 
@@ -51,9 +52,15 @@ export function MemberDetailDialog({
 }) {
   const queryClient = api.useContext();
 
-  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(member.role);
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
+  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(
+    member.role,
+  );
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
+    Set<string>
+  >(new Set());
+  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
+    PendingBinding[]
+  >([]);
   const [isSaving, setIsSaving] = useState(false);
 
   const bindingInputRef = useRef<BindingInputRowHandle>(null);
@@ -82,8 +89,7 @@ export function MemberDetailDialog({
   const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
 
   const hasBindingChanges =
-    pendingBindingRemovals.size > 0 ||
-    pendingBindingAdditions.length > 0;
+    pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
   const roleChanged = pendingRole !== member.role;
   const hasChanges = hasBindingChanges || roleChanged;
 
@@ -132,8 +138,10 @@ export function MemberDetailDialog({
       toaster.create({ title: "Member updated", type: "success" });
       onClose();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save";
-      toaster.create({ title: message, type: "error" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update this member",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -210,7 +218,9 @@ export function MemberDetailDialog({
                           <Badge
                             colorPalette={roleBadgeColor(b.role)}
                             size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                            textDecoration={
+                              markedForRemoval ? "line-through" : undefined
+                            }
                           >
                             {b.customRoleName ?? b.role}
                           </Badge>
@@ -218,7 +228,9 @@ export function MemberDetailDialog({
                           <Badge
                             colorPalette="purple"
                             size="sm"
-                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                            textDecoration={
+                              markedForRemoval ? "line-through" : undefined
+                            }
                           >
                             {scopeTypeLabel(b.scopeType)}{" "}
                             {b.scopeName ?? b.scopeId}
@@ -229,11 +241,17 @@ export function MemberDetailDialog({
                               size="xs"
                               variant="ghost"
                               color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
+                              aria-label={
+                                markedForRemoval
+                                  ? "Undo removal"
+                                  : "Remove binding"
+                              }
                               onClick={() =>
                                 setPendingBindingRemovals((prev) => {
                                   const next = new Set(prev);
-                                  next.has(b.id) ? next.delete(b.id) : next.add(b.id);
+                                  next.has(b.id)
+                                    ? next.delete(b.id)
+                                    : next.add(b.id);
                                   return next;
                                 })
                               }
@@ -259,7 +277,8 @@ export function MemberDetailDialog({
                         </Badge>
                         <Text color="fg.muted">on</Text>
                         <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                          {scopeTypeLabel(b.scopeType)}{" "}
+                          {b.scopeName ?? b.scopeId}
                         </Badge>
                         <Spacer />
                         <Button
@@ -317,32 +336,41 @@ export function MemberDetailDialog({
                         <Text fontSize="sm" color="fg.muted">
                           {group.name}
                         </Text>
-                        <Link href="/settings/groups" fontSize="xs" color="blue.400">
+                        <Link
+                          href="/settings/groups"
+                          fontSize="xs"
+                          color="blue.400"
+                        >
                           No access configured
                         </Link>
                       </HStack>
-                    ) : group.bindings.map((b) => (
-                      <HStack
-                        key={b.id}
-                        px={3}
-                        py={2}
-                        bg="bg.muted"
-                        borderRadius="md"
-                        fontSize="sm"
-                      >
-                        <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
-                          {b.customRoleName ?? b.role}
-                        </Badge>
-                        <Text color="fg.muted">on</Text>
-                        <Badge colorPalette="purple" size="sm">
-                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? "—"}
-                        </Badge>
-                        <Spacer />
-                        <Text fontSize="xs" color="fg.muted">
-                          via {group.name}
-                        </Text>
-                      </HStack>
-                    ))
+                    ) : (
+                      group.bindings.map((b) => (
+                        <HStack
+                          key={b.id}
+                          px={3}
+                          py={2}
+                          bg="bg.muted"
+                          borderRadius="md"
+                          fontSize="sm"
+                        >
+                          <Badge
+                            colorPalette={roleBadgeColor(b.role)}
+                            size="sm"
+                          >
+                            {b.customRoleName ?? b.role}
+                          </Badge>
+                          <Text color="fg.muted">on</Text>
+                          <Badge colorPalette="purple" size="sm">
+                            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? "—"}
+                          </Badge>
+                          <Spacer />
+                          <Text fontSize="xs" color="fg.muted">
+                            via {group.name}
+                          </Text>
+                        </HStack>
+                      ))
+                    ),
                   )}
                 </VStack>
               )}

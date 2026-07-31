@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { OnboardingFlowDirection } from "../types/types";
 
 export function useGenericOnboardingFlow<

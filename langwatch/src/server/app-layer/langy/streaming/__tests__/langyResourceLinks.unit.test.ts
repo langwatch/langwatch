@@ -23,8 +23,7 @@ function fakeRedis() {
       return added;
     }),
     hget: vi.fn(
-      async (key: string, field: string) =>
-        hashes.get(key)?.get(field) ?? null,
+      async (key: string, field: string) => hashes.get(key)?.get(field) ?? null,
     ),
     expire: vi.fn(async () => 1),
   } satisfies LangyLinkRedis;
@@ -36,7 +35,8 @@ describe("langyResourceLinkStore", () => {
     it("resolves every id a remembered link was keyed under", async () => {
       const { redis } = fakeRedis();
       const store = createLangyResourceLinkStore({ redis });
-      const href = "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1";
+      const href =
+        "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1";
       await store.remember({
         conversationId: "conv-1",
         links: [
@@ -45,8 +45,12 @@ describe("langyResourceLinkStore", () => {
         ],
       });
 
-      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toBe(href);
-      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toBe(href);
+      expect(
+        await store.resolve({ conversationId: "conv-1", id: "batch_1" }),
+      ).toBe(href);
+      expect(
+        await store.resolve({ conversationId: "conv-1", id: "run_1" }),
+      ).toBe(href);
     });
 
     it("returns null for a resource this conversation never surfaced", async () => {

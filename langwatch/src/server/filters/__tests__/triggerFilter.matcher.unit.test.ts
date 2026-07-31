@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { PreconditionTraceData } from "../precondition-matchers";
-import type { TriggerFilters } from "../types";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
@@ -9,7 +9,7 @@ import {
   matchesTriggerFilters,
   triggerFiltersReferenceEvents,
 } from "../triggerFilter.matcher";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TriggerFilters } from "../types";
 
 function makeTraceData(
   overrides: Partial<PreconditionTraceData> = {},

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock posthog-js before importing the module under test
 vi.mock("posthog-js", () => ({
@@ -53,9 +53,8 @@ describe("captureException()", () => {
       expect(posthog.capture).toHaveBeenCalledWith(
         "$exception",
         expect.objectContaining({
-          $exception_stack_trace_raw: expect.stringContaining(
-            "connection failed",
-          ),
+          $exception_stack_trace_raw:
+            expect.stringContaining("connection failed"),
         }),
       );
     });

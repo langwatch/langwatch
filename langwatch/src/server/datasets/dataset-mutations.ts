@@ -958,6 +958,7 @@ export const migrateS3JsonlColumns = async ({
     ) {
       throw new DatasetConflictError(
         "Dataset columns changed since you opened the editor — please reopen and retry.",
+        { reason: "stale_columns" },
       );
     }
 

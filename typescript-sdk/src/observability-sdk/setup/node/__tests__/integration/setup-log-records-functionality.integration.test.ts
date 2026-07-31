@@ -46,7 +46,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     resetObservabilitySdkConfig();
   });
 
-  it('should create log records with correct attributes', async () => {
+  it('creates log records with correct attributes', async () => {
     const logRecordLogger = getLangWatchLogger('test-logger');
 
     // Create a log record with attributes
@@ -80,7 +80,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(record.attributes["user.id"]).toBe('12345');
   });
 
-  it('should handle log records with custom log record processors', async () => {
+  it('handles log records with custom log record processors', async () => {
     const logRecordLogger = getLangWatchLogger('custom-processor-test');
 
     const logRecord = {
@@ -110,7 +110,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(record.attributes?.['test.feature']).toBe('custom-processors');
   });
 
-  it('should handle different log severity levels', async () => {
+  it('handles different log severity levels', async () => {
     const logRecordLogger = getLangWatchLogger('severity-test');
 
     // Test different severity levels
@@ -156,7 +156,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     }
   });
 
-  it('should handle log records with complex attributes', async () => {
+  it('handles log records with complex attributes', async () => {
     const logRecordLogger = getLangWatchLogger('complex-attributes');
 
     // Create a log record with complex attributes
@@ -199,7 +199,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(record.attributes["undefined.attr"]).toBeUndefined();
   });
 
-  it('should handle log records with timestamps', () => {
+  it('handles log records with timestamps', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -222,7 +222,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with trace context', () => {
+  it('handles log records with trace context', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -243,7 +243,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle multiple log records from same logger', () => {
+  it('handles multiple log records from same logger', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -265,7 +265,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with different loggers', () => {
+  it('handles log records with different loggers', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -301,7 +301,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logger3).toBeDefined();
   });
 
-  it('should handle log records with console logging enabled', () => {
+  it('handles log records with console logging enabled', () => {
     const logger = createMockLogger();
     setupObservability({
       langwatch: { apiKey: 'test-key' },
@@ -323,7 +323,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with error conditions', () => {
+  it('handles log records with error conditions', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -344,7 +344,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with performance metrics', () => {
+  it('handles log records with performance metrics', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -367,7 +367,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with business context', () => {
+  it('handles log records with business context', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -389,7 +389,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with security context', () => {
+  it('handles log records with security context', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -410,7 +410,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with application metrics', () => {
+  it('handles log records with application metrics', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -432,7 +432,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with structured data', () => {
+  it('handles log records with structured data', () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
@@ -472,7 +472,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with multiple processors', () => {
+  it('handles log records with multiple processors', () => {
     const logger = createMockLogger();
     const processor1 = {
       onEmit: vi.fn(),
@@ -508,7 +508,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(processor2).toBeDefined();
   });
 
-  it('should handle log records with different log levels and console logging', () => {
+  it('handles log records with different log levels and console logging', () => {
     const logger = createMockLogger();
     setupObservability({
       langwatch: { apiKey: 'test-key' },
@@ -540,7 +540,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-  it('should handle log records with resource attributes', () => {
+  it('handles log records with resource attributes', () => {
     const logger = createMockLogger();
     setupObservability({
       langwatch: { apiKey: 'test-key' },

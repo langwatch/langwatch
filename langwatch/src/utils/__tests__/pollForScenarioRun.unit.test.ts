@@ -3,7 +3,15 @@
  * @see specs/scenarios/scenario-failure-handler.feature "Polling Logic Improvements"
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 import { pollForScenarioRun } from "../pollForScenarioRun";
 
 interface ScenarioRun {
@@ -22,7 +30,9 @@ type BatchRunDataResult =
   | { changed: false }
   | { changed: true; runs: ScenarioRun[] };
 
-type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
+type FetchBatchRunData = (
+  params: PollForRunParams,
+) => Promise<BatchRunDataResult>;
 
 describe("pollForScenarioRun", () => {
   const baseParams = {

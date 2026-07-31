@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Database,
   Download,
-  Edit2,
   Plus,
   Settings2,
   Trash2,
@@ -14,8 +13,7 @@ import { useMemo } from "react";
 
 import { Menu } from "~/components/ui/menu";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import type { DatasetColumn, DatasetReference } from "../../types";
-import { DEFAULT_TEST_DATA_ID } from "../../types";
+import type { DatasetReference } from "../../types";
 
 type DatasetTabsProps = {
   onSelectExisting: () => void;

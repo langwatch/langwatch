@@ -8,9 +8,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useOnboardingFlow } from "../use-onboarding-flow";
 import { OnboardingScreenIndex } from "../../types/types";
+import { useOnboardingFlow } from "../use-onboarding-flow";
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: { IS_SAAS: true }, isLoading: false }),

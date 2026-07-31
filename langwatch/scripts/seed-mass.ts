@@ -24,41 +24,38 @@
  * idempotent: same window → same ids → re-running upserts the same story.
  */
 import { PrismaClient } from "@prisma/client";
+import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
+import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
-import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { CollectorSpanUtils } from "../src/server/traces/collectorSpan.utils";
+import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
+  type CustomMetadata,
   customMetadataSchema,
+  type ReservedTraceMetadata,
   reservedTraceMetadataSchema,
   spanValidatorSchema,
-  type CustomMetadata,
-  type ReservedTraceMetadata,
 } from "../src/server/tracer/types";
-import { seedDemoPlatform } from "../prisma/seed-demo-platform";
-import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
-import {
-  DAY_MS,
-  TRACE_WINDOW_DAYS,
-  assertLocalUrl,
-  buildCollectorPayload,
-  ingestOtlpMetrics,
-  ingestTrace,
-  type CollectorTarget,
-  type TraceFixture,
-} from "./seed-lib/seed-primitives";
+import { CollectorSpanUtils } from "../src/server/traces/collectorSpan.utils";
+import { buildMassMetrics, MASS_METRICS_SCOPE } from "./seed-lib/mass-metrics";
+import { buildMassTimeline, type MassTimeline } from "./seed-lib/mass-timeline";
 import {
   EXPERIMENT_ROWS,
   SCENARIO_FIXTURES,
 } from "./seed-lib/platform-fixtures";
-import {
-  buildMassTimeline,
-  type MassTimeline,
-} from "./seed-lib/mass-timeline";
-import { MASS_METRICS_SCOPE, buildMassMetrics } from "./seed-lib/mass-metrics";
 import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
+import {
+  assertLocalUrl,
+  buildCollectorPayload,
+  type CollectorTarget,
+  DAY_MS,
+  ingestOtlpMetrics,
+  ingestTrace,
+  TRACE_WINDOW_DAYS,
+  type TraceFixture,
+} from "./seed-lib/seed-primitives";
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";
@@ -377,10 +374,12 @@ async function main(): Promise<void> {
     // command seam with backdated occurredAt.
     const collectorCutoff = now - TRACE_WINDOW_DAYS * DAY_MS;
     const windowed = traces.filter(
-      (trace) => (trace.finishedAtMs ?? now) - trace.latencyMs >= collectorCutoff,
+      (trace) =>
+        (trace.finishedAtMs ?? now) - trace.latencyMs >= collectorCutoff,
     );
     const deep = traces.filter(
-      (trace) => (trace.finishedAtMs ?? now) - trace.latencyMs < collectorCutoff,
+      (trace) =>
+        (trace.finishedAtMs ?? now) - trace.latencyMs < collectorCutoff,
     );
     console.log(
       `🌱 Mass seed: ${timeline.days} days — ${timeline.scenarioRuns.length} scenario runs, ${timeline.experimentRuns.length} experiment runs, ${traces.length} traces (${windowed.length} via collector, ${deep.length} via pipeline), ${metrics.totalPoints} metric points`,

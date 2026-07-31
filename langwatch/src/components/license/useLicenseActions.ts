@@ -1,7 +1,6 @@
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
-import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -24,34 +23,23 @@ export function useLicenseActions({
       onUploadSuccess();
       window.location.reload();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to activate license",
-        description: getUserFriendlyLicenseError(error.message),
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't activate license" }),
   });
 
   const removeMutation = api.license.remove.useMutation({
     onSuccess: () => {
       toaster.create({
         title: "License removed",
-        description: "Your organization is now running without a license. Some features may be limited.",
+        description:
+          "Your organization is now running without a license. Some features may be limited.",
         type: "info",
       });
       onRemoveSuccess();
       window.location.reload();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to remove license",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't remove license" }),
   });
 
   const upload = (licenseKey: string) => {

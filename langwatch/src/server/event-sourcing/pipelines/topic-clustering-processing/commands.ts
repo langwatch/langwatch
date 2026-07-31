@@ -1,10 +1,10 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
   topicClusteringRequestedEventDataSchema,
-  topicClusteringTopicsRecordedEventDataSchema,
   topicClusteringRunCompletedEventDataSchema,
   topicClusteringRunFailedEventDataSchema,
   topicClusteringRunStartedEventDataSchema,
+  topicClusteringTopicsRecordedEventDataSchema,
 } from "./schemas/events";
 
 /**

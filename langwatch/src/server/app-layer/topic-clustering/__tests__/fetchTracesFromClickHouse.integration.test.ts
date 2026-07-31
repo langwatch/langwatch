@@ -116,7 +116,13 @@ describe("fetchTracesFromClickHouse integration", () => {
 
   describe("when the search cursor advances", () => {
     it("returns strictly older, non-overlapping traces", async () => {
-      const first = await fetchTracesFromClickHouse(ch, TENANT_ID, false, [], []);
+      const first = await fetchTracesFromClickHouse(
+        ch,
+        TENANT_ID,
+        false,
+        [],
+        [],
+      );
       const second = await fetchTracesFromClickHouse(
         ch,
         TENANT_ID,
@@ -158,7 +164,13 @@ describe("fetchTracesFromClickHouse integration", () => {
     });
 
     it("advances the cursor past a full empty page to reach older traces", async () => {
-      const page1 = await fetchTracesFromClickHouse(ch, EMPTY_TENANT, false, [], []);
+      const page1 = await fetchTracesFromClickHouse(
+        ch,
+        EMPTY_TENANT,
+        false,
+        [],
+        [],
+      );
 
       // Page 1 is a full page of empty-input traces: nothing to cluster, but
       // the cursor must still track the page boundary (the 2000th trace).

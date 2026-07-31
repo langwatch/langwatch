@@ -150,9 +150,9 @@ describe("parseRetryAfterMs", () => {
 
   describe("when the header is an HTTP date", () => {
     it("returns the delta from now for a future date", () => {
-      expect(
-        parseRetryAfterMs("Wed, 15 Jul 2026 12:01:00 GMT", NOW),
-      ).toBe(60_000);
+      expect(parseRetryAfterMs("Wed, 15 Jul 2026 12:01:00 GMT", NOW)).toBe(
+        60_000,
+      );
     });
     it("returns undefined for a past date", () => {
       expect(

@@ -3,7 +3,6 @@ import { performance } from "node:perf_hooks";
 import {
   Counter,
   collectDefaultMetrics,
-  Gauge,
   Histogram,
   register,
 } from "prom-client";
@@ -520,6 +519,27 @@ export const incrementEsFoldReadWindowFallbackTotal = (
   outcome: "recovered" | "absent",
 ) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_absent_miss_trusted_total");
+const esFoldAbsentMissTrustedTotal = new Counter({
+  name: "es_fold_absent_miss_trusted_total",
+  help: "Absent store misses a trustAbsentMiss fold answered from init(), by which recovery mechanism was skipped",
+  labelNames: ["projection_name", "skipped"] as const,
+});
+
+/**
+ * The direct measure of what `trustAbsentMiss` saves — each increment is one
+ * ClickHouse read that no longer happens. `fallback_read` — the unwindowed
+ * fallback scan of the fold's own backing table. `refold` — the `event_log`
+ * history replay under `refoldOnStoreMiss`. Their pre-change steady state was
+ * ~290/min and ~180/min respectively; if this counter goes quiet while
+ * `es_fold_read_window_fallback_total` climbs again, the option was disabled
+ * (env kill-switch) or dropped from the fold.
+ */
+export const incrementEsFoldAbsentMissTrustedTotal = (
+  projectionName: string,
+  skipped: "fallback_read" | "refold",
+) => esFoldAbsentMissTrustedTotal.labels(projectionName, skipped).inc();
+
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
@@ -835,7 +855,8 @@ export const observeEsProcessOutboxDispatchLag = ({
 }: {
   processName: string;
   lagMs: number;
-}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+}) =>
+  esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
@@ -916,7 +937,9 @@ const ingestionPullDuration = new Histogram({
   // adapter kind lives behind the run port — no cheap low-cardinality label.
   // A pull is a network poll plus row inserts, capped by the worker's
   // 5-minute soft deadline, so buckets run 100ms to 5min.
-  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+  buckets: [
+    100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000,
+  ],
 });
 
 export const observeIngestionPullDuration = ({
@@ -1135,7 +1158,7 @@ export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
 // Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
 // failure outcomes are the drift alarm for prompt regressions in block
 // emission — a rising unsalvageable/invalid rate means the agent's emission
-// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+// quality slipped, exactly like ADR-079's probe-miss counter for cards.
 register.removeSingleMetric("langwatch_langy_blocks_total");
 const langyBlocksTotal = new Counter({
   name: "langwatch_langy_blocks_total",
@@ -1273,9 +1296,7 @@ const codingAgentSessionListReadDuration = new Histogram({
   // "now", and a top bucket at 5s would put exactly that degradation into
   // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
   // the moment it was supposed to speak.
-  buckets: [
-    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000,
-  ],
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000],
 });
 
 /**
@@ -1317,9 +1338,7 @@ export const observeCodingAgentSessionListReadDuration = ({
   outcome: CodingAgentSessionListReadOutcome;
   durationMs: number;
 }) =>
-  codingAgentSessionListReadDuration
-    .labels(table, outcome)
-    .observe(durationMs);
+  codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

@@ -10,10 +10,10 @@ import type {
 import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 
 import {
-  topicClusteringProcessEventViewSchema,
-  type topicClusteringRunIntentSchema,
   type TopicClusteringProcessEventView,
   type TopicClusteringProcessState,
+  topicClusteringProcessEventViewSchema,
+  type topicClusteringRunIntentSchema,
 } from "./topicClusteringProcess.types";
 
 /**

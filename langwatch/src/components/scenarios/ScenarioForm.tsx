@@ -1,15 +1,5 @@
-import {
-  Accordion,
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -152,7 +142,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
-
     </VStack>
   );
 }

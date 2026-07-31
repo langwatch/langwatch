@@ -40,13 +40,17 @@ import { getServerAuthSession } from "../auth";
 const fakeReq = { headers: { cookie: "better-auth.session_token=abc" } } as any;
 
 const makeBetterAuthResponse = (
-  overrides: Partial<{ id: string; email: string; name: string; image: string }> = {},
+  overrides: Partial<{
+    id: string;
+    email: string;
+    name: string;
+    image: string;
+  }> = {},
   sessionOverrides: Partial<{ id: string; expiresAt: Date | string }> = {},
 ) => ({
   session: {
     id: sessionOverrides.id ?? "sess_real",
-    expiresAt:
-      sessionOverrides.expiresAt ?? new Date(Date.now() + 86400_000),
+    expiresAt: sessionOverrides.expiresAt ?? new Date(Date.now() + 86400_000),
   },
   user: {
     id: overrides.id ?? "user_1",
@@ -62,7 +66,10 @@ describe("getServerAuthSession", () => {
     mockSessionFindUnique.mockReset();
     mockUserFindUnique.mockReset();
     // Default: any impersonation target is an active user.
-    mockUserFindUnique.mockResolvedValue({ id: "target_1", deactivatedAt: null });
+    mockUserFindUnique.mockResolvedValue({
+      id: "target_1",
+      deactivatedAt: null,
+    });
   });
 
   describe("when there is no session cookie", () => {
@@ -123,11 +130,13 @@ describe("getServerAuthSession", () => {
 
   describe("when an admin is impersonating another user", () => {
     it("rewrites session.user to the impersonated user and sets impersonator", async () => {
-      mockGetSession.mockResolvedValue(makeBetterAuthResponse({
-        id: "admin_1",
-        email: "admin@langwatch.ai",
-        name: "Admin One",
-      }));
+      mockGetSession.mockResolvedValue(
+        makeBetterAuthResponse({
+          id: "admin_1",
+          email: "admin@langwatch.ai",
+          name: "Admin One",
+        }),
+      );
       mockSessionFindUnique.mockResolvedValue({
         impersonating: {
           id: "target_1",
@@ -153,10 +162,12 @@ describe("getServerAuthSession", () => {
 
   describe("when impersonation has expired", () => {
     it("falls through to the real session without impersonator", async () => {
-      mockGetSession.mockResolvedValue(makeBetterAuthResponse({
-        id: "admin_1",
-        email: "admin@langwatch.ai",
-      }));
+      mockGetSession.mockResolvedValue(
+        makeBetterAuthResponse({
+          id: "admin_1",
+          email: "admin@langwatch.ai",
+        }),
+      );
       mockSessionFindUnique.mockResolvedValue({
         impersonating: {
           id: "target_1",

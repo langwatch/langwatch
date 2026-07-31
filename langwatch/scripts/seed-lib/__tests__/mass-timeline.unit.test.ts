@@ -12,9 +12,7 @@ describe("buildMassTimeline", () => {
     it("spans ninety completed days of scenario and experiment history", () => {
       expect(timeline.days).toBe(90);
       expect(timeline.lastDayStart).toBeLessThan(NOW);
-      expect(timeline.firstDayStart).toBe(
-        timeline.lastDayStart - 89 * DAY_MS,
-      );
+      expect(timeline.firstDayStart).toBe(timeline.lastDayStart - 89 * DAY_MS);
       // Every day runs at least the three core scenarios.
       expect(timeline.scenarioRuns.length).toBeGreaterThanOrEqual(90 * 3);
       // One baseline+improved experiment pair per week.

@@ -190,12 +190,18 @@ describe("Feature: LLM model cost drawer save errors", () => {
 
         await submitStoredModelCost();
 
+        // The raw message never reaches the customer: an unhandled failure
+        // gets the calm generic description, and the caller's fallback title
+        // names what was being attempted.
         expect(mockToasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: "Error",
-            description: "Network error",
+            title: "Couldn't update model cost",
+            description: "We've been notified. Try again in a moment.",
             type: "error",
           }),
+        );
+        expect(mockToasterCreate).not.toHaveBeenCalledWith(
+          expect.objectContaining({ description: "Network error" }),
         );
       });
     });

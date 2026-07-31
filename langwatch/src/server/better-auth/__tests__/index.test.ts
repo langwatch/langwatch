@@ -221,9 +221,21 @@ describe("better-auth config", () => {
     };
 
     it.each([
-      ["google", "google", { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" }],
-      ["github", "github", { GITHUB_CLIENT_ID: "id", GITHUB_CLIENT_SECRET: "secret" }],
-      ["gitlab", "gitlab", { GITLAB_CLIENT_ID: "id", GITLAB_CLIENT_SECRET: "secret" }],
+      [
+        "google",
+        "google",
+        { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" },
+      ],
+      [
+        "github",
+        "github",
+        { GITHUB_CLIENT_ID: "id", GITHUB_CLIENT_SECRET: "secret" },
+      ],
+      [
+        "gitlab",
+        "gitlab",
+        { GITLAB_CLIENT_ID: "id", GITLAB_CLIENT_SECRET: "secret" },
+      ],
       [
         "microsoft",
         "azure-ad",
@@ -233,11 +245,7 @@ describe("better-auth config", () => {
           AZURE_AD_TENANT_ID: "tenant",
         },
       ],
-    ])("social provider %s never overwrites profile info on sign-in", async (
-      _label,
-      provider,
-      creds,
-    ) => {
+    ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
       const { buildSocialProviders } = await import("../index");
       const providers = buildSocialProviders({
         ...noSocialEnv,

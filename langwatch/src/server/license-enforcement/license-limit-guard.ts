@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import type { RoleChangeType } from "./member-classification";
-import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
+import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
+import type { RoleChangeType } from "./member-classification";
 
 /**
  * Error messages for license limit violations.
@@ -33,7 +33,7 @@ export async function assertMemberTypeLimitNotExceeded(
   changeType: RoleChangeType,
   organizationId: string,
   licenseRepo: ILicenseEnforcementRepository,
-  limits: MemberTypeLimits
+  limits: MemberTypeLimits,
 ): Promise<void> {
   // No limit check needed if type unchanged or limits overridden
   if (changeType === "no-change" || limits.overrideAddingLimitations) {

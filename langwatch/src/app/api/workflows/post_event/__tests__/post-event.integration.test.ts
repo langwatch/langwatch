@@ -20,9 +20,9 @@
  *
  * Run cost: ~3-5s per invocation + ~3s subprocess startup.
  */
-import { spawn, type ChildProcess } from "node:child_process";
-import { setTimeout as sleep } from "node:timers/promises";
+import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -259,14 +259,20 @@ describe("studioBackendPostEvent FF-gated SSE routing to nlpgo", () => {
       // the digit we asked for. Loose match: the actual response often
       // includes trailing whitespace or punctuation.
       const componentChanges = events.filter(
-        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
-          e.type === "component_state_change",
+        (
+          e,
+        ): e is Extract<
+          StudioServerEvent,
+          { type: "component_state_change" }
+        > => e.type === "component_state_change",
       );
       const lastEndChange = [...componentChanges]
         .reverse()
         .find((e) => e.payload.component_id === "end");
       expect(lastEndChange, JSON.stringify(events)).toBeDefined();
-      const stringified = JSON.stringify(lastEndChange?.payload.execution_state);
+      const stringified = JSON.stringify(
+        lastEndChange?.payload.execution_state,
+      );
       expect(stringified).toContain("7");
     },
     60_000,

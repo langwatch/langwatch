@@ -62,8 +62,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-import { FieldsFilters } from "../FieldsFilters";
 import type { FilterField } from "../../../server/filters/types";
+import { FieldsFilters } from "../FieldsFilters";
 
 const mockFilterOptions = [
   { field: "label-1", label: "Production", count: 100 },

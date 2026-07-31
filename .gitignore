@@ -153,3 +153,8 @@ server.log
 /bin/haven
 langwatch/dev.log
 .claude/tmp/
+
+# Biome gate artifacts (.github/workflows/langwatch-app-ci.yml lint job)
+/biome.raw.json
+/biome.rdjson
+/biome.posted.json

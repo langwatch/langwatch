@@ -107,9 +107,7 @@ describe("resolveEligible", () => {
     [{ id: PROJECT_ID, teamId: TEAM_ID }],
     ORG_ID,
   );
-  const keyAtProject = [
-    { scopeType: "PROJECT" as const, scopeId: PROJECT_ID },
-  ];
+  const keyAtProject = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }];
   const orgProvider: OrgModelProvider = {
     id: "mp-org",
     name: "Central OpenAI",
@@ -206,9 +204,7 @@ describe("resolveEligible", () => {
     it("fails closed rather than advertising it", () => {
       const { enabled: _dropped, ...noSignal } = orgProvider;
 
-      expect(
-        resolveEligible(keyAtProject, [noSignal], hierarchy),
-      ).toEqual([]);
+      expect(resolveEligible(keyAtProject, [noSignal], hierarchy)).toEqual([]);
     });
   });
 });

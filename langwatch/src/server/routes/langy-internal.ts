@@ -2,7 +2,9 @@
  * Internal Langy control-plane endpoints — the Go agent's OUTBOUND calls back
  * to the app. Mounted at `/api/internal/langy`, protected by the shared bearer
  * secret `LANGY_INTERNAL_SECRET` (the same secret the control plane presents to
- * the agent on its `/worker/*` turn endpoints). Never expose publicly.
+ * the agent on its `/worker/*` turn endpoints). Never expose publicly — the Helm chart
+ * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
+ * the app through its internal Service rather than the ingress.
  *
  * This is the durable half of the turn lifecycle (see
  * specs/langy/langy-turn-lifecycle.md): the agent posts its final result here
@@ -14,24 +16,20 @@
  * so the old registration was a latent path mismatch (a 404 the agent swallowed).
  */
 
-import type { Context, Next } from "hono";
+import { ValidationError } from "@langwatch/handled-error";
+import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy";
+import { createLogger } from "@langwatch/observability";
 import { timingSafeEqual } from "crypto";
+import type { Context, Next } from "hono";
 import { z } from "zod";
-import {
-  cliToolResultSchema,
-  type CliToolResult,
-} from "@langwatch/langy";
-
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "@langwatch/handled-error";
+import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { prisma } from "~/server/db";
 import {
   getLangySessionKeysCounter,
   getLangyTurnResultsCounter,
 } from "~/server/metrics";
-import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
-import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:langy:internal");
 
@@ -120,73 +118,75 @@ const turnResultSchema = z.object({
  * collapses to one event at the store. Returns 202 either way — accepted, and
  * the event log is the source of truth for whether it changed anything.
  */
-secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => {
-  const turnId = c.req.param("turnId");
-  if (!turnId) {
-    throw new ValidationError("turnId is required", {
-      meta: { fieldErrors: { turnId: ["turnId is required"] } },
-    });
-  }
+secured
+  .access(langyInternalPolicy())
+  .post("/turn/:turnId/result", async (c) => {
+    const turnId = c.req.param("turnId");
+    if (!turnId) {
+      throw new ValidationError("turnId is required", {
+        meta: { fieldErrors: { turnId: ["turnId is required"] } },
+      });
+    }
 
-  const parsed = turnResultSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    throw ValidationError.fromZodError(parsed.error);
-  }
-  const body = parsed.data;
-
-  // Cross-check the triple before writing. `projectId`/`conversationId` are
-  // body fields the bearer alone would otherwise let through unverified — the
-  // sibling relay proves the same thing with an HMAC over the runToken, but
-  // this durable path has only the shared secret. A turn row exists only if
-  // the turn was really accepted under this conversation in this project, so
-  // this rejects a forged triple and a benign cross-tenant mix-up alike.
-  // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
-  // the manager treats 4xx as terminal, so it will not retry-loop.
-  const turnExists = await getApp().langy.conversations.turnExists({
-    projectId: body.projectId,
-    conversationId: body.conversationId,
-    turnId,
-  });
-  if (!turnExists) {
-    logger.warn(
-      {
-        projectId: body.projectId,
-        conversationId: body.conversationId,
-        turnId,
-      },
-      "refusing a turn-result ingest for an unknown (project, conversation, turn) triple",
+    const parsed = turnResultSchema.safeParse(
+      await c.req.json().catch(() => null),
     );
-    return c.json({ error: "turn not found" }, 404);
-  }
+    if (!parsed.success) {
+      throw ValidationError.fromZodError(parsed.error);
+    }
+    const body = parsed.data;
 
-  await getApp().langy.conversations.ingestAgentTurnResult({
-    projectId: body.projectId,
-    conversationId: body.conversationId,
-    turnId,
-    status: body.status,
-    text: body.text,
-    toolCalls: body.toolCalls,
-    errorCode: body.errorCode,
-  });
+    // Cross-check the triple before writing. `projectId`/`conversationId` are
+    // body fields the bearer alone would otherwise let through unverified — the
+    // sibling relay proves the same thing with an HMAC over the runToken, but
+    // this durable path has only the shared secret. A turn row exists only if
+    // the turn was really accepted under this conversation in this project, so
+    // this rejects a forged triple and a benign cross-tenant mix-up alike.
+    // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
+    // the manager treats 4xx as terminal, so it will not retry-loop.
+    const turnExists = await getApp().langy.conversations.turnExists({
+      projectId: body.projectId,
+      conversationId: body.conversationId,
+      turnId,
+    });
+    if (!turnExists) {
+      logger.warn(
+        {
+          projectId: body.projectId,
+          conversationId: body.conversationId,
+          turnId,
+        },
+        "refusing a turn-result ingest for an unknown (project, conversation, turn) triple",
+      );
+      return c.json({ error: "turn not found" }, 404);
+    }
 
-  // The durable completion of a turn — the one line that says a turn ended
-  // and how, attributable by ids and graphable by outcome.
-  getLangyTurnResultsCounter(body.status).inc();
-  logger.info(
-    {
+    await getApp().langy.conversations.ingestAgentTurnResult({
       projectId: body.projectId,
       conversationId: body.conversationId,
       turnId,
       status: body.status,
-      ...(body.errorCode ? { errorCode: body.errorCode } : {}),
-    },
-    "langy turn result ingested",
-  );
+      text: body.text,
+      toolCalls: body.toolCalls,
+      errorCode: body.errorCode,
+    });
 
-  return c.json({ status: "accepted" }, 202);
-});
+    // The durable completion of a turn — the one line that says a turn ended
+    // and how, attributable by ids and graphable by outcome.
+    getLangyTurnResultsCounter(body.status).inc();
+    logger.info(
+      {
+        projectId: body.projectId,
+        conversationId: body.conversationId,
+        turnId,
+        status: body.status,
+        ...(body.errorCode ? { errorCode: body.errorCode } : {}),
+      },
+      "langy turn result ingested",
+    );
+
+    return c.json({ status: "accepted" }, 202);
+  });
 
 // ── credentials/revoke (relocated from /api/langy) ────────────────────────
 

@@ -486,7 +486,9 @@ describe("experiments.deleteExperiment", () => {
           where: { id, projectId: PROJECT_ID },
         });
         expect(after.slug).toBe(archived.slug);
-        expect(after.archivedAt?.getTime()).toBe(archived.archivedAt?.getTime());
+        expect(after.archivedAt?.getTime()).toBe(
+          archived.archivedAt?.getTime(),
+        );
         expect(after.workbenchState).toEqual(archived.workbenchState);
       });
     });

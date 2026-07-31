@@ -369,7 +369,7 @@ export class CodexGatewayRefreshService {
     | { status: "session_expired" }
   > {
     const row = await this.repository.findByIdWithDecryptedKeys(providerRowId);
-    if (!row || row.provider !== "openai_codex") {
+    if (row?.provider !== "openai_codex") {
       return { status: "not_connected" };
     }
     const parsed = codexTokenKeysSchema.safeParse(row.customKeys ?? {});

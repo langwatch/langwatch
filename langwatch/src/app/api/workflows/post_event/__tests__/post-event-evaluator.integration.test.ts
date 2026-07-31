@@ -22,11 +22,11 @@
  *
  * Run cost: ~5-8s + ~3s subprocess startup.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -392,8 +392,12 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       // the amount on `execution_state.cost` for the workflow-level
       // total accumulator.
       const componentChanges = events.filter(
-        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
-          e.type === "component_state_change",
+        (
+          e,
+        ): e is Extract<
+          StudioServerEvent,
+          { type: "component_state_change" }
+        > => e.type === "component_state_change",
       );
       const finalEvalChange = [...componentChanges]
         .reverse()

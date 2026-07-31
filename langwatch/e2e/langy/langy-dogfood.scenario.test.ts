@@ -96,10 +96,15 @@ describe("Langy dogfood — named flows", () => {
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({ model, criteria: LANGY_FAILING_TRACES_CRITERIA }),
+          scenario.judgeAgent({
+            model,
+            criteria: LANGY_FAILING_TRACES_CRITERIA,
+          }),
         ],
         script: [
-          scenario.user("find my failing traces from the last day and tell me what's going wrong"),
+          scenario.user(
+            "find my failing traces from the last day and tell me what's going wrong",
+          ),
           scenario.agent(),
           scenario.judge(),
         ],
@@ -148,7 +153,10 @@ describe("Langy dogfood — named flows", () => {
         agents: [
           langy,
           scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({ model, criteria: LANGY_EVAL_CREATION_CRITERIA }),
+          scenario.judgeAgent({
+            model,
+            criteria: LANGY_EVAL_CREATION_CRITERIA,
+          }),
         ],
         script: [
           scenario.user("make me an eval"),

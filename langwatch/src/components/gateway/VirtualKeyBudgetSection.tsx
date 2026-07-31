@@ -8,13 +8,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-
-import { SmallLabel } from "../SmallLabel";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { api } from "~/utils/api";
-
-import { formatBudgetUsd } from "./formatBudgetUsd";
+import { SmallLabel } from "../SmallLabel";
 import type { ScopeTriadEntry } from "../settings/ScopeChipPicker";
+import { formatBudgetUsd } from "./formatBudgetUsd";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 
@@ -145,8 +143,7 @@ export function VirtualKeyBudgetSection({
             onChange={(e) =>
               onChange({
                 ...value,
-                window:
-                  (e.target.value as VirtualKeyBudgetWindow) ?? "DAY",
+                window: (e.target.value as VirtualKeyBudgetWindow) ?? "DAY",
               })
             }
           >

@@ -10,12 +10,12 @@
  *
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
-import { describe, expect, it } from "vitest";
 
 import type {
   IExportLogsServiceRequest,
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
+import { describe, expect, it } from "vitest";
 
 import { extractCanonicalCostEvents } from "../canonicalCostExtractor.service";
 
@@ -48,8 +48,7 @@ function buildRequest(input: {
             scope: { name: "test-scope", version: "1" },
             logRecords: [
               {
-                timeUnixNano:
-                  input.timeUnixNano ?? "1714978800000000000",
+                timeUnixNano: input.timeUnixNano ?? "1714978800000000000",
                 observedTimeUnixNano:
                   input.timeUnixNano ?? "1714978800000000000",
                 severityNumber: 9,
@@ -125,7 +124,9 @@ describe("extractCanonicalCostEvents", () => {
     it("prefers the record-level value (closer to the event)", () => {
       const events = extractCanonicalCostEvents(
         buildRequest({
-          resourceAttrs: [strKv("langwatch.principal.email", "default@acme.test")],
+          resourceAttrs: [
+            strKv("langwatch.principal.email", "default@acme.test"),
+          ],
           recordAttrs: [
             strKv("langwatch.principal.email", "actor@acme.test"),
             dblKv("langwatch.cost.usd", 0.01),

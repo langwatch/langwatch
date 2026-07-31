@@ -9,15 +9,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Check, Terminal } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
-  IngestionTemplateInstallDrawer,
   type IngestionBindingResult,
+  IngestionTemplateInstallDrawer,
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -58,6 +57,22 @@ import { api } from "~/utils/api";
  */
 const FALLBACK_ICON = <Bot size={20} />;
 
+/**
+ * The mutation's error, but only if it was this template that raised it.
+ *
+ * `install` and `rotate` are one mutation each for the whole grid, and tRPC
+ * keeps the last error until the next call — so the question a drawer has to
+ * ask is never "did this fail" but "did this fail for the tool I'm showing".
+ * `variables` is the request that failed, which is the only record of that.
+ */
+function errorFor<TError, TVariables extends { sourceType: string }>(
+  mutation: { error: TError | null; variables?: TVariables },
+  sourceType: string,
+): TError | null {
+  if (!mutation.error) return null;
+  return mutation.variables?.sourceType === sourceType ? mutation.error : null;
+}
+
 export function TraceIngestSection() {
   const ctx = usePersonalContext();
   const orgId = ctx.organizationId ?? "";
@@ -72,28 +87,17 @@ export function TraceIngestSection() {
   );
 
   const utils = api.useUtils();
+  // Neither mutation toasts: both are driven from inside the install drawer,
+  // which is open whenever they can fail and renders this same error inline
+  // via `<HandledErrorAlert>`. A toast would report it a second time.
   const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Install failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Rotate failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
 
@@ -126,7 +130,7 @@ export function TraceIngestSection() {
   if (!templatesQuery.isSuccess && !templatesQuery.isError) return null;
   if (templatesQuery.isSuccess && templates.length === 0) return null;
   const openTemplate = openSlug
-    ? templates.find((t) => t.slug === openSlug) ?? null
+    ? (templates.find((t) => t.slug === openSlug) ?? null)
     : null;
 
   const handleInstall = async (
@@ -145,7 +149,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `installMutation.error`
     }
   };
 
@@ -165,7 +169,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `rotateMutation.error`
     }
   };
 
@@ -227,9 +231,7 @@ export function TraceIngestSection() {
       {openTemplate && (
         <IngestionTemplateInstallDrawer
           open={!!openSlug}
-          onOpenChange={(next) =>
-            handleOpenChange(openTemplate.slug, next)
-          }
+          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
           template={{
             slug: openTemplate.slug,
             displayName: openTemplate.displayName,
@@ -238,11 +240,16 @@ export function TraceIngestSection() {
           }}
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
+          // Both halves are gated on the template they belong to. A tRPC
+          // mutation's `error` outlives the drawer that caused it, and these
+          // two mutations are shared across every tile — so an ungated
+          // fallback meant a failed rotate on one tool was still on screen
+          // when you opened the next one's drawer, reported as that tool's
+          // failure. This drawer is the only place either failure is shown,
+          // which makes showing the wrong one worse than showing none.
           installError={
-            installMutation.error?.message &&
-            installMutation.variables?.sourceType === openTemplate.sourceType
-              ? installMutation.error.message
-              : rotateMutation.error?.message ?? null
+            errorFor(installMutation, openTemplate.sourceType) ??
+            errorFor(rotateMutation, openTemplate.sourceType)
           }
           hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
           onInstall={() =>

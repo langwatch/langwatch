@@ -26,9 +26,7 @@ vi.mock("~/server/metrics", () => ({
 
 import { googleDLPClearPII } from "./piiCheck";
 
-function mockFindings(
-  ranges: { start: number; end: number }[],
-): void {
+function mockFindings(ranges: { start: number; end: number }[]): void {
   inspectContentMock.mockResolvedValue([
     {
       result: {
@@ -62,7 +60,11 @@ describe("googleDLPClearPII", () => {
         ]);
         const wrapper = { value };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value.startsWith("[REDACTED] met [REDACTED]")).toBe(
           true,
@@ -82,7 +84,11 @@ describe("googleDLPClearPII", () => {
         mockFindings([{ start: 2, end: 6 }]);
         const wrapper = { value: "😀😀John" };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value).toBe("😀😀[REDACTED]");
       });
@@ -95,10 +101,64 @@ describe("googleDLPClearPII", () => {
         mockFindings([]);
         const wrapper = { value: "nothing sensitive here" };
 
-        await googleDLPClearPII(wrapper, "value", "STRICT");
+        await googleDLPClearPII({
+          currentObject: wrapper,
+          lastKey: "value",
+          piiRedactionLevel: "STRICT",
+        });
 
         expect(wrapper.value).toBe("nothing sensitive here");
       });
     });
+  });
+});
+
+describe("googleDLPClearPII with exception patterns", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps a finding whose matched text matches an exception", async () => {
+    // "res 00528000043000 x": the 14-digit number spans codepoints [4, 18).
+    const wrapper = { value: "res 00528000043000 x" };
+    mockFindings([{ start: 4, end: 18 }]);
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+      exceptPatterns: ["00\\d{12}"],
+    });
+    expect(wrapper.value).toBe("res 00528000043000 x");
+  });
+
+  /** @scenario An exception pattern keeps a business identifier while other PII is still redacted */
+  it("preserves the whole excepted span when an overlapping finding is masked", async () => {
+    // Finding A [4, 18) is the excepted number; finding B [10, 20) overlaps
+    // its tail plus " x". Only the part of B outside the protected range may
+    // be masked: the number itself must survive character for character.
+    const wrapper = { value: "res 00528000043000 x" };
+    mockFindings([
+      { start: 4, end: 18 },
+      { start: 10, end: 20 },
+    ]);
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+      exceptPatterns: ["00\\d{12}"],
+    });
+    expect(wrapper.value).toBe("res 00528000043000[REDACTED]");
+  });
+
+  it("masks normally when no exception matches", async () => {
+    const wrapper = { value: "res 00528000043000 x" };
+    mockFindings([{ start: 4, end: 18 }]);
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+      exceptPatterns: ["zz\\d{4}"],
+    });
+    expect(wrapper.value).toBe("res [REDACTED] x");
   });
 });

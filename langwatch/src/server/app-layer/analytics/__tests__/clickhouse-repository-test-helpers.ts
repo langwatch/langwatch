@@ -137,7 +137,8 @@ export async function windowedReadCount({
   const snapshot = await metric.get();
   return (
     snapshot.values.find(
-      (value) => value.labels.table === table && value.labels.outcome === outcome,
+      (value) =>
+        value.labels.table === table && value.labels.outcome === outcome,
     )?.value ?? 0
   );
 }

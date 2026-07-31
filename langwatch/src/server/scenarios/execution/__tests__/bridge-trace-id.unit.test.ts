@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it, vi } from "vitest";
 import type { AgentInput, JudgeAgentConfig } from "@langwatch/scenario";
+import { describe, expect, it, vi } from "vitest";
 import { bridgeTraceIdFromAdapterToJudge } from "../bridge-trace-id";
 import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
 
@@ -33,7 +33,10 @@ function createMockAdapter(traceId: string | undefined) {
 function createJudge(): RemoteSpanJudgeAgent {
   return new RemoteSpanJudgeAgent({
     criteria: ["test criterion"],
-    model: { provider: "openai", model: "gpt-4o" } as unknown as JudgeAgentConfig["model"],
+    model: {
+      provider: "openai",
+      model: "gpt-4o",
+    } as unknown as JudgeAgentConfig["model"],
     projectId: "project_123",
     querySpans: vi.fn().mockResolvedValue([]),
   });

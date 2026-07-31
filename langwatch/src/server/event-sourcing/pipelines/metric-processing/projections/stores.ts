@@ -7,7 +7,9 @@ import type {
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 
-abstract class MetricStoreBase implements AppendStore<CanonicalMetricDataPoint> {
+abstract class MetricStoreBase
+  implements AppendStore<CanonicalMetricDataPoint>
+{
   constructor(protected readonly repo: MetricDataPointRepository) {}
 
   protected retention(

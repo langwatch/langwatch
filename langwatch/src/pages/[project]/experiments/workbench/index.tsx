@@ -1,4 +1,4 @@
-import { Alert, Box, Center, VStack } from "@chakra-ui/react";
+import { Box, Center } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import {
@@ -8,6 +8,7 @@ import {
   type SavedRecord,
 } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
@@ -131,16 +132,10 @@ export default function NewExperimentWorkbench() {
       <Center height="calc(100vh - 100px)">
         {createExperiment.isError ? (
           <Box padding={6} maxWidth="500px">
-            <Alert.Root status="error">
-              <Alert.Indicator />
-              <VStack align="start" gap={1}>
-                <Alert.Title>Failed to create experiment</Alert.Title>
-                <Alert.Description>
-                  {createExperiment.error?.message ??
-                    "An unexpected error occurred."}
-                </Alert.Description>
-              </VStack>
-            </Alert.Root>
+            <HandledErrorAlert
+              error={createExperiment.error}
+              fallbackTitle="Couldn't create the experiment"
+            />
           </Box>
         ) : null}
       </Center>

@@ -1,9 +1,18 @@
+import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import { createLogger } from "@langwatch/observability";
 import type { AlertType } from "@prisma/client";
-import { Column, Container, Heading, Html, Img, Link, Row, Section } from "@react-email/components";
+import {
+  Column,
+  Container,
+  Heading,
+  Html,
+  Img,
+  Link,
+  Row,
+  Section,
+} from "@react-email/components";
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
-import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
 import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { env } from "../../env.mjs";

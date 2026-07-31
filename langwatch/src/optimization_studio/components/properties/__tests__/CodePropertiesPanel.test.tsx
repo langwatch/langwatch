@@ -88,7 +88,7 @@ vi.mock("../BasePropertiesPanel", () => ({
   ),
 }));
 
-import type { Component, Field } from "../../../types/dsl";
+import type { Component } from "../../../types/dsl";
 import { CodePropertiesPanel } from "../CodePropertiesPanel";
 
 const createMockNode = (

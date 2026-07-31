@@ -13,7 +13,8 @@
  * calls that were made. Only `usePublicEnv` is mocked, because it is the flag
  * boundary and reaching it would need a tRPC client.
  */
-import { act, cleanup, render } from "@testing-library/react";
+
+import { NavigationContextManager } from "@langwatch/react-rum";
 import { context, trace } from "@opentelemetry/api";
 import {
   BasicTracerProvider,
@@ -21,7 +22,11 @@ import {
   type ReadableSpan,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
+import {
+  ATTR_HTTP_ROUTE,
+  ATTR_URL_PATH,
+} from "@opentelemetry/semantic-conventions";
+import { act, cleanup, render } from "@testing-library/react";
 import {
   createMemoryRouter,
   Outlet,
@@ -29,15 +34,12 @@ import {
   RouterProvider,
 } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { NavigationContextManager } from "@langwatch/react-rum";
 import { useNavigationTracing } from "../useNavigationTracing";
 
 const publicEnv = { RUM_ENABLED: true };
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({ data: publicEnv }),
 }));
-
 
 const exporter = new InMemorySpanExporter();
 const provider = new BasicTracerProvider({
@@ -206,7 +208,9 @@ describe("useNavigationTracing", () => {
 
         callServer("GET /api/trpc/poll");
 
-        expect(exported("GET /api/trpc/poll")?.parentSpanContext).toBeUndefined();
+        expect(
+          exported("GET /api/trpc/poll")?.parentSpanContext,
+        ).toBeUndefined();
       });
     });
   });

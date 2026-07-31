@@ -49,9 +49,7 @@ export function useWorkspaceCurrent(
     }
 
     if (project) {
-      const matched = switcher.projects.find(
-        (p) => p.projectId === project.id,
-      );
+      const matched = switcher.projects.find((p) => p.projectId === project.id);
       if (matched) return { kind: "project", projectId: matched.projectId };
     }
 

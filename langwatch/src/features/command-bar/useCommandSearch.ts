@@ -1,16 +1,16 @@
+import { BookText, Bot, Percent, Table, Workflow } from "lucide-react";
 import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
-import { Bot, BookText, Percent, Table, Workflow } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { SearchResult } from "./types";
-import { SEARCH_DEBOUNCE_MS, MIN_SEARCH_QUERY_LENGTH } from "./constants";
+import { MIN_SEARCH_QUERY_LENGTH, SEARCH_DEBOUNCE_MS } from "./constants";
 import {
   findEntityByPrefix,
-  isTraceId,
   isSpanId,
+  isTraceId,
   traceIcon,
 } from "./entityRegistry";
+import type { SearchResult } from "./types";
 
 /**
  * Detect if the query is an entity ID and return navigation info.
@@ -91,12 +91,12 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   const { data: prompts, isLoading: promptsLoading } =
     api.prompts.getAllPromptsForProject.useQuery(
       { projectId },
-      { enabled: canFetch }
+      { enabled: canFetch },
     );
 
   const { data: agents, isLoading: agentsLoading } = api.agents.getAll.useQuery(
     { projectId },
-    { enabled: canFetch }
+    { enabled: canFetch },
   );
 
   const { data: datasets, isLoading: datasetsLoading } =
@@ -130,7 +130,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
 
     // Filter prompts
     prompts
-      ?.filter((p) => p.handle && p.handle.toLowerCase().includes(lowerQuery))
+      ?.filter((p) => p.handle?.toLowerCase().includes(lowerQuery))
       .forEach((p) => {
         results.push({
           id: `prompt-${p.id}`,

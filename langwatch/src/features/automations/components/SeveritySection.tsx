@@ -3,7 +3,7 @@ import { AlertType } from "@prisma/client";
 import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 
 /** Alerts carry a severity; automations and reports don't (ADR-043). */
 const SEVERITY_OPTIONS = [

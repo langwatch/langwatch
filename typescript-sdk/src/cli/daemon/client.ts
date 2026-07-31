@@ -51,6 +51,12 @@ export interface DaemonExecOptions {
   cwd: string;
   env: Record<string, string>;
   colorLevel: number;
+  /**
+   * The bin this client was invoked as (`process.argv[1]`), so the daemon can
+   * title usage and error output with the caller's name rather than its own.
+   * See `ExecFrame.bin`.
+   */
+  bin?: string;
   maxBufferBytes?: number;
   /** Where served output goes. Injectable for tests. */
   stdout?: NodeJS.WritableStream;
@@ -188,6 +194,7 @@ export async function execViaDaemon(
         cwd: options.cwd,
         env: options.env,
         colorLevel: options.colorLevel,
+        bin: options.bin,
       });
     });
 

@@ -25,13 +25,13 @@ import {
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
-import { WinRateChart } from "./WinRateChart";
 import type {
-  BatchEvaluationData,
   BatchComparisonColumn,
+  BatchEvaluationData,
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
+import { WinRateChart } from "./WinRateChart";
 
 /** Metric types that can be displayed */
 type MetricType =
@@ -1316,8 +1316,8 @@ export const ComparisonCharts = ({
                           textAnchor={axis.textAnchor}
                           height={axis.height}
                           tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                            truncateLabel(String(value), axis.maxLabelLength)
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1413,8 +1413,8 @@ export const ComparisonCharts = ({
                           textAnchor={axis.textAnchor}
                           height={axis.height}
                           tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                            truncateLabel(String(value), axis.maxLabelLength)
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}

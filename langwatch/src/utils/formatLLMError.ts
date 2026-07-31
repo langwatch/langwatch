@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 export type LLMErrorType =
   | "not_found"
   | "bad_request"
@@ -9,6 +11,32 @@ export type LLMErrorType =
 export interface ParsedLLMError {
   type: LLMErrorType;
   message: string;
+}
+
+const LLM_ERROR_TYPES: ReadonlySet<string> = new Set<LLMErrorType>([
+  "not_found",
+  "bad_request",
+  "auth",
+  "rate_limit",
+  "connection",
+  "unknown",
+]);
+
+/**
+ * Whether a string off the wire is one of the failure classes we recognise.
+ *
+ * `LLMErrorType` is a closed set, and consumers now branch on it to choose the
+ * sentence a customer reads — so something has to actually enforce it. Nothing
+ * did: the playground builds a `ParsedLLMError` by `JSON.parse`-ing an
+ * `[ERROR]` payload and checking only `typeof parsed.type === "string"`, which
+ * happily admits a provider's own discriminant (`api_error`) into a field
+ * typed as ours. A `switch` over the six then falls through to `undefined`.
+ *
+ * Anything unrecognised is `"unknown"`, which is the honest answer and the one
+ * branch that already routes to the registry's generic copy.
+ */
+export function isLLMErrorType(value: string): value is LLMErrorType {
+  return LLM_ERROR_TYPES.has(value);
 }
 
 /**

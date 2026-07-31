@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { Badge, Box, HStack, TagsInput, Text, VStack } from "@chakra-ui/react";
 import { Search } from "lucide-react";
+import { useState } from "react";
 import { api } from "~/utils/api";
 
 export function TenantSelector({

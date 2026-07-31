@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import { z } from "zod";
-
+import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
   ShareLinkNotFoundError,
@@ -9,30 +9,23 @@ import {
 } from "~/server/app-layer/share/errors";
 import type { ShareViewer } from "~/server/app-layer/share/share.service";
 import { buildSharedTraceCacheKey } from "~/server/app-layer/share/shared-trace-cache.service";
-import { rateLimit } from "~/server/rateLimit";
-import { getClientIp } from "~/utils/getClientIp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
+import { rateLimit } from "~/server/rateLimit";
 import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redaction";
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
-
-import {
-  createTRPCRouter,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { getClientIp } from "~/utils/getClientIp";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
   skipPermissionCheck,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import type { SharedTraceDto } from "./sharedTrace.schemas";
 import {
-  gateEvaluations,
-  gateHeaderCost,
-  gateResources,
-  gateTreeCost,
-} from "./tracesV2.gates";
-import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
+  SHARE_MAX_FULL_SPANS,
+  sharedTraceDtoSchema,
+} from "./sharedTrace.schemas";
 import {
   deriveTraceDropPrivacy,
   mapSpanSummaryToTreeNode,
@@ -41,10 +34,12 @@ import {
   redactV2Content,
 } from "./tracesV2";
 import {
-  SHARE_MAX_FULL_SPANS,
-  sharedTraceDtoSchema,
-} from "./sharedTrace.schemas";
-import type { SharedTraceDto } from "./sharedTrace.schemas";
+  gateEvaluations,
+  gateHeaderCost,
+  gateResources,
+  gateTreeCost,
+} from "./tracesV2.gates";
+import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type { TraceResourceInfoDto } from "./tracesV2.schemas";
 
 /**
@@ -373,7 +368,9 @@ function buildResourceInfo(
   const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
   return {
     rootSpanId: root?.spanId ?? null,
-    resourceAttributes: withoutHiddenResourceAttrs(root?.resourceAttributes ?? {}),
+    resourceAttributes: withoutHiddenResourceAttrs(
+      root?.resourceAttributes ?? {},
+    ),
     scope: root
       ? { name: root.scopeName ?? "", version: root.scopeVersion }
       : null,

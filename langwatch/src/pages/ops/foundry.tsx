@@ -1,14 +1,22 @@
-import { useState, useEffect } from "react";
-import { Box, Flex, Button, HStack, Center, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
+import { GenerateConversationDialog } from "~/components/ops/foundry/GenerateConversationDialog";
+import { GenerateTraceDialog } from "~/components/ops/foundry/GenerateTraceDialog";
 import { PlaygroundContent } from "~/components/ops/foundry/PlaygroundContent";
 import { PresetPicker } from "~/components/ops/foundry/PresetPicker";
-import { GenerateTraceDialog } from "~/components/ops/foundry/GenerateTraceDialog";
-import { GenerateConversationDialog } from "~/components/ops/foundry/GenerateConversationDialog";
 import { useTraceStore } from "~/components/ops/foundry/traceStore";
+import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 const SPLASH_LINES = [
   "Warming up the flux capacitor...",
@@ -22,7 +30,7 @@ const SPLASH_LINES = [
 
 function Splash() {
   const [line] = useState(
-    () => SPLASH_LINES[Math.floor(Math.random() * SPLASH_LINES.length)]!
+    () => SPLASH_LINES[Math.floor(Math.random() * SPLASH_LINES.length)]!,
   );
 
   return (
@@ -64,7 +72,12 @@ export default function OpsFoundryPage() {
             </HStack>
           </Flex>
         </PageLayout.Header>
-        <Box height="calc(100vh - 56px - 48px)" w="full" overflow="hidden" borderTopLeftRadius="inherit">
+        <Box
+          height="calc(100vh - 56px - 48px)"
+          w="full"
+          overflow="hidden"
+          borderTopLeftRadius="inherit"
+        >
           {mounted ? <PlaygroundContent /> : <Splash />}
         </Box>
       </DashboardLayout>

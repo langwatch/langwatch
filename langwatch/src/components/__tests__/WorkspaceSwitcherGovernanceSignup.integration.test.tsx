@@ -98,8 +98,8 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import { useRouter } from "~/utils/compat/next-router";
-import { WorkspaceSwitcher } from "../WorkspaceSwitcher";
 import { useWorkspaceData } from "../useWorkspaceData";
+import { WorkspaceSwitcher } from "../WorkspaceSwitcher";
 
 const mockRouter = useRouter();
 

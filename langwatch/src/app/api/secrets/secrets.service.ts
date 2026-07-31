@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
-import { SecretsRepository } from "./secrets.repository";
-import { encrypt } from "~/utils/encryption";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
+import { encrypt } from "~/utils/encryption";
+import { SecretsRepository } from "./secrets.repository";
 
 const MAX_SECRETS_PER_PROJECT = 50;
 
@@ -36,7 +36,11 @@ export class SecretsService {
     this.repo = new SecretsRepository(prisma);
   }
 
-  async getAll({ projectId }: { projectId: string }): Promise<SecretResponse[]> {
+  async getAll({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<SecretResponse[]> {
     const secrets = await this.repo.findAllByProject({ projectId });
     return secrets.map(toResponse);
   }
@@ -67,7 +71,9 @@ export class SecretsService {
     teamId: string;
     name: string;
     value: string;
-  }): Promise<{ secret: SecretResponse } | { error: string; status: 409 | 422 }> {
+  }): Promise<
+    { secret: SecretResponse } | { error: string; status: 409 | 422 }
+  > {
     // The uppercase-only name schema can never produce a reserved (lowercase)
     // name today; this check pins the boundary rather than trusting that
     // disjointness to hold forever.

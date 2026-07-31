@@ -13,9 +13,9 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import {
+import type {
+  BudgetSpendTarget,
   GatewayBudgetClickHouseRepository,
-  type BudgetSpendTarget,
 } from "./budget.clickhouse.repository";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
@@ -105,7 +105,8 @@ export async function resolveApplicableBudgetsForDraftKey(
     name: budget.name,
     scopeType: budget.scopeType,
     scopeId: budget.scopeId,
-    scopeLabel: labels.get(`${budget.scopeType}:${budget.scopeId}`) ?? budget.scopeId,
+    scopeLabel:
+      labels.get(`${budget.scopeType}:${budget.scopeId}`) ?? budget.scopeId,
     window: budget.window,
     limitUsd: budget.limitUsd.toFixed(6),
     spentUsd: spentByBudgetId.get(budget.id) ?? "0",
@@ -218,5 +219,3 @@ async function loadScopeLabels(
   }
   return labels;
 }
-
-

@@ -22,9 +22,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function result(
-  current: TimeseriesResult["currentPeriod"],
-): TimeseriesResult {
+function result(current: TimeseriesResult["currentPeriod"]): TimeseriesResult {
   return { currentPeriod: current, previousPeriod: [] };
 }
 

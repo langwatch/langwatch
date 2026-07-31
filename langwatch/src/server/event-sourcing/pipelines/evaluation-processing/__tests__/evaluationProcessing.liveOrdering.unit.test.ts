@@ -14,8 +14,8 @@ import { EventRepositoryMemory } from "../../../stores/repositories/eventReposit
 import { CompleteEvaluationCommand, StartEvaluationCommand } from "../commands";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import {
-  EvaluationAnalyticsFoldProjection,
   type EvaluationAnalyticsData,
+  EvaluationAnalyticsFoldProjection,
 } from "../projections/evaluationAnalytics.foldProjection";
 import { EvaluationRunFoldProjection } from "../projections/evaluationRun.foldProjection";
 import type {

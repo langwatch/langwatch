@@ -70,7 +70,11 @@ export function resolveScopeFilter(
   }
   if (filter.kind === "project-current") {
     return ctx.currentProjectId
-      ? { kind: "specific", scopeType: "PROJECT", scopeId: ctx.currentProjectId }
+      ? {
+          kind: "specific",
+          scopeType: "PROJECT",
+          scopeId: ctx.currentProjectId,
+        }
       : { kind: "all" };
   }
   return {

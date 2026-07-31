@@ -32,6 +32,7 @@ func (m *mockAuth) Resolve(ctx context.Context, token string) (*domain.Bundle, e
 
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -42,8 +43,11 @@ func (m *mockProvider) DispatchStream(_ context.Context, _ *domain.Request, _ do
 	return nil, nil
 }
 
-func (m *mockProvider) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, creds)
+	}
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {
@@ -743,6 +747,86 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 	assert.Equal(t, "model", ids["gpt-5-mini"], `response must include {"id": "gpt-5-mini", "object": "model"}`)
 	assert.Equal(t, "openai", ownedBy["gpt-5-mini"],
 		"the bundle's sole credential provider must be attributed to a plain allowlist entry")
+}
+
+// @scenario "GET /v1/models says so when a provider's catalog cannot be enumerated"
+// @scenario "a failed catalog probe surfaces as a gap, not a silent empty list"
+// Discovery gaps render as the X-Langwatch-Models-Discovery-Incomplete
+// header (provider:reason tokens), so an empty or partial list is
+// diagnosable from the response while the body stays exactly the OpenAI
+// list shape. No gaps, no header.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestRouter_ModelsEndpoint_SurfacesDiscoveryGapsHeader(t *testing.T) {
+	bundle := testBundle()
+	bundle.Credentials = []domain.Credential{
+		{ID: "cred-1", ProviderID: domain.ProviderAnthropic, APIKey: "sk"},
+		{ID: "cred-2", ProviderID: domain.ProviderBedrock},
+	}
+
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "claude-haiku-4-5", ProviderID: domain.ProviderAnthropic}},
+					[]domain.ModelDiscoveryGap{
+						{ProviderID: domain.ProviderOpenAI, Reason: domain.ModelDiscoveryProbeFailed},
+						{ProviderID: domain.ProviderBedrock, Reason: domain.ModelDiscoveryNotEnumerable},
+					},
+					nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	// Both reasons serialize distinctly: a formatter collapsing every
+	// reason to one token would pass a single-gap assertion.
+	assert.Equal(t, "openai:probe-failed,bedrock:not-enumerable",
+		rec.Header().Get("X-Langwatch-Models-Discovery-Incomplete"))
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
+	require.Len(t, parsed.Data, 1, "the listable provider's models still appear")
+}
+
+// The header is absent when discovery has nothing to report: quiet
+// success must look exactly like it did before the header existed.
+func TestRouter_ModelsEndpoint_NoGapsNoHeader(t *testing.T) {
+	bundle := testBundle()
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+				return []domain.Model{{ID: "gpt-5-mini", ProviderID: domain.ProviderOpenAI}}, nil, nil
+			},
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	_, present := rec.Header()["X-Langwatch-Models-Discovery-Incomplete"]
+	assert.False(t, present, "no gaps must mean no header")
 }
 
 // A model the gateway cannot attribute to a provider still needs a

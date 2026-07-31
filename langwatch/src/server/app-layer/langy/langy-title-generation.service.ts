@@ -13,11 +13,12 @@
  *
  * @see specs/langy/langy-conversation-title.feature
  */
-import { generateText } from "ai";
+
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy";
+import { createLogger } from "@langwatch/observability";
+import { generateText } from "ai";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "@langwatch/observability";
 import type { LangyTrustedMessageReader } from "./langy-message.service";
 
 const logger = createLogger("langwatch:langy:title-generator");

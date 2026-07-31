@@ -38,10 +38,7 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { GatewayGuardrailService } from "../guardrail.service";
-import {
-  VK_TAG_MAX_LENGTH,
-  VK_TAGS_MAX_COUNT,
-} from "../virtualKey.config";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "../virtualKey.config";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 
 const suffix = nanoid(8);
@@ -526,9 +523,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       const vk = await repo.findById(VK_ID, ORG_ID);
       const mat = new GatewayConfigMaterialiser(prisma, null);
       const bundle = await mat.materialise(vk!);
-      const slot = bundle.providers.find(
-        (p) => p.id === MP_ANTHROPIC_PLAIN_ID,
-      );
+      const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_PLAIN_ID);
       expect(slot).toBeDefined();
       expect(slot!.type).toBe("anthropic");
       expect(slot!.base_url).toBeUndefined();

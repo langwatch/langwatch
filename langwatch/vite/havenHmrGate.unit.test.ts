@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HmrContext, ViteDevServer } from "vite";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { havenHmrGate } from "./havenHmrGate";
 
 describe("havenHmrGate", () => {
@@ -14,7 +14,9 @@ describe("havenHmrGate", () => {
     vi.useFakeTimers();
     dir = mkdtempSync(path.join(tmpdir(), "haven-hmr-gate-"));
     sentMessages = [];
-    server = { ws: { send: (msg: unknown) => sentMessages.push(msg) } } as unknown as ViteDevServer;
+    server = {
+      ws: { send: (msg: unknown) => sentMessages.push(msg) },
+    } as unknown as ViteDevServer;
   });
 
   afterEach(() => {
@@ -27,7 +29,9 @@ describe("havenHmrGate", () => {
   }
 
   function build() {
-    const plugin = havenHmrGate({ markerPath: path.join(dir, ".haven-hmr-gate") });
+    const plugin = havenHmrGate({
+      markerPath: path.join(dir, ".haven-hmr-gate"),
+    });
     // configureServer + handleHotUpdate are always plain functions on this plugin.
     (plugin.configureServer as (s: ViteDevServer) => void)(server);
     return plugin.handleHotUpdate as (ctx: HmrContext) => unknown;
@@ -69,7 +73,9 @@ describe("havenHmrGate", () => {
 
       const plugin = havenHmrGate({ markerPath });
       (plugin.configureServer as (s: ViteDevServer) => void)(server);
-      const handleHotUpdate = plugin.handleHotUpdate as (ctx: HmrContext) => unknown;
+      const handleHotUpdate = plugin.handleHotUpdate as (
+        ctx: HmrContext,
+      ) => unknown;
 
       expect(handleHotUpdate(fakeCtx())).toEqual([]);
       expect(sentMessages).toHaveLength(0);

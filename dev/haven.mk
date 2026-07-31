@@ -1,5 +1,5 @@
 # =============================================================================
-# THUISHAVEN — hostname-based local dev (ADR-048)
+# THUISHAVEN — hostname-based local dev
 # =============================================================================
 # Included from the repo-root Makefile (`include dev/haven.mk`, last line).
 #

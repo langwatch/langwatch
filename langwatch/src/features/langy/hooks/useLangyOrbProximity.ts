@@ -77,8 +77,7 @@ export function useLangyOrbProximity({ enabled }: { enabled: boolean }) {
           `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) ` +
           `rotate(${angle.toFixed(2)}deg) ` +
           `scale(${(grow * (1 + stretch)).toFixed(3)}, ${(
-            grow *
-            (1 - stretch)
+            grow * (1 - stretch)
           ).toFixed(3)}) ` +
           `rotate(${(-angle).toFixed(2)}deg)`;
       }

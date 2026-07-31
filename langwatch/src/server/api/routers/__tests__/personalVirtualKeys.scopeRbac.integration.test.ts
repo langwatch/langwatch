@@ -21,13 +21,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import type { Permission } from "../../rbac";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import type { Permission } from "../../rbac";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
@@ -59,7 +59,12 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
   async function seedCustomRole(userId: string, perms: Permission[]) {
     const roleId = `crole-${userId}`;
     await prisma.customRole.create({
-      data: { id: roleId, organizationId: ORG_ID, name: roleId, permissions: perms },
+      data: {
+        id: roleId,
+        organizationId: ORG_ID,
+        name: roleId,
+        permissions: perms,
+      },
     });
     await prisma.roleBinding.create({
       data: {
@@ -73,7 +78,10 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     });
   }
 
-  async function seedPersonalVk(principalUserId: string, name: string): Promise<string> {
+  async function seedPersonalVk(
+    principalUserId: string,
+    name: string,
+  ): Promise<string> {
     const vk = await prisma.virtualKey.create({
       data: {
         organizationId: ORG_ID,
@@ -107,15 +115,40 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     });
     await prisma.organizationUser.createMany({
       data: [
-        { organizationId: ORG_ID, userId: LEO, role: OrganizationUserRole.MEMBER },
-        { organizationId: ORG_ID, userId: MAYA, role: OrganizationUserRole.MEMBER },
-        { organizationId: ORG_ID, userId: SWEEPER, role: OrganizationUserRole.MEMBER },
-        { organizationId: ORG_ID, userId: ORG_ADMIN, role: OrganizationUserRole.ADMIN },
-        { organizationId: ORG_ID, userId: PLAIN, role: OrganizationUserRole.MEMBER },
+        {
+          organizationId: ORG_ID,
+          userId: LEO,
+          role: OrganizationUserRole.MEMBER,
+        },
+        {
+          organizationId: ORG_ID,
+          userId: MAYA,
+          role: OrganizationUserRole.MEMBER,
+        },
+        {
+          organizationId: ORG_ID,
+          userId: SWEEPER,
+          role: OrganizationUserRole.MEMBER,
+        },
+        {
+          organizationId: ORG_ID,
+          userId: ORG_ADMIN,
+          role: OrganizationUserRole.ADMIN,
+        },
+        {
+          organizationId: ORG_ID,
+          userId: PLAIN,
+          role: OrganizationUserRole.MEMBER,
+        },
       ],
     });
     await prisma.team.create({
-      data: { id: TEAM_ID, name: TEAM_ID, slug: `team-${ns}`, organizationId: ORG_ID },
+      data: {
+        id: TEAM_ID,
+        name: TEAM_ID,
+        slug: `team-${ns}`,
+        organizationId: ORG_ID,
+      },
     });
     await prisma.project.create({
       data: {
@@ -175,17 +208,25 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
   afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.routingPolicy.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.routingPolicy.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.modelProviderScope.deleteMany({
       where: { modelProviderId: MODEL_PROVIDER_ID },
     });
     await prisma.modelProvider.deleteMany({ where: { id: MODEL_PROVIDER_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.teamUser.deleteMany({ where: { team: { organizationId: ORG_ID } } });
-    await prisma.project.deleteMany({ where: { team: { organizationId: ORG_ID } } });
+    await prisma.teamUser.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({ where: { email: { contains: ns } } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
     await stopTestContainers();
@@ -210,7 +251,9 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     /** @scenario A user can view their own personal VK without any explicit grant */
     it("returns the caller's own keys and not another user's", async () => {
       const ids = (
-        await callerFor(LEO).personalVirtualKeys.list({ organizationId: ORG_ID })
+        await callerFor(LEO).personalVirtualKeys.list({
+          organizationId: ORG_ID,
+        })
       ).map((k) => k.id);
       expect(ids).toContain(leoVk);
       expect(ids).not.toContain(mayaVk);
@@ -246,7 +289,9 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
     /** @scenario Org admin with viewOtherPersonal can audit other users' personal VKs (offboarding sweep) */
     it("returns every member's personal keys when no target is given", async () => {
       const ids = (
-        await callerFor(SWEEPER).personalVirtualKeys.list({ organizationId: ORG_ID })
+        await callerFor(SWEEPER).personalVirtualKeys.list({
+          organizationId: ORG_ID,
+        })
       ).map((k) => k.id);
       expect(ids).toContain(leoVk);
       expect(ids).toContain(mayaVk);

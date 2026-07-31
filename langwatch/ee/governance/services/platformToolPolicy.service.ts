@@ -39,7 +39,10 @@ export interface PlatformToolPolicy {
   allowOtelDirect: boolean;
 }
 
-export type PlatformToolPolicyMap = Record<PlatformToolSlug, PlatformToolPolicy>;
+export type PlatformToolPolicyMap = Record<
+  PlatformToolSlug,
+  PlatformToolPolicy
+>;
 
 /**
  * Hardcoded defaults. claude/codex/gemini/opencode allow both paths; cursor is

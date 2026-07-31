@@ -83,7 +83,5 @@ export interface SubscriptionService {
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }>;
 
-  listInvoices(params: {
-    organizationId: string;
-  }): Promise<DisplayInvoice[]>;
+  listInvoices(params: { organizationId: string }): Promise<DisplayInvoice[]>;
 }

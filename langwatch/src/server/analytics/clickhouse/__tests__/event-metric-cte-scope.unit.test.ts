@@ -19,9 +19,9 @@
  * because doing so would silently change "average score" to "count of traces".
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { resetParamCounter } from "../filter-translator";
-import { buildTimeseriesQuery } from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 
 /**
  * Extract the outer SELECT portion of a CTE-based query.
@@ -56,8 +56,7 @@ describe("buildTimeseriesQuery()", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              metric: "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
               aggregation: "cardinality" as const,
             },
           ],
@@ -82,8 +81,7 @@ describe("buildTimeseriesQuery()", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              metric: "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
               aggregation: "cardinality" as const,
             },
           ],

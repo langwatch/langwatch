@@ -6,13 +6,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../../../";
 import type { Command } from "../../../../";
+import { createTenantId } from "../../../../";
+import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,
   type ExecuteEvaluationCommandDeps,
 } from "../executeEvaluation.command";
-import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 
 function buildDeps(
   overrides: Partial<ExecuteEvaluationCommandDeps> = {},
@@ -80,7 +80,9 @@ describe("ExecuteEvaluationCommand", () => {
         // Pin the skip to the missing-thread-id branch: the command must reach
         // executeForTrace (which returns the skip) rather than bailing out at an
         // earlier guard, otherwise an empty event list would be a false positive.
-        expect(deps.evaluationExecution.executeForTrace).toHaveBeenCalledTimes(1);
+        expect(deps.evaluationExecution.executeForTrace).toHaveBeenCalledTimes(
+          1,
+        );
         expect(events).toEqual([]);
         expect(deps.costRecorder.recordCost).not.toHaveBeenCalled();
       });

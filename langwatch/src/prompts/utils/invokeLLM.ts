@@ -1,7 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { LATEST_SPEC_VERSION, type ExecutionState, type LlmPromptConfigComponent, type Workflow } from "~/optimization_studio/types/dsl";
+import {
+  type ExecutionState,
+  LATEST_SPEC_VERSION,
+  type LlmPromptConfigComponent,
+  type Workflow,
+} from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { fetchSSE } from "~/utils/sse/fetchSSE";

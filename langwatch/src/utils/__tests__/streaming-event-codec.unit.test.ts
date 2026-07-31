@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  encodeStart,
   encodeContent,
   encodeEnd,
+  encodeStart,
   isCompactStreamingEvent,
 } from "../streaming-event-codec";
 
@@ -79,9 +79,7 @@ describe("streaming-event-codec", () => {
     describe("when delta contains special characters", () => {
       it("preserves whitespace and unicode exactly", () => {
         const delta = "  line1\nline2\ttab \u2603";
-        const result = JSON.parse(
-          encodeContent({ ...baseFields, delta }),
-        );
+        const result = JSON.parse(encodeContent({ ...baseFields, delta }));
 
         expect(result.d).toBe(delta);
       });
@@ -89,9 +87,7 @@ describe("streaming-event-codec", () => {
 
     describe("when delta is an empty string", () => {
       it("preserves the empty string", () => {
-        const result = JSON.parse(
-          encodeContent({ ...baseFields, delta: "" }),
-        );
+        const result = JSON.parse(encodeContent({ ...baseFields, delta: "" }));
 
         expect(result.d).toBe("");
       });
@@ -131,9 +127,7 @@ describe("streaming-event-codec", () => {
 
     describe("when content is an empty string", () => {
       it("includes the c key with empty string", () => {
-        const result = JSON.parse(
-          encodeEnd({ ...baseFields, content: "" }),
-        );
+        const result = JSON.parse(encodeEnd({ ...baseFields, content: "" }));
 
         // empty string is falsy but not null/undefined, so it should be included
         // Actually, the implementation checks `!= null`, so empty string IS included
@@ -145,19 +139,25 @@ describe("streaming-event-codec", () => {
   describe("isCompactStreamingEvent()", () => {
     describe("when parsed has e='S'", () => {
       it("returns true", () => {
-        expect(isCompactStreamingEvent({ e: "S", r: "r", b: "b", m: "m" })).toBe(true);
+        expect(
+          isCompactStreamingEvent({ e: "S", r: "r", b: "b", m: "m" }),
+        ).toBe(true);
       });
     });
 
     describe("when parsed has e='C'", () => {
       it("returns true", () => {
-        expect(isCompactStreamingEvent({ e: "C", r: "r", b: "b", m: "m" })).toBe(true);
+        expect(
+          isCompactStreamingEvent({ e: "C", r: "r", b: "b", m: "m" }),
+        ).toBe(true);
       });
     });
 
     describe("when parsed has e='E'", () => {
       it("returns true", () => {
-        expect(isCompactStreamingEvent({ e: "E", r: "r", b: "b", m: "m" })).toBe(true);
+        expect(
+          isCompactStreamingEvent({ e: "E", r: "r", b: "b", m: "m" }),
+        ).toBe(true);
       });
     });
 

@@ -26,12 +26,10 @@ export const NodeDraggable = (props: {
   disableDrag?: boolean;
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;
 }) => {
-  const { setNodes, nodes } = useWorkflowStore(
-    (state) => ({
-      setNodes: state.setNodes,
-      nodes: state.nodes,
-    }),
-  );
+  const { setNodes, nodes } = useWorkflowStore((state) => ({
+    setNodes: state.setNodes,
+    nodes: state.nodes,
+  }));
 
   const createNewNode = useCallback(() => {
     const { name: newName, id: newId } = findLowestAvailableName(

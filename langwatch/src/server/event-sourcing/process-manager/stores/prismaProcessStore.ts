@@ -1,11 +1,10 @@
+import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
   type ProcessManagerInstance,
   type ProcessManagerOutbox,
 } from "@prisma/client";
-
-import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { JsonValue } from "../json";
 import type { ProcessRef } from "../processManager.types";
@@ -72,9 +71,7 @@ function toMessage(row: ProcessManagerOutbox): OutboxMessageRecord {
   };
 }
 
-function toLeasedMessage(
-  row: ProcessManagerOutbox,
-): LeasedOutboxMessageRecord {
+function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
   const message = toMessage(row);
   if (message.leaseToken === null) {
     throw new Error(`Leased outbox message ${row.id} has no lease token`);
@@ -169,7 +166,9 @@ export class PrismaProcessStore implements ProcessStore {
           const inserted = await tx.processManagerInstance.createMany({
             data: [
               {
-                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE).toString(),
+                id: generate(
+                  KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE,
+                ).toString(),
                 ...refWhere(commit.ref),
                 ...instanceData,
               },

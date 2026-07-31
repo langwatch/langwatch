@@ -14,9 +14,9 @@
  */
 
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { mapReasoningToProvider } from "./reasoningBoundary";
 import type { SupportedParameter } from "../modelProviders/customModel.schema";
 import { filterUnsupportedSamplingParams } from "../modelProviders/resolveSupportedParameters";
+import { mapReasoningToProvider } from "./reasoningBoundary";
 
 /**
  * Input type for building LLM config - accepts camelCase fields

@@ -29,7 +29,11 @@ describe("useProjectEventTypes", () => {
   });
 
   it("returns empty eventTypes when projectId is undefined", () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
 
     const { result } = renderHook(() =>
       useProjectEventTypes({ projectId: undefined }),
@@ -107,7 +111,11 @@ describe("useProjectEventTypes", () => {
   });
 
   it("disables the query when projectId is undefined", () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
 
     renderHook(() => useProjectEventTypes({ projectId: undefined }));
 
@@ -118,7 +126,11 @@ describe("useProjectEventTypes", () => {
   });
 
   it("disables the query when enabled is false even with a projectId", () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
 
     renderHook(() =>
       useProjectEventTypes({ projectId: "project-123", enabled: false }),

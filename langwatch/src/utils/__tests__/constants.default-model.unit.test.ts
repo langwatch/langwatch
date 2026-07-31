@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { DEFAULT_MODEL } from "../constants";
-import { getModelById } from "~/server/modelProviders/registry";
+import { describe, expect, it } from "vitest";
 import { getLatestOpenAIChatFlagship } from "~/server/modelProviders/getLatestFlagship";
+import { getModelById } from "~/server/modelProviders/registry";
+import { DEFAULT_MODEL } from "../constants";
 
 /**
  * `DEFAULT_MODEL` is auto-derived from the model registry, so drift is

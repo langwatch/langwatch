@@ -7,7 +7,7 @@
  * 2. Results are loaded and displayed correctly when the table renders
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";

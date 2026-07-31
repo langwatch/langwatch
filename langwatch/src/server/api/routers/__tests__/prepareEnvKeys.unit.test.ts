@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { prepareEnvKeys } from "../modelProviders.utils";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
+import { prepareEnvKeys } from "../modelProviders.utils";
 
 // prepareEnvKeys reads the credential names off the provider's keysSchema.
 // Providers whose credentials are valid in more than one combination wrap

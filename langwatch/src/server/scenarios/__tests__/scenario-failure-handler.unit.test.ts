@@ -10,8 +10,8 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
 import {
-  ScenarioInfraErrorCode,
   decodeScenarioError,
+  ScenarioInfraErrorCode,
 } from "../scenario-infra-error";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);

@@ -403,8 +403,9 @@ describe("codingAgentSpanFactsDispatch", () => {
         // shape the seam happened to stage.
         expect(
           dedup.makeId(
-            makeSpanReferencedEvent(first as SpanReceivedEvent) as
-              TraceProcessingEvent,
+            makeSpanReferencedEvent(
+              first as SpanReceivedEvent,
+            ) as TraceProcessingEvent,
           ),
         ).toBe(dedup.makeId(first));
       });

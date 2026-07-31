@@ -73,6 +73,7 @@ export async function applySeedRetention(
     organizationId,
     retentionDays,
     shouldWaitForCacheRollover = false,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: a no-op default for an optional logger callback.
     log = () => {},
   } = args;
   let hasChanged = false;

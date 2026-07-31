@@ -2,6 +2,12 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
+import {
+  compilePiiExceptPatterns,
+  matchesPiiException,
+  type ProtectedRange,
+  subtractProtectedRanges,
+} from "~/server/data-privacy/redaction/essentialPii";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
@@ -202,11 +208,77 @@ const codepointToCodeUnitConverter = (
   return (cp) => offsets[Math.max(0, Math.min(cp, offsets.length - 1))]!;
 };
 
-export const googleDLPClearPII = async (
-  currentObject: Record<string | number, any>,
-  lastKey: string | number,
-  piiRedactionLevel: PIIRedactionLevel,
-): Promise<void> => {
+/**
+ * Mask every DLP finding over `text`, skipping findings vetoed by a policy
+ * exception. DLP reports codepoint offsets against the original text; they are
+ * converted to code-unit indices once. Each mask replaces the range with the
+ * same number of code units ("✳" is a single BMP code unit), so code-unit
+ * indices derived from the original text stay valid on the accumulating copy.
+ */
+const maskDlpFindings = ({
+  text,
+  findings,
+  exceptions,
+}: {
+  text: string;
+  findings: google.privacy.dlp.v2.IFinding[];
+  exceptions: readonly RegExp[];
+}): { redacted: string; masked: number } => {
+  const toCodeUnit = codepointToCodeUnitConverter(text);
+  const ranged = findings.flatMap((finding) => {
+    const start = finding.location?.codepointRange?.start;
+    const end = finding.location?.codepointRange?.end;
+    if (start == null || end == null) return [];
+    return [
+      { finding, startIdx: toCodeUnit(+start), endIdx: toCodeUnit(+end) },
+    ];
+  });
+
+  // First pass: findings whose entire matched text matches a policy exception
+  // are known-safe formats (an internal id that merely looks like PII). Their
+  // ranges become protected so an overlapping finding cannot eat into them.
+  // `includeQuote` is set, but derive the matched text from the range over the
+  // ORIGINAL text as the fallback, so the veto never depends on the quote
+  // being echoed back.
+  const protectedRanges: ProtectedRange[] = ranged.flatMap(
+    ({ finding, startIdx, endIdx }) => {
+      const matchedText = finding.quote?.length
+        ? finding.quote
+        : text.substring(startIdx, endIdx);
+      return matchesPiiException(matchedText, exceptions)
+        ? [{ start: startIdx, end: endIdx }]
+        : [];
+    },
+  );
+
+  let redacted = text;
+  let masked = 0;
+  for (const { startIdx, endIdx } of ranged) {
+    for (const part of subtractProtectedRanges(
+      { start: startIdx, end: endIdx },
+      protectedRanges,
+    )) {
+      redacted =
+        redacted.substring(0, part.start) +
+        "✳".repeat(part.end - part.start) +
+        redacted.substring(part.end);
+      masked++;
+    }
+  }
+  return { redacted, masked };
+};
+
+export const googleDLPClearPII = async ({
+  currentObject,
+  lastKey,
+  piiRedactionLevel,
+  exceptPatterns,
+}: {
+  currentObject: Record<string | number, any>;
+  lastKey: string | number;
+  piiRedactionLevel: PIIRedactionLevel;
+  exceptPatterns?: readonly string[];
+}): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
   const [text, remaining] = [
     currentObject[lastKey].slice(0, 250_000),
@@ -214,25 +286,12 @@ export const googleDLPClearPII = async (
   ];
 
   const findings = await dlpCheck(text, piiRedactionLevel);
-  // DLP reports codepoint offsets against the original text; convert them to
-  // code-unit indices once. Each mask below replaces the range with the same
-  // number of code units ("✳" is a single BMP code unit), so code-unit indices
-  // derived from the original text stay valid on the accumulating copy.
-  const toCodeUnit = codepointToCodeUnitConverter(text);
-  let redacted = text;
-  for (const finding of findings) {
-    const start = finding.location?.codepointRange?.start;
-    const end = finding.location?.codepointRange?.end;
-    if (start != null && end != null) {
-      const startIdx = toCodeUnit(+start);
-      const endIdx = toCodeUnit(+end);
-      redacted =
-        redacted.substring(0, startIdx) +
-        "✳".repeat(endIdx - startIdx) +
-        redacted.substring(endIdx);
-    }
-  }
-  if (findings.length > 0) {
+  const { redacted, masked } = maskDlpFindings({
+    text,
+    findings,
+    exceptions: compilePiiExceptPatterns(exceptPatterns ?? []),
+  });
+  if (masked > 0) {
     currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
   }
 };
@@ -349,4 +408,22 @@ export type PIICheckOptions = {
    * only the analysis-service identifiers a team selected.
    */
   entities?: readonly string[];
+  /**
+   * The policy's do-not-redact exception patterns (raw source strings). Only
+   * `defaultBatchClearPII`'s google_dlp branch actually reads this: DLP
+   * findings carry the matched text, so a finding fully covered by an
+   * exception can be vetoed before masking (see maskDlpFindings above).
+   * `mainMethod: "presidio"` — the one every strict/custom analysis-service
+   * call currently uses — ignores this field entirely: Presidio's batch
+   * endpoint returns pre-anonymized text with no positions or matched text to
+   * veto against. This is why a resolved policy with exceptions narrows the
+   * Presidio call to just the strict-only entities (names, locations) instead
+   * of trying to pass exceptions through it (see lambdaAfterNative in
+   * span-pii-redaction.service.ts) — narrowing shrinks WHICH entities are
+   * exposed to the gap, it does not close it. A name/location match is never
+   * protected by an exception; only entities the native pass handles are
+   * (locked in by span-pii-redaction.nativeScopedPolicy.test.ts's
+   * "strict-only exception scoping" tests).
+   */
+  exceptPatterns?: readonly string[];
 };

@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,8 +33,7 @@ vi.mock("~/hooks/useReducedMotion", () => ({
 // The Langy announcement starts its conversation in place rather than routing.
 const askLangy = vi.fn();
 vi.mock("~/features/langy/stores/langyStore", () => ({
-  useLangyStore: (selector: (s: unknown) => unknown) =>
-    selector({ askLangy }),
+  useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
 }));
 
 // The automations banner navigates via the compat router on CTA click. One
@@ -152,7 +157,9 @@ describe("<HomePageBanners />", () => {
     it("routes in-app announcements through SPA navigation", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Explore automations/ }),
+      );
 
       expect(routerPush).toHaveBeenCalledWith("/my-project/automations");
     });
@@ -160,7 +167,9 @@ describe("<HomePageBanners />", () => {
     it("keeps the announcement on the page, so the way back is not lost", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Explore automations/ }),
+      );
 
       // Still on screen: following a link is interest, not "seen it, thanks".
       expect(

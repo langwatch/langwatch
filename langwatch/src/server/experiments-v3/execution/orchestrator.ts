@@ -10,6 +10,7 @@
  * 6. Checks abort flags between executions
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -33,9 +34,9 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
@@ -52,17 +53,18 @@ import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
-  mapErrorEvent,
   mapNlpEvent,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
-import type {
-  EvaluationV3Event,
-  ExecutionCell,
-  ExecutionScope,
-  ExecutionSummary,
+import {
+  type EvaluationV3Event,
+  type ExecutionCell,
+  type ExecutionScope,
+  type ExecutionSummary,
+  UNNAMED_FAILURE,
 } from "./types";
 import { buildCellWorkflow } from "./workflowBuilder";
 
@@ -264,7 +266,7 @@ export const generateCells = (
   // visible to the user as a silent no-op with "No verdict yet" everywhere.
   const expandComparisonDeps = (id: string): string[] => {
     const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (!t || t.type !== "evaluator") return [id];
+    if (t?.type !== "evaluator") return [id];
     const deps = (toComparisonConfig(t)?.variants ?? []).filter(
       (v): v is string => !!v,
     );
@@ -1283,7 +1285,11 @@ export async function* executeCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 
@@ -1356,7 +1362,18 @@ export async function* executeWorkflowCell(
     let totalCost = 0;
     let sawCost = false;
     let targetFailed = false;
-    let targetError: string | undefined;
+    /**
+     * The failing state, captured whole.
+     *
+     * One assignment, not three latches: message, code and upstream status
+     * describe ONE failure. Latching them independently (`ex.error ?? previous`
+     * and so on) let a state carrying only `error` be followed by one carrying
+     * only `error_type`, yielding a `domainError` whose code came from one node
+     * and whose message came from another.
+     */
+    let targetFailure:
+      | { error?: string; errorType?: string; upstreamStatus?: number }
+      | undefined;
     let durationMs: number | undefined;
     let finalTraceId = traceId;
     const evaluatorEvents: EvaluationV3Event[] = [];
@@ -1376,7 +1393,11 @@ export async function* executeWorkflowCell(
         }
         if (ex?.status === "error") {
           targetFailed = true;
-          targetError = ex.error ?? targetError;
+          targetFailure = {
+            error: ex.error,
+            errorType: ex.error_type,
+            upstreamStatus: ex.upstream_status,
+          };
         }
         continue;
       }
@@ -1417,6 +1438,11 @@ export async function* executeWorkflowCell(
               outputs: execution_state.outputs,
               cost: execution_state.cost,
               error: execution_state.error,
+              // The coded half of the failure — without it the evaluator cell
+              // renders the engine's raw message verbatim.
+              nodeErrorCode: execution_state.error_type,
+              upstream_status: execution_state.upstream_status,
+              trace_id: execution_state.trace_id ?? finalTraceId,
             },
           ),
         );
@@ -1432,9 +1458,22 @@ export async function* executeWorkflowCell(
       cost: sawCost ? totalCost : undefined,
       duration: durationMs,
       traceId: finalTraceId,
+      // The engine's own words when it gave any; otherwise the marker, so the
+      // client's fallback copy owns what the customer reads rather than a
+      // sentence written here.
       error: targetFailed
-        ? (targetError ?? "Workflow execution failed")
+        ? (targetFailure?.error ?? UNNAMED_FAILURE)
         : undefined,
+      ...(targetFailed && targetFailure?.errorType
+        ? {
+            domainError: nodeErrorToDomainError({
+              errorType: targetFailure.errorType,
+              message: targetFailure.error,
+              upstreamStatus: targetFailure.upstreamStatus,
+              traceId: finalTraceId,
+            }),
+          }
+        : {}),
     };
 
     for (const evaluatorEvent of evaluatorEvents) {
@@ -1445,7 +1484,11 @@ export async function* executeWorkflowCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Workflow cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 
@@ -1701,6 +1744,16 @@ export const buildTargetMetadata = ({
  * falsy target outputs (`false`, `0`, `""`) must persist as
  * `{ output: value }` (only null/undefined become a null `predicted`), and
  * error events must land as predicted-null rows carrying the error message.
+ *
+ * The row stores the failure's CODE (`domainError`) as well as its string.
+ * This row is what the grid renders after a reload, so a row holding only the
+ * engine's raw text (`httpblock: Post "…": no such host`) meant the customer
+ * read registry copy live and raw Go on refresh — the leak this event's
+ * `domainError` closes only for as long as the tab stays open.
+ *
+ * A thrown failure's own message is NOT stored. Nothing about it is
+ * customer-safe, and this column is customer-visible; it belongs on the log
+ * line at the catch site, next to the trace id this row also carries.
  */
 export const buildTargetResultDispatch = ({
   tenantId,
@@ -1732,6 +1785,7 @@ export const buildTargetResultDispatch = ({
       cost: event.cost ?? null,
       duration: event.duration ?? null,
       error: event.error ?? null,
+      domainError: event.domainError ?? null,
       traceId: event.traceId ?? null,
       occurredAt,
     };
@@ -1752,8 +1806,12 @@ export const buildTargetResultDispatch = ({
       predicted: null,
       cost: null,
       duration: null,
+      // The wire message: a handled failure's code, or the unnamed-failure
+      // marker. Both are safe to read back; the thrown error's own words are
+      // not, and are logged instead.
       error: event.message,
-      traceId: null,
+      domainError: event.domainError ?? null,
+      traceId: event.traceId ?? null,
       occurredAt,
     };
   }
@@ -2600,7 +2658,9 @@ const getLoadedDataForTarget = (
           agent.workflowId ??
           (agent.config as { workflow_id?: string }).workflow_id;
         const workflow = linkedWorkflowId
-          ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
+          ? loadedWorkflows?.get(
+              workflowLoadKey({ workflowId: linkedWorkflowId }),
+            )
           : undefined;
         return { agent, workflow };
       }

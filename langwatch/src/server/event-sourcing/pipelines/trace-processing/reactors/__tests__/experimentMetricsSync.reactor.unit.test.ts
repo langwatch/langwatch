@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { createTenantId } from "../../../../domain/tenantId";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "../../schemas/constants";
+import type { SpanReceivedEvent } from "../../schemas/events";
 import {
   createExperimentMetricsSyncReactor,
   type ExperimentMetricsSyncReactorDeps,
 } from "../experimentMetricsSync.reactor";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { SPAN_RECEIVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_VERSION_LATEST } from "../../schemas/constants";
-import type { SpanReceivedEvent } from "../../schemas/events";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -20,7 +23,9 @@ function createDeps(): ExperimentMetricsSyncReactorDeps & {
   };
 }
 
-function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
+function createTraceSummaryState(
+  overrides: Partial<TraceSummaryData> = {},
+): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -219,7 +224,9 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
   describe("when computeExperimentRunMetrics fails", () => {
     it("logs warning and does not throw", async () => {
       const deps = createDeps();
-      deps.computeExperimentRunMetrics.mockRejectedValue(new Error("Dispatch error"));
+      deps.computeExperimentRunMetrics.mockRejectedValue(
+        new Error("Dispatch error"),
+      );
       const reactor = createExperimentMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({

@@ -116,6 +116,31 @@ describe("createCommandExecutor", () => {
     sink,
   });
 
+  describe("when the caller was invoked as one of the two bin names", () => {
+    it("builds the program with the CALLER's bin, not the daemon's own", async () => {
+      // One daemon serves both `lw` and `langwatch`, so its own argv[1] is
+      // whichever bin happened to spawn it. Titling help and every commander
+      // error (the root sets `.showHelpAfterError()`) from that showed an `lw`
+      // caller `Usage: langwatch …`.
+      mockedBuildProgram.mockReturnValue(okProgram());
+
+      const executor = createCommandExecutor({
+        window,
+        telemetry: noopTelemetry,
+        requestTimeoutMs: 5_000,
+      });
+
+      await executor({
+        ...request({ requestId: "r0", cwd: dirA, sink: collect().sink }),
+        bin: "/usr/local/bin/lw",
+      }).completed;
+
+      expect(mockedBuildProgram).toHaveBeenCalledWith({
+        bin: "/usr/local/bin/lw",
+      });
+    });
+  });
+
   describe("when the caller's working directory no longer exists", () => {
     it("rejects the server-facing promise, so the client re-runs in-process", async () => {
       // ExecutionWindow.acquire rejects (chdir throws) before any output is

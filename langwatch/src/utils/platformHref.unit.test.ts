@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isPreciseResourceHref, toRelativeSameOriginHref } from "./platformHref";
+import {
+  isPreciseResourceHref,
+  toRelativeSameOriginHref,
+} from "./platformHref";
 
 describe("toRelativeSameOriginHref", () => {
   describe("given a url on the same origin", () => {
@@ -65,7 +68,10 @@ describe("toRelativeSameOriginHref", () => {
   describe("given input that cannot be parsed as a url", () => {
     it("returns null rather than throwing", () => {
       expect(
-        toRelativeSameOriginHref({ url: "not a url", origin: "https://app.langwatch.ai" }),
+        toRelativeSameOriginHref({
+          url: "not a url",
+          origin: "https://app.langwatch.ai",
+        }),
       ).toBeNull();
     });
 
@@ -83,9 +89,9 @@ describe("toRelativeSameOriginHref", () => {
 describe("isPreciseResourceHref", () => {
   describe("given a bare surface index (no extra path, no query)", () => {
     it("is not precise", () => {
-      expect(isPreciseResourceHref("https://app.langwatch.ai/demo/simulations")).toBe(
-        false,
-      );
+      expect(
+        isPreciseResourceHref("https://app.langwatch.ai/demo/simulations"),
+      ).toBe(false);
       expect(isPreciseResourceHref("/demo/simulations")).toBe(false);
     });
   });
@@ -99,12 +105,12 @@ describe("isPreciseResourceHref", () => {
   describe("given a resource address carried entirely in the query string", () => {
     it("is precise", () => {
       expect(
-        isPreciseResourceHref(
-          "/demo/simulations/set_1/batch_1?openRun=run_1",
-        ),
+        isPreciseResourceHref("/demo/simulations/set_1/batch_1?openRun=run_1"),
       ).toBe(true);
       expect(
-        isPreciseResourceHref("/demo/agents?drawer.open=agentCodeEditor&drawer.agentId=ag_1"),
+        isPreciseResourceHref(
+          "/demo/agents?drawer.open=agentCodeEditor&drawer.agentId=ag_1",
+        ),
       ).toBe(true);
     });
   });

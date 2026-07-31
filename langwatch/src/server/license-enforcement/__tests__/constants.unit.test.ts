@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { LIMIT_TYPE_LABELS, LIMIT_TYPE_DISPLAY_LABELS } from "../constants";
-import { limitTypes, type LimitType } from "../types";
+import { describe, expect, it } from "vitest";
+import { LIMIT_TYPE_DISPLAY_LABELS, LIMIT_TYPE_LABELS } from "../constants";
+import { type LimitType, limitTypes } from "../types";
 
 describe("LIMIT_TYPE_LABELS", () => {
   it("provides a label for every LimitType", () => {

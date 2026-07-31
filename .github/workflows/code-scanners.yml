@@ -1,0 +1,229 @@
+name: code-scanners
+
+# The deterministic scanners that were configured but never executed.
+#
+# `.coderabbit.yaml` has enabled gitleaks and pointed semgrep at
+# `.semgrep/langwatch.yml` for a long time, and `coderabbit-config-check.yml`
+# proves that ruleset PARSES — but nothing has ever run either against the
+# repository except CodeRabbit itself, once per PR, as a comment. Same shape as
+# the ast-grep ruleset before it moved to /.ast-grep/.
+#
+# Everything here is DIFF-SCOPED. Measured baselines at the time of writing:
+#
+#   semgrep      347  (290 clickhouse-no-qualified-table, 57 pii-in-logger-call)
+#
+# A full-tree gate at those numbers would be switched off within a day, and
+# `.coderabbit.yaml` already frames these rules as "flag ONLY newly added or
+# modified lines". `--baseline-commit` is semgrep's own implementation of
+# exactly that, so the rule text and the gate finally agree.
+#
+# Versions are pinned to match coderabbit-config-check.yml — rule-matching
+# behaviour is version-sensitive. Bump them together.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_dispatch:
+  schedule:
+    # The dependency scanners below are report-only on a PR because they fail
+    # on upstream advisories nobody in the PR caused. This is where they get
+    # looked at on their own schedule instead.
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-scanners-${{ github.ref }}
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  secrets:
+    name: secrets (gitleaks + trufflehog)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          # Both scanners diff a commit range, which needs the range present.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A committed credential is never acceptable, so this is blocking from
+      # the start rather than phased. #5708 is the precedent.
+      #
+      # The binary, not gitleaks-action: that action requires a paid
+      # GITLEAKS_LICENSE for organisation-owned repositories and fails without
+      # one. The CLI is Apache-2.0 and unrestricted.
+      - name: gitleaks
+        run: |
+          version=8.30.0
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks --version
+          # Scoped to this branch's own commits, not all history. A repository
+          # this age has rotated credentials still sitting in old objects
+          # (#5708); scanning everything would fail every PR for something no
+          # PR author did, and the gate would be off within a day.
+          # --verbose because without it gitleaks prints only "leaks found: N"
+          # and nothing about WHERE, which makes a blocking gate impossible to
+          # act on from the log alone. --redact keeps the matched value itself
+          # out of CI output; the file, line, rule id and fingerprint still
+          # print, which is what an author needs. Rule + path is also exactly
+          # what an entry in `.gitleaks.toml` is keyed on.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.base_ref }}"
+            git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+            gitleaks git --redact --no-banner --no-color --verbose --log-opts="origin/$BASE..HEAD" .
+          else
+            gitleaks git --redact --no-banner --no-color --verbose --log-opts="-1" .
+          fi
+
+      # gitleaks matches patterns; trufflehog additionally VERIFIES a candidate
+      # against the provider, so it catches live credentials that do not match
+      # a known shape. --only-verified keeps it to secrets proven live, which
+      # is what makes it safe to block on.
+      #
+      # The binary rather than trufflesecurity/trufflehog, for the same reason
+      # as gitleaks above: every other `uses:` in this repo is a first-party
+      # actions/* or an already-approved pin, and this workflow's first run
+      # ended in startup_failure with the third-party action as its only
+      # unapproved reference. A pinned release tarball needs no allowlist.
+      - name: trufflehog
+        run: |
+          version=3.96.0
+          curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${version}/trufflehog_${version}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin trufflehog
+          trufflehog --version
+          # Same scoping as gitleaks. --only-verified means it blocks only on a
+          # credential the provider confirms is live, so a historical rotated
+          # one does not stop the queue.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            trufflehog git "file://$(pwd)" \
+              --since-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" \
+              --only-verified --fail --no-update
+          else
+            trufflehog git "file://$(pwd)" --max-depth=1 --only-verified --fail --no-update
+          fi
+
+  sast:
+    name: semgrep (changed lines)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned semgrep
+        run: pip install "semgrep==1.164.0"
+
+      # The ruleset must parse before anything else is believable — this is the
+      # check coderabbit-config-check.yml already does, repeated here so this
+      # workflow fails honestly rather than scanning with a broken config.
+      - name: Ruleset validates
+        run: semgrep --validate --config .semgrep/langwatch.yml
+
+      # REPORT-ONLY for now, for two measured reasons — promote to --error
+      # once both are dealt with:
+      #
+      #  1. `pii-in-logger-call` counts `userId` as PII, but logging a raw
+      #     userId is a deliberate decision here (opaque id, and the identity
+      #     link is deleted with the account). 57 of the 347 findings are that
+      #     rule. Drop userId from the rule's field list before this blocks,
+      #     or the gate argues with a policy that already exists.
+      #
+      #  2. --baseline-commit attributes a finding to whoever last touched the
+      #     LINE. This branch reformats the repository, so 4 untouched
+      #     pii-in-logger-call sites read as newly introduced. Any baseline
+      #     diff is unreliable across a format sweep; it becomes reliable again
+      #     once that sweep is on main.
+      - name: Scan (diff-scoped on PRs, full tree elsewhere)
+        continue-on-error: true
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            semgrep --config .semgrep/langwatch.yml --quiet \
+              --baseline-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" .
+          else
+            semgrep --config .semgrep/langwatch.yml --quiet .
+          fi
+
+  # Two jobs rather than one, because they are on different tiers and a single
+  # job would not let them be. A failed step aborts the rest of its job even
+  # under `continue-on-error`, so the first version of this — one report-only
+  # job — stopped at govulncheck and never ran pip-audit at all. A reporter
+  # that reports the first thing only is not a reporter.
+
+  go-advisories:
+    name: govulncheck (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # BLOCKING, on the same "clean baseline earns a gate" rule the Biome
+      # rules in this branch follow. The baseline is zero as of the go.mod bump
+      # that accompanies this file — `go 1.26.2 -> 1.26.5` plus grpc, x/text
+      # and the otel v1 family, which together cleared all 13 findings this
+      # workflow reported on its first run (two XSS in html/template and an
+      # HTTP/2 infinite loop among them).
+      #
+      # Blocking is affordable here specifically because govulncheck is
+      # reachability-based: it fires only when a vulnerable symbol is actually
+      # called from our code, not merely present in the module graph. An
+      # advisory against a dependency we do not call stays quiet. So a failure
+      # means a reachable vulnerability, which is worth stopping for — and the
+      # remedy is the same version bump this commit demonstrates.
+      - name: govulncheck
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 \
+            ./services/... ./pkg/... ./cmd/... ./tools/...
+
+  python-advisories:
+    name: pip-audit (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+        with:
+          python-version: "3.12"
+
+      # Report-only, unlike govulncheck above, because pip-audit has no
+      # reachability analysis: it flags an advisory against anything in the
+      # resolved set whether or not a line of our code can reach it. Blocking
+      # on that stops unrelated work for a reason its author cannot fix. The
+      # weekly cron at the top of this file is where these get actioned.
+      #
+      # `continue-on-error` sits on the step, not the job, so every requirements
+      # file is still audited and the whole report lands in the log.
+      - name: pip-audit
+        continue-on-error: true
+        run: |
+          pip install pip-audit==2.9.0
+          for req in $(git ls-files '*requirements*.txt' 'python-sdk/pyproject.toml' 'langevals/pyproject.toml'); do
+            echo "==> $req"
+            pip-audit -r "$req" || true
+          done

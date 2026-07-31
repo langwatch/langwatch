@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
-import { router } from "./routes";
 import { OuterProviders } from "./AppProviders";
-import { setRouterInstance } from "./utils/compat/next-router";
+import { router } from "./routes";
 import { registerChunkReloadListener } from "./utils/chunkReload";
+import { setRouterInstance } from "./utils/compat/next-router";
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
 
@@ -25,5 +25,5 @@ createRoot(container).render(
     <Suspense fallback={null}>
       <RouterProvider router={router} />
     </Suspense>
-  </OuterProviders>
+  </OuterProviders>,
 );

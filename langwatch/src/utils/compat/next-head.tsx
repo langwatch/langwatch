@@ -2,7 +2,12 @@
  * Compatibility layer: next/head → react-helmet-async
  * Provides a simple Head component that updates document head.
  */
-import { Fragment, isValidElement, useLayoutEffect, type ReactNode } from "react";
+import {
+  Fragment,
+  isValidElement,
+  type ReactNode,
+  useLayoutEffect,
+} from "react";
 
 interface HeadProps {
   children?: ReactNode;
@@ -61,10 +66,7 @@ export default function Head({ children }: HeadProps) {
     if (children) {
       const childArray = Array.isArray(children) ? children : [children];
       for (const child of childArray) {
-        if (
-          isValidElement(child) &&
-          child.type === "title"
-        ) {
+        if (isValidElement(child) && child.type === "title") {
           const props = child.props as { children?: ReactNode } | undefined;
           const text = extractTitleText(props?.children).trim();
           if (text.length > 0) document.title = text;

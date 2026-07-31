@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
@@ -35,20 +35,14 @@ function createMockClickHouse(jsonResult: unknown[] = []) {
   return { query: queryFn, command: vi.fn() } as unknown as ClickHouseClient;
 }
 
-function setQueryResult(
-  clickhouse: ClickHouseClient,
-  result: unknown[],
-) {
+function setQueryResult(clickhouse: ClickHouseClient, result: unknown[]) {
   const jsonFn = vi.fn().mockResolvedValue(result);
   (clickhouse.query as ReturnType<typeof vi.fn>).mockResolvedValue({
     json: jsonFn,
   });
 }
 
-function setQueryResults(
-  clickhouse: ClickHouseClient,
-  results: unknown[][],
-) {
+function setQueryResults(clickhouse: ClickHouseClient, results: unknown[][]) {
   const queryFn = clickhouse.query as ReturnType<typeof vi.fn>;
   for (const result of results) {
     const jsonFn = vi.fn().mockResolvedValue(result);
@@ -314,8 +308,12 @@ describe("SimulationClickHouseRepository", () => {
 
         const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
           .calls[0]![0] as { query: string };
-        expect(call.query).toContain("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
-        expect(call.query).toContain("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
+        expect(call.query).toContain(
+          "toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})",
+        );
+        expect(call.query).toContain(
+          "toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})",
+        );
       });
     });
 
@@ -422,9 +420,7 @@ describe("SimulationClickHouseRepository", () => {
               NormalizedSetId: "__internal__b__suite",
             },
           ],
-          [
-            makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" }),
-          ],
+          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
         ]);
 
         const result = await repo.getRunDataForAllSuites({
@@ -589,7 +585,13 @@ describe("SimulationClickHouseRepository", () => {
           setQueryResults(clickhouse, [
             [{ TotalBatchCount: "1" }],
             // Stored as STALLED, so it is not counted in RunningCount…
-            [makeBatchRow({ RunningCount: "0", TotalCount: "1", PassCount: "0" })],
+            [
+              makeBatchRow({
+                RunningCount: "0",
+                TotalCount: "1",
+                PassCount: "0",
+              }),
+            ],
             [
               // …but the item is still unfinished and stale, so it re-derives
               // STALLED at read time; RunningCount - stalledCount would go
@@ -647,10 +649,7 @@ describe("SimulationClickHouseRepository", () => {
 
     describe("when startDate and endDate are provided", () => {
       it("passes date parameters for partition pruning", async () => {
-        setQueryResults(clickhouse, [
-          [{ TotalBatchCount: "0" }],
-          [],
-        ]);
+        setQueryResults(clickhouse, [[{ TotalBatchCount: "0" }], []]);
 
         await repo.getBatchHistoryForScenarioSet({
           projectId: "proj-1",

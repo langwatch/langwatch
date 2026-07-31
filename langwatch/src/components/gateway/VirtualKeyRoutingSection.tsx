@@ -1,8 +1,7 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
-
-import { SmallLabel } from "../SmallLabel";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Radio, RadioGroup } from "~/components/ui/radio";
+import { SmallLabel } from "../SmallLabel";
 
 /**
  * What happens when the provider serving a request fails. One decision

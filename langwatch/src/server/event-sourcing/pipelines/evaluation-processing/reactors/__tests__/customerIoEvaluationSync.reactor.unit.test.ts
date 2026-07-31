@@ -21,7 +21,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -134,7 +134,10 @@ describe("customerIoEvaluationSync reactor", () => {
     it("returns cio-eval-sync-{projectId}-{evaluationId}", () => {
       const deps = createDeps();
       const reactor = createCustomerIoEvaluationSyncReactor(deps);
-      const event = createEvent({ tenantId: "project-42", aggregateId: "eval-99" });
+      const event = createEvent({
+        tenantId: "project-42",
+        aggregateId: "eval-99",
+      });
 
       const jobId = reactor.options!.makeJobId!({
         event,
@@ -154,10 +157,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -252,10 +252,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
@@ -276,10 +273,7 @@ describe("customerIoEvaluationSync reactor", () => {
       });
       const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-      await reactor.handle(
-        createEvent(),
-        createContext(createFoldState()),
-      );
+      await reactor.handle(createEvent(), createContext(createFoldState()));
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
       expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();

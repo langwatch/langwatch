@@ -135,22 +135,21 @@ describe("evaluationAnalytics fold-equivalence across the read-back boundary", (
   });
 
   describe("given an evaluation folded from its real lifecycle events", () => {
-    describe.each(SPLIT_POINTS)(
-      "when the fold is interrupted after event %i and resumed from the committed row",
-      (splitAt) => {
-        const before = LIFECYCLE.slice(0, splitAt);
-        const after = LIFECYCLE.slice(splitAt);
+    describe.each(
+      SPLIT_POINTS,
+    )("when the fold is interrupted after event %i and resumed from the committed row", (splitAt) => {
+      const before = LIFECYCLE.slice(0, splitAt);
+      const after = LIFECYCLE.slice(splitAt);
 
-        it("reaches the same row as the fold that never lost its state", () => {
-          const committed = foldAll(before, projection.init());
+      it("reaches the same row as the fold that never lost its state", () => {
+        const committed = foldAll(before, projection.init());
 
-          const uninterrupted = foldAll(after, committed);
-          const resumed = foldAll(after, roundTrip(committed));
+        const uninterrupted = foldAll(after, committed);
+        const resumed = foldAll(after, roundTrip(committed));
 
-          expect(project(resumed)).toEqual(project(uninterrupted));
-        });
-      },
-    );
+        expect(project(resumed)).toEqual(project(uninterrupted));
+      });
+    });
 
     it("measures the retry's real duration after resuming from the row", () => {
       // Sanity anchor for the property above: the terminal event that lands

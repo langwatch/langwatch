@@ -57,11 +57,7 @@ export function ScopeFilter({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          data-testid="scope-filter"
-        >
+        <Button size="sm" variant="outline" data-testid="scope-filter">
           <HStack gap={1}>
             <Text>{label}</Text>
             <ChevronDown size={14} />

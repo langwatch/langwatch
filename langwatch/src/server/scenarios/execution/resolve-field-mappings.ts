@@ -101,7 +101,9 @@ function resolveMapping({
 }
 
 function extractLastUserMessage(agentInput: AgentInput): string {
-  const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
+  const lastUserMessage = agentInput.messages.findLast(
+    (m) => m.role === "user",
+  );
   if (!lastUserMessage) return "";
   return typeof lastUserMessage.content === "string"
     ? lastUserMessage.content

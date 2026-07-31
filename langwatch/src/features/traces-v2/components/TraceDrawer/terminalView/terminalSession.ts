@@ -18,7 +18,9 @@ export interface TimelinePoint {
   elapsedMs: number;
 }
 
-export function buildEntryTimeline(entries: TranscriptEntry[]): TimelinePoint[] {
+export function buildEntryTimeline(
+  entries: TranscriptEntry[],
+): TimelinePoint[] {
   const startMs = entries[0]?.atMs;
   let cumulativeTokens = 0;
   let cumulativeCostUsd = 0;

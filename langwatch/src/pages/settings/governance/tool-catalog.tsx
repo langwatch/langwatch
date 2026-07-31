@@ -1,23 +1,15 @@
-import {
-  Heading,
-  HStack,
-  Spacer,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Heading, HStack, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import type { AiToolEntry } from "~/components/me/tiles/types";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import type { AiToolEntry } from "~/components/me/tiles/types";
 
 /**
  * Admin AI Tool Catalog editor - Phase 7 B6+B9 wired surface.
@@ -92,12 +84,8 @@ function ToolCatalogPage() {
           <Tabs.Content value="tool-tiles" paddingTop={4}>
             <ToolCatalogEditor
               organizationId={organization.id}
-              onAddTile={(type) =>
-                setDrawerState({ mode: "create", type })
-              }
-              onEditTile={(entry) =>
-                setDrawerState({ mode: "edit", entry })
-              }
+              onAddTile={(type) => setDrawerState({ mode: "create", type })}
+              onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
             />
           </Tabs.Content>
           <Tabs.Content value="ingestion-templates" paddingTop={4}>

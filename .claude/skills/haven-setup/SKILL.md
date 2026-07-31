@@ -7,7 +7,7 @@ argument-hint: "[--with-observability] [--managed-db] [--foreground]"
 
 # Haven Setup — thuishaven local dev stack
 
-You are bringing up the LangWatch app via haven (ADR-048), not raw `pnpm dev`. Read `dev/haven.mk` and the "Local dev by hostname" section of the root `CLAUDE.md` if you need the command reference — this skill is the field-tested runbook on top of that, including failure modes that are NOT in the docs yet.
+You are bringing up the LangWatch app via haven, not raw `pnpm dev`. Read `dev/haven.mk` and the "Local dev by hostname" section of the root `CLAUDE.md` if you need the command reference — this skill is the field-tested runbook on top of that, including failure modes that are NOT in the docs yet.
 
 ## Step 0: Is it already running?
 
@@ -82,7 +82,7 @@ install -m0755 opencode ~/.local/bin/opencode   # confirm this dir is on $PATH f
 rm -f opencode opencode.tar.gz
 ```
 
-**Even with `opencode` installed and every DNS issue fixed, the chat can still hang until `AGENT_CHAT_TIMEOUT_MS` (120s) with no visible error** — symptom: worker creates fine (202 on `/worker/create`), SSE connects fine, but the panel sits on "Starting up…" / "Reconnecting to the agent…" forever. Root cause: the per-worker egress adapter (`services/langyagent/adapters/egress/enforcing.go`, ADR-043) enforces `EgressRequireTLS` by default — "only opaque CONNECT :443 tunnels; cleartext forwards... are refused" — and the worker's own `OPENAI_BASE_URL` points at the manager's LOCAL loopback relay over plain `http://` (not `:443`/TLS), so its own legitimate LLM call gets refused by this rung. `NO_PROXY` is supposed to route this call around the egress proxy entirely (`127.0.0.1` is in the list), but something in opencode's Bun runtime still routes it through — not fully root-caused, just confirmed as the trigger. Confirm this is the failure (not DNS, not a missing binary) by tailing opencode's own **unbuffered** per-session log — do NOT rely on `server.log` here, see Gotcha 5:
+**Even with `opencode` installed and every DNS issue fixed, the chat can still hang until `AGENT_CHAT_TIMEOUT_MS` (120s) with no visible error** — symptom: worker creates fine (202 on `/worker/create`), SSE connects fine, but the panel sits on "Starting up…" / "Reconnecting to the agent…" forever. Root cause: the per-worker egress adapter (`services/langyagent/adapters/egress/enforcing.go`, ADR-076) enforces `EgressRequireTLS` by default — "only opaque CONNECT :443 tunnels; cleartext forwards... are refused" — and the worker's own `OPENAI_BASE_URL` points at the manager's LOCAL loopback relay over plain `http://` (not `:443`/TLS), so its own legitimate LLM call gets refused by this rung. `NO_PROXY` is supposed to route this call around the egress proxy entirely (`127.0.0.1` is in the list), but something in opencode's Bun runtime still routes it through — not fully root-caused, just confirmed as the trigger. Confirm this is the failure (not DNS, not a missing binary) by tailing opencode's own **unbuffered** per-session log — do NOT rely on `server.log` here, see Gotcha 5:
 
 ```bash
 find ~/.langwatch/portless/langyagent -iname opencode.log 2>/dev/null | xargs tail -f

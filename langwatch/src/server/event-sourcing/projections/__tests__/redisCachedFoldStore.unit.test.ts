@@ -220,7 +220,6 @@ describe("RedisCachedFoldStore", () => {
       expect(redis.values.get(CACHE_KEY)?.ttlSeconds).toBe(3_600);
     });
 
-
     it("records the state version so confirmation has something to compare", async () => {
       const redis = createRedis();
       const { store } = createStore(redis);
@@ -355,7 +354,9 @@ describe("RedisCachedFoldStore", () => {
         const before = await dedupUnavailableCount("cache_miss");
 
         const redis = createRedis();
-        const inner = createDurableInnerStore({ appliedEventIds: ["e1", "e2"] });
+        const inner = createDurableInnerStore({
+          appliedEventIds: ["e1", "e2"],
+        });
         const { store } = createStore(redis, inner);
 
         const result = await store.getWithApplied("agg-1", {

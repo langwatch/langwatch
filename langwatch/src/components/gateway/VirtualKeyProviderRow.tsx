@@ -1,17 +1,10 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { Checkbox } from "~/components/ui/checkbox";
-import { ProviderScopeChips } from "../settings/ProviderScopeChips";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { ProviderScopeChips } from "../settings/ProviderScopeChips";
 
 import type {
   EligibleModelProvider,

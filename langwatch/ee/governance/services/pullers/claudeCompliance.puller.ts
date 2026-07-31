@@ -20,8 +20,8 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 import {
-  HttpPollingPullerAdapter,
   type HttpPollingConfig,
+  HttpPollingPullerAdapter,
 } from "./httpPollingPullerAdapter";
 import type { PullResult, PullRunOptions } from "./pullerAdapter";
 

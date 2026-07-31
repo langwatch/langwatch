@@ -4,7 +4,15 @@
  * Integration tests for Secrets tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer with a real database.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { decrypt } from "../../../../utils/encryption";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -43,7 +51,9 @@ describe("Secrets Endpoints", () => {
   });
 
   afterAll(async () => {
-    await prisma.projectSecret.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.projectSecret
+      .deleteMany({ where: { projectId } })
+      .catch(() => {});
   });
 
   describe("create", () => {
@@ -141,8 +151,16 @@ describe("Secrets Endpoints", () => {
     describe("when listing secrets for a project", () => {
       // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("returns secrets sorted by name without values", async () => {
-        await caller.secrets.create({ projectId, name: "ZEBRA_KEY", value: "v1" });
-        await caller.secrets.create({ projectId, name: "ALPHA_KEY", value: "v2" });
+        await caller.secrets.create({
+          projectId,
+          name: "ZEBRA_KEY",
+          value: "v1",
+        });
+        await caller.secrets.create({
+          projectId,
+          name: "ALPHA_KEY",
+          value: "v2",
+        });
 
         const result = await caller.secrets.list({ projectId });
 

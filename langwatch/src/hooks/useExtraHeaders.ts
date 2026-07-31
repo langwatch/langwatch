@@ -52,9 +52,7 @@ export function useExtraHeaders({
 
   const toggleExtraHeaderConcealed = useCallback((index: number) => {
     setExtraHeaders((prev) =>
-      prev.map((h, i) =>
-        i === index ? { ...h, concealed: !h.concealed } : h,
-      ),
+      prev.map((h, i) => (i === index ? { ...h, concealed: !h.concealed } : h)),
     );
   }, []);
 

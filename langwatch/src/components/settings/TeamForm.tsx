@@ -31,9 +31,9 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
-import { toaster } from "../ui/toaster";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
+import { toaster } from "../ui/toaster";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,
@@ -60,21 +60,22 @@ function TeamProjectsBody({
             </HStack>
           </Table.Cell>
           <Table.Cell textAlign="right">
-            {teamProject.id !== project?.id && hasPermission("project:delete") && (
-              <Button
-                variant="ghost"
-                color="red.fg"
-                size="sm"
-                onClick={() =>
-                  onArchiveClick({
-                    id: teamProject.id,
-                    name: teamProject.name,
-                  })
-                }
-              >
-                <Trash2 size={16} />
-              </Button>
-            )}
+            {teamProject.id !== project?.id &&
+              hasPermission("project:delete") && (
+                <Button
+                  variant="ghost"
+                  color="red.fg"
+                  size="sm"
+                  onClick={() =>
+                    onArchiveClick({
+                      id: teamProject.id,
+                      name: teamProject.name,
+                    })
+                  }
+                >
+                  <Trash2 size={16} />
+                </Button>
+              )}
           </Table.Cell>
         </Table.Row>
       ))}
@@ -244,11 +245,15 @@ export const TeamForm = ({
                               name={`members.${index}.userId`}
                               rules={{ required: "User is required" }}
                               render={({ field }) => {
-                                const rowCollection = perRowCollections[index] ?? createListCollection({ items: userOptions });
+                                const rowCollection =
+                                  perRowCollections[index] ??
+                                  createListCollection({ items: userOptions });
                                 return (
                                   <Select.Root
                                     collection={rowCollection}
-                                    value={field.value ? [field.value.value] : []}
+                                    value={
+                                      field.value ? [field.value.value] : []
+                                    }
                                     onValueChange={(details) => {
                                       const selectedValue = details.value[0];
                                       if (selectedValue) {
@@ -261,12 +266,18 @@ export const TeamForm = ({
                                       }
                                     }}
                                   >
-                                    <Select.Trigger width="full" background="bg">
+                                    <Select.Trigger
+                                      width="full"
+                                      background="bg"
+                                    >
                                       <Select.ValueText placeholder="Select..." />
                                     </Select.Trigger>
                                     <Select.Content paddingY={2}>
                                       {rowCollection.items.map((option) => (
-                                        <Select.Item key={option.value} item={option}>
+                                        <Select.Item
+                                          key={option.value}
+                                          item={option}
+                                        >
                                           {option.label}
                                         </Select.Item>
                                       ))}
@@ -279,12 +290,13 @@ export const TeamForm = ({
                               content={
                                 <>
                                   <Text>
-                                    Those are existing members of your organization.
+                                    Those are existing members of your
+                                    organization.
                                   </Text>
                                   <Text paddingTop={2}>
                                     Want to add a team member that is not listed
-                                    yet? You can create the team first and invite
-                                    them later to the organization
+                                    yet? You can create the team first and
+                                    invite them later to the organization
                                   </Text>
                                 </>
                               }

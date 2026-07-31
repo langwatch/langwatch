@@ -23,8 +23,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types";
 import { ProjectionRouter } from "../../projections/projectionRouter";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import { QueueManager } from "../../services/queues/queueManager";
 import {
   createMockEventStore,
   createTestAggregateType,
@@ -33,6 +31,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { EventSourcingService } from "../../services/eventSourcingService";
+import { QueueManager } from "../../services/queues/queueManager";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types";
 
 const aggregateType = createTestAggregateType();
@@ -303,7 +303,10 @@ describe("subscriber enqueue-time contract", () => {
         );
 
         const causes = await expectDispatchFailure(
-          router.dispatch([makeEvent("evt-a"), makeEvent("evt-b")], readContext),
+          router.dispatch(
+            [makeEvent("evt-a"), makeEvent("evt-b")],
+            readContext,
+          ),
           /filter blew up/,
         );
 

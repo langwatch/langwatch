@@ -138,17 +138,53 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       mockRunDataQuery.mockReturnValue({
         data: undefined,
         isLoading: false,
-        error: { message: "Network error" },
+        error: { message: "internal_error" },
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
       render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
       expect(screen.getByText(/Couldn't load runs/i)).toBeInTheDocument();
-      expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+      // Since #5984 the wire message is the error's code slug, so it must
+      // never reach the page — the words come from the registry instead.
+      expect(screen.queryByText("internal_error")).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /Try again/i }),
       ).toBeInTheDocument();
+    });
+
+    describe("given the failure carries a handled payload", () => {
+      it("shows the registry's copy for the code", () => {
+        mockRunDataQuery.mockReturnValue({
+          data: undefined,
+          isLoading: false,
+          error: {
+            message: "query_timeout",
+            data: {
+              error: {
+                code: "query_timeout",
+                httpStatus: 504,
+                fault: "platform",
+                tips: [],
+              },
+            },
+          },
+        });
+        mockScenariosQuery.mockReturnValue({ data: [] });
+
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
+
+        expect(
+          screen.getByText("This search took too long"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            "Narrow the time range or add a filter, then try again.",
+          ),
+        ).toBeInTheDocument();
+      });
     });
   });
 

@@ -16,7 +16,7 @@
  * type:
  *
  *   - MEASURED — the CLI actually ran. The kind is stamped once, server-side,
- *     from the command and the payload's shape (ADR-059). The acceptance
+ *     from the command and the payload's shape (ADR-079). The acceptance
  *     schemas below read those payloads.
  *   - DERIVED — Langy wrote the JSON itself, inline in a ```langy-card fence
  *     (ADR-060). `derived-safe.ts` builds those schemas, from the shapes
@@ -217,7 +217,7 @@ export const choicesCardFields = {
  * `timeseriesShape.ts` in the CLI) — and the registry only recognises the
  * shape once it is there (`timeseriesProbeSchema`).
  *
- * ADR-059 §5 also sketches a `langwatch present` command for an agent to emit
+ * ADR-079 §5 also sketches a `langwatch present` command for an agent to emit
  * a card directly. That command does not exist; nothing emits this card except
  * a command that shaped its own answer.
  *

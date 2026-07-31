@@ -55,7 +55,11 @@ export class SpanStatusService {
     }
 
     // 3. span-level statusMessage (HTTP status fallback)
-    if (!errorMessage && span.statusCode === StatusCode.ERROR && span.statusMessage) {
+    if (
+      !errorMessage &&
+      span.statusCode === StatusCode.ERROR &&
+      span.statusMessage
+    ) {
       errorMessage = span.statusMessage;
     }
 

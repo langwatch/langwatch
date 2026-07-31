@@ -63,7 +63,11 @@ export function indexToolSpansBySpanId({
   events,
 }: {
   spans: SpanDetail[];
-  events: { spanId: string; name: string; attributes: Record<string, string> }[];
+  events: {
+    spanId: string;
+    name: string;
+    attributes: Record<string, string>;
+  }[];
 }): Map<string, TerminalToolSpan> {
   const outputBySpanId = new Map<string, Record<string, string>>();
   for (const event of events) {

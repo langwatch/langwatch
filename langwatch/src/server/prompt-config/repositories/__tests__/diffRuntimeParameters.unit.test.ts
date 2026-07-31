@@ -21,7 +21,10 @@ describe("diffRuntimeParameters()", () => {
           }),
         ).toEqual([]);
         expect(
-          diffRuntimeParameters({ localParameters: null, remoteParameters: {} }),
+          diffRuntimeParameters({
+            localParameters: null,
+            remoteParameters: {},
+          }),
         ).toEqual([]);
       });
     });
@@ -63,10 +66,7 @@ describe("diffRuntimeParameters()", () => {
           localParameters: { max_tokens: 1000, top_p: 0.9 },
           remoteParameters: { max_tokens: 500, top_p: 0.5 },
         });
-        expect(result).toEqual([
-          "max_tokens: 1000 → 500",
-          "top_p: 0.9 → 0.5",
-        ]);
+        expect(result).toEqual(["max_tokens: 1000 → 500", "top_p: 0.9 → 0.5"]);
       });
     });
 

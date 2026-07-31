@@ -8,10 +8,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
+import { LangyPanelSurface } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
-import { LangyPanelSurface } from "~/features/asaplangy";
 import type { StatusCell } from "../types";
 
 /**
@@ -111,7 +111,11 @@ export function HomeOverviewCard({
             <motion.span
               aria-hidden
               animate={{ opacity: [0.25, 1, 0.25] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              transition={{
+                duration: 1.4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
               style={{
                 display: "inline-block",
                 width: "6px",
@@ -168,7 +172,9 @@ export function HomeOverviewCard({
   if (bare) return content;
 
   return (
-    <LangyPanelSurface padding={{ base: 4, md: 5 }}>{content}</LangyPanelSurface>
+    <LangyPanelSurface padding={{ base: 4, md: 5 }}>
+      {content}
+    </LangyPanelSurface>
   );
 }
 

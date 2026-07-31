@@ -64,7 +64,10 @@ type OtlpMetric =
       name: string;
       description: string;
       unit: string;
-      histogram: { dataPoints: HistogramDataPoint[]; aggregationTemporality: 1 };
+      histogram: {
+        dataPoints: HistogramDataPoint[];
+        aggregationTemporality: 1;
+      };
     };
 
 export interface MassMetricsBatch {

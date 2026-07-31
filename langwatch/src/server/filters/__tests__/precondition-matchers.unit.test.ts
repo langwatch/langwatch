@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  PRECONDITION_FIELD_MATCHERS,
-  PRECONDITION_ALLOWED_RULES,
   getAvailablePreconditionFields,
   getFieldLabel,
   normalizePreconditionTraceData,
-  type PreconditionTraceData,
+  PRECONDITION_ALLOWED_RULES,
+  PRECONDITION_FIELD_MATCHERS,
   type PreconditionField,
+  type PreconditionTraceData,
 } from "../precondition-matchers";
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ function makeTraceData(
 
 describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("input matcher", () => {
-    const matcher = PRECONDITION_FIELD_MATCHERS["input"]!;
+    const matcher = PRECONDITION_FIELD_MATCHERS.input!;
 
     it("returns the input value from trace data", () => {
       expect(matcher(makeTraceData({ input: "hello" }), "")).toBe("hello");
@@ -54,7 +54,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   });
 
   describe("output matcher", () => {
-    const matcher = PRECONDITION_FIELD_MATCHERS["output"]!;
+    const matcher = PRECONDITION_FIELD_MATCHERS.output!;
 
     it("returns the output value from trace data", () => {
       expect(matcher(makeTraceData({ output: "world" }), "")).toBe("world");
@@ -117,9 +117,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
 
     it("returns undefined when userId is not set", () => {
-      expect(
-        matcher(makeTraceData({ userId: undefined }), ""),
-      ).toBeUndefined();
+      expect(matcher(makeTraceData({ userId: undefined }), "")).toBeUndefined();
     });
   });
 
@@ -145,9 +143,10 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.labels"]!;
 
     it("returns labels array from trace data", () => {
-      expect(
-        matcher(makeTraceData({ labels: ["a", "b"] }), ""),
-      ).toEqual(["a", "b"]);
+      expect(matcher(makeTraceData({ labels: ["a", "b"] }), "")).toEqual([
+        "a",
+        "b",
+      ]);
     });
 
     it("returns empty array when labels is empty", () => {
@@ -159,9 +158,10 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.prompt_ids"]!;
 
     it("returns promptIds array from trace data", () => {
-      expect(
-        matcher(makeTraceData({ promptIds: ["p1", "p2"] }), ""),
-      ).toEqual(["p1", "p2"]);
+      expect(matcher(makeTraceData({ promptIds: ["p1", "p2"] }), "")).toEqual([
+        "p1",
+        "p2",
+      ]);
     });
   });
 
@@ -211,9 +211,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.type"]!;
 
     it("returns spanTypes array from trace data", () => {
-      expect(
-        matcher(makeTraceData({ spanTypes: ["llm", "rag"] }), ""),
-      ).toEqual(["llm", "rag"]);
+      expect(matcher(makeTraceData({ spanTypes: ["llm", "rag"] }), "")).toEqual(
+        ["llm", "rag"],
+      );
     });
   });
 
@@ -221,9 +221,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.model"]!;
 
     it("returns spanModels array from trace data", () => {
-      expect(
-        matcher(makeTraceData({ spanModels: ["gpt-4"] }), ""),
-      ).toEqual(["gpt-4"]);
+      expect(matcher(makeTraceData({ spanModels: ["gpt-4"] }), "")).toEqual([
+        "gpt-4",
+      ]);
     });
   });
 
@@ -231,15 +231,13 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.topics"]!;
 
     it("returns topicId wrapped in array when present", () => {
-      expect(
-        matcher(makeTraceData({ topicId: "topic_1" }), ""),
-      ).toEqual(["topic_1"]);
+      expect(matcher(makeTraceData({ topicId: "topic_1" }), "")).toEqual([
+        "topic_1",
+      ]);
     });
 
     it("returns null when topicId is not set", () => {
-      expect(
-        matcher(makeTraceData({ topicId: undefined }), ""),
-      ).toBeNull();
+      expect(matcher(makeTraceData({ topicId: undefined }), "")).toBeNull();
     });
   });
 
@@ -247,15 +245,13 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.subtopics"]!;
 
     it("returns subTopicId wrapped in array when present", () => {
-      expect(
-        matcher(makeTraceData({ subTopicId: "sub_1" }), ""),
-      ).toEqual(["sub_1"]);
+      expect(matcher(makeTraceData({ subTopicId: "sub_1" }), "")).toEqual([
+        "sub_1",
+      ]);
     });
 
     it("returns null when subTopicId is not set", () => {
-      expect(
-        matcher(makeTraceData({ subTopicId: undefined }), ""),
-      ).toBeNull();
+      expect(matcher(makeTraceData({ subTopicId: undefined }), "")).toBeNull();
     });
   });
 
@@ -263,17 +259,19 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["annotations.hasAnnotation"]!;
 
     it("returns 'true' when annotationIds is non-empty", () => {
-      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe("true");
-    });
-
-    it("returns 'false' when annotationIds is empty", () => {
-      expect(matcher(makeTraceData({ annotationIds: [] }), "")).toBe(
-        "false",
+      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe(
+        "true",
       );
     });
 
+    it("returns 'false' when annotationIds is empty", () => {
+      expect(matcher(makeTraceData({ annotationIds: [] }), "")).toBe("false");
+    });
+
     it("returns null when annotationIds is undefined", () => {
-      expect(matcher(makeTraceData({ annotationIds: undefined }), "")).toBeNull();
+      expect(
+        matcher(makeTraceData({ annotationIds: undefined }), ""),
+      ).toBeNull();
     });
   });
 
@@ -301,7 +299,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     it("returns metric keys for a specific event type", () => {
       const data = makeTraceData({
         events: [
-          { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: 1 }],
+            event_details: [],
+          },
         ],
       });
       expect(matcher(data, "", "thumbs_up_down")).toEqual(["vote"]);
@@ -310,7 +312,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     it("returns null when key (event_type) is not provided", () => {
       const data = makeTraceData({
         events: [
-          { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: 1 }],
+            event_details: [],
+          },
         ],
       });
       expect(matcher(data, "")).toBeNull();
@@ -319,7 +325,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     it("returns null when no matching event type", () => {
       const data = makeTraceData({
         events: [
-          { event_type: "purchase", metrics: [{ key: "amount", value: 99 }], event_details: [] },
+          {
+            event_type: "purchase",
+            metrics: [{ key: "amount", value: 99 }],
+            event_details: [],
+          },
         ],
       });
       expect(matcher(data, "", "thumbs_up_down")).toBeNull();
@@ -332,7 +342,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     it("returns event detail keys for a specific event type", () => {
       const data = makeTraceData({
         events: [
-          { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+          {
+            event_type: "purchase",
+            metrics: [],
+            event_details: [{ key: "item", value: "shoes" }],
+          },
         ],
       });
       expect(matcher(data, "", "purchase")).toEqual(["item"]);
@@ -341,7 +355,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     it("returns null when key (event_type) is not provided", () => {
       const data = makeTraceData({
         events: [
-          { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+          {
+            event_type: "purchase",
+            metrics: [],
+            event_details: [{ key: "item", value: "shoes" }],
+          },
         ],
       });
       expect(matcher(data, "")).toBeNull();
@@ -376,8 +394,8 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
   /** @scenario Allowed rules derive from field characteristics */
   it("allows all 4 text rules for input and output", () => {
     const textRules = ["is", "contains", "not_contains", "matches_regex"];
-    expect(PRECONDITION_ALLOWED_RULES["input"]).toEqual(textRules);
-    expect(PRECONDITION_ALLOWED_RULES["output"]).toEqual(textRules);
+    expect(PRECONDITION_ALLOWED_RULES.input).toEqual(textRules);
+    expect(PRECONDITION_ALLOWED_RULES.output).toEqual(textRules);
   });
 
   it("allows only 'is' for boolean fields", () => {
@@ -393,7 +411,9 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
     expect(PRECONDITION_ALLOWED_RULES["spans.model"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["events.event_type"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["events.metrics.key"]).toEqual(["is"]);
-    expect(PRECONDITION_ALLOWED_RULES["events.event_details.key"]).toEqual(["is"]);
+    expect(PRECONDITION_ALLOWED_RULES["events.event_details.key"]).toEqual([
+      "is",
+    ]);
   });
 
   it("allows is, contains, not_contains for array fields", () => {
@@ -409,9 +429,7 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
   it("allows all text rules for string metadata fields", () => {
     const textRules = ["is", "contains", "not_contains", "matches_regex"];
     expect(PRECONDITION_ALLOWED_RULES["metadata.user_id"]).toEqual(textRules);
-    expect(PRECONDITION_ALLOWED_RULES["metadata.thread_id"]).toEqual(
-      textRules,
-    );
+    expect(PRECONDITION_ALLOWED_RULES["metadata.thread_id"]).toEqual(textRules);
     expect(PRECONDITION_ALLOWED_RULES["metadata.customer_id"]).toEqual(
       textRules,
     );
@@ -467,11 +485,9 @@ describe("getAvailablePreconditionFields()", () => {
 
   it("returns correct labels for each field", () => {
     const fields = getAvailablePreconditionFields();
-    const fieldMap = Object.fromEntries(
-      fields.map((f) => [f.field, f.label]),
-    );
-    expect(fieldMap["input"]).toBe("Input");
-    expect(fieldMap["output"]).toBe("Output");
+    const fieldMap = Object.fromEntries(fields.map((f) => [f.field, f.label]));
+    expect(fieldMap.input).toBe("Input");
+    expect(fieldMap.output).toBe("Output");
   });
 
   it("returns allowedRules matching PRECONDITION_ALLOWED_RULES", () => {

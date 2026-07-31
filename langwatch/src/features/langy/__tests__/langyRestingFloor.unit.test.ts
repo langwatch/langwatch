@@ -25,7 +25,10 @@ describe("langyRestingFloorPx", () => {
   describe("given a thread holding a single turn", () => {
     it("stands at the turn floor", () => {
       expect(
-        langyRestingFloorPx({ emptyAndSettled: false, expectedMessageCount: 1 }),
+        langyRestingFloorPx({
+          emptyAndSettled: false,
+          expectedMessageCount: 1,
+        }),
       ).toBe(LANGY_FLOATING_FLOOR_TURN_PX);
     });
   });
@@ -33,7 +36,10 @@ describe("langyRestingFloorPx", () => {
   describe("given a thread of several messages", () => {
     it("stands at the thread floor", () => {
       expect(
-        langyRestingFloorPx({ emptyAndSettled: false, expectedMessageCount: 6 }),
+        langyRestingFloorPx({
+          emptyAndSettled: false,
+          expectedMessageCount: 6,
+        }),
       ).toBe(LANGY_FLOATING_FLOOR_THREAD_PX);
     });
   });
@@ -57,7 +63,10 @@ describe("langyRestingFloorPx", () => {
     // floor: we know a conversation is coming, just not how big.
     it("clears the empty floor even when the count is not known yet", () => {
       expect(
-        langyRestingFloorPx({ emptyAndSettled: false, expectedMessageCount: 0 }),
+        langyRestingFloorPx({
+          emptyAndSettled: false,
+          expectedMessageCount: 0,
+        }),
       ).toBeGreaterThan(LANGY_FLOATING_FLOOR_EMPTY_PX);
     });
   });

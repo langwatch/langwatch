@@ -1,9 +1,9 @@
 import {
+  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
   useState,
-  type RefObject,
 } from "react";
 
 /**

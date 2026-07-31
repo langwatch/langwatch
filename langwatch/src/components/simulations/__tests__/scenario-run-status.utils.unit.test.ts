@@ -46,7 +46,11 @@ describe("shouldShowNoResponse()", () => {
       ScenarioRunStatus.ERROR,
     ])("shows the no-response state for %s", (status) => {
       expect(
-        shouldShowNoResponse({ status, hasConversation: false, hasError: false }),
+        shouldShowNoResponse({
+          status,
+          hasConversation: false,
+          hasError: false,
+        }),
       ).toBe(true);
     });
   });
@@ -86,7 +90,11 @@ describe("shouldShowNoResponse()", () => {
       ScenarioRunStatus.STALLED,
     ])("does not show the no-response state for %s", (status) => {
       expect(
-        shouldShowNoResponse({ status, hasConversation: false, hasError: false }),
+        shouldShowNoResponse({
+          status,
+          hasConversation: false,
+          hasError: false,
+        }),
       ).toBe(false);
     });
   });

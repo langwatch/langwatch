@@ -114,7 +114,9 @@ export class SuiteRunStateRepositoryClickHouse<
       UpdatedAt: new Date(data.UpdatedAt),
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
-      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt
+        ? new Date(data.LastEventOccurredAt)
+        : new Date(0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -186,8 +188,10 @@ export class SuiteRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({ batchRunId, tenantId: context.tenantId, error: errorMessage },
-        "Failed to get projection from ClickHouse");
+      logger.error(
+        { batchRunId, tenantId: context.tenantId, error: errorMessage },
+        "Failed to get projection from ClickHouse",
+      );
       throw new StoreError(
         "getProjection",
         "SuiteRunStateRepositoryClickHouse",
@@ -234,7 +238,9 @@ export class SuiteRunStateRepositoryClickHouse<
         projection.version,
       );
 
-      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { scenarios?: number | null }
+        | undefined;
       projectionRecord._retention_days =
         retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 
@@ -244,22 +250,27 @@ export class SuiteRunStateRepositoryClickHouse<
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        batchRunId: String(projection.aggregateId),
-        projectionId: projection.id,
-        error: errorMessage,
-      }, "Failed to store projection in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          batchRunId: String(projection.aggregateId),
+          projectionId: projection.id,
+          error: errorMessage,
+        },
+        "Failed to store projection in ClickHouse",
+      );
       throw new StoreError(
         "storeProjection",
         "SuiteRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for batch run ${projection.aggregateId}: ${errorMessage}`,
         classifyClickHouseError(error),
-        { projectionId: projection.id, batchRunId: String(projection.aggregateId) },
+        {
+          projectionId: projection.id,
+          batchRunId: String(projection.aggregateId),
+        },
         error,
       );
     }
@@ -288,7 +299,9 @@ export class SuiteRunStateRepositoryClickHouse<
     }
 
     try {
-      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { scenarios?: number | null }
+        | undefined;
       const retentionDays =
         retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
@@ -312,11 +325,14 @@ export class SuiteRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        count: projections.length,
-        error: errorMessage,
-      }, "Failed to batch store suite projections in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          count: projections.length,
+          error: errorMessage,
+        },
+        "Failed to batch store suite projections in ClickHouse",
+      );
       throw new StoreError(
         "storeProjectionBatch",
         "SuiteRunStateRepositoryClickHouse",

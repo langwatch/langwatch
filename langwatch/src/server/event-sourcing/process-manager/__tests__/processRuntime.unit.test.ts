@@ -1,15 +1,18 @@
 import type { Logger } from "@langwatch/observability";
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { createTenantId } from "../../domain/tenantId";
 import { buildProcessManager } from "../../pipeline/processBuilder";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "../../pipelines/automations/schemas/constants";
 import {
-  triggerMatchRecordedEventSchema,
   type AutomationEvent,
+  triggerMatchRecordedEventSchema,
 } from "../../pipelines/automations/schemas/events";
-import { ProcessRuntime, SCHEDULED_SINGLETON_PROJECT_ID } from "../processRuntime";
+import {
+  ProcessRuntime,
+  SCHEDULED_SINGLETON_PROJECT_ID,
+} from "../processRuntime";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
 import type { ProcessStore } from "../stores/processStore.types";
 
@@ -168,7 +171,9 @@ describe("ProcessRuntime", () => {
           pipelineName: "automations-second",
           processManagers: new Map([["dupeInbox", definition]]),
         }),
-      ).toThrow('Process manager "dupeInbox" is mounted by more than one pipeline');
+      ).toThrow(
+        'Process manager "dupeInbox" is mounted by more than one pipeline',
+      );
     });
   });
 

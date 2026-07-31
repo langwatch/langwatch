@@ -14,25 +14,25 @@ import {
   spawnChildProcessDirectly,
 } from "./scenario-processor-test-helpers";
 
-describe.skipIf(process.env.CI)("Scenario Processor - Execution Results", () => {
-  let mockCollector: ReturnType<typeof createMockCollectorServer>;
+describe.skipIf(process.env.CI)(
+  "Scenario Processor - Execution Results",
+  () => {
+    let mockCollector: ReturnType<typeof createMockCollectorServer>;
 
-  beforeAll(async () => {
-    mockCollector = createMockCollectorServer();
-    await mockCollector.start();
-  }, 10000);
+    beforeAll(async () => {
+      mockCollector = createMockCollectorServer();
+      await mockCollector.start();
+    }, 10000);
 
-  afterAll(async () => {
-    await mockCollector.stop();
-  }, 10000);
+    afterAll(async () => {
+      await mockCollector.stop();
+    }, 10000);
 
-  beforeEach(() => {
-    mockCollector.requests.length = 0;
-  });
+    beforeEach(() => {
+      mockCollector.requests.length = 0;
+    });
 
-  it(
-    "returns result with success property",
-    async () => {
+    it("returns result with success property", async () => {
       const jobData = createTestJobData();
       const env = {
         LANGWATCH_API_KEY: "test-api-key",
@@ -43,13 +43,9 @@ describe.skipIf(process.env.CI)("Scenario Processor - Execution Results", () => 
 
       expect(result).toHaveProperty("success");
       expect(typeof result.success).toBe("boolean");
-    },
-    60000
-  );
+    }, 60000);
 
-  it(
-    "returns success=false when execution fails",
-    async () => {
+    it("returns success=false when execution fails", async () => {
       const jobData = createTestJobData({
         adapterData: {
           type: "http",
@@ -68,13 +64,9 @@ describe.skipIf(process.env.CI)("Scenario Processor - Execution Results", () => 
       const { result } = await spawnChildProcessDirectly(jobData, env);
 
       expect(result.success).toBe(false);
-    },
-    60000
-  );
+    }, 60000);
 
-  it(
-    "returns non-empty error message when execution fails",
-    async () => {
+    it("returns non-empty error message when execution fails", async () => {
       const jobData = createTestJobData({
         adapterData: {
           type: "http",
@@ -95,13 +87,9 @@ describe.skipIf(process.env.CI)("Scenario Processor - Execution Results", () => 
       expect(result.error).toBeDefined();
       expect(typeof result.error).toBe("string");
       expect(result.error!.length).toBeGreaterThan(0);
-    },
-    60000
-  );
+    }, 60000);
 
-  it(
-    "returns valid JSON via stdout",
-    async () => {
+    it("returns valid JSON via stdout", async () => {
       const jobData = createTestJobData();
       const env = {
         LANGWATCH_API_KEY: "test-api-key",
@@ -111,7 +99,6 @@ describe.skipIf(process.env.CI)("Scenario Processor - Execution Results", () => 
       const { result } = await spawnChildProcessDirectly(jobData, env);
 
       expect(typeof result).toBe("object");
-    },
-    60000
-  );
-});
+    }, 60000);
+  },
+);

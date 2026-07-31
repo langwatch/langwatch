@@ -13,7 +13,9 @@ vi.mock("~/server/app-layer/app", () => ({
     usage: { checkLimit: mockCheckLimit },
     planProvider: { getActivePlan: mockGetActivePlan },
     usageLimits: { notifyPlanLimitReached: mockNotifyPlanLimitReached },
-    traces: { metricCollection: { handleOtlpMetricRequest: mockHandleMetrics } },
+    traces: {
+      metricCollection: { handleOtlpMetricRequest: mockHandleMetrics },
+    },
   })),
 }));
 

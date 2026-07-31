@@ -1,7 +1,7 @@
 import type { PrismaClient, Subscription } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
-import { PLAN_LIMITS, getFreePlanLimits } from "./planLimits";
+import { getFreePlanLimits, PLAN_LIMITS } from "./planLimits";
 import { PlanTypes, SubscriptionStatus } from "./planTypes";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
@@ -39,7 +39,6 @@ type MinimalUser = {
   };
 };
 
-
 export const isAdmin = (user?: { email?: string | null }) => {
   if (!user?.email) {
     return false;
@@ -54,14 +53,11 @@ export const isAdmin = (user?: { email?: string | null }) => {
   return adminSet.has(user.email);
 };
 
-
 export type SaaSPlanProvider = {
   getActivePlan(organizationId: string, user?: MinimalUser): Promise<PlanInfo>;
 };
 
-export const createSaaSPlanProvider = (
-  db: PrismaClient,
-): SaaSPlanProvider => {
+export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
   return {
     async getActivePlan(organizationId, user) {
       const overrideAddingLimitations =

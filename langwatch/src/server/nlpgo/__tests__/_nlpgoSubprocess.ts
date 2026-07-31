@@ -19,10 +19,10 @@
  * that calls ensureNlpgoBinary() within the same CI job.
  */
 import {
+  type ChildProcess,
   execFileSync,
   execSync,
   spawn,
-  type ChildProcess,
 } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -197,9 +197,7 @@ export async function startNlpgoSubprocess(opts: {
   child.on("exit", (code, signal) => {
     if (code !== 0 && code !== null) {
       // eslint-disable-next-line no-console
-      console.error(
-        `nlpgo exited unexpectedly: code=${code} signal=${signal}`,
-      );
+      console.error(`nlpgo exited unexpectedly: code=${code} signal=${signal}`);
     }
   });
 

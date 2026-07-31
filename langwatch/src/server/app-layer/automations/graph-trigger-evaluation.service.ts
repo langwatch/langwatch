@@ -23,32 +23,32 @@
  * `lastRunAt`).
  */
 
-import type { CustomGraph, Project, Trigger } from "@prisma/client";
-import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
-import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
-import {
-  aggregateSeriesValues,
-  extractSeriesPoints,
-} from "~/server/app-layer/analytics/series-points";
+import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+import { createLogger } from "@langwatch/observability";
+import type { CustomGraph, Project, Trigger } from "@prisma/client";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import {
-  graphAlertFireDigest,
+  aggregateSeriesValues,
+  extractSeriesPoints,
+} from "~/server/app-layer/analytics/series-points";
+import {
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
+  graphAlertFireDigest,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
-import { createLogger } from "@langwatch/observability";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,

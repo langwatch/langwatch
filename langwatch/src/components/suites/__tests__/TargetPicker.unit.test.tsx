@@ -6,15 +6,23 @@
  * @see specs/features/suites/inline-add-target-and-scenario-buttons.feature
  */
 
-import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TargetPicker, type TargetPickerProps } from "../TargetPicker";
 
 vi.mock("../ui/checkbox", () => ({
-  Checkbox: ({ checked, onCheckedChange, children }: { checked: boolean; onCheckedChange?: (details: { checked: boolean }) => void; children: React.ReactNode }) => (
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+    children,
+  }: {
+    checked: boolean;
+    onCheckedChange?: (details: { checked: boolean }) => void;
+    children: React.ReactNode;
+  }) => (
     <label>
       <input
         type="checkbox"
@@ -84,7 +92,11 @@ describe("<TargetPicker />", () => {
   describe("given archived targets are present", () => {
     const archivedTargets = [
       { type: "http" as const, referenceId: "agent_old", name: "agent_old" },
-      { type: "prompt" as const, referenceId: "prompt_old", name: "prompt_old" },
+      {
+        type: "prompt" as const,
+        referenceId: "prompt_old",
+        name: "prompt_old",
+      },
     ];
 
     describe("when the picker renders", () => {
@@ -156,15 +168,29 @@ describe("<TargetPicker />", () => {
     describe("when the picker renders with onSelectAll and onClear", () => {
       /** @scenario "Target picker displays Select All and Clear buttons" */
       it("displays a Select All button in the footer", () => {
-        renderPicker({ targets, totalCount: 3, onSelectAll: vi.fn(), onClear: vi.fn() });
+        renderPicker({
+          targets,
+          totalCount: 3,
+          onSelectAll: vi.fn(),
+          onClear: vi.fn(),
+        });
 
-        expect(screen.getByRole("button", { name: "Select All" })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Select All" }),
+        ).toBeInTheDocument();
       });
 
       it("displays a Clear button in the footer", () => {
-        renderPicker({ targets, totalCount: 3, onSelectAll: vi.fn(), onClear: vi.fn() });
+        renderPicker({
+          targets,
+          totalCount: 3,
+          onSelectAll: vi.fn(),
+          onClear: vi.fn(),
+        });
 
-        expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Clear" }),
+        ).toBeInTheDocument();
       });
 
       it("displays the selection count", () => {
@@ -193,7 +219,9 @@ describe("<TargetPicker />", () => {
             { type: "prompt", referenceId: "prompt_1" },
             { type: "http", referenceId: "agent_old" },
           ],
-          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
+          archivedTargets: [
+            { type: "http", referenceId: "agent_old", name: "agent_old" },
+          ],
         });
 
         expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
@@ -233,7 +261,9 @@ describe("<TargetPicker />", () => {
     describe("when the picker renders", () => {
       it("uses singular text for the warning", () => {
         renderPicker({
-          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
+          archivedTargets: [
+            { type: "http", referenceId: "agent_old", name: "agent_old" },
+          ],
         });
 
         expect(
@@ -263,12 +293,8 @@ describe("<TargetPicker />", () => {
       it("does not display separate Add New Agent and Add New Prompt buttons", () => {
         renderPicker();
 
-        expect(
-          screen.queryByText("Add New Agent"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByText("Add New Prompt"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Add New Agent")).not.toBeInTheDocument();
+        expect(screen.queryByText("Add New Prompt")).not.toBeInTheDocument();
       });
     });
 

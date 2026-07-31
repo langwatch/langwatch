@@ -36,7 +36,9 @@ describe("createLangyFrameDedup", () => {
     it("reserves it as fresh and arms the TTL", async () => {
       const redis = fakeRedis();
       const dedup = createLangyFrameDedup({ redis, ttlSeconds: 60 });
-      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(true);
+      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(
+        true,
+      );
       expect(redis.expire).toHaveBeenCalledWith("langy:seen:conv-1:turn-1", 60);
     });
   });
@@ -48,7 +50,9 @@ describe("createLangyFrameDedup", () => {
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       redis.expire.mockClear();
 
-      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(false);
+      expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(
+        false,
+      );
       expect(redis.expire).not.toHaveBeenCalled();
     });
   });

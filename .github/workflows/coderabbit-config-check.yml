@@ -15,6 +15,7 @@ on:
     paths:
       - ".coderabbit.yaml"
       - ".coderabbit/**"
+      - ".ast-grep/**"
       - ".semgrep/**"
       - ".github/workflows/coderabbit-config-check.yml"
 
@@ -42,7 +43,7 @@ jobs:
         run: ast-grep --version
 
       - name: ast-grep rule fixtures — every rule must match its fixture
-        working-directory: .coderabbit/ast-grep
+        working-directory: .ast-grep
         run: ast-grep test -c sgconfig.yml -t rule-tests
 
       - name: semgrep ruleset validates

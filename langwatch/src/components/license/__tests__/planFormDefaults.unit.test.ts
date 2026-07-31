@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../planFormDefaults";
+import { describe, expect, it } from "vitest";
 import {
-  PRO_TEMPLATE,
   ENTERPRISE_TEMPLATE,
+  PRO_TEMPLATE,
 } from "../../../../ee/licensing/planTemplates";
+import {
+  getPlanDefaults,
+  PLAN_DEFAULTS,
+  type PlanType,
+} from "../planFormDefaults";
 
 describe("planFormDefaults", () => {
   describe("getPlanDefaults", () => {
@@ -76,9 +80,15 @@ describe("planFormDefaults", () => {
     it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {
       const enterpriseDefaults = PLAN_DEFAULTS.ENTERPRISE;
 
-      expect(enterpriseDefaults.maxPrompts).toBe(ENTERPRISE_TEMPLATE.maxPrompts);
-      expect(enterpriseDefaults.maxEvaluators).toBe(ENTERPRISE_TEMPLATE.maxEvaluators);
-      expect(enterpriseDefaults.maxScenarios).toBe(ENTERPRISE_TEMPLATE.maxScenarios);
+      expect(enterpriseDefaults.maxPrompts).toBe(
+        ENTERPRISE_TEMPLATE.maxPrompts,
+      );
+      expect(enterpriseDefaults.maxEvaluators).toBe(
+        ENTERPRISE_TEMPLATE.maxEvaluators,
+      );
+      expect(enterpriseDefaults.maxScenarios).toBe(
+        ENTERPRISE_TEMPLATE.maxScenarios,
+      );
       expect(enterpriseDefaults.maxAgents).toBe(ENTERPRISE_TEMPLATE.maxAgents);
     });
   });

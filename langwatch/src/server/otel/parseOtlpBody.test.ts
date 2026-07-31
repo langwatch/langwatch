@@ -13,9 +13,10 @@
  * (cross-cutting "shared OTLP parser" invariant) +
  * specs/ai-gateway/governance/receiver-shapes.feature.
  */
-import { describe, expect, it } from "vitest";
+
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import { describe, expect, it } from "vitest";
 
 import {
   parseOtlpLogs,
@@ -84,7 +85,9 @@ function buildTraceRequest(): {
   };
 }
 
-function buildProtobufBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
+function buildProtobufBody(
+  payload: ReturnType<typeof buildTraceRequest>,
+): ArrayBuffer {
   const message = traceRequestType.create(payload);
   const bytes = traceRequestType.encode(message).finish() as Uint8Array;
   return bytes.buffer.slice(
@@ -93,11 +96,17 @@ function buildProtobufBody(payload: ReturnType<typeof buildTraceRequest>): Array
   ) as ArrayBuffer;
 }
 
-function buildJsonBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
-  return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
+function buildJsonBody(
+  payload: ReturnType<typeof buildTraceRequest>,
+): ArrayBuffer {
+  return new TextEncoder().encode(JSON.stringify(payload))
+    .buffer as ArrayBuffer;
 }
 
-function makeRequest(body: ArrayBuffer | Buffer, headers: Record<string, string>): Request {
+function makeRequest(
+  body: ArrayBuffer | Buffer,
+  headers: Record<string, string>,
+): Request {
   return new Request("http://localhost/test", {
     method: "POST",
     headers,
@@ -105,7 +114,9 @@ function makeRequest(body: ArrayBuffer | Buffer, headers: Record<string, string>
   });
 }
 
-function spanCountOf(parsed: { resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: unknown[] }> }> }): number {
+function spanCountOf(parsed: {
+  resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: unknown[] }> }>;
+}): number {
   return (parsed.resourceSpans ?? []).flatMap((rs) =>
     (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),
   ).length;
@@ -163,7 +174,9 @@ describe("readOtlpBody", () => {
       const req = makeRequest(new ArrayBuffer(0), {
         "content-encoding": "snappy",
       });
-      await expect(readOtlpBody(req)).rejects.toThrow(/Unsupported Content-Encoding/);
+      await expect(readOtlpBody(req)).rejects.toThrow(
+        /Unsupported Content-Encoding/,
+      );
     });
   });
 });
@@ -171,7 +184,10 @@ describe("readOtlpBody", () => {
 describe("parseOtlpTraces", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceSpans", () => {
-      const result = parseOtlpTraces(new ArrayBuffer(0), "application/x-protobuf");
+      const result = parseOtlpTraces(
+        new ArrayBuffer(0),
+        "application/x-protobuf",
+      );
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceSpans).toEqual([]);
@@ -242,7 +258,10 @@ describe("parseOtlpTraces", () => {
 describe("parser equivalence — JSON path produces same shape as protobuf path", () => {
   it("returns the same span count and same canonical attributes regardless of wire format", () => {
     const payload = buildTraceRequest();
-    const jsonResult = parseOtlpTraces(buildJsonBody(payload), "application/json");
+    const jsonResult = parseOtlpTraces(
+      buildJsonBody(payload),
+      "application/json",
+    );
     const protoResult = parseOtlpTraces(
       buildProtobufBody(payload),
       "application/x-protobuf",
@@ -252,7 +271,9 @@ describe("parser equivalence — JSON path produces same shape as protobuf path"
     expect(protoResult.ok).toBe(true);
     if (!jsonResult.ok || !protoResult.ok) return;
 
-    expect(spanCountOf(jsonResult.request)).toBe(spanCountOf(protoResult.request));
+    expect(spanCountOf(jsonResult.request)).toBe(
+      spanCountOf(protoResult.request),
+    );
 
     const jsonSpan =
       jsonResult.request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
@@ -319,7 +340,10 @@ describe("parser-helper exports — both consumer routes import the same primiti
 describe("parseOtlpLogs", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceLogs", () => {
-      const result = parseOtlpLogs(new ArrayBuffer(0), "application/x-protobuf");
+      const result = parseOtlpLogs(
+        new ArrayBuffer(0),
+        "application/x-protobuf",
+      );
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceLogs).toEqual([]);
@@ -372,7 +396,10 @@ describe("parseOtlpLogs", () => {
 describe("parseOtlpMetrics", () => {
   describe("when body is empty", () => {
     it("returns ok with empty resourceMetrics", () => {
-      const result = parseOtlpMetrics(new ArrayBuffer(0), "application/x-protobuf");
+      const result = parseOtlpMetrics(
+        new ArrayBuffer(0),
+        "application/x-protobuf",
+      );
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.request.resourceMetrics).toEqual([]);

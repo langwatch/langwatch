@@ -591,7 +591,7 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
         </Text>
         {banner.model && (
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate>
-            {(banner.model)}
+            {banner.model}
           </Text>
         )}
         {banner.repo && (
@@ -1097,7 +1097,7 @@ function StatusLine({
           </Text>
         </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
-          {model && <Stat label={(model)} />}
+          {model && <Stat label={model} />}
           {elapsedMs > 0 && <Stat label={formatDuration(elapsedMs)} />}
           {tokens > 0 && <Stat label={`${formatTokens(tokens)} tok`} />}
           {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}

@@ -59,7 +59,9 @@ describe("currentSessionId", () => {
         currentSessionId(1_000);
         const second = currentSessionId(1_000 + SESSION_INACTIVITY_MS + 1);
 
-        expect(currentSessionId(1_000 + SESSION_INACTIVITY_MS + 2)).toBe(second);
+        expect(currentSessionId(1_000 + SESSION_INACTIVITY_MS + 2)).toBe(
+          second,
+        );
       });
     });
   });

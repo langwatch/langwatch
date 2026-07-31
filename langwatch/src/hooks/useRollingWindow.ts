@@ -10,10 +10,7 @@ import { useEffect, useMemo, useState } from "react";
  * cadence, and quantising it to the minute keeps the query key stable
  * enough that this is a refetch a minute rather than one a render.
  */
-export function useRollingWindow(
-  range: number | "mtd",
-  refreshMs = 60_000,
-) {
+export function useRollingWindow(range: number | "mtd", refreshMs = 60_000) {
   const [tick, setTick] = useState(() => quantiseToMinute(Date.now()));
 
   useEffect(() => {

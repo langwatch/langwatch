@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScimTokenService } from "../scim-token.service";
 
 function createMockPrisma() {
@@ -26,7 +26,7 @@ describe("ScimTokenService", () => {
       it("creates a token record with a hashed value", async () => {
         const mockToken = { id: "token-1", organizationId: "org-1" };
         (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockToken
+          mockToken,
         );
 
         const result = await service.generate({ organizationId: "org-1" });
@@ -39,14 +39,14 @@ describe("ScimTokenService", () => {
           .mock.calls[0]![0];
         expect(createCall.data.organizationId).toBe("org-1");
         expect(createCall.data.hashedToken).toBe(
-          crypto.createHash("sha256").update(result.token).digest("hex")
+          crypto.createHash("sha256").update(result.token).digest("hex"),
         );
       });
 
       it("stores the description when provided", async () => {
         const mockToken = { id: "token-1" };
         (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockToken
+          mockToken,
         );
 
         await service.generate({
@@ -69,12 +69,16 @@ describe("ScimTokenService", () => {
           .update("valid-token")
           .digest("hex");
 
-        (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           id: "token-1",
           organizationId: "org-1",
           hashedToken,
         });
-        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
+        );
 
         const result = await service.verify({ token: "valid-token" });
 
@@ -91,9 +95,9 @@ describe("ScimTokenService", () => {
 
     describe("when the token does not exist", () => {
       it("returns null", async () => {
-        (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
-          null
-        );
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
 
         const result = await service.verify({ token: "invalid-token" });
 

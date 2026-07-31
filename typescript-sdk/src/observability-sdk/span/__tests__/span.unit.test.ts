@@ -22,7 +22,7 @@ describe("span.ts", () => {
   });
 
   describe("createLangWatchSpan", () => {
-    it("should create a LangWatchSpan from an OpenTelemetry Span", () => {
+    it("creates a LangWatchSpan from an OpenTelemetry Span", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
       expect(langwatchSpan).toBeDefined();
@@ -31,7 +31,7 @@ describe("span.ts", () => {
       expect(typeof langwatchSpan.setOutput).toBe("function");
     });
 
-    it("should preserve OpenTelemetry Span methods", () => {
+    it("preserves OpenTelemetry Span methods", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
       expect(typeof langwatchSpan.setAttribute).toBe("function");
@@ -43,7 +43,7 @@ describe("span.ts", () => {
   });
 
   describe("OpenTelemetry Span method compatibility", () => {
-    it("should support fluent API for setAttribute", () => {
+    it("supports fluent API for setAttribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setAttribute("test.key", "test-value");
 
@@ -51,7 +51,7 @@ describe("span.ts", () => {
       expect(mockSpan.setAttribute).toHaveBeenCalledWith("test.key", "test-value");
     });
 
-    it("should support fluent API for setAttributes", () => {
+    it("supports fluent API for setAttributes", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const attributes = { "key1": "value1", "key2": "value2" };
       const result = langwatchSpan.setAttributes(attributes);
@@ -60,7 +60,7 @@ describe("span.ts", () => {
       expect(mockSpan.setAttributes).toHaveBeenCalledWith(attributes);
     });
 
-    it("should support fluent API for addEvent", () => {
+    it("supports fluent API for addEvent", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.addEvent("test-event", { "event.data": "test" });
 
@@ -68,7 +68,7 @@ describe("span.ts", () => {
       expect(mockSpan.addEvent).toHaveBeenCalledWith("test-event", { "event.data": "test" });
     });
 
-    it("should support fluent API for recordException", () => {
+    it("supports fluent API for recordException", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const error = new Error("Test error");
       const result = langwatchSpan.recordException(error);
@@ -77,7 +77,7 @@ describe("span.ts", () => {
       expect(mockSpan.recordException).toHaveBeenCalledWith(error);
     });
 
-    it("should support fluent API for setStatus", () => {
+    it("supports fluent API for setStatus", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const status = { code: SpanStatusCode.OK };
       const result = langwatchSpan.setStatus(status);
@@ -86,7 +86,7 @@ describe("span.ts", () => {
       expect(mockSpan.setStatus).toHaveBeenCalledWith(status);
     });
 
-    it("should support fluent API for updateName", () => {
+    it("supports fluent API for updateName", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.updateName("new-name");
 
@@ -94,7 +94,7 @@ describe("span.ts", () => {
       expect(mockSpan.updateName).toHaveBeenCalledWith("new-name");
     });
 
-    it("should support fluent API for addLink", () => {
+    it("supports fluent API for addLink", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const link = { context: mockSpan.spanContext() };
       const result = langwatchSpan.addLink(link);
@@ -103,7 +103,7 @@ describe("span.ts", () => {
       expect(mockSpan.addLink).toHaveBeenCalledWith(link);
     });
 
-    it("should support fluent API for addLinks", () => {
+    it("supports fluent API for addLinks", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const links = [{ context: mockSpan.spanContext() }];
       const result = langwatchSpan.addLinks(links);
@@ -112,7 +112,7 @@ describe("span.ts", () => {
       expect(mockSpan.addLinks).toHaveBeenCalledWith(links);
     });
 
-    it("should delegate non-fluent methods", () => {
+    it("delegates non-fluent methods", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       // Test isRecording before ending
       const isRecordingBefore = langwatchSpan.isRecording();
@@ -133,7 +133,7 @@ describe("span.ts", () => {
   });
 
   describe("setType", () => {
-    it("should set the span type attribute", () => {
+    it("sets the span type attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setType("llm");
 
@@ -144,7 +144,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should accept all valid span types", () => {
+    it("accepts all valid span types", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const validTypes: SpanType[] = ["span", "llm", "chain", "tool", "agent", "guardrail"];
 
@@ -159,7 +159,7 @@ describe("span.ts", () => {
   });
 
   describe("setRequestModel and setResponseModel", () => {
-    it("should set request model attribute", () => {
+    it("sets request model attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setRequestModel("gpt-4");
 
@@ -170,7 +170,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should set response model attribute", () => {
+    it("sets response model attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setResponseModel("gpt-4-turbo");
 
@@ -189,7 +189,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should set single RAG context", () => {
+    it("sets single RAG context", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const ragContext = testData.ragContext();
       const result = langwatchSpan.setRAGContext(ragContext);
@@ -201,7 +201,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should set multiple RAG contexts", () => {
+    it("sets multiple RAG contexts", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const ragContexts = testData.ragContexts();
       const result = langwatchSpan.setRAGContexts(ragContexts);
@@ -215,7 +215,7 @@ describe("span.ts", () => {
   });
 
   describe("setMetrics", () => {
-    it("should set metrics attribute", () => {
+    it("sets metrics attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const metrics = testData.metrics();
       const result = langwatchSpan.setMetrics(metrics);
@@ -230,7 +230,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should handle partial metrics", () => {
+    it("handles partial metrics", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const partialMetrics = { promptTokens: 100 };
       const result = langwatchSpan.setMetrics(partialMetrics);
@@ -248,7 +248,7 @@ describe("span.ts", () => {
 
   describe("input/output methods", () => {
     describe("setInput", () => {
-      it("should set JSON input", () => {
+      it("sets JSON input", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = { prompt: "Hello", temperature: 0.7 };
         const result = langwatchSpan.setInput(input);
@@ -263,7 +263,7 @@ describe("span.ts", () => {
         );
       });
 
-      it("should handle string input", () => {
+      it("handles string input", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = "Simple string input";
         const result = langwatchSpan.setInput(input);
@@ -278,7 +278,7 @@ describe("span.ts", () => {
         );
       });
 
-      it("should handle array input", () => {
+      it("handles array input", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = ["item1", "item2", "item3"];
         const result = langwatchSpan.setInput(input);
@@ -299,7 +299,7 @@ describe("span.ts", () => {
     });
 
     describe("setInputString", () => {
-      it("should set string input with text type", () => {
+      it("sets string input with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = "String input for LLM";
         const result = langwatchSpan.setInput(input);
@@ -316,7 +316,7 @@ describe("span.ts", () => {
     });
 
     describe("setOutput", () => {
-      it("should set JSON output", () => {
+      it("sets JSON output", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = { response: "Hello there!", tokens: 15 };
         const result = langwatchSpan.setOutput(output);
@@ -331,7 +331,7 @@ describe("span.ts", () => {
         );
       });
 
-      it("should handle string output", () => {
+      it("handles string output", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = "Generated response";
         const result = langwatchSpan.setOutput(output);
@@ -348,7 +348,7 @@ describe("span.ts", () => {
     });
 
     describe("setOutputString", () => {
-      it("should set string output with text type", () => {
+      it("sets string output with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = "Generated text response";
         const result = langwatchSpan.setOutput(output);
@@ -368,7 +368,7 @@ describe("span.ts", () => {
 
 
   describe("method chaining", () => {
-    it("should support fluent API chaining", () => {
+    it("supports fluent API chaining", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan
         .setType("llm")
@@ -389,7 +389,7 @@ describe("span.ts", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle empty/null inputs gracefully", () => {
+    it("handles empty/null inputs gracefully", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
       expect(() => langwatchSpan.setInput(null)).not.toThrow();
       expect(() => langwatchSpan.setInput(undefined)).not.toThrow();
@@ -397,12 +397,12 @@ describe("span.ts", () => {
       expect(() => langwatchSpan.setOutput(undefined)).not.toThrow();
     });
 
-    it("should handle empty metrics", () => {
+    it("handles empty metrics", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
       expect(() => langwatchSpan.setMetrics({})).not.toThrow();
     });
 
-    it("should handle complex nested objects", () => {
+    it("handles complex nested objects", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const complexInput = {
         messages: [
@@ -428,7 +428,7 @@ describe("span.ts", () => {
   });
 
   describe("behavioral testing", () => {
-    it("should maintain proper span lifecycle", () => {
+    it("maintains proper span lifecycle", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       // Initially recording
@@ -460,7 +460,7 @@ describe("span.ts", () => {
       });
     });
 
-    it("should handle duplicate end() calls gracefully", () => {
+    it("handles duplicate end() calls gracefully", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       langwatchSpan.end();
@@ -476,7 +476,7 @@ describe("span.ts", () => {
   });
 
   describe("performance characteristics", () => {
-    it("should handle high-frequency attribute setting efficiently", async () => {
+    it("handles high-frequency attribute setting efficiently", async () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
       const { duration } = await performanceUtils.measureTime(async () => {
@@ -489,7 +489,7 @@ describe("span.ts", () => {
       performanceUtils.expectPerformance(duration, { maxDuration: 1000 });
     });
 
-    it("should handle concurrent method calls", async () => {
+    it("handles concurrent method calls", async () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
       const operations = await performanceUtils.createConcurrentOperations(
@@ -512,7 +512,7 @@ describe("span.ts", () => {
   });
 
   describe("setInput and setOutput function overloads", () => {
-    it("should support explicit type overloads for setInput", () => {
+    it("supports explicit type overloads for setInput", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       // Test explicit text type
@@ -547,7 +547,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should support explicit type overloads for setOutput", () => {
+    it("supports explicit type overloads for setOutput", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       // Test explicit text type
@@ -582,7 +582,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should prefer explicit types over auto-detection", () => {
+    it("prefers explicit types over auto-detection", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       // Object that would auto-detect as "json", but explicit "text" should be preferred
@@ -607,7 +607,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should handle chat_messages type correctly", () => {
+    it("handles chat_messages type correctly", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       const messages = [
@@ -634,7 +634,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should handle list type correctly", () => {
+    it("handles list type correctly", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       const list = [
@@ -661,7 +661,7 @@ describe("span.ts", () => {
       );
     });
 
-    it("should handle invalid types gracefully", () => {
+    it("handles invalid types gracefully", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       // Invalid type should fall back to json

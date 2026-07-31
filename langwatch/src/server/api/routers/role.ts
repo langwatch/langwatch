@@ -1,17 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "../enterprise";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import {
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 
 const permissionSchema = permissionFormatSchema;
 

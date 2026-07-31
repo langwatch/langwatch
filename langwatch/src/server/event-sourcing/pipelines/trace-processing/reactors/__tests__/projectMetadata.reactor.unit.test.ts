@@ -11,6 +11,14 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
+const { mockTrackServerEvent } = vi.hoisted(() => ({
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
+}));
+
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
@@ -18,7 +26,6 @@ import {
   createProjectMetadataReactor,
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
-
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -106,6 +113,11 @@ function createMockProjectService() {
     getWithTeam: vi.fn(),
     updateMetadata: vi.fn(),
     isFeatureEnabled: vi.fn(),
+    resolveOrgAdmin: vi.fn().mockResolvedValue({
+      userId: "admin-user-1",
+      organizationId: "org-1",
+      firstMessage: false,
+    }),
     repo: {} as any,
   };
 }
@@ -118,6 +130,7 @@ describe("createProjectMetadataReactor()", () => {
   beforeEach(() => {
     logger.error.mockClear();
     logger.warn.mockClear();
+    mockTrackServerEvent.mockClear();
     mockProjects = createMockProjectService();
     deps = {
       projects: mockProjects as any,
@@ -159,6 +172,63 @@ describe("createProjectMetadataReactor()", () => {
         id: tenantId,
         data: expect.objectContaining({ integrated: true }),
       });
+    });
+
+    /** @scenario First trace tracks the PostHog integration milestone against the org admin */
+    it("tracks first_trace_integrated against the org admin", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const foldState = createFoldState({
+        attributes: {
+          "sdk.language": "python",
+          "langwatch.sdk.framework": "openai",
+        },
+      });
+
+      await reactor.handle(event, createContext(tenantId, foldState));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "admin-user-1",
+        event: "first_trace_integrated",
+        properties: {
+          sdk_language: "python",
+          sdk_framework: "openai",
+        },
+        projectId: tenantId,
+      });
+    });
+
+    /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
+    it("falls back to unknown sdk properties when attributes are absent", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+
+      await reactor.handle(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: {
+            sdk_language: "unknown",
+            sdk_framework: "unknown",
+          },
+        }),
+      );
+    });
+
+    /** @scenario PostHog integration milestone is skipped when the project has no org admin */
+    it("does not track first_trace_integrated when no admin user is found", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+      });
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+
+      await reactor.handle(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -261,6 +331,17 @@ describe("createProjectMetadataReactor()", () => {
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
+
+    /** @scenario PostHog integration milestone fires only on the firstMessage transition */
+    it("does not track first_trace_integrated again", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const context = createContext(tenantId, createFoldState());
+
+      await reactor.handle(event, context);
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe("when project is not found", () => {
@@ -343,7 +424,17 @@ describe("createProjectMetadataReactor()", () => {
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
 
+    /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
+    it("does not track first_trace_integrated for a failed write", async () => {
+      // The next trace retries the write and fires the event then.
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const context = createContext(tenantId, createFoldState());
 
+      await reactor.handle(event, context);
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe("given a project receiving its first real trace", () => {
@@ -503,6 +594,20 @@ describe("createProjectMetadataReactor()", () => {
 
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
         expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+
+      it("does not track first_trace_integrated for the repeat write", async () => {
+        // The event is gated on the firstMessage transition, not on the
+        // metadata write: an integrated-flag repair must not re-fire it.
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(mockTrackServerEvent).not.toHaveBeenCalled();
       });
     });
   });

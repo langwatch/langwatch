@@ -19,12 +19,12 @@
  * outcome summary so the operator knows to attach budgets later.
  */
 
-import { runSeedHeavyUsage } from "../seed-heavy-usage";
 import type {
   SeedAction,
   SeedActionContext,
   SeedActionOutcome,
 } from "../_lib/seedRunner";
+import { runSeedHeavyUsage } from "../seed-heavy-usage";
 
 const DEFAULT_DAYS = 30;
 const DEFAULT_ROWS_PER_PERSONA = 150;

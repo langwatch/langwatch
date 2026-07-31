@@ -1,6 +1,6 @@
 import {
-  useDraggableTabsBrowserStore,
   type Tab,
+  useDraggableTabsBrowserStore,
 } from "./DraggableTabsBrowserStore";
 
 /**

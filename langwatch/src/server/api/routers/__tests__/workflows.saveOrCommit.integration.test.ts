@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { nanoid } from "nanoid";
-import { getTestUser } from "~/utils/testUtils";
-import { prisma } from "~/server/db";
-import { saveOrCommitWorkflowVersion } from "../workflows";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth";
+import { prisma } from "~/server/db";
+import { getTestUser } from "~/utils/testUtils";
+import { saveOrCommitWorkflowVersion } from "../workflows";
 
 /**
  * Integration test for saveOrCommitWorkflowVersion.
@@ -105,9 +105,7 @@ describe("saveOrCommitWorkflowVersion", () => {
 
       // mergeLocalConfigsIntoDsl splits the system message into instructions
       // and keeps only non-system messages in the messages parameter
-      expect(messages?.value).toEqual([
-        { role: "user", content: "{{input}}" },
-      ]);
+      expect(messages?.value).toEqual([{ role: "user", content: "{{input}}" }]);
 
       // localPromptConfig must be stripped
       expect(signatureNode.data.localPromptConfig).toBeUndefined();

@@ -76,7 +76,7 @@ export class SavedViewService {
    * Creates a new saved view with auto-incremented order.
    * When userId is provided, the view becomes personal (only visible to that user).
    */
-  // biome-ignore lint/suspicious/useAdjacentOverloadSignatures: not an overload - static create() creates service, instance create() creates view
+  // Not an overload: the static create() builds the service, this one builds a view.
   async createView({
     projectId,
     input,

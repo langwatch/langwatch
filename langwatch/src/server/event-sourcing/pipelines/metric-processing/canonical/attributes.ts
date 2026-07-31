@@ -1,14 +1,10 @@
+import { compareOrdinal } from "../../../utils/compareOrdinal";
 import type {
   OtlpAnyValue,
   OtlpKeyValue,
 } from "../../trace-processing/schemas/otlp";
-import { compareOrdinal } from "../../../utils/compareOrdinal";
 import { integerDecimal } from "./numbers";
-import {
-  isRecord,
-  stableStringify,
-  type UnknownRecord,
-} from "./serialization";
+import { isRecord, stableStringify, type UnknownRecord } from "./serialization";
 
 export function canonicalAnyValue(
   value: OtlpAnyValue | UnknownRecord | undefined,

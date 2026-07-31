@@ -95,10 +95,9 @@ export const SUGGESTIONS: LangySuggestion[] = [
     // app-layer/langyagent/skills/github/SKILL.md: clone → branch → edit →
     // commit → push → `gh pr create`). It stops there, and so does this copy.
     // Opening an ISSUE and VALIDATING a fix are NOT capabilities today — there
-    // is no `gh issue create` anywhere in the skill, `githubPrLinks` extracts
-    // pull-request URLs only (and has a test asserting it ignores issue URLs),
-    // the progress vocabulary ends at `opened`, and the rate limiter is scoped
-    // to PR permits. Offering either would be a suggestion that reliably fails.
+    // is no `gh issue create` anywhere in the skill, the progress vocabulary
+    // ends at `opened`, and the rate limiter is scoped to PR permits. Offering
+    // either would be a suggestion that reliably fails.
     icon: GitHub,
     label: "Investigate an issue and open a PR",
     prompt:
@@ -120,7 +119,8 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Onboard your agent",
-    prompt: "Help me onboard my agent and send its first trace to this project.",
+    prompt:
+      "Help me onboard my agent and send its first trace to this project.",
     // The first trace arriving is exactly what makes this ask obsolete.
     until: "traces",
   },
@@ -154,9 +154,7 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
  * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
  * a mascot. A fresh one is picked each time the empty state mounts.
  */
-const GREETINGS = [
-  "Hey, I'm Langy!"
-];
+const GREETINGS = ["Hey, I'm Langy!"];
 
 export function EmptyState({
   onPick,

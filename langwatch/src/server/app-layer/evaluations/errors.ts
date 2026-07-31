@@ -25,10 +25,7 @@ export class EvaluationNotFoundError extends NotFoundError {
 export class TraceNotEvaluatableError extends HandledError {
   declare readonly code: "trace_not_evaluatable";
 
-  constructor(
-    traceId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(traceId: string, options: { reasons?: readonly Error[] } = {}) {
     super("trace_not_evaluatable", `Trace ${traceId} is not evaluatable`, {
       meta: { traceId },
       httpStatus: 422,
@@ -44,7 +41,10 @@ export class EvaluatorConfigError extends HandledError {
 
   constructor(
     message: string,
-    options: { meta?: Record<string, unknown>; reasons?: readonly Error[] } = {},
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,

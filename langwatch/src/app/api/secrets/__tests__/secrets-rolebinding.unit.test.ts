@@ -69,7 +69,8 @@ vi.mock("../../middleware/tracer", () => ({
 // the auth module directly, so mock that path (not just the barrel) to inject a
 // project and bypass real auth in this unit test.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
     authMiddleware: async (c: any, next: any) => {
@@ -152,7 +153,7 @@ describe("secrets API fallback owner lookup", () => {
             createdById: "user-rolebinding-only",
             updatedById: "user-rolebinding-only",
           }),
-        })
+        }),
       );
     });
   });
@@ -178,7 +179,7 @@ describe("secrets API fallback owner lookup", () => {
             createdById: "system",
             updatedById: "system",
           }),
-        })
+        }),
       );
     });
   });

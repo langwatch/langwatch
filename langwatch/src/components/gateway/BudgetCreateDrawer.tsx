@@ -10,21 +10,13 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
-import {
-  Boxes,
-  Building2,
-  Folder,
-  KeyRound,
-  User,
-  Users,
-} from "lucide-react";
+import { Boxes, Building2, Folder, KeyRound, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { api } from "~/utils/api";
 
 import { humanizeGatewayError } from "./gatewayErrorCopy";
@@ -348,8 +340,9 @@ export function BudgetCreateDrawer({
                       {targetsLoading
                         ? "Loading…"
                         : `Pick a ${
-                            KIND_OPTIONS.find((o) => o.kind === scopeKind)
-                              ?.label.toLowerCase() ?? "target"
+                            KIND_OPTIONS.find(
+                              (o) => o.kind === scopeKind,
+                            )?.label.toLowerCase() ?? "target"
                           }`}
                     </option>
                     {(targetOptions ?? []).map((t) => (
@@ -458,13 +451,13 @@ export function BudgetCreateDrawer({
                 <NativeSelect.Field
                   value={onBreach}
                   onChange={(e) =>
-                    setOnBreach(
-                      (e.target.value as "BLOCK" | "WARN") ?? "BLOCK",
-                    )
+                    setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
                   }
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
-                  <option value="WARN">Warn: tag responses, keep serving</option>
+                  <option value="WARN">
+                    Warn: tag responses, keep serving
+                  </option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Field.Root>

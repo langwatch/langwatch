@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { createTenantId } from "../../../../domain/tenantId";
-import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
+import { FoldProjectionExecutor } from "../../../../projections/foldProjectionExecutor";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,

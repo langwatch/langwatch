@@ -118,71 +118,71 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       closeOnInteractOutside={!pinned}
       onOpenChange={() => handleClose()}
     >
-        <Drawer.Content
-          // Transparent at the Content level so the header section
-          // below can run its own translucent + backdrop-blur fill
-          // (page content behind the drawer reads through blurred,
-          // consistent with the rest of the site's translucent
-          // chrome — see BelowFoldIndicator, sequence overlays).
-          // The lower pane container has its own `bg.surface` white,
-          // so only the header area is translucent — everything
-          // below stays solid white.
-          bg="transparent"
-          ref={drawerContentRef}
+      <Drawer.Content
+        // Transparent at the Content level so the header section
+        // below can run its own translucent + backdrop-blur fill
+        // (page content behind the drawer reads through blurred,
+        // consistent with the rest of the site's translucent
+        // chrome — see BelowFoldIndicator, sequence overlays).
+        // The lower pane container has its own `bg.surface` white,
+        // so only the header area is translucent — everything
+        // below stays solid white.
+        bg="transparent"
+        ref={drawerContentRef}
+        paddingX={0}
+        // When `contentWidthStyle` is set (non-compact viewports) the
+        // inline style below owns width/maxWidth. The fallback here
+        // only matters on compact viewports (<md), where we want
+        // the drawer full-bleed — the operator can't drag on a
+        // phone-sized window anyway.
+        maxWidth={contentWidthStyle ? undefined : "100vw"}
+        width={contentWidthStyle ? undefined : "100vw"}
+        // The ResizeRail renders the visible pill in a 10px gutter
+        // *outside* the drawer's left edge. Allow horizontal overflow
+        // so that bit isn't clipped; the body itself still clips its
+        // own scroll content.
+        overflow="visible"
+        // Anchor for the empty-state onboarding tour: a global
+        // CSS rule keyed off `body[data-traces-tour-stage]`
+        // applies a soft blue glow to this element during
+        // `drawerOverview` so the user knows where the tour copy
+        // is pointing. No-op outside the onboarding journey.
+        data-tour-target="drawer"
+        style={contentWidthStyle}
+      >
+        <ResizeRail />
+        <Drawer.Body
+          paddingY={0}
           paddingX={0}
-          // When `contentWidthStyle` is set (non-compact viewports) the
-          // inline style below owns width/maxWidth. The fallback here
-          // only matters on compact viewports (<md), where we want
-          // the drawer full-bleed — the operator can't drag on a
-          // phone-sized window anyway.
-          maxWidth={contentWidthStyle ? undefined : "100vw"}
-          width={contentWidthStyle ? undefined : "100vw"}
-          // The ResizeRail renders the visible pill in a 10px gutter
-          // *outside* the drawer's left edge. Allow horizontal overflow
-          // so that bit isn't clipped; the body itself still clips its
-          // own scroll content.
-          overflow="visible"
-          // Anchor for the empty-state onboarding tour: a global
-          // CSS rule keyed off `body[data-traces-tour-stage]`
-          // applies a soft blue glow to this element during
-          // `drawerOverview` so the user knows where the tour copy
-          // is pointing. No-op outside the onboarding journey.
-          data-tour-target="drawer"
-          style={contentWidthStyle}
+          // The drawer body NEVER scrolls — every section inside is
+          // its own pane with its own scroll viewport. This is the
+          // headline behaviour change in the DevTools-inspired
+          // redesign: no more single drawer scroller chasing
+          // sections up and down.
+          overflow="hidden"
+          // Clip the inner panel backgrounds (bg.surface in light
+          // mode) to the drawer's rounded chrome. Without this the
+          // white pane fills extend past the bottom-left corner of
+          // the drawer since Drawer.Content runs with overflow:visible
+          // (to let the ResizeRail pill escape the chrome).
+          borderRadius="lg"
+          display="flex"
+          flexDirection="column"
+          minHeight={0}
+          // Positioning context for the trace-switch refresh overlay below.
+          position="relative"
         >
-          <ResizeRail />
-          <Drawer.Body
-            paddingY={0}
-            paddingX={0}
-            // The drawer body NEVER scrolls — every section inside is
-            // its own pane with its own scroll viewport. This is the
-            // headline behaviour change in the DevTools-inspired
-            // redesign: no more single drawer scroller chasing
-            // sections up and down.
-            overflow="hidden"
-            // Clip the inner panel backgrounds (bg.surface in light
-            // mode) to the drawer's rounded chrome. Without this the
-            // white pane fills extend past the bottom-left corner of
-            // the drawer since Drawer.Content runs with overflow:visible
-            // (to let the ResizeRail pill escape the chrome).
-            borderRadius="lg"
-            display="flex"
-            flexDirection="column"
-            minHeight={0}
-            // Positioning context for the trace-switch refresh overlay below.
-            position="relative"
-          >
-            <TraceDrawerContent
-              traceId={traceId}
-              trace={trace}
-              spanTree={spanTree}
-              selectedSpan={selectedSpan}
-              isLoading={isLoading}
-              isSpansLoading={spanTreeQuery.isLoading}
-              onClose={handleClose}
-            />
-          </Drawer.Body>
-        </Drawer.Content>
+          <TraceDrawerContent
+            traceId={traceId}
+            trace={trace}
+            spanTree={spanTree}
+            selectedSpan={selectedSpan}
+            isLoading={isLoading}
+            isSpansLoading={spanTreeQuery.isLoading}
+            onClose={handleClose}
+          />
+        </Drawer.Body>
+      </Drawer.Content>
       <KeyboardShortcutsHelp
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}

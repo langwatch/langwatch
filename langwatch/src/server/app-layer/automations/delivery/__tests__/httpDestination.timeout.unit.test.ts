@@ -44,28 +44,24 @@ afterAll(async () => {
 
 describe("sendHttpDestination against a real endpoint", () => {
   describe("when the endpoint accepts the connection but never responds", () => {
-    it(
-      "rejects within the requested timeout instead of riding undici's 300s default",
-      async () => {
-        const timeoutMs = 500;
-        const startedAt = Date.now();
+    it("rejects within the requested timeout instead of riding undici's 300s default", async () => {
+      const timeoutMs = 500;
+      const startedAt = Date.now();
 
-        const error = (await sendHttpDestination({
-          url: `${baseUrl}/never-responds`,
-          body: "{}",
-          timeoutMs,
-          contextLabel: "slowloris webhook",
-        }).catch((err: unknown) => err)) as DispatchError;
+      const error = (await sendHttpDestination({
+        url: `${baseUrl}/never-responds`,
+        body: "{}",
+        timeoutMs,
+        contextLabel: "slowloris webhook",
+      }).catch((err: unknown) => err)) as DispatchError;
 
-        const elapsedMs = Date.now() - startedAt;
+      const elapsedMs = Date.now() - startedAt;
 
-        expect(error).toBeInstanceOf(DispatchError);
-        // A timeout is transient — the drainer should retry, not dead-letter.
-        expect(error.retryable).toBe(true);
-        expect(error.message).toContain("slowloris webhook");
-        expect(elapsedMs).toBeLessThan(timeoutMs * 10);
-      },
-      20_000,
-    );
+      expect(error).toBeInstanceOf(DispatchError);
+      // A timeout is transient — the drainer should retry, not dead-letter.
+      expect(error.retryable).toBe(true);
+      expect(error.message).toContain("slowloris webhook");
+      expect(elapsedMs).toBeLessThan(timeoutMs * 10);
+    }, 20_000);
   });
 });

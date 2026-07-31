@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { JOB_RETRY_CONFIG } from "../../shared";
-import { legacyStagedJobAttempt } from "../legacyStagedJobAttempt";
 import { readJobAttempt } from "../jobEnvelope";
+import { legacyStagedJobAttempt } from "../legacyStagedJobAttempt";
 
 const BASE =
   "event_000649zPnIW3V0Ug6yVk9DECNYK3S/subscriber/pm:langyConversation";
@@ -59,7 +59,9 @@ describe("legacyStagedJobAttempt", () => {
           legacyStagedJobAttempt(`${BASE}/r/${JOB_RETRY_CONFIG.maxAttempts}`),
         ).toBe(JOB_RETRY_CONFIG.maxAttempts);
         expect(
-          legacyStagedJobAttempt(`${BASE}/r/${JOB_RETRY_CONFIG.maxAttempts + 1}`),
+          legacyStagedJobAttempt(
+            `${BASE}/r/${JOB_RETRY_CONFIG.maxAttempts + 1}`,
+          ),
         ).toBe(0);
       });
     });

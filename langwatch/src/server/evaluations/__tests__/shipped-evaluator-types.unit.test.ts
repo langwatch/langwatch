@@ -99,9 +99,7 @@ describe("the evaluator types our shipped instructions teach", () => {
         ({ slug }) => !(slug in AVAILABLE_EVALUATORS),
       );
 
-      expect(
-        invalid.map(({ slug, file }) => `${slug} (${file})`),
-      ).toEqual([]);
+      expect(invalid.map(({ slug, file }) => `${slug} (${file})`)).toEqual([]);
     });
   });
 

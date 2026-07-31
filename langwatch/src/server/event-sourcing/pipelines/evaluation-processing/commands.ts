@@ -1,8 +1,8 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
-  evaluationStartedEventDataSchema,
   evaluationCompletedEventDataSchema,
   evaluationReportedEventDataSchema,
+  evaluationStartedEventDataSchema,
 } from "./schemas/events";
 
 /**

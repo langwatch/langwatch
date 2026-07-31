@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  actionCommands,
+  allStaticCommands,
   filterCommands,
   navigationCommands,
-  actionCommands,
   supportCommands,
   themeCommands,
-  allStaticCommands,
   topLevelNavigationCommands,
 } from "../command-registry";
 
@@ -69,7 +69,7 @@ describe("command-registry", () => {
 
     it("includes settings command", () => {
       const settings = navigationCommands.find(
-        (cmd) => cmd.id === "nav-settings"
+        (cmd) => cmd.id === "nav-settings",
       );
       expect(settings).toBeDefined();
       expect(settings?.path).toBe("/settings");
@@ -95,14 +95,14 @@ describe("command-registry", () => {
 
     it("includes new agent command", () => {
       const newAgent = actionCommands.find(
-        (cmd) => cmd.id === "action-new-agent"
+        (cmd) => cmd.id === "action-new-agent",
       );
       expect(newAgent).toBeDefined();
     });
 
     it("includes new evaluation command", () => {
       const newEval = actionCommands.find(
-        (cmd) => cmd.id === "action-new-evaluation"
+        (cmd) => cmd.id === "action-new-evaluation",
       );
       expect(newEval).toBeDefined();
     });
@@ -114,7 +114,7 @@ describe("command-registry", () => {
         navigationCommands.length +
           actionCommands.length +
           supportCommands.length +
-          themeCommands.length
+          themeCommands.length,
       );
     });
   });

@@ -19,7 +19,6 @@
  */
 process.env.TZ = "Asia/Kolkata";
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import {
@@ -35,12 +34,17 @@ const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  return new TraceAnalyticsClickHouseRepository(async () => clientReturning(record));
+  return new TraceAnalyticsClickHouseRepository(async () =>
+    clientReturning(record),
+  );
 }
 
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
   const { client, seen } = orderingClient(rows);
-  return { repository: new TraceAnalyticsClickHouseRepository(async () => client), seen };
+  return {
+    repository: new TraceAnalyticsClickHouseRepository(async () => client),
+    seen,
+  };
 }
 
 /** A committed version of one trace, with the fold-progress columns spelled out. */
@@ -92,9 +96,13 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
           traceId: TRACE_ID,
         });
 
-        expect(read?.row.occurredAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 0, 123));
+        expect(read?.row.occurredAtMs).toBe(
+          Date.UTC(2026, 6, 24, 12, 0, 0, 123),
+        );
         expect(read?.row.createdAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 1, 0));
-        expect(read?.row.updatedAtMs).toBe(Date.UTC(2026, 6, 24, 12, 0, 2, 500));
+        expect(read?.row.updatedAtMs).toBe(
+          Date.UTC(2026, 6, 24, 12, 0, 2, 500),
+        );
       });
     });
   });
@@ -207,7 +215,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given a caller-supplied window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as a window hit", async () => {
-        const before = await windowedReadCount({ table: TABLE, outcome: "hit" });
+        const before = await windowedReadCount({
+          table: TABLE,
+          outcome: "hit",
+        });
         const { repository } = makeOrderingRepository([]);
 
         await repository.findByTraceIdWithApplied({
@@ -216,7 +227,9 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(before + 1);
+        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
+          before + 1,
+        );
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -264,7 +277,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given no window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as unwindowed", async () => {
-        const before = await windowedReadCount({ table: TABLE, outcome: "unwindowed" });
+        const before = await windowedReadCount({
+          table: TABLE,
+          outcome: "unwindowed",
+        });
         const { repository, seen } = makeOrderingRepository([]);
 
         await repository.findByTraceIdWithApplied({
@@ -272,7 +288,9 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           traceId: TRACE_ID,
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
+        expect(
+          await windowedReadCount({ table: TABLE, outcome: "unwindowed" }),
+        ).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });
@@ -296,6 +314,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     tenantId: TENANT_ID,
     traceId: TRACE_ID,
     version: "2026-07-27",
+    hasSignal: true,
     occurredAtMs: 1_750_000_000_000,
     createdAtMs: 1_750_000_000_000,
     updatedAtMs: 1_750_000_000_000,
@@ -328,6 +347,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     rootMetadataFromFallback: false,
     traceNameUserOverridden: false,
     lastEventOccurredAt: 1_750_000_000_000,
+    earliestSpanStartMs: 1_750_000_000_000,
   };
 
   describe("given a table that predates the row's columns", () => {

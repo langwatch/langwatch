@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProjectionRegistry } from "../projectionRegistry";
-import { ConfigurationError } from "../../services/errorHandling";
+import type { Event } from "../../domain/types";
+import type { EventSourcedQueueProcessor } from "../../queues";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
@@ -8,10 +9,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
-import type { Event } from "../../domain/types";
-import type { EventSourcedQueueProcessor } from "../../queues";
 import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { ProjectionRegistry } from "../projectionRegistry";
 
 function createMockGlobalQueue(): {
   globalQueue: EventSourcedQueueProcessor<Record<string, unknown>>;
@@ -104,9 +103,9 @@ describe("ProjectionRegistry", () => {
         const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
         registry.initialize(globalQueue, globalJobRegistry);
 
-        expect(() => registry.initialize(globalQueue, globalJobRegistry)).toThrow(
-          /Already initialized/,
-        );
+        expect(() =>
+          registry.initialize(globalQueue, globalJobRegistry),
+        ).toThrow(/Already initialized/);
       });
     });
 
@@ -120,7 +119,9 @@ describe("ProjectionRegistry", () => {
         registry.initialize(globalQueue, globalJobRegistry);
         await registry.close();
 
-        expect(() => registry.initialize(globalQueue, globalJobRegistry)).not.toThrow();
+        expect(() =>
+          registry.initialize(globalQueue, globalJobRegistry),
+        ).not.toThrow();
       });
     });
   });
@@ -239,7 +240,9 @@ describe("ProjectionRegistry", () => {
         registry.registerReactor("myFold", createMockReactor("myReactor"));
 
         const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
-        expect(() => registry.initialize(globalQueue, globalJobRegistry)).not.toThrow();
+        expect(() =>
+          registry.initialize(globalQueue, globalJobRegistry),
+        ).not.toThrow();
       });
     });
   });

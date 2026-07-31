@@ -28,7 +28,9 @@ function assertLocalEndpoint(endpoint: string): void {
   try {
     hostname = new URL(endpoint).hostname;
   } catch {
-    console.error(`Refusing to seed: HAVEN_SEED_ENDPOINT is not a valid URL (${endpoint}).`);
+    console.error(
+      `Refusing to seed: HAVEN_SEED_ENDPOINT is not a valid URL (${endpoint}).`,
+    );
     process.exit(1);
   }
   const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();

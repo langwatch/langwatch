@@ -19,10 +19,17 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import type {
+  EventSourcedQueueDefinition,
+  JobDelivery,
+} from "../../queue.types";
 import { JOB_RETRY_CONFIG } from "../../shared";
-import type { EventSourcedQueueDefinition, JobDelivery } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { encodeJobEnvelope, readJobAttempt, withJobAttempt } from "../jobEnvelope";
+import {
+  encodeJobEnvelope,
+  readJobAttempt,
+  withJobAttempt,
+} from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import {
   DEFAULT_CLAIM_STRIKE_THRESHOLD,
@@ -30,9 +37,9 @@ import {
 } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
 import {
-  incompressible,
   InMemoryJobBlobStore,
   InMemoryObjectStore,
+  incompressible,
 } from "./blobTestDoubles";
 
 // Skip outside testcontainers (e.g. plain unit runs) — mirrors the other
@@ -57,8 +64,10 @@ type TestPayload = {
 /** Tenant prefix on groupIds so GQ2 (content-addressed, tenant-namespaced) engages. */
 const TENANT = "proj1";
 const PROJECT = createTenantId(TENANT);
-const STORAGE_DESTINATION = async () =>
-  ({ kind: "s3" as const, bucket: "test-bucket" });
+const STORAGE_DESTINATION = async () => ({
+  kind: "s3" as const,
+  bucket: "test-bucket",
+});
 
 /** > the 256 KiB s3 threshold once gzipped (see groupQueue.gq2.integration.test.ts). */
 const OFFLOADABLE_S3_VALUE = () => incompressible(768 * 1024);
@@ -159,7 +168,8 @@ describe.skipIf(!hasTestcontainers)(
       redis.get(attemptKey(name, groupId));
     const failStreak = (name: string, groupId: string) =>
       redis.get(failStreakKey(name, groupId));
-    const blockedMembers = (name: string) => redis.smembers(`${name}:gq:blocked`);
+    const blockedMembers = (name: string) =>
+      redis.smembers(`${name}:gq:blocked`);
     const readyScore = (name: string, groupId: string) =>
       redis.zscore(`${name}:gq:ready`, groupId);
     const totalPending = (name: string) =>
@@ -199,10 +209,7 @@ describe.skipIf(!hasTestcontainers)(
       stagedJobId: string;
       objectStore: InMemoryObjectStore;
       attempt?: number;
-      routing?: Pick<
-        TestPayload,
-        "__pipelineName" | "__jobType" | "__jobName"
-      >;
+      routing?: Pick<TestPayload, "__pipelineName" | "__jobType" | "__jobName">;
     }): Promise<void> {
       const tiered = new TieredBlobStore({
         redisBlobs: new InMemoryJobBlobStore(),
@@ -621,7 +628,10 @@ describe.skipIf(!hasTestcontainers)(
         groupId: string;
         chainAt: number;
         onDelivery: (delivery: JobDelivery | undefined) => void;
-      }): Promise<{ queue: GroupQueueProcessor<TestPayload>; payload: TestPayload }> {
+      }): Promise<{
+        queue: GroupQueueProcessor<TestPayload>;
+        payload: TestPayload;
+      }> {
         const queue = newQueue({
           name,
           processFn: async (_p, delivery) => {
@@ -738,9 +748,9 @@ describe.skipIf(!hasTestcontainers)(
           await queue.send(payload);
 
           // The redelivery pulled the job's OWN position forward to now...
-          expect(Number(await stagedScore(name, groupId, stagedJobId))).toBeLessThan(
-            backoffDeadline,
-          );
+          expect(
+            Number(await stagedScore(name, groupId, stagedJobId)),
+          ).toBeLessThan(backoffDeadline);
           // ...but the group's hold is untouched: the ready score still names
           // the backoff deadline and the active key still locks the group.
           expect(Number(await readyScore(name, groupId))).toBe(backoffDeadline);
@@ -788,10 +798,13 @@ describe.skipIf(!hasTestcontainers)(
               __jobName: "pm:langyConversation",
             });
 
-            await vi.waitFor(() => expect(probe.beats.beforeTick).toBeGreaterThan(0), {
-              timeout: 15000,
-              interval: 25,
-            });
+            await vi.waitFor(
+              () => expect(probe.beats.beforeTick).toBeGreaterThan(0),
+              {
+                timeout: 15000,
+                interval: 25,
+              },
+            );
             expect(failures).toBeGreaterThan(0);
             // Control: the heartbeat WAS armed and the probe did observe it.
             expect(probe.refreshed).toContain(
@@ -1109,9 +1122,9 @@ describe.skipIf(!hasTestcontainers)(
 
           // Pre-ADR-080 the promptly-unblocked group came back on attempt 25
           // and the patient operator's group came back on attempt 1.
-          expect(seen.filter((s) => s.groupId === promptGroup)[1]!.attempt).toBe(
-            1,
-          );
+          expect(
+            seen.filter((s) => s.groupId === promptGroup)[1]!.attempt,
+          ).toBe(1);
           expect(seen.filter((s) => s.groupId === lateGroup)[1]!.attempt).toBe(
             1,
           );
@@ -1199,7 +1212,12 @@ describe.skipIf(!hasTestcontainers)(
           // A group that has already been round the ladder several times.
           await redis.set(attemptKey(name, groupId), "9");
 
-          await runLadderOnce({ name, groupId, objectStore, expectChain: "10" });
+          await runLadderOnce({
+            name,
+            groupId,
+            objectStore,
+            expectChain: "10",
+          });
 
           expect(await stagedIds(name, groupId)).toEqual([stagedJobId]);
         }, 45000);
@@ -1340,7 +1358,9 @@ describe.skipIf(!hasTestcontainers)(
             ...routing,
           });
           expect(readJobAttempt(bareJson)).toBeNull();
-          expect(withJobAttempt({ value: bareJson, attempt: 9 })).toBe(bareJson);
+          expect(withJobAttempt({ value: bareJson, attempt: 9 })).toBe(
+            bareJson,
+          );
 
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.stageBatch([
@@ -1547,8 +1567,7 @@ describe.skipIf(!hasTestcontainers)(
           const name = freshName();
           const groupId = `${TENANT}/legacy-resumes`;
           const objectStore = new UnreachableObjectStore();
-          const legacyId =
-            "event_resume/subscriber/pm:langyConversation/r/7";
+          const legacyId = "event_resume/subscriber/pm:langyConversation/r/7";
 
           // Neither its message nor its group can say how far it got: the
           // count was recorded ONLY in the id, which is exactly the in-flight

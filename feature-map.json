@@ -849,7 +849,8 @@
                 "virtual-keys create",
                 "virtual-keys update",
                 "virtual-keys rotate",
-                "virtual-keys revoke"
+                "virtual-keys revoke",
+                "virtual-keys spend"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/virtual-keys.md"

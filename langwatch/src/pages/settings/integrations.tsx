@@ -20,10 +20,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 
 import SettingsLayout from "../../components/SettingsLayout";
+import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -40,6 +42,26 @@ export default withPermissionGuard("organization:manage", {
 
 function IntegrationsContent({ organizationId }: { organizationId: string }) {
   const status = api.langyGithub.getInstallStatus.useQuery({ organizationId });
+  const router = useRouter();
+
+  useEffect(() => {
+    const githubError = router.query.githubError;
+    if (typeof githubError !== "string") return;
+
+    toaster.create({
+      type: "error",
+      title: "GitHub installation failed",
+      description: githubError,
+    });
+
+    const { githubError: _drop, ...rest } = router.query;
+    void router.replace({ pathname: router.pathname, query: rest }, undefined, {
+      shallow: true,
+      scroll: false,
+    });
+    // Intentionally keyed only on the error value, not the whole router object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.githubError]);
 
   const onInstall = () => {
     const ret = encodeURIComponent("/settings/integrations#github");
@@ -154,7 +176,12 @@ function InstallationRow({
         }`;
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={3}
+    >
       <HStack justify="space-between" gap={3}>
         <VStack align="stretch" gap={0}>
           <HStack gap={2}>
@@ -172,8 +199,7 @@ function InstallationRow({
           </Text>
           {uninstallStarted ? (
             <Text fontSize="xs" color="fg.muted">
-              Finish uninstalling on GitHub — this updates once GitHub
-              confirms.
+              Finish uninstalling on GitHub — this updates once GitHub confirms.
             </Text>
           ) : null}
         </VStack>

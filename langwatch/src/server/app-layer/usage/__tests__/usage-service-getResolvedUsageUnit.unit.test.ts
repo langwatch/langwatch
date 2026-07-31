@@ -1,11 +1,11 @@
+import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
-import type { PlanResolver } from "../../subscription/plan-provider";
-import type { OrganizationService } from "../../organizations/organization.service";
-import { UsageService } from "../usage.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
-import { PricingModel } from "@prisma/client";
+import type { OrganizationService } from "../../organizations/organization.service";
+import type { PlanResolver } from "../../subscription/plan-provider";
+import { UsageService } from "../usage.service";
 
 vi.mock("~/env.mjs", () => ({
   env: { IS_SAAS: true },

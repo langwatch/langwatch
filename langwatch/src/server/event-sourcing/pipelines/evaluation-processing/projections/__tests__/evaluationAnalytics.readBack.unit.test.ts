@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { EvaluationCompletedEvent } from "../../schemas/events";
-import { EvaluationAnalyticsStore } from "../evaluationAnalytics.store";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -11,6 +10,7 @@ import {
   evaluationAnalyticsStateFromRow,
   projectEvaluationAnalyticsStateToRow,
 } from "../evaluationAnalytics.foldProjection";
+import { EvaluationAnalyticsStore } from "../evaluationAnalytics.store";
 
 /**
  * Read-back round-trip for the slim evaluation fold (ADR-066). `fromRow`

@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
+import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
+import { EventStoreMemory } from "../../stores/eventStoreMemory";
+import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
@@ -299,9 +299,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         context,
         aggregateType,
       );
-      const event1Count = finalEvents.filter(
-        (e) => e.id === event1.id,
-      ).length;
+      const event1Count = finalEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
       expect(finalEvents).toHaveLength(2);
 

@@ -12,28 +12,35 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Dialog } from "~/components/ui/dialog";
-import { Select } from "~/components/ui/select";
-import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Plus,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
+import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
+import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import {
-  useDepartmentColumn,
   type DepartmentOption,
+  useDepartmentColumn,
 } from "../../components/settings/useDepartmentColumn";
-import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
+import { api } from "../../utils/api";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
-type DirectMember = TeamData["directMembers"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
 
 // ── Role options ──────────────────────────────────────────────────────────────
@@ -69,11 +76,15 @@ function RoleSelect({
 
   const roleItems = [
     ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+    ...(customRoles.data ?? []).map((r) => ({
+      label: r.name,
+      value: `CUSTOM:${r.id}`,
+    })),
   ];
   const roleCollection = createListCollection({ items: roleItems });
 
-  const selectValue = value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
+  const selectValue =
+    value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
 
   return (
     <Select.Root
@@ -124,14 +135,20 @@ function AddToTeamDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("MEMBER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
+    undefined,
+  );
   const queryClient = api.useContext();
 
-  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId, includeDeactivated: false },
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: false },
+      { enabled: open },
+    );
+  const customRoles = api.role.getAll.useQuery(
+    { organizationId },
     { enabled: open },
   );
-  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -139,30 +156,39 @@ function AddToTeamDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) => {
-      toaster.create({ title: e.message, type: "error" });
-    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
   });
 
   const userItems = useMemo(
-    () => (orgMembers.data?.members ?? [])
-      .filter((m) => !existingMemberIds.includes(m.userId))
-      .map((m) => ({
-        label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-        value: m.userId,
-      })),
+    () =>
+      (orgMembers.data?.members ?? [])
+        .filter((m) => !existingMemberIds.includes(m.userId))
+        .map((m) => ({
+          label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+          value: m.userId,
+        })),
     [orgMembers.data, existingMemberIds],
   );
-  const userCollection = useMemo(() => createListCollection({ items: userItems }), [userItems]);
+  const userCollection = useMemo(
+    () => createListCollection({ items: userItems }),
+    [userItems],
+  );
 
   const allRoleItems = useMemo(
     () => [
       ...BASE_ROLE_ITEMS,
-      ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+      ...(customRoles.data ?? []).map((r) => ({
+        label: r.name,
+        value: `CUSTOM:${r.id}`,
+      })),
     ],
     [customRoles.data],
   );
-  const allRoleCollection = useMemo(() => createListCollection({ items: allRoleItems }), [allRoleItems]);
+  const allRoleCollection = useMemo(
+    () => createListCollection({ items: allRoleItems }),
+    [allRoleItems],
+  );
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -225,12 +251,15 @@ function AddToTeamDialog({
             </Field.Root>
 
             <Text fontSize="sm" color="gray.500">
-              This gives them access to all projects in the team at this role level.
+              This gives them access to all projects in the team at this role
+              level.
             </Text>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             disabled={!userId}
             loading={create.isPending}
@@ -270,14 +299,20 @@ function AddToProjectDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("VIEWER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
+    undefined,
+  );
   const queryClient = api.useContext();
 
-  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId, includeDeactivated: false },
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: false },
+      { enabled: open },
+    );
+  const customRoles = api.role.getAll.useQuery(
+    { organizationId },
     { enabled: open },
   );
-  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -285,9 +320,8 @@ function AddToProjectDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) => {
-      toaster.create({ title: e.message, type: "error" });
-    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
   });
 
   const userItems = (orgMembers.data?.members ?? []).map((m) => ({
@@ -298,7 +332,10 @@ function AddToProjectDialog({
 
   const allRoleItems = [
     ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+    ...(customRoles.data ?? []).map((r) => ({
+      label: r.name,
+      value: `CUSTOM:${r.id}`,
+    })),
   ];
   const allRoleCollection = createListCollection({ items: allRoleItems });
 
@@ -363,12 +400,15 @@ function AddToProjectDialog({
             </Field.Root>
 
             <Text fontSize="sm" color="gray.500">
-              If they&apos;re already on the team, this overrides their team role for this project only.
+              If they&apos;re already on the team, this overrides their team
+              role for this project only.
             </Text>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             disabled={!userId}
             loading={create.isPending}
@@ -417,7 +457,8 @@ function ProjectSection({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the access" }),
   });
 
   const inherited = access.filter((a) => a.source === "team");
@@ -426,12 +467,7 @@ function ProjectSection({
 
   return (
     <>
-      <Box
-        borderWidth="1px"
-        borderRadius="md"
-        mb={2}
-        overflow="hidden"
-      >
+      <Box borderWidth="1px" borderRadius="md" mb={2} overflow="hidden">
         <HStack
           px={3}
           py={2}
@@ -439,11 +475,7 @@ function ProjectSection({
           onClick={() => setExpanded((v) => !v)}
           _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
         >
-          {expanded ? (
-            <ChevronDown size={14} />
-          ) : (
-            <ChevronRight size={14} />
-          )}
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <Text fontSize="sm" fontWeight="medium">
             📁 {project.name}
           </Text>
@@ -487,11 +519,7 @@ function ProjectSection({
         </HStack>
 
         {expanded && (
-          <Box
-            px={3}
-            pb={3}
-            borderTopWidth="1px"
-          >
+          <Box px={3} pb={3} borderTopWidth="1px">
             {/* Inherited from team */}
             {inherited.length > 0 && (
               <Box mt={3}>
@@ -506,23 +534,28 @@ function ProjectSection({
                   Inherited from team
                 </Text>
                 {inherited.map((m, i) => (
-                  <HStack
-                    key={i}
-                    py={1}
-                    opacity={0.5}
-                    fontSize="sm"
-                  >
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                  <HStack key={i} py={1} opacity={0.5} fontSize="sm">
+                    <RandomColorAvatar
+                      name={m.name}
+                      image={m.image}
+                      size="xs"
+                    />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.customRoleName ?? m.role}
                     </Badge>
                     {m.viaGroupName ? (
-                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
+                      <Link
+                        href="/settings/groups"
+                        fontSize="xs"
+                        color="purple.400"
+                      >
                         via {m.viaGroupName}
                       </Link>
                     ) : (
-                      <Text fontSize="xs" color="gray.400">from team</Text>
+                      <Text fontSize="xs" color="gray.400">
+                        from team
+                      </Text>
                     )}
                   </HStack>
                 ))}
@@ -544,16 +577,15 @@ function ProjectSection({
                 </Text>
                 {projectLevel.map((m, i) => (
                   <HStack key={i} py={1} fontSize="sm">
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <RandomColorAvatar
+                      name={m.name}
+                      image={m.image}
+                      size="xs"
+                    />
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
-                        <Text
-                          as="span"
-                          fontSize="xs"
-                          color="gray.400"
-                          ml={2}
-                        >
+                        <Text as="span" fontSize="xs" color="gray.400" ml={2}>
                           team role: {m.teamRole}
                         </Text>
                       )}
@@ -570,7 +602,9 @@ function ProjectSection({
                       <Button
                         size="xs"
                         variant="ghost"
-                        color={m.source === "override" ? "orange.400" : "gray.400"}
+                        color={
+                          m.source === "override" ? "orange.400" : "gray.400"
+                        }
                         title={
                           m.source === "override"
                             ? "Remove override, revert to team role"
@@ -601,12 +635,7 @@ function ProjectSection({
 
             {/* Empty state */}
             {projectLevel.length === 0 && inherited.length > 0 && (
-              <Text
-                fontSize="xs"
-                color="gray.400"
-                fontStyle="italic"
-                mt={2}
-              >
+              <Text fontSize="xs" color="gray.400" fontStyle="italic" mt={2}>
                 No project-level overrides. Everyone uses their team role.
               </Text>
             )}
@@ -704,17 +733,24 @@ function TeamCard({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
   });
 
   const updateBinding = api.roleBinding.update.useMutation({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the member's role",
+      }),
   });
 
-  const existingMemberIds = team.directMembers.flatMap((m) => m.userId ? [m.userId] : []);
+  const existingMemberIds = team.directMembers.flatMap((m) =>
+    m.userId ? [m.userId] : [],
+  );
 
   return (
     <>
@@ -727,11 +763,7 @@ function TeamCard({
           onClick={() => setExpanded((v) => !v)}
           _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
         >
-          {expanded ? (
-            <ChevronDown size={16} />
-          ) : (
-            <ChevronRight size={16} />
-          )}
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Text fontWeight="semibold">{team.name}</Text>
           <Spacer />
           <Text fontSize="sm" color="gray.500">
@@ -767,10 +799,7 @@ function TeamCard({
         </HStack>
 
         {expanded && (
-          <Card.Body
-            pt={0}
-            borderTopWidth="1px"
-          >
+          <Card.Body pt={0} borderTopWidth="1px">
             {/* ── Team members (team-scoped bindings, editable) ── */}
             <Box mt={4}>
               <HStack mb={3}>
@@ -813,7 +842,11 @@ function TeamCard({
                     _dark={{ borderColor: "gray.700" }}
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <RandomColorAvatar
+                      name={m.name}
+                      image={m.image}
+                      size="xs"
+                    />
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
@@ -822,7 +855,11 @@ function TeamCard({
                         <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                           {m.customRoleName ?? m.role}
                         </Badge>
-                        <Link href="/settings/groups" fontSize="xs" color="purple.400">
+                        <Link
+                          href="/settings/groups"
+                          fontSize="xs"
+                          color="purple.400"
+                        >
                           via {m.viaGroupName}
                         </Link>
                       </>
@@ -894,7 +931,11 @@ function TeamCard({
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <RandomColorAvatar
+                      name={m.name}
+                      image={m.image}
+                      size="xs"
+                    />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}
@@ -1014,7 +1055,9 @@ function TeamsAndProjects() {
           </Box>
           <Spacer />
           {hasPermission("project:create") && (
-            <PageLayout.HeaderButton onClick={() => openDrawer("createProject")}>
+            <PageLayout.HeaderButton
+              onClick={() => openDrawer("createProject")}
+            >
               <Plus size={16} />
               Add project
             </PageLayout.HeaderButton>

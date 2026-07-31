@@ -263,12 +263,10 @@ describe("spanTreeQueryFn progressive publishing", () => {
         { nodes: [node("c")], nextCursor: null },
       ]);
       const originalSet = queryClient.setQueryData.bind(queryClient);
-      vi.spyOn(queryClient, "setQueryData").mockImplementation(
-        (key, data) => {
-          published.push((data as SpanTreeNode[]).map((n) => n.spanId));
-          return originalSet(key, data);
-        },
-      );
+      vi.spyOn(queryClient, "setQueryData").mockImplementation((key, data) => {
+        published.push((data as SpanTreeNode[]).map((n) => n.spanId));
+        return originalSet(key, data);
+      });
 
       const queryFn = spanTreeQueryFn({ utils, queryClient, input });
       await queryFn({});
@@ -349,10 +347,7 @@ describe("mergeSpanTreeDelta", () => {
     it("appends them in (startTimeMs, spanId) order", () => {
       const existing = [node("a", 1), node("c", 3)];
 
-      const merged = mergeSpanTreeDelta(existing, [
-        node("d", 2),
-        node("b", 3),
-      ]);
+      const merged = mergeSpanTreeDelta(existing, [node("d", 2), node("b", 3)]);
 
       expect(merged.map((n) => n.spanId)).toEqual(["a", "d", "b", "c"]);
     });

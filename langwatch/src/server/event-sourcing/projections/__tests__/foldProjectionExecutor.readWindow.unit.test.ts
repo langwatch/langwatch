@@ -276,9 +276,8 @@ describe("FoldProjectionExecutor declared read window", () => {
         });
         // A history to rebuild FROM: an empty one is its own failure case,
         // covered below.
-        (
-          fold as typeof fold & { eventLoaderUpTo?: unknown }
-        ).eventLoaderUpTo = async () => [eventAt(OCCURRED_AT)];
+        (fold as typeof fold & { eventLoaderUpTo?: unknown }).eventLoaderUpTo =
+          async () => [eventAt(OCCURRED_AT)];
         const getWithApplied = vi.fn().mockResolvedValue({
           state: null,
           appliedEventIds: [],

@@ -419,7 +419,8 @@ function foldModelCall(
   return {
     ...next,
     modelCalls: next.modelCalls + 1,
-    modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
+    modelCallMs:
+      next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
     ttftMsTotal: next.ttftMsTotal + ttft,
     ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
     // Attempts includes the first try, so attempts > modelCalls means the
@@ -615,7 +616,6 @@ function foldToolInvocation(
 
   return withTool;
 }
-
 
 /**
  * Fold one LOG record's facts into the session.

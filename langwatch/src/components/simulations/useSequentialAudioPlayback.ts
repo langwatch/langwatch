@@ -20,7 +20,7 @@
  *   <MediaPart part={item.part} projectId={projectId} audioPlayback={getAudioProps(item.id)} />
  */
 
-import { useRef, useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 interface SequentialAudioPlaybackOptions {
   /**

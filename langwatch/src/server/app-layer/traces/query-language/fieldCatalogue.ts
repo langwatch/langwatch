@@ -48,7 +48,10 @@ function pickSampleValues(
 ): string[] {
   const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
   const fromStatic = FIELD_VALUES[fieldName] ?? [];
-  return Array.from(new Set([...fromDb, ...fromStatic])).slice(0, SAMPLES_SHOWN);
+  return Array.from(new Set([...fromDb, ...fromStatic])).slice(
+    0,
+    SAMPLES_SHOWN,
+  );
 }
 
 /**

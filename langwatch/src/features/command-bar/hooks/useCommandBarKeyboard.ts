@@ -18,7 +18,7 @@ export function useCommandBarKeyboard(
    * through to its normal job of moving focus: a shortcut that silently does
    * nothing is worse than one that was never offered.
    */
-  onAskLangy?: () => void
+  onAskLangy?: () => void,
 ) {
   return useCallback(
     (e: React.KeyboardEvent) => {
@@ -66,6 +66,6 @@ export function useCommandBarKeyboard(
       handleCopyLink,
       isMac,
       onAskLangy,
-    ]
+    ],
   );
 }

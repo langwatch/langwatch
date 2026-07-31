@@ -5,14 +5,29 @@ import type { ProjectionStoreContext } from "../../../projections/projectionStor
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   traceAnalyticsStateFromRow,
 } from "./traceAnalytics.foldProjection";
 
 /**
+ * The projection stamps whose rows `getWithApplied` will decode.
+ *
+ * Two, not one: the current shape, and the pre-split shape the decoder can read
+ * without ambiguity. Everything older is a store miss. Adding a member here is a
+ * claim that `traceAnalyticsStateFromRow` derives every field correctly from
+ * that shape — for the pre-split stamp that claim is discharged by the
+ * `occurredAt` branch in the decoder, and nowhere else.
+ */
+const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
+  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+]);
+
+/**
  * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
  * Phase 2, read-back per ADR-066). Mirrors the trace-summary store's shape —
- * skip empty traces, fall back to the aggregateId when the state has no
+ * fall back to the aggregateId when the state has no
  * traceId, stamp the per-tenant retention onto the record — and projects the
  * in-memory `TraceAnalyticsData` accumulator into the slim row at write time.
  *
@@ -78,7 +93,15 @@ export class TraceAnalyticsStore
     retentionDays: number;
     appliedEventIds: string[];
   } | null {
-    if (!hasPersistableSignal(state)) return null;
+    // ALWAYS writes — including dimension-only states, which used to be gated
+    // out here. The gate's verdict now rides on the in-memory row as
+    // `hasSignal` (stamped inside `projectAnalyticsStateToRow`) and readers
+    // derive it in SQL from columns the row already carries
+    // (TRACE_ANALYTICS_HAS_SIGNAL_SQL), so the product still never
+    // counts a phantom trace, while the fold read-back always finds its row —
+    // which is what lets the executor trust an absent read
+    // (`trustAbsentMiss`) instead of paying an unwindowed fallback scan plus
+    // an `event_log` re-fold on every genuinely-new aggregate.
     const stateWithId: TraceAnalyticsData = state.traceId
       ? state
       : { ...state, traceId: String(context.aggregateId) };
@@ -121,6 +144,25 @@ export class TraceAnalyticsStore
    * aggregate is rewritten, and for the population as a whole once retention has
    * aged the pre-00056 rows out.
    *
+   * The storage-anchor split (ADR-071 step 3, migration 00061) is the ONE stamp
+   * change that does NOT take that route, and deliberately. Its predecessor is
+   * admitted and decoded, because on a pre-split row `OccurredAt` is
+   * `min(span start)` — at once a valid anchor (it is what the row is already
+   * partitioned and TTL'd on) and the correct span timing baseline (it is what
+   * the new column was split out to carry). Refusing it would force the whole
+   * population to rebuild, and a rebuild re-derives the anchor — re-anchoring
+   * every trace as the opening act of the change that exists to stop anchors
+   * moving. See {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT} for why the
+   * pair is unambiguous before the split and ambiguous after it.
+   *
+   * That "no refold" holds in the FORWARD direction, which is where the
+   * population is. In the reverse it does not: during a rolling deploy a pod on
+   * the previous build refuses the new stamp — its gate is a bare equality — and
+   * refolds each row a new pod wrote, rewriting it at the old stamp. That is the
+   * ordinary cost of any stamp bump, bounded by the deploy window rather than by
+   * the size of the table, and it is precisely why the decode exists on the
+   * forward path instead.
+   *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
    * event being folded; it is passed through verbatim. On an ABSENT windowed
@@ -152,7 +194,7 @@ export class TraceAnalyticsStore
     // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
     // executor must not answer with an unwindowed re-read that can only find
     // the same row again.
-    if (found.row.version !== TRACE_ANALYTICS_PROJECTION_VERSION_LATEST) {
+    if (!DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
@@ -168,27 +210,4 @@ export class TraceAnalyticsStore
   ): Promise<TraceAnalyticsData | null> {
     return (await this.getWithApplied(aggregateId, context)).state;
   }
-}
-
-/**
- * Same persistable-signal predicate the trace-summary store uses. Spans-only
- * gating is too strict for log-only emitters (Claude Code Path B, Codex Path B);
- * the trace-summary fold counts log records via
- * langwatch.reserved.log_record_count and we mirror its acceptance.
- *
- * `occurredAt > 0` is the second door onto the same signal: only a folded span
- * ever sets it (never a phantom init state), so it admits a state whose real
- * timing survived even if the span counter did not.
- *
- * A state carrying ONLY dimension signal (topic / annotation / name, no span or
- * log record) still writes nothing — and that is now SAFE rather than lossy: no
- * row means `get()` misses, and the fold's `refoldOnStoreMiss` rebuilds the
- * dimension from `event_log`. Before the version gate restored that net, such a
- * state lived in Redis alone and its signal was lost for good on eviction.
- */
-function hasPersistableSignal(state: TraceAnalyticsData): boolean {
-  if (state.spanCount > 0) return true;
-  if (state.occurredAt > 0) return true;
-  const raw = state.attributes?.["langwatch.reserved.log_record_count"];
-  return typeof raw === "string" && Number(raw) > 0;
 }

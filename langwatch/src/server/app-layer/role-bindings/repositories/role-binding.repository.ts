@@ -1,5 +1,11 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import type { CustomRole, User } from "@prisma/client";
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
+import type {
+  CustomRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+  User,
+} from "@prisma/client";
 
 // A direct (user, not group) TEAM-scoped binding, shaped to populate the
 // team-settings members list. Mirrors a legacy `TeamUser` row joined with its

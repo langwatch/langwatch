@@ -9,11 +9,11 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
 } from "~/server/metrics";
-import type { FoldProjectionStore } from "./foldProjection.types";
 import {
   decodeFoldCacheEntry,
   encodeFoldCacheEntry,
 } from "./foldCache/foldCacheEntry";
+import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
@@ -110,9 +110,7 @@ function readUpdatedAt<State>(state: State): number {
  * keeps the pre-durable behaviour: eviction or Redis loss drops the set,
  * degrading to a blind re-apply, not to something worse.
  */
-export class RedisCachedFoldStore<State>
-  implements FoldProjectionStore<State>
-{
+export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly keyPrefix: string;
   private readonly ttlSeconds: number;
   private readonly updatedAtOf: (state: State) => number;
@@ -210,7 +208,11 @@ export class RedisCachedFoldStore<State>
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.warn(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache read failed — falling through to the durable store",
       );
       return { hit: false, reason: "read_error" };
@@ -239,7 +241,11 @@ export class RedisCachedFoldStore<State>
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
       logger.error(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
         "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
       );
       return { hit: false, reason: "unreadable" };

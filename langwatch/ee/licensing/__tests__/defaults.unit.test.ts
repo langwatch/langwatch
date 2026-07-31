@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  resolvePlanDefaults,
-  type ResolvedPlanLimits,
-} from "../defaults";
 import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "../constants";
+import { type ResolvedPlanLimits, resolvePlanDefaults } from "../defaults";
 import type { LicensePlanLimits } from "../types";
 
 /**

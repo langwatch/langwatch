@@ -26,18 +26,13 @@
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { env } from "~/env.mjs";
+import { hasOrganizationPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
-import { hasOrganizationPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
-import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
-import { LangyGithubInstallationConflictError } from "~/server/app-layer/langy/langy-github-installations.service";
-import { auditLog } from "~/server/auditLog";
-import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -52,6 +47,11 @@ import {
   signGithubOauthState,
   verifyGithubOauthState,
 } from "~/server/app-layer/langy/githubOauthState";
+import { LangyGithubInstallationConflictError } from "~/server/app-layer/langy/langy-github-installations.service";
+import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
+import { auditLog } from "~/server/auditLog";
+import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
 
 import type { NextRequestShim } from "./types";
 
@@ -103,18 +103,6 @@ function safeReturnTo(raw: string | null | undefined): string {
   if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
   if (/[\r\n\t\0]/.test(raw)) return fallback;
   return raw;
-}
-
-function appOrigin(reqUrl: string): string {
-  const fromEnv = env.NEXTAUTH_URL;
-  if (fromEnv) {
-    try {
-      return new URL(fromEnv).origin;
-    } catch {
-      // misconfigured NEXTAUTH_URL — fall through to request-derived
-    }
-  }
-  return new URL(reqUrl).origin;
 }
 
 // The App must have a private key (to mint tokens) + id (JWT issuer) + slug
@@ -172,7 +160,13 @@ function publicGithubErrorMessage(): string {
 }
 
 secured
-  .access(handlerManagedAuth(INSTALL_HANDLER_AUTH_REASON))
+  .access(
+    handlerManagedAuth({
+      reason: INSTALL_HANDLER_AUTH_REASON,
+      permissions: ["langy:manage"],
+      credential: "session",
+    }),
+  )
   .get("/github-langy/install", async (c) => {
     if (!installConfigured()) {
       return c.json(
@@ -360,7 +354,10 @@ secured
             args: { installationId: err.installationId },
           });
         } catch (auditErr) {
-          logger.warn({ err: auditErr }, "audit log write failed after blocked rebind");
+          logger.warn(
+            { err: auditErr },
+            "audit log write failed after blocked rebind",
+          );
         }
       } else {
         logger.warn({ err }, "github installation record failed");

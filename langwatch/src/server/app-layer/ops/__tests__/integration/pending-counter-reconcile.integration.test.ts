@@ -42,7 +42,15 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.del(markerKey);
 
         // Seed: group A has 3 jobs, group B has 2 jobs → ground truth = 5
-        await redis.zadd(groupAJobsKey, 1000, "job-a1", 1001, "job-a2", 1002, "job-a3");
+        await redis.zadd(
+          groupAJobsKey,
+          1000,
+          "job-a1",
+          1001,
+          "job-a2",
+          1002,
+          "job-a3",
+        );
         await redis.zadd(groupBJobsKey, 2000, "job-b1", 2001, "job-b2");
 
         // Also add both groups to the ready zset (production shape)
@@ -128,7 +136,15 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         await redis.del(markerKey);
 
         // Seed 7 jobs across groups
-        await redis.zadd(`${queueName}:gq:group:ga:jobs`, 1, "j1", 2, "j2", 3, "j3");
+        await redis.zadd(
+          `${queueName}:gq:group:ga:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+          3,
+          "j3",
+        );
         await redis.zadd(`${queueName}:gq:group:gb:jobs`, 4, "j4", 5, "j5");
         await redis.zadd(`${queueName}:gq:group:gc:jobs`, 6, "j6", 7, "j7");
 

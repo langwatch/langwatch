@@ -5,7 +5,7 @@
  * Full mode: one JSON line per trace with complete spans and evaluations arrays.
  */
 
-import type { Trace, Span, LLMSpan, RAGSpan } from "~/server/tracer/types";
+import type { LLMSpan, RAGSpan, Span, Trace } from "~/server/tracer/types";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
 // ---------------------------------------------------------------------------
@@ -60,11 +60,7 @@ export function serializeTraceToSummaryJson({
  * @param trace - The trace to serialize (should have populated spans)
  * @returns A single JSON string (no trailing newline)
  */
-export function serializeTraceToFullJson({
-  trace,
-}: {
-  trace: Trace;
-}): string {
+export function serializeTraceToFullJson({ trace }: { trace: Trace }): string {
   const obj = {
     trace_id: trace.trace_id,
     project_id: trace.project_id,
@@ -110,7 +106,9 @@ function serializeSpanForJson(span: Span): Record<string, unknown> {
     timestamps: span.timestamps,
     metrics: span.metrics ?? null,
     params: span.params ?? null,
-    ...(llmSpan ? { model: llmSpan.model ?? null, vendor: llmSpan.vendor ?? null } : {}),
+    ...(llmSpan
+      ? { model: llmSpan.model ?? null, vendor: llmSpan.vendor ?? null }
+      : {}),
     ...(ragSpan ? { contexts: ragSpan.contexts } : {}),
     error: span.error ?? null,
   };
@@ -141,7 +139,11 @@ function serializeEvaluation(evaluation: {
 function extractMetadataForJson(trace: Trace): Record<string, unknown> {
   const metadata: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(trace.metadata)) {
-    if (!RESERVED_METADATA_KEYS.has(key) && value !== null && value !== undefined) {
+    if (
+      !RESERVED_METADATA_KEYS.has(key) &&
+      value !== null &&
+      value !== undefined
+    ) {
       metadata[key] = value;
     }
   }

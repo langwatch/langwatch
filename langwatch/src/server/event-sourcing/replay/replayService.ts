@@ -1,22 +1,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
-import type {
-  RegisteredFoldProjection,
-  ReplayConfig,
-  ReplayCallbacks,
-  ReplayResult,
-  DiscoveryResult,
-  ReplayContext,
-} from "./types";
-import { cleanupAll, hasPreviousRun } from "./replayMarkers";
-import type { ReplayLogWriter } from "./replayLog";
-import { nullLog } from "./replayLog";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import { discoverProjectionAggregates } from "./replayDiscovery";
 import { replayFoldProjection } from "./replayFoldPath";
+import type { ReplayLogWriter } from "./replayLog";
+import { nullLog } from "./replayLog";
 import { replayMapProjection } from "./replayMapPath";
-import { replayStateProjection } from "./replayStatePath";
+import { cleanupAll, hasPreviousRun } from "./replayMarkers";
 import { replayOptimized } from "./replayOptimizedPath";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import { replayStateProjection } from "./replayStatePath";
+import type {
+  DiscoveryResult,
+  RegisteredFoldProjection,
+  ReplayCallbacks,
+  ReplayConfig,
+  ReplayContext,
+  ReplayResult,
+} from "./types";
 
 export class ReplayService {
   /** Shared dependencies handed to the path implementations. */
@@ -179,9 +179,8 @@ export class ReplayService {
         if (p.targetTable) tables.add(p.targetTable);
       }
 
-      const tenantTargets = touchedTenants.size > 0
-        ? [...touchedTenants]
-        : ["default"];
+      const tenantTargets =
+        touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
 
       for (const tenantId of tenantTargets) {
         try {
@@ -191,7 +190,11 @@ export class ReplayService {
               query: "OPTIMIZE TABLE {table:Identifier}",
               query_params: { table },
             });
-            callbacks?.log?.write({ step: "optimize", table, tenant: tenantId });
+            callbacks?.log?.write({
+              step: "optimize",
+              table,
+              tenant: tenantId,
+            });
           }
         } catch {
           // Non-fatal — merge will happen eventually
@@ -218,7 +221,9 @@ export class ReplayService {
     await cleanupAll({ redis: this.ctx.redis, projectionName });
   }
 
-  async checkPreviousRun(projectionName: string): Promise<{ completedCount: number; markerCount: number }> {
+  async checkPreviousRun(
+    projectionName: string,
+  ): Promise<{ completedCount: number; markerCount: number }> {
     return hasPreviousRun({ redis: this.ctx.redis, projectionName });
   }
 }

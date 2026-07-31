@@ -1,11 +1,11 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
-import { deriveSessionBanner } from "./sessionBanner";
-import { indexToolSpansBySpanId } from "./toolSpans";
 import { TERMINAL_TOKENS } from "./palette";
+import { deriveSessionBanner } from "./sessionBanner";
 import { TerminalSkeleton } from "./TerminalSkeleton";
 import { TerminalView } from "./TerminalView";
+import { indexToolSpansBySpanId } from "./toolSpans";
 
 interface TerminalTabProps {
   projectId: string;

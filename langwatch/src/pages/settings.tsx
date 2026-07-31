@@ -1,7 +1,6 @@
 import {
   Badge,
   Button,
-  Card,
   createListCollection,
   Field,
   Heading,
@@ -129,8 +128,7 @@ function SettingsForm({
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
-  const [showCreateProjectDialog, setShowCreateProjectDialog] =
-    useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
@@ -189,8 +187,7 @@ function SettingsForm({
         onError: () => {
           toaster.create({
             title: "Failed to update organization",
-            description:
-              "Your changes could not be saved. Please try again.",
+            description: "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -256,12 +253,7 @@ function SettingsForm({
                   label="Project ID"
                   helper="Use this ID when authenticating with API Keys"
                 >
-                  <Input
-                    width="full"
-                    disabled
-                    type="text"
-                    value={project.id}
-                  />
+                  <Input width="full" disabled type="text" value={project.id} />
                 </HorizontalFormControl>
               )}
 
@@ -294,68 +286,68 @@ function SettingsForm({
               </HorizontalFormControl>
 
               {governanceEnabled && (
-              <HorizontalFormControl
-                label="Primary use"
-                helper={
-                  <VStack align="start" gap={1}>
-                    <Text>
-                      What this organization mainly uses LangWatch for. Decides
-                      where everyone lands when opening the app: coding-agent
-                      tracking opens the personal usage page, LLM apps open the
-                      project home. &quot;Not set&quot; keeps the current
-                      behavior.
-                    </Text>
-                    {!hasPermission("organization:manage") && (
-                      <AdminOnlyBadge />
-                    )}
-                  </VStack>
-                }
-              >
-                {hasPermission("organization:manage") ? (
-                  <Controller
-                    control={control}
-                    name="primaryIntent"
-                    render={({ field }) => (
-                      <Select.Root
-                        collection={primaryUseCollection}
-                        value={[field.value]}
-                        width="full"
-                        onValueChange={(d) =>
-                          field.onChange(
-                            (d.value[0] ?? "") as "" | OrganizationIntent,
-                          )
-                        }
-                      >
-                        <Select.Trigger
-                          background="bg"
-                          aria-label="Primary use"
-                        >
-                          <Select.ValueText />
-                        </Select.Trigger>
-                        <Select.Content>
-                          {primaryUseCollection.items.map((item) => (
-                            <Select.Item key={item.value} item={item}>
-                              {item.label}
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Root>
-                    )}
-                  />
-                ) : (
-                  <Text>
-                    {organization.primaryIntent ? (
-                      primaryUseCollection.items.find(
-                        (item) => item.value === organization.primaryIntent,
-                      )?.label
-                    ) : (
-                      <Text as="span" color="fg.subtle">
-                        Not set
+                <HorizontalFormControl
+                  label="Primary use"
+                  helper={
+                    <VStack align="start" gap={1}>
+                      <Text>
+                        What this organization mainly uses LangWatch for.
+                        Decides where everyone lands when opening the app:
+                        coding-agent tracking opens the personal usage page, LLM
+                        apps open the project home. &quot;Not set&quot; keeps
+                        the current behavior.
                       </Text>
-                    )}
-                  </Text>
-                )}
-              </HorizontalFormControl>
+                      {!hasPermission("organization:manage") && (
+                        <AdminOnlyBadge />
+                      )}
+                    </VStack>
+                  }
+                >
+                  {hasPermission("organization:manage") ? (
+                    <Controller
+                      control={control}
+                      name="primaryIntent"
+                      render={({ field }) => (
+                        <Select.Root
+                          collection={primaryUseCollection}
+                          value={[field.value]}
+                          width="full"
+                          onValueChange={(d) =>
+                            field.onChange(
+                              (d.value[0] ?? "") as "" | OrganizationIntent,
+                            )
+                          }
+                        >
+                          <Select.Trigger
+                            background="bg"
+                            aria-label="Primary use"
+                          >
+                            <Select.ValueText />
+                          </Select.Trigger>
+                          <Select.Content>
+                            {primaryUseCollection.items.map((item) => (
+                              <Select.Item key={item.value} item={item}>
+                                {item.label}
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      )}
+                    />
+                  ) : (
+                    <Text>
+                      {organization.primaryIntent ? (
+                        primaryUseCollection.items.find(
+                          (item) => item.value === organization.primaryIntent,
+                        )?.label
+                      ) : (
+                        <Text as="span" color="fg.subtle">
+                          Not set
+                        </Text>
+                      )}
+                    </Text>
+                  )}
+                </HorizontalFormControl>
               )}
 
               <HorizontalFormControl
@@ -408,9 +400,7 @@ function SettingsForm({
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
-                      onCheckedChange={({ checked }) =>
-                        field.onChange(checked)
-                      }
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
                       disabled={!hasPermission("organization:manage")}
                     />
                   )}
@@ -491,8 +481,8 @@ function SettingsForm({
           <Dialog.Body>
             <Text>
               Your changes are saved. Monitoring LLM apps happens inside a
-              project, and this organization doesn&apos;t have one yet —
-              create your first project so everyone has somewhere to land.
+              project, and this organization doesn&apos;t have one yet — create
+              your first project so everyone has somewhere to land.
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
@@ -510,9 +500,8 @@ function SettingsForm({
                   openDrawer("createProject", {
                     navigateOnCreate: true,
                     organizationId: organization.id,
-                    defaultTeamId: organization.teams.find(
-                      (t) => !t.isPersonal,
-                    )?.id,
+                    defaultTeamId: organization.teams.find((t) => !t.isPersonal)
+                      ?.id,
                   });
                 }}
               >
@@ -669,8 +658,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         onError: () => {
           toaster.create({
             title: "Failed to update project",
-            description:
-              "Your changes could not be saved. Please try again.",
+            description: "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -762,9 +750,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     ? "Disabled at the organization level - turn it on there first."
                     : "Disable to turn presence off for this project only."}
                 </Text>
-                {!userIsAdmin && (
-                  <AdminOnlyBadge />
-                )}
+                {!userIsAdmin && <AdminOnlyBadge />}
               </VStack>
             }
             invalid={!!formState.errors.presenceEnabled}
@@ -796,9 +782,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     ? "Disabled at the organization level - turn it on there first."
                     : "Disable to turn sharing off for this project only."}
                 </Text>
-                {!userIsAdmin && (
-                  <AdminOnlyBadge />
-                )}
+                {!userIsAdmin && <AdminOnlyBadge />}
               </VStack>
             }
             invalid={!!formState.errors.traceSharingEnabled}

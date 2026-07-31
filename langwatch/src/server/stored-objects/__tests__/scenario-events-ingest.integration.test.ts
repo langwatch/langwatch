@@ -330,7 +330,6 @@ function makeMessageSnapshotWithOpenAiFile(scenarioRunId: string) {
 
 let testApiKey: string;
 let testProjectId: string;
-let testProjectSlug: string;
 let orgId: string;
 let teamId: string;
 let previousBaseHost: string | undefined;
@@ -363,7 +362,6 @@ beforeAll(async () => {
   });
   testApiKey = created.apiKey;
   testProjectId = created.id;
-  testProjectSlug = created.slug;
 
   // Set BASE_HOST so the handler can build the redirect URL
   process.env.BASE_HOST = BASE_HOST;

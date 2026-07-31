@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/redis";
@@ -19,9 +20,9 @@ export interface WorkerHandle {
 export interface StartWorkersOptions {
   /**
    * Expose the worker prom-client registry over its own HTTP port. On for the
-   * standalone worker deployment (the web process scrapes it at
-   * `GET /workers/metrics`); off for the in-process dev mode, where the web
-   * server already serves the shared registry at `/metrics`.
+   * standalone worker deployment, where a scraper reaches the worker directly
+   * on the metrics port; off for the in-process dev mode, where the web server
+   * already serves the shared registry at `/metrics`.
    */
   shouldStartMetricsServer?: boolean;
 }
@@ -45,8 +46,9 @@ async function verifyDatabaseReady(): Promise<void> {
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } =
-    await import("~/server/clickhouse/clickhouseClient");
+  const { getSharedClickHouseClient } = await import(
+    "~/server/clickhouse/clickhouseClient"
+  );
   const { startStorageStatsCollection, stopStorageStatsCollection } =
     await import("~/server/clickhouse/metrics");
   const clickHouseClient = getSharedClickHouseClient();
@@ -63,14 +65,18 @@ async function bootStorageStatsCollection(
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getScenarioExecutionHandle } =
-    await import("~/server/app-layer/presets");
-  const { ScenarioExecutionPool } =
-    await import("~/server/scenarios/execution/execution-pool");
-  const { startScenarioProcessor } =
-    await import("~/server/scenarios/scenario.processor");
-  const { SCENARIO_WORKER } =
-    await import("~/server/scenarios/scenario.constants");
+  const { getScenarioExecutionHandle } = await import(
+    "~/server/app-layer/presets"
+  );
+  const { ScenarioExecutionPool } = await import(
+    "~/server/scenarios/execution/execution-pool"
+  );
+  const { startScenarioProcessor } = await import(
+    "~/server/scenarios/scenario.processor"
+  );
+  const { SCENARIO_WORKER } = await import(
+    "~/server/scenarios/scenario.constants"
+  );
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
@@ -87,8 +93,9 @@ async function bootScenarioProcessor(
 async function bootAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startAnomalyWorker } =
-    await import("~/server/observability/anomalyWorker");
+  const { startAnomalyWorker } = await import(
+    "~/server/observability/anomalyWorker"
+  );
   const anomalyWorker = startAnomalyWorker();
   if (anomalyWorker) {
     shutdownHandles.push(() => anomalyWorker.stop());
@@ -102,8 +109,9 @@ async function bootAnomalyWorker(
 async function bootSpendSpikeAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startSpendSpikeAnomalyWorker } =
-    await import("@ee/governance/services/spendSpikeAnomalyWorker");
+  const { startSpendSpikeAnomalyWorker } = await import(
+    "@ee/governance/services/spendSpikeAnomalyWorker"
+  );
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
@@ -122,17 +130,38 @@ async function bootUsageStatsWorker(
   }
 }
 
-// Expose the worker process's prom-client registry over HTTP so the web
-// process can scrape it at GET /workers/metrics (proxied in start.ts). In
-// the in-process dev mode this is skipped — the web server serves the same
-// (shared) registry at /metrics directly.
-async function bootMetricsServer(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { getWorkerMetricsPort, isMetricsAuthorized } =
-    await import("~/server/metrics");
-  const metricsPort = getWorkerMetricsPort();
-  const metricsServer = http.createServer((req, res) => {
+/**
+ * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
+ * not `/metrics`.
+ *
+ * The kubelet needs a path it can call with no credentials, because it has
+ * neither of the two things `/metrics` demands. `/metrics` is fail-closed in
+ * production (no METRICS_API_KEY ⇒ 500, and the chart leaves the key unset by
+ * default), and an httpGet probe cannot read a Kubernetes Secret, so a
+ * secretKeyRef-delivered key can never reach a rendered Authorization header.
+ * Probing `/metrics` therefore crash-loops both the default install and the
+ * secretKeyRef install. See specs/server/worker-liveness-probe.feature.
+ *
+ * It answers 200 whenever the event loop is turning enough to accept the
+ * connection and run this handler — which is the whole question a liveness
+ * probe asks, and strictly more than the old `kill -0 1` could tell us. It
+ * carries no telemetry, so leaving it open exposes nothing the bearer gate on
+ * `/metrics` was protecting.
+ */
+export const WORKER_LIVENESS_PATH = "/healthz";
+
+/**
+ * The worker metrics server's request handler, split out so the routing and
+ * auth branches are testable without binding a port.
+ */
+export function createWorkerMetricsHandler(
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): RequestListener {
+  return (req: IncomingMessage, res: ServerResponse) => {
+    if (req.url === WORKER_LIVENESS_PATH) {
+      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      return;
+    }
     if (req.url !== "/metrics") {
       res.writeHead(404).end();
       return;
@@ -156,7 +185,31 @@ async function bootMetricsServer(
         logger.error({ error }, "error getting worker metrics");
         res.writeHead(500).end();
       });
-  });
+  };
+}
+
+// Expose the worker process's prom-client registry over HTTP on the worker
+// metrics port, behind the same bearer gate the web process uses. In a split
+// deployment this port is what a scraper talks to: the chart's Prometheus
+// scrape config targets the worker pod directly on it, NOT the web process's
+// `/workers/metrics` proxy — that proxy dials its own loopback, so it only
+// resolves when the workers share the web process (in-process dev mode).
+//
+// In that in-process mode this listener is skipped entirely; the web server
+// serves the same shared registry at /metrics.
+//
+// The same listener serves the unauthenticated liveness path the chart's
+// probes call.
+async function bootMetricsServer(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
+    "~/server/metrics"
+  );
+  const metricsPort = getWorkerMetricsPort();
+  const metricsServer = http.createServer(
+    createWorkerMetricsHandler(isMetricsAuthorized),
+  );
   await new Promise<void>((resolve, reject) => {
     metricsServer.once("error", reject);
     metricsServer.listen(metricsPort, () => {

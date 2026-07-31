@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { AppConfig } from "../../../src/server/app-layer/config";
-import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../src/utils/posthogErrorCapture";
 import type {
   CioBatchCall,
   CioEventName,
@@ -52,7 +55,7 @@ export class NurturingService {
         ? REGIONAL_ENDPOINTS[region as Region]
         : REGIONAL_ENDPOINTS.eu;
     this.fetchFn =
-      options.fetchFn ?? ((...args) => fetch(...args)) as typeof fetch;
+      options.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
   }
 
   /**
@@ -161,7 +164,11 @@ export class NurturingService {
       if (!response.ok) {
         const responseBody = await response.text().catch(() => "<unreadable>");
         logger.error(
-          { path, status: response.status, responseBody: responseBody.slice(0, 500) },
+          {
+            path,
+            status: response.status,
+            responseBody: responseBody.slice(0, 500),
+          },
           `[CIO] <<< ${path} FAILED: HTTP ${response.status}`,
         );
         captureException(

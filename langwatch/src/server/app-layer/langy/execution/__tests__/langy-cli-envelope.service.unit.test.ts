@@ -121,7 +121,10 @@ describe("LangyCliEnvelopeService", () => {
     it("re-types the other shell-tool spellings too", () => {
       for (const name of ["shell", "execute", "Bash"]) {
         const frame = service.normalizeToolFrame({
-          frame: bashFrame({ name, input: { command: "langwatch monitor list" } }),
+          frame: bashFrame({
+            name,
+            input: { command: "langwatch monitor list" },
+          }),
         });
         expect(frame.name).toBe("langwatch.monitor.list");
       }

@@ -91,9 +91,7 @@ describe("toActivityEntries", () => {
     it("shows only the moment it started", () => {
       const entries = toActivityEntries({
         fires: [makeFire({ customGraphId: "graph-1", resolvedAt: null })],
-        triggersById: triggersById([
-          makeTrigger({ customGraphId: "graph-1" }),
-        ]),
+        triggersById: triggersById([makeTrigger({ customGraphId: "graph-1" })]),
       });
       expect(entries.map((e) => e.kind)).toEqual(["alertOpened"]);
     });

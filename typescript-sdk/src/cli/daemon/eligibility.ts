@@ -31,6 +31,11 @@ import * as path from "node:path";
  *   very first `npx langwatch` contact. Leaving a resident daemon behind as
  *   a side effect of filing an issue report would be surprising, and the
  *   cold-start saving is irrelevant next to the upload.
+ * - push: resolves a prompt conflict with a `readline` question on stdin. The
+ *   daemon's fd 0 is /dev/null (spawn.ts spawns it with `stdio: "ignore"`), so
+ *   `rl.question` never gets an answer, the promise never settles, and the
+ *   request hangs to the ten-minute request timeout. See DENIED_COMMAND_PHRASES
+ *   for the other prompting command.
  */
 const DENIED_COMMANDS = new Set([
   "daemon",
@@ -46,7 +51,23 @@ const DENIED_COMMANDS = new Set([
   "opencode",
   "init-shell",
   "report",
+  "push",
 ]);
+
+/**
+ * Commands that must never be served, but whose NAME is too ordinary to deny on
+ * its own. Every word must be present somewhere in the argument list.
+ *
+ * `prompt tag delete` prompts on stdin exactly as `push` does (commands/tag/
+ * delete.ts), and hangs the same way. Denying the bare word `tag` would take
+ * `prompt pull --tag production` with it — a common, perfectly servable
+ * invocation — so the phrase is matched instead. Position-agnostic like every
+ * other rule here: a tag literally named `delete` is denied too, which costs
+ * one cold start.
+ */
+const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
+  ["tag", "delete"],
+];
 
 /**
  * Flags that make a command unbounded in time. A `--follow` would pin one
@@ -55,11 +76,26 @@ const DENIED_COMMANDS = new Set([
  */
 const DENIED_FLAGS = new Set(["--follow", "--watch"]);
 
+/**
+ * Flags that make the CALLER's standard input part of the command's input.
+ *
+ * The daemon cannot reproduce fd 0: it is spawned detached with
+ * `stdio: "ignore"` (spawn.ts), so its standard input is /dev/null. Served in
+ * that process, `dataset records add <ds> --stdin` reads "" on immediate EOF
+ * and dies with `Invalid JSON: could not parse input.` — while the identical
+ * command run in-process adds the records. The SECOND such request is worse
+ * still: `process.stdin` has already emitted `end`, so nothing ever fires again
+ * and the request hangs to its ten-minute timeout.
+ */
+const STDIN_FLAGS = new Set(["--stdin"]);
+
 export type Ineligible =
   | "unsupported-platform"
   | "disabled-by-env"
   | "disabled-by-config"
   | "interactive-tty"
+  | "piped-stdin"
+  | "reads-stdin"
   | "denied-command"
   | "long-running-flag"
   | "no-command";
@@ -80,11 +116,17 @@ export interface EligibilityInput {
   stderrIsTty: boolean;
   /** process.stdin.isTTY */
   stdinIsTty: boolean;
+  /**
+   * The caller's fd 0 holds data a command could read — a pipe, a redirected
+   * file or a socket, as opposed to /dev/null, a terminal or a closed
+   * descriptor. See `stdinCarriesData`, which is how dispatch.ts resolves it.
+   */
+  stdinCarriesData: boolean;
   platform: NodeJS.Platform;
 }
 
 /**
- * The TTY rule is what makes this whole feature safe.
+ * The stdio rules are what make this whole feature safe.
  *
  * A daemon-served command runs inside a process whose stdio is /dev/null. It
  * therefore cannot render a live spinner, cannot read an interactive prompt,
@@ -94,10 +136,20 @@ export interface EligibilityInput {
  * that has a terminal attached.
  *
  * Humans therefore get today's behaviour, bit for bit. Agents and pipes — the
- * callers that actually issue N commands per turn and whose stdio is already
+ * callers that actually issue N commands per turn and whose OUTPUT is already
  * a pipe, so ora and chalk already behave in their degraded, non-TTY way —
  * get the daemon. The two cases can't diverge, because the daemon reproduces
  * exactly the non-TTY environment the caller already had.
+ *
+ * INPUT is the half a terminal check does not cover, and the direction the rule
+ * has to be read in is the opposite one. `cat records.json | langwatch …` has no
+ * TTY anywhere, so it looked like the ideal daemon caller — while being the one
+ * shape the daemon can least reproduce, because fd 0 is the only stdio stream
+ * that carries the caller's DATA rather than merely its destination. The daemon
+ * is spawned with `stdio: "ignore"`, and there is no way to hand it a descriptor
+ * a client opened, so any invocation that will read stdin is ineligible: by the
+ * shape of fd 0 (`piped-stdin`), by a flag that says so (`reads-stdin`), or by
+ * the name of a command that prompts (`denied-command`).
  */
 export function evaluateEligibility(input: EligibilityInput): Eligibility {
   if (input.platform === "win32") {
@@ -117,14 +169,52 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "interactive-tty" };
   }
 
-  const command = input.args.find((arg) => !arg.startsWith("-"));
-  if (!command) {
-    // Bare `langwatch`, or only flags (`--help`, `--version`). Cheap already,
-    // and commander's help output is the one thing we gain nothing by warming.
-    return { eligible: false, reason: "no-command" };
+  // A separate fact from the TTY check, and a separate reason: this caller has
+  // no terminal at all, which is precisely why it looked servable.
+  if (input.stdinCarriesData) {
+    return { eligible: false, reason: "piped-stdin" };
   }
 
-  if (DENIED_COMMANDS.has(command)) {
+  // The denied names and flags are checked BEFORE asking whether there is a
+  // command at all: they are facts about the argument list that hold wherever
+  // the word sits, so checking them first keeps the sharper reason — and keeps
+  // `--verbose login` reading as `denied-command` rather than as an argument
+  // list we could not find a command in.
+  //
+  // Every argument is checked, not just the first operand — because the first
+  // operand is NOT reliably the command.
+  //
+  // The root program takes value-bearing global options (`-o <format>`,
+  // `--json <fields>`, `--jq <expr>`; see registerOutputOptions) and enables
+  // positional options, so those parse BEFORE the subcommand and their VALUE
+  // is the first thing here that does not start with `-`. Under the old
+  // first-operand rule `langwatch -o json open /traces` therefore read as the
+  // command `json`, sailed through this gate, and ran `open` inside a daemon
+  // that is detached with stdio `/dev/null` and carries none of the caller's
+  // display or session environment — so no browser ever opened. `-o json
+  // claude -p '…'` was worse still: the wrapper ran with its output going to
+  // /dev/null, and the caller got nothing back.
+  //
+  // Skipping the known value-taking globals instead would fix today's argv and
+  // rot on tomorrow's: this module is deliberately dependency-free (it runs on
+  // every invocation, before anything else loads), so it cannot consult the
+  // program's real option table, and a hand-copied list silently reopens the
+  // hole the moment a global option is added. Scanning every argument depends
+  // on neither argument position nor that table, so there is nothing to keep
+  // in sync and no ordering trick to bypass it.
+  //
+  // It over-rejects — `langwatch prompt get open` is not the `open` command —
+  // and that is the correct direction to be wrong in: a needless rejection
+  // costs one cold start, while a wrong acceptance is a behaviour change.
+  if (input.args.some((arg) => DENIED_COMMANDS.has(arg))) {
+    return { eligible: false, reason: "denied-command" };
+  }
+
+  if (
+    DENIED_COMMAND_PHRASES.some((phrase) =>
+      phrase.every((word) => input.args.includes(word)),
+    )
+  ) {
     return { eligible: false, reason: "denied-command" };
   }
 
@@ -132,7 +222,84 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "long-running-flag" };
   }
 
+  if (input.args.some((arg) => STDIN_FLAGS.has(arg))) {
+    return { eligible: false, reason: "reads-stdin" };
+  }
+
+  if (!hasCommandOperand(input.args)) {
+    // Bare `langwatch`, only flags (`--help`, `--version`), or nothing but a
+    // global option and its value. Cheap already, and commander's help output
+    // is the one thing we gain nothing by warming.
+    return { eligible: false, reason: "no-command" };
+  }
+
   return { eligible: true };
+}
+
+/**
+ * Could any of these arguments actually BE a command?
+ *
+ * An operand is not a command when the option in front of it is eating it. The
+ * root program's value-taking globals (`-o <format>`, `--json <fields>`,
+ * `--jq <expr>`) parse ahead of the subcommand, so `langwatch -o json` carries
+ * no command at all — `json` is a format. Under a plain "is there a bare word?"
+ * rule that invocation sailed through as eligible and commander rendered the
+ * ROOT HELP inside the daemon — a round trip bought for a caller whose entire
+ * invocation was a help request, where there is nothing to warm at all.
+ *
+ * (Which bin NAME that help is titled with is no longer this rule's business:
+ * the two bins share one daemon — `resolveBuildId` stats the same symlink
+ * target for both — so the caller's `argv[1]` rides the `exec` frame and
+ * `buildProgram({ bin })` titles the help with it. Rejecting here is about
+ * cost, not correctness.)
+ *
+ * Which options take a value is exactly what this module cannot look up — it
+ * is dependency-free by design and cannot consult the program's option table,
+ * and a hand-copied list rots (see the note above). So it assumes any `-x`
+ * might take one, and treats only `-x=value`, which carries its own, as
+ * certainly not. That over-rejects a one-word command behind a boolean flag
+ * (`langwatch --agent status`) for the price of one cold start, and never lets
+ * a commandless invocation through. Anything longer is unaffected:
+ * in `--agent trace list`, `list` follows an operand rather than a flag.
+ */
+function hasCommandOperand(args: string[]): boolean {
+  return args.some((arg, index) => {
+    if (arg.startsWith("-")) return false;
+    const previous = index === 0 ? undefined : args[index - 1];
+    return (
+      previous === undefined ||
+      !previous.startsWith("-") ||
+      previous.includes("=")
+    );
+  });
+}
+
+/**
+ * Does this descriptor carry data a command could actually READ?
+ *
+ * `isTTY` cannot answer this. It distinguishes a terminal from everything else,
+ * and everything else covers both the shape the daemon reproduces perfectly
+ * (/dev/null, or a closed descriptor — nothing to read, EOF immediately) and
+ * the shape it cannot reproduce at all (a pipe, a `< file` redirect, a socket —
+ * bytes that exist only in the CALLER's process). `fstat` tells the two apart:
+ * the first pair are character devices or plain errors, the second are FIFOs,
+ * regular files and sockets.
+ *
+ * `fstat(0)` rather than `process.stdin`: touching `process.stdin` instantiates
+ * the read stream, and this runs on every single invocation, before anything
+ * else is loaded.
+ *
+ * Anything we cannot stat is treated as carrying nothing — the daemon path is
+ * an optimisation, and the failure mode of guessing "no" here is one served
+ * command that had nothing to read anyway.
+ */
+export function stdinCarriesData(fd = 0): boolean {
+  try {
+    const stat = fs.fstatSync(fd);
+    return stat.isFIFO() || stat.isFile() || stat.isSocket();
+  } catch {
+    return false;
+  }
 }
 
 /** Whether the client may auto-spawn a daemon it did not find. */

@@ -49,10 +49,9 @@ async function main() {
     await pwFields[0]!.fill(REAL_PW);
     await pwFields[1]!.fill(REAL_PW);
     await page.click('button:has-text("Sign up")');
-    await page.waitForURL(
-      (url) => !url.toString().includes("/auth/signup"),
-      { timeout: 15000 },
-    );
+    await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+      timeout: 15000,
+    });
     console.log(`\n[setup] signed up ${EMAIL}`);
 
     // Hit changePassword with WRONG current password 6 times
@@ -73,9 +72,9 @@ async function main() {
           },
         },
       );
-      const body = (await r.json().catch(() => null)) as
-        | Array<{ error?: { json?: { data?: { code?: string } } } }>
-        | null;
+      const body = (await r.json().catch(() => null)) as Array<{
+        error?: { json?: { data?: { code?: string } } };
+      }> | null;
       const errCode = body?.[0]?.error?.json?.data?.code ?? null;
       results.push({ status: r.status(), code: errCode });
       console.log(`     attempt ${i}: HTTP ${r.status()} code=${errCode}`);
@@ -114,9 +113,9 @@ async function main() {
         },
       },
     );
-    const correctBody = (await correctRes.json().catch(() => null)) as
-      | Array<{ error?: { json?: { data?: { code?: string } } } }>
-      | null;
+    const correctBody = (await correctRes.json().catch(() => null)) as Array<{
+      error?: { json?: { data?: { code?: string } } };
+    }> | null;
     const correctCode = correctBody?.[0]?.error?.json?.data?.code ?? null;
     check(
       "correct password still rate-limited",

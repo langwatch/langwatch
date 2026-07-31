@@ -6,9 +6,8 @@
  * username charset so the Co-authored-by trailer is always well-formed.
  */
 import { describe, expect, it } from "vitest";
-
-import { resolveActingGithubLogin } from "../LangyCredentialService";
 import type { Session } from "~/server/auth";
+import { resolveActingGithubLogin } from "../LangyCredentialService";
 
 function session(user: Record<string, unknown>): Session {
   return { user: { id: "u1", ...user }, expires: "1" } as unknown as Session;

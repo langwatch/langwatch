@@ -50,10 +50,7 @@ export interface StateProjectionOptions {
  * ClickHouse fold: direct store load/apply/store, no event-log recovery read,
  * no Redis cache hook, and no projection-attached reactor or outbox.
  */
-export interface StateProjectionDefinition<
-  State,
-  E extends Event = Event,
-> {
+export interface StateProjectionDefinition<State, E extends Event = Event> {
   name: string;
   version: string;
   eventTypes: readonly string[];
@@ -62,31 +59,4 @@ export interface StateProjectionDefinition<
   store: StateProjectionStore<State>;
   key?: (event: E) => string;
   options?: StateProjectionOptions;
-}
-
-/** Reuse an existing type-aware fold reducer with a direct operational store. */
-export function createStateProjection<State, E extends Event>({
-  name,
-  reducer,
-  store,
-  options,
-}: {
-  name: string;
-  reducer: Pick<
-    StateProjectionDefinition<State, E>,
-    "version" | "eventTypes" | "init" | "apply" | "key"
-  >;
-  store: StateProjectionStore<State>;
-  options?: StateProjectionOptions;
-}): StateProjectionDefinition<State, E> {
-  return {
-    name,
-    version: reducer.version,
-    eventTypes: reducer.eventTypes,
-    init: () => reducer.init(),
-    apply: (state, event) => reducer.apply(state, event),
-    store,
-    ...(reducer.key ? { key: reducer.key } : {}),
-    ...(options ? { options } : {}),
-  };
 }

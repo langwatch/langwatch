@@ -26,10 +26,9 @@ import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService scope-aware deletion (real DB)",
   () => {
     const ns = `mp-del-${nanoid(8)}`;
@@ -65,7 +64,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherOrgId = otherOrg.id;
 
       const team = await prisma.team.create({
-        data: { name: `Del Team ${ns}`, slug: `--del-team-${ns}`, organizationId: orgId },
+        data: {
+          name: `Del Team ${ns}`,
+          slug: `--del-team-${ns}`,
+          organizationId: orgId,
+        },
       });
       teamId = team.id;
 
@@ -115,11 +118,18 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherProjectId = otherProject.id;
 
       const orgAdmin = await prisma.user.create({
-        data: { name: "Del Org Admin", email: `del-org-admin-${ns}@example.com` },
+        data: {
+          name: "Del Org Admin",
+          email: `del-org-admin-${ns}@example.com`,
+        },
       });
       orgAdminUserId = orgAdmin.id;
       await prisma.organizationUser.create({
-        data: { userId: orgAdmin.id, organizationId: orgId, role: OrganizationUserRole.ADMIN },
+        data: {
+          userId: orgAdmin.id,
+          organizationId: orgId,
+          role: OrganizationUserRole.ADMIN,
+        },
       });
       await prisma.roleBinding.create({
         data: {
@@ -133,15 +143,21 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(Boolean);
+      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(
+        Boolean,
+      );
       await prisma.modelProvider
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.roleBinding.deleteMany({ where: { organizationId: orgId } }).catch(() => {});
+      await prisma.roleBinding
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.project.deleteMany({ where: { id: { in: projectIds } } }).catch(() => {});
+      await prisma.project
+        .deleteMany({ where: { id: { in: projectIds } } })
+        .catch(() => {});
       await prisma.team
         .deleteMany({ where: { id: { in: [teamId, otherTeamId] } } })
         .catch(() => {});
@@ -170,7 +186,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
           const scopes = await prisma.modelProviderScope.findMany({
             where: { modelProviderId: created.id },
@@ -197,7 +215,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });
@@ -220,9 +240,16 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               { id: created.id, projectId: projectAId, provider: "openai" },
               ctxFor(orgAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+            // `model_provider_not_found`, not the tRPC `NOT_FOUND` this once
+            // asserted: the service throws a HandledError now. The property
+            // under test is unchanged — a cross-tenant id is refused, and
+            // refused as "not found" so it can't be used to probe for
+            // existence.
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).not.toBeNull();
         });
       });
@@ -245,7 +272,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });

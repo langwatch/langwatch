@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mapToPlanInfo } from "../planMapping";
 import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "../constants";
+import { mapToPlanInfo } from "../planMapping";
 import type { LicenseData } from "../types";
 
 describe("mapToPlanInfo", () => {
   const createLicenseData = (
-    planOverrides: Partial<LicenseData["plan"]> = {}
+    planOverrides: Partial<LicenseData["plan"]> = {},
   ): LicenseData => ({
     licenseId: "lic-test-001",
     version: 1,

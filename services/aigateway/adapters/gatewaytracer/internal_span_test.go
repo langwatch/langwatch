@@ -74,7 +74,7 @@ func TestStampInternalGenAI_OmitsPromptAndCompletionContent(t *testing.T) {
 	span := stampedSpan(t, paramsWithBodies())
 
 	for _, kv := range span.Attributes() {
-		value := kv.Value.Emit()
+		value := kv.Value.String()
 		for _, secret := range []string{secretPrompt, secretCompletion, secretSystem} {
 			assert.NotContains(t, value, secret,
 				"attribute %q leaked message content onto the gateway's own span", kv.Key)
@@ -108,7 +108,7 @@ func TestStampInternalGenAI_KeepsOperationalMetadata(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 
 	assert.Equal(t, "chat", got[AttrGenAIOperationName])
@@ -134,7 +134,7 @@ func TestStampInternalGenAI_OmitsUntrustedModelMetadata(t *testing.T) {
 
 	span := stampedSpan(t, params)
 	for _, kv := range span.Attributes() {
-		assert.NotContains(t, kv.Value.Emit(), secret,
+		assert.NotContains(t, kv.Value.String(), secret,
 			"attribute %q leaked a customer-controlled model value", kv.Key)
 	}
 }
@@ -148,7 +148,7 @@ func TestStampInternalGenAI_RecordsUpstreamFailure(t *testing.T) {
 
 	got := make(map[string]string, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
-		got[string(kv.Key)] = kv.Value.Emit()
+		got[string(kv.Key)] = kv.Value.String()
 	}
 	assert.Equal(t, "provider_timeout", got[AttrErrorType])
 	assert.Equal(t, "504", got[AttrUpstreamStatusCode])
@@ -166,7 +166,7 @@ func TestStampInternalGenAI_ErrorTypeCarriesNoProviderText(t *testing.T) {
 		if string(kv.Key) != AttrErrorType {
 			continue
 		}
-		assert.NotContains(t, kv.Value.Emit(), " ",
+		assert.NotContains(t, kv.Value.String(), " ",
 			"error.type must stay a classifier token, not a message")
 	}
 }

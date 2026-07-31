@@ -1,4 +1,5 @@
 import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
 import type {
@@ -18,7 +19,6 @@ import {
   type ParameterConstraints,
 } from "../../modelProviders/registry";
 import { parseWireValue } from "../../modelProviders/wireFormat";
-import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 
 /**
  * Normalises either wire format ("mp_abc/gpt-5" or "openai/gpt-5") into

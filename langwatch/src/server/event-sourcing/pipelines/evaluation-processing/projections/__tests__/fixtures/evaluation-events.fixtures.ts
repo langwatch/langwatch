@@ -66,7 +66,11 @@ export function createEvaluationScheduledEvent(
   options: IdentityOptions = {},
 ): EvaluationScheduledEvent {
   return {
-    ...envelope({ type: "lw.evaluation.scheduled", options, fallbackEventId: "evt-1" }),
+    ...envelope({
+      type: "lw.evaluation.scheduled",
+      options,
+      fallbackEventId: "evt-1",
+    }),
     data: {
       evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
       evaluatorId: options.evaluatorId ?? "monitor-x",
@@ -82,7 +86,11 @@ export function createEvaluationStartedEvent(
   options: IdentityOptions = {},
 ): EvaluationStartedEvent {
   return {
-    ...envelope({ type: "lw.evaluation.started", options, fallbackEventId: "evt-2" }),
+    ...envelope({
+      type: "lw.evaluation.started",
+      options,
+      fallbackEventId: "evt-2",
+    }),
     data: {
       evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
       evaluatorId: options.evaluatorId ?? "monitor-x",
@@ -102,7 +110,11 @@ export function createEvaluationCompletedEvent(
   options: CommonOptions & OutcomeOptions = {},
 ): EvaluationCompletedEvent {
   return {
-    ...envelope({ type: "lw.evaluation.completed", options, fallbackEventId: "evt-3" }),
+    ...envelope({
+      type: "lw.evaluation.completed",
+      options,
+      fallbackEventId: "evt-3",
+    }),
     data: {
       evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
       status: options.status ?? "processed",
@@ -121,7 +133,11 @@ export function createEvaluationReportedEvent(
   options: IdentityOptions & OutcomeOptions = {},
 ): EvaluationReportedEvent {
   return {
-    ...envelope({ type: "lw.evaluation.reported", options, fallbackEventId: "evt-r" }),
+    ...envelope({
+      type: "lw.evaluation.reported",
+      options,
+      fallbackEventId: "evt-r",
+    }),
     data: {
       evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
       evaluatorId: options.evaluatorId ?? "monitor-y",

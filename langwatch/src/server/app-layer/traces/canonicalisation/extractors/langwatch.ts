@@ -25,7 +25,6 @@
  * - gen_ai.system_instructions (extracted from first system message)
  */
 
-import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";
@@ -35,8 +34,6 @@ import {
   stripSystemMessages,
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-
-const logger = createLogger("langwatch:trace-processing:langwatch-extractor");
 
 /** JSON.stringify that never throws — returns a fallback on circular refs / BigInt / etc. */
 function safeStringify(value: unknown): string {

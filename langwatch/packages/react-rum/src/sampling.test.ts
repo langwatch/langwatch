@@ -105,7 +105,8 @@ describe("SessionRatioSampler", () => {
             .toString(16)
             .padStart(8, "0");
           visitWith(`${leading}${"0".repeat(24)}`);
-          if (decide(sampler) === SamplingDecision.RECORD_AND_SAMPLED) sampled++;
+          if (decide(sampler) === SamplingDecision.RECORD_AND_SAMPLED)
+            sampled++;
         }
 
         expect(sampled / 400).toBeGreaterThan(0.15);

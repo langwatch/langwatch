@@ -8,14 +8,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useRouter } from "~/utils/compat/next-router";
-
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 const fmtUsd = (n: number) =>
@@ -47,8 +46,7 @@ const fmtRelative = (date: Date | string | null): string => {
  */
 function GovernanceTeamDetailPage() {
   const router = useRouter();
-  const teamId =
-    typeof router.query.id === "string" ? router.query.id : null;
+  const teamId = typeof router.query.id === "string" ? router.query.id : null;
   const { organization, organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -110,9 +108,8 @@ function GovernanceTeamDetailPage() {
             padding={5}
           >
             <Text fontSize="sm" color="fg.muted">
-              No spend data for this team in the last 30 days. The team
-              may not have any associated ingestion sources reporting
-              activity yet.
+              No spend data for this team in the last 30 days. The team may not
+              have any associated ingestion sources reporting activity yet.
             </Text>
           </Box>
         ) : (
@@ -143,8 +140,8 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this
-                team will land here in a follow-up.
+                Per-day spend, per-user breakdown, and model mix for this team
+                will land here in a follow-up.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -156,10 +153,15 @@ function GovernanceTeamDetailPage() {
                   >
                     View this team's workspace traces →
                   </Link>
-                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
-                    The trace explorer opens with the team's data. A
-                    'Viewing as admin' banner stays present + the access
-                    is logged to /settings/audit-log.
+                  <Text
+                    fontSize="xs"
+                    color="fg.subtle"
+                    marginTop={1}
+                    marginBottom={3}
+                  >
+                    The trace explorer opens with the team's data. A 'Viewing as
+                    admin' banner stays present + the access is logged to
+                    /settings/audit-log.
                   </Text>
                 </>
               )}
@@ -172,9 +174,8 @@ function GovernanceTeamDetailPage() {
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data
-                through one orthogonal lens until the dedicated drilldown
-                ships.
+                The chart's {`'By Team'`} toggle exercises the same data through
+                one orthogonal lens until the dedicated drilldown ships.
               </Text>
             </Box>
           </>

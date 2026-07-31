@@ -1,10 +1,10 @@
 import { createListCollection, Field, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
 import {
   CADENCE_LABELS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { useMemo } from "react";
 import { Select } from "~/components/ui/select";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";

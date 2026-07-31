@@ -20,6 +20,7 @@ import type {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
+import { z } from "zod";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
@@ -73,13 +74,30 @@ function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
  * key, so a key can never exist for a moment with the cap its creator
  * asked for missing. `null` on update removes the cap (by archiving, never
  * deleting: the ledger behind it is spend history).
+ *
+ * The zod schema is the single validation source for this shape: the tRPC
+ * mutations and the public REST API both parse through it, so the two
+ * doors cannot accept different caps. Only the calendar windows a person
+ * reasons about in a drawer: a per-minute cap on one key is an ops knob,
+ * not a spending decision, and belongs on the budgets page.
  */
-export type VirtualKeyBudgetInput = {
-  limitUsd: string;
-  window: "DAY" | "WEEK" | "MONTH";
-  onBreach?: "BLOCK" | "WARN";
-  name?: string;
-};
+export const virtualKeyBudgetInputSchema = z.object({
+  // A decimal number of dollars, strictly positive. String rather
+  // than number to survive JSON round-trips without float drift; the
+  // regex rejects partial parses ("10abs"), signs, and bare dots.
+  limitUsd: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
+    .refine((v) => Number.parseFloat(v) > 0, {
+      message: "limitUsd must be greater than zero",
+    }),
+  window: z.enum(["DAY", "WEEK", "MONTH"]),
+  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+  name: z.string().min(1).max(128).optional(),
+});
+
+export type VirtualKeyBudgetInput = z.infer<typeof virtualKeyBudgetInputSchema>;
 
 export type CreateVirtualKeyInput = {
   organizationId: string;
@@ -259,10 +277,18 @@ export class VirtualKeyService {
         tx,
       );
       await this.assertTraceProjectResolvable(vk, tx);
-      await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
+      await this.assertProvidersAllowedReachable(
+        vk,
+        config.providersAllowed,
+        tx,
+      );
       if (input.budget) {
         await this.upsertKeyBudget(
-          { virtualKey: vk, budget: input.budget, actorUserId: input.actorUserId },
+          {
+            virtualKey: vk,
+            budget: input.budget,
+            actorUserId: input.actorUserId,
+          },
           tx,
         );
       }
@@ -332,8 +358,7 @@ export class VirtualKeyService {
             null
           : existing.routingPolicyId;
     const routingMode =
-      input.routingMode !== undefined ||
-      input.routingPolicyId !== undefined
+      input.routingMode !== undefined || input.routingPolicyId !== undefined
         ? resolveRoutingMode(
             input.routingMode ?? existing.routingMode,
             nextRoutingPolicyId,
@@ -645,9 +670,7 @@ export class VirtualKeyService {
         organizationId: vk.organizationId,
         projectId: null,
         actorUserId,
-        action: existing
-          ? "gateway.budget.updated"
-          : "gateway.budget.created",
+        action: existing ? "gateway.budget.updated" : "gateway.budget.created",
         targetKind: "budget",
         targetId: row.id,
         ...(existing ? { before: serializeRowForAudit(existing) } : {}),
@@ -806,7 +829,8 @@ function resolveRoutingMode(
   if (mode === "POLICY" && !routingPolicyId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+      message:
+        "routing_policy_required: routingMode POLICY needs a routingPolicyId",
     });
   }
   if (mode !== "POLICY" && routingPolicyId) {

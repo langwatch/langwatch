@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
 import {
   compareLangyEventCursors,
   cursorHasReachedEvent,
 } from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";

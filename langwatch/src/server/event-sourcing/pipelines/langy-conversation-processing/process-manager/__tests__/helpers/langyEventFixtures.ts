@@ -2,23 +2,23 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
   LangyConversationArchivedEventSchema,
-  LangyMessageRecordedEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyConversationStartedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
+  LangyMessageRecordedEventSchema,
   LangyPlanUpdatedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import { buildLangyProcessEventView } from "../../langyConversationProcess";
 

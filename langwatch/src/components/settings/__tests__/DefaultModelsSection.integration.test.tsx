@@ -75,7 +75,11 @@ vi.mock("~/utils/api", () => ({
       getAllForProject: {
         useQuery: () => ({
           data: {
-            openai: { enabled: true, customModels: [], customEmbeddingsModels: [] },
+            openai: {
+              enabled: true,
+              customModels: [],
+              customEmbeddingsModels: [],
+            },
           },
           isLoading: false,
         }),
@@ -224,9 +228,7 @@ describe("<DefaultModelsSection />", () => {
   /** @scenario The Default Models page shows the list of override rules */
   it("renders one row per config in the All-you-can-see view", () => {
     renderSection();
-    expect(
-      screen.getByTestId("config-row-cfg_acme_org"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("config-row-cfg_acme_org")).toBeInTheDocument();
     expect(
       screen.getByTestId("config-row-cfg_ai_search_override"),
     ).toBeInTheDocument();
@@ -256,12 +258,8 @@ describe("<DefaultModelsSection />", () => {
     renderSection();
     // Open the 3-dot row menu, then pick Edit. Mirrors the model-providers
     // row pattern — Edit + Delete live behind a MoreVertical popover.
-    fireEvent.click(
-      screen.getByTestId("config-row-cfg_acme_org-actions"),
-    );
-    fireEvent.click(
-      await screen.findByTestId("config-row-cfg_acme_org-edit"),
-    );
+    fireEvent.click(screen.getByTestId("config-row-cfg_acme_org-actions"));
+    fireEvent.click(await screen.findByTestId("config-row-cfg_acme_org-edit"));
     // Drawer is opened through the URL-driven currentDrawer registry —
     // the section only fires openDrawer with the row's id, the registry
     // mounts the actual drawer component above the page.
@@ -273,9 +271,7 @@ describe("<DefaultModelsSection />", () => {
   /** @scenario Deleting a config via the row menu removes the row */
   it("fires the delete mutation when Delete is picked from the row menu", async () => {
     renderSection();
-    fireEvent.click(
-      screen.getByTestId("config-row-cfg_acme_org-actions"),
-    );
+    fireEvent.click(screen.getByTestId("config-row-cfg_acme_org-actions"));
     fireEvent.click(
       await screen.findByTestId("config-row-cfg_acme_org-delete"),
     );

@@ -16,11 +16,10 @@
 import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
-import { prisma } from "~/server/db";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
@@ -203,16 +202,21 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         "langwatch.virtual_key_id": VK_ID,
         "langwatch.gateway_request_id": gatewayRequestId,
       });
-      await reactor.handle({} as TraceProcessingEvent, {
-        tenantId: PROJECT_ID,
-        aggregateId: state.traceId,
-        foldState: state,
-      } as ReactorContext<TraceSummaryData>);
+      await reactor.handle(
+        {} as TraceProcessingEvent,
+        {
+          tenantId: PROJECT_ID,
+          aggregateId: state.traceId,
+          foldState: state,
+        } as ReactorContext<TraceSummaryData>,
+      );
     };
   }, 120_000);
 
   afterAll(async () => {
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_ID, PRE_VK_ID] } },
     });
@@ -345,11 +349,14 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         "langwatch.virtual_key_id": PRE_VK_ID,
         "langwatch.gateway_request_id": gatewayRequestId,
       });
-      await reactor.handle({} as TraceProcessingEvent, {
-        tenantId: PRE_PROJECT_ID,
-        aggregateId: state.traceId,
-        foldState: state,
-      } as ReactorContext<TraceSummaryData>);
+      await reactor.handle(
+        {} as TraceProcessingEvent,
+        {
+          tenantId: PRE_PROJECT_ID,
+          aggregateId: state.traceId,
+          foldState: state,
+        } as ReactorContext<TraceSummaryData>,
+      );
     };
 
     beforeAll(async () => {

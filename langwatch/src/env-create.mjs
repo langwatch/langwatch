@@ -106,7 +106,8 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
     } catch {
       continue;
     }
-    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost") continue;
+    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost")
+      continue;
 
     processEnv[name] = target;
     realigned.push({ name, from: current, to: target });

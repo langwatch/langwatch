@@ -117,7 +117,9 @@ export interface ProcessStore {
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
   /** All messages for one process, primarily for diagnostics and tests. */
-  findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]>;
+  findMessagesByRef(params: {
+    ref: ProcessRef;
+  }): Promise<OutboxMessageRecord[]>;
 
   /**
    * Lease pending, due messages for exclusive dispatch until

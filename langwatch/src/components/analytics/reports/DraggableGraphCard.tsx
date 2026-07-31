@@ -110,6 +110,6 @@ export function DraggableGraphCard({
   );
 }
 
-export type { SizeOption, GraphData };
 // Re-export from GraphCardMenu for backwards compatibility
 export { getCurrentSize, sizeOptions } from "./GraphCardMenu";
+export type { GraphData, SizeOption };

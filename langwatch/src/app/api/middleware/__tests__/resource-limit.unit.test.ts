@@ -250,9 +250,7 @@ describe("resourceLimitMiddleware()", () => {
         const res = await app.request("/", { method: "POST" });
         const body = await res.json();
 
-        expect(body.message).toContain(
-          "License limit of 5 prompts reached",
-        );
+        expect(body.message).toContain("License limit of 5 prompts reached");
         expect(body.message).toContain(
           "upgrade your license at https://my-instance.example.com/settings/license",
         );
@@ -265,9 +263,7 @@ describe("resourceLimitMiddleware()", () => {
       mockEnforceLimit.mockRejectedValue(
         new LimitExceededError("prompts", 5, 5),
       );
-      mockNotifyPlanLimitReached.mockRejectedValue(
-        new Error("Slack failed"),
-      );
+      mockNotifyPlanLimitReached.mockRejectedValue(new Error("Slack failed"));
     });
 
     it("still returns 403 (notification is non-blocking)", async () => {

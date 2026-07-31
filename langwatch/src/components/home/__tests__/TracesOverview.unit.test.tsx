@@ -140,7 +140,9 @@ describe("<TracesOverview /> presentation", () => {
       renderWithProviders(<TracesOverview variant="strip" />);
 
       expect(
-        screen.getByRole("button", { name: "Show the trend over the last 7 days" }),
+        screen.getByRole("button", {
+          name: "Show the trend over the last 7 days",
+        }),
       ).toBeDefined();
     });
 
@@ -157,7 +159,9 @@ describe("<TracesOverview /> presentation", () => {
       renderWithProviders(<TracesOverview variant="trend" />);
 
       expect(screen.getByTestId("traces-overview-trend")).toBeDefined();
-      expect(screen.queryByRole("button", { name: /Show the trend/ })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /Show the trend/ }),
+      ).toBeNull();
     });
   });
 

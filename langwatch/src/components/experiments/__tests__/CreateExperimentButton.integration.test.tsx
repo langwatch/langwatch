@@ -170,12 +170,20 @@ describe("given experiment creation permissions and mutation boundaries", () => 
         );
       });
 
-      expect(mockToasterCreate).toHaveBeenCalledWith({
-        title: "Error creating experiment",
-        description: "Experiment service failed",
-        type: "error",
-        meta: { closable: true },
-      });
+      // The headline is the call site's `fallbackTitle`, because an
+      // unrecognised failure has no registry copy of its own. The raw
+      // `error.message` is deliberately NOT the description: since #5984 the
+      // wire message for a handled error is its code slug, so relaying it
+      // showed customers "validation_error". Don't restore it.
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Couldn't create the experiment",
+          type: "error",
+        }),
+      );
+      expect(mockToasterCreate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ description: "Experiment service failed" }),
+      );
     });
   });
 });

@@ -20,7 +20,9 @@ export const SUITE_AGENT_TARGET_TYPES = ["http", "code", "workflow"] as const;
 export type SuiteAgentTargetType = (typeof SUITE_AGENT_TARGET_TYPES)[number];
 
 /** Type guard: narrows `type` to `SuiteAgentTargetType`. */
-export function isSuiteAgentTargetType(type: string): type is SuiteAgentTargetType {
+export function isSuiteAgentTargetType(
+  type: string,
+): type is SuiteAgentTargetType {
   return (SUITE_AGENT_TARGET_TYPES as readonly string[]).includes(type);
 }
 

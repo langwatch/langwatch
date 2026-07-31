@@ -13,7 +13,8 @@ import { createInnerTRPCContext } from "../../trpc";
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual =
+    await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -429,7 +430,9 @@ describe("Agents Endpoints", () => {
       const targetCopy = copies.find((c) => c.projectId === targetProjectId);
       expect(targetCopy).toBeDefined();
       expect(targetCopy!.projectId).toBe(targetProjectId);
-      expect((targetCopy!.fullPath as string).includes("Test Project Copy Target")).toBe(true);
+      expect(
+        (targetCopy!.fullPath as string).includes("Test Project Copy Target"),
+      ).toBe(true);
     });
 
     it("pushToCopies updates selected copies with source name and config", async () => {
@@ -437,7 +440,10 @@ describe("Agents Endpoints", () => {
         projectId: sourceProjectId,
         name: "Push Source",
         type: "signature",
-        config: { ...signatureConfig, llm: { ...signatureConfig.llm, temperature: 0.5 } },
+        config: {
+          ...signatureConfig,
+          llm: { ...signatureConfig.llm, temperature: 0.5 },
+        },
       });
 
       const copied = await caller.agents.copy({

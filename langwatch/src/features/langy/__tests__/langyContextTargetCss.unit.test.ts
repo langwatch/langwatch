@@ -48,7 +48,11 @@ describe("the armed ring stylesheet", () => {
       // The old trough was 0.03 alpha on a 1px hairline — invisible on a real
       // monitor, which read as "arming does nothing". Quiet is the brief;
       // invisible is a bug. Every near/hover stop must stay at or above 0.15.
-      const stops = [...css.matchAll(/--langy-target-(?:near|hover)-\d:\s*rgba\([^)]*,\s*([\d.]+)\)/g)];
+      const stops = [
+        ...css.matchAll(
+          /--langy-target-(?:near|hover)-\d:\s*rgba\([^)]*,\s*([\d.]+)\)/g,
+        ),
+      ];
       expect(stops.length).toBeGreaterThan(0);
       for (const [declaration, alpha] of stops) {
         expect(Number(alpha), declaration).toBeGreaterThanOrEqual(0.15);

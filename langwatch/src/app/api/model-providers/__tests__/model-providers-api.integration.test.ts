@@ -3,8 +3,8 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
-import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
+import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Model Providers API", () => {

@@ -14,11 +14,11 @@
  *                option renders from its own label, selectable as given.
  *   - `pending`  the fetch is still in flight.
  */
-import { useEffect, useMemo, useState } from "react";
 
+import type { LangyDerivedChoicesCard } from "@langwatch/langy";
+import { useEffect, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { LangyDerivedChoicesCard } from "@langwatch/langy";
 import { CAPABILITY_HYDRATORS } from "../capabilities/capabilityHydrators";
 
 export type ChoicesRefRow =
@@ -67,9 +67,7 @@ export function useChoicesRefRows(
               projectId,
               ids: entries.map((entry) => entry.refId),
             });
-            const rowById = new Map(
-              hydration.rows.map((row) => [row.id, row]),
-            );
+            const rowById = new Map(hydration.rows.map((row) => [row.id, row]));
             for (const entry of entries) {
               const row = rowById.get(entry.refId);
               next.set(

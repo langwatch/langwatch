@@ -230,9 +230,7 @@ describe("given the retired stored_log_records write chain", () => {
       expect(
         definition.commands.find((c) => c.name === "recordLog"),
       ).toBeUndefined();
-      expect(
-        definition.mapProjections.get("logRecordStorage"),
-      ).toBeUndefined();
+      expect(definition.mapProjections.get("logRecordStorage")).toBeUndefined();
     });
   });
 });

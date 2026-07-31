@@ -2,9 +2,9 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import {
   IDLE_STATUS,
+  type ReplayHistoryEntry,
   type ReplayRepository,
   type ReplayStatus,
-  type ReplayHistoryEntry,
 } from "./replay.repository";
 
 const REPLAY_LOCK_KEY = "ops:replay:lock";
@@ -106,18 +106,17 @@ export class ReplayRedisRepository implements ReplayRepository {
     await this.redis.del(REPLAY_CANCEL_KEY);
   }
 
-  async pushToHistory(params: {
-    entry: ReplayHistoryEntry;
-  }): Promise<void> {
-    await this.redis.lpush(
-      REPLAY_HISTORY_KEY,
-      JSON.stringify(params.entry),
-    );
+  async pushToHistory(params: { entry: ReplayHistoryEntry }): Promise<void> {
+    await this.redis.lpush(REPLAY_HISTORY_KEY, JSON.stringify(params.entry));
     await this.redis.ltrim(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
   }
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
-    const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
+    const raw = await this.redis.lrange(
+      REPLAY_HISTORY_KEY,
+      0,
+      REPLAY_HISTORY_MAX - 1,
+    );
     const entries: ReplayHistoryEntry[] = [];
     for (const item of raw) {
       try {

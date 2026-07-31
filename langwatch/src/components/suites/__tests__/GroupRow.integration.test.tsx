@@ -10,10 +10,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GroupRow } from "../GroupRow";
 import { cssRulesForElement } from "~/utils/emotionTestCss";
-import { makeScenarioRunData, makeSummary } from "./test-helpers";
+import { GroupRow } from "../GroupRow";
 import type { RunGroup } from "../run-history-transforms";
+import { makeScenarioRunData, makeSummary } from "./test-helpers";
 
 vi.mock("../usePrefetchRunState", () => ({
   usePrefetchRunState: () => vi.fn(),
@@ -50,7 +50,12 @@ describe("<GroupRow/>", () => {
       render(
         <GroupRow
           group={makeGroup()}
-          summary={makeSummary({ passedCount: 4, failedCount: 1, totalCount: 5, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 4,
+            failedCount: 1,
+            totalCount: 5,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
@@ -67,7 +72,11 @@ describe("<GroupRow/>", () => {
       render(
         <GroupRow
           group={makeGroup()}
-          summary={makeSummary({ passedCount: 4, failedCount: 1, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 4,
+            failedCount: 1,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}

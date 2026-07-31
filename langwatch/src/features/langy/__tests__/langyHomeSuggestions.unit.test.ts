@@ -7,10 +7,7 @@
  * specs/langy/langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  SETUP_SUGGESTIONS,
-  SUGGESTIONS,
-} from "../components/EmptyState";
+import { SETUP_SUGGESTIONS, SUGGESTIONS } from "../components/EmptyState";
 import {
   HOME_SUGGESTION_COUNT,
   PANEL_SUGGESTION_COUNT,

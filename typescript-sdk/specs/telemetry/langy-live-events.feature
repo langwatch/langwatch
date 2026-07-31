@@ -59,7 +59,9 @@ Feature: The CLI streams live progress events for the Langy UI
       Then an error event carries the failure message
       And the command still fails the way it always did
 
-    @unit
+    # Unverified: that a command other than trace search names its own resource
+    # and verb. Only the failure shape of a non-trace command is observed today.
+    @unit @unimplemented
     Scenario: The same vocabulary describes other read commands
       Given the live event channel is switched on
       When I list datasets
