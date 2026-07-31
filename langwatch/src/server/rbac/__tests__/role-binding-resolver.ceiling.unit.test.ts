@@ -57,6 +57,8 @@ function makePrisma({
   /** Org role of the owner, or null for "not a legacy-membership user". */
   legacyOrgRole = null as OrganizationUserRole | null,
   legacyTeamRole = null as TeamUserRole | null,
+  /** Organization the legacy team actually belongs to. */
+  legacyTeamOrgId = ORG_ID as string,
 } = {}) {
   const findMany = vi.fn(
     async ({ where }: { where: Record<string, unknown> }) => {
@@ -77,9 +79,17 @@ function makePrisma({
         count: vi.fn().mockResolvedValue(legacyOrgRole === null ? 1 : 0),
       },
       teamUser: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue(legacyTeamRole ? { role: legacyTeamRole } : null),
+        // Answers according to the where-clause, so a query that fails to
+        // constrain the team to this organization is visible rather than
+        // silently satisfied by a fixture that ignores its own filter.
+        findFirst: vi.fn(async ({ where }: any) => {
+          if (!legacyTeamRole) return null;
+          const wantsOrg = where?.team?.organizationId;
+          if (wantsOrg !== undefined && wantsOrg !== legacyTeamOrgId) {
+            return null;
+          }
+          return { role: legacyTeamRole };
+        }),
       },
       user: {
         findFirst: vi.fn().mockResolvedValue(
@@ -300,6 +310,29 @@ describe("resolveApiKeyPermission()", () => {
         userBindings: [],
         legacyOrgRole: OrganizationUserRole.EXTERNAL,
         legacyTeamRole: TeamUserRole.ADMIN,
+      });
+
+      await expect(resolve({ prisma })).resolves.toBe(false);
+    });
+  });
+  describe("given a legacy row on a team belonging to a different organization", () => {
+    /**
+     * The membership gate proves the USER belongs to the org being asked
+     * about; it says nothing about the TEAM. `loadScopeResolution` constrains
+     * the team too (`team: { organizationId }`), and this function's docstring
+     * claims to use the same predicate — so a claimed parity that does not
+     * hold is exactly the defect class this fallback was rewritten to remove.
+     *
+     * Unreachable today, since both callers derive the scope from a validated
+     * project or team. Pinned so it stays that way.
+     */
+    it("grants nothing from the other organization's role", async () => {
+      const { prisma } = makePrisma({
+        apiKeyBindings: [teamBinding(TeamUserRole.ADMIN)],
+        userBindings: [],
+        legacyOrgRole: OrganizationUserRole.MEMBER,
+        legacyTeamRole: TeamUserRole.ADMIN,
+        legacyTeamOrgId: "some-other-org",
       });
 
       await expect(resolve({ prisma })).resolves.toBe(false);

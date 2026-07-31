@@ -386,3 +386,62 @@ describe("detecting comparison columns", () => {
     });
   });
 });
+
+describe("rows the judge declined to call", () => {
+  /**
+   * Counted rather than discarded, because it is the explanation for a fit
+   * that later fails to connect. Swap-and-reconcile records no verdict when
+   * the judge's pick flips with the candidate order, and those rows take
+   * their evidence out of the win graph with them — enough of them and the
+   * leaderboard reports "not enough overlap to rank these" for a reason the
+   * reader would otherwise have no way to see.
+   */
+  it("counts a skipped comparison instead of dropping it silently", () => {
+    const run = createRun([
+      {
+        evaluator: "cmp-1",
+        status: "processed",
+        index: 0,
+        label: "concise-support-v2",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+      {
+        evaluator: "cmp-1",
+        status: "skipped",
+        index: 1,
+        details: "Order-sensitive verdict",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+      {
+        evaluator: "cmp-1",
+        status: "skipped",
+        index: 2,
+        details: "Order-sensitive verdict",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+    ]);
+
+    const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+    expect(column.rowsWithoutVerdict).toBe(2);
+    // The skipped rows still produce no verdict — they are counted, not
+    // resurrected as evidence.
+    expect(Object.keys(column.verdictsByRow)).toEqual(["0"]);
+  });
+
+  it("reports zero when the judge called every row", () => {
+    const run = createRun([
+      {
+        evaluator: "cmp-1",
+        status: "processed",
+        index: 0,
+        label: "concise-support-v2",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+    ]);
+
+    const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+    expect(column.rowsWithoutVerdict).toBe(0);
+  });
+});

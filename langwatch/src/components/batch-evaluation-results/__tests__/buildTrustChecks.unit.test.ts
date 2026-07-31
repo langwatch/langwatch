@@ -495,3 +495,57 @@ describe("buildTrustChecks — the sample-size threshold the product actually sh
     });
   });
 });
+
+/**
+ * The step-2 badge is derived from these checks rather than re-listing their
+ * conditions, because the parallel boolean it replaced had drifted from the
+ * panel TWICE — it knew about neither a graph broken into groups nor a
+ * bootstrap whose resamples failed to settle. Both render an amber line inside
+ * a step whose border and badge stayed neutral, which is the one thing a
+ * "look here" affordance must not do.
+ *
+ * These pin the derivation, so a check added later cannot go unnoticed by the
+ * badge again.
+ */
+describe("the step badge, derived from the checks", () => {
+  const hasProblem = (overrides: Partial<LeaderboardTrustPanelProps> = {}) =>
+    build(overrides).some((check) => check.tone === "warn");
+
+  it("stays quiet on a run with nothing wrong", () => {
+    expect(hasProblem()).toBe(false);
+  });
+
+  it("fires on a graph that broke into groups", () => {
+    expect(
+      hasProblem({
+        leaderboard: leaderboard({
+          comparability: {
+            identifiable: false,
+            groups: [["a"], ["b"]],
+            dominates: [
+              [false, false],
+              [false, false],
+            ],
+          },
+        }),
+      }),
+    ).toBe(true);
+  });
+
+  it("fires on a bootstrap whose resamples did not settle", () => {
+    expect(
+      hasProblem({
+        leaderboard: leaderboard({ bootstrapNonConvergence: 0.61 }),
+      }),
+    ).toBe(true);
+  });
+
+  it("fires when the judge declined a large share of the rows", () => {
+    expect(
+      hasProblem({
+        leaderboard: leaderboard({ comparisonCount: 10 }),
+        rowsWithoutVerdict: 10,
+      }),
+    ).toBe(true);
+  });
+});
