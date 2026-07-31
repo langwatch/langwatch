@@ -303,19 +303,26 @@ export const useOrganizationTeamProject = (
       ),
   );
 
+  // A slug can name a project in more than one team, so prefer a match on a
+  // team the caller is on before falling back to the first one.
+  const slugMatches = projectsTeamsOrganizationsMatchingSlug ?? [];
+  const slugMatch =
+    (userId
+      ? slugMatches.find((match) => userBelongsToTeam(match.team, userId))
+      : undefined) ?? slugMatches[0];
+
   // A slug that resolved off the persisted selection rather than off the URL
   // is stickiness, not intent: it survives from the last visit to
   // /[some-slug]/* into every organization-scoped page that carries no project
-  // of its own. Two kinds have to be dropped there — a personal workspace,
-  // which is a private context the caller never asked to work in, and a team
-  // the caller does not belong to, which the chrome refuses outright. Both let
-  // the ambient resolution below pick again, which also re-persists what it
-  // picks so the stale selection heals itself.
+  // of its own. Two kinds have to be dropped there. A personal workspace is a
+  // private context the caller never asked to work in, and a team the caller
+  // does not belong to is one the chrome refuses outright. Both let the
+  // ambient resolution below pick again, which also re-persists what it picks
+  // so the stale selection heals itself.
   //
   // A slug named in the address bar keeps resolving exactly as before,
   // including into a team the caller is not on: the refusal that follows is
   // the honest answer to typing someone else's project into the URL.
-  const slugMatch = projectsTeamsOrganizationsMatchingSlug?.[0];
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
@@ -368,10 +375,10 @@ export const useOrganizationTeamProject = (
     : undefined;
 
   // The remembered selection carries the same membership requirement as the
-  // ambient pick below. A team id persisted before that pick was membership
-  // aware — or carried over from an admin session on a shared machine — would
-  // otherwise keep resolving a team the caller is not on, long after the
-  // resolution itself stopped producing one.
+  // ambient pick below. Without it a persisted team id keeps resolving a team
+  // the caller is not on, long after the resolution itself stopped producing
+  // one: the selection is written from whatever last resolved, so a bad pick
+  // outlives the page that made it.
   const rememberedTeam = organization?.teams.find(
     (team) =>
       team.id == localStorageTeamId &&
