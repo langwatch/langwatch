@@ -129,11 +129,18 @@ function collectEngineDeclarations(): EngineDeclaration[] {
       // A materialized view with a TO target has no engine of its own; the
       // engine that matters is the target table's.
       if (!engine) continue;
+      // The engine expression ends where the next table clause begins, so a
+      // single-line `ENGINE = X() ORDER BY ...` is judged on X() alone.
+      const engineText = engine[1]!
+        .split(
+          /\s+(?:ORDER\s+BY|PARTITION\s+BY|PRIMARY\s+KEY|SETTINGS|TTL|AS)\s/i,
+        )[0]!
+        .trim();
       declarations.push({
         file,
         objectType: create[1]!.replace(/\s+/g, " ").toUpperCase(),
         objectName: create[2]!.replace("${CLICKHOUSE_DATABASE}.", ""),
-        engine: engine[1]!.trim(),
+        engine: engineText,
       });
     }
   }
