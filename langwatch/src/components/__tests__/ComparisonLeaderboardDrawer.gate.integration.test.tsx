@@ -81,6 +81,16 @@ const renderDrawer = () =>
     { wrapper: Wrapper },
   );
 
+/**
+ * What `CurrentDrawer` actually mounts from a URL: the one serializable prop
+ * and nothing else. The tests above hand-feed `column` and `rows`, which a
+ * query string cannot carry — so they were passing on a path no reader takes.
+ */
+const renderDrawerFromUrlAlone = () =>
+  render(<ComparisonLeaderboardDrawer evaluatorId={column.evaluatorId} />, {
+    wrapper: Wrapper,
+  });
+
 describe("the expanded comparison leaderboard, opened straight from a URL", () => {
   afterEach(() => {
     rollout.enabled = true;
@@ -104,6 +114,34 @@ describe("the expanded comparison leaderboard, opened straight from a URL", () =
       renderDrawer();
 
       expect(screen.getByText("Comparison — leaderboard")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the link is opened cold, carrying no in-memory run data", () => {
+    /** @scenario "A pasted leaderboard link explains where to find the run" */
+    it("points at the results page instead of throwing", () => {
+      renderDrawerFromUrlAlone();
+
+      expect(
+        screen.getByTestId(
+          `leaderboard-needs-results-page-${column.evaluatorId}`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * The reason this case matters beyond the crash: the rollout gate used to
+     * sit BELOW the dereference that threw, so on the one route it exists to
+     * guard it was never reached.
+     *
+     * @scenario "A shared leaderboard link opens nothing for an organization without it"
+     */
+    it("still refuses an organization the rollout has not reached", () => {
+      rollout.enabled = false;
+
+      const { container } = renderDrawerFromUrlAlone();
+
+      expect(container).toBeEmptyDOMElement();
     });
   });
 });

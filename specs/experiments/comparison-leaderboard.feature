@@ -63,6 +63,17 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     # thing to one that has not been given it.
 
   @integration
+  Scenario: A pasted leaderboard link explains where to find the run
+    Given my organization has the comparison leaderboard turned on
+    When I open a link that addresses the expanded leaderboard directly
+    Then I am told to open the run and expand the leaderboard card
+    # A link carries the evaluator's identity and nothing else — the run's
+    # rows are far too large for a query string — so a cold link cannot
+    # rebuild the leaderboard. Saying where to find it beats the alternative,
+    # which threw partway through rendering and silently stripped the drawer
+    # back out of the URL, leaving no sign anything had been asked for.
+
+  @integration
   Scenario: The leaderboard chart appears once there are enough variants to rank
     Given the comparison has 3 variants
     When I view the run on the results page
@@ -137,6 +148,41 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Then I am told the run splits into groups it never connected
     # Reachable in the ordinary way: the Comparison evaluator drops a
     # candidate that produced no output for a row.
+
+  @unit
+  Scenario: A winner is never named across variants that never met
+    Given two variants were compared only with each other
+    And two more were compared only with each other
+    When I read the headline
+    Then it does not name a variant to ship
+    And it does not offer the cheaper of them as an equal-quality swap
+    # Telling the reader in the trust panel is not enough on its own: the
+    # panel lives in the drawer, and the headline that names a variant to
+    # ship is on the results page where most readers stop. The gap across
+    # the split is an artifact of how the fit is centred, and every resample
+    # re-centres it the same way — so the interval around that gap comes out
+    # TIGHT, and the run reports high confidence in a number that carries no
+    # information about the pair at all.
+
+  @unit
+  Scenario: A variant is never called droppable by one it never met
+    Given two variants were compared only with each other
+    And two more were compared only with each other
+    And cost and speed are too close to separate any of them
+    When I read which variants are beaten outright
+    Then no variant is listed as beaten by one from the other group
+    # The strongest instruction this feature gives — "beaten outright and can
+    # be dropped" — so it is the last place an unmeasured gap may surface.
+
+  @unit
+  Scenario: Pairs that never met are not counted as pairs the run settled
+    Given two variants were compared only with each other
+    And two more were compared only with each other
+    When I read how much of the ranking the run established
+    Then the pairs spanning the two groups are not counted as separated
+    # The verdict and this count share one separation test precisely so they
+    # cannot disagree on screen; a veto applied to only one of them would
+    # reintroduce the disagreement it was written to prevent.
 
   @unit
   Scenario: A ranking that cannot settle does not claim it has

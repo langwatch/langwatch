@@ -13,6 +13,12 @@
  * rather than refetched — it's the same data already loaded on the results
  * page, and these can be large enough that URL serialization would be the
  * wrong tool.
+ *
+ * Which means the drawer has two mount paths, not one. `CurrentDrawer` also
+ * mounts it straight from the query string, where complexProps are gone and
+ * only `evaluatorId` survives; that path gets `LeaderboardNeedsResultsPage`.
+ * Everything below the gate in `ComparisonLeaderboardDrawer` may assume the
+ * data is present, and nothing above it may touch the data.
  */
 import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
@@ -27,7 +33,10 @@ import {
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
-import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
+import {
+  buildTrustChecks,
+  LeaderboardTrustPanel,
+} from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
 import {
   DEFAULT_WARN_THRESHOLD,
@@ -45,14 +54,30 @@ import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics"
 import { Drawer } from "./ui/drawer";
 
 export type ComparisonLeaderboardDrawerProps = {
+  /** Which comparison this drawer is for. The only URL-serializable prop. */
   evaluatorId: string;
-  column: BatchComparisonColumn;
-  rows: BatchResultRow[];
+  /**
+   * The run's data, handed over in memory by the results page.
+   *
+   * OPTIONAL because it cannot survive the URL. `CurrentDrawer` mounts this
+   * component from the query string on a reload or a pasted link, and then
+   * only `evaluatorId` arrives — everything below is undefined. Typing these
+   * as required described a guarantee the drawer does not have, and the code
+   * dereferenced them on the strength of it.
+   */
+  column?: BatchComparisonColumn;
+  rows?: BatchResultRow[];
   targetColors?: Record<string, string>;
   /** Model each target ran on, as recorded on the run. */
   modelByTargetId?: Record<string, string | null>;
   /** Model that judged this comparison, as recorded on the run. */
   judgeModel?: string | null;
+};
+
+/** The same props, once the caller has been confirmed to have the data. */
+type LoadedProps = ComparisonLeaderboardDrawerProps & {
+  column: BatchComparisonColumn;
+  rows: BatchResultRow[];
 };
 
 type SelectedPair = { winnerId: string; opponentId: string };
@@ -65,12 +90,13 @@ const useLeaderboardAnalysis = ({
   column,
   rows,
   variantIds,
+  variantNames,
   modelByTargetId,
   judgeModel,
-}: Pick<
-  ComparisonLeaderboardDrawerProps,
-  "column" | "rows" | "modelByTargetId" | "judgeModel"
-> & { variantIds: string[] }) => {
+}: Pick<LoadedProps, "column" | "rows" | "modelByTargetId" | "judgeModel"> & {
+  variantIds: string[];
+  variantNames: Record<string, string>;
+}) => {
   // Shared across the card and the drawer — see useBTLeaderboard. Both need
   // the same fit for the same column, and it is expensive enough that doing
   // it twice was a visible pause when the drawer opened.
@@ -108,6 +134,28 @@ const useLeaderboardAnalysis = ({
     [judgeModel, modelByTargetId, variantIds],
   );
 
+  // Asked of the checks themselves rather than re-derived from their inputs.
+  //
+  // The badge on step 2 used to be a parallel boolean listing the conditions
+  // it thought were serious, and it had drifted from the panel twice: it
+  // never learned about a fit whose graph broke into groups that never met,
+  // nor about a bootstrap whose resamples failed to settle. Both render an
+  // amber line inside a step whose border and badge stayed neutral, which is
+  // the one thing this step must not do — it exists to say "look here".
+  // Deriving it means a check added later cannot be forgotten here.
+  const trustChecks = useMemo(
+    () =>
+      buildTrustChecks({
+        leaderboard,
+        warnThreshold: DEFAULT_WARN_THRESHOLD,
+        sampleAdequacy,
+        verbosity,
+        judgeIndependence,
+        variantNames,
+      }),
+    [leaderboard, sampleAdequacy, verbosity, judgeIndependence, variantNames],
+  );
+
   return {
     leaderboard,
     variantMetrics,
@@ -116,12 +164,7 @@ const useLeaderboardAnalysis = ({
     sampleAdequacy,
     verbosity,
     judgeIndependence,
-    trustHasProblem:
-      leaderboard.minMatchups < DEFAULT_WARN_THRESHOLD ||
-      leaderboard.hasDegenerate ||
-      !leaderboard.didConverge ||
-      judgeIndependence.sharedFamilyVariantIds.length > 0 ||
-      (sampleAdequacy.totalPairs > 0 && sampleAdequacy.separatedPairs === 0),
+    trustHasProblem: trustChecks.some((check) => check.tone === "warn"),
   };
 };
 
@@ -277,19 +320,92 @@ function TradeoffStep({
   );
 }
 
+/**
+ * Mounted from a URL with no in-memory data behind it.
+ *
+ * The run's rows are far too large to serialize into a query string, so a
+ * reload or a pasted link cannot rebuild them here. Saying so is the point:
+ * the alternative was dereferencing `column` anyway, which threw a TypeError
+ * into the ErrorBoundary above and silently stripped the drawer from the URL,
+ * leaving the reader on the results page with no indication anything had been
+ * asked for.
+ *
+ * Reconstituting properly needs the run identifiers in the URL alongside
+ * `evaluatorId` so the drawer can refetch — tracked as a follow-up rather
+ * than done here, because it means threading them through two more
+ * components.
+ */
+function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
+  const { closeDrawer } = useDrawer();
+
+  return (
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="lg"
+      onOpenChange={closeDrawer}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <Text fontWeight="semibold" fontSize="lg">
+            Leaderboard
+          </Text>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            data-testid={`leaderboard-needs-results-page-${evaluatorId}`}
+          >
+            This leaderboard is built from the run&apos;s results, which are not
+            carried in the link. Open the run and expand the leaderboard card to
+            see it.
+          </Text>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
 export function ComparisonLeaderboardDrawer({
+  evaluatorId,
+  column,
+  rows,
+  ...rest
+}: ComparisonLeaderboardDrawerProps) {
+  // The chart's expand button is the only affordance that opens this, and it
+  // is already gone when the flag is off — but a drawer is addressable by URL,
+  // so a link shared out of an enabled organization would otherwise render the
+  // whole leaderboard for one that has not been given it.
+  //
+  // Both bails sit ABOVE every deref of `column`. They used to sit seventeen
+  // lines below one, so the URL path threw before it could reach this gate and
+  // the gate was unreachable on exactly the route it exists to guard.
+  const showLeaderboard = useShowComparisonLeaderboard();
+  if (!showLeaderboard) return null;
+  if (!column || !rows) {
+    return <LeaderboardNeedsResultsPage evaluatorId={evaluatorId} />;
+  }
+
+  return (
+    <LoadedComparisonLeaderboardDrawer
+      evaluatorId={evaluatorId}
+      column={column}
+      rows={rows}
+      {...rest}
+    />
+  );
+}
+
+function LoadedComparisonLeaderboardDrawer({
   column,
   rows,
   targetColors,
   modelByTargetId,
   judgeModel,
-}: ComparisonLeaderboardDrawerProps) {
+}: LoadedProps) {
   const { closeDrawer } = useDrawer();
-  // The chart's expand button is the only affordance that opens this, and it
-  // is already gone when the flag is off — but a drawer is addressable by URL,
-  // so a link shared out of an enabled organization would otherwise render the
-  // whole leaderboard for one that has not been given it.
-  const showLeaderboard = useShowComparisonLeaderboard();
 
   const variantIds = useMemo(
     () => column.variants.map((v) => v.id).filter((id): id is string => !!id),
@@ -304,11 +420,10 @@ export function ComparisonLeaderboardDrawer({
     column,
     rows,
     variantIds,
+    variantNames,
     modelByTargetId,
     judgeModel,
   });
-
-  if (!showLeaderboard) return null;
 
   return (
     <Drawer.Root
