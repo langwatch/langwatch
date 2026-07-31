@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import { llmModels } from "~/server/modelProviders/loadModelCatalog";
 import {
@@ -36,6 +37,8 @@ export function currentRegistryRateVersion(): string {
   return date ? `registry@${date}` : "registry@unversioned";
 }
 
+const logger = createLogger("langwatch:gateway-spend:rating");
+
 export function rateSpendNanoUsd({
   model,
   usage,
@@ -49,6 +52,11 @@ export function rateSpendNanoUsd({
     model,
     getStaticModelCosts(),
   );
+  if (!llmModelCost && model && model !== "unknown") {
+    // A missing rate rule must never disappear silently as a $0 charge:
+    // this is the catalog-freshness alarm's raw signal.
+    logger.warn({ model }, "no rate rule matched; spend rated at zero");
+  }
   const usd = llmModelCost
     ? estimateCost({
         llmModelCost,

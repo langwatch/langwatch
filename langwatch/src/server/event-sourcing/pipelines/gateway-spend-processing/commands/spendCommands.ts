@@ -43,11 +43,15 @@ import type {
  * crash cannot double-rate it.
  */
 
-function idempotencyKey(
-  tenantId: string,
-  gatewayRequestId: string,
-  step: string,
-): string {
+function idempotencyKey({
+  tenantId,
+  gatewayRequestId,
+  step,
+}: {
+  tenantId: string;
+  gatewayRequestId: string;
+  step: string;
+}): string {
   return `${tenantId}:${gatewayRequestId}:${step}`;
 }
 
@@ -75,11 +79,11 @@ export class AdmitSpendCommand
         data,
         metadata: {},
         occurredAt: data.occurred_at,
-        idempotencyKey: idempotencyKey(
-          command.tenantId,
-          data.gateway_request_id,
-          "admitted",
-        ),
+        idempotencyKey: idempotencyKey({
+          tenantId: command.tenantId,
+          gatewayRequestId: data.gateway_request_id,
+          step: "admitted",
+        }),
       }),
     ];
   }
@@ -123,11 +127,11 @@ export class ConfirmSpendCommand
         data,
         metadata: {},
         occurredAt: data.occurred_at,
-        idempotencyKey: idempotencyKey(
-          command.tenantId,
-          data.gateway_request_id,
-          "confirmed",
-        ),
+        idempotencyKey: idempotencyKey({
+          tenantId: command.tenantId,
+          gatewayRequestId: data.gateway_request_id,
+          step: "confirmed",
+        }),
       }),
     ];
   }
@@ -171,11 +175,11 @@ export class FailSpendCommand
         data,
         metadata: {},
         occurredAt: data.occurred_at,
-        idempotencyKey: idempotencyKey(
-          command.tenantId,
-          data.gateway_request_id,
-          "failed",
-        ),
+        idempotencyKey: idempotencyKey({
+          tenantId: command.tenantId,
+          gatewayRequestId: data.gateway_request_id,
+          step: "failed",
+        }),
       }),
     ];
   }
@@ -218,11 +222,11 @@ export class SettleSpendCommand
         data,
         metadata: {},
         occurredAt: data.occurred_at,
-        idempotencyKey: idempotencyKey(
-          command.tenantId,
-          data.gateway_request_id,
-          "settled",
-        ),
+        idempotencyKey: idempotencyKey({
+          tenantId: command.tenantId,
+          gatewayRequestId: data.gateway_request_id,
+          step: "settled",
+        }),
       }),
     ];
   }

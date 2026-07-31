@@ -15,6 +15,7 @@ import type {
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
 } from "../../schemas/events";
+import { rateSpendNanoUsd } from "../../services/spend-rating.service";
 import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
@@ -176,6 +177,15 @@ describe("gatewaySpend fold", () => {
     expect(state.usage?.input_tokens).toBe(869);
     expect(Number.isInteger(state.costNanoUsd)).toBe(true);
     expect(state.costNanoUsd).toBeGreaterThan(0);
+    // The fold and the rating service must always agree: same quantities,
+    // same rate identity, same integer.
+    expect(state.costNanoUsd).toBe(
+      rateSpendNanoUsd({
+        model: "openai/gpt-5",
+        usage: confirmed().data.usage,
+        rateVersion: "catalog@2026-07-26",
+      }).costNanoUsd,
+    );
     expect(state.rateVersion).toBe("catalog@2026-07-26");
   });
 
@@ -245,6 +255,11 @@ describe("gatewaySpend fold", () => {
     );
     expect(afterAdmit.status).toBe("confirmed");
     expect(afterAdmit.organizationId).toBe("org_1");
+    // The resolved identity and the cost rated from it survive the late
+    // admission; only attribution fills in.
+    expect(afterAdmit.model).toBe(early.model);
+    expect(afterAdmit.providerKey).toBe(early.providerKey);
+    expect(afterAdmit.costNanoUsd).toBe(early.costNanoUsd);
   });
 
   /** @scenario Partial usage on a failure still prices */

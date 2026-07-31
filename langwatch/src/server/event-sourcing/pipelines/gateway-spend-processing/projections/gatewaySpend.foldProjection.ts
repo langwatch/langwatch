@@ -156,16 +156,20 @@ export class GatewaySpendFoldProjection
     state: GatewaySpendState,
   ): GatewaySpendState {
     const d = event.data;
+    // A completion that raced ahead of its admission must not be downgraded,
+    // and the outcome's RESOLVED model/provider identity must not be
+    // overwritten by the admission's requested values: the rated cost was
+    // derived from the resolved identity.
+    const outcomeResolved = state.status !== "" && state.status !== "admitted";
     return {
       ...state,
-      // A completion that raced ahead of its admission must not downgrade.
       status: state.status === "" ? "admitted" : state.status,
       organizationId: d.organization_id,
       virtualKeyId: d.virtual_key_id,
       principalUserId: d.principal_user_id,
       endUserId: d.end_user_id,
-      model: d.model,
-      providerKey: d.model_provider_id,
+      model: outcomeResolved ? state.model : d.model,
+      providerKey: outcomeResolved ? state.providerKey : d.model_provider_id,
       traceId: d.trace_id,
       requestType: d.request_type,
       labels: d.labels,

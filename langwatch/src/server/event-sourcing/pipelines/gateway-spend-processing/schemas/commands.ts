@@ -14,7 +14,33 @@ import { z } from "zod";
 /** Bounds mirror the gateway edge: ids are opaque tokens, metadata is a
  *  validated JSON object capped at 4KB before it ever reaches a command. */
 const boundedId = z.string().min(1).max(256);
-const boundedMetadataJson = z.string().max(4096).default("");
+const boundedMetadataJson = z
+  .string()
+  .max(4096)
+  .refine(
+    (raw) => {
+      if (raw === "") return true;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        return (
+          typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        );
+      } catch {
+        return false;
+      }
+    },
+    { message: "metadata must be a JSON object string" },
+  )
+  .default("");
+
+/** Request time, unix ms, bounded to the plausible clock range so a
+ *  seconds- or microseconds-scale timestamp fails at the ingest boundary
+ *  instead of landing in the wrong partition. */
+const occurredAtMs = z
+  .number()
+  .int()
+  .min(Date.UTC(2020, 0, 1))
+  .max(Date.UTC(2100, 0, 1));
 
 export const spendUsageSchema = z.object({
   input_tokens: z.number().int().min(0).default(0),
@@ -28,7 +54,7 @@ export type SpendUsage = z.infer<typeof spendUsageSchema>;
 export const admitSpendCommandDataSchema = z.object({
   gateway_request_id: boundedId,
   /** Request time, unix ms. Period placement anchors here, never ingest time. */
-  occurred_at: z.number().int().positive(),
+  occurred_at: occurredAtMs,
   organization_id: boundedId,
   /** TenantId = project id; the framework's group keys and every ClickHouse
    *  filter key off this. The ingest route maps the wire's project_id here. */
@@ -55,7 +81,7 @@ export type AdmitSpendCommandData = z.infer<typeof admitSpendCommandDataSchema>;
 
 export const confirmSpendCommandDataSchema = z.object({
   gateway_request_id: boundedId,
-  occurred_at: z.number().int().positive(),
+  occurred_at: occurredAtMs,
   tenantId: boundedId,
   /** The RESOLVED model + provider: identity only settles post-dispatch in
    *  the gateway, so the outcome carries it and wins over admitted's
@@ -74,7 +100,7 @@ export type ConfirmSpendCommandData = z.infer<
 
 export const failSpendCommandDataSchema = z.object({
   gateway_request_id: boundedId,
-  occurred_at: z.number().int().positive(),
+  occurred_at: occurredAtMs,
   tenantId: boundedId,
   model: z.string().max(512).default(""),
   model_provider_id: z.string().max(256).default(""),
@@ -98,7 +124,7 @@ export type FailSpendCommandData = z.infer<typeof failSpendCommandDataSchema>;
 
 export const settleSpendCommandDataSchema = z.object({
   gateway_request_id: boundedId,
-  occurred_at: z.number().int().positive(),
+  occurred_at: occurredAtMs,
   tenantId: boundedId,
   /** Why settlement fired (e.g. confirmation_deadline_expired). */
   reason: z.string().min(1).max(128),

@@ -830,8 +830,9 @@ const spendCommandBatchSchema = z.object({
  * Per-record acceptance: one malformed record must not wedge the spool
  * (the drainer would retry a permanently rejected batch forever), so bad
  * records are reported back by index and the rest append. The gateway
- * counts rejects; a nonzero rate is a contract bug, never data loss the
- * gap detector cannot see.
+ * counts rejects; a nonzero rate is a contract bug, and a rejected outcome
+ * still surfaces later when settlement flags the admission for
+ * reconciliation (the pod-seq gap detector only covers admits).
  */
 secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
   const parsed = spendCommandBatchSchema.safeParse(
