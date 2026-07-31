@@ -1,15 +1,4 @@
-import {
-  bySeverityDescending,
-  computeSeverityPrior,
-  severityRank,
-} from "../evidence/severity";
-import { formatDuration } from "../format";
-import type {
-  Block,
-  QuestionTier,
-  ReportEvidence,
-  TrendClassification,
-} from "../report.types";
+import type { Block, QuestionTier, ReportEvidence } from "../report.types";
 
 /**
  * The questions a run report answers.

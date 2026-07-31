@@ -9,11 +9,7 @@
  * @see specs/scenarios/scenario-run-report.feature
  */
 
-import type {
-  Block,
-  ReportEvidence,
-  TrendClassification,
-} from "../report.types";
+import type { ReportEvidence, TrendClassification } from "../report.types";
 
 /** Whether a question can be answered from this run, and why not when it cannot. */
 export type Applicability =

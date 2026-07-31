@@ -8,14 +8,12 @@ import { formatDuration } from "../format";
 import type {
   Block,
   ReportEvidence,
-  TableCell,
   TrendClassification,
 } from "../report.types";
 import {
   plural,
   scenarioNameFor,
   TREND_LABELS,
-  trendClassificationById,
   trendPoints,
 } from "./question-helpers";
 

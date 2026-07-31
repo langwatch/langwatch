@@ -84,19 +84,7 @@ export async function runVerifierPass({
       abortSignal,
     });
 
-    // One ruling per claim. A model repeating an id is an ordinary
-    // generateObject failure mode, and left as-is it breaks both derived
-    // values: `seen.length` counts the repeat towards coverage, so twenty
-    // verdicts on one claim can pass a gate meant to prove breadth, and a
-    // later `supported: true` would overwrite an earlier `false`. First
-    // verdict wins, which is the conservative half of that.
-    const known = new Set(claims.map((claim) => claim.id));
-    const ruledOn = new Map<string, boolean>();
-    for (const verdict of object.verdicts) {
-      if (!known.has(verdict.claimId)) continue;
-      if (ruledOn.has(verdict.claimId)) continue;
-      ruledOn.set(verdict.claimId, verdict.supported);
-    }
+    const ruledOn = rulingsByClaim({ verdicts: object.verdicts, claims });
     const isUsable = ruledOn.size >= claims.length * MIN_COVERAGE_TO_TRUST;
 
     if (!isUsable) {
@@ -121,4 +109,29 @@ export async function runVerifierPass({
     logger.warn({ error }, "Run report check failed; leaving report unchecked");
     return null;
   }
+}
+
+/**
+ * One ruling per claim, first verdict winning.
+ *
+ * A model repeating a claim id is an ordinary `generateObject` failure mode,
+ * and left alone it breaks both values derived from this: a count of verdicts
+ * would let twenty rulings on one claim pass a gate meant to prove breadth,
+ * and a later `supported: true` would overwrite an earlier `false`. Taking the
+ * first is the conservative half of that.
+ */
+function rulingsByClaim({
+  verdicts,
+  claims,
+}: {
+  verdicts: { claimId: string; supported: boolean }[];
+  claims: Claim[];
+}): Map<string, boolean> {
+  const known = new Set(claims.map((claim) => claim.id));
+  const ruledOn = new Map<string, boolean>();
+  for (const verdict of verdicts) {
+    if (!known.has(verdict.claimId) || ruledOn.has(verdict.claimId)) continue;
+    ruledOn.set(verdict.claimId, verdict.supported);
+  }
+  return ruledOn;
 }
