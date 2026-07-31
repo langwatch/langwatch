@@ -155,6 +155,7 @@ describe("scenario run CSV serializers", () => {
       expect(row.run_unmet_criteria_count).toBe("3");
     });
 
+    /** @scenario Criteria are encoded so that their commas survive */
     it("encodes criteria as JSON so their commas survive a round trip", () => {
       const criterion = "stays polite, even when the customer escalates";
       const csv = serializeRunsToFullCsv({
@@ -176,6 +177,7 @@ describe("scenario run CSV serializers", () => {
       expect(JSON.parse(row.run_met_criteria!)).toEqual([criterion]);
     });
 
+    /** @scenario Timestamps are written as ISO-8601 UTC */
     it("writes timestamps as ISO-8601 UTC", () => {
       const csv = serializeRunsToFullCsv({
         runs: [buildRun({ timestamp: 1785177315009 })],
@@ -194,6 +196,10 @@ describe("scenario run CSV serializers", () => {
       expect(parse(csv)[0]!.run_total_cost).toBe("");
     });
 
+    /**
+     * @scenario Every row reports both the run's status and its category
+     * @scenario Statuses that mean failure are categorised together but still distinguishable
+     */
     it("reports the run status alongside its outcome category", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
@@ -212,6 +218,7 @@ describe("scenario run CSV serializers", () => {
       ]);
     });
 
+    /** @scenario The export computes no pass rate of its own */
     it("emits no aggregate columns", () => {
       const csv = serializeRunsToFullCsv({
         runs: [buildRun()],
@@ -219,6 +226,80 @@ describe("scenario run CSV serializers", () => {
       });
 
       expect(csv.split("\n")[0]).not.toContain("pass_rate");
+    });
+
+    /**
+     * There is no finished_at column, so duration is the only time signal a
+     * reader gets. For a run still going it is elapsed-so-far, and the category
+     * is what says so — read on its own the number would look like a run that
+     * finished quickly.
+     *
+     * @scenario An in-flight run reports elapsed time, not a final duration
+     */
+    it("pairs an unfinished run's elapsed time with an in-progress category", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            status: ScenarioRunStatus.IN_PROGRESS,
+            durationInMs: 4200,
+            results: null,
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      const row = parse(csv)[0]!;
+      expect(row.run_duration_ms).toBe("4200");
+      expect(row.run_status_category).toBe("in_progress");
+      expect(csv.split("\n")[0]).not.toContain("finished_at");
+    });
+
+    /**
+     * The stated reason there is no third, one-row-per-run mode: every
+     * run-level column is repeated on every message row, so a spreadsheet's
+     * "remove duplicates" gives that file for free.
+     *
+     * @scenario One row per run is a de-duplication away
+     */
+    it("repeats run columns so de-duplicating leaves one intact row per run", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            scenarioRunId: "run_a",
+            messages: [
+              { role: "user", content: "first" },
+              { role: "assistant", content: "second" },
+              { role: "user", content: "third" },
+            ] as ExportableRun["messages"],
+          }),
+          buildRun({
+            scenarioRunId: "run_b",
+            name: "Password Reset",
+            messages: [
+              { role: "user", content: "help" },
+            ] as ExportableRun["messages"],
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      const rows = parse(csv);
+      expect(rows).toHaveLength(4);
+
+      const deduped = [
+        ...new Map(rows.map((row) => [row.run_scenario_run_id, row])).values(),
+      ];
+      expect(deduped).toHaveLength(2);
+      expect(deduped.map((row) => row.run_scenario_name)).toEqual([
+        "Refund Request",
+        "Password Reset",
+      ]);
+      // Not just present on the surviving row — the same on every row it was
+      // dropped from, which is what makes the de-duplication lossless.
+      for (const row of rows.filter((r) => r.run_scenario_run_id === "run_a")) {
+        expect(row.run_scenario_name).toBe("Refund Request");
+        expect(row.run_verdict).toBe("success");
+      }
     });
 
     it("extracts the target from the langwatch metadata namespace", () => {
@@ -371,6 +452,7 @@ describe("scenario run CSV serializers", () => {
   });
 
   describe("when exporting in criteria mode", () => {
+    /** @scenario Criteria CSV writes one row per criterion per run */
     it("writes one row per criterion, flagged met or unmet", () => {
       const csv = serializeRunsToCriteriaCsv({
         runs: [
@@ -396,6 +478,7 @@ describe("scenario run CSV serializers", () => {
       ]);
     });
 
+    /** @scenario Criteria rows carry enough run context to pivot on */
     it("carries run context onto every criterion row so it can be pivoted", () => {
       const csv = serializeRunsToCriteriaCsv({
         runs: [
@@ -419,6 +502,7 @@ describe("scenario run CSV serializers", () => {
       }
     });
 
+    /** @scenario A run that was judged against no criteria produces no criteria rows */
     it("contributes no rows for a run judged against no criteria", () => {
       const csv = serializeRunsToCriteriaCsv({
         runs: [
@@ -441,9 +525,51 @@ describe("scenario run CSV serializers", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]!.scenario_run_id).toBe("has-one");
     });
+
+    /**
+     * The whole reason criteria mode exists: one row per (run, criterion) is
+     * what makes "which rule do we break most often?" a group-and-count rather
+     * than a manual read of every transcript.
+     *
+     * @scenario Criteria mode makes the failing-criteria ranking a spreadsheet pivot
+     */
+    it("lets one criterion's failures be counted across many runs", () => {
+      const terse = "Langy is terse";
+      const runs = Array.from({ length: 18 }, (_, index) =>
+        buildRun({
+          scenarioRunId: `run_${index}`,
+          scenarioId: `scenario_${index}`,
+          results: {
+            verdict: Verdict.FAILURE,
+            reasoning: "",
+            metCriteria: ["verifies identity"],
+            unmetCriteria: [terse],
+            error: undefined,
+          },
+        }),
+      );
+
+      const rows = parse(
+        serializeRunsToCriteriaCsv({ runs, includeHeader: true }),
+      );
+
+      const failuresOfTerse = rows.filter(
+        (row) => row.criterion === terse && row.met === "false",
+      );
+      expect(failuresOfTerse).toHaveLength(18);
+      // Across 18 distinct scenarios, which is the part no per-scenario view
+      // can show — the same rule breaking everywhere.
+      expect(new Set(failuresOfTerse.map((row) => row.scenario_id)).size).toBe(
+        18,
+      );
+    });
   });
 
   describe("when exporting a conversation in full mode", () => {
+    /**
+     * @scenario Full CSV writes one row per conversation message
+     * @scenario Full rows repeat the run fields on every message row
+     */
     it("writes one row per message with run fields repeated", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
@@ -495,6 +621,7 @@ describe("scenario run CSV serializers", () => {
       expect(row.run_reasoning).toBe("The agent asked a clarifying question.");
     });
 
+    /** @scenario A run with no messages still appears in Full mode */
     it("still writes one row for a run that produced no messages", () => {
       const csv = serializeRunsToFullCsv({
         runs: [buildRun({ messages: [] as ExportableRun["messages"] })],
@@ -507,6 +634,7 @@ describe("scenario run CSV serializers", () => {
       expect(rows[0]!.run_scenario_run_id).toBe("run_1");
     });
 
+    /** @scenario Conversation content keeps its commas, quotes, and newlines */
     it("round-trips message content containing commas, quotes and newlines", () => {
       const content = 'He said "no, refund it".\nThen he left.';
       const csv = serializeRunsToFullCsv({
