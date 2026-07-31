@@ -199,4 +199,14 @@ describe("mapToPlanInfo", () => {
     expect(parsed.limit).toBe(DEFAULT_LIMIT);
     expect(Number.isFinite(DEFAULT_LIMIT)).toBe(true);
   });
+
+  /** @scenario A licensed webhook entitlement survives the PlanInfo mapping */
+  it("carries webhookEndpointsEnabled into PlanInfo, defaulting false when absent", () => {
+    const withFlag = mapToPlanInfo(
+      createLicenseData({ webhookEndpointsEnabled: true }),
+    );
+    expect(withFlag.webhookEndpointsEnabled).toBe(true);
+    const withoutFlag = mapToPlanInfo(createLicenseData({}));
+    expect(withoutFlag.webhookEndpointsEnabled).toBe(false);
+  });
 });

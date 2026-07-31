@@ -89,6 +89,28 @@ describe("generateLicenseKey", () => {
   });
 
   describe("when generating an ENTERPRISE license", () => {
+    /** @scenario A generated enterprise license carries the webhook entitlement */
+    it("carries webhookEndpointsEnabled through signing and validation", () => {
+      const { licenseKey, licenseData } = generateLicenseKey({
+        ...baseParams,
+        planType: "ENTERPRISE",
+        maxMembers: 50,
+      });
+      // The generator hand-lists plan keys for signature key-order
+      // stability; this pins that the entitlement survives that list AND
+      // round-trips signature validation.
+      expect(licenseData.plan.webhookEndpointsEnabled).toBe(true);
+      const validated = validateLicense({
+        licenseKey,
+        publicKey: TEST_PUBLIC_KEY,
+        now: baseParams.now,
+      });
+      expect(validated.valid).toBe(true);
+      if (validated.valid) {
+        expect(validated.licenseData.plan.webhookEndpointsEnabled).toBe(true);
+      }
+    });
+
     it("generates a valid license with ENTERPRISE template limits", () => {
       const { licenseKey, licenseData } = generateLicenseKey({
         ...baseParams,

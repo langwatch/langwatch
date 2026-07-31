@@ -67,6 +67,7 @@ export function generateLicenseKey({
     maxCustomGraphs: template.maxCustomGraphs,
     maxAutomations: template.maxAutomations,
     canPublish: template.canPublish,
+    webhookEndpointsEnabled: template.webhookEndpointsEnabled,
     usageUnit: template.usageUnit,
   };
 
