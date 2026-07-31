@@ -15,7 +15,9 @@ import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import type { RouterOutputs } from "~/utils/api";
 
-type EventType = RouterOutputs["webhookEndpoints"]["eventTypes"][number];
+import type { WebhookEventType } from "@ee/webhooks/eventRegistry";
+
+type EventType = WebhookEventType;
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 
 const FAMILY_LABELS: Record<string, string> = {
@@ -191,7 +193,7 @@ export function WebhookEndpointDrawer({
                         >
                           <HStack gap={2}>
                             <Text fontSize="sm">{t.type}</Text>
-                            {!t.emitting && (
+                            {!t.isEmitting && (
                               <Badge size="sm" colorPalette="gray">
                                 not emitting yet
                               </Badge>

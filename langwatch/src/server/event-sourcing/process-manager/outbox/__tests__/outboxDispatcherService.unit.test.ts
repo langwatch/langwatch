@@ -180,7 +180,10 @@ describe("OutboxDispatcherService", () => {
         expect(handler).toHaveBeenCalledTimes(1);
       });
 
-      it("a retryable-true error still follows the ladder", async () => {
+    });
+
+    describe("when the handler throws a retryable-true error", () => {
+      it("classifies it as retried and re-dispatches after the delay", async () => {
         const transient = Object.assign(new Error("HTTP 503"), {
           retryable: true,
         });
@@ -195,6 +198,12 @@ describe("OutboxDispatcherService", () => {
         const first = await dispatcher.runOnce({ now: T0 + 1 });
         expect(first.retried).toEqual(["dispatch:turn_1:1"]);
         expect(first.dead).toEqual([]);
+
+        // The ladder is real: past the delay the same message dispatches
+        // again as attempt two.
+        const second = await dispatcher.runOnce({ now: T0 + 1_100 });
+        expect(second.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(handler).toHaveBeenCalledTimes(2);
       });
     });
 

@@ -27,14 +27,25 @@ export function WebhookSecretDialog({
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
-    void navigator.clipboard.writeText(secret ?? "").then(() => {
-      setCopied(true);
-      toaster.create({
-        title: "Signing secret copied",
-        type: "success",
-        meta: { closable: true },
-      });
-    });
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(secret ?? "");
+        setCopied(true);
+        toaster.create({
+          title: "Signing secret copied",
+          type: "success",
+          meta: { closable: true },
+        });
+      } catch {
+        // The secret never shows again, so a silent copy failure is the
+        // worst outcome: say it failed and leave the value on screen.
+        toaster.create({
+          title: "Copy failed. Select the secret and copy it manually.",
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+    })();
   };
 
   return (

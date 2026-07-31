@@ -293,16 +293,26 @@ function BillingEventsPage() {
                   <Table.Cell>
                     {row.status === "confirmed" ? (
                       <Badge size="sm" colorPalette="green">
-                        success
+                        confirmed
                       </Badge>
-                    ) : (
+                    ) : row.status === "failed" ? (
                       <UITooltip
                         content={row.errorClass || `HTTP ${row.httpStatus}`}
                       >
                         <Badge size="sm" colorPalette="red">
-                          error
+                          failed
                         </Badge>
                       </UITooltip>
+                    ) : row.status === "settled" ? (
+                      <UITooltip content="Confirmation never arrived; cost unknown, flagged for reconciliation">
+                        <Badge size="sm" colorPalette="yellow">
+                          settled
+                        </Badge>
+                      </UITooltip>
+                    ) : (
+                      <Badge size="sm" colorPalette="gray">
+                        admitted
+                      </Badge>
                     )}
                   </Table.Cell>
                 </Table.Row>

@@ -18,14 +18,14 @@ const EVENT_TYPES = [
     type: "gateway.request.completed",
     family: "gateway",
     schemaVersion: "1" as const,
-    emitting: true,
+    isEmitting: true,
     description: "The billing feed.",
   },
   {
     type: "gateway.budget.breached",
     family: "gateway",
     schemaVersion: "1" as const,
-    emitting: false,
+    isEmitting: false,
     description: "A budget reached its cap.",
   },
 ];

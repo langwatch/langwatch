@@ -51,7 +51,7 @@ const SPEND_ROW = {
   tokensCacheWrite: 0,
   tokensReasoning: 0,
   costUsd: "0.004200",
-  status: "success",
+  status: "confirmed" as const,
   errorClass: "",
   httpStatus: 200,
   labels: [],
@@ -102,7 +102,22 @@ describe("BillingEventsPage", () => {
   /** @scenario Changing a ledger filter resets pagination */
   it("wires filters into the query input and resets paging on change", async () => {
     const user = userEvent.setup();
+    listQuery.mockReturnValue({
+      data: {
+        rows: [SPEND_ROW],
+        nextCursor: { occurredAtMs: 1, gatewayRequestId: "req_0" },
+        virtualKeyNames: {},
+        clickHouseDisabled: false,
+      },
+      isLoading: false,
+    });
     renderPage();
+    // Advance the cursor first: without this, asserting an undefined cursor
+    // proves nothing about the reset.
+    await user.click(screen.getByTestId("billing-events-load-more"));
+    const advanced = listQuery.mock.calls.at(-1)?.[0];
+    expect(advanced.cursor).toBeDefined();
+
     await user.type(screen.getByTestId("filter-end-user"), "enduser-9");
     const lastCall = listQuery.mock.calls.at(-1)?.[0];
     expect(lastCall).toMatchObject({

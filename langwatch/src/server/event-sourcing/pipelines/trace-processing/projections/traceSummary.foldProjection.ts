@@ -1,4 +1,3 @@
-import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {

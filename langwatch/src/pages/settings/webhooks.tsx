@@ -25,6 +25,7 @@ import {
 import { useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
 import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
 import { WebhookSecretDialog } from "~/components/webhooks/WebhookSecretDialog";
@@ -62,8 +63,7 @@ export default function WebhooksSettingsPage() {
   const { activePlan, isLoading: isPlanLoading } = useActivePlan();
   const organizationId = organization?.id ?? "";
   const webhooksEnabled =
-    (activePlan as { webhookEndpoints?: boolean } | undefined)
-      ?.webhookEndpoints === true;
+    activePlan?.webhookEndpointsEnabled === true;
   const canManage = hasPermission("webhookEndpoints:manage");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -71,6 +71,8 @@ export default function WebhooksSettingsPage() {
   const [viewingDeliveries, setViewingDeliveries] =
     useState<EndpointView | null>(null);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+  const [rollingSecret, setRollingSecret] = useState<EndpointView | null>(null);
+  const [deleting, setDeleting] = useState<EndpointView | null>(null);
 
   const utils = api.useContext();
   const enabled = !!organization && webhooksEnabled;
@@ -255,12 +257,7 @@ export default function WebhooksSettingsPage() {
                               </Menu.Item>
                               <Menu.Item
                                 value="roll-secret"
-                                onClick={() =>
-                                  rollSecretMutation.mutate({
-                                    organizationId,
-                                    endpointId: endpoint.id,
-                                  })
-                                }
+                                onClick={() => setRollingSecret(endpoint)}
                               >
                                 <RotateCw size={14} /> Roll secret
                               </Menu.Item>
@@ -292,12 +289,7 @@ export default function WebhooksSettingsPage() {
                               <Menu.Item
                                 value="delete"
                                 color="fg.error"
-                                onClick={() =>
-                                  archiveMutation.mutate({
-                                    organizationId,
-                                    endpointId: endpoint.id,
-                                  })
-                                }
+                                onClick={() => setDeleting(endpoint)}
                               >
                                 <Trash2 size={14} /> Delete
                               </Menu.Item>
@@ -360,6 +352,44 @@ export default function WebhooksSettingsPage() {
       <WebhookSecretDialog
         secret={revealedSecret}
         onClose={() => setRevealedSecret(null)}
+      />
+      <ConfirmDialog
+        open={!!rollingSecret}
+        onOpenChange={(open) => {
+          if (!open) setRollingSecret(null);
+        }}
+        title="Roll the signing secret?"
+        message={`Receivers verifying ${rollingSecret?.url ?? "this endpoint"} start rejecting signatures the moment the secret rolls, until the new value is configured. The new secret is shown once.`}
+        confirmLabel="Roll secret"
+        tone="warning"
+        loading={rollSecretMutation.isPending}
+        onConfirm={() => {
+          if (!rollingSecret) return;
+          rollSecretMutation.mutate({
+            organizationId,
+            endpointId: rollingSecret.id,
+          });
+          setRollingSecret(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title="Delete this endpoint?"
+        message={`${deleting?.url ?? "This endpoint"} stops receiving events. Emitted events stay pullable, but nothing is delivered here again.`}
+        confirmLabel="Delete endpoint"
+        tone="danger"
+        loading={archiveMutation.isPending}
+        onConfirm={() => {
+          if (!deleting) return;
+          archiveMutation.mutate({
+            organizationId,
+            endpointId: deleting.id,
+          });
+          setDeleting(null);
+        }}
       />
     </SettingsLayout>
   );
