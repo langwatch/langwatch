@@ -158,7 +158,13 @@ export function LangyTracesCard({
   const router = useRouter();
   const search = readTraceSearchQuery(input);
   const queryHref = search.query
-    ? buildTraceExplorerHref({ projectSlug, search })
+    ? buildTraceExplorerHref({
+        projectSlug,
+        search,
+        // A `langwatch trace search` result — an absent window here is the
+        // CLI's own last-24h default, not an unknown one.
+        unstatedWindow: "cli-last-24h",
+      })
     : null;
 
   if (isSingle) {

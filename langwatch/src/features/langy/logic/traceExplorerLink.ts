@@ -232,22 +232,55 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
 }
 
 /**
+ * What an ABSENT window means for a given caller — which is not the same
+ * question for every caller, and answering it wrong invents a filter.
+ *
+ *   "cli-last-24h"  the search came from `langwatch trace search`, whose own
+ *                   default is the last day (`cli/commands/traces/search.ts`).
+ *                   Stating no window there is a positive fact about the data:
+ *                   it WAS the last 24h, and the link should say so rather than
+ *                   drop the user into the Explorer's 30d default.
+ *
+ *   "unknown"       the search came from somewhere with no such guarantee —
+ *                   an ADR-060 derived-card `explore` hint, for one, which the
+ *                   model authors as `{ origin: "evaluation" }` with no dates
+ *                   and no claim about when the underlying data is from. A card
+ *                   summarising last quarter would link to a 24h window and show
+ *                   an empty page.
+ *
+ * DEFAULT IS `"unknown"`, deliberately: a caller that forgets to say gets the
+ * Explorer's own default, which is a SUPERSET the user can see through. The
+ * opposite mistake — a silently invented window — hides the rows they came for,
+ * and that is the one failure this module must not produce.
+ */
+export type UnstatedWindow = "cli-last-24h" | "unknown";
+
+/**
  * The Explorer's fragment for this search: the default lens, plus whatever
  * survived of the query and the window. Shared by every link out of a trace
  * search, so the Explorer behind a drawer and the Explorer behind the card's
  * own button are always showing the same result set.
  */
-function explorerFragment(search: TraceSearchQuery): string {
+function explorerFragment(
+  search: TraceSearchQuery,
+  unstatedWindow: UnstatedWindow,
+): string {
   const fragmentParams = new URLSearchParams();
   const query = buildExplorerQuery(search);
   if (query) fragmentParams.set("q", query);
   if (search.startDate !== undefined && search.endDate !== undefined) {
     fragmentParams.set("from", String(search.startDate));
     fragmentParams.set("to", String(search.endDate));
-  } else if (search.startDate === undefined && search.endDate === undefined) {
-    // NEITHER bound named: the search covered the CLI's own default window and
-    // we can say so exactly — see CLI_DEFAULT_WINDOW_PRESET. Saying nothing here
-    // is not neutral; it hands the user the Explorer's 30d default instead.
+  } else if (
+    search.startDate === undefined &&
+    search.endDate === undefined &&
+    unstatedWindow === "cli-last-24h"
+  ) {
+    // NEITHER bound named AND the caller vouches for the CLI's own default: the
+    // search covered the last day and we can say so exactly — see
+    // CLI_DEFAULT_WINDOW_PRESET. Saying nothing here is not neutral; it hands
+    // the user the Explorer's 30d default instead. Only the CLI's own search
+    // carries that guarantee, which is why the caller has to state it.
     fragmentParams.set("preset", CLI_DEFAULT_WINDOW_PRESET);
   }
   // Exactly ONE bound named falls through deliberately, carrying no window at
@@ -283,15 +316,18 @@ export function buildTraceExplorerHref({
   search,
   traceId,
   traceTimestamp,
+  unstatedWindow = "unknown",
 }: {
   projectSlug?: string | null;
   search: TraceSearchQuery;
   traceId?: string | null;
   traceTimestamp?: number | null;
+  /** What an absent window means here — see {@link UnstatedWindow}. */
+  unstatedWindow?: UnstatedWindow;
 }): string | null {
   if (!projectSlug) return null;
 
-  const fragment = explorerFragment(search);
+  const fragment = explorerFragment(search, unstatedWindow);
 
   const drawerParams = new URLSearchParams();
   if (traceId) {
@@ -330,9 +366,12 @@ export function buildTraceExplorerHref({
 export function buildAutomationHref({
   projectSlug,
   search,
+  unstatedWindow = "unknown",
 }: {
   projectSlug?: string | null;
   search: TraceSearchQuery;
+  /** What an absent window means here — see {@link UnstatedWindow}. */
+  unstatedWindow?: UnstatedWindow;
 }): string | null {
   if (!projectSlug) return null;
   const query = buildExplorerQuery(search);
@@ -343,7 +382,7 @@ export function buildAutomationHref({
   drawerParams.set("drawer.initialSource", "trace");
   drawerParams.set("drawer.initialFilterQuery", query);
 
-  return `/${projectSlug}/traces?${drawerParams.toString()}#${explorerFragment(search)}`;
+  return `/${projectSlug}/traces?${drawerParams.toString()}#${explorerFragment(search, unstatedWindow)}`;
 }
 
 /**

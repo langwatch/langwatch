@@ -302,7 +302,13 @@ describe("given a derived timeseries with hints", () => {
       ]),
     );
     expect(derivedFrames()).toHaveLength(1);
-    expect(screen.getByText("Open in Traces")).toBeDefined();
+    const link = screen.getByText("Open in Traces").closest("a");
+    // A derived hint carries no dates and makes no claim about when its data is
+    // from, so the link must NOT stamp the CLI's 24h default on it — that would
+    // point a card summarising older data at a one-day window and show nothing.
+    expect(link?.getAttribute("href")).toBe(
+      "/demo/traces#all-traces?q=%22checkout%22",
+    );
   });
 
   it("binds an explore hint narrowed only by origin, no free text", () => {
@@ -334,7 +340,10 @@ describe("given a derived timeseries with hints", () => {
         },
       ]),
     );
-    expect(screen.getByText("Open in Traces")).toBeDefined();
+    const link = screen.getByText("Open in Traces").closest("a");
+    expect(link?.getAttribute("href")).toBe(
+      "/demo/traces#all-traces?q=origin%3Aevaluation",
+    );
   });
 
   it("drops an explore hint the platform cannot validate, card intact", () => {

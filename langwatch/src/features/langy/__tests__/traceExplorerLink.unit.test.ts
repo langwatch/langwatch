@@ -410,6 +410,7 @@ describe("buildTraceExplorerHref", () => {
           buildTraceExplorerHref({
             projectSlug: "acme",
             search: { query: "x" },
+            unstatedWindow: "cli-last-24h",
           })!,
         );
 
@@ -422,10 +423,63 @@ describe("buildTraceExplorerHref", () => {
         const href = buildTraceExplorerHref({
           projectSlug: "acme",
           search: {},
+          unstatedWindow: "cli-last-24h",
         })!;
 
         expect(fragmentParams(href).get("preset")).toBe("24h");
         expect(fragmentParams(href).get("q")).toBeNull();
+      });
+    });
+
+    describe("when the caller cannot vouch for what an absent window means", () => {
+      // `buildTraceExplorerHref` is also the seam for ADR-060 derived-card
+      // `explore` hints, which the model authors with no dates and no claim
+      // about when the underlying data is from. Stamping the CLI's 24h default
+      // on those invents a filter: a card summarising last quarter would link
+      // to a one-day window and show an empty page.
+      it("asserts no window at all rather than inventing the CLI's default", () => {
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: { origins: ["evaluation"] },
+          })!,
+        );
+
+        expect(params.get("q")).toBe("origin:evaluation");
+        expect(params.get("preset")).toBeNull();
+        expect(params.get("from")).toBeNull();
+        expect(params.get("to")).toBeNull();
+      });
+
+      it("defaults to saying nothing, so forgetting to state it cannot narrow a link", () => {
+        // The unsafe default would be the invented window; this pins that the
+        // omitted argument resolves to the widening direction, not the hiding
+        // one.
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: { query: "x" },
+          })!,
+        );
+
+        expect(params.get("preset")).toBeNull();
+      });
+
+      it("still carries an explicitly stated window untouched", () => {
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: {
+              query: "x",
+              startDate: 1750000000000,
+              endDate: 1750086400000,
+            },
+          })!,
+        );
+
+        expect(params.get("from")).toBe("1750000000000");
+        expect(params.get("to")).toBe("1750086400000");
+        expect(params.get("preset")).toBeNull();
       });
     });
   });
@@ -481,7 +535,11 @@ describe("buildAutomationHref", () => {
     describe("when the user chooses to alert on it", () => {
       it("opens the automation drawer through the same URL params every drawer opens from", () => {
         const params = searchParams(
-          buildAutomationHref({ projectSlug: "acme", search })!,
+          buildAutomationHref({
+            projectSlug: "acme",
+            search,
+            unstatedWindow: "cli-last-24h",
+          })!,
         );
 
         expect(params.get("drawer.open")).toBe("automation");
@@ -490,7 +548,11 @@ describe("buildAutomationHref", () => {
 
       it("seeds the alert's subject with the search text, exactly as the Explorer's own Automate button would", () => {
         const params = searchParams(
-          buildAutomationHref({ projectSlug: "acme", search })!,
+          buildAutomationHref({
+            projectSlug: "acme",
+            search,
+            unstatedWindow: "cli-last-24h",
+          })!,
         );
 
         expect(params.get("drawer.initialFilterQuery")).toBe(
@@ -519,7 +581,11 @@ describe("buildAutomationHref", () => {
       });
 
       it("lands on the Explorer showing the very traces the alert would match", () => {
-        const href = buildAutomationHref({ projectSlug: "acme", search })!;
+        const href = buildAutomationHref({
+          projectSlug: "acme",
+          search,
+          unstatedWindow: "cli-last-24h",
+        })!;
 
         expect(href.startsWith("/acme/traces?")).toBe(true);
         expect(fragmentParams(href).get("q")).toBe('"checkout failed"');
