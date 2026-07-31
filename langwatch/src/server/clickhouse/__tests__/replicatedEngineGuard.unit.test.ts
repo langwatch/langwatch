@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -35,25 +36,58 @@ const GOOSE_SOURCE = readFileSync(
   "utf8",
 );
 
+function propertyName(
+  property: ts.ObjectLiteralElementLike,
+): string | undefined {
+  if (
+    !ts.isPropertyAssignment(property) &&
+    !ts.isShorthandPropertyAssignment(property)
+  ) {
+    return undefined;
+  }
+  const name = property.name;
+  return ts.isIdentifier(name) || ts.isStringLiteral(name)
+    ? name.text
+    : undefined;
+}
+
+function collectObjectLiteralKeys(node: ts.Node, keys: Set<string>): void {
+  if (ts.isObjectLiteralExpression(node)) {
+    for (const property of node.properties) {
+      const name = propertyName(property);
+      if (name !== undefined) keys.add(name);
+    }
+  }
+  ts.forEachChild(node, (child) => collectObjectLiteralKeys(child, keys));
+}
+
 /**
- * The source of buildMigrationEnvVars with its comments removed, so the
- * provisioning assertion below is scoped to that function and a mention in a
- * comment (anywhere) or elsewhere in the file cannot satisfy it. Text-based
- * on purpose: the function is a flat object literal, and the assertion's
- * `^\s*NAME:` shape matches only key positions in it.
+ * The property names of the object literals buildMigrationEnvVars declares,
+ * read from the TypeScript AST so only real object keys count: comments,
+ * string contents, and code elsewhere in goose.ts cannot satisfy the
+ * provisioning assertion below.
  */
-const ENV_VARS_BODY = (() => {
-  const start = GOOSE_SOURCE.indexOf("function buildMigrationEnvVars");
-  if (start < 0) {
+const ENV_VAR_KEYS = (() => {
+  const sourceFile = ts.createSourceFile(
+    "goose.ts",
+    GOOSE_SOURCE,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const fn = sourceFile.statements.find(
+    (statement): statement is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(statement) &&
+      statement.name?.text === "buildMigrationEnvVars",
+  );
+  if (!fn) {
     throw new Error("buildMigrationEnvVars not found in goose.ts");
   }
-  const end = GOOSE_SOURCE.indexOf("\n}", start);
-  if (end < 0) {
-    throw new Error("buildMigrationEnvVars closing brace not found");
+  const keys = new Set<string>();
+  collectObjectLiteralKeys(fn, keys);
+  if (keys.size === 0) {
+    throw new Error("buildMigrationEnvVars declares no object literal keys");
   }
-  return GOOSE_SOURCE.slice(start, end)
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+  return keys;
 })();
 
 const APPROVED_ENGINE_PATTERNS: { name: string; pattern: RegExp }[] = [
@@ -258,7 +292,7 @@ describe("ClickHouse migration engine guard", () => {
 
     for (const name of [...referenced].sort()) {
       expect(
-        new RegExp(`^\\s*${name}:`, "m").test(ENV_VARS_BODY),
+        ENV_VAR_KEYS.has(name),
         `migrations reference \${${name}} but buildMigrationEnvVars in goose.ts does not provide it; ` +
           `the ENVSUB default would silently apply on every deployment, including production`,
       ).toBe(true);
