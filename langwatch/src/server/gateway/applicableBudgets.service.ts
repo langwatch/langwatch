@@ -24,6 +24,7 @@ import {
 import { resolveProviderLabels } from "./providerLabels";
 import { resolveTraceProject } from "./scopeResolver";
 import { resolveScopeTargetsBatch, scopeTargetKey } from "./scopeTargets";
+import { organizationSpendTenantIds } from "./spendTenants";
 import type { ScopeInput } from "./virtualKey.repository";
 
 export type DraftVirtualKey = {
@@ -155,11 +156,8 @@ async function loadSpend(
   chRepo?: GatewayBudgetClickHouseRepository,
 ): Promise<Map<string, string>> {
   if (!chRepo) return new Map();
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId } },
-    select: { id: true },
-  });
-  if (projects.length === 0) return new Map();
+  const tenantIds = await organizationSpendTenantIds(prisma, organizationId);
+  if (tenantIds.length === 0) return new Map();
   const targets: BudgetSpendTarget[] = resolved.map((r) => ({
     budgetId: r.budget.id,
     scope: r.budget.scopeType,
@@ -169,7 +167,7 @@ async function loadSpend(
   }));
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
-      projects.map((p) => p.id),
+      tenantIds,
       targets,
     );
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));

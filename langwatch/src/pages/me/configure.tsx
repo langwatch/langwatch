@@ -355,7 +355,9 @@ function MySettingsPage() {
 
         {ctx.budgetOverview.gatewayAccess && (
           <SectionCard title="Budgets that apply to you">
-            {ctx.budgetOverview.budgets.length === 0 ? (
+            {ctx.budgetOverview.budgets.length > 0 ? (
+              <BudgetOverviewList items={ctx.budgetOverview.budgets} />
+            ) : ctx.budgetOverview.resolved ? (
               <VStack align="start" gap={1}>
                 <Text fontSize="sm" color="fg.muted">
                   No budgets apply to your usage yet.
@@ -364,9 +366,7 @@ function MySettingsPage() {
                   If you'd like one, ask your admin.
                 </Text>
               </VStack>
-            ) : (
-              <BudgetOverviewList items={ctx.budgetOverview.budgets} />
-            )}
+            ) : null}
           </SectionCard>
         )}
       </VStack>

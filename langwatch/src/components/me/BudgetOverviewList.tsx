@@ -42,7 +42,7 @@ const WINDOW_PHRASE: Record<string, string> = {
 };
 
 export function windowPhrase(window: string): string {
-  return WINDOW_PHRASE[window] ?? window.toLowerCase();
+  return WINDOW_PHRASE[window.toUpperCase()] ?? window.toLowerCase();
 }
 
 const WINDOW_ADJECTIVE: Record<string, string> = {
@@ -56,7 +56,17 @@ const WINDOW_ADJECTIVE: Record<string, string> = {
 
 /** "MONTH" -> "monthly", for copy like "monthly personal budget". */
 export function windowAdjective(window: string): string {
-  return WINDOW_ADJECTIVE[window] ?? window.toLowerCase();
+  return WINDOW_ADJECTIVE[window.toUpperCase()] ?? window.toLowerCase();
+}
+
+/**
+ * How a banner names the budget it is warning about: "monthly personal
+ * budget", "weekly department budget". A scope class the server had no
+ * wording for drops out rather than inventing one.
+ */
+export function budgetDescription(item: BudgetOverviewItemView): string {
+  const scope = item.scopeClass === "other" ? "" : `${item.scopeClass} `;
+  return `${windowAdjective(item.window)} ${scope}budget`;
 }
 
 export function formatResetDay(resetsAt: string | null): string | null {
@@ -72,17 +82,32 @@ export function formatResetDay(resetsAt: string | null): string | null {
   });
 }
 
-function pctUsed(item: BudgetOverviewItemView): number {
+/**
+ * How much of a budget is spent, and the two thresholds every surface
+ * judges it by. One definition: the progress bar's colour, the /me
+ * banners and anything else that reacts to a budget filling up must
+ * agree, or the bar turns red while the banner still says "approaching".
+ */
+export function budgetPctUsed(item: BudgetOverviewItemView): number {
   const limit = Number.parseFloat(item.limitUsd);
   if (!Number.isFinite(limit) || limit <= 0) return 0;
   const spent = Number.parseFloat(item.spentUsd) || 0;
   return (spent / limit) * 100;
 }
 
+/** Over its limit AND configured to block, so requests are being refused. */
+export function isBudgetBreached(item: BudgetOverviewItemView): boolean {
+  return budgetPctUsed(item) >= 100 && item.onBreach === "BLOCK";
+}
+
+/** Close enough that the member should know before it bites. */
+export function isBudgetNearLimit(item: BudgetOverviewItemView): boolean {
+  return budgetPctUsed(item) >= 80;
+}
+
 function barColor(item: BudgetOverviewItemView): string {
-  const pct = pctUsed(item);
-  if (pct >= 100 && item.onBreach === "BLOCK") return "red.500";
-  if (pct >= 80) return "yellow.500";
+  if (isBudgetBreached(item)) return "red.500";
+  if (isBudgetNearLimit(item)) return "yellow.500";
   return "blue.400";
 }
 
@@ -93,59 +118,68 @@ export function BudgetOverviewList({
 }) {
   return (
     <VStack align="stretch" gap={4}>
-      {items.map((item) => (
-        <VStack key={item.id} align="stretch" gap={1}>
-          <HStack gap={2} alignItems="baseline">
-            <Text fontSize="sm">
-              <Text as="span" fontWeight="semibold">
-                {formatBudgetUsd(Number.parseFloat(item.spentUsd) || 0)}
-              </Text>{" "}
-              of{" "}
-              <Text as="span" fontWeight="semibold">
-                {formatBudgetUsd(Number.parseFloat(item.limitUsd) || 0)}
-              </Text>{" "}
-              {windowPhrase(item.window)}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              ({item.scopePhrase}
-              {item.providerLabel ? `, ${item.providerLabel} only` : ""})
-            </Text>
-            <Tooltip
-              openDelay={100}
-              positioning={{ placement: "top" }}
-              content={<BudgetTooltip item={item} />}
+      {items.map((item) => {
+        const resetDay = formatResetDay(item.resetsAt);
+        const pctUsed = budgetPctUsed(item);
+        return (
+          <VStack key={item.id} align="stretch" gap={1}>
+            <HStack gap={2} alignItems="baseline">
+              <Text fontSize="sm">
+                <Text as="span" fontWeight="semibold">
+                  {formatBudgetUsd(Number.parseFloat(item.spentUsd) || 0)}
+                </Text>{" "}
+                of{" "}
+                <Text as="span" fontWeight="semibold">
+                  {formatBudgetUsd(Number.parseFloat(item.limitUsd) || 0)}
+                </Text>{" "}
+                {windowPhrase(item.window)}
+              </Text>
+              <Text fontSize="sm" color="fg.muted">
+                ({item.scopePhrase}
+                {item.providerLabel ? `, ${item.providerLabel} only` : ""})
+              </Text>
+              <Tooltip
+                openDelay={100}
+                positioning={{ placement: "top" }}
+                content={<BudgetTooltip item={item} />}
+              >
+                <Box
+                  as="span"
+                  color="fg.muted"
+                  cursor="default"
+                  display="inline-flex"
+                  // A span takes no focus of its own, so without tabIndex a
+                  // keyboard user can never open the tooltip that holds the
+                  // budget's name, provider filter and reset time.
+                  tabIndex={0}
+                  role="img"
+                  aria-label={`About ${item.name}`}
+                >
+                  <Info size={13} />
+                </Box>
+              </Tooltip>
+              {resetDay && (
+                <Text fontSize="xs" color="fg.muted" marginLeft="auto">
+                  resets {resetDay}
+                </Text>
+              )}
+            </HStack>
+            <Box
+              height="6px"
+              backgroundColor="bg.muted"
+              borderRadius="full"
+              overflow="hidden"
             >
               <Box
-                as="span"
-                color="fg.muted"
-                cursor="default"
-                display="inline-flex"
-                aria-label={`About ${item.name}`}
-              >
-                <Info size={13} />
-              </Box>
-            </Tooltip>
-            {formatResetDay(item.resetsAt) && (
-              <Text fontSize="xs" color="fg.muted" marginLeft="auto">
-                resets {formatResetDay(item.resetsAt)}
-              </Text>
-            )}
-          </HStack>
-          <Box
-            height="6px"
-            backgroundColor="bg.muted"
-            borderRadius="full"
-            overflow="hidden"
-          >
-            <Box
-              height="full"
-              width={`${Math.min(100, Math.max(pctUsed(item) > 0 ? 2 : 0, pctUsed(item)))}%`}
-              backgroundColor={barColor(item)}
-              borderRadius="full"
-            />
-          </Box>
-        </VStack>
-      ))}
+                height="full"
+                width={`${Math.min(100, Math.max(pctUsed > 0 ? 2 : 0, pctUsed))}%`}
+                backgroundColor={barColor(item)}
+                borderRadius="full"
+              />
+            </Box>
+          </VStack>
+        );
+      })}
     </VStack>
   );
 }

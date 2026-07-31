@@ -60,6 +60,13 @@ Feature: Budget overview, the one source for every member-facing budget surface
     Then all three report the same spent amount
 
   @integration
+  Scenario: Spend recorded in an archived project still counts, on every surface
+    Given an organization budget with spend recorded in an archived project
+    When the /me overview, the CLI budget-overview endpoint, and the budgets settings page each report that budget
+    Then all three include the archived project's spend
+    And the figure matches the one the gateway enforces against
+
+  @integration
   Scenario: An organization budget's recent activity lists debits from every project it spans
     Given an organization budget with debits recorded in two different projects
     When an admin opens that budget's detail page
@@ -87,8 +94,14 @@ Feature: Budget overview, the one source for every member-facing budget surface
     Then no budget line renders at all
 
   @unit
-  Scenario: The login epilogue falls back to the legacy single line only on servers without the overview
+  Scenario: The login epilogue falls back to the legacy single line on a server without the overview
     Given the server predates the budget-overview endpoint
     When the login ceremony renders
     Then the legacy collapsed budget line renders
-    But when the overview endpoint responded, the labelled lines replace it
+
+  @unit
+  Scenario: The labelled budget lines replace the legacy single line
+    Given the budget-overview endpoint returned the budgets that bind the member
+    When the login ceremony renders
+    Then the labelled budget lines render
+    And the legacy collapsed budget line does not render

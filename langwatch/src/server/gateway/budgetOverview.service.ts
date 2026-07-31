@@ -28,7 +28,11 @@
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import type { GatewayBudget, PrismaClient } from "@prisma/client";
+import type {
+  GatewayBudget,
+  GatewayBudgetScopeType,
+  PrismaClient,
+} from "@prisma/client";
 import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
 
 import {
@@ -40,29 +44,38 @@ import { spendTargetsForBudgets } from "./budget.clickhouse.repository";
 import { nextResetAt } from "./budgetWindow";
 import { resolveProviderLabels } from "./providerLabels";
 import { resolveScopeTargetsBatch, scopeTargetKey } from "./scopeTargets";
+import { organizationSpendTenantIds } from "./spendTenants";
 
 /**
  * How binding a budget scope is to the person reading, most binding
  * first. Personal caps beat key caps beat the shared pools; every
  * surface that can only show a few lines truncates in this order.
+ *
+ * `satisfies` over the Prisma enum keeps the map exhaustive: a new scope
+ * kind fails to compile here rather than silently sorting last.
  */
-export const BUDGET_SCOPE_RANK: Record<string, number> = {
+export const BUDGET_SCOPE_RANK = {
   PRINCIPAL: 0,
   VIRTUAL_KEY: 1,
   GROUP: 2,
   PROJECT: 3,
   TEAM: 4,
   ORGANIZATION: 5,
-};
+} as const satisfies Record<GatewayBudgetScopeType, number>;
 
-/** What the budget is, relative to the person reading it. */
+/**
+ * What the budget is, relative to the person reading it. `"other"` is the
+ * honest answer for a scope kind this module has no wording for: surfaces
+ * then name the target instead of claiming a scope.
+ */
 export type BudgetOverviewScopeClass =
   | "organization"
   | "team"
   | "project"
   | "personal"
   | "key"
-  | "department";
+  | "department"
+  | "other";
 
 export type BudgetOverviewItem = ApplicableBudget & {
   scopeClass: BudgetOverviewScopeClass;
@@ -73,10 +86,12 @@ export type BudgetOverviewItem = ApplicableBudget & {
    */
   scopePhrase: string;
   /**
-   * When the current window's spend goes back to zero. Computed from the
-   * window the same way enforcement's rollup buckets periods (UTC), so
-   * the promise matches when the ledger actually resets. Null for TOTAL
-   * windows, which never reset.
+   * When the current window's spend goes back to zero, in UTC. Every
+   * budget resets on that clock: the rollup buckets periods with
+   * `toStartOfDay`/`Week`/`Month` on UTC `OccurredAt`, and `budget.timezone`
+   * has no reader on the reset path (see `budgetWindow.ts`), so this
+   * matches when the ledger actually rolls over regardless of the column.
+   * Null for TOTAL windows, which never reset.
    */
   resetsAt: string | null;
   /**
@@ -144,38 +159,42 @@ export class BudgetOverviewService {
       return { gatewayAccess: false, reason: "flag_off", budgets: [] };
     }
 
-    const workspace = await new PersonalWorkspaceService(
-      this.prisma,
-    ).findExisting({
-      userId: input.userId,
-      organizationId: input.organizationId,
-    });
-    const personalVks = await PersonalVirtualKeyService.create(
-      this.prisma,
-    ).list({
-      userId: input.userId,
-      organizationId: input.organizationId,
-    });
+    // Independent lookups on the /me blocking path: run them together.
+    // The gates above stay sequential so the service still fails closed
+    // before it reads any data.
+    const [workspace, personalVks] = await Promise.all([
+      new PersonalWorkspaceService(this.prisma).findExisting({
+        userId: input.userId,
+        organizationId: input.organizationId,
+      }),
+      PersonalVirtualKeyService.create(this.prisma).list({
+        userId: input.userId,
+        organizationId: input.organizationId,
+      }),
+    ]);
     const personalVkIds = new Set(personalVks.map((vk) => vk.id));
 
-    const applicable = await resolveApplicableBudgetsForTarget(
-      this.prisma,
-      {
-        organizationId: input.organizationId,
-        teamId: workspace?.team.id ?? null,
-        projectId: workspace?.project.id ?? null,
-        virtualKeyId: personalVks[0]?.id ?? null,
-        principalUserId: input.userId,
-      },
-      this.chRepo,
-    );
-
-    const topModels = input.includeTopModels
-      ? await this.loadTopModels({
-          personalProjectId: workspace?.project.id ?? null,
-          userId: input.userId,
-        })
-      : undefined;
+    // The model breakdown needs only the workspace, so it does not queue
+    // behind budget resolution.
+    const [applicable, topModels] = await Promise.all([
+      resolveApplicableBudgetsForTarget(
+        this.prisma,
+        {
+          organizationId: input.organizationId,
+          teamId: workspace?.team.id ?? null,
+          projectId: workspace?.project.id ?? null,
+          virtualKeyId: personalVks[0]?.id ?? null,
+          principalUserId: input.userId,
+        },
+        this.chRepo,
+      ),
+      input.includeTopModels
+        ? this.loadTopModels({
+            personalProjectId: workspace?.project.id ?? null,
+            userId: input.userId,
+          })
+        : Promise.resolve(undefined),
+    ]);
 
     const items = applicable
       .map((budget) => {
@@ -225,7 +244,7 @@ export class BudgetOverviewService {
     const scopeLabel =
       targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ??
       budget.scopeId;
-    const scopeClass = absoluteScopeClass(budget.scopeType);
+    const scopeClass = absoluteScopeClass(budget.scopeType) ?? "other";
     return {
       id: budget.id,
       name: budget.name,
@@ -254,14 +273,14 @@ export class BudgetOverviewService {
     organizationId: string,
   ): Promise<string> {
     if (!this.chRepo) return "0";
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
-    });
-    if (projects.length === 0) return "0";
+    const tenantIds = await organizationSpendTenantIds(
+      this.prisma,
+      organizationId,
+    );
+    if (tenantIds.length === 0) return "0";
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
-        projects.map((p) => p.id),
+        tenantIds,
         spendTargetsForBudgets([budget]),
       );
       return spends[0]?.spentUsd ?? "0";
@@ -289,13 +308,21 @@ export class BudgetOverviewService {
   }
 }
 
+/** Last, for a scope kind the rank map has no opinion about. */
+const UNRANKED_SCOPE = 99;
+
+function scopeRank(scopeType: string): number {
+  return (
+    BUDGET_SCOPE_RANK[scopeType as keyof typeof BUDGET_SCOPE_RANK] ??
+    UNRANKED_SCOPE
+  );
+}
+
 function byMostBindingFirst(
   a: BudgetOverviewItem,
   b: BudgetOverviewItem,
 ): number {
-  const rank =
-    (BUDGET_SCOPE_RANK[a.scopeType] ?? 99) -
-    (BUDGET_SCOPE_RANK[b.scopeType] ?? 99);
+  const rank = scopeRank(a.scopeType) - scopeRank(b.scopeType);
   if (rank !== 0) return rank;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
@@ -313,9 +340,9 @@ function scopeClassForUser(
     case "ORGANIZATION":
       return "organization";
     case "PRINCIPAL":
-      return budget.scopeId === ctx.userId
-        ? "personal"
-        : absoluteScopeClass(budget.scopeType);
+      // Resolution targets this caller's own principal, so a PRINCIPAL
+      // budget in the set is always a cap on them.
+      return "personal";
     case "GROUP":
       return "department";
     case "VIRTUAL_KEY":
@@ -327,27 +354,31 @@ function scopeClassForUser(
     case "PROJECT":
       return budget.scopeId === ctx.personalProjectId ? "personal" : "project";
     default:
-      return absoluteScopeClass(budget.scopeType);
+      return absoluteScopeClass(budget.scopeType) ?? "other";
   }
 }
 
-function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass {
-  switch (scopeType) {
-    case "ORGANIZATION":
-      return "organization";
-    case "TEAM":
-      return "team";
-    case "PROJECT":
-      return "project";
-    case "VIRTUAL_KEY":
-      return "key";
-    case "PRINCIPAL":
-      return "personal";
-    case "GROUP":
-      return "department";
-    default:
-      return "organization";
-  }
+const SCOPE_CLASS_BY_TYPE = {
+  ORGANIZATION: "organization",
+  TEAM: "team",
+  PROJECT: "project",
+  VIRTUAL_KEY: "key",
+  PRINCIPAL: "personal",
+  GROUP: "department",
+} as const satisfies Record<GatewayBudgetScopeType, BudgetOverviewScopeClass>;
+
+/**
+ * Null for a scope kind this module does not know. Callers must then name
+ * the target rather than assert a scope: labelling an unrecognised scope
+ * "whole organization budget" is the same mislabel, in the other
+ * direction, that this service exists to remove.
+ */
+function absoluteScopeClass(
+  scopeType: string,
+): BudgetOverviewScopeClass | null {
+  return (
+    SCOPE_CLASS_BY_TYPE[scopeType as keyof typeof SCOPE_CLASS_BY_TYPE] ?? null
+  );
 }
 
 /**
@@ -372,6 +403,8 @@ export function scopePhraseFor(
       return "this key's budget";
     case "department":
       return `department budget (${scopeLabel})`;
+    case "other":
+      return `budget (${scopeLabel})`;
   }
 }
 
@@ -381,7 +414,7 @@ function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
   // budget" would dangle; name the target instead.
   if (scopeClass === "key") return `key budget (${scopeLabel})`;
   if (scopeClass === "personal") return `personal budget (${scopeLabel})`;
-  return scopePhraseFor(scopeClass, scopeLabel);
+  return scopePhraseFor(scopeClass ?? "other", scopeLabel);
 }
 
 function resetsAtFor(window: string): string | null {

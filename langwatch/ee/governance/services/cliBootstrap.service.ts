@@ -72,12 +72,13 @@ export interface CliBootstrapResult {
   gatewayProviders: string[];
   /**
    * @deprecated The single-number collapse the login ceremony used to
-   * print. It keeps the top-ranked applicable budget's figures so old
-   * CLI versions still render a line, but it cannot say WHICH budget
-   * the number belongs to. New consumers read the full per-budget
-   * overview from `GET /api/auth/cli/budget-overview` /
-   * `api.user.budgetOverview`; this field is populated FROM that same
-   * overview so the two can never disagree.
+   * print. It carries the most binding MONTH-window budget that applies,
+   * so old CLI versions still render a line, but it cannot say WHICH
+   * budget the number belongs to and it can only ever speak for a
+   * monthly one. New consumers read the full per-budget overview from
+   * `GET /api/auth/cli/budget-overview` / `api.user.budgetOverview`;
+   * this field is populated FROM that same overview so the two can
+   * never disagree.
    */
   budget: {
     monthlyLimitUsd: number | null;
@@ -217,20 +218,26 @@ export class CliBootstrapService {
 }
 
 /**
- * Old CLIs render one budget line, so they get the most binding item
- * (the overview is already ordered most-binding first). No access or
- * no budgets collapses to the shape's long-standing empty state.
+ * Old CLIs render one budget line from a field that says `monthly`, so
+ * they get the most binding MONTH-window budget and nothing else. A
+ * weekly or daily cap put here would travel as a monthly figure and
+ * print as one, which is the mislabel the overview exists to end - and
+ * the labelled list already carries those budgets for any CLI new
+ * enough to ask. No access, no budgets, or no monthly budget collapses
+ * to the shape's long-standing empty state.
  */
 function collapseOverviewToLegacyBudget(
   overview: BudgetOverviewForUser,
 ): CliBootstrapResult["budget"] {
-  const top = overview.gatewayAccess ? overview.budgets[0] : undefined;
-  if (!top) {
+  const monthly = overview.gatewayAccess
+    ? overview.budgets.find((b) => b.window === "MONTH")
+    : undefined;
+  if (!monthly) {
     return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
   }
   return {
-    monthlyLimitUsd: Number.parseFloat(top.limitUsd) || 0,
-    monthlyUsedUsd: Number.parseFloat(top.spentUsd) || 0,
-    period: top.window,
+    monthlyLimitUsd: Number.parseFloat(monthly.limitUsd) || 0,
+    monthlyUsedUsd: Number.parseFloat(monthly.spentUsd) || 0,
+    period: "MONTHLY",
   };
 }

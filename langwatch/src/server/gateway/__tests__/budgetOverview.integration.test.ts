@@ -30,6 +30,7 @@ const suffix = nanoid(8);
 const ORG_ID = `org-bov-${suffix}`;
 const TEAM_ID = `team-bov-${suffix}`;
 const WORK_PROJECT_ID = `proj-bov-work-${suffix}`;
+const ARCHIVED_PROJECT_ID = `proj-bov-archived-${suffix}`;
 const PERSONAL_TEAM_ID = `pteam-bov-${suffix}`;
 const PERSONAL_PROJECT_ID = `proj-bov-personal-${suffix}`;
 const USER_ID = `usr-bov-${suffix}`;
@@ -42,9 +43,10 @@ const BUDGET_ORG_ID = `bdg-bov-org-${suffix}`;
 const BUDGET_PRINCIPAL_ID = `bdg-bov-principal-${suffix}`;
 const BUDGET_PROVIDER_ID = `bdg-bov-provider-${suffix}`;
 const BUDGET_GROUP_ID = `bdg-bov-group-${suffix}`;
+const BUDGET_ARCHIVED_ID = `bdg-bov-archived-${suffix}`;
 const ACCESS_TOKEN = `lw_at_bov-${suffix}`;
 
-const TENANTS = [WORK_PROJECT_ID, PERSONAL_PROJECT_ID];
+const TENANTS = [WORK_PROJECT_ID, PERSONAL_PROJECT_ID, ARCHIVED_PROJECT_ID];
 
 function chRepo(): GatewayBudgetClickHouseRepository {
   const ch = getTestClickHouseClient();
@@ -62,7 +64,7 @@ async function seedDebit(input: {
   budgetId: string;
   scope: "ORGANIZATION" | "PRINCIPAL" | "GROUP";
   bucketScopeId: string;
-  window: "MONTH" | "WEEK";
+  window: "MONTH" | "WEEK" | "DAY";
   amountUsd: string;
   requestId: string;
 }) {
@@ -137,6 +139,21 @@ describe("budget overview (real PG + CH + Redis)", () => {
         language: "en",
         framework: "openai",
         apiKey: `bov-work-key-${suffix}`,
+      },
+    });
+    // An archived project still holds the ledger rows it wrote while it
+    // was live, and the gateway still counts them, so every read-side
+    // surface has to as well.
+    await prisma.project.create({
+      data: {
+        id: ARCHIVED_PROJECT_ID,
+        name: `Retired ${suffix}`,
+        slug: `bov-archived-${suffix}`,
+        teamId: TEAM_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `bov-archived-key-${suffix}`,
+        archivedAt: new Date(),
       },
     });
     // Admin power flows through team/role bindings, not OrgUser.role:
@@ -252,6 +269,22 @@ describe("budget overview (real PG + CH + Redis)", () => {
         resetsAt,
       },
     });
+    // Its own window, so it reads a rollup bucket no other budget in this
+    // fixture shares and its total is unambiguously the archived debit.
+    await prisma.gatewayBudget.create({
+      data: {
+        id: BUDGET_ARCHIVED_ID,
+        name: `Org daily ${suffix}`,
+        organizationId: ORG_ID,
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
+        window: "DAY",
+        limitUsd: "20.00",
+        onBreach: "BLOCK",
+        createdById: USER_ID,
+        resetsAt,
+      },
+    });
     await prisma.gatewayBudget.create({
       data: {
         id: BUDGET_GROUP_ID,
@@ -298,6 +331,15 @@ describe("budget overview (real PG + CH + Redis)", () => {
       requestId: `req-bov-principal-${suffix}`,
     });
     await seedDebit({
+      tenantId: ARCHIVED_PROJECT_ID,
+      budgetId: BUDGET_ARCHIVED_ID,
+      scope: "ORGANIZATION",
+      bucketScopeId: ORG_ID,
+      window: "DAY",
+      amountUsd: "3.30",
+      requestId: `req-bov-archived-${suffix}`,
+    });
+    await seedDebit({
       tenantId: WORK_PROJECT_ID,
       budgetId: BUDGET_PROVIDER_ID,
       scope: "ORGANIZATION",
@@ -326,6 +368,22 @@ describe("budget overview (real PG + CH + Redis)", () => {
       amountUsd: "9.00",
       requestId: `req-bov-group-other-${suffix}`,
     });
+
+    // The device-session record the CLI's bearer token resolves through,
+    // so any test here can call the REST endpoint the CLI calls.
+    const { connection: redis } = await import("~/server/redis");
+    expect(redis).toBeTruthy();
+    await redis!.set(
+      `lwcli:access:${ACCESS_TOKEN}`,
+      JSON.stringify({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        issued_at: Date.now(),
+        expires_at: Date.now() + 60 * 60 * 1000,
+      }),
+      "EX",
+      60 * 60,
+    );
   }, 120_000);
 
   afterAll(async () => {
@@ -471,7 +529,7 @@ describe("budget overview (real PG + CH + Redis)", () => {
     });
   });
 
-  describe("one source across every surface", () => {
+  describe("given the same seeded budget read through every surface", () => {
     /** @scenario "Every surface reports the same spend for the same budget" */
     it("tRPC user.budgetOverview, the CLI REST endpoint, and gatewayBudgets.get agree on spentUsd", async () => {
       const caller = appRouter.createCaller(
@@ -486,19 +544,6 @@ describe("budget overview (real PG + CH + Redis)", () => {
       const trpcOrg = viaTrpc.budgets.find((b) => b.id === BUDGET_ORG_ID);
       expect(trpcOrg).toBeDefined();
 
-      const { connection: redis } = await import("~/server/redis");
-      expect(redis).toBeTruthy();
-      await redis!.set(
-        `lwcli:access:${ACCESS_TOKEN}`,
-        JSON.stringify({
-          user_id: USER_ID,
-          organization_id: ORG_ID,
-          issued_at: Date.now(),
-          expires_at: Date.now() + 60 * 60 * 1000,
-        }),
-        "EX",
-        60 * 60,
-      );
       const { app } = await import("~/server/routes/auth-cli");
       const res = await app.request("/api/auth/cli/budget-overview", {
         headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
@@ -531,7 +576,52 @@ describe("budget overview (real PG + CH + Redis)", () => {
     });
   });
 
-  describe("budget detail recent activity", () => {
+  describe("given an organization budget whose only spend sits in an archived project", () => {
+    /** @scenario "Spend recorded in an archived project still counts, on every surface" */
+    it("counts it on the overview, the CLI endpoint and the budgets settings read alike", async () => {
+      const caller = appRouter.createCaller(
+        createInnerTRPCContext({
+          session: { user: { id: USER_ID }, expires: "1" },
+        }),
+      );
+
+      const viaTrpc = await caller.user.budgetOverview({
+        organizationId: ORG_ID,
+      });
+      const trpcArchived = viaTrpc.budgets.find(
+        (b) => b.id === BUDGET_ARCHIVED_ID,
+      );
+      expect(trpcArchived).toBeDefined();
+
+      const { app } = await import("~/server/routes/auth-cli");
+      const res = await app.request("/api/auth/cli/budget-overview", {
+        headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      });
+      expect(res.status).toBe(200);
+      const viaRest = (await res.json()) as {
+        budgets: Array<{ id: string; spentUsd: string }>;
+      };
+      const restArchived = viaRest.budgets.find(
+        (b) => b.id === BUDGET_ARCHIVED_ID,
+      );
+      expect(restArchived).toBeDefined();
+
+      const viaSettings = await caller.gatewayBudgets.get({
+        organizationId: ORG_ID,
+        id: BUDGET_ARCHIVED_ID,
+      });
+
+      // Archiving a project retires it from the product, not from the
+      // ledger: the gateway still enforces against these debits, so a
+      // surface that dropped them would promise headroom that is not
+      // there.
+      expect(Number(trpcArchived!.spentUsd)).toBeCloseTo(3.3, 6);
+      expect(Number(restArchived!.spentUsd)).toBeCloseTo(3.3, 6);
+      expect(Number(viaSettings.spentUsd)).toBeCloseTo(3.3, 6);
+    });
+  });
+
+  describe("given an organization budget with debits in two projects", () => {
     /** @scenario "An organization budget's recent activity lists debits from every project it spans" */
     it("lists the org budget's debits from both projects", async () => {
       const service = GatewayBudgetService.create(prisma, chRepo());

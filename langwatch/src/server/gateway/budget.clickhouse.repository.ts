@@ -35,6 +35,14 @@ import {
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
+/**
+ * How far back the budget detail page's recent-activity panel looks. Wide
+ * enough to cover any budget window the product offers (the longest is a
+ * month) plus the previous few periods, narrow enough that the read prunes
+ * to a handful of `toYYYYMM(OccurredAt)` partitions.
+ */
+const RECENT_EVENTS_LOOKBACK_DAYS = 90;
+
 const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
 export type BudgetDebitRow = {
@@ -417,14 +425,25 @@ export class GatewayBudgetClickHouseRepository {
    * or per-member group budget accrues rows under every project that
    * emitted a matching trace, so reading a single tenant would render
    * "No usage yet" on a budget that is actively debiting.
+   *
+   * Bounded by `lookbackDays` on `OccurredAt`, the table's partition key:
+   * without it ClickHouse opens every monthly partition the budget has
+   * ever written to before it can sort and take the top rows. The panel
+   * asks for recent activity, so the window is part of the question, not
+   * a shortcut.
    */
   async recentEventsForBudget(
     tenantIds: string[],
     budgetId: string,
     limit = 20,
+    lookbackDays = RECENT_EVENTS_LOOKBACK_DAYS,
   ): Promise<LedgerEventRow[]> {
     if (tenantIds.length === 0) return [];
-    const params: Record<string, string | number> = { budgetId, limit };
+    const params: Record<string, string | number> = {
+      budgetId,
+      limit,
+      since: Date.now() - lookbackDays * 24 * 60 * 60 * 1000,
+    };
     const tenantPlaceholders = tenantIds
       .map((id, i) => {
         params[`tenant${i}`] = id;
@@ -451,6 +470,7 @@ export class GatewayBudgetClickHouseRepository {
         FROM ${EVENTS_TABLE}
         WHERE TenantId IN (${tenantPlaceholders})
           AND BudgetId = {budgetId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
         ORDER BY OccurredAt DESC
         LIMIT {limit:UInt32}
       `,

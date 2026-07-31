@@ -39,6 +39,7 @@ import {
   resolveScopeTargetsBatch,
   scopeTargetKey,
 } from "./scopeTargets";
+import { organizationSpendTenantIds } from "./spendTenants";
 
 const logger = createLogger("langwatch:gateway:budget-service");
 
@@ -95,8 +96,6 @@ export type ArchiveBudgetInput = {
   actorUserId: string;
 };
 
-export type BudgetScopeTarget = BudgetScopeTargetInfo;
-
 export type BudgetLedgerLine = {
   id: string;
   virtualKeyId: string;
@@ -110,7 +109,7 @@ export type BudgetLedgerLine = {
 
 export type BudgetDetail = {
   budget: GatewayBudget;
-  scopeTarget: BudgetScopeTarget;
+  scopeTarget: BudgetScopeTargetInfo;
   recentLedger: Array<{
     id: string;
     virtualKeyId: string;
@@ -265,15 +264,14 @@ export class GatewayBudgetService {
     if (budgets.length === 0) return { budgets, spendAvailable: true };
     if (!this.chRepo) return { budgets, spendAvailable: false };
 
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
-      select: { id: true },
-    });
+    const tenantIds = await organizationSpendTenantIds(
+      this.prisma,
+      organizationId,
+    );
     // No project means nothing has ever been able to emit a ledger row, so
     // zero is the true total rather than a missing one.
-    if (projects.length === 0) return { budgets, spendAvailable: true };
+    if (tenantIds.length === 0) return { budgets, spendAvailable: true };
 
-    const tenantIds = projects.map((p) => p.id);
     let spends;
     try {
       spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
@@ -386,7 +384,7 @@ export class GatewayBudgetService {
     );
     // Scope FKs are ON DELETE CASCADE, but a stale row must not blank
     // the page: fall back to the raw scopeId as the display name.
-    const scopeTarget: BudgetScopeTarget = targets.get(
+    const scopeTarget: BudgetScopeTargetInfo = targets.get(
       scopeTargetKey(budget.scopeType, budget.scopeId),
     ) ?? {
       kind: budget.scopeType,
@@ -406,17 +404,13 @@ export class GatewayBudgetService {
       // every project in the org, so the read fans out over the same
       // tenant set the utilization read uses. The BudgetId filter keeps
       // narrower scopes exact.
-      const projects = await this.prisma.project.findMany({
-        where: { team: { organizationId }, archivedAt: null },
-        select: { id: true },
-      });
+      const tenantIds = await organizationSpendTenantIds(
+        this.prisma,
+        organizationId,
+      );
       const events =
-        projects.length > 0
-          ? await this.chRepo.recentEventsForBudget(
-              projects.map((p) => p.id),
-              budget.id,
-              20,
-            )
+        tenantIds.length > 0
+          ? await this.chRepo.recentEventsForBudget(tenantIds, budget.id, 20)
           : [];
       const vkIds = Array.from(new Set(events.map((e) => e.virtualKeyId)));
       const vks = vkIds.length
@@ -728,11 +722,10 @@ export class GatewayBudgetService {
     // trace project. Mirrors the materialiser's `loadCurrentSpend`.
     const chSpendByBudgetId = this.chRepo
       ? await (async () => {
-          const orgProjects = await this.prisma.project.findMany({
-            where: { team: { organizationId: input.organizationId } },
-            select: { id: true },
-          });
-          const tenantIds = orgProjects.map((p) => p.id);
+          const tenantIds = await organizationSpendTenantIds(
+            this.prisma,
+            input.organizationId,
+          );
           if (tenantIds.length === 0) return new Map<string, string>();
           const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
             tenantIds,

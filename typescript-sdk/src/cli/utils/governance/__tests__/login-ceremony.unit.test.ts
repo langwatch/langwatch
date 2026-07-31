@@ -121,7 +121,8 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("when a budget is supplied", () => {
+  describe("when the server predates the overview and sends only the collapsed budget", () => {
+    /** @scenario "The login epilogue falls back to the legacy single line on a server without the overview" */
     it("renders the budget line with the storyboard formatting", () => {
       const lines = formatLoginCeremony({
         ...baseInput,
@@ -178,7 +179,10 @@ describe("formatLoginCeremony", () => {
       resetsAt: "2026-08-03T00:00:00.000Z",
     };
 
-    describe("when the user has gateway access but no budgets apply", () => {
+    // The ceremony is handed an empty list for two different server
+    // answers: gateway access denied, and access granted with no budget
+    // bound. Both must render nothing, so both are covered here.
+    describe("when the organization gives the member no gateway access", () => {
       /** @scenario "The login epilogue renders nothing without gateway access" */
       it("renders no budget section at all", () => {
         const lines = formatLoginCeremony({ ...baseInput, budgets: [] });
@@ -283,7 +287,7 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the overview supersedes the legacy line", () => {
-      /** @scenario "The login epilogue falls back to the legacy single line only on servers without the overview" */
+      /** @scenario "The labelled budget lines replace the legacy single line" */
       it("renders the labelled lines, not the collapsed number", () => {
         const lines = formatLoginCeremony({
           ...baseInput,

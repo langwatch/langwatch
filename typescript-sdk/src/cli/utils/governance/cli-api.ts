@@ -82,6 +82,13 @@ export interface CliApiOptions {
   fetchImpl?: typeof fetch;
   /** Seams for the automatic session refresh. Tests only. */
   refreshDeps?: SessionRefreshDeps;
+  /**
+   * Abort the request after this many milliseconds. Set it on any call
+   * a user is waiting behind: without it a connection that opens and
+   * never answers holds the CLI forever, since fetch has no default
+   * timeout of its own.
+   */
+  timeoutMs?: number;
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
@@ -110,9 +117,18 @@ async function authorizedFetch(
     fetchImpl: opts.fetchImpl,
     ...opts.refreshDeps,
   };
+  // Each attempt gets its own signal: one shared deadline would arm the
+  // clock before the refresh round-trip and abort the retry early.
+  const send = () =>
+    f(url, {
+      ...init(cfg.access_token!),
+      ...(opts.timeoutMs === undefined
+        ? {}
+        : { signal: AbortSignal.timeout(opts.timeoutMs) }),
+    });
   await refreshSessionIfExpired(cfg, deps);
 
-  const res = await f(url, init(cfg.access_token!));
+  const res = await send();
   if (res.status !== 401 || !canRefreshSession(cfg)) return res;
 
   const outcome = await refreshSession(cfg, deps);
@@ -122,7 +138,7 @@ async function authorizedFetch(
   // a 401 first attempt cannot have committed a write. That argument is
   // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
   // which can follow a partially applied write.
-  return f(url, init(cfg.access_token!));
+  return send();
 }
 
 async function getJSON<T>(

@@ -205,6 +205,24 @@ export async function runUnifiedLoginFlow(
 			// the /bootstrap collapsed line.
 			const budgetOverview = await fetchBudgetOverviewSafely(cfg);
 
+			// Three states, named rather than nested: undefined means the
+			// server predates the overview endpoint and the ceremony may
+			// fall back to the legacy line; an empty list means the member
+			// has no gateway access, which renders nothing budget-related
+			// and stops the legacy line resurfacing it.
+			const ceremonyBudgets = !budgetOverview
+				? undefined
+				: budgetOverview.gatewayAccess
+					? budgetOverview.budgets.map((b) => ({
+							spentUsd: Number.parseFloat(b.spentUsd) || 0,
+							limitUsd: Number.parseFloat(b.limitUsd) || 0,
+							window: b.window,
+							scopePhrase: b.scopePhrase,
+							providerLabel: b.providerLabel,
+							resetsAt: b.resetsAt,
+						}))
+					: [];
+
 			console.log();
 			const ceremonyLines = formatLoginCeremony({
 				email: cfg.user?.email ?? result.user.email,
@@ -219,20 +237,7 @@ export async function runUnifiedLoginFlow(
 								usedUsd: bootstrap.budget.monthlyUsedUsd,
 							}
 						: undefined,
-				// gatewayAccess false renders nothing budget-related at all:
-				// pass an empty list so the legacy line cannot resurface it.
-				budgets: budgetOverview
-					? budgetOverview.gatewayAccess
-						? budgetOverview.budgets.map((b) => ({
-								spentUsd: Number.parseFloat(b.spentUsd) || 0,
-								limitUsd: Number.parseFloat(b.limitUsd) || 0,
-								window: b.window,
-								scopePhrase: b.scopePhrase,
-								providerLabel: b.providerLabel,
-								resetsAt: b.resetsAt,
-							}))
-						: []
-					: undefined,
+				budgets: ceremonyBudgets,
 				budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
 			});
 			for (const line of ceremonyLines) {
@@ -393,13 +398,25 @@ async function fetchBootstrapSafely(
 	}
 }
 
+/**
+ * The login has already succeeded by the time this runs, so the epilogue
+ * gets a deadline rather than the user's patience: a control plane that
+ * accepts the connection and never answers would otherwise stop the
+ * ceremony from printing at all.
+ */
+const BUDGET_OVERVIEW_TIMEOUT_MS = 5_000;
+
 async function fetchBudgetOverviewSafely(
 	cfg: GovernanceConfig,
 ): Promise<BudgetOverviewResponse | null> {
 	try {
-		return await getBudgetOverview(cfg);
+		return await getBudgetOverview(cfg, {
+			timeoutMs: BUDGET_OVERVIEW_TIMEOUT_MS,
+		});
 	} catch {
-		// The epilogue is decoration on a login that already succeeded.
+		// The epilogue is decoration on a login that already succeeded:
+		// a timeout, a refused connection or a 5xx all fall back to the
+		// legacy collapsed line rather than failing the login.
 		return null;
 	}
 }

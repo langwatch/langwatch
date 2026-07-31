@@ -13,9 +13,11 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import {
+  budgetDescription,
   type BudgetOverviewItemView,
   BudgetOverviewList,
-  windowAdjective,
+  isBudgetBreached,
+  isBudgetNearLimit,
 } from "~/components/me/BudgetOverviewList";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
 import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
@@ -35,12 +37,6 @@ import Head from "~/utils/compat/next-head";
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
 const fmtUsd = (amount: number) => formatBudgetUsd(amount);
-
-const budgetPct = (b: BudgetOverviewItemView): number => {
-  const limit = Number.parseFloat(b.limitUsd);
-  if (!Number.isFinite(limit) || limit <= 0) return 0;
-  return ((Number.parseFloat(b.spentUsd) || 0) / limit) * 100;
-};
 
 const fmtPctDelta = (pct: number | null) =>
   pct === null
@@ -452,24 +448,20 @@ function BudgetStateBanners({
   budgetOverview: ReturnType<typeof usePersonalContext>["budgetOverview"];
   budget: ReturnType<typeof usePersonalContext>["budget"];
 }) {
-  const breachedItem = budgetOverview.budgets.find(isBreached);
+  const breachedItem = budgetOverview.budgets.find(isBudgetBreached);
   if (breachedItem) {
     return <BreachedBudgetBanner item={breachedItem} budget={budget} />;
   }
-  const warningItem = budgetOverview.budgets.find(isNearLimit);
+  const warningItem = budgetOverview.budgets.find(isBudgetNearLimit);
   if (!warningItem) return null;
   return (
     <BudgetBanner
       tone="yellow"
       title="Approaching budget"
-      message={`You've used ${fmtUsd(Number.parseFloat(warningItem.spentUsd) || 0)} of your ${fmtUsd(Number.parseFloat(warningItem.limitUsd) || 0)} ${windowAdjective(warningItem.window)} ${warningItem.scopeClass} budget.`}
+      message={`You've used ${fmtUsd(Number.parseFloat(warningItem.spentUsd) || 0)} of your ${fmtUsd(Number.parseFloat(warningItem.limitUsd) || 0)} ${budgetDescription(warningItem)}.`}
     />
   );
 }
-
-const isBreached = (b: BudgetOverviewItemView) =>
-  budgetPct(b) >= 100 && b.onBreach === "BLOCK";
-const isNearLimit = (b: BudgetOverviewItemView) => budgetPct(b) >= 80;
 
 function BreachedBudgetBanner({
   item,

@@ -30,9 +30,9 @@ export function scopeTargetKey(scopeType: string, scopeId: string): string {
 
 /**
  * Resolve display targets for a set of budget scopes, grouped by scopeType
- * so each scope kind costs at most one findMany. VK and GROUP lookups are
- * pinned to `organizationId` so a stray scopeId can never surface another
- * tenant's name.
+ * so each scope kind costs at most one findMany. VK, GROUP and PRINCIPAL
+ * lookups are pinned to `organizationId` so a stray scopeId can never
+ * surface another tenant's name, key or member.
  */
 export async function resolveScopeTargetsBatch(
   prisma: PrismaClient,
@@ -67,7 +67,12 @@ export async function resolveScopeTargetsBatch(
       idSet: ids.VIRTUAL_KEY!,
       organizationId,
     }),
-    addPrincipalTargets({ out, prisma, idSet: ids.PRINCIPAL! }),
+    addPrincipalTargets({
+      out,
+      prisma,
+      idSet: ids.PRINCIPAL!,
+      organizationId,
+    }),
     addGroupTargets({ out, prisma, idSet: ids.GROUP!, organizationId }),
   ]);
   return out;
@@ -159,10 +164,17 @@ async function addPrincipalTargets({
   out,
   prisma,
   idSet,
+  organizationId,
 }: AddTargetArgs): Promise<void> {
-  if (idSet.size === 0) return;
+  // Same tenant pin as the VIRTUAL_KEY and GROUP branches, and the one
+  // that matters most: this row carries a person's name and email, so a
+  // stray scopeId must never resolve to a user outside the organization.
+  if (idSet.size === 0 || !organizationId) return;
   const users = await prisma.user.findMany({
-    where: { id: { in: [...idSet] } },
+    where: {
+      id: { in: [...idSet] },
+      orgMemberships: { some: { organizationId } },
+    },
     select: { id: true, name: true, email: true },
   });
   for (const u of users) {
