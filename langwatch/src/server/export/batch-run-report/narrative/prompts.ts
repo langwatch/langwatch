@@ -96,9 +96,10 @@ consider.
  * Whether a prompt satisfies OpenAI-compatible APIs' own requirement: a
  * request using `response_format: json_object` 400s unless the word "json"
  * appears somewhere in the messages. Both system prompts here are what get
- * sent as those messages, so this is checked at module load — a prompt edit
- * that drops the word fails every report silently (a fast, generic-looking
- * 400) rather than failing loudly at the one place it can be caught cheaply.
+ * sent as those messages, so this is checked at module load and throws there.
+ * Unchecked, a prompt edit that drops the word would instead break every
+ * report at request time as a fast, generic-looking 400 that reads like a
+ * provider outage rather than like the edit that caused it.
  */
 export function mentionsJson(text: string): boolean {
   return /\bjson\b/i.test(text);

@@ -31,7 +31,7 @@ interface StartReportInput {
   withAnalysis?: boolean;
 }
 
-interface UseBatchRunReportReturn {
+export interface UseBatchRunReportReturn {
   /** Every batch run whose report is currently being produced. */
   runningBatchIds: ReadonlySet<string>;
   /** Whether THIS batch run is currently producing a report. */
@@ -42,45 +42,14 @@ interface UseBatchRunReportReturn {
   cancelReport: (input: { batchRunId: string }) => void;
 }
 
-/**
- * Turns a successful response into a downloaded file.
- *
- * The file always arrives; what can be missing from it is the half a model
- * writes. Saying so is the difference between a reader thinking the run had
- * nothing to explain and knowing the explanation is what went missing.
- */
-async function deliverReport({
-  response,
-  suiteName,
-  batchRunId,
-}: {
-  response: Response;
-  suiteName?: string;
-  batchRunId: string;
-}): Promise<void> {
-  if (!response.ok) {
-    throw await reportRequestError(response);
-  }
-
-  const tier = response.headers.get("X-Report-Tier") as ReportTier | null;
-  const blob = await response.blob();
-
-  triggerBlobDownload({
-    blob,
-    filename: extractFilename({
-      contentDisposition: response.headers.get("Content-Disposition"),
-      fallbackName: fallbackReportFilename({ suiteName, batchRunId }),
-    }),
-  });
-
-  if (tier === "figures_only") {
-    toaster.create({
-      title: "Report downloaded without Langy's analysis",
-      description:
-        "Every figure for this run is in the file. Langy couldn't write the analysis this time.",
-      type: "info",
-    });
-  }
+/** One line of the report endpoint's NDJSON: a stage, the document, or a failure. */
+interface ReportStreamEvent {
+  stage?: ReportStage;
+  done?: boolean;
+  tier?: ReportTier;
+  filename?: string;
+  html?: string;
+  error?: string;
 }
 
 /**
@@ -111,38 +80,17 @@ async function consumeReportStream({
 
   const decoder = new TextDecoder();
   let buffered = "";
-  let delivered = false;
+  let isDelivered = false;
 
   const handle = (line: string) => {
-    if (line.trim() === "") return;
-    const event = JSON.parse(line) as {
-      stage?: ReportStage;
-      done?: boolean;
-      tier?: ReportTier;
-      filename?: string;
-      html?: string;
-      error?: string;
-    };
-
+    const event = parseStreamEvent(line);
+    if (!event) return;
     if (event.stage) return onStage(event.stage);
     if (event.error) throw new Error(event.error);
     if (!event.done || event.html === undefined) return;
 
-    triggerBlobDownload({
-      blob: new Blob([event.html], { type: "text/html;charset=utf-8" }),
-      filename:
-        event.filename ?? fallbackReportFilename({ suiteName, batchRunId }),
-    });
-    delivered = true;
-
-    if (event.tier === "figures_only") {
-      toaster.create({
-        title: "Report downloaded without Langy's analysis",
-        description:
-          "Every figure for this run is in the file. Langy couldn't write the analysis this time.",
-        type: "info",
-      });
-    }
+    deliverDocument({ event, suiteName, batchRunId });
+    isDelivered = true;
   };
 
   for (;;) {
@@ -155,8 +103,40 @@ async function consumeReportStream({
   }
   handle(buffered);
 
-  if (!delivered) {
+  if (!isDelivered) {
     throw new Error("The report stream ended before the file arrived.");
+  }
+}
+
+/** One NDJSON line as an event, or null for the blank lines between them. */
+function parseStreamEvent(line: string): ReportStreamEvent | null {
+  if (line.trim() === "") return null;
+  return JSON.parse(line) as ReportStreamEvent;
+}
+
+/** Saves the finished document and says so when the analysis is missing. */
+function deliverDocument({
+  event,
+  suiteName,
+  batchRunId,
+}: {
+  event: ReportStreamEvent;
+  suiteName?: string;
+  batchRunId: string;
+}): void {
+  triggerBlobDownload({
+    blob: new Blob([event.html ?? ""], { type: "text/html;charset=utf-8" }),
+    filename:
+      event.filename ?? fallbackReportFilename({ suiteName, batchRunId }),
+  });
+
+  if (event.tier === "figures_only") {
+    toaster.create({
+      title: "Report downloaded without Langy's analysis",
+      description:
+        "Every figure for this run is in the file. Langy couldn't write the analysis this time.",
+      type: "info",
+    });
   }
 }
 
@@ -176,26 +156,6 @@ function triggerBlobDownload({
   link.click();
   link.remove();
   window.URL.revokeObjectURL(url);
-}
-
-/** Reads the filename the server chose, falling back to one we can build. */
-function extractFilename({
-  contentDisposition,
-  fallbackName,
-}: {
-  contentDisposition: string | null;
-  fallbackName: string;
-}): string {
-  if (!contentDisposition) return fallbackName;
-
-  const filenameMatch = contentDisposition.match(
-    /filename\*?=(?:UTF-8''|")?([^";]+)"?/i,
-  );
-  if (filenameMatch?.[1]) {
-    return decodeURIComponent(filenameMatch[1]);
-  }
-
-  return fallbackName;
 }
 
 /** A name that still says which run it came from when the header does not. */
@@ -233,11 +193,59 @@ async function reportRequestError(response: Response): Promise<Error> {
   );
 }
 
-export function useBatchRunReport({
+/**
+ * Asks for one report and sees it through to the file or to a toast.
+ *
+ * Rejection is handled here rather than by the caller so the hook's own body
+ * stays about which runs are in flight: an abort is the user cancelling and
+ * says nothing, anything else is worth a toast.
+ */
+async function requestReport({
   projectId,
+  scenarioSetId,
+  batchRunId,
+  suiteName,
+  withAnalysis,
+  controller,
+  onStage,
 }: {
-  projectId: string | undefined;
-}): UseBatchRunReportReturn {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+  suiteName?: string;
+  withAnalysis: boolean;
+  controller: AbortController;
+  onStage: (stage: ReportStage) => void;
+}): Promise<void> {
+  try {
+    const response = await fetch(`${BATCH_RUN_REPORT_DOWNLOAD_PATH}?stream=1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId,
+        scenarioSetId,
+        batchRunId,
+        withAnalysis,
+      }),
+      signal: controller.signal,
+    });
+    await consumeReportStream({ response, suiteName, batchRunId, onStage });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") return;
+    showErrorToast({ error, fallbackTitle: "Couldn't build the report" });
+  }
+}
+
+/**
+ * Which runs are producing a report, and how far along each one is.
+ *
+ * Kept apart from starting and cancelling: this is bookkeeping over two maps
+ * keyed by run, while the caller below is about one request's lifecycle. The
+ * controllers live here too, because a controller and the "running" flag it
+ * backs must be added and removed together or a row loses the ability to
+ * cancel what it started.
+ */
+function useRunningReports() {
   const controllersRef = useRef(new Map<string, AbortController>());
   const [runningBatchIds, setRunningBatchIds] = useState<ReadonlySet<string>>(
     new Set<string>(),
@@ -274,6 +282,51 @@ export function useBatchRunReport({
     });
   }, []);
 
+  const markRunning = useCallback(
+    ({
+      batchRunId,
+      controller,
+    }: {
+      batchRunId: string;
+      controller: AbortController;
+    }) => {
+      controllersRef.current.set(batchRunId, controller);
+      setRunningBatchIds((previous) => new Set(previous).add(batchRunId));
+    },
+    [],
+  );
+
+  const setStage = useCallback(
+    ({ batchRunId, stage }: { batchRunId: string; stage: ReportStage }) => {
+      setStages((previous) => new Map(previous).set(batchRunId, stage));
+    },
+    [],
+  );
+
+  return {
+    controllersRef,
+    runningBatchIds,
+    stages,
+    clearRunning,
+    markRunning,
+    setStage,
+  };
+}
+
+export function useBatchRunReport({
+  projectId,
+}: {
+  projectId: string | undefined;
+}): UseBatchRunReportReturn {
+  const {
+    controllersRef,
+    runningBatchIds,
+    stages,
+    clearRunning,
+    markRunning,
+    setStage,
+  } = useRunningReports();
+
   const startReport = useCallback(
     ({
       batchRunId,
@@ -295,36 +348,19 @@ export function useBatchRunReport({
       if (controllersRef.current.has(batchRunId)) return;
 
       const controller = new AbortController();
-      controllersRef.current.set(batchRunId, controller);
-      setRunningBatchIds((previous) => new Set(previous).add(batchRunId));
+      markRunning({ batchRunId, controller });
 
-      void fetch(`${BATCH_RUN_REPORT_DOWNLOAD_PATH}?stream=1`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          scenarioSetId,
-          batchRunId,
-          withAnalysis,
-        }),
-        signal: controller.signal,
-      })
-        .then((response) =>
-          consumeReportStream({
-            response,
-            suiteName,
-            batchRunId,
-            onStage: (stage) =>
-              setStages((previous) => new Map(previous).set(batchRunId, stage)),
-          }),
-        )
-        .catch((error: unknown) => {
-          if (error instanceof Error && error.name === "AbortError") return;
-          showErrorToast({ error, fallbackTitle: "Couldn't build the report" });
-        })
-        .finally(() => clearRunning(batchRunId));
+      void requestReport({
+        projectId,
+        scenarioSetId,
+        batchRunId,
+        suiteName,
+        withAnalysis,
+        controller,
+        onStage: (stage) => setStage({ batchRunId, stage }),
+      }).finally(() => clearRunning(batchRunId));
     },
-    [projectId, clearRunning],
+    [projectId, clearRunning, markRunning, setStage, controllersRef],
   );
 
   const cancelReport = useCallback(
@@ -332,7 +368,7 @@ export function useBatchRunReport({
       controllersRef.current.get(batchRunId)?.abort();
       clearRunning(batchRunId);
     },
-    [clearRunning],
+    [clearRunning, controllersRef],
   );
 
   const isReportRunning = useCallback(

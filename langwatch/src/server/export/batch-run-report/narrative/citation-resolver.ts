@@ -63,8 +63,14 @@ export function citationKey(citation: Citation): string {
  * Every reference the evidence can support.
  *
  * Turns are enumerated per run rather than range-checked at lookup time, so a
- * citation pointing past the end of a conversation simply is not in the set —
+ * citation pointing past the end of a conversation simply is not in the set:
  * one rule, applied the same way to every citation kind.
+ *
+ * The turns come from the transcripts that were actually selected, not from
+ * each run's `turnCount`. A long conversation is truncated before the model
+ * sees it, so indexing the full count would admit citations to turns it was
+ * never shown, which is precisely the fabrication the citation gate exists to
+ * stop. A run with no transcript selected contributes no turns at all.
  */
 export function buildCitationIndex({
   evidence,
@@ -75,8 +81,10 @@ export function buildCitationIndex({
 
   for (const run of evidence.runs) {
     index.add(`run:${run.runId}`);
-    for (let turn = 0; turn < run.turnCount; turn++) {
-      index.add(`turn:${run.runId}:${turn}`);
+  }
+  for (const transcript of evidence.transcripts) {
+    for (const turn of transcript.turns) {
+      index.add(`turn:${transcript.runId}:${turn.index}`);
     }
   }
   for (const criterion of evidence.criteria) {

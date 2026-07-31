@@ -26,7 +26,7 @@ function assemble({
   verdicts = null,
 }: {
   draft: DraftReport | null;
-  verdicts?: { supported: Set<string>; usable: boolean } | null;
+  verdicts?: { supported: Set<string>; isUsable: boolean } | null;
 }) {
   return assembleSections({
     evidence: evidenceFixture(),
@@ -163,7 +163,7 @@ describe("assembleSections() admission of statements", () => {
 
       const { sections, integrity } = assemble({
         draft,
-        verdicts: { supported: new Set([ids[0]!]), usable: true },
+        verdicts: { supported: new Set([ids[0]!]), isUsable: true },
       });
       const claims = collectClaims(sections);
 
@@ -189,7 +189,7 @@ describe("assembleSections() admission of statements", () => {
 
       const { sections } = assemble({
         draft,
-        verdicts: { supported: new Set(), usable: true },
+        verdicts: { supported: new Set(), isUsable: true },
       });
 
       expect(collectClaims(sections)).toEqual([]);

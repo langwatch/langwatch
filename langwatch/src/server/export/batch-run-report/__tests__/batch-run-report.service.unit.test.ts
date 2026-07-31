@@ -375,7 +375,7 @@ describe("BatchRunReportService.generate() figures", () => {
 
       const model = await generate(makeService());
 
-      expect(model.headline.passRate.tooFewToConclude).toBe(true);
+      expect(model.headline.passRate.isTooFewToConclude).toBe(true);
     });
   });
 

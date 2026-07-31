@@ -4,7 +4,9 @@ import type { Tone } from "../report.types";
  * The token a {@link Tone} contributes to a class name.
  *
  * Lives beside the stylesheet that defines `.tone-*` and `.fill-*` so the two
- * cannot drift: adding a tone is a compile error here until it has a colour.
+ * stay together. The exhaustive switch means a new {@link Tone} fails to
+ * compile until it is given a token here; it cannot also prove the stylesheet
+ * grew a matching rule, so add the colour below in the same change.
  */
 export function toneToken(tone: Tone | undefined): string {
   switch (tone ?? "neutral") {

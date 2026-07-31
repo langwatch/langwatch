@@ -91,7 +91,7 @@ export function evidenceFixture(
       value: 50,
       ci95: null,
       settled: 2,
-      tooFewToConclude: true,
+      isTooFewToConclude: true,
       inconclusiveReason: "too_few_runs",
     },
     runs: FIXTURE_RUNS,
@@ -118,14 +118,18 @@ export function evidenceFixture(
         runId: "run_1",
         signatureId: "s_known",
         scenarioName: "Refund escalation",
+        // run_1 ran three turns and the selector kept the last two, which is
+        // the ordinary case: a long conversation is tail-biased and truncated
+        // before the model ever sees it. Turn 0 is therefore a turn that
+        // exists but was not shown, and nothing may cite it.
         turns: [
-          { index: 0, role: "user", content: "I want a refund." },
-          { index: 1, role: "assistant", content: "No." },
+          { index: 1, role: "user", content: "I want a refund." },
+          { index: 2, role: "assistant", content: "No." },
         ],
-        omittedTurns: 0,
+        omittedTurns: 1,
       },
     ],
-    stillRunning: false,
+    isStillRunning: false,
     ...overrides,
   };
 }

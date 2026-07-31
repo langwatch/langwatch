@@ -127,7 +127,7 @@ function caveat(evidence: ReportEvidence): string | null {
   if (total > 0 && unjudged / total >= UNJUDGED_SHARE_THAT_MISLEADS) {
     return `${unjudged} of ${total} scenarios never reached a verdict, so this says less about the agent than the numbers suggest — those are failures of the run, not of the agent.`;
   }
-  if (evidence.stillRunning) {
+  if (evidence.isStillRunning) {
     return "Some scenarios had not finished, so these figures cover only the ones that had.";
   }
   if (evidence.passRate.inconclusiveReason === "too_few_runs") {

@@ -68,7 +68,7 @@ export function makeModel(overrides: Partial<ReportModel> = {}): ReportModel {
         value: 80,
         ci95: { low: 49, high: 94 },
         settled: 10,
-        tooFewToConclude: false,
+        isTooFewToConclude: false,
         inconclusiveReason: null,
       },
       counts: makeCounts(),
@@ -265,7 +265,7 @@ export function makeSmallSampleModel(): ReportModel {
         value: 25,
         ci95: null,
         settled: 4,
-        tooFewToConclude: true,
+        isTooFewToConclude: true,
         inconclusiveReason: "too_few_runs",
       },
       counts: makeCounts({
@@ -286,7 +286,7 @@ export function makeNothingSettledModel(): ReportModel {
         value: null,
         ci95: null,
         settled: 0,
-        tooFewToConclude: false,
+        isTooFewToConclude: false,
         inconclusiveReason: null,
       },
       counts: makeCounts({

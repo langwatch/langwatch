@@ -192,7 +192,7 @@ export interface PassRateFact {
   value: number | null;
   ci95: { low: number; high: number } | null;
   settled: number;
-  tooFewToConclude: boolean;
+  isTooFewToConclude: boolean;
   /**
    * Why the rate cannot carry a conclusion, when it cannot.
    *
@@ -265,7 +265,7 @@ export interface ReportEvidence {
    */
   transcripts: SelectedTranscript[];
   /** True when scenarios were still running, so the figures cover a subset. */
-  stillRunning: boolean;
+  isStillRunning: boolean;
 }
 
 // ============================================================================

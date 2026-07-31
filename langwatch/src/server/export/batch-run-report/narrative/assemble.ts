@@ -122,7 +122,7 @@ export function assembleSections({
     integrity.claimsDroppedUncited += resolved.droppedUncited;
     integrity.claimsDroppedUnresolvable += resolved.droppedUnresolvable;
 
-    if (!verdicts?.usable) return resolved.kept;
+    if (!verdicts?.isUsable) return resolved.kept;
 
     const confirmed = resolved.kept.filter((claim) =>
       verdicts.supported.has(claim.id),

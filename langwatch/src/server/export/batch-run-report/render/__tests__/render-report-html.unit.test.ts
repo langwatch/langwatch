@@ -14,10 +14,16 @@ import {
   makeSmallSampleModel,
 } from "./report-fixtures";
 
-/** The document's single script, or null when there is not exactly one. */
+/**
+ * The document's single script, or null when there is not exactly one.
+ *
+ * Case-insensitive because this is the injection guard: HTML tag names are
+ * case-insensitive to a browser, so a case-sensitive scan would run `<SCRIPT>`
+ * happily and report the document clean.
+ */
 function soleScriptBody(html: string): string | null {
   const matches = [
-    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g),
+    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi),
   ];
   return matches.length === 1 ? (matches[0]?.[1] ?? null) : null;
 }
@@ -311,7 +317,7 @@ describe("Feature: Run report — the headline", () => {
               value: 47.6,
               ci95: { low: 28.3, high: 67.6 },
               settled: 21,
-              tooFewToConclude: true,
+              isTooFewToConclude: true,
               inconclusiveReason: "spread_too_wide",
             },
             counts: makeCounts({

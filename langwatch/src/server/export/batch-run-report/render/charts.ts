@@ -160,7 +160,9 @@ export function sparkline({ points }: { points: SparkPoint[] }): string {
   const currentPoint = points[points.length - 1];
   const first = points[0];
   const earlier = points.length - 1;
-  const title = `Pass rate across ${points.length} runs, ending at ${formatRate(currentPoint?.value ?? 0)}`;
+  const title = `Pass rate across ${points.length} ${
+    points.length === 1 ? "run" : "runs"
+  }, ending at ${formatRate(currentPoint?.value ?? 0)}`;
 
   return [
     '<figure class="spark">',

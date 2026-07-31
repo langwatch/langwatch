@@ -71,7 +71,7 @@ function reportModel(overrides: Partial<ReportModel> = {}): ReportModel {
         value: 50,
         ci95: null,
         settled: 2,
-        tooFewToConclude: true,
+        isTooFewToConclude: true,
         inconclusiveReason: "too_few_runs",
       },
       counts: {

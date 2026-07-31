@@ -112,7 +112,7 @@ export class BatchRunReportService {
 
     onProgress("rendering");
 
-    const { sections, integrity } = verdicts?.usable
+    const { sections, integrity } = verdicts?.isUsable
       ? assembleSections({
           evidence,
           questions: QUESTION_REGISTRY,
@@ -326,10 +326,10 @@ function resolveTier({
   verdicts,
 }: {
   draft: unknown | null;
-  verdicts: { usable: boolean } | null;
+  verdicts: { isUsable: boolean } | null;
 }): ReportTier {
   if (draft === null) return "figures_only";
-  return verdicts?.usable ? "verified" : "unchecked";
+  return verdicts?.isUsable ? "verified" : "unchecked";
 }
 
 function buildNotes({
@@ -362,7 +362,7 @@ function buildNotes({
       `Langy read ${evidence.truncation.transcriptsIncluded} of ${evidence.truncation.failingRuns} failing conversations, covering ${evidence.truncation.signaturesCovered} of ${evidence.truncation.signaturesTotal} distinct failure groups.`,
     );
   }
-  if (evidence.stillRunning) {
+  if (evidence.isStillRunning) {
     notes.push(
       "Some scenarios had not finished, so this report covers only those that had.",
     );

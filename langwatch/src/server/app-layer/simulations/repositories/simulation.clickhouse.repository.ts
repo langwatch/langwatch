@@ -479,7 +479,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     //
     //   - Page has a StartedAt range: the read runs windowed and is metered
     //     `hit` — the cheap, pruned path.
-    //   - Page has no usable StartedAt (empty / provisional): the hint is null,
+    //   - Page has no isUsable StartedAt (empty / provisional): the hint is null,
     //     so the read runs unbounded and is metered `unwindowed`. This is the
     //     widening the old empty-clause helper did *silently*; it is now counted.
     //

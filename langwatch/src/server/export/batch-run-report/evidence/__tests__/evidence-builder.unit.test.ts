@@ -275,12 +275,12 @@ describe("buildEvidence() when scenarios have not finished", () => {
       judgedRun({ runId: "run_1", met: [REFUND] }),
       makeRun({ scenarioRunId: "run_2", status }),
     ];
-    expect(build({ runs }).stillRunning).toBe(true);
+    expect(build({ runs }).isStillRunning).toBe(true);
   });
 
   it("does not flag a run where everything reached a terminal state", () => {
     const runs = [judgedRun({ runId: "run_1", met: [REFUND] }), erroredRun];
-    expect(build({ runs }).stillRunning).toBe(false);
+    expect(build({ runs }).isStillRunning).toBe(false);
   });
 
   it("leaves unfinished runs out of the failure signatures", () => {
@@ -380,7 +380,7 @@ describe("buildEvidence() with nothing to report", () => {
 
   it("reports no pass rate at all", () => {
     expect(evidence.passRate.value).toBeNull();
-    expect(evidence.passRate.tooFewToConclude).toBe(true);
+    expect(evidence.passRate.isTooFewToConclude).toBe(true);
   });
 
   it("reports no total cost when no run carried one", () => {

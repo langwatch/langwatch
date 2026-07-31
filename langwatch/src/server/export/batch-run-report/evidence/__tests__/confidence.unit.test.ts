@@ -71,7 +71,7 @@ describe("buildPassRateFact()", () => {
     });
 
     it("refuses to draw a conclusion", () => {
-      expect(fact.tooFewToConclude).toBe(true);
+      expect(fact.isTooFewToConclude).toBe(true);
       expect(fact.settled).toBe(0);
     });
   });
@@ -81,7 +81,7 @@ describe("buildPassRateFact()", () => {
 
     /** @scenario A small sample is reported as a small sample */
     it("says there were too few runs to draw a conclusion", () => {
-      expect(fact.tooFewToConclude).toBe(true);
+      expect(fact.isTooFewToConclude).toBe(true);
     });
 
     it("still carries the counts the rate came from", () => {
@@ -95,7 +95,7 @@ describe("buildPassRateFact()", () => {
 
     /** @scenario A small sample is reported as a small sample */
     it("refuses to conclude because the margin is too wide", () => {
-      expect(fact.tooFewToConclude).toBe(true);
+      expect(fact.isTooFewToConclude).toBe(true);
       expect(fact.ci95!.high - fact.ci95!.low).toBeGreaterThan(30);
     });
   });
@@ -113,7 +113,7 @@ describe("buildPassRateFact()", () => {
      * @scenario A small sample is reported as a small sample
      */
     it("blames the spread rather than the sample size", () => {
-      expect(fact.tooFewToConclude).toBe(true);
+      expect(fact.isTooFewToConclude).toBe(true);
       expect(fact.inconclusiveReason).toBe("spread_too_wide");
     });
   });
@@ -143,7 +143,7 @@ describe("buildPassRateFact()", () => {
     });
 
     it("draws a conclusion from it", () => {
-      expect(fact.tooFewToConclude).toBe(false);
+      expect(fact.isTooFewToConclude).toBe(false);
     });
   });
 });

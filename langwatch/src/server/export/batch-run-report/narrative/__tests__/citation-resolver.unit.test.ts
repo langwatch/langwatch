@@ -30,12 +30,25 @@ function resolve(claims: Claim[]) {
 }
 
 describe("buildCitationIndex()", () => {
-  describe("given a run with three turns", () => {
-    it("admits every turn that exists", () => {
+  describe("given a run of three turns whose last two were shown", () => {
+    it("admits the turns the model was actually given", () => {
       const index = buildCitationIndex({ evidence: evidenceFixture() });
 
-      expect(index.has("turn:run_1:0")).toBe(true);
+      expect(index.has("turn:run_1:1")).toBe(true);
       expect(index.has("turn:run_1:2")).toBe(true);
+    });
+
+    /**
+     * Turn 0 is real. It is also not in the truncated transcript, so a claim
+     * citing it is describing something the model never read - which is the
+     * fabrication this index exists to refuse, not a detail it can be lenient
+     * about because the turn happens to exist.
+     */
+    /** @scenario A turn that does not exist is never pointed at */
+    it("refuses a turn that exists but was truncated away", () => {
+      const index = buildCitationIndex({ evidence: evidenceFixture() });
+
+      expect(index.has("turn:run_1:0")).toBe(false);
     });
 
     /** @scenario A turn that does not exist is never pointed at */
@@ -44,6 +57,14 @@ describe("buildCitationIndex()", () => {
 
       expect(index.has("turn:run_1:3")).toBe(false);
       expect(index.has("turn:run_1:99")).toBe(false);
+    });
+
+    /** @scenario A turn that does not exist is never pointed at */
+    it("refuses every turn of a run whose conversation was not selected", () => {
+      const index = buildCitationIndex({ evidence: evidenceFixture() });
+
+      expect(index.has("run:run_2")).toBe(true);
+      expect(index.has("turn:run_2:0")).toBe(false);
     });
   });
 

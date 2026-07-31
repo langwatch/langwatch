@@ -51,7 +51,10 @@ import {
   resolveOriginLabel,
 } from "./run-history-transforms";
 import { useAutoExpansion } from "./useAutoExpansion";
-import { useBatchRunReport } from "./useBatchRunReport";
+import {
+  type UseBatchRunReportReturn,
+  useBatchRunReport,
+} from "./useBatchRunReport";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useRunHistoryStore } from "./useRunHistoryStore";
@@ -78,6 +81,46 @@ type RunHistoryPanelProps = {
   /** When set, the matching batch row is scrolled into view and highlighted. */
   highlightBatchId?: string | null;
 };
+
+/**
+ * The report props for one row.
+ *
+ * Both exports differ only by whether Langy is asked, and a row with no set to
+ * report on offers neither: building them together keeps that pairing in one
+ * place rather than as two near-identical ternaries in the middle of JSX.
+ */
+function reportActionsFor({
+  batchRunId,
+  scenarioSetId,
+  suiteName,
+  startReport,
+  cancelReport,
+  isReportRunning,
+  reportStage,
+}: {
+  batchRunId: string;
+  scenarioSetId: string | undefined;
+  suiteName: string | undefined;
+  startReport: UseBatchRunReportReturn["startReport"];
+  cancelReport: UseBatchRunReportReturn["cancelReport"];
+  isReportRunning: UseBatchRunReportReturn["isReportRunning"];
+  reportStage: UseBatchRunReportReturn["reportStage"];
+}) {
+  const start = (withAnalysis: boolean) =>
+    scenarioSetId
+      ? () =>
+          startReport({ batchRunId, scenarioSetId, suiteName, withAnalysis })
+      : undefined;
+  const stage = reportStage(batchRunId);
+
+  return {
+    onExportReport: start(false),
+    onExportReportWithLangy: start(true),
+    onCancelReport: () => cancelReport({ batchRunId }),
+    isReportRunning: isReportRunning(batchRunId),
+    reportStage: stage ? REPORT_STAGE_LABELS[stage] : null,
+  };
+}
 
 export function RunHistoryPanel({
   scenarioSetId,
@@ -525,37 +568,15 @@ export function RunHistoryPanel({
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
-                    onExportReport={
-                      reportSetId
-                        ? () =>
-                            startReport({
-                              batchRunId: batchRun.batchRunId,
-                              scenarioSetId: reportSetId,
-                              suiteName,
-                              withAnalysis: false,
-                            })
-                        : undefined
-                    }
-                    onExportReportWithLangy={
-                      reportSetId
-                        ? () =>
-                            startReport({
-                              batchRunId: batchRun.batchRunId,
-                              scenarioSetId: reportSetId,
-                              suiteName,
-                              withAnalysis: true,
-                            })
-                        : undefined
-                    }
-                    onCancelReport={() =>
-                      cancelReport({ batchRunId: batchRun.batchRunId })
-                    }
-                    isReportRunning={isReportRunning(batchRun.batchRunId)}
-                    reportStage={
-                      reportStage(batchRun.batchRunId)
-                        ? REPORT_STAGE_LABELS[reportStage(batchRun.batchRunId)!]
-                        : null
-                    }
+                    {...reportActionsFor({
+                      batchRunId: batchRun.batchRunId,
+                      scenarioSetId: reportSetId,
+                      suiteName,
+                      startReport,
+                      cancelReport,
+                      isReportRunning,
+                      reportStage,
+                    })}
                   />
                 );
               })

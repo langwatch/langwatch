@@ -48,7 +48,7 @@ export interface VerifierOutcome {
   /** Claim ids the checker affirmatively supported. */
   supported: Set<string>;
   /** False when the response was too incomplete to act on. */
-  usable: boolean;
+  isUsable: boolean;
 }
 
 export async function runVerifierPass({
@@ -63,7 +63,7 @@ export async function runVerifierPass({
   abortSignal?: AbortSignal;
 }): Promise<VerifierOutcome | null> {
   if (claims.length === 0) {
-    return { supported: new Set(), usable: true };
+    return { supported: new Set(), isUsable: true };
   }
 
   try {
@@ -88,9 +88,9 @@ export async function runVerifierPass({
     const seen = object.verdicts.filter((verdict) =>
       known.has(verdict.claimId),
     );
-    const usable = seen.length >= claims.length * MIN_COVERAGE_TO_TRUST;
+    const isUsable = seen.length >= claims.length * MIN_COVERAGE_TO_TRUST;
 
-    if (!usable) {
+    if (!isUsable) {
       logger.warn(
         { reviewed: seen.length, total: claims.length },
         "Run report check reviewed too few statements to act on",
@@ -101,7 +101,7 @@ export async function runVerifierPass({
       supported: new Set(
         seen.filter((verdict) => verdict.supported).map((it) => it.claimId),
       ),
-      usable,
+      isUsable,
     };
   } catch (error) {
     logger.warn({ error }, "Run report check failed; leaving report unchecked");

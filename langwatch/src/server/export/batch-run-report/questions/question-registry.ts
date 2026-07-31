@@ -216,7 +216,7 @@ function outcomeBlocks(evidence: ReportEvidence): Block[] {
     blocks.push({ kind: "trend", points: history });
   }
 
-  if (evidence.stillRunning) {
+  if (evidence.isStillRunning) {
     blocks.unshift({
       kind: "note",
       tone: "warn",

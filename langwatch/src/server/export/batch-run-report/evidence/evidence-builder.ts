@@ -70,10 +70,7 @@ export function buildEvidence({
       batchRunId,
       scenarioSetId,
       suiteName,
-      startedAt: runs.reduce(
-        (min, run) => Math.min(min, run.timestamp),
-        Number.POSITIVE_INFINITY,
-      ),
+      startedAt: earliestTimestamp(runs),
       durationMs: runs.reduce((sum, run) => sum + (run.durationInMs || 0), 0),
       totalCost: sumCost(runs),
     },
@@ -106,7 +103,7 @@ export function buildEvidence({
     // Filled in by the service once transcript selection has run — mirrors
     // `truncation`'s counts above, which are completed the same way.
     transcripts: [],
-    stillRunning: counts.inProgressCount + counts.queuedCount > 0,
+    isStillRunning: counts.inProgressCount + counts.queuedCount > 0,
   };
 }
 
@@ -132,6 +129,20 @@ function sumCost(runs: ScenarioRunData[]): number | null {
   const withCost = runs.filter((run) => run.totalCost != null);
   if (withCost.length === 0) return null;
   return withCost.reduce((sum, run) => sum + (run.totalCost ?? 0), 0);
+}
+
+/**
+ * When the earliest of these runs started, or 0 when there are none.
+ *
+ * A `Math.min` fold seeded with `POSITIVE_INFINITY` returns `Infinity` for an
+ * empty list, and `Infinity` travels as a timestamp: it renders as an invalid
+ * date and compares as later than every real run, which silently inverts a
+ * trend. The batch read is guarded against empty, but the per-batch history
+ * grouping is not, so this is the shared floor for both.
+ */
+function earliestTimestamp(runs: { timestamp: number }[]): number {
+  if (runs.length === 0) return 0;
+  return runs.reduce((min, run) => Math.min(min, run.timestamp), Infinity);
 }
 
 /**
@@ -178,11 +189,11 @@ function buildCriterionFacts(runFacts: RunFact[]): CriterionFact[] {
   const record = ({
     run,
     text,
-    met,
+    isMet,
   }: {
     run: RunFact;
     text: string;
-    met: boolean;
+    isMet: boolean;
   }) => {
     const criterionId = criterionIdFor({ scenarioId: run.scenarioId, text });
     const existing = facts.get(criterionId) ?? {
@@ -194,7 +205,7 @@ function buildCriterionFacts(runFacts: RunFact[]): CriterionFact[] {
       metRunIds: [],
       unmetRunIds: [],
     };
-    if (met) {
+    if (isMet) {
       existing.metCount++;
       existing.metRunIds.push(run.runId);
     } else {
@@ -205,8 +216,8 @@ function buildCriterionFacts(runFacts: RunFact[]): CriterionFact[] {
   };
 
   for (const run of runFacts) {
-    for (const text of run.metCriteria) record({ run, text, met: true });
-    for (const text of run.unmetCriteria) record({ run, text, met: false });
+    for (const text of run.metCriteria) record({ run, text, isMet: true });
+    for (const text of run.unmetCriteria) record({ run, text, isMet: false });
   }
 
   return [...facts.values()];
@@ -382,10 +393,7 @@ function buildPriorBatches({
     });
     return {
       batchRunId,
-      startedAt: batchRuns.reduce(
-        (min, run) => Math.min(min, run.timestamp),
-        Number.POSITIVE_INFINITY,
-      ),
+      startedAt: earliestTimestamp(batchRuns),
       passRate: passRateFrom({ counts }),
       settled: counts.settledCount,
     };

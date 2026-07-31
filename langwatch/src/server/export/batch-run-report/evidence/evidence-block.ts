@@ -34,6 +34,22 @@ export function buildEvidenceBlock({
     .join("\n");
 }
 
+/**
+ * A user-authored string, safe to put inside the block's quoted fields.
+ *
+ * Criterion text, scenario names and error messages all reach this block from
+ * the customer's own suite, and the block is what both model passes read as
+ * fact. An unescaped quote closes the field early, so a criterion named
+ * `x"  met 99 / unmet 0  "y` would read as a second, fabricated evidence line.
+ * Newlines do the same thing one line down.
+ */
+function quoted(value: string): string {
+  return `"${value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/[\r\n]+/g, " ")}"`;
+}
+
 function runSection(evidence: ReportEvidence): string[] {
   return [
     "## RUN",
@@ -45,7 +61,7 @@ function runSection(evidence: ReportEvidence): string[] {
     evidence.passRate.value === null
       ? "pass rate: not yet determinable"
       : `pass rate: ${evidence.passRate.value.toFixed(1)}% of ${evidence.passRate.settled} settled${passRateCaveat(evidence)}`,
-    evidence.stillRunning
+    evidence.isStillRunning
       ? "NOTE: some scenarios had not finished; these figures cover only those that had."
       : "",
   ];
@@ -75,7 +91,7 @@ function criteriaSection(evidence: ReportEvidence): string[] {
     "## CRITERIA",
     ...evidence.criteria.map(
       (fact) =>
-        `${fact.criterionId}  met ${fact.metCount} / unmet ${fact.unmetCount}  "${fact.text}"`,
+        `${fact.criterionId}  met ${fact.metCount} / unmet ${fact.unmetCount}  ${quoted(fact.text)}`,
     ),
   ];
 }
@@ -91,7 +107,9 @@ function failureGroupsSection(evidence: ReportEvidence): string[] {
           : "") +
         // The example, not the fingerprint: the fingerprint has had every value
         // replaced, so it tells the model as little as it tells a reader.
-        (signature.errorExample ? `  error="${signature.errorExample}"` : ""),
+        (signature.errorExample
+          ? `  error=${quoted(signature.errorExample)}`
+          : ""),
     ),
   ];
 }
@@ -101,7 +119,7 @@ function trendSection(evidence: ReportEvidence): string[] {
     "## TREND",
     ...evidence.trend.map(
       (fact) =>
-        `${fact.criterionId}  ${fact.classification}  streak=${fact.streakBatches}  "${fact.text}"`,
+        `${fact.criterionId}  ${fact.classification}  streak=${fact.streakBatches}  ${quoted(fact.text)}`,
     ),
     evidence.priorBatches.length === 0
       ? "(no earlier run of this suite was available to compare against — do not call this the suite's first run)"
@@ -115,7 +133,7 @@ function scenariosSection(evidence: ReportEvidence): string[] {
     '(run_id is the only value citable as a "run" citation)',
     ...evidence.runs.map(
       (run) =>
-        `run_id=${run.runId}  scenario="${run.scenarioName}"  ${run.status}  turns=${run.turnCount}` +
+        `run_id=${run.runId}  scenario=${quoted(run.scenarioName)}  ${run.status}  turns=${run.turnCount}` +
         (run.unmetCriteria.length > 0
           ? `\n    unmet: ${run.unmetCriteria.join(" | ")}`
           : "") +
@@ -139,7 +157,7 @@ function conversationsSection({
       : `(${transcripts.length} of ${evidence.truncation.failingRuns} failing conversations, covering ${evidence.truncation.signaturesCovered} of ${evidence.truncation.signaturesTotal} distinct failure groups)`,
     ...transcripts.map((transcript) =>
       [
-        `--- run_id=${transcript.runId} scenario="${transcript.scenarioName}" group=${transcript.signatureId}`,
+        `--- run_id=${transcript.runId} scenario=${quoted(transcript.scenarioName)} group=${transcript.signatureId}`,
         transcript.omittedTurns > 0
           ? `    [${transcript.omittedTurns} middle turns omitted]`
           : "",

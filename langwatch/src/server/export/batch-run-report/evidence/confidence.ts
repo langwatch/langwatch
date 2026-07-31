@@ -77,7 +77,7 @@ export function buildPassRateFact({
       value: null,
       ci95: null,
       settled: 0,
-      tooFewToConclude: true,
+      isTooFewToConclude: true,
       inconclusiveReason: "no_settled_runs",
     };
   }
@@ -108,7 +108,7 @@ export function buildPassRateFact({
     value: (passedCount / settledCount) * 100,
     ci95,
     settled: settledCount,
-    tooFewToConclude: inconclusiveReason !== null,
+    isTooFewToConclude: inconclusiveReason !== null,
     inconclusiveReason,
   };
 }
