@@ -1,5 +1,6 @@
 import { formatCost, formatDuration } from "../format";
 import type { ReportEvidence, RunSummary, Tone } from "../report.types";
+import { bySeverityDescending, computeSeverityPrior } from "./severity";
 
 /**
  * The reading someone gets before they decide whether to read the rest.
@@ -61,27 +62,56 @@ function movementSentence(evidence: ReportEvidence): string | null {
   return `That is ${direction} ${Math.abs(delta).toFixed(0)} points on the run before it.`;
 }
 
-/** The failure worth naming first, in the words the run itself used. */
+/**
+ * The failure worth naming first, in the words the run itself used.
+ *
+ * Ranked by the same severity the report's own "which failure matters most"
+ * section ranks by — NOT by how many scenarios it touched. Blast radius is a
+ * poor proxy for consequence: six scenarios failing a tone criterion outrank a
+ * single leak of another customer's data by count, and the reader this card is
+ * written for is the one least likely to scroll down and find that out. Two
+ * places naming a different "first thing to fix" is worse than either alone.
+ *
+ * Ties break on reach, so among equals the widest is named.
+ */
 function topProblem(evidence: ReportEvidence): string | null {
-  const regression = evidence.trend.find(
-    (fact) => fact.classification === "regression",
+  const trendByCriterion = new Map(
+    evidence.trend.map((fact) => [fact.criterionId, fact.classification]),
   );
-  if (regression) {
-    return `Something that used to hold has broken: "${regression.text}".`;
-  }
-
-  const worst = [...evidence.signatures].sort(
-    (a, b) => b.runIds.length - a.runIds.length,
-  )[0];
+  const worst = [...evidence.signatures]
+    .map((signature) => ({
+      signature,
+      severity: computeSeverityPrior({
+        signature,
+        trendByCriterion,
+        settledRuns: evidence.counts.settledCount,
+      }),
+    }))
+    .sort(
+      (a, b) =>
+        bySeverityDescending(a.severity, b.severity) ||
+        b.signature.runIds.length - a.signature.runIds.length,
+    )[0];
   if (!worst) return null;
 
+  const criterionId = worst.signature.unmetCriterionIds[0];
   const criterion = evidence.criteria.find(
-    (fact) => fact.criterionId === worst.unmetCriterionIds[0],
+    (fact) => fact.criterionId === criterionId,
   );
-  const affected = plural(worst.runIds.length, "scenario", "scenarios");
-  return criterion
-    ? `The most widespread failure is "${criterion.text}", in ${affected}.`
-    : `The most widespread failure stopped ${affected} before a verdict.`;
+  const affected = plural(
+    worst.signature.runIds.length,
+    "scenario",
+    "scenarios",
+  );
+
+  // A run that errored has no criterion to be named by — it never got as far
+  // as being judged against one.
+  if (criterionId === undefined || !criterion) {
+    return `The most serious failure stopped ${affected} before a verdict.`;
+  }
+  return trendByCriterion.get(criterionId) === "regression"
+    ? `Something that used to hold has broken: "${criterion.text}", in ${affected}.`
+    : `The most serious failure is "${criterion.text}", in ${affected}.`;
 }
 
 /**

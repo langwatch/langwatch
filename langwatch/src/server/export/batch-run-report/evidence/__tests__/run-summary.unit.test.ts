@@ -173,3 +173,72 @@ describe("the run summary's audience", () => {
     expect(labels).toContain("Took");
   });
 });
+
+describe("the run summary against the severity section", () => {
+  /**
+   * Two places naming a different "first thing to fix" is worse than either
+   * alone, and this card is read by whoever is least likely to scroll down and
+   * discover the disagreement. Ranking by reach put six scenarios failing a
+   * tone criterion above a single leak of another customer's data.
+   *
+   * @scenario The summary leads with the thing most worth fixing
+   */
+  it("names the most serious failure, not the most widespread", () => {
+    const summary = summaryOf({
+      criteria: [
+        {
+          criterionId: "c_wide",
+          scenarioId: "s1",
+          text: "uses a friendly tone",
+          metCount: 0,
+          unmetCount: 6,
+          metRunIds: [],
+          unmetRunIds: [],
+        },
+        {
+          criterionId: "c_bad",
+          scenarioId: "s2",
+          text: "never leaks another customer's data",
+          metCount: 0,
+          unmetCount: 1,
+          metRunIds: [],
+          unmetRunIds: [],
+        },
+      ],
+      signatures: [
+        {
+          signatureId: "s_wide",
+          kind: "judged",
+          unmetCriterionIds: ["c_wide"],
+          errorShape: null,
+          errorExample: null,
+          runIds: ["r1", "r2", "r3", "r4", "r5", "r6"],
+          scenarioIds: ["s1"],
+        },
+        {
+          signatureId: "s_bad",
+          kind: "judged",
+          unmetCriterionIds: ["c_bad"],
+          errorShape: null,
+          errorExample: null,
+          runIds: ["r7"],
+          scenarioIds: ["s2"],
+        },
+      ],
+      trend: [
+        {
+          criterionId: "c_bad",
+          scenarioId: "s2",
+          text: "never leaks another customer's data",
+          classification: "long_standing",
+          currentOutcome: "unmet",
+          history: [],
+          streakBatches: 4,
+        },
+      ],
+    });
+
+    expect(summary.topProblem).toContain("never leaks another customer's data");
+    expect(summary.topProblem).not.toContain("friendly tone");
+  });
+});
