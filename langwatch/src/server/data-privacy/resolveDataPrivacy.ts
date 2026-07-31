@@ -125,6 +125,7 @@ export function resolveDataPrivacy({
   const setCategory: Record<string, boolean> = {};
   let setPii = false;
   let setSecretsEnabled = false;
+  const piiExceptPatterns = new Set<string>();
   // Per attribute pattern, the first (most-specific) entry in the chain wins.
   const attributeRules = new Map<
     string,
@@ -157,9 +158,15 @@ export function resolveDataPrivacy({
       resolved.pii = {
         level: config.pii.level,
         entities: config.pii.entities ?? [],
+        exceptPatterns: [],
       };
       setPii = true;
     }
+    // Like secret customPatterns, exceptions accumulate across the whole chain
+    // even though the level itself is first-set-wins: an org-wide exception for
+    // a company id format applies no matter which scope pinned the level.
+    for (const pattern of config.pii?.exceptPatterns ?? [])
+      piiExceptPatterns.add(pattern);
 
     if (config.secrets && !setSecretsEnabled) {
       resolved.secrets.enabled = config.secrets.enabled;
@@ -181,5 +188,6 @@ export function resolveDataPrivacy({
 
   resolved.customAttributes = [...attributeRules.values()];
   resolved.secrets.customPatterns = [...customPatterns];
+  resolved.pii.exceptPatterns = [...piiExceptPatterns];
   return resolved;
 }

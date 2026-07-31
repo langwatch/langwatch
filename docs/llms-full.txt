@@ -15750,8 +15750,8 @@ Open the trace. You should see:
 - `langwatch.cost.usd`, derived by the receiver's `canonicalCostExtractor` from the
   upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
-  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all receiver-stamped
-  post-auth (authoritative attribution + template provenance), with
+  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all
+  receiver-stamped post-auth (authoritative attribution + template provenance), with
   `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
   assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
 
@@ -15838,8 +15838,12 @@ The `protectedTemplateAttributeKeys` closed list:
   `langwatch.project.id`, `langwatch.tenant.id`, virtual-key shapes,
   ingestion-source shapes, governance shapes.
 - `langwatch.template.id`, receiver-stamped provenance.
-- `langwatch.api_key.id`, receiver-stamped provenance (the ingestion key that landed
-  the trace).
+- `langwatch.api_key.id`, receiver-written provenance (the id of the API key
+  that landed the trace, never the key material). Rewritten from the
+  authenticated identity on every authenticated OTLP request, so a payload
+  cannot set it. Redaction exempts this exact name from the secret-name
+  deny-list on the strength of that guarantee, and still scrubs real key
+  material under it by shape.
 - `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
   assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at

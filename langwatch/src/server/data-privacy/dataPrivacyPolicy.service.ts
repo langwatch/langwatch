@@ -22,28 +22,75 @@ export class InvalidDataPrivacyConfigError extends Error {
 }
 
 /**
- * Custom secret patterns run against every ingested payload, so a pattern must
- * both compile and pass the safe-regex (ReDoS) analysis before it is stored.
- * Rejecting at write time keeps the redaction hot path free of per-event
- * pattern vetting.
+ * Custom secret patterns and PII exception patterns are evaluated in the
+ * ingestion hot path whenever their redaction pass runs (secrets scanning when
+ * enabled; PII exceptions against detected PII spans), so a pattern must both
+ * compile and pass the safe-regex (ReDoS) analysis before it is stored.
+ * Rejecting at write time keeps that hot path free of per-event pattern
+ * vetting.
  */
-function assertSafeCustomPatterns(patterns: string[]): void {
+function assertSafePatterns(patterns: string[], label: string): void {
   for (const pattern of patterns) {
     try {
       new RegExp(pattern);
     } catch {
       throw new InvalidDataPrivacyConfigError(
-        `Custom secret pattern ${JSON.stringify(
+        `${label} ${JSON.stringify(
           pattern,
         )} is not a valid regular expression.`,
       );
     }
     if (!isSafeRegex(pattern)) {
       throw new InvalidDataPrivacyConfigError(
-        `Custom secret pattern ${JSON.stringify(
+        `${label} ${JSON.stringify(
           pattern,
         )} could backtrack catastrophically (ReDoS) and was rejected. ` +
           "Simplify the pattern (avoid nested quantifiers).",
+      );
+    }
+  }
+}
+
+/**
+ * A PII exception is the one pattern here that REMOVES redaction, so an
+ * over-broad one fails open: compiled anchored as `^(?:pattern)$`, something
+ * like `.*` or `\d+` matches every detected span and silently turns the whole
+ * PII pass off while the UI still reports the level as active. A custom secret
+ * pattern that is too broad only over-redacts, which is why this check is not
+ * applied to those.
+ *
+ * The test is that the pattern cannot match a string of a kind it was not
+ * written for: an exception exists to name a specific business identifier, so
+ * it must not match both a digit run and a plain word.
+ */
+const OVER_BROAD_EXCEPTION_PROBES = [
+  "4111111111111111",
+  "12345678901234",
+  "someone@example.com",
+  "Jane Doe",
+  "+1 555 0100",
+] as const;
+
+function assertNotOverBroadExceptions(patterns: string[]): void {
+  for (const pattern of patterns) {
+    let anchored: RegExp;
+    try {
+      anchored = new RegExp(`^(?:${pattern})$`);
+    } catch {
+      // Compile failure already reported by assertSafePatterns.
+      continue;
+    }
+    const matched = OVER_BROAD_EXCEPTION_PROBES.filter((probe) =>
+      anchored.test(probe),
+    );
+    if (matched.length > 1) {
+      throw new InvalidDataPrivacyConfigError(
+        `PII exception pattern ${JSON.stringify(
+          pattern,
+        )} is too broad: it matches unrelated values (${matched
+          .map((probe) => JSON.stringify(probe))
+          .join(", ")}), so it would keep real personal data. ` +
+          "Describe the specific identifier, including its length and any fixed prefix.",
       );
     }
   }
@@ -126,7 +173,15 @@ export class DataPrivacyPolicyService {
         `Invalid data-privacy config: ${parsed.error.message}`,
       );
     }
-    assertSafeCustomPatterns(parsed.data.secrets?.customPatterns ?? []);
+    assertSafePatterns(
+      parsed.data.secrets?.customPatterns ?? [],
+      "Custom secret pattern",
+    );
+    assertSafePatterns(
+      parsed.data.pii?.exceptPatterns ?? [],
+      "PII exception pattern",
+    );
+    assertNotOverBroadExceptions(parsed.data.pii?.exceptPatterns ?? []);
     assertSafeAttributePatterns(parsed.data.customAttributes);
 
     const organizationId =
