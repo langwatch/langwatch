@@ -36,6 +36,7 @@ describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
           traceId: "trace-2",
           full: false,
         });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
       });
     });
   });
