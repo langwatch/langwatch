@@ -13,11 +13,13 @@
  * and TTL anchor.
  *
  * CI runs in UTC, where the broken and correct parses agree, so this suite
- * forces a non-UTC zone before importing anything that touches Date. Kolkata
- * is deliberate: its +05:30 offset also catches a parse that happens to align
- * on whole hours.
+ * forces a non-UTC zone. The helper re-applies it per test and guards that it
+ * took — see it for why the module-scope assignment alone was not enough under
+ * the unit pool's `isolate: false`.
  */
-process.env.TZ = "Asia/Kolkata";
+import { useNonUtcTimezone } from "~/test-utils/nonUtcTimezone";
+
+useNonUtcTimezone();
 
 import { describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";

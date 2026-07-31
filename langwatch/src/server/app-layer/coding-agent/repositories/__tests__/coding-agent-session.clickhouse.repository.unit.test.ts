@@ -2,12 +2,14 @@
  * @vitest-environment node
  *
  * CI runs in UTC, where a correct DateTime64 parse and a locally-anchored one
- * agree, so the decode suite below forces a non-UTC zone before importing
- * anything that touches Date. Kolkata is deliberate: its +05:30 offset also
- * catches a parse that happens to align on whole hours. The stamp suite is
- * unaffected — it works in raw epoch numbers.
+ * agree, so the decode suite below forces a non-UTC zone. The helper re-applies
+ * it per test and guards that it took — see it for why the module-scope
+ * assignment alone was not enough under the unit pool's `isolate: false`. The
+ * stamp suite is unaffected — it works in raw epoch numbers.
  */
-process.env.TZ = "Asia/Kolkata";
+import { useNonUtcTimezone } from "~/test-utils/nonUtcTimezone";
+
+useNonUtcTimezone();
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { register } from "prom-client";

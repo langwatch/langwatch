@@ -11,11 +11,13 @@
  * than merely displaying a wrong time.
  *
  * CI runs in UTC, where the broken and correct parses agree, so this suite
- * forces a non-UTC zone before importing anything that touches Date. Kolkata
- * is deliberate: its +05:30 offset also catches a parse that happens to align
- * on whole hours.
+ * forces a non-UTC zone. The helper re-applies it per test and guards that it
+ * took — see it for why the module-scope assignment alone was not enough under
+ * the unit pool's `isolate: false`.
  */
-process.env.TZ = "Asia/Kolkata";
+import { useNonUtcTimezone } from "~/test-utils/nonUtcTimezone";
+
+useNonUtcTimezone();
 
 import { describe, expect, it } from "vitest";
 import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
@@ -80,10 +82,8 @@ describe("EvaluationAnalyticsClickHouseRepository DateTime64 decode", () => {
   describe("given a row whose DateTime64 columns carry no timezone suffix", () => {
     describe("when it is read back on a host that is not on UTC", () => {
       it("decodes them as UTC rather than the host's local time", async () => {
-        // Guards the guard: if Node ever stops honouring a runtime TZ change,
-        // this suite would pass vacuously under CI's UTC.
-        expect(new Date().getTimezoneOffset()).not.toBe(0);
-
+        // The "is the zone actually non-UTC" guard lives in useNonUtcTimezone's
+        // beforeEach, so it covers every test here rather than just this one.
         const repository = makeRepositoryReturning({
           TenantId: TENANT_ID,
           EvaluationId: EVALUATION_ID,
