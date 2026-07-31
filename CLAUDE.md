@@ -92,9 +92,19 @@ dies with `self signed certificate in certificate chain`. haven publishes the CA
 as `NODE_EXTRA_CA_CERTS` in `.env.portless` and injects it into everything it
 spawns. Anything else must have it in the environment **before the process
 starts** — Node reads that variable once at startup, so loading `.env.portless`
-with dotenv from inside the process sets it and still fails. Use
-`pnpm cli:haven <cmd>` (in `typescript-sdk/`) or
-`dotenv -e langwatch/.env.portless -- <cmd>`.
+with dotenv from inside the process sets it and still fails. Run it through
+haven instead, from any directory:
+
+```bash
+haven exec -- node ./some-script   # any command, with this stack's environment
+haven cli onboard                  # sugar for this checkout's langwatch CLI
+```
+
+`haven exec` layers `platform/app/.env` then `.env.portless` under the
+environment you already have, so a variable exported inline still wins, and it
+`exec`s rather than wraps — the exit code, signals and terminal stay the
+command's own. Everything after `--` belongs to the command, so its own flags
+are never read as haven's.
 
 ```bash
 make quickstart                        # Interactive preset picker

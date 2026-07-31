@@ -218,13 +218,21 @@ so the app, the workers and the langy worker are already fine.
 Anything haven does **not** spawn has to pick it up itself, and there is a trap:
 Node reads `NODE_EXTRA_CA_CERTS` **once at startup**, so loading `.env.portless`
 with dotenv *inside* the process sets the variable and still fails the handshake.
-It must be in the environment before the command runs:
+It must be in the environment before the command runs, which is what `haven
+exec` is for — from any directory, no per-package script to wire:
 
 ```bash
-pnpm cli:haven onboard                                    # from typescript-sdk/
-dotenv -e langwatch/.env.portless -- node ./some-script   # anything else
-set -a; . langwatch/.env.portless; set +a                 # or export it once
+haven exec -- node ./some-script    # any command, with this stack's environment
+haven exec -- pnpm vitest run foo   # its own flags survive: everything after -- is the command's
+haven cli onboard                   # sugar for this checkout's langwatch CLI
 ```
+
+`exec` merges `platform/app/.env` then `.env.portless` — the same layers, in the
+same order, the app itself reads — *underneath* the environment you already have,
+so a variable you export inline still wins. It then `exec`s the command rather
+than supervising it, so the exit code, the signals and the terminal belong to the
+command; an interactive CLI drawing a QR code and waiting on it behaves exactly
+as it would unwrapped.
 
 ### Why native processes, not kind/k8s (yet)
 

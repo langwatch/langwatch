@@ -95,8 +95,8 @@ func (s Stack) OverlayEnv() []string {
 	// bootstrap, so a tool that loads this file with dotenv sets the variable and
 	// still fails the handshake — the read has already happened. Children haven
 	// spawns get it for free (planChildren passes this env to exec). Anything
-	// else must export it first: `dotenv -e langwatch/.env.portless -- <cmd>`,
-	// or `set -a; . langwatch/.env.portless; set +a`.
+	// else should go through `haven exec -- <cmd>`, which applies these layers
+	// before the process starts (see ExecEnv).
 	if s.PortlessCACertPath != "" {
 		env = append(env, "NODE_EXTRA_CA_CERTS="+s.PortlessCACertPath)
 	}

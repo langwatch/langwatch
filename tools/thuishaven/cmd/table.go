@@ -87,6 +87,19 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
 		switch {
+		case a == "--":
+			// Everything after the terminator is a positional, verbatim. It is
+			// how `exec` hands a flag like --watch to the command it runs
+			// instead of having it read as one of haven's. The terminator
+			// belongs to the CLI rather than to one command so it reads the
+			// same way everywhere, and it grants nothing: addPositional still
+			// applies, so a command declaring no arguments refuses these too.
+			for _, passthrough := range rest[i+1:] {
+				if err := addPositional(passthrough); err != nil {
+					return inv, err
+				}
+			}
+			return inv, nil
 		case strings.HasPrefix(a, "--"):
 			name, embedded, hasEmbedded := strings.Cut(a, "=")
 			f := findLong(name)
@@ -381,6 +394,26 @@ var table = []commandSpec{
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
 		},
 		run: runClean,
+	},
+	{
+		name:    "exec",
+		summary: "run a command with this stack's environment",
+		args:    "-- <cmd> [args…]",
+		maxArgs: -1,
+		// The command's own flags must survive the parser. Single-dash ones
+		// reach it through minusArgs; double-dash ones only through the "--"
+		// terminator, which is why exec declares no flags of its own — every
+		// one of them would be a name it could no longer pass through.
+		minusArgs: true,
+		run:       runExec,
+	},
+	{
+		name:      "cli",
+		summary:   "run this checkout's langwatch CLI against this stack",
+		args:      "[args…]",
+		maxArgs:   -1,
+		minusArgs: true,
+		run:       runCLI,
 	},
 	{
 		name:    "typecheck",
