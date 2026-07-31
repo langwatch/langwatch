@@ -149,7 +149,18 @@ function gzipped(
   source: ReadableStream<Uint8Array>,
 ): ReadableStream<Uint8Array> {
   const gzip = createGzip();
-  Readable.fromWeb(source as Parameters<typeof Readable.fromWeb>[0]).pipe(gzip);
+  const nodeSource = Readable.fromWeb(
+    source as Parameters<typeof Readable.fromWeb>[0],
+  );
+
+  // `.pipe()` does not forward a source error the way `pipeThrough` does: it
+  // unpipes and leaves the destination open, and the Readable's own 'error'
+  // event goes unhandled — which takes the process down rather than failing
+  // the one request. Destroying the gzip with the error propagates it to the
+  // response instead, so a failed query reads as a failed download.
+  nodeSource.on("error", (error) => gzip.destroy(error));
+  nodeSource.pipe(gzip);
+
   return Readable.toWeb(gzip) as ReadableStream<Uint8Array>;
 }
 

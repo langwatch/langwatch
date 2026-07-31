@@ -82,6 +82,20 @@ class OneRunRepository extends NullSimulationRepository {
   }
 }
 
+/** Fails partway through the sweep, the way a ClickHouse error would. */
+class FailingRepository extends NullSimulationRepository {
+  override async countRunsForExport(): Promise<number> {
+    return 100;
+  }
+  override async findRunsForExport(): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    throw new Error("clickhouse blew up");
+  }
+}
+
 /** Serves an endless supply of pages and counts how many were asked for. */
 class EndlessRepository extends NullSimulationRepository {
   calls = 0;
@@ -275,6 +289,36 @@ describe("POST /api/export/scenario-runs/download", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       // Cancelling returns the generator, so the sweep is over for good.
       expect(repository.calls).toBe(afterCancel);
+    });
+
+    /**
+     * Headers are already sent by the time the sweep can fail, so the only way
+     * to report it is to break the body. Node's `.pipe()` does not forward a
+     * source error — it unpipes and leaves the destination open, and the
+     * unhandled 'error' event takes the process down rather than the request.
+     * The client has to see a broken stream, not a truncated-but-clean file.
+     */
+    it("breaks the stream when the sweep fails mid-flight", async () => {
+      const repository = new FailingRepository();
+      globalForApp.__langwatch_app = createTestApp({
+        simulations: {
+          runs: new SimulationRunService(repository),
+          export: ScenarioRunExportService.create(repository),
+        },
+      });
+
+      const response = await download();
+      expect(response.status).toBe(200);
+
+      await expect(
+        (async () => {
+          const reader = response.body!.getReader();
+          for (;;) {
+            const { done } = await reader.read();
+            if (done) return;
+          }
+        })(),
+      ).rejects.toThrow();
     });
 
     it("records who exported what before streaming a byte", async () => {

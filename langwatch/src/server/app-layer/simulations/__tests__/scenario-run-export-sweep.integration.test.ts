@@ -116,7 +116,7 @@ afterAll(async () => {
       // still rewriting parts when the next file starts perturbs its reads —
       // observed as a sibling repository suite failing only when run after this
       // one.
-      clickhouse_settings: { mutations_sync: 2 },
+      clickhouse_settings: { mutations_sync: "2" },
     });
   }
   await stopTestContainers();
