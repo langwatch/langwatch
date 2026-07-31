@@ -360,7 +360,11 @@ describe("Feature: Object storage provider parity and migration", () => {
     // The chunk exists ONLY at the destination — uploaded while that
     // provider was briefly the active backend (#6323 posture).
     state.destinationDriver.objects.set(
-      state.destination.datasetChunkUri("project-1", "dataset-on-destination", 0),
+      state.destination.datasetChunkUri(
+        "project-1",
+        "dataset-on-destination",
+        0,
+      ),
       Buffer.from("chunk-at-destination"),
     );
 
