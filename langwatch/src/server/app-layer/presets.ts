@@ -95,6 +95,7 @@ import {
   PrismaProcessStore,
 } from "../event-sourcing/process-manager";
 import { ExperimentService } from "../experiments/experiment.service";
+import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "../subscriptionHandler";
@@ -477,6 +478,11 @@ export function initializeDefaultApp(options?: {
   );
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
+  );
+  // Shares the repository instance so the export reads through the same store
+  // the run history does, rather than opening a second one.
+  const scenarioRunExport = ScenarioRunExportService.create(
+    simulationReads.repository,
   );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
@@ -1264,7 +1270,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
-    simulations: { runs: simulationReads },
+    simulations: { runs: simulationReads, export: scenarioRunExport },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1338,6 +1344,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPinnedTraceService = new PinnedTraceService(
     new PinnedTraceRepository(testPrisma),
   );
+  // Hoisted so the export shares the null repository with `runs`, matching how
+  // the production preset wires the pair.
+  const testSimulationReads = SimulationRunService.create(null);
   const noop = async () => {
     /* noop */
   };
@@ -1468,7 +1477,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
-    simulations: { runs: SimulationRunService.create(null) },
+    simulations: {
+      runs: testSimulationReads,
+      export: ScenarioRunExportService.create(testSimulationReads.repository),
+    },
     suiteRuns: {
       runs: SuiteRunService.create({
         resolveClickHouseClient: null,

@@ -150,6 +150,8 @@ export const APP_ERROR_CODES = [
   "rum_payload_too_large",
   "rum_rate_limited",
   "run_not_found",
+  "scenario_run_export_forbidden",
+  "scenario_run_export_unauthenticated",
   "scenario_set_limit_exceeded",
   "schema_failure",
   "seat_billing_unavailable",
