@@ -32,6 +32,7 @@ import {
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
+  GroupRowsButton,
   RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
@@ -47,6 +48,7 @@ import {
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
 import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
+import { useResultsGrouping } from "./useResultsGrouping";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -326,10 +328,13 @@ export function BatchEvaluationResults({
 
   const handleGroupByChange = useCallback(
     (next: string | null) => {
-      if (onSelectRunId) {
-        setLocalGroupBy(next);
-        return;
-      }
+      // Apply locally first, always. Routing to read the answer back out of
+      // the URL put ~4s between the click and the table regrouping, which
+      // reads as the grouping itself being slow rather than as a round-trip.
+      // The URL is still the source of truth on load and still what a shared
+      // link carries — it just no longer gates the render.
+      setLocalGroupBy(next);
+      if (onSelectRunId) return;
       const newQuery = queryWithGroupBy(router.query, next);
       if (!newQuery) return;
       void router.replace(
@@ -458,6 +463,13 @@ export function BatchEvaluationResults({
   ]);
 
   // Chart data to display - either comparison data or single run data
+  // Derived here so the toolbar button and the table agree on which keys
+  // exist; ComparisonTable derives the same set for its own rendering.
+  const { availableKeys: groupableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+
   const chartDisplayData = compareMode ? comparisonData : singleRunChartData;
 
   // Target colors from charts (when X-axis is "target")
@@ -564,6 +576,11 @@ export function BatchEvaluationResults({
             <>
               <RowHeightButton value={rowHeight} onChange={setRowHeight} />
               <FieldsButton fields={fields} onToggle={toggleField} />
+              <GroupRowsButton
+                availableKeys={groupableKeys}
+                value={localGroupBy ?? queryGroupBy}
+                onChange={handleGroupByChange}
+              />
             </>
           )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
@@ -649,7 +666,7 @@ export function BatchEvaluationResults({
                   showEvaluations={fields.scores}
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
-                  groupBy={onSelectRunId ? localGroupBy : queryGroupBy}
+                  groupBy={localGroupBy ?? queryGroupBy}
                   onGroupByChange={handleGroupByChange}
                 />
               </Card.Body>

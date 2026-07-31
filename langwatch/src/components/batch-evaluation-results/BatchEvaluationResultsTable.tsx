@@ -7,8 +7,14 @@
  *
  * The actual table implementations are in separate files for better maintainability.
  */
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Columns3, Rows3, SlidersHorizontal } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Columns3,
+  HelpCircle,
+  ListTree,
+  Rows3,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverArrow,
@@ -18,6 +24,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Radio, RadioGroup } from "~/components/ui/radio";
+import { Tooltip } from "~/components/ui/tooltip";
 import { ComparisonTable } from "./ComparisonTable";
 import { SingleRunTable } from "./SingleRunTable";
 import {
@@ -177,6 +184,102 @@ export const FieldsButton = ({ fields, onToggle }: FieldsButtonProps) => (
  * resized, so it's safe (and useful) to persist across sessions — see
  * {@link useResultDisplayPreferences}.
  */
+export type GroupRowsButtonProps = {
+  /** Metadata keys this comparison can group on. Empty hides the control. */
+  availableKeys: string[];
+  /** The key currently applied, or `null` when the table is flat. */
+  value: string | null;
+  onChange: (key: string | null) => void;
+};
+
+const NO_GROUPING = "__none__";
+
+const GROUPABLE_FIELD_HELP =
+  "Only fields that split these rows. A field with one value everywhere, " +
+  "or a different value on every row, is left out.";
+
+/**
+ * Group the comparison rows by a dataset-entry metadata key.
+ *
+ * Sits in the results toolbar with Row height / Fields / Columns rather than
+ * floating above the table on its own: it is the same kind of control — a
+ * per-view display choice — and a lone button on its own row read as belonging
+ * to the data rather than to the toolbar.
+ *
+ * Uses the shared Popover for the same reason the neighbours do. The in-table
+ * version had to hand-roll a Portal to escape an `overflow: hidden` ancestor;
+ * from the toolbar there is nothing to escape.
+ */
+export const GroupRowsButton = ({
+  availableKeys,
+  value,
+  onChange,
+}: GroupRowsButtonProps) => {
+  if (availableKeys.length === 0) return null;
+  return (
+    <PopoverRoot>
+      <PopoverTrigger asChild>
+        <Button
+          size="sm"
+          variant="outline"
+          aria-label="Group rows by a metadata field"
+          data-testid="group-by-row-button"
+          // Pinned so picking a field does not resize the button and shove
+          // every control to its right along the toolbar. Long keys truncate
+          // instead of growing; the full name is in the menu either way.
+          minWidth="150px"
+          maxWidth="150px"
+          justifyContent="flex-start"
+        >
+          <ListTree size={16} style={{ flexShrink: 0 }} />
+          {/* The applied key, not "Group rows by: No grouping" — the idle
+              state should read as an invitation, not as a stated negative. */}
+          <Text truncate>{value ? `Grouped by ${value}` : "Group rows"}</Text>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="240px">
+        <PopoverArrow />
+        <PopoverBody>
+          <HStack gap={1.5} align="center" marginBottom={2}>
+            <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+              Fields
+            </Text>
+            {/* Why a field is missing is the question this control provokes,
+                and the answer is not guessable from the list itself. */}
+            <Tooltip content={GROUPABLE_FIELD_HELP}>
+              <Box color="fg.muted" display="flex" cursor="pointer">
+                <HelpCircle size={12} />
+              </Box>
+            </Tooltip>
+          </HStack>
+          <RadioGroup
+            value={value ?? NO_GROUPING}
+            onValueChange={(d: { value: string | null }) => {
+              if (d.value) onChange(d.value === NO_GROUPING ? null : d.value);
+            }}
+            size="sm"
+          >
+            <VStack align="stretch" gap={1.5}>
+              <Radio value={NO_GROUPING} data-testid="group-by-row-option-none">
+                <Text fontSize="sm">No grouping</Text>
+              </Radio>
+              {availableKeys.map((key) => (
+                <Radio
+                  key={key}
+                  value={key}
+                  data-testid={`group-by-row-option-${key}`}
+                >
+                  <Text fontSize="sm">{key}</Text>
+                </Radio>
+              ))}
+            </VStack>
+          </RadioGroup>
+        </PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
+  );
+};
+
 export type RowHeightButtonProps = {
   value: RowHeight;
   onChange: (value: RowHeight) => void;

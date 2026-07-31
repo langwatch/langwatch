@@ -14,12 +14,12 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { DiffCell, type DiffValue } from "./DiffCell";
 import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
-import { GroupByRowsMenu } from "./GroupByRowsMenu";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   calculateMinTableWidth,
@@ -327,10 +327,17 @@ const bucketRowsByGroup = (
     value,
     rows,
   }));
+  // Insertion order is whatever the rows happened to arrive in, so the same
+  // data could group differently between two loads. Sort by value, numerically
+  // when both sides are numbers so "10" does not land between "1" and "2".
+  // Unspecified always sinks: it is the absence of a value, not one of them.
   ordered.sort((a, b) => {
     if (a.value === GROUP_UNSPECIFIED) return 1;
     if (b.value === GROUP_UNSPECIFIED) return -1;
-    return 0;
+    const na = Number(a.value);
+    const nb = Number(b.value);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+    return a.value.localeCompare(b.value);
   });
   return ordered;
 };
@@ -582,18 +589,8 @@ export function ComparisonTable({
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
-  const showGroupByControl = availableKeys.length > 0;
-
   return (
     <VStack align="stretch" width="100%" height="100%" gap={0}>
-      {showGroupByControl && (
-        <GroupByRowsMenu
-          availableKeys={availableKeys}
-          value={effectiveGroupBy}
-          onChange={handleGroupByChange}
-        />
-      )}
-
       <Box
         ref={scrollContainerRef}
         overflowX="auto"
@@ -648,8 +645,21 @@ export function ComparisonTable({
                           color="fg.muted"
                           paddingX={1}
                           cursor="pointer"
+                          display="flex"
+                          alignItems="center"
                         >
-                          {collapsed ? "▶" : "▼"}
+                          {/* One rotating chevron rather than swapping two
+                              glyphs — the arrow turns instead of the row
+                              flickering between characters. */}
+                          <ChevronRight
+                            size={13}
+                            style={{
+                              transform: collapsed
+                                ? "rotate(0deg)"
+                                : "rotate(90deg)",
+                              transition: "transform 140ms ease",
+                            }}
+                          />
                         </Box>
                         <Text fontSize="13px" fontWeight="semibold">
                           {value}
