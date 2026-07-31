@@ -54,14 +54,27 @@ function createMockBatchClearPII(): {
   return { mockBatchClearPII: batchSpy, batchSpy };
 }
 
+/**
+ * The only variable this suite touches, cleared on both sides of every test.
+ *
+ * Restore it by key, never by assigning a fresh object to `process.env`:
+ * `process.env` is node's env store, and writing to it is what runs
+ * `setenv()`/`tzset()` and notifies V8 that the timezone changed. Replacing it
+ * with a plain clone silently detaches every later write, and under
+ * `pool: "vmForks"` with `isolate: false` (see vitest.config.ts) the whole
+ * worker shares one `process`, so the clone outlives this file: the ClickHouse
+ * DateTime64 suites set `process.env.TZ` at module scope and would then read
+ * the host zone instead, passing vacuously on a UTC host.
+ */
+const KILL_SWITCH_ENV_VAR = "OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED";
+
 describe("OtlpSpanPiiRedactionService", () => {
   let service: OtlpSpanPiiRedactionService;
   let batchSpy: ReturnType<typeof vi.fn>;
-  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED;
+    delete process.env[KILL_SWITCH_ENV_VAR];
     const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
     batchSpy = spy;
     service = new OtlpSpanPiiRedactionService({
@@ -72,13 +85,13 @@ describe("OtlpSpanPiiRedactionService", () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    delete process.env[KILL_SWITCH_ENV_VAR];
   });
 
   describe("redactSpan", () => {
     describe("when the strict-PII analysis kill switch is enabled", () => {
       it("does not modify the span regardless of redaction level", async () => {
-        process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED = "1";
+        process.env[KILL_SWITCH_ENV_VAR] = "1";
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
         ]);
@@ -91,7 +104,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
 
       it("skips redaction even for ESSENTIAL level", async () => {
-        process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED = "1";
+        process.env[KILL_SWITCH_ENV_VAR] = "1";
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
         ]);

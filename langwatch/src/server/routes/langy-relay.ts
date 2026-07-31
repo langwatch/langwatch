@@ -14,7 +14,10 @@
  * runToken, the turn, the dedup set, the stream — is in Redis).
  *
  * On instance death the worker reconnects and re-pushes from the stream's last
- * id; redelivered frames are dropped by the dedup set. Never expose publicly.
+ * id; redelivered frames are dropped by the dedup set. Never expose publicly —
+ * the Helm chart
+ * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
+ * the app through its internal Service rather than the ingress.
  */
 
 import { createLogger } from "@langwatch/observability";

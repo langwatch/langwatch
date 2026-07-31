@@ -875,6 +875,26 @@ export class ApiKeyService {
     return this.repo.findById({ id });
   }
 
+  /**
+   * Resolve one key id to its display name, within an organization. Returns
+   * null for an id that belongs to another organization or does not exist, so
+   * the two are indistinguishable to the caller.
+   *
+   * A revoked key still resolves: the trace it authorized is still readable,
+   * and naming the key that produced it is the whole point.
+   */
+  async getNameByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ name: string; revoked: boolean } | null> {
+    const row = await this.repo.findNameByIdInOrg({ id, organizationId });
+    if (!row) return null;
+    return { name: row.name, revoked: row.revokedAt !== null };
+  }
+
   async getUserBindings({
     userId,
     organizationId,

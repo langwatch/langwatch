@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 
@@ -145,6 +146,18 @@ describe("buildSlimTimeseriesQuery", () => {
 
   it("filters on TenantId first", () => {
     expect(sql).toMatch(/ta\.TenantId\s*=\s*\{tenantId:String\}/);
+  });
+
+  /**
+   * The fold's store writes a row for every state it is handed, including one
+   * whose only signal is a topic or an annotation, because that is what makes
+   * an absent row proof the trace was never committed. Every row on this table
+   * counts as A TRACE to the aggregates below, so this predicate is the only
+   * thing standing between the always-write row and the product's numbers.
+   */
+  /** @scenario absence is authoritative because nothing is ever gated out */
+  it("keeps dimension-only rows out via the has-signal predicate", () => {
+    expect(sql).toContain(TRACE_ANALYTICS_HAS_SIGNAL_SQL);
   });
 
   it("filters on the partition column OccurredAt for partition pruning", () => {

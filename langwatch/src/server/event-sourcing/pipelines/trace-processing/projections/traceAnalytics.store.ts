@@ -211,4 +211,3 @@ export class TraceAnalyticsStore
     return (await this.getWithApplied(aggregateId, context)).state;
   }
 }
-

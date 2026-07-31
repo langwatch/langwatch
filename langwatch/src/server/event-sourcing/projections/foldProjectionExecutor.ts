@@ -9,10 +9,7 @@ import {
 } from "~/server/metrics";
 import type { Event } from "../domain/types";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
-import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "./foldProjection.types";
+import type { FoldProjectionDefinition } from "./foldProjection.types";
 import {
   type ProjectionStoreContext,
   readWindowAround,
@@ -374,14 +371,16 @@ export class FoldProjectionExecutor {
     // shortcut: there a complete row EXISTS and the re-fold is what makes
     // refusing it safe.
     const absentTrusted =
-      loaded === null &&
-      miss === "absent" &&
-      this.trustsAbsentMiss(projection);
+      loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
     if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
     }
 
-    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
+    if (
+      loaded === null &&
+      !absentTrusted &&
+      this.shouldRefoldOnMiss(projection)
+    ) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         [event],
@@ -548,14 +547,16 @@ export class FoldProjectionExecutor {
 
     // Same trusted-absent shortcut as the single-event path above.
     const absentTrusted =
-      loaded === null &&
-      miss === "absent" &&
-      this.trustsAbsentMiss(projection);
+      loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
     if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
     }
 
-    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
+    if (
+      loaded === null &&
+      !absentTrusted &&
+      this.shouldRefoldOnMiss(projection)
+    ) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         ordered,
