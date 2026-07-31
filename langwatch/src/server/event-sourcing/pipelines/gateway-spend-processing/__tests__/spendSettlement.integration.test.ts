@@ -7,7 +7,7 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -26,7 +26,6 @@ import {
   buildProcessDefinition,
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import {
-  INITIAL_SPEND_SETTLEMENT_STATE,
   SPEND_SETTLEMENT_PROCESS_NAME,
   type SpendSettlementProcessDeps,
   type SpendSettlementState,
