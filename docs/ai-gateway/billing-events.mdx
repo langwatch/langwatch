@@ -1,0 +1,223 @@
+---
+title: Billing & Spend Events
+description: One spend event per gateway request, delivered by signed webhooks and reconcilable over REST. The money contract, settled requests, supersession, and the two-grain reconciliation workflow.
+sidebarTitle: Billing & Spend Events
+keywords: spend events, billing events, rebilling, reconciliation, nano USD, settled, replay, usage metering
+---
+
+Every request through the AI Gateway produces one **spend event**: token quantities by class, rated cost, and attribution (the virtual key, the end user, your echoed metadata). Spend events are pushed to your systems through [webhook endpoints](/features/webhooks) and pulled back for reconciliation over REST. Together they are the metering feed for platforms that rebill their own customers.
+
+Three properties make the feed billing-grade:
+
+- **Nothing is silently missing.** A request whose confirmation never arrived still produces an event, typed `settled`, with its cost marked unknown rather than zero. The worst case is a recorded request with an unknown cost, never a missing request.
+- **Everything is idempotent.** Event ids are stable across retries and replays. Recorded spend is never mutated: budget resets move period boundaries, corrections arrive as new events, and the ledger is append-only.
+- **Push and pull agree.** The pull surface serves the same canonical envelopes the webhooks deliver, from the same ledger, so a checksum mismatch means something real.
+
+<Note>
+The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
+</Note>
+
+## The spend event
+
+Spend events ride the standard envelope (`{id, type, created, schema_version, data}`). The `data` payload:
+
+```json
+{
+  "event_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T:completed",
+  "event_type": "gateway.request.completed",
+  "gateway_request_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T",
+  "occurred_at": "2026-07-27T14:03:11.482Z",
+  "organization_id": "org_01H...",
+  "project_id": "proj_01H...",
+  "virtual_key_id": "vk_01H...",
+  "principal_user_id": null,
+  "end_user_id": "d7dcef1e-0755-4ad1-b31a-c253fc27e8bf",
+  "trace_id": "cbabd1d8-4f...",
+  "model": "bedrock/global.anthropic.claude-sonnet-5",
+  "model_provider_id": "mp_01H...",
+  "request_type": "chat_completions",
+  "usage": {
+    "input_tokens": 869,
+    "output_tokens": 207,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "reasoning_tokens": 0
+  },
+  "cost": {
+    "total_usd": "0.003808",
+    "nano_usd": 3808000,
+    "rate_version": "2026-07-15"
+  },
+  "status": "success",
+  "needs_reconciliation": null,
+  "settle_reason": null,
+  "error": null,
+  "duration_ms": 3878,
+  "labels": ["tier:pro"],
+  "metadata": { "tenant_org": "acme-172", "environment": "production" }
+}
+```
+
+Field notes:
+
+- **`event_id`** is the envelope `id`: the gateway request id with a type suffix. Dedup on it. **`gateway_request_id`** is the plain join key across the settled and completed pair, and it is the same ULID your client received in the `X-LangWatch-Gateway-Request-Id` response header, so you can join request-side logs to billing events.
+- **`occurred_at`** is request time, never ingest or delivery time. Late events land in the right invoice period.
+- **`status`** is `success` or `error` on completed events. Failed provider calls are events too; `error` carries `{class, http_status}` so your billing decides whether to charge for them.
+- **`end_user_id`** is the attributed end user (see [attribution](#attribution-what-the-request-carries)). **`metadata`** is your caller echo, returned verbatim: this is how billing joins events to your own tenant and user records.
+- **`model_provider_id`** names the provider credential that actually served the request.
+
+### Money representation
+
+Get your ingest right once:
+
+- Quantities are exact integers per token class: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`.
+- Cost is **`cost.nano_usd`**, an int64 in billionths of a USD ($0.003808 arrives as `3808000`), together with **`rate_version`**, the pricing catalog version used to rate it. `total_usd` is a display-friendly decimal string of the same amount.
+- Never parse floats for money. Sum the integers; round exactly once, at invoice time. Currency is USD, single and stated.
+
+### Settled events and supersession
+
+A request is **admitted** when the gateway accepts it and **confirmed** when its outcome (tokens, cost, duration) arrives. If the confirmation never arrives inside the settlement window (30 minutes by default), the request is settled:
+
+```json
+{
+  "event_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T:settled",
+  "event_type": "gateway.request.settled",
+  "gateway_request_id": "01K1D3H8ZQ4M9X2C7V5B1N6P8T",
+  "usage": null,
+  "cost": null,
+  "duration_ms": null,
+  "status": "settled",
+  "needs_reconciliation": true,
+  "settle_reason": "confirmation_deadline_expired"
+}
+```
+
+The rules:
+
+- Quantities, cost, and duration are **`null`**: unknown is not zero. Never book a settled event as $0.
+- A settled request **never** appears in the completed stream, so your billing can trust `completed` for money and treat `settled` as a work queue.
+- If the confirmation later arrives, a real `gateway.request.completed` for the same `gateway_request_id` follows and **supersedes** the settled event. Your consumer replaces the settled figure with the completed one. **Replace, never sum.** The type-suffixed event ids exist precisely so your dedup layer does not swallow the second event.
+
+## Attribution: what the request carries
+
+Attribution is captured on the request path; nothing is provisioned per end user.
+
+- **End-user id** resolution precedence: the `x-langwatch-end-user-id` header, then `x-litellm-end-user-id` (a migration alias, accepted so LiteLLM-shaped clients need no change), then the OpenAI `user` body field. Headers win over the body.
+- **Metadata echo**: send `x-langwatch-metadata` (a JSON object, 4 KB cap). It returns verbatim as `metadata` on every spend event for that request.
+- **Request id**: every gateway response carries `X-LangWatch-Gateway-Request-Id`, the same ULID that keys the spend event.
+
+One resolver feeds both metering and [per-end-user budget enforcement](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates), so billing and capping can never disagree about who a request was.
+
+## Reconciliation: two grains, one ledger
+
+The pull surface reads the spend **ledger**, not the webhook stream, so it includes settled rows and admitted (in-flight) rows the push deliberately types differently. Reconcile in two passes: checksums first, item diff only on divergence.
+
+### Fast path: aggregate checksums
+
+```
+GET /api/gateway/v1/spend-summaries?group_by=virtual_key&from=1751328000000&to=1753920000000
+```
+
+`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` optionally narrows. Each row:
+
+```json
+{
+  "key": "vk_01H...",
+  "event_count": 18412,
+  "settled_count": 3,
+  "usage": {
+    "input_tokens": 10233801,
+    "output_tokens": 2214410,
+    "cache_read_input_tokens": 3400122,
+    "cache_creation_input_tokens": 90212,
+    "reasoning_tokens": 0
+  },
+  "cost": { "total_usd": "184.402117", "nano_usd": 184402117000 }
+}
+```
+
+`settled_count` counts unpriced requests separately; settled rows are **never** included in the cost sums. Compare a closed period's `event_count` and `nano_usd` against what your billing ingested. Matching checksums end the reconciliation; totals-only comparison is not enough on divergence, because one dropped and one duplicated request of similar cost can net to nearly zero.
+
+### Item diff: the cursor walk
+
+```
+GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
+```
+
+- `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
+- Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
+- Filters: `virtual_key_id`, `end_user_id`, `project_id`, `model`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). `limit` defaults to 50, max 200.
+- Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
+- A garbled `cursor` is refused with `400` rather than silently restarting the walk.
+- In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
+
+### The settled work queue
+
+`GET /api/gateway/v1/spend-events?status=settled&from=...&to=...` lists requests recorded without a price. Each is bounded, visible, and resolvable; when a late confirmation supersedes one, it leaves this queue and the completed event carries the money.
+
+### Retention
+
+Spend records are retained for a **fixed 13 months**, independent of your organization's [trace retention settings](/platform/data-retention#billing-records-are-exempt). A tenant retention policy shrunk to weeks does not touch billing records. The 13 months bound your reconciliation and replay window by contract.
+
+## Per-end-user spend
+
+The read a rebilling platform polls at period close, or renders in its own UI next to the user's allowance:
+
+```
+GET /api/gateway/v1/end-users/:end_user_id/spend
+```
+
+It resolves the [attributed-user budget templates](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates) your organization runs and returns, per applicable template, the pair that matters: the user's current bucket spend and the cap it counts against.
+
+```json
+{
+  "data": [
+    {
+      "budget_id": "bgt_01H...",
+      "anchor_id": "vk_01H...",
+      "window": "MONTH",
+      "on_breach": "BLOCK",
+      "limit_usd": "1",
+      "spent_usd": "0.412209",
+      "period_started_at": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+`anchor_virtual_key_id` narrows to one template when several anchors carry one. An empty `data` array means no attributed-user template applies to that user. This route is served on the gateway management surface (project API key, `gatewayBudgets:view`).
+
+## Replay
+
+```
+POST /api/gateway/v1/spend-events/replay
+{"from": 1753747200000, "to": 1753833600000, "endpoint_id": "whep_01H..."}
+```
+
+Re-delivers the window's spend envelopes to **one** endpoint through the normal delivery path: per-endpoint stream, retry ladder, delivery log, and the endpoint's own event subscriptions. Envelope ids are **unchanged**, so your consumer's event-id dedup decides what a redelivery means.
+
+Caps and caveats:
+
+- The window is capped at **7 days** per call, and a window holding more than **10,000** envelopes is refused with a request to narrow it.
+- The response reports `{endpoint_id, replay_id, replayed, window}`; `replay_id` identifies this replay in delivery bookkeeping without touching envelope ids.
+- **Downstream dedup windows are finite** (Metronome documents 34 days, Stripe meters 24 hours and up). Replaying a range older than your billing system's dedup window can double-bill on your side. For old ranges, prefer pull-and-diff over replay.
+
+Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your organization.
+
+## The ledger UI
+
+**Settings > Gateway > Billing events** (`/settings/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, provider, status, and date range, with token classes and cost per row and drill-through to the trace. The delivery-health strip sits alongside, so an operator sees both what was metered and whether it reached the consumer. It is the screen to keep open during an integration bring-up: if the numbers here match your ledger, the pipeline works.
+
+## Operational notes
+
+- **Failed requests are events.** Decide explicitly whether your billing charges for provider errors; `status` and `error` give you the branch.
+- **Blocked requests are not.** A request rejected before dispatch (budget breach, missing end-user id, disabled key) produced no provider spend and no spend event. The rejection is visible on the [budget events](/features/webhooks#family-gateway) and in gateway metrics instead.
+- **Settlement window**: 30 minutes by default. Self-hosted deployments can tune it; see [self-hosting webhooks and billing](/self-hosting/webhooks).
+- **No content, ever.** Spend events carry ids, counts, classes, and your metadata echo. Prompts and responses never enter the billing pipe.
+
+## See also
+
+- [Webhooks](/features/webhooks): endpoints, signatures, retries, health, the events log.
+- [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling): the end-to-end cookbook, with the runnable demo repo.
+- [Budgets](/ai-gateway/budgets): caps on tenants and end users, thresholds, resets.
+- [Virtual keys](/ai-gateway/virtual-keys): the tenant credential, disable and revoke semantics.
