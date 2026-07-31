@@ -57,13 +57,27 @@ describe("spanStorage shard group key", () => {
     });
   });
 
+  describe("when events for the same span belong to different tenants", () => {
+    it("returns the same lane — tenant scoping is the queue prefix's job", () => {
+      // The queue composes the full group id as
+      // `<tenantId>/map/spanStorage/<domainKey>`, so the domain key must be a
+      // pure function of the span identity: same span id → same lane string,
+      // and the tenant prefix keeps lanes tenant-scoped.
+      const a = { id: "evt_1", tenantId: "tenant_a", metadata: { spanId: "span_s", traceId: "t" } } as never;
+      const b = { id: "evt_2", tenantId: "tenant_b", metadata: { spanId: "span_s", traceId: "t" } } as never;
+      expect(spanStorageMapGroupKey(a)).toBe(spanStorageMapGroupKey(b));
+    });
+  });
+
   describe("when the projection is constructed", () => {
     it("declares the shard key and the coalesce ceiling", () => {
       const projection = new SpanStorageMapProjection({ store: {} as never });
       expect(projection.options.coalesceMaxBatch).toBe(
         TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
       );
-      expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBeGreaterThan(1);
+      // 256 is deliberate (matches the log/metric map ceilings); changing it
+      // is a decision, so the exact value is pinned.
+      expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBe(256);
       // Guard against regressing to the per-event key.
       expect(
         projection.options.groupKeyFn(event("span_x", "evt_unique")),

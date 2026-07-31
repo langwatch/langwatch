@@ -20,6 +20,12 @@
  *
  * Rollout note: old `span:{eventId}` groups drain naturally under their
  * historic keys; new events route to lanes. No key collision, no migration.
+ * During the transition a span's old-key and new-key deliveries can process
+ * in either order — which is exactly the (absence of) guarantee the per-event
+ * key always had, and is harmless either way: `stored_spans` is
+ * ReplacingMergeTree(StartTime) keyed by (TenantId, TraceId, SpanId)
+ * (migration 00002), so the surviving row is chosen by the span's own
+ * business timestamp, independent of insert order.
  */
 
 import type { Event } from "../../../domain/types";

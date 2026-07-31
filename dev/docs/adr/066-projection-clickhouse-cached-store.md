@@ -161,7 +161,7 @@ The amendment: **an append map whose group can back up adopts the metric-map
 shape** — shard-keyed lanes (`shardIndexFor`, bounded lane count) +
 `coalesceMaxBatch` + `bulkAppend` — so a backed-up lane drains N events per
 job instead of one. Adopters: coding-agent maps (langwatch#6407, 256),
-`spanStorage` (this change: `span-map:<lane>` pinned by span id, which also
+`spanStorage` (this change: `span-map:<lane>` at 256, lane pinned by span id, which also
 *fixes* an ordering hole — the per-event key let two deliveries of the same
 span run in parallel). Remaining: `traceAnalyticsRollup` and
 `orgBillableEventsMeter` (needs a billing idempotency review), then the
