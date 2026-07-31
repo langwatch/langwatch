@@ -16,7 +16,7 @@ import {
  * which edges ran over — so the fade cue cannot silently stop firing.
  */
 
-const entry = (variantId: string, score: number, degenerate = false) =>
+const entry = (variantId: string, score: number, isDegenerate = false) =>
   ({
     variantId,
     wins: 1,
@@ -26,7 +26,7 @@ const entry = (variantId: string, score: number, degenerate = false) =>
     strength: 1,
     score,
     scoreCI: null,
-    degenerate,
+    isDegenerate,
   }) as any;
 
 describe("computeBandClipping", () => {

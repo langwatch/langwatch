@@ -13,12 +13,12 @@ const makeEntry = ({
   variantId,
   score,
   scoreCI,
-  degenerate = false,
+  isDegenerate = false,
 }: {
   variantId: string;
   score: number;
   scoreCI: [number, number] | null;
-  degenerate?: boolean;
+  isDegenerate?: boolean;
 }): BTLeaderboardEntry => ({
   variantId,
   wins: 10,
@@ -28,7 +28,7 @@ const makeEntry = ({
   strength: 1,
   score,
   scoreCI,
-  degenerate,
+  isDegenerate,
 });
 
 const makeLeaderboard = (
@@ -39,7 +39,7 @@ const makeLeaderboard = (
   winMatrix: {},
   comparisonCount: 60,
   minMatchups: 15,
-  hasDegenerate: entries.some((e) => e.degenerate),
+  hasDegenerate: entries.some((e) => e.isDegenerate),
   didConverge: true,
   comparability: { identifiable: true, groups: [], dominates: [] },
   // No replicates, so separation falls back to comparing the marginal
@@ -157,7 +157,7 @@ describe("computeLeaderboardVerdict", () => {
           variantId: "a",
           score: 500,
           scoreCI: null,
-          degenerate: true,
+          isDegenerate: true,
         }),
       ]);
 
@@ -174,7 +174,7 @@ describe("computeLeaderboardVerdict", () => {
           variantId: "z",
           score: 999,
           scoreCI: null,
-          degenerate: true,
+          isDegenerate: true,
         }),
       ]);
 

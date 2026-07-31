@@ -102,7 +102,7 @@ export function PairwiseLeaderboard({
     }
   };
 
-  const lowSample = showWarnings && leaderboard.minMatchups < warnThreshold;
+  const isLowSample = showWarnings && leaderboard.minMatchups < warnThreshold;
 
   return (
     <VStack
@@ -131,7 +131,7 @@ export function PairwiseLeaderboard({
         </Text>
       </HStack>
 
-      {lowSample ? (
+      {isLowSample ? (
         <WarnBanner
           tone="warning"
           icon={LuTriangleAlert}
@@ -197,7 +197,7 @@ export function PairwiseLeaderboard({
                 <Table.Cell>
                   <HStack gap={2}>
                     <Text>{e.name}</Text>
-                    {e.degenerate ? (
+                    {e.isDegenerate ? (
                       <Text fontSize="xs" color="fg.muted">
                         (degenerate)
                       </Text>

@@ -73,7 +73,7 @@ describe("computeComparability", () => {
       // The premise: the old guard is clean here. If this ever fails, the
       // test is no longer covering the gap it was written for.
       expect(leaderboard.hasDegenerate).toBe(false);
-      expect(leaderboard.entries.every((e) => !e.degenerate)).toBe(true);
+      expect(leaderboard.entries.every((e) => !e.isDegenerate)).toBe(true);
 
       const comparability = computeComparability({
         winMatrix: leaderboard.winMatrix,

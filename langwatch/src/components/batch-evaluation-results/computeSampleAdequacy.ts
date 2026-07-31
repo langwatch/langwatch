@@ -49,7 +49,7 @@ export type SampleAdequacy = {
 export const computeSampleAdequacy = (
   leaderboard: BTLeaderboard,
 ): SampleAdequacy => {
-  const ranked = leaderboard.entries.filter((entry) => !entry.degenerate);
+  const ranked = leaderboard.entries.filter((entry) => !entry.isDegenerate);
   const rankedVariantCount = ranked.length;
   const totalPairs = (rankedVariantCount * (rankedVariantCount - 1)) / 2;
   const differenceCI = leaderboard.scoreDifferenceCI;

@@ -10,7 +10,7 @@ const entry = (
   variantId: string,
   score: number,
   scoreCI: [number, number] | null,
-  degenerate = false,
+  isDegenerate = false,
 ): BTLeaderboardEntry => ({
   variantId,
   wins: 1,
@@ -20,7 +20,7 @@ const entry = (
   strength: 1,
   score,
   scoreCI,
-  degenerate,
+  isDegenerate,
 });
 
 const leaderboard = (
@@ -31,7 +31,7 @@ const leaderboard = (
   winMatrix: {},
   comparisonCount,
   minMatchups: 2,
-  hasDegenerate: entries.some((e) => e.degenerate),
+  hasDegenerate: entries.some((e) => e.isDegenerate),
   didConverge: true,
   comparability: { identifiable: true, groups: [], dominates: [] },
   // No replicates, so separation falls back to comparing the marginal
@@ -150,7 +150,7 @@ describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
       strength: 1,
       score: 0,
       scoreCI: [-10, 10] as [number, number],
-      degenerate: false,
+      isDegenerate: false,
     }));
 
   const board = (ids: string[]) =>

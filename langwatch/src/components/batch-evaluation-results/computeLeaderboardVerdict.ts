@@ -44,7 +44,7 @@ export const computeLeaderboardVerdict = (
   const differenceCI = leaderboard.scoreDifferenceCI;
   // Degenerate variants (no wins or no losses at all) have no meaningful
   // MLE score, so they cannot be crowned or used to unseat anyone.
-  const ranked = leaderboard.entries.filter((entry) => !entry.degenerate);
+  const ranked = leaderboard.entries.filter((entry) => !entry.isDegenerate);
 
   if (leaderboard.comparisonCount === 0 || ranked.length === 0) {
     return { kind: "no-signal", leaderId: null, tiedIds: [] };

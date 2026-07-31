@@ -57,7 +57,7 @@ export const computeScoreBarScale = (
   entries: BTLeaderboard["entries"],
 ): { min: number; max: number; pct: (value: number) => number } | null => {
   const scores = entries
-    .filter((entry) => !entry.degenerate)
+    .filter((entry) => !entry.isDegenerate)
     .map((entry) => entry.score)
     .filter((score) => Number.isFinite(score));
   if (scores.length === 0) return null;
@@ -246,7 +246,7 @@ function ScoreBars({
                     tied for first
                   </Text>
                 ) : null}
-                {entry.degenerate ? (
+                {entry.isDegenerate ? (
                   <Text fontSize="2xs" color="fg.muted">
                     not scoreable
                   </Text>

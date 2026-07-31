@@ -116,7 +116,7 @@ describe("computeBTLeaderboard", () => {
     });
     expect(result.hasDegenerate).toBe(true);
     const aEntry = result.entries.find((e) => e.variantId === "A")!;
-    expect(aEntry.degenerate).toBe(true);
+    expect(aEntry.isDegenerate).toBe(true);
     expect(aEntry.losses).toBe(0);
     // Degenerate sinks past healthy variants — but A still wins on smoothed MLE
     // because B and C are also touched by smoothing. The point is: no crash,

@@ -25,7 +25,7 @@ const entry = (
   variantId: string,
   score: number,
   scoreCI: [number, number] | null,
-  degenerate = false,
+  isDegenerate = false,
 ) =>
   ({
     variantId,
@@ -36,7 +36,7 @@ const entry = (
     strength: 1,
     score,
     scoreCI,
-    degenerate,
+    isDegenerate,
   }) as any;
 
 const board = (entries: any[]) =>
@@ -45,7 +45,7 @@ const board = (entries: any[]) =>
     winMatrix: {},
     comparisonCount: 60,
     minMatchups: 60,
-    hasDegenerate: entries.some((e) => e.degenerate),
+    hasDegenerate: entries.some((e) => e.isDegenerate),
     didConverge: true,
     comparability: { identifiable: true, groups: [], dominates: [] },
   }) as any;
@@ -64,7 +64,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
         bootstrapSamples: 0,
       });
 
-      expect(leaderboard.entries.filter((e) => !e.degenerate)).toHaveLength(1);
+      expect(leaderboard.entries.filter((e) => !e.isDegenerate)).toHaveLength(1);
 
       const verdict = computeLeaderboardVerdict(leaderboard);
 
@@ -185,7 +185,7 @@ describe("computeBTLeaderboard — evidence it must not invent", () => {
 
       const c = leaderboard.entries.find((e) => e.variantId === "c")!;
       expect(c.matchups).toBe(0);
-      expect(c.degenerate).toBe(true);
+      expect(c.isDegenerate).toBe(true);
     });
   });
 });

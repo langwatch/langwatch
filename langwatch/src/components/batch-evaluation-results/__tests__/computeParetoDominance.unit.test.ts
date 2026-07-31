@@ -29,12 +29,12 @@ const entry = ({
   variantId,
   score,
   scoreCI,
-  degenerate = false,
+  isDegenerate = false,
 }: {
   variantId: string;
   score: number;
   scoreCI: [number, number] | null;
-  degenerate?: boolean;
+  isDegenerate?: boolean;
 }) =>
   ({
     variantId,
@@ -45,7 +45,7 @@ const entry = ({
     strength: 1,
     score,
     scoreCI,
-    degenerate,
+    isDegenerate,
   }) as any;
 
 const board = (entries: any[]) =>
@@ -54,7 +54,7 @@ const board = (entries: any[]) =>
     winMatrix: {},
     comparisonCount: 60,
     minMatchups: 60,
-    hasDegenerate: entries.some((e) => e.degenerate),
+    hasDegenerate: entries.some((e) => e.isDegenerate),
     didConverge: true,
     comparability: { identifiable: true, groups: [], dominates: [] },
   }) as any;
@@ -331,7 +331,7 @@ describe("computeParetoDominance", () => {
           variantId: "swept",
           score: 900,
           scoreCI: null,
-          degenerate: true,
+          isDegenerate: true,
         }),
       ]);
       const variantMetrics = metrics({

@@ -183,7 +183,7 @@ export const buildTrustChecks = ({
   // The top variant the fit is entitled to rank — degenerates are excluded
   // from every claim, so one of them is not a leader.
   const leaderId =
-    leaderboard.entries.find((entry) => !entry.degenerate)?.variantId ?? null;
+    leaderboard.entries.find((entry) => !entry.isDegenerate)?.variantId ?? null;
   checks.push(
     buildJudgeIndependenceCheck(judgeIndependence, variantNames, leaderId),
   );

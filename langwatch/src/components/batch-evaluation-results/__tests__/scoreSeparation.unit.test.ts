@@ -24,7 +24,7 @@ const entry = (variantId: string, score: number, scoreCI: [number, number] | nul
     strength: 1,
     score,
     scoreCI,
-    degenerate: false,
+    isDegenerate: false,
   }) as any;
 
 const intervalsOverlap = (a: [number, number], b: [number, number]) =>
@@ -210,7 +210,7 @@ describe("computeBTLeaderboard — the difference intervals it produces", () => 
       // ever fails the two are not measuring the same thing.
       for (const seed of [1, 2, 3, 4, 5, 6]) {
         const lb = fourWay({ rows: 60, seed });
-        const ranked = lb.entries.filter((e) => !e.degenerate);
+        const ranked = lb.entries.filter((e) => !e.isDegenerate);
         for (let i = 0; i < ranked.length; i++) {
           for (let j = i + 1; j < ranked.length; j++) {
             const A = ranked[i]!;
@@ -237,7 +237,7 @@ describe("computeBTLeaderboard — the difference intervals it produces", () => 
       let byDifference = 0;
       for (const seed of [1, 2, 3, 4, 5, 6]) {
         const lb = fourWay({ rows: 60, seed });
-        const ranked = lb.entries.filter((e) => !e.degenerate);
+        const ranked = lb.entries.filter((e) => !e.isDegenerate);
         for (let i = 0; i < ranked.length; i++) {
           for (let j = i + 1; j < ranked.length; j++) {
             const A = ranked[i]!;

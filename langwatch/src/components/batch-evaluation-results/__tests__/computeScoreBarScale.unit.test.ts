@@ -16,7 +16,7 @@ import { computeScoreBarScale } from "../LeaderboardVerdictPanel";
 const entry = (
   variantId: string,
   score: number,
-  degenerate = false,
+  isDegenerate = false,
 ): BTLeaderboardEntry => ({
   variantId,
   wins: 1,
@@ -26,7 +26,7 @@ const entry = (
   strength: 1,
   score,
   scoreCI: null,
-  degenerate,
+  isDegenerate,
 });
 
 describe("computeScoreBarScale", () => {

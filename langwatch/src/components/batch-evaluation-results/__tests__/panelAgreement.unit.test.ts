@@ -33,7 +33,7 @@ const entry = (
     strength: 1,
     score,
     scoreCI,
-    degenerate: false,
+    isDegenerate: false,
   }) as any;
 
 /**

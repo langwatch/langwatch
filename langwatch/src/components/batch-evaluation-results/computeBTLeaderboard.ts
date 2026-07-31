@@ -47,7 +47,7 @@ export type BTLeaderboardEntry = {
   /** 95% bootstrap CI for score, null when bootstrap disabled or N too small. */
   scoreCI: [number, number] | null;
   /** True when this variant has 0 wins OR 0 losses → MLE degenerate. */
-  degenerate: boolean;
+  isDegenerate: boolean;
 };
 
 /**
@@ -193,11 +193,11 @@ export function computeBTLeaderboard({
   // the way to 50/50 while a pair with thirty barely moves. On unequal sample
   // sizes that reorders healthy variants: measured 545 flips across 4000 such
   // matrices between eps=1e-4 and the eps=0.5 used here. The trigger is a
-  // degenerate variant elsewhere in the field, which is why the reordering can
+  // isDegenerate variant elsewhere in the field, which is why the reordering can
   // involve two variants that have nothing to do with it.
   //
   // Kept because the alternative — no finite fit at all — is worse, and
-  // because the degenerate variant that triggers it is excluded from the
+  // because the isDegenerate variant that triggers it is excluded from the
   // ranking anyway. Callers are told via the trust panel.
   const smooth = hasDegenerate ? 0.5 : 0;
   const { strength, converged } = fitBT({
@@ -240,13 +240,13 @@ export function computeBTLeaderboard({
     strength: strength[i] ?? 1,
     score: score[i] ?? 0,
     scoreCI: scoreCI[i] ?? null,
-    degenerate: degenerateMask[i] ?? false,
+    isDegenerate: degenerateMask[i] ?? false,
   }));
 
-  // Sort by score desc, but push degenerate variants to the bottom so a
+  // Sort by score desc, but push isDegenerate variants to the bottom so a
   // smoothed +∞-ish "always wins" variant doesn't dominate the table.
   entries.sort((a, b) => {
-    if (a.degenerate !== b.degenerate) return a.degenerate ? 1 : -1;
+    if (a.isDegenerate !== b.isDegenerate) return a.isDegenerate ? 1 : -1;
     return b.score - a.score;
   });
 

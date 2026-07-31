@@ -108,7 +108,7 @@ export const computeParetoDominance = ({
   leaderboard: BTLeaderboard;
   variantMetrics: Record<string, VariantMetrics>;
 }): ParetoDominance => {
-  const ranked = leaderboard.entries.filter((entry) => !entry.degenerate);
+  const ranked = leaderboard.entries.filter((entry) => !entry.isDegenerate);
 
   const costOf = (variantId: string) =>
     usableMean(variantMetrics[variantId]?.costStats);

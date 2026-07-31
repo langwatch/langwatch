@@ -366,8 +366,8 @@ describe("buildTrustChecks — reasons that must be the actual reason", () => {
       const checks = build({
         leaderboard: leaderboard({
           entries: [
-            { variantId: "a", degenerate: false } as any,
-            { variantId: "b", degenerate: false } as any,
+            { variantId: "a", isDegenerate: false } as any,
+            { variantId: "b", isDegenerate: false } as any,
           ],
         }),
         judgeIndependence: independence({
