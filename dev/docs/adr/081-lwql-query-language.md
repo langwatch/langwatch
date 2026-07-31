@@ -4,6 +4,8 @@
 
 **Status:** Proposed
 
+**Implementation:** PR [#6413](https://github.com/langwatch/langwatch/pull/6413) — service, compiler and both transports, with an executed ClickHouse integration suite.
+
 > One-line: one server-side compiler turns constrained query text into a **closed JSON IR** and then into ClickHouse SQL, exposed through **one service with two transports** (REST + tRPC), so a caller can ask an arbitrary question of their own traces and spans and get a table back — with tenant scope injected by the compiler, every identifier drawn from a developer-authored allowlist, and content-visibility rules applied to filters as well as to output.
 
 ## Context
@@ -12,11 +14,14 @@ Issue [#6346](https://github.com/langwatch/langwatch/issues/6346). The product r
 
 Prior art in-repo, and the honest distance:
 
-- [#5670](https://github.com/langwatch/langwatch/issues/5670) / PR [#5709](https://github.com/langwatch/langwatch/pull/5709) — a spike that built a compiler, an aggregation-only IR, and an executed two-tenant isolation proof. **It is an unmerged draft; `trace-query` does not exist on `main`.**
+- **A trace query language already ships.** `app-layer/traces/query-language` is a Lucene-flavoured filter DSL (liqe-based, ~2,100 lines) behind the search bar, and `app-layer/traces/filter-to-clickhouse` compiles it to a tenant-scoped, parameterised ClickHouse *predicate* — `translateFilterToClickHouse(text, tenantId, timeRange) → { sql, params }`, already composed by four production callers. It selects rows; it has no `SELECT` list, `GROUP BY`, aggregation or ordering, and its grammar is a third-party parser that cannot be extended to acquire them.
+- [#5670](https://github.com/langwatch/langwatch/issues/5670) / PR [#5709](https://github.com/langwatch/langwatch/pull/5709) — a spike that built an aggregation-only compiler and IR plus an executed two-tenant isolation proof. **It is an unmerged draft; its `trace-query` module does not exist on `main`.**
 - [#5389](https://github.com/langwatch/langwatch/issues/5389) — the charting investigation, which carried an explicit constraint: *no second timeseries/aggregation engine is introduced*.
 - [ADR-034](./034-event-sourced-analytics-materialization.md) -> [ADR-066](./066-projection-clickhouse-cached-store.md) -> [ADR-068](./068-windowed-clickhouse-reads.md) — the analytics read-path substrate, with [#5912](https://github.com/langwatch/langwatch/issues/5912) still in flight over it.
 
-So in shipped terms the starting point is zero, and the design question is not "what do we build" but "which existing read path hosts it."
+So the gap is narrower than "build a query language". Filtering, tenant scoping and value parameterisation ship today; what is missing is the **aggregation and projection layer** — the ability to say what to *compute* over the selected rows — plus the service and transports to expose it.
+
+That constrains the design rather than freeing it. LWQL is a SQL-shaped surface (issue [#6346](https://github.com/langwatch/langwatch/issues/6346) fixes this), so it does not reuse the Lucene grammar; but the two must not become two answers to "may this caller read this field". The reusable asset is the *field-to-expression mapping*, which is syntax-independent — not the parser.
 
 ## Decision
 
