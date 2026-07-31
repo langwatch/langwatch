@@ -89,6 +89,16 @@ export type BudgetSpendTarget = {
    * absorb a filtered sibling's buckets on the same group.
    */
   bucketSuffix?: string | null;
+  /**
+   * Lower bound (unix ms) for the spend read when the budget's period
+   * boundary is NOT the calendar one: always set for MANUAL windows
+   * (currentPeriodStartedAt) and set on calendar windows after a
+   * mid-period reset (until the next calendar boundary passes). Targets
+   * with a floor read the raw ledger events bounded by OccurredAt instead
+   * of the rollup's PeriodStart-equality fast path, which cannot see a
+   * moved boundary.
+   */
+  periodFloorMs?: number;
 };
 
 /**
@@ -388,14 +398,83 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
+    // Targets with a moved boundary (MANUAL windows, mid-period resets)
+    // cannot use the rollup: its buckets are keyed by calendar PeriodStart
+    // and pre-aggregate the whole bucket, so a floor inside the bucket is
+    // unanswerable there. They read the raw ledger bounded by OccurredAt.
+    const floored = targets.filter((t) => t.periodFloorMs !== undefined);
+    const fast = targets.filter((t) => t.periodFloorMs === undefined);
+
     const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
-    for (const t of targets) {
+    for (const t of fast) {
       const list = byWindow.get(t.window) ?? [];
       list.push(t);
       byWindow.set(t.window, list);
     }
 
     const out: Map<string, ScopeSpend> = new Map();
+
+    if (floored.length > 0) {
+      const tenantPlaceholders = tenantIds
+        .map((_, i) => `{tenant${i}:String}`)
+        .join(",");
+      const params: Record<string, string | number> = {
+        sep: PROVIDER_BUCKET_SEPARATOR,
+      };
+      for (let i = 0; i < tenantIds.length; i++) {
+        params[`tenant${i}`] = tenantIds[i]!;
+      }
+      // One conditional sum per target: exact even when two budgets share
+      // a bucket with different boundaries.
+      const sumExprs = floored
+        .map((t, i) => {
+          params[`fscope${i}`] = scopeToClickHouse(t.scope);
+          params[`fscopeId${i}`] = t.scopeId;
+          params[`fwindow${i}`] = windowToClickHouse(t.window);
+          params[`ffloor${i}`] = t.periodFloorMs!;
+          const bucket =
+            t.match === "prefix"
+              ? t.bucketSuffix
+                ? ((params[`fsuffix${i}`] = t.bucketSuffix),
+                  `startsWith(ScopeId, {fscopeId${i}:String}) AND endsWith(ScopeId, {fsuffix${i}:String})`)
+                : `startsWith(ScopeId, {fscopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0`
+              : `ScopeId = {fscopeId${i}:String}`;
+          return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
+        })
+        .join(",\n              ");
+      try {
+        const client = await this.resolveClient(tenantIds[0]!);
+        const result = await client.query({
+          query: `
+            SELECT
+              ${sumExprs}
+            FROM ${EVENTS_TABLE} FINAL
+            WHERE TenantId IN (${tenantPlaceholders})
+              AND Status = 'success'
+          `,
+          query_params: params,
+          format: "JSONEachRow",
+        });
+        const rows = (await result.json()) as Array<Record<string, string>>;
+        const row = rows[0] ?? {};
+        for (let i = 0; i < floored.length; i++) {
+          const t = floored[i]!;
+          const total = Number.parseFloat(row[`T${i}`] ?? "0") || 0;
+          out.set(t.budgetId, {
+            budgetId: t.budgetId,
+            scope: t.scope,
+            scopeId: t.scopeId,
+            spentUsd: total.toFixed(6),
+          });
+        }
+      } catch (error) {
+        logger.error(
+          { tenantIds, targets: floored.length, error },
+          "failed to read boundary-floored gateway budget spend",
+        );
+        throw error;
+      }
+    }
 
     for (const [window, targetsForWindow] of byWindow) {
       const periodStart = currentPeriodStart(window, now);
@@ -677,6 +756,8 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
       return "principal";
     case "GROUP":
       return "group";
+    case "ATTRIBUTED_USER":
+      return "attributed_user";
   }
 }
 
@@ -696,6 +777,33 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * entirely: spend is written, every read returns 0, and budgets on that
  * window silently stop enforcing.
  */
+/**
+ * The OccurredAt lower bound a spend read must honor for a budget whose
+ * period boundary is not the calendar one, or undefined for the rollup
+ * fast path. MANUAL windows always read from their stored boundary. A
+ * calendar (or TOTAL) window reads from the boundary only after an actual
+ * mid-period reset (lastResetAt set) and only until the next calendar
+ * boundary passes it; an unreset TOTAL budget keeps its lifetime-bucket
+ * semantics.
+ */
+export function budgetPeriodFloorMs(
+  budget: {
+    window: GatewayBudgetWindow;
+    currentPeriodStartedAt: Date;
+    lastResetAt: Date | null;
+  },
+  now: Date = new Date(),
+): number | undefined {
+  if (budget.window === "MANUAL") {
+    return budget.currentPeriodStartedAt.getTime();
+  }
+  if (!budget.lastResetAt) return undefined;
+  const boundary = budget.currentPeriodStartedAt.getTime();
+  return boundary > currentPeriodStart(budget.window, now).getTime()
+    ? boundary
+    : undefined;
+}
+
 export function currentPeriodStart(
   window: GatewayBudgetWindow,
   now: Date,
@@ -724,6 +832,10 @@ export function currentPeriodStart(
   if (window === "MONTH") {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
   }
-  // TOTAL: one lifetime bucket, keyed by the epoch sentinel.
+  // TOTAL and MANUAL: one lifetime bucket, keyed by the epoch sentinel
+  // (the MV's multiIf falls through to epoch for both). MANUAL is never
+  // read through the PeriodStart fast path (budgetPeriodFloorMs always
+  // floors it onto the raw-events read); the sentinel only keys where its
+  // debits land in the rollup.
   return new Date(0);
 }

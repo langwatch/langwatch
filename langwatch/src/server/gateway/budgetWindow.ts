@@ -56,6 +56,11 @@ export function nextResetAt(
       // Sentinel — never resets. Use far-future to keep sort orders sensible.
       return new Date(Date.UTC(9999, 11, 31));
     }
+    case "MANUAL": {
+      // The boundary moves only through an explicit reset; until then the
+      // window is open-ended. Same far-future sentinel as TOTAL.
+      return new Date(Date.UTC(9999, 11, 31));
+    }
   }
 }
 
@@ -64,7 +69,7 @@ export function shouldResetBudget(
   resetsAt: Date | string,
   now: Date = new Date(),
 ): boolean {
-  if (window === "TOTAL") return false;
+  if (window === "TOTAL" || window === "MANUAL") return false;
   const resetTs = typeof resetsAt === "string" ? new Date(resetsAt) : resetsAt;
   return now.getTime() >= resetTs.getTime();
 }

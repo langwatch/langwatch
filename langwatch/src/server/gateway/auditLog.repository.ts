@@ -24,6 +24,7 @@ export const GATEWAY_AUDIT_ACTIONS = [
   "gateway.virtual_key.guardrail_detached",
   "gateway.budget.created",
   "gateway.budget.updated",
+  "gateway.budget.reset",
   "gateway.budget.deleted",
   "gateway.provider_binding.created",
   "gateway.provider_binding.updated",

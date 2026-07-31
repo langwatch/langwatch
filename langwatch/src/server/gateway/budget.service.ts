@@ -19,6 +19,8 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
   budgetAppliesToProvider,
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
@@ -53,7 +55,10 @@ export type BudgetScope =
   | { kind: "PROJECT"; projectId: string }
   | { kind: "VIRTUAL_KEY"; virtualKeyId: string }
   | { kind: "PRINCIPAL"; principalUserId: string }
-  | { kind: "GROUP"; groupId: string };
+  | { kind: "GROUP"; groupId: string }
+  // Template: each distinct external end user on the anchor gets the
+  // budget's limit per window. The anchor is a virtual key or a project.
+  | { kind: "ATTRIBUTED_USER"; anchorVirtualKeyId?: string; anchorProjectId?: string };
 
 export type CreateBudgetInput = {
   organizationId: string;
@@ -107,6 +112,14 @@ export type BudgetScopeTarget =
       projectSlug: string | null;
     }
   | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "ATTRIBUTED_USER";
+      id: string;
+      name: string;
+      secondary: string | null;
+      /** Whether the template anchors a virtual key or a project. */
+      anchorKind: "virtual_key" | "project";
+    }
   | {
       kind: "GROUP";
       id: string;
@@ -481,6 +494,10 @@ export class GatewayBudgetService {
         // the person works in, so there is no single CH tenant to read
         // their recent ledger from.
         return null;
+      case "ATTRIBUTED_USER":
+        // Per-user buckets accrue wherever the anchor's traffic lands;
+        // no single tenant, same as GROUP.
+        return null;
     }
   }
 
@@ -575,6 +592,34 @@ export class GatewayBudgetService {
           name: group?.name ?? budget.scopeId,
           secondary: group?.slug ?? null,
           memberCount: group?._count.members ?? 0,
+        };
+      }
+      case "ATTRIBUTED_USER": {
+        // The anchor is a virtual key or a project; resolve whichever the
+        // id turns out to be so the UI can render "every end user on X".
+        const vk = await this.prisma.virtualKey.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, displayPrefix: true },
+        });
+        if (vk) {
+          return {
+            kind: "ATTRIBUTED_USER",
+            id: budget.scopeId,
+            name: vk.name,
+            secondary: vk.displayPrefix,
+            anchorKind: "virtual_key",
+          };
+        }
+        const project = await this.prisma.project.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true },
+        });
+        return {
+          kind: "ATTRIBUTED_USER",
+          id: budget.scopeId,
+          name: project?.name ?? budget.scopeId,
+          secondary: project?.slug ?? null,
+          anchorKind: "project",
         };
       }
     }
@@ -674,6 +719,46 @@ export class GatewayBudgetService {
       });
       if (!group) {
         throw new GatewayScopeOrgMismatchError("group");
+      }
+    }
+
+    if (input.scope.kind === "ATTRIBUTED_USER") {
+      // Per-end-user buckets are unbounded-cardinality and only exist on
+      // the ClickHouse spend path; same refusal as GROUP, for the same
+      // reason: a template that cannot mean what it says must not exist.
+      if (!this.chRepo) {
+        throw new GatewayGroupBudgetUnsupportedError();
+      }
+      const vkAnchor = input.scope.anchorVirtualKeyId;
+      const projectAnchor = input.scope.anchorProjectId;
+      if ((vkAnchor ? 1 : 0) + (projectAnchor ? 1 : 0) !== 1) {
+        throw new GatewayScopeOrgMismatchError("attributed-user anchor");
+      }
+      // Cross-org guard on the anchor, mirroring VIRTUAL_KEY / PROJECT.
+      if (vkAnchor) {
+        const vk = await this.prisma.virtualKey.findFirst({
+          where: {
+            id: vkAnchor,
+            organizationId: input.organizationId,
+            purpose: "USER",
+          },
+          select: { id: true },
+        });
+        if (!vk) {
+          throw new GatewayScopeOrgMismatchError("virtual key");
+        }
+      }
+      if (projectAnchor) {
+        const proj = await this.prisma.project.findFirst({
+          where: {
+            id: projectAnchor,
+            team: { organizationId: input.organizationId },
+          },
+          select: { id: true },
+        });
+        if (!proj) {
+          throw new GatewayScopeOrgMismatchError("project");
+        }
       }
     }
 
@@ -824,6 +909,118 @@ export class GatewayBudgetService {
   }
 
   /**
+   * Move a budget's period boundary to now. NEVER mutates recorded spend:
+   * the ledger and every emitted billing event are immutable, so
+   * reconciliation is unaffected by resets; the boundary move alone is
+   * what makes the current-period figure start over. On calendar windows
+   * this truncates the running period (the next boundary stays calendar);
+   * on MANUAL windows the new period stays open until the next reset.
+   * With `endUserId`, only that end-user's bucket boundary moves (a
+   * per-bucket row, the template's own boundary stays), which is the
+   * single-user reset an operator does mid-cycle.
+   */
+  async reset(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+    endUserId?: string | null;
+    reason?: string | null;
+  }): Promise<GatewayBudget> {
+    const existing = await this.get(input.id, input.organizationId);
+    if (!existing) throw new GatewayBudgetNotFoundError();
+    const before = serializeRowForAudit(existing);
+    const now = new Date();
+
+    if (input.endUserId) {
+      if (existing.scopeType !== "ATTRIBUTED_USER") {
+        throw new GatewayScopeOrgMismatchError("attributed-user budget");
+      }
+      const bucketScopeId = bucketScopeIdFor(
+        existing,
+        attributedUserBucketScopeId(existing.scopeId, input.endUserId),
+      );
+      await this.prisma.$transaction(async (tx) => {
+        await tx.gatewayBudgetBucketBoundary.upsert({
+          where: {
+            budgetId_bucketScopeId: {
+              budgetId: existing.id,
+              bucketScopeId,
+            },
+          },
+          create: {
+            organizationId: input.organizationId,
+            budgetId: existing.id,
+            bucketScopeId,
+            periodStartedAt: now,
+          },
+          update: { periodStartedAt: now },
+        });
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            actorUserId: input.actorUserId,
+            action: "gateway.budget.reset",
+            targetKind: "budget",
+            targetId: existing.id,
+            before,
+            after: {
+              row: serializeRowForAudit(existing),
+              resetBucketScopeId: bucketScopeId,
+              resetReason: input.reason ?? null,
+            },
+          },
+          tx,
+        );
+      });
+      return existing;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.gatewayBudget.update({
+        where: { id: input.id },
+        data: {
+          currentPeriodStartedAt: now,
+          lastResetAt: now,
+          resetsAt: nextResetAt(existing.window, now),
+          // The current-period figure the bundle reads; the period just
+          // restarted, so it is zero by definition. Ledger rows untouched.
+          spentUsd: new Prisma.Decimal(0),
+        },
+      });
+      // Anchor-wide reset clears any per-bucket boundaries: the whole
+      // template starts a fresh period, including buckets that had their
+      // own single-user resets inside the old one.
+      await tx.gatewayBudgetBucketBoundary.deleteMany({
+        where: { budgetId: existing.id },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: input.organizationId,
+          kind: "BUDGET_UPDATED",
+          budgetId: updated.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: input.organizationId,
+          actorUserId: input.actorUserId,
+          action: "gateway.budget.reset",
+          targetKind: "budget",
+          targetId: updated.id,
+          before,
+          after: {
+            row: serializeRowForAudit(updated),
+            resetReason: input.reason ?? null,
+          },
+        },
+        tx,
+      );
+      return updated;
+    });
+  }
+
+  /**
    * Pre-request projective check: given `projected_cost_usd` would any
    * applicable scope breach? Does NOT mutate spend — that happens in the
    * post-response debit path (contract §4.5).
@@ -952,12 +1149,22 @@ function scopeIdForScope(scope: BudgetScope): string {
       return scope.principalUserId;
     case "GROUP":
       return scope.groupId;
+    case "ATTRIBUTED_USER":
+      // The stored target is the ANCHOR the template applies to.
+      return scope.anchorVirtualKeyId ?? scope.anchorProjectId ?? "";
   }
 }
 
 function scopeKindToEnum(
   kind: BudgetScope["kind"],
-): "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" {
+):
+  | "ORGANIZATION"
+  | "TEAM"
+  | "PROJECT"
+  | "VIRTUAL_KEY"
+  | "PRINCIPAL"
+  | "GROUP"
+  | "ATTRIBUTED_USER" {
   return kind;
 }
 

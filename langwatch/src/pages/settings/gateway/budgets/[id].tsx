@@ -441,6 +441,13 @@ type ScopeTarget =
     }
   | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
   | {
+      kind: "ATTRIBUTED_USER";
+      id: string;
+      name: string;
+      secondary: string | null;
+      anchorKind: "virtual_key" | "project";
+    }
+  | {
       kind: "GROUP";
       id: string;
       name: string;
@@ -455,7 +462,7 @@ function ScopeBadge({
   target: ScopeTarget;
   projectSlug: string | null;
 }) {
-  const kindLabel = target.kind.toLowerCase().replace("_", " ");
+  const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
   const vkHref =
     target.kind === "VIRTUAL_KEY"
       ? `/settings/gateway/virtual-keys/${target.id}`

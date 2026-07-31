@@ -113,6 +113,7 @@ const budgetDtoSchema = z.object({
     "VIRTUAL_KEY",
     "PRINCIPAL",
     "GROUP",
+    "ATTRIBUTED_USER",
   ]),
   scope_id: z.string(),
   name: z.string(),
@@ -307,6 +308,7 @@ const budgetScopeTypeSchema = z.enum([
   "VIRTUAL_KEY",
   "PRINCIPAL",
   "GROUP",
+  "ATTRIBUTED_USER",
 ]);
 
 const createBudgetSchema = z.object({
@@ -319,10 +321,17 @@ const createBudgetSchema = z.object({
     // Per-member group budgets. Creation is service-guarded: it needs the
     // ClickHouse spend path (group_budget_requires_clickhouse otherwise).
     z.object({ kind: z.literal("GROUP"), group_id: z.string() }),
+    // Per-end-user template on an anchor (exactly one of the two ids).
+    // Service-guarded like GROUP: per-user buckets need the spend ledger.
+    z.object({
+      kind: z.literal("ATTRIBUTED_USER"),
+      anchor_virtual_key_id: z.string().optional(),
+      anchor_project_id: z.string().optional(),
+    }),
   ]),
   name: z.string().min(1).max(128),
   description: z.string().optional(),
-  window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"]),
+  window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL", "MANUAL"]),
   limit_usd: usdAmountSchema,
   on_breach: z.enum(["BLOCK", "WARN"]).optional(),
   timezone: z.string().nullable().optional(),
@@ -1655,6 +1664,12 @@ function scopeFromWire(
       return { kind: "PRINCIPAL", principalUserId: scope.principal_user_id };
     case "GROUP":
       return { kind: "GROUP", groupId: scope.group_id };
+    case "ATTRIBUTED_USER":
+      return {
+        kind: "ATTRIBUTED_USER",
+        anchorVirtualKeyId: scope.anchor_virtual_key_id,
+        anchorProjectId: scope.anchor_project_id,
+      };
   }
 }
 

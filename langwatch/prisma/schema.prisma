@@ -2246,6 +2246,11 @@ model BillingMeterCheckpoint {
 
 enum VirtualKeyStatus {
   ACTIVE
+  // Reversibly stopped: requests are rejected with a distinct error, but
+  // the key material, scopes, budgets, and any rotation-grace state stay
+  // intact so enable restores service without re-provisioning. REVOKED
+  // stays terminal.
+  DISABLED
   REVOKED
 }
 
@@ -2290,6 +2295,12 @@ enum GatewayBudgetScopeType {
   VIRTUAL_KEY
   PRINCIPAL
   GROUP
+  // A TEMPLATE scope: scopeId is the ANCHOR (a virtual key or project id),
+  // and the budget applies to each distinct external end-user id seen on
+  // that anchor ("every end user: $limit per window"). Spend accrues into
+  // lazy buckets keyed "<anchorId>:<endUserId>"; the bundle carries the one
+  // template entry, never per-user rows (cardinality is unbounded).
+  ATTRIBUTED_USER
 }
 
 enum GatewayBudgetWindow {
@@ -2299,6 +2310,11 @@ enum GatewayBudgetWindow {
   WEEK
   MONTH
   TOTAL
+  // Accrues until an explicit reset moves the period boundary; the period
+  // is owned by the customer's billing cycle, not our calendar. Debit rows
+  // bucket under the epoch sentinel (like TOTAL); reads bound by the
+  // budget's currentPeriodStartedAt instead of a calendar period start.
+  MANUAL
 }
 
 enum GatewayBudgetBreachAction {
@@ -2370,6 +2386,11 @@ model VirtualKey {
   description String?
   status      VirtualKeyStatus  @default(ACTIVE)
   purpose     VirtualKeyPurpose @default(USER)
+
+  // Set while status is DISABLED; cleared on enable. Revoke does not touch
+  // these: DISABLED and REVOKED are independent lifecycle exits.
+  disabledAt     DateTime?
+  disabledReason String?
 
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
@@ -3102,7 +3123,8 @@ model GatewayBudget {
   createdById String
   createdBy   User     @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
 
-  ledgerEntries GatewayBudgetLedger[]
+  ledgerEntries    GatewayBudgetLedger[]
+  bucketBoundaries GatewayBudgetBucketBoundary[]
 
   // Set when this budget row is the one the virtual-key drawer's budget
   // field manages (created with the key or through its edit drawer).
@@ -3115,6 +3137,28 @@ model GatewayBudget {
   @@index([scopeType, scopeId, providerKey])
   @@index([managedByVirtualKeyId])
   @@index([resetsAt])
+}
+
+// Per-bucket period boundary for ATTRIBUTED_USER template budgets. The
+// template's own currentPeriodStartedAt is the anchor-wide boundary; a
+// single end-user bucket reset (POST budgets/:id/reset?end_user_id=) writes
+// a row here instead of moving the whole template. Spend reads for a bucket
+// bound by max(template boundary, bucket boundary). Rows are boundaries,
+// not counters: recorded spend is never mutated.
+model GatewayBudgetBucketBoundary {
+  id             String        @id @default(nanoid())
+  organizationId String
+  budgetId       String
+  budget         GatewayBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  // The ledger bucket key: "<anchorId>:<endUserId>".
+  bucketScopeId  String
+
+  periodStartedAt DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([budgetId, bucketScopeId])
+  @@index([organizationId])
 }
 
 model GatewayBudgetLedger {
