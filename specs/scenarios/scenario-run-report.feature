@@ -205,11 +205,15 @@ Feature: Run report
     When I export a report
     Then the report lists what was not attempted
 
+  # The run record does not carry the suite's roster, so a scenario that has
+  # never run in any visible run is invisible here. Claiming full coverage
+  # would assert something the report cannot see, so it says only what it can.
   @unit
-  Scenario: A run that covered everything says so
-    Given the run executed every scenario in its suite
+  Scenario: A run that covered everything says so against what it can see
+    Given the run executed every scenario seen in previous runs
     When I export a report
-    Then the report says nothing was left unattempted
+    Then the report says every scenario from previous runs was covered
+    And it does not claim that nothing was left unattempted
 
   # ============================================================================
   # Trend — the present only means something against the past

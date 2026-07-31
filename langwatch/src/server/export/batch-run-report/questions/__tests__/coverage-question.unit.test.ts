@@ -50,7 +50,7 @@ describe("the coverage question", () => {
   });
 
   describe("given a run that covered everything seen before", () => {
-    /** @scenario A run that covered everything says so */
+    /** @scenario A run that covered everything says so against what it can see */
     it("says so without claiming knowledge of scenarios it has never seen", () => {
       const blocks = coverage.computed(
         evidenceFixture({

@@ -65,6 +65,11 @@ Feature: One pass rate, everywhere
   # pass", and both are counted the same way, but the distinction still matters
   # when reading a single run — so the bucket is derived from the status rather
   # than replacing it.
+  #
+  # These are every value of ScenarioRunStatus. The ClickHouse aggregations
+  # additionally accept a legacy 'FAILURE' string that the enum has never had;
+  # widening the enum to match would change counts already on screen, so it is
+  # recorded as a known divergence here rather than fixed in passing.
   @unit
   Scenario Outline: Every run status lands in exactly one bucket
     Given a run with status <status>
