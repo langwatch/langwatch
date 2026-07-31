@@ -170,6 +170,46 @@ describe("buildTrustChecks", () => {
     });
   });
 
+  describe("when the judge declined to call some rows", () => {
+    /**
+     * Swap-and-reconcile records no verdict when the judge's pick flips with
+     * the candidate order. Right call — a flip is not a tie — but the row's
+     * evidence leaves the win graph with it, which is how a field comes apart
+     * into groups the fit may not rank across. The reader who is told "not
+     * enough overlap to rank these" needs to be able to see why.
+     */
+    it("reports the count and says those rows carry no weight", () => {
+      const checks = build({ rowsWithoutVerdict: 4 });
+
+      const check = find(checks, "Rows the judge would not call");
+      expect(check.detail).toContain("4 of 64");
+      expect(check.detail).toContain("opposite order");
+    });
+
+    it("turns amber once they are a large enough share to be the reason", () => {
+      const quiet = build({ rowsWithoutVerdict: 4 });
+      const loud = build({
+        leaderboard: leaderboard({ comparisonCount: 10 }),
+        rowsWithoutVerdict: 10,
+      });
+
+      expect(find(quiet, "Rows the judge would not call").tone).toBe("note");
+      expect(find(loud, "Rows the judge would not call").tone).toBe("warn");
+      // At that share, more rows will not help — the judge is the problem.
+      expect(find(loud, "Rows the judge would not call").detail).toContain(
+        "change the judge model",
+      );
+    });
+  });
+
+  describe("when the judge called every row", () => {
+    it("says so rather than staying silent", () => {
+      const checks = build({ rowsWithoutVerdict: 0 });
+
+      expect(find(checks, "The judge called every row").tone).toBe("ok");
+    });
+  });
+
   describe("when the judge's model id does not name a provider", () => {
     /**
      * `modelFamily` returns null for an id with no `provider/` prefix, which

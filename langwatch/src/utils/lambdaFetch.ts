@@ -160,7 +160,8 @@ export const lambdaFetch = async <T>(
       ? Buffer.from(response.Payload).toString("utf-8")
       : "";
 
-    const actualBody = responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
+    const actualBody =
+      responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
 
     const statusCode = response.StatusCode ?? 200;
 

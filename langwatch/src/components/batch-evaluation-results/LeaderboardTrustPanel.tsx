@@ -28,6 +28,11 @@ import type { SampleAdequacy } from "./computeSampleAdequacy";
 
 export type LeaderboardTrustPanelProps = {
   leaderboard: BTLeaderboard;
+  /**
+   * Rows the judge ran on and declined to call. Reported because it is the
+   * usual explanation for a fit that then fails to connect.
+   */
+  rowsWithoutVerdict?: number;
   /** Matchups per variant below which scores are treated as unstable. */
   warnThreshold: number;
   sampleAdequacy: SampleAdequacy;
@@ -168,6 +173,53 @@ const buildMarginsCheck = (leaderboard: BTLeaderboard): TrustCheck[] => {
   ];
 };
 
+/**
+ * Rows the judge produced no verdict for.
+ *
+ * Reported because it is the missing half of the comparability check above.
+ * A run whose judge declined many rows loses that evidence from the win
+ * graph, which is exactly how a field comes apart into groups the fit may not
+ * rank across — and the reader who is told "not enough overlap" otherwise has
+ * no way to see why, or that re-running would not help until the judge stops
+ * flipping. Stated either way, like every other check here.
+ */
+const buildDeclinedRowsCheck = ({
+  leaderboard,
+  rowsWithoutVerdict,
+}: Pick<
+  LeaderboardTrustPanelProps,
+  "leaderboard" | "rowsWithoutVerdict"
+>): TrustCheck[] => {
+  if (rowsWithoutVerdict === undefined) return [];
+
+  const judged = leaderboard.comparisonCount;
+  if (rowsWithoutVerdict === 0) {
+    return [
+      {
+        label: "The judge called every row",
+        tone: "ok",
+        detail: "No row was left without a verdict.",
+      },
+    ];
+  }
+
+  // Amber only once the declined rows are a large enough share to be the
+  // reason the ranking is thin, rather than the handful any judge produces.
+  const total = judged + rowsWithoutVerdict;
+  const share = total > 0 ? rowsWithoutVerdict / total : 0;
+  return [
+    {
+      label: "Rows the judge would not call",
+      tone: share >= 0.25 ? "warn" : "note",
+      detail: `${rowsWithoutVerdict} of ${total} rows produced no verdict — the judge picked a different winner when the candidates were shown in the opposite order, so neither answer was recorded. Those rows contribute nothing to the ranking${
+        share >= 0.25
+          ? ", and at this share they are the likeliest reason it is thin. A judge this order-sensitive will not settle by running more rows; change the judge model or the prompt."
+          : "."
+      }`,
+    },
+  ];
+};
+
 /** Exported for tests: the checks that decide whether a run is trustworthy. */
 export const buildTrustChecks = ({
   leaderboard,
@@ -176,6 +228,7 @@ export const buildTrustChecks = ({
   verbosity,
   judgeIndependence,
   variantNames,
+  rowsWithoutVerdict,
 }: LeaderboardTrustPanelProps): TrustCheck[] => {
   // The top variant the fit is entitled to rank — degenerates are excluded
   // from every claim, so one of them is not a leader.
@@ -193,6 +246,7 @@ export const buildTrustChecks = ({
     // rather than a measurement. Ford (1957) is the sufficient condition, so
     // it gets its own check rather than riding on the sweep one.
     buildComparabilityCheck(leaderboard),
+    ...buildDeclinedRowsCheck({ leaderboard, rowsWithoutVerdict }),
     buildSettledCheck(leaderboard),
     ...buildMarginsCheck(leaderboard),
     // How much of the order this run actually established. Deliberately a

@@ -152,8 +152,16 @@ const useLeaderboardAnalysis = ({
         verbosity,
         judgeIndependence,
         variantNames,
+        rowsWithoutVerdict: column.rowsWithoutVerdict,
       }),
-    [leaderboard, sampleAdequacy, verbosity, judgeIndependence, variantNames],
+    [
+      leaderboard,
+      sampleAdequacy,
+      verbosity,
+      judgeIndependence,
+      variantNames,
+      column.rowsWithoutVerdict,
+    ],
   );
 
   return {
@@ -465,6 +473,7 @@ function LoadedComparisonLeaderboardDrawer({
             >
               <LeaderboardTrustPanel
                 leaderboard={analysis.leaderboard}
+                rowsWithoutVerdict={column.rowsWithoutVerdict}
                 warnThreshold={DEFAULT_WARN_THRESHOLD}
                 sampleAdequacy={analysis.sampleAdequacy}
                 verbosity={analysis.verbosity}

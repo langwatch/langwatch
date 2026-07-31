@@ -173,6 +173,22 @@ export type BatchComparisonColumn = {
   variants: BatchComparisonVariant[];
   /** Per-row verdicts keyed by row index. Missing rows → no verdict. */
   verdictsByRow: Record<number, BatchComparisonVerdict>;
+  /**
+   * Rows the judge ran on and declined to call, rather than rows it never saw.
+   *
+   * Counted because the leading cause is now swap-and-reconcile: the judge is
+   * asked twice with the candidate order reversed, and a disagreement between
+   * the two is recorded as no verdict. That is the right call — a flip under
+   * order is not a tie — but the row's evidence leaves the win graph with it,
+   * and enough of them will fragment the graph into groups the fit is not
+   * entitled to rank across. Without this count the reader is told the run
+   * "does not have enough overlap to rank these" with the reason discarded.
+   *
+   * Optional so an absent count states nothing rather than asserting zero —
+   * `detectComparisonColumns` always sets it, but a column built any other
+   * way should make no claim about rows it never counted.
+   */
+  rowsWithoutVerdict?: number;
 };
 
 /**
@@ -630,11 +646,18 @@ const detectComparisonColumns = (
     );
   };
 
+  // Comparisons the judge ran and declined to call, per bucket key. Kept
+  // outside `buckets` because they are counted before a bucket exists — a run
+  // where EVERY row was declined has a count and no bucket at all.
+  const skippedByKey = new Map<string, number>();
+
   // Group by evaluator id + name so different comparison instances (same
   // evaluator type wired against different variant sets) stay separate.
   const buckets = new Map<
     string,
     {
+      /** The map key, carried so a column can find its own skipped count. */
+      key: string;
       evaluatorId: string;
       name: string;
       /** First-seen judge order of the candidates, from the judge's inputs. */
@@ -652,8 +675,19 @@ const detectComparisonColumns = (
   >();
 
   for (const ev of evaluations) {
-    if (ev.status !== "processed") continue;
     const isForced = forcedComparisonEvaluatorIds.has(ev.evaluator);
+    if (ev.status !== "processed") {
+      // A comparison the judge RAN and declined to call. Recorded before the
+      // early return discards it, because it is the explanation for a graph
+      // that later fails to connect — see `rowsWithoutVerdict`.
+      if (ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced)) {
+        const skippedKey = ev.name
+          ? `${ev.evaluator}::${ev.name}`
+          : ev.evaluator;
+        skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
+      }
+      continue;
+    }
     const hasLabel = typeof ev.label === "string" && ev.label.length > 0;
     if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
 
@@ -676,6 +710,7 @@ const detectComparisonColumns = (
       // / winner column labeled "Comparison" instead of the raw `target_XYZ`
       // id when ev.name is null.
       bucket = {
+        key,
         evaluatorId: ev.evaluator,
         name: ev.name ?? targetNameById.get(ev.evaluator) ?? ev.evaluator,
         candidateIds: [],
@@ -805,6 +840,7 @@ const detectComparisonColumns = (
       name: bucket.name,
       variants,
       verdictsByRow,
+      rowsWithoutVerdict: skippedByKey.get(bucket.key) ?? 0,
     });
   }
   return columns;

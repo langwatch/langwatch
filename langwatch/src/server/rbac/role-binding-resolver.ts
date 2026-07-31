@@ -426,7 +426,13 @@ export async function resolveLegacyCeiling({
   if (bindingCount > 0) return LEGACY_CEILING_DENIES_ALL;
 
   const teamUser = await prisma.teamUser.findFirst({
-    where: { userId, teamId },
+    // The team must belong to the organization being asked about, not just
+    // exist. The membership gate above proves the USER is in this org; without
+    // this, a legacy row on a team in a DIFFERENT org would still resolve a
+    // grant here. Unreachable today — both callers derive `scope` from a
+    // validated project or team — but `loadScopeResolution` carries the same
+    // predicate, and this function's docstring claims parity with it.
+    where: { userId, teamId, team: { organizationId } },
     select: { role: true },
   });
 
