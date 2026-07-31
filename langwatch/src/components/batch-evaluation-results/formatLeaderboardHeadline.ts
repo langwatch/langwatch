@@ -83,6 +83,19 @@ export const formatLeaderboardHeadline = ({
     verdict.tiedIds.map((id) => nameOf(id, variantNames)),
   );
 
+  // Deliberately NOT phrased as a tie, and deliberately offered no cheaper
+  // alternative. A tie says the run looked and found no difference, which
+  // makes cost the right tie-breaker. This says the run never looked — so
+  // picking the cheaper one could be shipping the worse one, and the reader
+  // has to be told the difference.
+  if (verdict.kind === "not-comparable") {
+    return {
+      tone: "caution",
+      heading: "Not enough overlap to rank these",
+      detail: `${tiedNames} were never put up against each other in this run, directly or through a shared opponent, so it cannot say which is better. Re-run so every variant answers the same rows.`,
+    };
+  }
+
   // A tie plus a price difference is not an inconclusive result — it is a
   // decision, just made on cost instead of on quality.
   if (cheaperAlternative) {

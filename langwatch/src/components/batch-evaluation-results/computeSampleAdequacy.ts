@@ -54,13 +54,22 @@ export const computeSampleAdequacy = (
   const totalPairs = (rankedVariantCount * (rankedVariantCount - 1)) / 2;
   const differenceCI = leaderboard.scoreDifferenceCI;
 
-  // The same test the verdict uses, from the same module. These two counted
-  // separation independently once and disagreed on screen: the verdict named
-  // a clear winner while this panel reported zero separated pairs.
+  // The same test the verdict uses, from the same module — including the
+  // comparability veto, which has to reach both or the two drift again. A
+  // pair from components that never met used to be counted here as separated,
+  // so a run split into two islands could report "5 of 6 pairs separated"
+  // while every cross-island pair in that count was a gauge artifact.
   let separatedPairs = 0;
   for (let i = 0; i < ranked.length; i++) {
     for (let j = i + 1; j < ranked.length; j++) {
-      if (areDistinguishable({ a: ranked[i]!, b: ranked[j]!, differenceCI })) {
+      if (
+        areDistinguishable({
+          a: ranked[i]!,
+          b: ranked[j]!,
+          differenceCI,
+          comparability: leaderboard.comparability,
+        })
+      ) {
         separatedPairs++;
       }
     }

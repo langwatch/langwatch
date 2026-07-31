@@ -95,6 +95,30 @@ export const comparabilityOf = ({
 };
 
 /**
+ * Whether the fit POSITIVELY establishes that these two never met.
+ *
+ * The distinction from `comparabilityOf` is the absent-evidence case. That
+ * function answers "incomparable" both for a pair it knows never met and for
+ * a variant it has never heard of — right for its own question, wrong as a
+ * veto, since a leaderboard whose graph was never decomposed (no groups at
+ * all) would then have every pair vetoed. Callers that suppress a claim on
+ * the strength of a break need the narrower question, and they need to ask it
+ * the same way, so it is asked once here.
+ */
+export const isIncomparable = ({
+  comparability,
+  a,
+  b,
+}: {
+  comparability?: Comparability | null;
+  a: string;
+  b: string;
+}): boolean =>
+  !!comparability &&
+  comparability.groups.length > 0 &&
+  comparabilityOf({ comparability, a, b }) === "incomparable";
+
+/**
  * The win digraph as adjacency lists over variant indices.
  *
  * An edge a -> b exists when a beat b at least once. Ties count: a 0.5/0.5

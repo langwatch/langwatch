@@ -35,6 +35,7 @@ import type {
   BTLeaderboardEntry,
   ScoreDifferenceCI,
 } from "./computeBTLeaderboard";
+import { type Comparability, isIncomparable } from "./computeComparability";
 
 /** Two intervals overlap unless one ends strictly before the other starts. */
 const intervalsOverlap = (a: [number, number], b: [number, number]): boolean =>
@@ -53,17 +54,41 @@ const isFinitePair = (interval: [number, number]): boolean =>
  * thin data. NaN in particular has to be caught explicitly: every comparison
  * against it is false, so an unguarded overlap check returns false and its
  * negation reads "distinguishable".
+ *
+ * ── Why comparability is consulted before any interval ──
+ *
+ * A pair in different strongly connected components that never met, directly
+ * or through a chain, has no gap to measure. The distance between their
+ * scores is a gauge artifact of `normalizeToGeometricMean`, and because every
+ * bootstrap replicate applies the SAME gauge, the difference interval comes
+ * out tight — so the interval test reports high confidence in a number that
+ * carries no information. That is the one failure mode here that is confident
+ * and wrong rather than merely conservative, so it is checked first.
+ *
+ * `dominated` pairs deliberately fall through to the interval test: there the
+ * direction is established even though the magnitude is unbounded, so the run
+ * really has separated them.
  */
 export const areDistinguishable = ({
   a,
   b,
   differenceCI,
+  comparability,
 }: {
   a: BTLeaderboardEntry;
   b: BTLeaderboardEntry;
   /** Omit or pass null to fall back to comparing the marginal intervals. */
   differenceCI?: ScoreDifferenceCI | null;
+  /**
+   * Omit for a fit whose graph was never decomposed — no groups means no
+   * evidence of a break, so nothing is vetoed.
+   */
+  comparability?: Comparability | null;
 }): boolean => {
+  if (isIncomparable({ comparability, a: a.variantId, b: b.variantId })) {
+    return false;
+  }
+
   const difference = differenceCI?.[a.variantId]?.[b.variantId];
   if (difference) {
     if (!isFinitePair(difference)) return false;

@@ -44,6 +44,7 @@ import type {
   BTLeaderboardEntry,
   ScoreDifferenceCI,
 } from "./computeBTLeaderboard";
+import type { Comparability } from "./computeComparability";
 import { MIN_PRICED_ROWS, type VariantMetrics } from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
@@ -79,12 +80,19 @@ const compareQuality = ({
   a,
   b,
   differenceCI,
+  comparability,
 }: {
   a: BTLeaderboardEntry;
   b: BTLeaderboardEntry;
   differenceCI: ScoreDifferenceCI | null;
+  comparability: Comparability;
 }): Comparison => {
-  if (!areDistinguishable({ a, b, differenceCI })) return 0;
+  // Comparability is passed here for the same reason the verdict and the
+  // adequacy count take it: this is the third caller of `areDistinguishable`,
+  // and it is the one that turns a separation into an instruction. A pair
+  // from groups that never met would otherwise be ordered on a gauge
+  // artifact and then reported as "beaten outright and can be dropped".
+  if (!areDistinguishable({ a, b, differenceCI, comparability })) return 0;
   return a.score > b.score ? 1 : -1;
 };
 
@@ -151,6 +159,7 @@ const compareOn = ({
       a,
       b,
       differenceCI: leaderboard.scoreDifferenceCI,
+      comparability: leaderboard.comparability,
     });
   }
   return comparePairedMetric({

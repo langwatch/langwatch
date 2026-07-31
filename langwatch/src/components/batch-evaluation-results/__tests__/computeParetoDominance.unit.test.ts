@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { computeBTLeaderboard } from "../computeBTLeaderboard";
 import { computeParetoDominance } from "../computeParetoDominance";
 
 /**
@@ -542,5 +543,57 @@ describe("computeParetoDominance — the duration side of the paired test", () =
 
       expect(edge.strictlyBetterOn).toEqual(["quality", "cost", "speed"]);
     });
+  });
+});
+
+describe("computeParetoDominance — a field that broke into groups that never met", () => {
+  const wins = (winner: string, loser: string, times: number) =>
+    Array.from({ length: times }, () => ({
+      candidates: [winner, loser],
+      winner,
+    }));
+
+  /**
+   * The real fit rather than a hand-built board, because the break is not
+   * visible at that level: every variant won and lost, so the solver's own
+   * degeneracy guard reports the field healthy, and the between-group gap
+   * arrives looking like an ordinary score difference.
+   */
+  const twoIslands = () =>
+    computeBTLeaderboard({
+      comparisons: [
+        ...wins("a", "b", 26),
+        ...wins("b", "a", 24),
+        ...wins("c", "d", 48),
+        ...wins("d", "c", 2),
+      ],
+      variantIds: ["a", "b", "c", "d"],
+      bootstrapSamples: 200,
+    });
+
+  const ISLAND: Record<string, number> = { a: 0, b: 0, c: 1, d: 1 };
+
+  /** @scenario "A variant is never called droppable by one it never met" */
+  it("claims no dominance across the break", () => {
+    const leaderboard = twoIslands();
+    expect(leaderboard.comparability.identifiable).toBe(false);
+
+    const dominance = computeParetoDominance({
+      leaderboard,
+      // Identical costs, so every cost interval straddles zero and quality is
+      // the only dimension left that can carry an edge.
+      variantMetrics: metrics({
+        a: { cost: 0.01 },
+        b: { cost: 0.01 },
+        c: { cost: 0.01 },
+        d: { cost: 0.01 },
+      }),
+    });
+
+    expect(
+      dominance.edges.filter(
+        (edge) => ISLAND[edge.winnerId] !== ISLAND[edge.loserId],
+      ),
+    ).toEqual([]);
   });
 });

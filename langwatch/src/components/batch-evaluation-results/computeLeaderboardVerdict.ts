@@ -16,16 +16,19 @@
  */
 
 import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
+import { isIncomparable } from "./computeComparability";
 import { MIN_PRICED_ROWS, type VariantMetrics } from "./computeVariantMetrics";
 import { areDistinguishable } from "./scoreSeparation";
 
 export type LeaderboardVerdict = {
   /**
-   * `clear-winner` — one variant beats every other beyond overlap.
-   * `tie-at-top`   — two or more are indistinguishable at the top.
-   * `no-signal`    — not enough resolved comparisons to say anything.
+   * `clear-winner`   — one variant beats every other beyond overlap.
+   * `tie-at-top`     — two or more are indistinguishable at the top.
+   * `not-comparable` — the top group spans variants that never met, so the
+   *                    run is not entitled to order them at all.
+   * `no-signal`      — not enough resolved comparisons to say anything.
    */
-  kind: "clear-winner" | "tie-at-top" | "no-signal";
+  kind: "clear-winner" | "tie-at-top" | "not-comparable" | "no-signal";
   /** Highest-scoring non-degenerate variant, when one exists. */
   leaderId: string | null;
   /**
@@ -76,17 +79,28 @@ export const computeLeaderboardVerdict = (
   // Grown greedily in rank order: a candidate joins only if it is
   // indistinguishable from everything already in the set. That keeps the
   // leader in by construction and yields the top clique in score order.
+  const comparability = leaderboard.comparability;
   const tied: BTLeaderboardEntry[] = [leader];
   for (const entry of ranked.slice(1)) {
     if (
       tied.every(
-        (member) => !areDistinguishable({ a: member, b: entry, differenceCI }),
+        (member) =>
+          !areDistinguishable({
+            a: member,
+            b: entry,
+            differenceCI,
+            comparability,
+          }),
       )
     ) {
       tied.push(entry);
     }
   }
 
+  // A clear winner is safe by construction: a variant this run cannot compare
+  // to the leader is never separable from it, so it joins the clique below and
+  // the field never reaches length 1. The crowning here therefore only happens
+  // over variants the leader actually faced.
   if (tied.length === 1) {
     return {
       kind: "clear-winner",
@@ -95,8 +109,24 @@ export const computeLeaderboardVerdict = (
     };
   }
 
+  // "We compared them and they are close" and "we could not compare them" are
+  // different findings, and only the first one licenses deciding on cost.
+  // Collapsing the second into `tie-at-top` handed the reader the opposite of
+  // the truth: `findCheaperTiedAlternative` would offer the cheaper of two
+  // variants that never met as interchangeable on quality, when the run holds
+  // no evidence about their quality relative to each other at all.
+  const spansBreak = tied.some((member, i) =>
+    tied.slice(i + 1).some((other) =>
+      isIncomparable({
+        comparability,
+        a: member.variantId,
+        b: other.variantId,
+      }),
+    ),
+  );
+
   return {
-    kind: "tie-at-top",
+    kind: spansBreak ? "not-comparable" : "tie-at-top",
     leaderId: leader.variantId,
     tiedIds: tied.map((entry) => entry.variantId),
   };

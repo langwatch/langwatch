@@ -149,6 +149,83 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
   });
 });
 
+describe("the verdict on a field that broke into groups that never met", () => {
+  /**
+   * Two islands: {a,b} traded wins closely, {c,d} did not, and no row ever
+   * put an islander against the other island. The whole fixture goes through
+   * the real fit — no hand-built leaderboard — because the failure was
+   * invisible at that level: the between-island gap is a pure artifact of
+   * `normalizeToGeometricMean`, every bootstrap replicate re-applies the same
+   * normalisation, so the DIFFERENCE interval comes out tight and the
+   * interval test read it as a confident separation.
+   */
+  const twoIslands = () =>
+    computeBTLeaderboard({
+      comparisons: [
+        ...wins("a", "b", 26),
+        ...wins("b", "a", 24),
+        ...wins("c", "d", 48),
+        ...wins("d", "c", 2),
+      ],
+      variantIds: ["a", "b", "c", "d"],
+      bootstrapSamples: 200,
+    });
+
+  it("sees the break at all — the fixture is the shape under test", () => {
+    const leaderboard = twoIslands();
+
+    expect(leaderboard.comparability.identifiable).toBe(false);
+    expect(leaderboard.comparability.groups).toHaveLength(2);
+    // Every variant won and lost, so the solver's own degeneracy guard —
+    // the check this one exists to backstop — reports the field healthy.
+    expect(leaderboard.entries.every((e) => !e.isDegenerate)).toBe(true);
+  });
+
+  /** @scenario "A winner is never named across variants that never met" */
+  it("does not name a variant to ship", () => {
+    const verdict = computeLeaderboardVerdict(twoIslands());
+
+    expect(verdict.kind).toBe("not-comparable");
+    // Asserted on the kind rather than the sentence: the headline is prose
+    // and will be reworded, but "this run picked a winner" must never again
+    // be derivable from a fit that never compared them.
+    expect(verdict.kind).not.toBe("clear-winner");
+  });
+
+  it("does not offer the cheaper of two variants that never met", () => {
+    const verdict = computeLeaderboardVerdict(twoIslands());
+
+    // `not-comparable` is what suppresses this: a cost-based swap is only
+    // honest between variants the run established are equal on quality.
+    expect(
+      findCheaperTiedAlternative({
+        verdict,
+        variantMetrics: Object.fromEntries(
+          ["a", "b", "c", "d"].map((id) => [
+            id,
+            {
+              variantId: id,
+              costStats: { avg: id === "a" ? 0.001 : 0.02, count: 50 },
+              durationStats: null,
+              costDifferenceCI: undefined,
+            } as any,
+          ]),
+        ),
+      }),
+    ).toBeNull();
+  });
+
+  /** @scenario "Pairs that never met are not counted as pairs the run settled" */
+  it("does not count the cross-group pairs as pairs it separated", () => {
+    const adequacy = computeSampleAdequacy(twoIslands());
+
+    // Six pairs across four variants; the four spanning the break carry no
+    // evidence, so at most the two within-island pairs can be separated.
+    expect(adequacy.totalPairs).toBe(6);
+    expect(adequacy.separatedPairs).toBeLessThanOrEqual(2);
+  });
+});
+
 describe("computeBTLeaderboard — evidence it must not invent", () => {
   describe("given a winner that was not among the row's candidates", () => {
     it("ignores the row instead of crediting wins never played", () => {
