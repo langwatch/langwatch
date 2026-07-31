@@ -203,10 +203,26 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   }
 
   /**
+   * The baseline moves to the submitted values before the mutation answers, so
+   * a save the server rejected would otherwise stay on screen as the local
+   * truth: the form shows membership that was never written, and every later
+   * autosave resubmits it, so even a rename can no longer land. Rolling both
+   * the baseline and the form back to the team's persisted values puts the
+   * refused edit where the server left it.
+   */
+  function restorePersistedTeamValues(): void {
+    const persisted = getInitialValues(team);
+    setDefaultValues(persisted);
+    form.reset(persisted);
+  }
+
+  /**
    * Saving is autosaved and debounced, so a failure nobody surfaces is a change
    * that silently did not happen.
    */
   function reportTeamSaveFailure(error: unknown): void {
+    restorePersistedTeamValues();
+
     if (isHandledByGlobalHandler(error)) return;
 
     const code = trpcErrorCode(error);
