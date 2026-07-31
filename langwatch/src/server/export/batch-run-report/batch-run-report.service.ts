@@ -22,6 +22,15 @@ type ResolveModel = (params: {
   featureKey: string;
 }) => Promise<ModelHandle>;
 
+/**
+ * How far back the batch history is read before the window is applied.
+ *
+ * The history arrives newest first and everything at or after the run being
+ * reported on is discarded, so reading exactly one window's worth would find
+ * nothing to compare against whenever the run is not the latest.
+ */
+const HISTORY_READ_LIMIT = 100;
+
 /** A run with no scenarios in it is not a run this project can report on. */
 export class BatchRunNotFoundError extends Error {
   constructor(batchRunId: string) {
@@ -114,7 +123,16 @@ export class BatchRunReportService {
       throw new BatchRunNotFoundError(request.batchRunId);
     }
 
-    const { priorRuns, priorBatchOrder } = await this.readHistory(request);
+    const { priorRuns, priorBatchOrder } = await this.readHistory({
+      request,
+      // The trend is only allowed to look backwards, so it needs to know when
+      // this run happened. Taken from the runs already read rather than from
+      // the history, which may not reach far enough back to contain this batch.
+      startedAt: runs.reduce(
+        (earliest, run) => Math.min(earliest, run.timestamp),
+        Number.POSITIVE_INFINITY,
+      ),
+    });
     const evidence = buildEvidence({
       runs,
       priorRuns,
@@ -222,18 +240,36 @@ export class BatchRunReportService {
    * nothing else, and pulling conversations for ten previous runs would cost
    * far more than the answer is worth.
    */
-  private async readHistory(request: BatchRunReportRequest): Promise<{
+  private async readHistory({
+    request,
+    startedAt,
+  }: {
+    request: BatchRunReportRequest;
+    startedAt: number;
+  }): Promise<{
     priorRuns: ScenarioRunData[];
     priorBatchOrder: string[];
   }> {
     const history = await this.reader.getBatchHistoryForScenarioSet({
       projectId: request.projectId,
       scenarioSetId: request.scenarioSetId,
-      limit: TREND_WINDOW + 1,
+      // Read wider than the window, because the history comes back newest
+      // first and everything after this run is about to be discarded. Reporting
+      // on a run from a fortnight ago should still find the runs before it.
+      limit: HISTORY_READ_LIMIT,
     });
 
     const priorBatchOrder = history.batches
-      .filter((batch) => batch.batchRunId !== request.batchRunId)
+      .filter(
+        (batch) =>
+          batch.batchRunId !== request.batchRunId &&
+          // Strictly earlier. Without this the newest batches in the set are
+          // taken as "previous" no matter which run is being reported on, so
+          // exporting an older run compares it against its own future and
+          // reverses every verdict: a criterion that starts passing later
+          // reads as a regression.
+          batch.lastRunAt < startedAt,
+      )
       .sort((a, b) => a.lastRunAt - b.lastRunAt)
       .slice(-TREND_WINDOW)
       .map((batch) => batch.batchRunId);

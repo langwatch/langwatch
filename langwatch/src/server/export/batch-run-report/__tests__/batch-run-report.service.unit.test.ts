@@ -144,6 +144,65 @@ beforeEach(() => {
   generateObjectMock.mockReset();
 });
 
+describe("BatchRunReportService.generate() history", () => {
+  /**
+   * The history comes back newest first, so taking a window of it hands the
+   * trend the set's latest runs whichever run is being reported on. Exporting
+   * an older run then compares it against its own future and reverses every
+   * verdict a reader acts on: a criterion that only starts passing later shows
+   * as a regression against it.
+   */
+  describe("given later runs exist in the same set", () => {
+    const RUN_AT = 1_700_000_000_000;
+    let requestedBatchIds: string[] = [];
+
+    function readerWithHistory(): BatchRunReportReader {
+      return {
+        getRunDataForBatchRun: async () => ({
+          changed: true as const,
+          lastUpdatedAt: 1,
+          runs: DEFAULT_RUNS.map((run) => ({ ...run, timestamp: RUN_AT })),
+        }),
+        getBatchHistoryForScenarioSet: async () => ({
+          batches: [
+            { batchRunId: "batch_after", lastRunAt: RUN_AT + 60_000 },
+            { batchRunId: "batch_1", lastRunAt: RUN_AT },
+            { batchRunId: "batch_before", lastRunAt: RUN_AT - 60_000 },
+          ],
+          hasMore: false,
+          lastUpdatedAt: 0,
+          totalCount: 3,
+        }),
+        findRunOutcomesForBatchIds: async ({
+          batchRunIds,
+        }: {
+          batchRunIds: string[];
+        }) => {
+          requestedBatchIds = batchRunIds;
+          return [];
+        },
+      } as unknown as BatchRunReportReader;
+    }
+
+    /** @scenario A run is only ever compared against runs that preceded it */
+    it("compares only against runs that came before it", async () => {
+      requestedBatchIds = [];
+      generateObjectMock.mockRejectedValue(new Error("no model"));
+
+      await generate(
+        BatchRunReportService.create({
+          reader: readerWithHistory(),
+          resolveModel: async () => ({}) as never,
+        }),
+      );
+
+      expect(requestedBatchIds).toEqual(["batch_before"]);
+      expect(requestedBatchIds).not.toContain("batch_after");
+      expect(requestedBatchIds).not.toContain("batch_1");
+    });
+  });
+});
+
 describe("BatchRunReportService.generate() degradation", () => {
   describe("when no model is configured", () => {
     /** @scenario A report still downloads when no model is configured */

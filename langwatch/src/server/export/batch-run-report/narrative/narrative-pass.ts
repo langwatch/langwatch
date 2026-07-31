@@ -42,8 +42,15 @@ const logger = createLogger("langwatch:batch-run-report:narrative");
  * runaway response, and sit where a runaway is still caught and real prose is
  * never touched.
  */
-const MAX_SENTENCE = 700;
-const MAX_PARAGRAPH = 1_500;
+/**
+ * Set from what real answers do, not from what reads well. A sentence that
+ * names the runs it is about grows with the run: 400 was hit by a four-scenario
+ * batch, then 700 by a twenty-one-scenario one. Both times the cost was the
+ * entire report, so these are now far enough out that a real sentence cannot
+ * reach them and only a runaway can.
+ */
+const MAX_SENTENCE = 4_000;
+const MAX_PARAGRAPH = 8_000;
 
 const draftStatementSchema = z.object({
   text: z

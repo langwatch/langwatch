@@ -188,7 +188,7 @@ describe("QUESTION_REGISTRY applicability when there is no history", () => {
   it.each(trendQuestionIds)("says why %s cannot be answered", (id) => {
     const applicability = descriptorFor(id).applicability(firstRunEvidence);
     expect(applicability.applicable ? "" : applicability.reason).toContain(
-      "first run",
+      "No earlier run",
     );
   });
 

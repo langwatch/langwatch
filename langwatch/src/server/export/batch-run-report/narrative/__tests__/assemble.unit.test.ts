@@ -90,7 +90,7 @@ describe("assembleSections() coverage of the registry", () => {
         (it) => it.questionId === "past.regressions",
       );
 
-      expect(regressions?.gap).toContain("first run");
+      expect(regressions?.gap).toContain("No earlier run");
     });
   });
 });

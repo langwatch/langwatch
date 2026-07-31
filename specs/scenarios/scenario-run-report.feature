@@ -240,6 +240,16 @@ Feature: Run report
     Then the trend section says there is nothing to compare against
     And the rest of the report is unaffected
 
+  # A report can be exported long after the run it describes, by which time the
+  # suite has run again. Comparing against those would reverse every verdict a
+  # reader acts on: a criterion that only starts passing later would be
+  # reported as having broken.
+  @unit
+  Scenario: A run is only ever compared against runs that preceded it
+    Given a suite has run again since the run being reported on
+    When I export a report for the earlier run
+    Then the later runs are not treated as its history
+
   @unit
   Scenario: A criterion never seen before is not called a regression
     Given a scenario was added since the last run

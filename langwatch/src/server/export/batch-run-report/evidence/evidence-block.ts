@@ -104,7 +104,7 @@ function trendSection(evidence: ReportEvidence): string[] {
         `${fact.criterionId}  ${fact.classification}  streak=${fact.streakBatches}  "${fact.text}"`,
     ),
     evidence.priorBatches.length === 0
-      ? "(this is the first run of this suite — there is nothing to compare against)"
+      ? "(no earlier run of this suite was available to compare against — do not call this the suite's first run)"
       : `(compared against ${evidence.priorBatches.length} previous runs)`,
   ];
 }

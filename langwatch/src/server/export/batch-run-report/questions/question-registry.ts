@@ -60,8 +60,12 @@ function hasPriorRuns(evidence: ReportEvidence): Applicability {
     ? { applicable: true }
     : {
         applicable: false,
+        // Not "this is the first run": the report sees a bounded window of
+        // history, so finding nothing earlier is a fact about what was read,
+        // not about the suite. Claiming primacy would be asserting something
+        // the evidence cannot support.
         reason:
-          "This is the first run of this suite, so there is nothing to compare it against.",
+          "No earlier run of this suite was available to compare against.",
       };
 }
 
