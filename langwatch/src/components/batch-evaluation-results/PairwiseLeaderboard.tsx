@@ -17,8 +17,12 @@ import {
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).
  * Purely presentational — caller computes `leaderboard` via
- * `computeBTLeaderboard` and passes it in. Gated by the
- * Mounted only for comparisons with 3+ variants (see ComparisonCharts).
+ * `computeBTLeaderboard` and passes it in.
+ *
+ * Reached only through the mount sites, which carry both gates: the
+ * `release_ui_comparison_leaderboard_enabled` rollout flag
+ * (useShowComparisonLeaderboard) and the 3+ variant product rule
+ * (ComparisonCharts).
  */
 
 export type PairwiseLeaderboardProps = {

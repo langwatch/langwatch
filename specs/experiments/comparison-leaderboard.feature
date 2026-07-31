@@ -23,29 +23,60 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
   # is new.
   #
   # The scenarios tagged @unimplemented are the ones about what the card and
-  # the drawer RENDER, which has no component test yet — tracked in #6402.
-  # Everything else is bound to a unit test.
+  # the drawer RENDER in detail — the heatmap, the trade-off scatter, the
+  # expand affordance — for which there is no component test yet, tracked in
+  # #6402. The two gates that decide whether any of it appears at all ARE
+  # covered, and everything else is bound to a unit test.
 
   Background:
     Given an EvaluationsV3 experiment with target variants "variant_1", "variant_2", "variant_3"
     And a dataset with rows having "input" and "expected_output" fields
     And a Comparison evaluator has run across all rows, producing a verdict per row
+    And my organization has the comparison leaderboard turned on
 
-  @integration @unimplemented
-  Scenario: The leaderboard is offered without any opt-in
+  # ── Who gets it at all ─────────────────────────────────────────────────
+  #
+  # Two gates, for two different reasons, and they must not be confused.
+  # The ROLLOUT gate is per organization and temporary: it exists so this
+  # ships dark and is switched on deliberately. The VARIANT-COUNT gate is a
+  # permanent product rule — at two variants the win-rate chart already
+  # tells the whole story.
+
+  @integration
+  Scenario: An organization without the leaderboard sees no trace of it
+    Given my organization does not have the comparison leaderboard turned on
     When I view the run on the results page
-    Then I see the leaderboard chart already enabled in the Metrics selector
-    # No feature flag: a ranking is the point of running a Comparison across
-    # 3+ variants, so it ships on. Variant count is the only gate, and it is a
-    # product rule rather than a rollout one — see the scenario below.
+    Then I do not see a leaderboard chart
+    And the Metrics selector does not offer one
+    # Both together, deliberately. Hiding the chart while leaving the menu
+    # entry gives the reader a switch that turns nothing on, which is worse
+    # than either state on its own.
 
-  @integration @unimplemented
+  @integration
+  Scenario: A shared leaderboard link opens nothing for an organization without it
+    Given my organization does not have the comparison leaderboard turned on
+    When I open a link that addresses the expanded leaderboard directly
+    Then no leaderboard opens
+    # The chart's expand affordance is the only way in, and it is already gone
+    # — but the expanded view is addressable by URL, so a link shared out of an
+    # organization that has the leaderboard would otherwise hand the whole
+    # thing to one that has not been given it.
+
+  @integration
   Scenario: The leaderboard chart appears once there are enough variants to rank
     Given the comparison has 3 variants
     When I view the run on the results page
     Then I see a leaderboard chart alongside the win-rate chart
 
   @integration @unimplemented
+  Scenario: The leaderboard is offered without further opt-in
+    When I view the run on the results page
+    Then I see the leaderboard chart already enabled in the Metrics selector
+    # Once the organization has it, there is no second switch: a ranking is
+    # the point of running a Comparison across 3+ variants, so it is
+    # pre-selected rather than left for the reader to discover.
+
+  @integration
   Scenario: Two variants is a plain win-rate story, not a leaderboard
     Given the comparison has 2 variants
     When I view the run on the results page

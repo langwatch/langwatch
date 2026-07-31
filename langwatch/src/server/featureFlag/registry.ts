@@ -242,6 +242,13 @@ export const FEATURE_FLAGS = [
       "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
   },
   {
+    key: "release_ui_comparison_leaderboard_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Adds a Bradley-Terry ranking chart (issue #5103) to the Comparison evaluator's charts on the experiments-v3 results page, alongside the existing win-rate chart — a compact card with an expand affordance opening the full leaderboard table, win-matrix heatmap, and cost/duration tradeoff scatter (spec: specs/experiments/comparison-leaderboard.feature). Only mounts once a Comparison has 3+ variants; below that the plain win-rate chart already tells the whole story. Default off — power-user surface, additive to the existing chart. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_comparison_leaderboard_enabled.",
+  },
+  {
     key: "release_ui_langy_peek_dock_enabled",
     scope: "PRODUCT",
     defaultValue: false,

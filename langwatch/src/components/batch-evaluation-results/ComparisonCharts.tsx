@@ -35,6 +35,7 @@ import type {
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
+import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 import { WinRateChart } from "./WinRateChart";
 
 /** Metric types that can be displayed */
@@ -362,21 +363,27 @@ const perEvaluatorMetrics = ({
  * so both toggle through the same Metrics visibility system as their siblings
  * (Cost / Latency / Score / Pass Rate).
  *
- * The leaderboard (#5103) is only meaningful at 3+ variants; a 2-variant
+ * Two independent gates on the leaderboard, for two different reasons. The
+ * rollout flag decides whether this organization has the feature at all;
+ * variant count is a product rule that applies once it does — a 2-variant
  * comparison is already a plain win-rate story, which the win-rate chart
  * already tells. Additive to that chart, never a replacement, so both are
  * offered for a 3+ comparison.
  */
-const comparisonMetrics = (
-  columns: BatchComparisonColumn[],
-): MetricDefinition[] => [
+const comparisonMetrics = ({
+  columns,
+  showLeaderboard,
+}: {
+  columns: BatchComparisonColumn[];
+  showLeaderboard: boolean;
+}): MetricDefinition[] => [
   ...columns.map((column) => ({
     id: `comparison_${column.evaluatorId}` as MetricType,
     name: `${column.name} (Win Rate)`,
     type: "comparison" as const,
     evaluatorId: column.evaluatorId,
   })),
-  ...columns
+  ...(showLeaderboard ? columns : [])
     .filter((column) => column.variants.length >= 3)
     .map((column) => ({
       id: `leaderboard_${column.evaluatorId}` as MetricType,
@@ -400,6 +407,11 @@ export const ComparisonCharts = ({
   comparisonColumns,
   comparisonRows,
 }: ComparisonChartsProps) => {
+  // Rollout gate for the Bradley-Terry leaderboard (#5103). Read here rather
+  // than passed in as a prop so the flag cannot drift from the two surfaces it
+  // controls, both of which live in this component.
+  const showComparisonLeaderboard = useShowComparisonLeaderboard();
+
   /**
    * The comparison evaluators on this page, which are excluded from the
    * candidate-oriented charts in two ways:
@@ -911,9 +923,17 @@ export const ComparisonCharts = ({
         idPrefix: "pass",
         label: "Pass Rate",
       }),
-      ...comparisonMetrics(comparisonColumns ?? []),
+      ...comparisonMetrics({
+        columns: comparisonColumns ?? [],
+        showLeaderboard: showComparisonLeaderboard,
+      }),
     ],
-    [scoreEvaluators, passRateEvaluators, comparisonColumns],
+    [
+      scoreEvaluators,
+      passRateEvaluators,
+      comparisonColumns,
+      showComparisonLeaderboard,
+    ],
   );
 
   // Show every metric the run offers, including ones that appear later.
@@ -1485,29 +1505,31 @@ export const ComparisonCharts = ({
 
             {/* Bradley-Terry leaderboard chart (#5103) — a sibling of
                 WinRateChart, gated the same way through the Metrics
-                dropdown. Only ever added to availableMetrics for 3+ variant
-                comparisons (see availableMetrics above), so no extra gating
-                is needed here beyond visibleMetrics. */}
-            {comparisonColumns?.map(
-              (column) =>
-                visibleMetrics.has(
-                  `leaderboard_${column.evaluatorId}` as MetricType,
-                ) && (
-                  <ComparisonLeaderboardChart
-                    key={`leaderboard-${column.evaluatorId}`}
-                    column={column}
-                    rows={comparisonRows ?? []}
-                    chartHeight={chartHeight}
-                    targetColors={targetColors}
-                    modelByTargetId={modelsFromRun.modelByTargetId}
-                    judgeModel={
-                      modelsFromRun.judgeModelByEvaluatorId[
-                        column.evaluatorId
-                      ] ?? null
-                    }
-                  />
-                ),
-            )}
+                dropdown. The rollout flag is re-checked here rather than
+                left to visibleMetrics: a metric id already switched on from
+                a previous session would otherwise keep rendering the chart
+                after the flag was turned back off. */}
+            {showComparisonLeaderboard &&
+              comparisonColumns?.map(
+                (column) =>
+                  visibleMetrics.has(
+                    `leaderboard_${column.evaluatorId}` as MetricType,
+                  ) && (
+                    <ComparisonLeaderboardChart
+                      key={`leaderboard-${column.evaluatorId}`}
+                      column={column}
+                      rows={comparisonRows ?? []}
+                      chartHeight={chartHeight}
+                      targetColors={targetColors}
+                      modelByTargetId={modelsFromRun.modelByTargetId}
+                      judgeModel={
+                        modelsFromRun.judgeModelByEvaluatorId[
+                          column.evaluatorId
+                        ] ?? null
+                      }
+                    />
+                  ),
+              )}
 
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(

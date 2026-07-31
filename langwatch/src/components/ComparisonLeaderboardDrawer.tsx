@@ -40,6 +40,7 @@ import type {
   BatchResultRow,
 } from "./batch-evaluation-results/types";
 import { useBTLeaderboard } from "./batch-evaluation-results/useBTLeaderboard";
+import { useShowComparisonLeaderboard } from "./batch-evaluation-results/useShowComparisonLeaderboard";
 import { useVariantMetrics } from "./batch-evaluation-results/useVariantMetrics";
 import { Drawer } from "./ui/drawer";
 
@@ -284,6 +285,11 @@ export function ComparisonLeaderboardDrawer({
   judgeModel,
 }: ComparisonLeaderboardDrawerProps) {
   const { closeDrawer } = useDrawer();
+  // The chart's expand button is the only affordance that opens this, and it
+  // is already gone when the flag is off — but a drawer is addressable by URL,
+  // so a link shared out of an enabled organization would otherwise render the
+  // whole leaderboard for one that has not been given it.
+  const showLeaderboard = useShowComparisonLeaderboard();
 
   const variantIds = useMemo(
     () => column.variants.map((v) => v.id).filter((id): id is string => !!id),
@@ -301,6 +307,8 @@ export function ComparisonLeaderboardDrawer({
     modelByTargetId,
     judgeModel,
   });
+
+  if (!showLeaderboard) return null;
 
   return (
     <Drawer.Root

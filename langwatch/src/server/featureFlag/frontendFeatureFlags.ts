@@ -87,6 +87,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // Bradley-Terry leaderboard chart on the experiments-v3 results page
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
+  "release_ui_comparison_leaderboard_enabled",
 ] as const;
 
 /**
