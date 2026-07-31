@@ -32,8 +32,10 @@
   },
   "files": [
     "packages/server/dist/",
+    "packages/ai-onboarding/",
     "packages/api/",
     "packages/automations/",
+    "packages/contracts/",
     "packages/handled-error/",
     "packages/langy/",
     "packages/observability/",
