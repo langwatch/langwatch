@@ -26,20 +26,20 @@ Feature: Judge-vs-annotation confusion matrix
     And each row's target execution has a real trace id
     And a human reviewer has left a thumbs up/down annotation on 12 of those traces
 
-  @unimplemented
+  @integration
   Scenario: Confusion matrix mounts only once enough rows are annotated
     Given fewer than 5 of the 20 rows have an annotation
     When I view the results page Metrics
-    Then the "Exact Match — agreement with reviewers" chart is not offered
+    Then the "Exact Match vs reviewers — support-agent" chart is not offered
     # Below a small floor, a 2x2 table is not a matrix, it's two anecdotes —
     # mirrors the BT leaderboard's low-sample-size framing rather than
     # inventing a new threshold philosophy.
 
-  @unimplemented
+  @integration
   Scenario: Confusion matrix mounts once the annotation floor is met
     Given 12 of the 20 rows have an annotation
     When I view the results page Metrics
-    Then the "Exact Match — agreement with reviewers" chart is offered
+    Then the "Exact Match vs reviewers — support-agent" chart is offered
     And enabling it shows a compact 2x2 matrix card next to the other evaluator charts
 
   @unit
@@ -95,7 +95,7 @@ Feature: Judge-vs-annotation confusion matrix
     # chart already refuses to mount below its own row floor, so a
     # count-based warning could never fire.
 
-  @unimplemented
+  @integration
   Scenario: Agreement is shown against the level chance alone would reach
     Given any matrix with enough annotated rows to mount
     When I open the expanded confusion matrix
@@ -160,19 +160,28 @@ Feature: Judge-vs-annotation confusion matrix
     # Four cells reading "0 · 0%" present the absence of a measurement as a
     # measurement.
 
-  @unimplemented
+  @integration
   Scenario: Each pass/fail evaluator with enough annotation coverage gets its own matrix
     Given the experiment also has a second pass/fail evaluator "LLM Answer Match" with its own runs and annotations meeting the floor
     When I view the results page Metrics
-    Then I see both "Exact Match — agreement with reviewers" and "LLM Answer Match — agreement with reviewers" as separate chart options
+    Then I see both "Exact Match vs reviewers — support-agent" and "LLM Answer Match vs reviewers — support-agent" as separate chart options
 
-  @unimplemented
+  @integration
+  Scenario: No confusion matrix is offered when comparing multiple runs
+    Given the results page is comparing two runs side by side
+    When I view the results page Metrics
+    Then no confusion-matrix chart option is offered
+    # The matrix scores one run's judge against reviewers of that run's
+    # traces. Multi-run compare mode is out of scope for v1 — the feature
+    # withdraws rather than silently scoring only the first run.
+
+  @integration
   Scenario: Feature flag gates the whole surface
     Given the "release_ui_judge_annotation_confusion_matrix_enabled" flag is off
     When I view the results page Metrics
     Then no confusion-matrix chart option is offered regardless of annotation coverage
 
-  @unimplemented
+  @integration
   Scenario: Comparison evaluators are not offered a confusion matrix
     Given the experiment also has a 3-variant Comparison evaluator
     When I view the results page Metrics

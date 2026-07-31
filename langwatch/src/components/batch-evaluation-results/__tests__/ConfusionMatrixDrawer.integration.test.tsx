@@ -133,6 +133,18 @@ describe("ConfusionMatrixDrawer", () => {
       expect(screen.getByText(/will not reflect the full run/)).toBeDefined();
     });
 
+    /** @scenario Agreement is shown against the level chance alone would reach */
+    it("plots observed accuracy against the chance floor", () => {
+      renderDrawer(fullMatrix);
+
+      expect(screen.getByText("Is this better than chance?")).toBeDefined();
+      // 1 TP / 1 FP / 1 FN / 1 TN: both raters split 50/50, so chance
+      // agreement is exactly 50% — and observed accuracy happens to sit on
+      // it, which the bar's caption must state rather than hide.
+      expect(screen.getByText(/chance 50% · observed 50%/)).toBeDefined();
+      expect(screen.getByText("at or below chance")).toBeDefined();
+    });
+
     describe("when a matrix cell is clicked", () => {
       /** @scenario Clicking a matrix cell drills into the underlying rows */
       it("lists that cell's rows with the reviewer's comment", async () => {

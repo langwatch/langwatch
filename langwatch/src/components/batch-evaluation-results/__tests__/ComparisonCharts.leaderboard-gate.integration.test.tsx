@@ -29,6 +29,20 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
+import { STABLE_EMPTY_QUERY_RESULTS } from "~/test-utils/stableEmptyQueryResults";
+
+// ComparisonCharts reads annotations through tRPC's `useQueries` for the
+// judge-vs-reviewer confusion matrix, which touches the tRPC context
+// unconditionally — an `enabled: false` guard does not spare it, so rendering
+// under a bare ChakraProvider would throw "Cannot destructure property
+// 'ssrState'". None of these tests are about annotations — see the fixture
+// for why the result array must be one constant.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useQueries: vi.fn(() => STABLE_EMPTY_QUERY_RESULTS),
+  },
+}));
+
 import { ComparisonCharts } from "../ComparisonCharts";
 import type { BatchComparisonColumn, ComparisonRunData } from "../types";
 
