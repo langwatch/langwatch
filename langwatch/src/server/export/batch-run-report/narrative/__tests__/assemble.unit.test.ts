@@ -212,6 +212,14 @@ describe("assembleSections() failure grouping", () => {
                   name: "Leaks under pressure",
                   mechanism: "The agent concedes when the user escalates.",
                   signatureIds: ["s_known"],
+                  // A group's wording only renders when something cited backs
+                  // it, so the group under test carries one real statement.
+                  statements: [
+                    {
+                      text: "It conceded once the user pushed back.",
+                      citations: [{ kind: "run", runId: "run_1" }],
+                    },
+                  ],
                 },
               ],
             },
@@ -324,5 +332,39 @@ describe("assembleSections() proposals", () => {
         sections.find((it) => it.questionId === "future.scenario")?.gap,
       ).toBeTruthy();
     });
+  });
+});
+
+describe("assembleSections() group wording", () => {
+  /**
+   * A group's name and mechanism are model prose describing what the agent did
+   * wrong, and they were reaching the page whether or not anything backed them
+   * — under a footer reporting nothing removed. Membership is expanded from the
+   * evidence and stays trustworthy, but the wording has to be earned.
+   *
+   * @scenario Text the run cannot support is removed
+   */
+  it("drops a group whose wording nothing cited supports", () => {
+    const { sections } = assemble({
+      draft: {
+        answers: [
+          {
+            questionId: "present.clusters",
+            declined: false,
+            groups: [
+              {
+                name: "FABRICATED NAME",
+                mechanism: "FABRICATED MECHANISM",
+                signatureIds: ["s_known"],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const written = writtenBlocksOf(sections, "present.clusters");
+    expect(written.find((block) => block.kind === "groups")).toBeUndefined();
+    expect(JSON.stringify(written)).not.toContain("FABRICATED");
   });
 });

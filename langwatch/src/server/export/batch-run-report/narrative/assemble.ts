@@ -209,23 +209,46 @@ function buildWrittenBlocks({
   const blocks: Block[] = [];
   let offset = 0;
 
-  // A group's supporting statements are admitted alongside the answer's own so
-  // they end up in a `claims` block rather than flattened into group detail
-  // text. A statement buried in a string is invisible to the checker, and an
-  // unchecked statement is exactly what this pipeline exists to prevent.
-  const statements = [
-    ...(answer.statements ?? []),
-    ...(answer.groups ?? []).flatMap((group) => group.statements ?? []),
-  ];
+  const own = answer.statements ?? [];
   const claims = admit({
-    claims: statements,
+    claims: own,
     questionId: answer.questionId,
     offset,
   });
-  offset += statements.length;
+  offset += own.length;
+
+  // A group's supporting statements are admitted so they land in the `claims`
+  // block rather than flattened into group detail text — a statement buried in
+  // a string is invisible to the checker, and an unchecked statement is exactly
+  // what this pipeline exists to prevent.
+  //
+  // Admitted PER GROUP, because the group's own name and mechanism are model
+  // prose too, and they were reaching the page whether or not anything backed
+  // them: a fabricated group title and a fabricated account of what the agent
+  // did wrong rendered under a footer reporting nothing removed. A group now
+  // has to bring at least one statement that survives resolution before its
+  // wording is shown. Nothing is lost when one does not — the deterministic
+  // failure groups are computed from the evidence and always render.
+  const supportedGroups: NonNullable<DraftAnswer["groups"]> = [];
+  for (const group of answer.groups ?? []) {
+    const statements = group.statements ?? [];
+    const groupClaims = admit({
+      claims: statements,
+      questionId: answer.questionId,
+      offset,
+    });
+    offset += statements.length;
+    if (groupClaims.length > 0) {
+      supportedGroups.push(group);
+      claims.push(...groupClaims);
+    }
+  }
   if (claims.length > 0) blocks.push({ kind: "claims", claims });
 
-  const groups = buildGroupBlock({ answer, evidence });
+  const groups = buildGroupBlock({
+    answer: { ...answer, groups: supportedGroups },
+    evidence,
+  });
   if (groups) blocks.push(groups);
 
   const findings = buildFindingsBlock({ answer, evidence, admit, offset });
