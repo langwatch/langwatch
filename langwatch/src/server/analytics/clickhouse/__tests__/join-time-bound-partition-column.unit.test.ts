@@ -25,7 +25,42 @@ import { resetParamCounter } from "../filter-translator";
  */
 
 const RANGE_BOUND_OR_TABLE =
-  /\bFROM\s+([a-zA-Z_]\w*)|(?<![\w.`])(?:([a-zA-Z_]\w*)\.)?([a-zA-Z_]\w*)\s*(?:>=|<=|>|<)\s*\{/g;
+  /\bFROM\s+([a-zA-Z_]\w*)(?:\s+(?:AS\s+)?([a-zA-Z_]\w*))?|(?<![\w.`])(?:([a-zA-Z_]\w*)\.)?([a-zA-Z_]\w*)\s*(?:>=|<=|>|<)\s*\{/g;
+
+/**
+ * Words that can follow a table name without being an alias for it. Without
+ * this, `FROM evaluation_runs WHERE ...` reads as an alias called `WHERE`,
+ * and a bound qualified with the word WHERE would resolve to the table.
+ */
+const NOT_AN_ALIAS = new Set([
+  "ALL",
+  "ANTI",
+  "ANY",
+  "ARRAY",
+  "ASOF",
+  "CROSS",
+  "FINAL",
+  "FORMAT",
+  "FULL",
+  "GROUP",
+  "HAVING",
+  "INNER",
+  "JOIN",
+  "LEFT",
+  "LIMIT",
+  "ON",
+  "ORDER",
+  "PREWHERE",
+  "RIGHT",
+  "SAMPLE",
+  "SELECT",
+  "SEMI",
+  "SETTINGS",
+  "UNION",
+  "USING",
+  "WHERE",
+  "WITH",
+]);
 
 /**
  * Columns a table was partitioned by before the current DDL, which long-lived
@@ -39,18 +74,27 @@ const LEGACY_PARTITION_COLUMNS: Record<string, readonly string[]> = {
   evaluation_runs: ["UpdatedAt"],
 };
 
+interface Scope {
+  enclosingTable: string | null;
+  knownTables: ReadonlySet<string>;
+  aliasToTable: ReadonlyMap<string, string>;
+}
+
 /**
- * The table a bound belongs to: its qualifier when that names a table, the
- * enclosing `FROM` when the bound is bare, and nothing when the qualifier is an
- * alias of the outer query.
+ * The table a bound belongs to: its qualifier when that names a table or an
+ * alias declared on one, the enclosing `FROM` when the bound is bare, and
+ * nothing when the qualifier belongs to the outer query.
  */
-function boundedTable(
-  qualifier: string | undefined,
-  enclosingTable: string | null,
-  knownTables: ReadonlySet<string>,
-): string | null {
-  if (!qualifier) return enclosingTable;
-  return knownTables.has(qualifier) ? qualifier : null;
+function boundedTable({
+  qualifier,
+  scope,
+}: {
+  qualifier: string | undefined;
+  scope: Scope;
+}): string | null {
+  if (!qualifier) return scope.enclosingTable;
+  if (scope.knownTables.has(qualifier)) return qualifier;
+  return scope.aliasToTable.get(qualifier) ?? null;
 }
 
 interface RangeBound {
@@ -60,30 +104,45 @@ interface RangeBound {
 }
 
 /**
- * Every range bound in `sql`, attributed to the table it bounds, deduped.
+ * The range bound a match represents, if it is one.
  *
  * A bare identifier belongs to the nearest preceding `FROM <table>` — that is
  * the scope ClickHouse would resolve it in, or fail to. A qualified one belongs
- * to its qualifier when the qualifier names a table, since qualifying pins the
- * reference to that table's own column; any other qualifier is an alias of the
- * outer query and is skipped.
+ * to its qualifier when the qualifier names a table or an alias of one, since
+ * qualifying pins the reference to that table's own column; any other qualifier
+ * is an alias of the outer query and is skipped.
  */
-function boundOf(
-  match: RegExpExecArray,
-  enclosingTable: string | null,
-  knownTables: ReadonlySet<string>,
-): RangeBound | null {
-  const [, fromTable, qualifier, column] = match;
+function boundOf({
+  match,
+  scope,
+}: {
+  match: RegExpExecArray;
+  scope: Scope;
+}): RangeBound | null {
+  const [, fromTable, , qualifier, column] = match;
   if (fromTable || !column) return null;
 
-  const table = boundedTable(qualifier, enclosingTable, knownTables);
+  const table = boundedTable({ qualifier, scope });
   if (!table) return null;
 
   return { table, column, qualified: Boolean(qualifier) };
 }
 
+/** Record `FROM <table> <alias>`, ignoring the keywords that are not aliases. */
+function rememberAlias(
+  aliasToTable: Map<string, string>,
+  table: string | undefined,
+  alias: string | undefined,
+): void {
+  if (!table || !alias) return;
+  if (NOT_AN_ALIAS.has(alias.toUpperCase())) return;
+  aliasToTable.set(alias, table);
+}
+
+/** Every range bound in `sql`, attributed to the table it bounds, deduped. */
 function rangeBounds(sql: string): RangeBound[] {
   const knownTables = new Set(Object.keys(TIME_PARTITIONED_TABLES));
+  const aliasToTable = new Map<string, string>();
   const bounds = new Map<string, RangeBound>();
   let enclosingTable: string | null = null;
 
@@ -91,7 +150,11 @@ function rangeBounds(sql: string): RangeBound[] {
   let match: RegExpExecArray | null = RANGE_BOUND_OR_TABLE.exec(sql);
   while (match !== null) {
     enclosingTable = match[1] ?? enclosingTable;
-    const bound = boundOf(match, enclosingTable, knownTables);
+    rememberAlias(aliasToTable, match[1], match[2]);
+    const bound = boundOf({
+      match,
+      scope: { enclosingTable, knownTables, aliasToTable },
+    });
     if (bound) {
       bounds.set(`${bound.table}.${bound.column}.${bound.qualified}`, bound);
     }
@@ -268,6 +331,17 @@ describe("analytics JOIN time bounds", () => {
       expect(partitionBoundViolations(sql)).toEqual([
         "evaluation_runs is bounded on OccurredAt, which is none of the columns it can prune on (ScheduledAt, UpdatedAt); ClickHouse resolves the bare OccurredAt against the outer trace_summaries scope instead of failing",
       ]);
+    });
+
+    /** @scenario A bound qualified with an alias of the bounded table is attributed to it */
+    it("resolves an alias declared on the bounded table's own FROM", () => {
+      const sql =
+        "SELECT 1 FROM evaluation_runs er WHERE er.CreatedAt >= {startDate:DateTime64(3)}";
+
+      expect(rangeBoundColumnsByTable(sql).get("evaluation_runs")).toEqual(
+        new Set(["CreatedAt"]),
+      );
+      expect(partitionBoundViolations(sql)).toHaveLength(1);
     });
 
     /** @scenario A bound qualified with the outer query's alias stays out of the inner table's bounds */

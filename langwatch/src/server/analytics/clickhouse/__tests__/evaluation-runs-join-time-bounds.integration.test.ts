@@ -160,11 +160,15 @@ function metricValue(rows: Row[], period: string): number {
 describe("evaluation_runs JOIN time bounds", () => {
   let ch: ClickHouseClient;
 
-  async function currentPeriodMetric(
-    metric: string,
-    aggregation: AggregationTypes,
-    evaluatorId: string,
-  ): Promise<number> {
+  async function currentPeriodMetric({
+    metric,
+    aggregation,
+    evaluatorId,
+  }: {
+    metric: string;
+    aggregation: AggregationTypes;
+    evaluatorId: string;
+  }): Promise<number> {
     resetParamCounter();
     const { sql, params } = buildTimeseriesQuery({
       ...baseInput,
@@ -285,22 +289,22 @@ describe("evaluation_runs JOIN time bounds", () => {
   describe("given an evaluation scheduled long after the queried window, on a trace inside it", () => {
     /** @scenario An evaluation scheduled after the queried window still scores its in-window trace */
     it("returns the evaluation score", async () => {
-      const score = await currentPeriodMetric(
-        "evaluations.evaluation_score",
-        "avg",
-        LATE_EVALUATOR,
-      );
+      const score = await currentPeriodMetric({
+        metric: "evaluations.evaluation_score",
+        aggregation: "avg",
+        evaluatorId: LATE_EVALUATOR,
+      });
 
       expect(score).toBeCloseTo(0.7, 10);
     });
 
     /** @scenario Both late-scheduled evaluations are counted, not just the nearest one */
     it("counts every late-scheduled evaluation", async () => {
-      const runs = await currentPeriodMetric(
-        "evaluations.evaluation_runs",
-        "cardinality",
-        LATE_EVALUATOR,
-      );
+      const runs = await currentPeriodMetric({
+        metric: "evaluations.evaluation_runs",
+        aggregation: "cardinality",
+        evaluatorId: LATE_EVALUATOR,
+      });
 
       expect(runs).toBe(2);
     });
@@ -329,16 +333,16 @@ describe("evaluation_runs JOIN time bounds", () => {
   describe("given one evaluation with row versions across weekly partitions, inserted out of UpdatedAt order", () => {
     /** @scenario The dedup keeps the newest version of an evaluation spread across partitions */
     it("scores the evaluation from its newest version only", async () => {
-      const avg = await currentPeriodMetric(
-        "evaluations.evaluation_score",
-        "avg",
-        VERSIONED_EVALUATOR,
-      );
-      const sum = await currentPeriodMetric(
-        "evaluations.evaluation_score",
-        "sum",
-        VERSIONED_EVALUATOR,
-      );
+      const avg = await currentPeriodMetric({
+        metric: "evaluations.evaluation_score",
+        aggregation: "avg",
+        evaluatorId: VERSIONED_EVALUATOR,
+      });
+      const sum = await currentPeriodMetric({
+        metric: "evaluations.evaluation_score",
+        aggregation: "sum",
+        evaluatorId: VERSIONED_EVALUATOR,
+      });
 
       expect(avg).toBeCloseTo(1, 10);
       expect(sum).toBeCloseTo(1, 10);
@@ -347,22 +351,22 @@ describe("evaluation_runs JOIN time bounds", () => {
 
   describe("given two row versions of one evaluation tied on UpdatedAt", () => {
     /** @scenario A tie on UpdatedAt leaves both row versions in the join */
-    it("keeps the count and the average, and doubles a summed metric", async () => {
-      const runs = await currentPeriodMetric(
-        "evaluations.evaluation_runs",
-        "cardinality",
-        TIED_EVALUATOR,
-      );
-      const avg = await currentPeriodMetric(
-        "evaluations.evaluation_score",
-        "avg",
-        TIED_EVALUATOR,
-      );
-      const sum = await currentPeriodMetric(
-        "evaluations.evaluation_score",
-        "sum",
-        TIED_EVALUATOR,
-      );
+    it("reads both tied versions when it queries the evaluator's runs and score", async () => {
+      const runs = await currentPeriodMetric({
+        metric: "evaluations.evaluation_runs",
+        aggregation: "cardinality",
+        evaluatorId: TIED_EVALUATOR,
+      });
+      const avg = await currentPeriodMetric({
+        metric: "evaluations.evaluation_score",
+        aggregation: "avg",
+        evaluatorId: TIED_EVALUATOR,
+      });
+      const sum = await currentPeriodMetric({
+        metric: "evaluations.evaluation_score",
+        aggregation: "sum",
+        evaluatorId: TIED_EVALUATOR,
+      });
 
       // The dedup keeps every version whose UpdatedAt equals the max, so a tie
       // keeps both. A distinct count and an average absorb that; a sum does

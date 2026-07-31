@@ -87,6 +87,12 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
     Then the bound is reported as resolving against the outer scope
 
   @unit
+  Scenario: A bound qualified with an alias of the bounded table is attributed to it
+    Given a bound qualified with an alias the bounded table declares for itself
+    When the generated SQL is checked for bounds on non-prunable columns
+    Then the alias resolves to the table and the bound is reported
+
+  @unit
   Scenario: A bound qualified with the outer query's alias stays out of the inner table's bounds
     Given a bound qualified with the outer query's alias
     When the bounds of the inner table are collected
