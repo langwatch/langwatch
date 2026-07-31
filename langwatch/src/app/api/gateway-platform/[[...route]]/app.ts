@@ -1522,51 +1522,19 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const boundaryByKey = new Map(
       boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),
     );
-    const targets = templates.map((t) => {
-      const bucketScopeId = bucketScopeIdFor(
-        t,
-        attributedUserBucketScopeId(t.scopeId, endUserId),
-      );
-      const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
-      const floors = [
-        budgetPeriodFloorMs(t),
-        bucketBoundary?.periodStartedAt.getTime(),
-      ].filter((n): n is number => typeof n === "number");
-      return {
-        budgetId: t.id,
-        scope: t.scopeType,
-        scopeId: bucketScopeId,
-        window: t.window,
-        match: "exact" as const,
-        periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
-      };
-    });
     try {
       const spends = await chRepo.getSpendForTargetsAcrossTenants(
         projects.map((p) => p.id),
-        targets,
-      );
-      const spentByBudget = new Map(
-        spends.map((sp) => [sp.budgetId, sp.spentUsd]),
+        attributedUserSpendTargets({ templates, endUserId, boundaryByKey }),
       );
       return c.json({
-        data: templates.map((t) => {
-          const bucketScopeId = bucketScopeIdFor(
-            t,
-            attributedUserBucketScopeId(t.scopeId, endUserId),
-          );
-          const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
-          const periodStart =
-            bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt;
-          return {
-            budget_id: t.id,
-            anchor_id: t.scopeId,
-            window: t.window,
-            on_breach: t.onBreach,
-            limit_usd: t.limitUsd.toString(),
-            spent_usd: spentByBudget.get(t.id) ?? "0",
-            period_started_at: periodStart.toISOString(),
-          };
+        data: attributedUserBucketRows({
+          templates,
+          endUserId,
+          boundaryByKey,
+          spentByBudget: new Map(
+            spends.map((sp) => [sp.budgetId, sp.spentUsd]),
+          ),
         }),
       });
     } catch (error) {
@@ -1574,6 +1542,71 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     }
   },
 );
+
+/** The bucket one attributed-user template resolves to for a given end
+ *  user. */
+function attributedUserBucketKey(
+  template: GatewayBudget,
+  endUserId: string,
+): string {
+  return bucketScopeIdFor(
+    template,
+    attributedUserBucketScopeId(template.scopeId, endUserId),
+  );
+}
+
+/** One spend-read target per template, floored at the later of the
+ *  template's own period floor and the bucket boundary's period start. */
+function attributedUserSpendTargets(params: {
+  templates: GatewayBudget[];
+  endUserId: string;
+  boundaryByKey: Map<string, { periodStartedAt: Date }>;
+}) {
+  return params.templates.map((template) => {
+    const bucketScopeId = attributedUserBucketKey(template, params.endUserId);
+    const floors = [
+      budgetPeriodFloorMs(template),
+      params.boundaryByKey
+        .get(`${template.id}:${bucketScopeId}`)
+        ?.periodStartedAt.getTime(),
+    ].filter((n): n is number => typeof n === "number");
+    return {
+      budgetId: template.id,
+      scope: template.scopeType,
+      scopeId: bucketScopeId,
+      window: template.window,
+      match: "exact" as const,
+      periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
+    };
+  });
+}
+
+/** One response row per template: the bucket's window and limit, the spend
+ *  read for it, and the period the bucket is currently in. */
+function attributedUserBucketRows(params: {
+  templates: GatewayBudget[];
+  endUserId: string;
+  boundaryByKey: Map<string, { periodStartedAt: Date }>;
+  spentByBudget: Map<string, string>;
+}) {
+  return params.templates.map((template) => {
+    const bucketScopeId = attributedUserBucketKey(template, params.endUserId);
+    const boundary = params.boundaryByKey.get(
+      `${template.id}:${bucketScopeId}`,
+    );
+    const periodStart =
+      boundary?.periodStartedAt ?? template.currentPeriodStartedAt;
+    return {
+      budget_id: template.id,
+      anchor_id: template.scopeId,
+      window: template.window,
+      on_breach: template.onBreach,
+      limit_usd: template.limitUsd.toString(),
+      spent_usd: params.spentByBudget.get(template.id) ?? "0",
+      period_started_at: periodStart.toISOString(),
+    };
+  });
+}
 
 // ── Provider credentials — update + disable ────────────────────────────
 

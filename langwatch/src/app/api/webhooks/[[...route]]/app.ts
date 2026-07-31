@@ -133,6 +133,43 @@ function endpointResponse(endpoint: {
 
 const logger = createLogger("langwatch:webhooks:rest");
 
+/** The single-envelope batch a test fire sends. */
+function testFireBody(now: Date): string {
+  return JSON.stringify({
+    batch: [
+      {
+        id: `evt_test_${randomUUID()}`,
+        type: "test.ping",
+        created: now.toISOString(),
+        schema_version: "1",
+        data: { message: "LangWatch webhook test delivery" },
+      },
+    ],
+  });
+}
+
+/** Record a test fire's outcome. The test itself ran, so a delivery-log
+ *  hiccup must not convert the documented 200-with-result contract into a
+ *  500. */
+async function recordTestFire(attempt: {
+  organizationId: string;
+  endpointId: string;
+  dispatchId: string;
+  outcome: "success" | "terminal";
+  responseStatus?: number;
+  error?: string;
+}): Promise<void> {
+  try {
+    await endpoints.recordDeliveryAttempt({
+      ...attempt,
+      attempt: 1,
+      eventCount: 1,
+    });
+  } catch (logError) {
+    logger.warn({ error: logError }, "test-fire delivery log write failed");
+  }
+}
+
 const secured = createOrgApp({ basePath: "/api/webhooks/v1" });
 
 secured.hono.onError(handleWebhookApiError);
@@ -288,23 +325,11 @@ secured.access(requires("webhookEndpoints:manage")).post(
       organizationId: organization.id,
       endpointId,
     });
-    const now = new Date();
-    const body = JSON.stringify({
-      batch: [
-        {
-          id: `evt_test_${randomUUID()}`,
-          type: "test.ping",
-          created: now.toISOString(),
-          schema_version: "1",
-          data: { message: "LangWatch webhook test delivery" },
-        },
-      ],
-    });
     const dispatchId = `test:${randomUUID()}`;
     try {
       const result = await sendWebhook({
         url: endpoint.url,
-        body,
+        body: testFireBody(new Date()),
         triggerName: endpointId,
         contextLabel: `Webhook endpoint ${endpointId} (test)`,
         testFire: true,
@@ -312,27 +337,17 @@ secured.access(requires("webhookEndpoints:manage")).post(
         signingSecret: secret,
         attempt: 1,
       });
-      // The test ran; a delivery-log hiccup must not convert the
-      // documented 200-with-result contract into a 500.
-      try {
-        await endpoints.recordDeliveryAttempt({
-          organizationId: organization.id,
-          endpointId,
-          dispatchId,
-          attempt: 1,
-          eventCount: 1,
-          outcome:
-            result.status >= 200 && result.status < 300
-              ? "success"
-              : "terminal",
-          responseStatus: result.status,
-        });
-      } catch (logError) {
-        logger.warn({ error: logError }, "test-fire delivery log write failed");
-      }
+      const delivered = result.status >= 200 && result.status < 300;
+      await recordTestFire({
+        organizationId: organization.id,
+        endpointId,
+        dispatchId,
+        outcome: delivered ? "success" : "terminal",
+        responseStatus: result.status,
+      });
       return c.json({
         data: {
-          delivered: result.status >= 200 && result.status < 300,
+          delivered,
           response_status: result.status,
           response_body: result.body.slice(0, 500),
         },
@@ -341,24 +356,14 @@ secured.access(requires("webhookEndpoints:manage")).post(
       // The full message goes to the delivery log for the operator; the
       // response carries a sanitized summary so internal dispatch wording
       // and transport details never reach the caller verbatim.
-      // The test ran; a delivery-log hiccup must not convert the
-      // documented 200-with-result contract into a 500.
-      try {
-        await endpoints.recordDeliveryAttempt({
-          organizationId: organization.id,
-          endpointId,
-          dispatchId,
-          attempt: 1,
-          eventCount: 1,
-          outcome: "terminal",
-          error:
-            error instanceof Error
-              ? error.message.slice(0, 500)
-              : String(error),
-        });
-      } catch (logError) {
-        logger.warn({ error: logError }, "test-fire delivery log write failed");
-      }
+      await recordTestFire({
+        organizationId: organization.id,
+        endpointId,
+        dispatchId,
+        outcome: "terminal",
+        error:
+          error instanceof Error ? error.message.slice(0, 500) : String(error),
+      });
       return c.json({
         data: {
           delivered: false,

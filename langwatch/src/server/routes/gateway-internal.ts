@@ -17,6 +17,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import { createLogger } from "@langwatch/observability";
+import type { GatewayBudget } from "@prisma/client";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
@@ -309,6 +310,67 @@ secured.access(gatewayPolicy()).get("/health", (c) => {
  * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
  * Response: { jwt, revision, key_id, display_prefix }
  */
+/** A refusal to resolve a presented key, in the contract's error shape. */
+interface KeyAuthRejection {
+  status: 401 | 403;
+  type: string;
+  code: string;
+  message: string;
+}
+
+function rejectionBody(rejection: KeyAuthRejection) {
+  return {
+    error: {
+      type: rejection.type,
+      code: rejection.code,
+      message: rejection.message,
+    },
+  };
+}
+
+/** Why the presented key does not parse, or null when it does. Anything
+ *  that is not a VirtualKeyCryptoError is a bug rather than a bad
+ *  credential, so it rethrows. */
+function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
+  try {
+    parseVirtualKey(presented);
+    return null;
+  } catch (err) {
+    if (!(err instanceof VirtualKeyCryptoError)) throw err;
+    return {
+      status: 401,
+      type: "invalid_api_key",
+      code: err.code,
+      message: err.message,
+    };
+  }
+}
+
+/** Why a resolved key's status bars it from serving, or null when it may.
+ *  Disabled is distinct from revoked AND from a bad key: a disabled tenant
+ *  must be able to tell "we turned you off" from "your credential is
+ *  wrong", and the platform's own tooling branches on this code. */
+function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
+  if (status === "REVOKED") {
+    return {
+      status: 403,
+      type: "virtual_key_revoked",
+      code: "virtual_key_revoked",
+      message: "virtual key has been revoked",
+    };
+  }
+  if (status === "DISABLED") {
+    return {
+      status: 403,
+      type: "virtual_key_disabled",
+      code: "virtual_key_disabled",
+      message:
+        "virtual key is disabled; it can be re-enabled by an administrator",
+    };
+  }
+  return null;
+}
+
 secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     key_presented?: string;
@@ -328,28 +390,16 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     );
   }
 
-  try {
-    parseVirtualKey(presented);
-  } catch (err) {
-    if (err instanceof VirtualKeyCryptoError) {
-      logAuthDecision(c, err.code, 401);
-      return c.json(
-        {
-          error: {
-            type: "invalid_api_key",
-            code: err.code,
-            message: err.message,
-          },
-        },
-        401,
-      );
-    }
-    throw err;
+  const parseRejection = virtualKeyParseRejection(presented);
+  if (parseRejection) {
+    logAuthDecision(c, parseRejection.code, parseRejection.status);
+    return c.json(rejectionBody(parseRejection), parseRejection.status);
   }
 
-  const hashed = hashVirtualKeySecret(presented);
   const service = VirtualKeyService.create(prisma);
-  const vk = await service.getByHashedSecretInternal(hashed);
+  const vk = await service.getByHashedSecretInternal(
+    hashVirtualKeySecret(presented),
+  );
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
     return c.json(
@@ -363,35 +413,12 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       401,
     );
   }
-  if (vk.status === "REVOKED") {
-    logAuthDecision(c, "virtual_key_revoked", 403, { vkId: vk.id });
-    return c.json(
-      {
-        error: {
-          type: "virtual_key_revoked",
-          code: "virtual_key_revoked",
-          message: "virtual key has been revoked",
-        },
-      },
-      403,
-    );
-  }
-  if (vk.status === "DISABLED") {
-    // Distinct from revoked AND from a bad key: a disabled tenant must be
-    // able to tell "we turned you off" from "your credential is wrong",
-    // and the platform's own tooling branches on this code.
-    logAuthDecision(c, "virtual_key_disabled", 403, { vkId: vk.id });
-    return c.json(
-      {
-        error: {
-          type: "virtual_key_disabled",
-          code: "virtual_key_disabled",
-          message:
-            "virtual key is disabled; it can be re-enabled by an administrator",
-        },
-      },
-      403,
-    );
+  const statusRejection = virtualKeyStatusRejection(vk.status);
+  if (statusRejection) {
+    logAuthDecision(c, statusRejection.code, statusRejection.status, {
+      vkId: vk.id,
+    });
+    return c.json(rejectionBody(statusRejection), statusRejection.status);
   }
 
   // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
@@ -840,6 +867,72 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
  * period boundary and any single-bucket boundary from a per-user reset:
  * whichever is later bounds the sum.
  */
+/** The budget ledger's ClickHouse reader, resolving one client per project. */
+function budgetClickHouseRepository(): GatewayBudgetClickHouseRepository {
+  return new GatewayBudgetClickHouseRepository(async (projectId) => {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        `ClickHouse enabled but no client for project ${projectId}`,
+      );
+    }
+    return client;
+  });
+}
+
+/** The floor the bucket's spend read starts at: the later of the budget
+ *  template's own period floor and the bucket boundary row's period start,
+ *  whichever of the two exist. */
+async function bucketPeriodFloorMs(params: {
+  budget: GatewayBudget;
+  bucketScopeId: string;
+}): Promise<number | undefined> {
+  const boundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
+    where: {
+      budgetId_bucketScopeId: {
+        budgetId: params.budget.id,
+        bucketScopeId: params.bucketScopeId,
+      },
+    },
+    select: { periodStartedAt: true },
+  });
+  const candidates = [
+    budgetPeriodFloorMs(params.budget),
+    boundary?.periodStartedAt.getTime(),
+  ].filter((n): n is number => typeof n === "number");
+  return candidates.length > 0 ? Math.max(...candidates) : undefined;
+}
+
+/** Spend in one budget bucket, in micro USD. An organization with no
+ *  projects has nothing to read, so it reports zero. */
+async function bucketSpentMicroUsd(params: {
+  budget: GatewayBudget;
+  bucketScopeId: string;
+  periodFloorMs: number | undefined;
+}): Promise<number> {
+  const projects = await prisma.project.findMany({
+    where: { team: { organizationId: params.budget.organizationId } },
+    select: { id: true },
+  });
+  if (projects.length === 0) return 0;
+  const spends =
+    await budgetClickHouseRepository().getSpendForTargetsAcrossTenants(
+      projects.map((p) => p.id),
+      [
+        {
+          budgetId: params.budget.id,
+          scope: params.budget.scopeType,
+          scopeId: params.bucketScopeId,
+          window: params.budget.window,
+          match: "exact",
+          periodFloorMs: params.periodFloorMs,
+        },
+      ],
+    );
+  const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
+  return Math.round(spentUsd * 1_000_000);
+}
+
 secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
   const budgetId = c.req.query("budget_id") ?? "";
   const endUserId = c.req.query("end_user_id") ?? "";
@@ -879,54 +972,12 @@ secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
     budget,
     attributedUserBucketScopeId(budget.scopeId, endUserId),
   );
-  const bucketBoundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
-    where: {
-      budgetId_bucketScopeId: { budgetId: budget.id, bucketScopeId },
-    },
-    select: { periodStartedAt: true },
+  const spentMicroUsd = await bucketSpentMicroUsd({
+    budget,
+    bucketScopeId,
+    periodFloorMs: await bucketPeriodFloorMs({ budget, bucketScopeId }),
   });
-  const templateFloor = budgetPeriodFloorMs(budget);
-  const floorCandidates = [
-    templateFloor,
-    bucketBoundary?.periodStartedAt.getTime(),
-  ].filter((n): n is number => typeof n === "number");
-  const periodFloorMs =
-    floorCandidates.length > 0 ? Math.max(...floorCandidates) : undefined;
-
-  const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId: budget.organizationId } },
-    select: { id: true },
-  });
-  if (projects.length === 0) {
-    return c.json({ spent_micro_usd: 0, bucket: bucketScopeId });
-  }
-  const spends = await chRepo.getSpendForTargetsAcrossTenants(
-    projects.map((p) => p.id),
-    [
-      {
-        budgetId: budget.id,
-        scope: budget.scopeType,
-        scopeId: bucketScopeId,
-        window: budget.window,
-        match: "exact",
-        periodFloorMs,
-      },
-    ],
-  );
-  const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
-  return c.json({
-    spent_micro_usd: Math.round(spentUsd * 1_000_000),
-    bucket: bucketScopeId,
-  });
+  return c.json({ spent_micro_usd: spentMicroUsd, bucket: bucketScopeId });
 });
 
 // ── spend command ingest (spend-command spine) ──────────────────────────
@@ -943,6 +994,141 @@ const spendCommandWireSchema = z.object({
 const spendCommandBatchSchema = z.object({
   records: z.array(spendCommandWireSchema).min(1).max(500),
 });
+
+type SpendCommandName = z.infer<typeof spendCommandWireSchema>["command"];
+type SpendCommandRecord = z.infer<typeof spendCommandWireSchema>;
+
+const SPEND_COMMAND_NAMES = [
+  "admitSpend",
+  "confirmSpend",
+  "failSpend",
+] as const;
+
+const SPEND_COMMAND_SCHEMAS = {
+  admitSpend: admitSpendCommandDataSchema,
+  confirmSpend: confirmSpendCommandDataSchema,
+  failSpend: failSpendCommandDataSchema,
+} as const;
+
+interface SpendCommandReject {
+  code: string;
+  message: string;
+  issues?: unknown[];
+}
+
+/** The gateway-spend pipeline, or undefined when event sourcing is not
+ *  registered (ClickHouse disabled). */
+function spendPipeline() {
+  try {
+    return getApp().eventSourcing?.getPipeline(GATEWAY_SPEND_PIPELINE_NAME);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The internal command data one wire record maps to, or why it cannot be
+ *  accepted. `project_id` on the wire is the internal `tenantId`; only
+ *  admits carry the pod identity the gap detector reads. */
+function toSpendCommandData(
+  record: SpendCommandRecord,
+):
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; reject: SpendCommandReject } {
+  const wire = record.payload;
+  const projectId = wire.project_id;
+  if (typeof projectId !== "string" || projectId.length === 0) {
+    return {
+      ok: false,
+      reject: {
+        code: "missing_project_id",
+        message: "spend command record rejected: missing project_id",
+      },
+    };
+  }
+  const { project_id: _projectId, ...rest } = wire;
+  const mapped: Record<string, unknown> =
+    record.command === "admitSpend"
+      ? {
+          ...rest,
+          tenantId: projectId,
+          pod_id: record.pod_id,
+          pod_seq: record.pod_seq,
+        }
+      : { ...rest, tenantId: projectId };
+  const validated = SPEND_COMMAND_SCHEMAS[record.command].safeParse(mapped);
+  if (!validated.success) {
+    return {
+      ok: false,
+      reject: {
+        code: "invalid_payload",
+        message: "spend command record rejected",
+        issues: validated.error.issues.slice(0, 3),
+      },
+    };
+  }
+  return { ok: true, data: validated.data as Record<string, unknown> };
+}
+
+/** Group the batch by command, reporting unacceptable records by index.
+ *  Every reject path logs: a silent per-record drop looks like a healthy
+ *  200 from the emitter's side and loses billing records. */
+function groupSpendCommands(records: SpendCommandRecord[]): {
+  perCommand: Record<SpendCommandName, Array<Record<string, unknown>>>;
+  rejected: Array<{ index: number; code: string }>;
+} {
+  const perCommand: Record<SpendCommandName, Array<Record<string, unknown>>> = {
+    admitSpend: [],
+    confirmSpend: [],
+    failSpend: [],
+  };
+  const rejected: Array<{ index: number; code: string }> = [];
+  records.forEach((record, index) => {
+    const mapped = toSpendCommandData(record);
+    if (!mapped.ok) {
+      rejected.push({ index, code: mapped.reject.code });
+      logger.warn(
+        {
+          command: record.command,
+          index,
+          ...(mapped.reject.issues ? { issues: mapped.reject.issues } : {}),
+        },
+        mapped.reject.message,
+      );
+      return;
+    }
+    perCommand[record.command].push(mapped.data);
+  });
+  return { perCommand, rejected };
+}
+
+interface SpendCommandSender {
+  sendBatch?: (payloads: unknown[]) => Promise<unknown>;
+  send: (payload: unknown) => Promise<unknown>;
+}
+
+/** Hand each command's group to the pipeline, preferring the batched
+ *  sender where the command exposes one. Answers the command whose sender
+ *  is missing, which is a registration bug the caller reports as a 503. */
+async function sendSpendCommands(
+  commands: unknown,
+  perCommand: Record<SpendCommandName, Array<Record<string, unknown>>>,
+): Promise<SpendCommandName | null> {
+  const senders = commands as Record<string, SpendCommandSender | undefined>;
+  for (const name of SPEND_COMMAND_NAMES) {
+    const batch = perCommand[name];
+    if (batch.length === 0) continue;
+    const sender = senders[name];
+    if (!sender) return name;
+    if (sender.sendBatch) {
+      await sender.sendBatch(batch);
+      continue;
+    }
+    for (const payloadItem of batch) {
+      await sender.send(payloadItem);
+    }
+  }
+  return null;
+}
 
 /**
  * Async spend-command ingest. The gateway's drainer posts spooled batches
@@ -974,14 +1160,7 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     );
   }
 
-  const es = getApp().eventSourcing;
-  const pipeline = (() => {
-    try {
-      return es?.getPipeline(GATEWAY_SPEND_PIPELINE_NAME);
-    } catch {
-      return undefined;
-    }
-  })();
+  const pipeline = spendPipeline();
   if (!pipeline) {
     return c.json(
       {
@@ -996,88 +1175,20 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     );
   }
 
-  const rejected: Array<{ index: number; code: string }> = [];
-  const perCommand: Record<
-    "admitSpend" | "confirmSpend" | "failSpend",
-    Array<Record<string, unknown>>
-  > = { admitSpend: [], confirmSpend: [], failSpend: [] };
+  const { perCommand, rejected } = groupSpendCommands(parsed.data.records);
 
-  parsed.data.records.forEach((record, index) => {
-    const wire = record.payload;
-    const projectId = wire.project_id;
-    if (typeof projectId !== "string" || projectId.length === 0) {
-      rejected.push({ index, code: "missing_project_id" });
-      // Every reject path logs: a silent per-record drop looks like a
-      // healthy 200 from the emitter's side and loses billing records.
-      logger.warn(
-        { command: record.command, index },
-        "spend command record rejected: missing project_id",
-      );
-      return;
-    }
-    const { project_id: _projectId, ...rest } = wire;
-    const mapped: Record<string, unknown> =
-      record.command === "admitSpend"
-        ? {
-            ...rest,
-            tenantId: projectId,
-            pod_id: record.pod_id,
-            pod_seq: record.pod_seq,
-          }
-        : { ...rest, tenantId: projectId };
-    const schema =
-      record.command === "admitSpend"
-        ? admitSpendCommandDataSchema
-        : record.command === "confirmSpend"
-          ? confirmSpendCommandDataSchema
-          : failSpendCommandDataSchema;
-    const validated = schema.safeParse(mapped);
-    if (!validated.success) {
-      rejected.push({ index, code: "invalid_payload" });
-      logger.warn(
-        {
-          command: record.command,
-          index,
-          issues: validated.error.issues.slice(0, 3),
+  const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
+  if (unregistered) {
+    return c.json(
+      {
+        error: {
+          type: "unavailable",
+          code: "spend_command_missing",
+          message: `command ${unregistered} is not registered`,
         },
-        "spend command record rejected",
-      );
-      return;
-    }
-    perCommand[record.command].push(validated.data);
-  });
-
-  for (const name of ["admitSpend", "confirmSpend", "failSpend"] as const) {
-    const batch = perCommand[name];
-    if (batch.length === 0) continue;
-    const sender = (
-      pipeline.commands as Record<
-        string,
-        {
-          sendBatch?: (p: unknown[]) => Promise<unknown>;
-          send: (p: unknown) => Promise<unknown>;
-        }
-      >
-    )[name];
-    if (!sender) {
-      return c.json(
-        {
-          error: {
-            type: "unavailable",
-            code: "spend_command_missing",
-            message: `command ${name} is not registered`,
-          },
-        },
-        503,
-      );
-    }
-    if (sender.sendBatch) {
-      await sender.sendBatch(batch);
-    } else {
-      for (const payloadItem of batch) {
-        await sender.send(payloadItem);
-      }
-    }
+      },
+      503,
+    );
   }
 
   return c.json({
