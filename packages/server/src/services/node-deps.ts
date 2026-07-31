@@ -286,9 +286,9 @@ export async function ensureLangwatchDeps(
  * doesn't carry. Exported for tests.
  */
 export function linkExternalMemberPeers(appRootDir: string): string[] {
-	const appNodeModules = join(appRootDir, "langwatch", "node_modules");
+	const appNodeModules = join(appRootDir, "platform", "app", "node_modules");
 	const memberDirs = [
-		join(appRootDir, "mcp-server"),
+		join(appRootDir, "mcp", "typescript"),
 		...listDirs(join(appRootDir, "packages")),
 	];
 	const linked: string[] = [];
@@ -469,6 +469,6 @@ export async function resolvePnpm(
 export function locateLangwatchDir(): string | null {
 	// appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
 	// ensureAppDir has run, or the dev workspace fallback otherwise.
-	const dir = join(appRoot(), "langwatch");
+	const dir = join(appRoot(), "platform", "app");
 	return existsSync(join(dir, "package.json")) ? dir : null;
 }

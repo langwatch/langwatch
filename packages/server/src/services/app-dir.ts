@@ -33,7 +33,7 @@ function locatePackageSource(): string | null {
 	// already been downloaded.
 	let dir = __dirname;
 	for (let i = 0; i < 6; i++) {
-		if (existsSync(join(dir, "langwatch", "package.json"))) return dir;
+		if (existsSync(join(dir, "platform", "app", "package.json"))) return dir;
 		const parent = dirname(dir);
 		if (parent === dir) break;
 		dir = parent;
