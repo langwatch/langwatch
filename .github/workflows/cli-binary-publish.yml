@@ -202,12 +202,18 @@ jobs:
           "${HOME}/.bun/bin/bun" --version
 
       - name: Install dependencies
-        # Full monorepo checkout: `prepare` (run by install) generates
-        # src/internal/generated/* from platform/app/ + services/langevals/
-        # sources and skills/ — the Bun compile fails to resolve those
-        # otherwise (same gotcha Dockerfile.langyagent's cli-builder stage
-        # documents).
         run: pnpm install --frozen-lockfile --filter "langwatch..."
+
+      - name: Generate the SDK's derived sources
+        # src/internal/generated/* is gitignored and derived from platform/app/
+        # + services/langevals/ sources and skills/, so the Bun compile cannot
+        # resolve it until the generators have run. Invoked explicitly rather
+        # than left to an install hook: the app depends on the SDK with
+        # `workspace:*`, so an install hook here also fires on every consumer
+        # install — including the one `npx @langwatch/server` performs, where
+        # the generators' devDependencies are absent by definition.
+        # Dockerfile.langyagent's cli-builder stage does the same.
+        run: pnpm --filter langwatch run generate
 
       - name: Resolve asset name
         id: names

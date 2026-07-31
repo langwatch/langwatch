@@ -158,11 +158,11 @@ COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/lan
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
 # each published SKILL.mdx, recipes/, version.txt, and the committed _compiled/native
 # renders). Bring both in at the ../../ paths those generators expect relative to
-# /src/sdks/typescript, or `pnpm run prepare` dies with `Cannot find module
+# /src/sdks/typescript, or `pnpm run generate` dies with `Cannot find module
 # '../../feature-map.json'`.
 COPY feature-map.json                                 /src/feature-map.json
 COPY skills                                            /src/skills
-RUN pnpm run prepare
+RUN pnpm run generate
 
 # BuildKit fills TARGETARCH from the target platform. Map it to Bun's target
 # triple so `--platform linux/arm64` (Graviton/gVisor) produces an arm64 binary
