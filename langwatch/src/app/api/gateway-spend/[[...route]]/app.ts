@@ -15,6 +15,18 @@ import {
   decodeSpendEventsCursor,
   GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
+import {
+  appendReplayToEndpointStream,
+  type SendBatchPayload,
+  type WebhookDeliveryProcessDeps,
+} from "@ee/webhooks/process-manager/webhookDelivery.process";
+import { eventMatches } from "@ee/webhooks/eventRegistry";
+import { nanoid } from "nanoid";
+import { getApp } from "~/server/app-layer/app";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
@@ -230,5 +242,114 @@ secured
       });
     },
   );
+
+const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const REPLAY_MAX_ENVELOPES = 10_000;
+
+const replayBodySchema = z
+  .object({
+    from: z.number().int().positive().safe(),
+    to: z.number().int().positive().safe(),
+    endpoint_id: z.string().min(1).max(200),
+  })
+  .refine((b) => b.from <= b.to, {
+    message: "from must be less than or equal to to",
+  })
+  .refine((b) => b.to - b.from <= REPLAY_MAX_WINDOW_MS, {
+    message: "the replay window is capped at 7 days per call",
+  });
+
+const REPLAY_DESCRIPTION =
+  "Re-delivers the window's spend envelopes to ONE endpoint through the " +
+  "normal delivery path (per-endpoint stream, retry ladder, delivery log), " +
+  "honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: " +
+  "your consumer's event-id dedup decides what a redelivery means. Mind your " +
+  "downstream billing system's finite dedup window (Metronome 34 days, " +
+  "Stripe 24h+): replaying older than that window can double-bill on your " +
+  "side, so prefer pull-and-diff for old ranges. The window is capped at 7 " +
+  "days per call.";
+
+secured.access(requires("gatewaySpend:manage")).post(
+  "/spend-events/replay",
+  requireBillingPlan,
+  describeRoute({ description: REPLAY_DESCRIPTION }),
+  zValidator("json", replayBodySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const body = c.req.valid("json");
+
+    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoint = await endpoints.getDeliverable({
+      organizationId: organization.id,
+      endpointId: body.endpoint_id,
+    });
+    if (!endpoint) {
+      throw new BadRequestError(
+        "unknown or inactive endpoint for this organization",
+      );
+    }
+
+    const events = new WebhookEventsService({
+      prisma,
+      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) throw new Error("ClickHouse is not configured");
+        return client;
+      }),
+    });
+    const deliveryDeps: WebhookDeliveryProcessDeps = {
+      processStore: new PrismaProcessStore(prisma),
+      endpoints,
+      getPlan: (organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }),
+    };
+
+    // One replay identity per call: it salts batch ids and inbox source
+    // ids so redelivered envelopes cannot collide with their historical
+    // batches; the ENVELOPE ids stay untouched.
+    const replayId = nanoid(10);
+    let replayed = 0;
+    let cursor: string | null = null;
+    do {
+      const page = await events.getEmittedEvents({
+        organizationId: organization.id,
+        fromMs: body.from,
+        toMs: body.to,
+        cursor,
+        limit: 200,
+      });
+      for (const envelope of page.events) {
+        if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
+        if (replayed >= REPLAY_MAX_ENVELOPES) {
+          throw new BadRequestError(
+            `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
+          );
+        }
+        await appendReplayToEndpointStream({
+          deps: deliveryDeps,
+          organizationId: organization.id,
+          projectId: envelope.data.project_id as string,
+          endpoint,
+          envelope: envelope as SendBatchPayload["envelopes"][number],
+          replayId,
+        });
+        replayed++;
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    return c.json({
+      data: {
+        endpoint_id: endpoint.id,
+        replay_id: replayId,
+        replayed,
+        window: {
+          from: new Date(body.from).toISOString(),
+          to: new Date(body.to).toISOString(),
+        },
+      },
+    });
+  },
+);
 
 export const app = secured.hono;

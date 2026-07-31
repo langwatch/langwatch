@@ -2095,6 +2095,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     spendEventsCmd
+      .command("replay")
+      .description("Re-deliver a window's spend envelopes to one endpoint (7-day cap)")
+      .requiredOption("--from <instant>", "ISO-8601 or epoch ms window start")
+      .requiredOption("--to <instant>", "ISO-8601 or epoch ms window end")
+      .requiredOption("--endpoint <id>", "Webhook endpoint id to replay to")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { from: string; to: string; endpoint: string }) => {
+      const { spendReplayCommand: impl } = await import("./commands/spend-events/replay.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
       .command("by-user <endUserId>")
       .description("Windowed spend rollup for one external end user")
       .option("--window <window>", "day|week|month (default month)")

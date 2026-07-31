@@ -128,6 +128,7 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
@@ -787,6 +788,20 @@ export class PipelineRegistry {
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
         attributedDebits: this.deps.attributedDebits,
+        settlement: {
+          // Lazy: the pipeline is being built by this very call, so the
+          // sweeper resolves the command sender at execution time.
+          sendSettleSpend: async (data) => {
+            const pipeline = this.deps.eventSourcing.getPipeline(
+              GATEWAY_SPEND_PIPELINE_NAME as never,
+            ) as unknown as {
+              commands: {
+                settleSpend: { send: (d: unknown) => Promise<unknown> };
+              };
+            };
+            await pipeline.commands.settleSpend.send(data);
+          },
+        },
       }),
     );
   }

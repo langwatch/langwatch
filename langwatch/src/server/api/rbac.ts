@@ -479,8 +479,11 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // webhookEndpoints:view for read-only delivery-log access.
     "webhookEndpoints:view",
     "webhookEndpoints:manage",
-    // Spend reconciliation reads (spend events, end-user rollups).
+    // Spend reconciliation reads (spend events, end-user rollups) and the
+    // operator write on that surface: replaying a window's spend
+    // envelopes to one endpoint.
     "gatewaySpend:view",
+    "gatewaySpend:manage",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

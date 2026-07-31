@@ -123,10 +123,14 @@ export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
 };
 
 /** A buffered envelope with its arrival instant, for the coalescing
- *  deadline and the lag (oldest-undelivered) metric. */
+ *  deadline and the lag (oldest-undelivered) metric. `salt` is set only
+ *  on REPLAYED entries: the batch id hashes it in so a replay of
+ *  already-delivered envelopes cannot collide with the historical
+ *  batch's message key and silently no-op. */
 export interface PendingEnvelope {
   envelope: SendBatchPayload["envelopes"][number];
   appendedAtMs: number;
+  salt?: string;
 }
 
 /**
@@ -277,10 +281,14 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
 
 function batchIdFor(
   endpointId: string,
-  envelopes: ReadonlyArray<{ id: string }>,
+  entries: ReadonlyArray<{ envelope: { id: string }; salt?: string }>,
 ): string {
   const hash = createHash("sha256")
-    .update(envelopes.map((e) => e.id).join(","))
+    .update(
+      entries
+        .map((e) => (e.salt ? `${e.envelope.id}:${e.salt}` : e.envelope.id))
+        .join(","),
+    )
     .digest("hex")
     .slice(0, 16);
   return `${endpointId}:${hash}`;
@@ -313,6 +321,7 @@ async function flushEndpointStream({
   projectId,
   endpoint,
   append,
+  appendSalt,
   sourceEventId,
 }: {
   deps: WebhookDeliveryProcessDeps;
@@ -320,6 +329,7 @@ async function flushEndpointStream({
   projectId: string;
   endpoint: WebhookEndpointView;
   append?: SendBatchPayload["envelopes"][number];
+  appendSalt?: string;
   sourceEventId?: string;
 }): Promise<void> {
   const now = (deps.now ?? Date.now)();
@@ -333,7 +343,15 @@ async function flushEndpointStream({
   });
   const pending: PendingEnvelope[] = [
     ...(existing?.state.pending ?? []),
-    ...(append ? [{ envelope: append, appendedAtMs: now }] : []),
+    ...(append
+      ? [
+          {
+            envelope: append,
+            appendedAtMs: now,
+            ...(appendSalt ? { salt: appendSalt } : {}),
+          },
+        ]
+      : []),
   ];
 
   const outstanding = (
@@ -354,10 +372,9 @@ async function flushEndpointStream({
       endpoint.maxBatchDelayMs === 0 ||
       dueAt(remaining[0]!) <= now)
   ) {
-    const batch = remaining
-      .splice(0, endpoint.maxBatchSize)
-      .map((e) => e.envelope);
-    const batchId = batchIdFor(endpoint.id, batch);
+    const batchEntries = remaining.splice(0, endpoint.maxBatchSize);
+    const batch = batchEntries.map((e) => e.envelope);
+    const batchId = batchIdFor(endpoint.id, batchEntries);
     messages.push({
       messageKey: `send:${batchId}`,
       intentType: "sendBatch",
@@ -458,6 +475,41 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
 
     await runMaintenanceIfDue(deps);
   };
+}
+
+/**
+ * Replay one already-emitted envelope to one endpoint's stream. Rides the
+ * exact live-delivery machinery (buffering, coalescing, the ladder, the
+ * delivery log), so a replayed delivery is operationally indistinguishable
+ * from the original: same envelope, same id (the consumer's dedup key,
+ * unchanged on purpose). The replayId salts the batch identity and the
+ * inbox source id so re-delivering recently-delivered envelopes cannot
+ * collide with their historical batches and silently no-op.
+ */
+export async function appendReplayToEndpointStream({
+  deps,
+  organizationId,
+  projectId,
+  endpoint,
+  envelope,
+  replayId,
+}: {
+  deps: WebhookDeliveryProcessDeps;
+  organizationId: string;
+  projectId: string;
+  endpoint: WebhookEndpointView;
+  envelope: SendBatchPayload["envelopes"][number];
+  replayId: string;
+}): Promise<void> {
+  await flushEndpointStream({
+    deps,
+    organizationId,
+    projectId,
+    endpoint,
+    append: envelope,
+    appendSalt: replayId,
+    sourceEventId: `replay:${replayId}:${endpoint.id}:${envelope.id}`,
+  });
 }
 
 /**

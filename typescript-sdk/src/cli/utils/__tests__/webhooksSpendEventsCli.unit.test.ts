@@ -42,7 +42,7 @@ describe("Feature: CLI families for webhooks and spend events", () => {
 
   /** @scenario The spend-events family covers pull and rollup */
   it("registers spend-events list and by-user", async () => {
-    expect((await commandPaths("spend-events")).sort()).toEqual(["by-user", "list", "summary"]);
+    expect((await commandPaths("spend-events")).sort()).toEqual(["by-user", "list", "replay", "summary"]);
   });
 
   /** @scenario Org-anchored commands resolve the organization API key */

@@ -388,6 +388,113 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(res.status).toBe(422);
   });
 
+  /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
+  it("replays a window to one endpoint with unchanged envelope ids", async () => {
+    const { WebhookEndpointService } = await import(
+      "@ee/webhooks/webhookEndpoint.service"
+    );
+    const { WEBHOOK_DELIVERY_PROCESS_NAME } = await import(
+      "@ee/webhooks/process-manager/webhookDelivery.process"
+    );
+    const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+    process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
+    const endpoints = new WebhookEndpointService({ prisma });
+    let endpointId = "";
+    const ns2 = `${ns}-replay`;
+    try {
+      const created = await endpoints.create({
+        organizationId: organization.id,
+        url: "http://localhost:9/webhooks/replay-test",
+        enabledEvents: ["gateway.request.completed"],
+        // Zero delay: batches ship on append, so the outbox assertion
+        // below sees them without simulating the coalescing wake.
+        maxBatchDelayMs: 0,
+      });
+      endpointId = created.endpoint.id;
+
+      await seed([
+        spendRow(`${ns2}-a`, { occurredAt: new Date(baseTime + 500_000) }),
+        spendRow(`${ns2}-b`, { occurredAt: new Date(baseTime + 501_000) }),
+        // Settled is a different family: the completed-only endpoint must
+        // not receive it, so it never counts toward the replay.
+        spendRow(`${ns2}-s`, {
+          status: "settled" as const,
+          needsReconciliation: true,
+          settleReason: "confirmation_deadline_expired",
+          costUsd: "0.000000",
+          occurredAt: new Date(baseTime + 502_000),
+        }),
+      ]);
+
+      const res = await app.request("/api/gateway/v1/spend-events/replay", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: baseTime + 499_000,
+          to: baseTime + 510_000,
+          endpoint_id: endpointId,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { replayed: number; replay_id: string };
+      };
+      expect(body.data.replayed).toBe(2);
+
+      // The replayed envelopes ride the REAL delivery stream: send-batch
+      // messages exist for the endpoint, and the envelope ids inside are
+      // the original type-suffixed ids, unchanged.
+      const messages = await prisma.processManagerOutbox.findMany({
+        where: {
+          processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+          projectId: { in: [project.id] },
+          messageKey: { startsWith: "send:" },
+        },
+      });
+      const payloads = messages
+        .map((m) => m.payload as { endpointId?: string; envelopes?: Array<{ id: string }> })
+        .filter((p) => p.endpointId === endpointId);
+      const ids = payloads.flatMap((p) => (p.envelopes ?? []).map((e) => e.id));
+      expect(ids.sort()).toEqual([`${ns2}-a:completed`, `${ns2}-b:completed`]);
+
+      // An inverted or over-wide window is refused.
+      const inverted = await app.request(
+        "/api/gateway/v1/spend-events/replay",
+        {
+          method: "POST",
+          headers: { ...headers(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: baseTime + 510_000,
+            to: baseTime + 500_000,
+            endpoint_id: endpointId,
+          }),
+        },
+      );
+      expect(inverted.status).toBe(422);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      } else {
+        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = previous;
+      }
+      if (endpointId) {
+        await prisma.processManagerOutbox.deleteMany({
+          where: {
+            projectId: { in: [project.id] },
+            messageKey: { contains: endpointId },
+          },
+        });
+        await prisma.processManagerInstance.deleteMany({
+          where: {
+            projectId: { in: [project.id] },
+            processKey: `endpoint:${endpointId}`,
+          },
+        });
+        await prisma.webhookEndpoint.deleteMany({ where: { id: endpointId } });
+      }
+    }
+  });
+
   /** @scenario A garbled cursor is refused, not silently reset */
   it("rejects an undecodable cursor with 400", async () => {
     const res = await app.request(

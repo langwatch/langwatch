@@ -78,6 +78,13 @@ export interface SpendEventsPage {
   next_cursor: string | null;
 }
 
+export interface SpendReplayResult {
+  endpoint_id: string;
+  replay_id: string;
+  replayed: number;
+  window: { from: string; to: string };
+}
+
 export interface EndUserSpend {
   end_user_id: string;
   window: string;
@@ -207,6 +214,33 @@ export class SpendEventsApiService {
       "read spend summaries",
       `/api/gateway/v1/spend-summaries?${params.toString()}`,
     );
+  }
+
+  /**
+   * Re-deliver a window's spend envelopes to ONE endpoint through the
+   * normal delivery path. Envelope ids are unchanged (your consumer's
+   * dedup key); mind your downstream billing system's finite dedup
+   * window before replaying old ranges. The window is capped server-side
+   * at 7 days per call.
+   */
+  async replay(options: {
+    from: number;
+    to: number;
+    endpointId: string;
+  }): Promise<SpendReplayResult> {
+    const response = await this.request<{ data: SpendReplayResult }>(
+      "replay spend events",
+      "/api/gateway/v1/spend-events/replay",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          from: options.from,
+          to: options.to,
+          endpoint_id: options.endpointId,
+        }),
+      },
+    );
+    return response.data;
   }
 
   async endUserSpend(

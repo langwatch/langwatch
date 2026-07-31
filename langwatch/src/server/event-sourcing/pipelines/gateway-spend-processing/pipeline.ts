@@ -25,6 +25,11 @@ import {
   GATEWAY_SPEND_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { GatewaySpendProcessingEvent } from "./schemas/events";
+import {
+  SPEND_SETTLEMENT_PROCESS_NAME,
+  spendSettlementPM,
+  type SpendSettlementProcessDeps,
+} from "./process-manager/spendSettlement.process";
 
 export interface GatewaySpendProcessingPipelineDeps {
   gatewaySpendStore: FoldProjectionStore<GatewaySpendState>;
@@ -34,6 +39,9 @@ export interface GatewaySpendProcessingPipelineDeps {
   /** Attributed-user budget debits; absent without the ClickHouse spend
    *  path (per-user buckets cannot exist without the ledger). */
   attributedDebits?: AttributedDebitsProcessDeps;
+  /** The M2 settlement sweeper: settles admissions whose confirmation
+   *  never arrived inside the grace window. */
+  settlement?: SpendSettlementProcessDeps;
 }
 
 /**
@@ -81,6 +89,12 @@ export function createGatewaySpendProcessingPipeline(
     pipeline = pipeline.withProcessManager(
       ATTRIBUTED_DEBITS_PROCESS_NAME,
       attributedUserDebitsPM(deps.attributedDebits),
+    );
+  }
+  if (deps.settlement) {
+    pipeline = pipeline.withProcessManager(
+      SPEND_SETTLEMENT_PROCESS_NAME,
+      spendSettlementPM(deps.settlement),
     );
   }
   return pipeline.build();

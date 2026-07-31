@@ -199,6 +199,46 @@ Feature: Billing spend events, one durable record per gateway request
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
 
+  Rule: Silence settles, and settlement is never the last word
+
+    @integration
+    Scenario: An unconfirmed admission settles when the grace expires
+      Given an admitted request whose confirmation never arrives
+      When the settlement grace elapses
+      Then the sweeper issues settleSpend for that request
+
+    @integration
+    Scenario: A confirmation inside the grace stands the sweeper down
+      Given an admitted request
+      When its confirmation arrives inside the grace
+      Then the armed settlement wake is cleared and nothing settles
+
+    @integration
+    Scenario: An outcome racing ahead of its admission arms no wake
+      Given a confirmation that arrived before its admission
+      Then the late admission arms no settlement wake
+
+    @integration
+    Scenario: Duplicate wakes cannot double-settle
+      Given a settlement wake that already fired
+      Then a duplicate wake issues no second settle
+
+    @integration
+    Scenario: The full settlement sequence: silent admission settles, a late confirmation supersedes
+      Given an admission folded to the spend record with no outcome
+      When the sweeper settles it and a late confirmation then arrives
+      Then the settled row carries unknown cost and needs reconciliation
+      And the confirmation replaces it with the rated record and the completed envelope
+
+  Rule: Replay re-delivers, the consumer's dedup decides
+
+    @integration
+    Scenario: Replay re-delivers a window's envelopes to one endpoint through the delivery path
+      Given emitted spend envelopes in a window
+      When the window is replayed to one endpoint
+      Then matching envelopes ride the normal delivery stream with unchanged ids
+      And an inverted or over-wide window is refused
+
   Rule: The pull surface serves the ledger, in-flight rows included
 
     @unit
