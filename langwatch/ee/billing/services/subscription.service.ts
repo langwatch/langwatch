@@ -30,6 +30,7 @@ import {
   stripePricesFile,
 } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
+import { translateStripeError } from "../stripe/translateStripeError";
 import {
   type BillingInterval,
   isGrowthSeatEventPlan,
@@ -401,10 +402,17 @@ export class EESubscriptionService implements SubscriptionService {
       return [];
     }
 
-    const invoices = await this.stripe.invoices.list({
-      customer: stripeCustomerId,
-      limit: RECENT_INVOICES_LIMIT,
-    });
+    let invoices: Stripe.ApiList<Stripe.Invoice>;
+    try {
+      invoices = await this.stripe.invoices.list({
+        customer: stripeCustomerId,
+        limit: RECENT_INVOICES_LIMIT,
+      });
+    } catch (error) {
+      // Rate limit / unreachable provider become a handled "try again";
+      // anything else stays unhandled and degrades to unknown at the boundary.
+      throw translateStripeError(error);
+    }
 
     return invoices.data
       .filter((inv) => inv.status !== "draft")

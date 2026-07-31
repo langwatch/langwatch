@@ -28,6 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import {
   GovernanceOcsfEventsClickHouseRepository,
@@ -88,19 +89,11 @@ afterAll(async () => {
       query_params: { tenantId: govProjectId },
     })
     .catch(() => {});
-  await prisma.project
-    .deleteMany({
-      where: { teamId: { in: [] }, slug: `governance-${organizationId}` },
-    })
-    .catch(() => {});
-  // Direct project delete by id (within team-scoped multi-tenancy).
-  await prisma.project
-    .deleteMany({ where: { team: { organizationId } } })
-    .catch(() => {});
-  await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { slug: `--ocsf-ver-${ns}` } })
-    .catch(() => {});
+  await cleanupTestRows(prisma, [
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { slug: `--ocsf-ver-${ns}` }],
+  ]);
 });
 
 describe("OCSF schema-version forward-compat", () => {

@@ -163,8 +163,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     });
 
   useEffect(() => {
+    let resetTimeout: ReturnType<typeof setTimeout> | undefined;
     if (props.datasetToSave) {
-      setTimeout(() => {
+      resetTimeout = setTimeout(() => {
         reset({
           name: props.datasetToSave!.name ?? "",
           columnTypes: props.datasetToSave!.columnTypes,
@@ -177,6 +178,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       });
     }
     resetSlugInfo();
+    return () => {
+      if (resetTimeout) clearTimeout(resetTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 

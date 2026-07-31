@@ -524,9 +524,10 @@ async function ensurePrincipalBudget(handles: SeedHandles): Promise<void> {
     create: {
       id: `dogfood-principal-budget-${handles.userId}`,
       organizationId: handles.organizationId,
+      // Post-ADR-021 the (scopeType, scopeId) pair is the only stored
+      // representation of the target; the typed FK columns are gone.
       scopeType: "PRINCIPAL",
       scopeId: handles.userId,
-      principalUserId: handles.userId,
       name: "Personal monthly cap",
       description: "Dogfood seed: $50/month spend cap on personal VK usage",
       window,

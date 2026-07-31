@@ -36,7 +36,7 @@ import {
   expect,
   it,
 } from "vitest";
-
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
@@ -183,37 +183,18 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
   });
 
   afterAll(async () => {
-    // A `beforeAll` that threw partway leaves these ids unset, and Prisma
-    // drops an `undefined` from a where clause rather than matching
-    // nothing: `deleteMany({ where: { id: undefined } })` is
-    // `deleteMany({})`, which empties the table. This database is shared
-    // with every other suite and worktree, so a broken setup must not
-    // escalate into a destructive teardown.
-    const orgIds = [orgId, outsiderOrgId].filter(Boolean);
-    if (orgIds.length === 0) return;
-
-    await prisma.modelProvider
-      .deleteMany({
-        where: { organizationId: { in: orgIds } },
-      })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId: { in: orgIds } } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organizationId: { in: orgIds } },
-      })
-      .catch(() => {});
-    if (teamId) {
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    }
-    await prisma.organization
-      .deleteMany({ where: { id: { in: orgIds } } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: {
+    await cleanupTestRows(prisma, [
+      // ModelProvider's tenancy guard takes a literal organizationId,
+      // not an in-list, so one entry per organization.
+      ["modelProvider", { organizationId: orgId }],
+      ["modelProvider", { organizationId: outsiderOrgId }],
+      ["roleBinding", { organizationId: { in: [orgId, outsiderOrgId] } }],
+      ["organizationUser", { organizationId: { in: [orgId, outsiderOrgId] } }],
+      ["team", { id: teamId }],
+      ["organization", { id: { in: [orgId, outsiderOrgId] } }],
+      [
+        "user",
+        {
           email: {
             in: [
               `noproj-admin-${ns}@example.com`,
@@ -223,8 +204,8 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
             ],
           },
         },
-      })
-      .catch(() => {});
+      ],
+    ]);
   });
 
   it("has no project, which is the state under test", async () => {
@@ -680,6 +661,11 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
     // The gate has to let the legitimate case through, or the fix is just
     // a broken feature. An org admin reaches the probe, and the recorded
     // call proves it got as far as the network.
+    //
+    // The host is unreachable by design, so the probe raises rather than
+    // returning a verdict on the key — reaching *that* failure is the proof
+    // the gate let this caller through, since a refused caller is turned
+    // back on permissions before any request is made.
     /** @scenario "Checking a credential for a scope I can manage" */
     it("lets an org admin through to the request", async () => {
       await expect(
@@ -692,9 +678,40 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
           },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
         }),
-      ).resolves.toEqual(expect.objectContaining({ valid: false }));
+      ).rejects.toThrow(/Could not reach custom/);
 
       expect(fetchCalls.length).toBeGreaterThan(0);
+    });
+
+    // A host the customer typed being unreachable is not our outage. tRPC
+    // v10 has no code for 502, so the envelope necessarily says
+    // INTERNAL_SERVER_ERROR — the attribution has to survive on the handled
+    // cause instead, which is what `handleTrpcCallLogging` reads for the
+    // status it records and what the client reads as
+    // `data.error.httpStatus`.
+    //
+    // The sentence asserted above is server-side only — the formatter
+    // replaces it with the code on the wire — so what the customer actually
+    // reads is pinned in the hook's unit test instead.
+    /** @scenario "An unreachable provider is not recorded as our own failure" */
+    it("blames the provider rather than us when the host never answers", async () => {
+      await expect(
+        callerFor(adminUserId).modelProvider.validateApiKey({
+          organizationId: orgId,
+          provider: "custom",
+          customKeys: {
+            CUSTOM_API_KEY: "x",
+            CUSTOM_BASE_URL: "https://example.invalid/v1",
+          },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+        }),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          code: "provider_unreachable",
+          fault: "provider",
+          httpStatus: 502,
+        }),
+      });
     });
   });
 

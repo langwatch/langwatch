@@ -1,5 +1,8 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import {
+  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+  graphTriggerActivityGroupKey,
+} from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
@@ -104,6 +107,11 @@ export function createEvaluationProcessingPipeline(
         extend: false,
         replace: false,
       },
+      // Same tenant lane as the trace-processing registration: the group id
+      // carries no pipeline segment, so both pipelines' sweeps serialize in
+      // ONE lane per tenant — a sweep evaluates all of the tenant's graph
+      // triggers regardless of which event kind woke it.
+      groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
     });

@@ -24,16 +24,16 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { prisma } from "../../../db";
 import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { grantOrganizationAdmin } from "./helpers/roleBindings";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
+describe("enterprise feature guards", () => {
   const testNamespace = `ent-guard-${nanoid(8)}`;
   let organizationId: string;
   let userId: string;
@@ -103,6 +103,15 @@ describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
       },
     });
 
+    // Without these the caller is refused at the permission gate and never
+    // reaches the enterprise guard each test here is about — see the helper.
+    await grantOrganizationAdmin({
+      prisma,
+      organizationId: organization.id,
+      userId: user.id,
+      teamId: team.id,
+    });
+
     // Create a custom role for tests that need one
     const role = await prisma.customRole.create({
       data: {
@@ -130,40 +139,22 @@ describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
-    await prisma.teamUser
-      .deleteMany({
-        where: {
-          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
-        },
-      })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
-      })
-      .catch(() => {});
-    await prisma.customRole
-      .deleteMany({
-        where: {
-          organization: { slug: `--test-org-${testNamespace}` },
-        },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organization: { slug: `--test-org-${testNamespace}` } },
-      })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({
-        where: { slug: `--test-org-${testNamespace}` },
-      })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: { email: `test-${testNamespace}@example.com` },
-      })
-      .catch(() => {});
+    // Literal ids rather than namespace filters: the org and team tenancy
+    // guards refuse a relation predicate, and the roles the tests create
+    // carry this org anyway. The bindings hold an FK to CustomRole, so
+    // they go first.
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      // The suite's own tests create invites and teams, so everything is
+      // swept by organization rather than by the ids beforeAll captured.
+      ["organizationInvite", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["customRole", { organizationId }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { email: `test-${testNamespace}@example.com` }],
+    ]);
   });
 
   function createCaller() {

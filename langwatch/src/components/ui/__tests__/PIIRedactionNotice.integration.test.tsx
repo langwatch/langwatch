@@ -5,12 +5,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { slug: "acme" },
-  }),
-}));
-
 vi.mock("~/utils/compat/next-link", () => ({
   default: ({
     href,
@@ -63,7 +57,11 @@ describe("PIIRedactionNotice", () => {
       const link = screen.getByRole("link", {
         name: /Settings/i,
       });
-      expect(link.getAttribute("href")).toBe("/acme/settings");
+      // The banner names privacy settings, so it links to the page that
+      // holds them. Settings is a top-level route: a project-slug prefix
+      // has no route behind it and lands the reader on a 404 or, for a
+      // member whose ambient team resolves elsewhere, on a refusal.
+      expect(link.getAttribute("href")).toBe("/settings/data-privacy");
     });
 
     it("renders the banner for a secret marker", () => {

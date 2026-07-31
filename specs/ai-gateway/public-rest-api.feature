@@ -1,125 +1,316 @@
 Feature: Public REST API — /api/gateway/v1/*
 
-  # All scenarios in this file describe the public REST API surface
-  # for the AI Gateway control plane (VK CRUD, budget CRUD, provider
-  # binding CRUD, RBAC scope checks, OpenAPI schema). The tRPC routers
-  # exist (langwatch/src/server/api/routers/{virtualKeys,gatewayBudgets,
-  # gatewayProviders,gatewayCacheRules}.ts) but no integration test
-  # harness has been added in langwatch/src/server/api/routers/__tests__/
-  # for these specific routers. All aspirational pending the router
-  # integration tests; the underlying service-layer business logic is
-  # already covered by langwatch/src/server/gateway/__tests__/ and
-  # bound piecewise from virtual-keys.feature and budgets.feature.
+  # The public REST surface for the AI Gateway control plane: virtual key
+  # CRUD + spend, budget CRUD across every scope dimension, cache rules.
+  # Bound scenarios run in
+  # langwatch/src/app/api/gateway-platform/__tests__/ against the real
+  # Hono app, real Postgres, and real ClickHouse.
 
   As a LangWatch customer integrating with the AI Gateway programmatically
-  I want a stable REST API that mirrors the tRPC routers used by the UI
-  So that CLI/scripts/CI/SDKs can manage VKs, budgets, and provider bindings
-  without having to shell out to the dashboard.
+  I want a stable REST API that behaves exactly like the tRPC routers the UI uses
+  So that a backend can mint a key per customer, cap it, and read its spend back
+  without a browser session anywhere in the loop.
 
-  The public REST API is exposed by Hono under /api/gateway/v1/* in the
-  LangWatch control plane, authenticated via standard project API tokens
-  (the same tokens used for /api/traces, /api/prompts, etc.). It shares a
-  service layer with the tRPC routers — there is zero duplicate business
-  logic; only DTO mappers differ (snake_case REST vs camelCase tRPC).
+  The API is exposed by Hono under /api/gateway/v1/*, authenticated by a
+  legacy project API key or a scoped API key (Bearer + X-Project-Id).
+  There is exactly one implementation of every write rule: REST handlers
+  route through the SAME service-layer methods and pre-flight asserts as
+  the tRPC mutations (VirtualKeyService, GatewayBudgetService,
+  virtualKey.authz), so the two doors cannot drift apart. Handlers
+  translate wire casing and map errors; they add no business rules.
 
   Background:
-    Given a project "acme-prod" exists with 1 team and 1 organization above it
-    And that project has an API token "sess_abc" with scopes:
-      | scope                   |
-      | virtualKeys:manage      |
-      | gatewayBudgets:manage   |
-      | gatewayProviders:manage |
-    And a model-provider "openai" is configured on the project
+    Given a project "acme-prod" with a team and an organization above it
+    And the organization has a governance project for org-scoped keys' traces
+    And the deployment has the ClickHouse spend ledgers configured
 
   # ============================================================================
-  # Auth
+  # Auth + permission ceiling
   # ============================================================================
 
-  @integration @rest @unimplemented
-  Scenario: Reject unauthenticated calls
-    When I send `GET /api/gateway/v1/virtual-keys` with no Authorization header
+  @integration @rest
+  Scenario: Reject unauthenticated gateway REST calls
+    When I send `GET /api/gateway/v1/virtual-keys` with no credentials
     Then the response status is 401
-    And the body has error.type = "unauthenticated"
 
-  @integration @rest @unimplemented
-  Scenario: Reject tokens missing the required scope
-    Given API token "sess_readonly" has only scope "virtualKeys:view"
-    When I send `POST /api/gateway/v1/virtual-keys` with token "sess_readonly"
+  @integration @rest @pat
+  Scenario: A viewer-scoped API key can list but not create virtual keys
+    Given a scoped API key whose bindings grant VIEWER at the project
+    When they send `GET /api/gateway/v1/virtual-keys`
+    Then the response status is 200
+    When they send `POST /api/gateway/v1/virtual-keys`
     Then the response status is 403
-    And the body has error.type = "permission_denied"
-    And error.code references "virtualKeys:create"
-
-  # ============================================================================
-  # Scoped API-key permission ceiling (b8fb945b3 — API-key rebase follow-up)
-  # ============================================================================
+    # The ceiling: effective = key bindings ∩ owning user's current bindings.
 
   @integration @rest @pat @unimplemented
-  Scenario: Scoped API keys exercise routes only within their scoped role (permission ceiling)
-    Given a user "alice" has role-bindings at project scope:
-      | permission               |
-      | virtualKeys:view         |
-      | virtualKeys:rotate       |
-    And that user issues a scoped API key "lwp_alice_ro" scoped to the SAME bindings
-    When they send `GET /api/gateway/v1/virtual-keys` with API key "lwp_alice_ro"
-    Then the response status is 200
-    When they send `POST /api/gateway/v1/virtual-keys` with API key "lwp_alice_ro"
-    Then the response status is 403 permission_denied
-    And error.code references "virtualKeys:create" as the missing permission
-    When they send `POST /api/gateway/v1/virtual-keys/vk_xxx/rotate` with API key "lwp_alice_ro"
-    Then the response status is 200
-
-  @integration @rest @pat @unimplemented
-  Scenario: Scoped API-key effective access = key bindings ∩ user's current bindings
-    Given an API key "lwp_bob_admin" originally scoped to "virtualKeys:manage" when user "bob" had that role
-    And user "bob"'s role has since been demoted to MEMBER (no :create, :update, :rotate, :delete)
-    When they send `POST /api/gateway/v1/virtual-keys` with API key "lwp_bob_admin"
-    Then the response status is 403 permission_denied
-    # Demoting the user immediately neutralises outstanding API keys without rotation.
-
-  @integration @rest @pat @security @unimplemented
   Scenario: A scoped API key fails closed when a linked custom-role row has malformed permissions (583f27ff6)
     Given an API key "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array
-    # This could happen after a bad migration or direct DB edit.
     When they send `GET /api/gateway/v1/virtual-keys` with API key "lwp_broken"
     Then the response status is 403
-    # The ceiling check raises a scope-violation error instead of falling back to empty-array
-    # (which would silently grant an "empty" ceiling and let every call through).
     # Parity with role-binding-resolver.ts: malformed permissions → no grants → deny.
 
-  @integration @rest @pat @unimplemented
-  Scenario: Legacy project API tokens bypass the API-key ceiling (full access)
-    Given a legacy project API token "sess_legacy" tied to project "acme-prod"
-    When they send `POST /api/gateway/v1/virtual-keys` with token "sess_legacy"
+  # ============================================================================
+  # Virtual keys: create
+  # ============================================================================
+
+  @integration @rest
+  Scenario: Create a virtual key with the SDK's current shape
+    When I send `POST /api/gateway/v1/virtual-keys` with body `{ "name": "ci-key" }`
     Then the response status is 201
-    # Project tokens predate scoped API keys and keep full access for backcompat —
-    # same behavior the unified-auth rebase (#3213) established for every other route.
+    And the body has a `secret` starting with "vk-lw-", returned exactly once
+    And `virtual_key.scopes` defaults to the caller's project
+    And `virtual_key.routing_mode` is "NONE" and `virtual_key.purpose` is "user"
+    And the response carries no `provider_credential_ids` field
+    And a subsequent GET returns the key without the secret
 
-  Scenario Outline: API-key ceiling mapping for every gateway REST route (b8fb945b3)
-    Given a scoped API key with only "<permission>"
-    When they send `<method> <path>`
-    Then the response is allowed (200/201) on a matching permission and 403 on a mismatch
+  @integration @rest
+  Scenario: Ghost provider_credential_ids no longer gates creation
+    # The old schema required min(1) ids of an entity deleted in iter 110,
+    # so the SDK's own requests failed validation (#6260). Unknown fields
+    # are stripped, never demanded.
+    When I send a create body that still carries `provider_credential_ids`
+    Then the response status is 201
 
-    Examples:
-      | method | path                                          | permission                 |
-      | GET    | /api/gateway/v1/virtual-keys                  | virtualKeys:view           |
-      | POST   | /api/gateway/v1/virtual-keys                  | virtualKeys:create         |
-      | GET    | /api/gateway/v1/virtual-keys/:id              | virtualKeys:view           |
-      | PATCH  | /api/gateway/v1/virtual-keys/:id              | virtualKeys:update         |
-      | POST   | /api/gateway/v1/virtual-keys/:id/rotate       | virtualKeys:rotate         |
-      | POST   | /api/gateway/v1/virtual-keys/:id/revoke       | virtualKeys:delete         |
-      | GET    | /api/gateway/v1/providers                     | gatewayProviders:view      |
-      | POST   | /api/gateway/v1/providers                     | gatewayProviders:manage    |
-      | PATCH  | /api/gateway/v1/providers/:id                 | gatewayProviders:update    |
-      | DELETE | /api/gateway/v1/providers/:id                 | gatewayProviders:manage    |
-      | GET    | /api/gateway/v1/budgets                       | gatewayBudgets:view        |
-      | POST   | /api/gateway/v1/budgets                       | gatewayBudgets:create      |
-      | PATCH  | /api/gateway/v1/budgets/:id                   | gatewayBudgets:update      |
-      | DELETE | /api/gateway/v1/budgets/:id                   | gatewayBudgets:delete      |
-      | GET    | /api/gateway/v1/cache-rules                   | gatewayCacheRules:view     |
-      | POST   | /api/gateway/v1/cache-rules                   | gatewayCacheRules:create   |
-      | GET    | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:view     |
-      | PATCH  | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:update   |
-      | DELETE | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:delete   |
+  @integration @rest
+  Scenario: Explicit project scopes are accepted with config
+    When I create a key with explicit PROJECT scopes, routing_mode FALLBACK_ALL, and a config
+    Then the response status is 201
+    And the config round-trips on the returned DTO
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot mint keys beyond its own project
+    # Legacy project keys keep their historical power: full access to their
+    # own project, nothing above it. Broader provisioning requires a scoped
+    # API key that can prove the grants.
+    When a legacy project key requests an ORGANIZATION-scoped key
+    Then the response status is 403
+    And the error names the missing `virtualKeys:manage` grant
+
+  @integration @rest @rbac
+  Scenario: An org-admin API key provisions an org-scoped key
+    Given a scoped API key whose bindings grant ADMIN at the organization
+    When they create a key with scopes `[{"scope_type": "ORGANIZATION", "scope_id": <org>}]`
+    Then the response status is 201
+    And the key is reachable org-wide
+
+  @integration @rest @rbac
+  Scenario: A member API key passes the route gate but not per-scope manage
+    # MEMBER holds virtualKeys:create (the route ceiling) but not
+    # virtualKeys:manage — the per-scope gate the tRPC create enforces.
+    # If REST ever stops running the shared per-scope assert, this
+    # returns 201 and the suite fails: the drift guard for #6260.
+    Given a scoped API key whose bindings grant MEMBER at the project
+    When they send `POST /api/gateway/v1/virtual-keys`
+    Then the response status is 403
+    And the error names `virtualKeys:manage`
+
+  @integration @rest
+  Scenario: Org-scoped key creation without a governance project is refused
+    # The trace_project_required invariant lives in VirtualKeyService.create
+    # and nowhere else — REST refusing here proves it runs the service.
+    Given an organization with no governance project
+    When an org-admin API key creates an ORGANIZATION-scoped key there
+    Then the response status is 400
+    And error.code is "trace_project_required"
+
+  @integration @rest @rbac
+  Scenario: An explicit trace destination gives an org-scoped key a home for its spend
+    Given the same organization with no governance project
+    When the org-admin creates the ORGANIZATION-scoped key with `trace_project_id` naming a project there
+    Then the response status is 201 and the DTO echoes `trace_project_id`
+    # The destination routes traces AND budget debits into that project,
+    # so choosing it needs `virtualKeys:manage` on the target project:
+    When a legacy project key names a sibling team's project as the destination
+    Then the response status is 403
+
+  @integration @rest @rbac
+  Scenario: Cross-org scopes are rejected
+    When an org-admin API key requests a scope belonging to another organization
+    Then the response status is 400
+    And error.code is "gateway_scope_org_mismatch"
+
+  @integration @rest
+  Scenario: routing_mode POLICY requires a routing policy id
+    When I create a key with routing_mode "POLICY" and no routing_policy_id
+    Then the response status is 400
+    And error.code is "routing_policy_required"
+
+  @integration @rest
+  Scenario: The product-managed purpose cannot be minted over REST
+    # A product-managed key is hidden from reads and refuses mutations —
+    # nothing a customer can ever want to mint against themselves.
+    When I create a key with purpose "langy"
+    Then the response status is 400 with error.code "validation_error"
+
+  @integration @rest @budgets
+  Scenario: A key and its cap are created atomically over REST
+    When I create a key with `budget: { "limit_usd": "12.50", "window": "MONTH" }`
+    Then the response status is 201
+    And a VIRTUAL_KEY-scoped GatewayBudget targeting the new key exists in the same transaction
+
+  @integration @rest @budgets
+  Scenario: A malformed cap is refused with the shared validation
+    # The budget wire parses through the SAME zod schema the tRPC create
+    # uses, so a cap tRPC would refuse cannot arrive via REST.
+    When I create a key with `budget: { "limit_usd": "10abs", "window": "MONTH" }`
+    Then the response status is 400
+    And the message names `limit_usd`
+
+  # ============================================================================
+  # Virtual keys: lifecycle + visibility + audit
+  # ============================================================================
+
+  @integration @audit
+  Scenario: Writes from a scoped API key are attributed to its user
+    When a scoped API key creates a key
+    Then the AuditLog row for `gateway.virtual_key.created` carries the key's owning user id
+
+  @integration @audit
+  Scenario: Writes from a legacy project key are attributed to the machine principal
+    When a legacy project key creates a key
+    Then the AuditLog row carries the synthetic actor `svc_<projectId>`
+
+  @integration @rest @rbac
+  Scenario: A sibling team's keys are invisible to the project credential
+    Given a key scoped to a sibling team's project in the same organization
+    When I list keys and GET that key by id with my project credential
+    Then the list omits it and the GET is a 404
+    # Same membership-shaped visibility as the tRPC list: org-scoped keys,
+    # own team, own project — never a sibling team's.
+
+  @integration @rest
+  Scenario: Update renames and re-caps a key through the shared service
+    When I PATCH name and budget on an existing key
+    Then the response status is 200
+    And unspecified fields (description) are left untouched
+    And the key's own budget row reflects the new window
+
+  @integration @rest @rbac
+  Scenario: Re-scoping over REST demands manage at the new scope
+    When a legacy project key PATCHes a key's scopes to ORGANIZATION
+    Then the response status is 403
+
+  @integration @rest
+  Scenario: Rotate returns a fresh secret exactly once
+    When I POST /virtual-keys/:id/rotate
+    Then the response status is 200 with a new `secret` different from the old one
+
+  @integration @rest
+  Scenario: Revoke is idempotent and archives the key's cap
+    When I POST /virtual-keys/:id/revoke twice
+    Then both responses are 200 with `virtual_key.status` "revoked"
+    And every VIRTUAL_KEY-scoped budget targeting the key is archived, not deleted
+
+  @integration @rest
+  Scenario: Product-managed keys refuse customer-facing reads and mutations
+    Given a purpose-LANGY key scoped to the caller's project
+    Then GET by id is a 404 and rotate is a 404
+    # Absent, not forbidden: a distinct error would confirm the id exists.
+
+  # ============================================================================
+  # Budgets
+  # ============================================================================
+
+  @integration @rest @budgets
+  Scenario: A VK-scoped budget created over REST is visible in the REST list
+    # Create-then-list must round-trip. Before #6261 the list filtered to
+    # ORGANIZATION/TEAM/PROJECT and hid the very rows POST /budgets minted.
+    When I create a VIRTUAL_KEY-scoped and a PRINCIPAL-scoped budget over REST
+    Then `GET /api/gateway/v1/budgets` returns both, with `spend_available: true`
+    And `?scope_type=VIRTUAL_KEY` filters to VIRTUAL_KEY rows only
+    And `?scope_type=ORGANIZATION,TEAM` excludes them
+
+  @integration @rest @budgets
+  Scenario: An invalid scope_type filter is refused
+    When I send `GET /api/gateway/v1/budgets?scope_type=BANANA`
+    Then the response status is 400
+
+  @integration @rest @budgets
+  Scenario: A PRINCIPAL budget must target a member of the org
+    When I create a PRINCIPAL budget for a user outside the organization
+    Then the response status is 400
+    # Otherwise the budget would be a silent no-op that never matches traffic.
+
+  @integration @rest @budgets
+  Scenario: A TEAM budget cannot target another org's team
+    When I create a TEAM budget naming a foreign organization's team id
+    Then the response status is 400
+
+  @integration @rest @budgets @groups
+  Scenario: A GROUP budget over REST carries the per-member semantics
+    Given a group with 2 members
+    When I create a GROUP-scoped budget with limit_usd "40"
+    Then the response status is 201 with scope_type "GROUP" and member_count 2
+    And the list row says limit_usd "40" (the PER-MEMBER allowance) while spent_usd sums the whole group's ledger buckets
+
+  @integration @rest @budgets @groups
+  Scenario: A GROUP budget cannot target another org's group
+    When a foreign tenant's key names my group id
+    Then the response status is 400
+
+  @integration @rest @budgets
+  Scenario: A provider-filtered budget round-trips provider_key
+    When I create a budget with `provider_key` naming my org's model provider
+    Then the response status is 201 and the DTO echoes `provider_key`
+    When a foreign tenant names the same provider id
+    Then the response status is 400 with error "gateway_scope_org_mismatch" naming the model provider
+
+  @integration @rest @budgets @clickhouse
+  Scenario: REST budget spend is the live ClickHouse ledger, not the stale PG column
+    # The #6248 wiring proof: the PG `spentUsd` column has had no writer
+    # since the ledger cutover. A REST service constructed without the
+    # ClickHouse repository reports the stale "0" here and fails.
+    Given a VK-scoped budget whose ledger carries a 1.25 USD debit
+    And the PG spentUsd column still reads "0"
+    When I list budgets over REST
+    Then the row's spent_usd is "1.25"
+
+  @integration @rest @budgets
+  Scenario: Budget update and archive over REST
+    When I PATCH limit_usd and on_breach, then DELETE the budget
+    Then the update echoes the new values and the delete returns archived_at non-null
+    And historical ledger entries are retained
+
+  # ============================================================================
+  # Per-key spend read
+  # ============================================================================
+
+  @integration @rest @spend
+  Scenario: A fresh key reports zero spend for the current month
+    When I send `GET /api/gateway/v1/virtual-keys/:id/spend` with no window params
+    Then the response status is 200
+    And spent_usd is "0" with requests 0
+    And the echoed window starts at the first of the current UTC month
+    # Zero is only honest because the spend source is present; without it
+    # the endpoint answers 412 spend_source_unavailable instead.
+
+  @integration @rest @spend @clickhouse
+  Scenario: Key spend over REST reads the same trace_summaries the UI reads
+    Given two traces for the key in trace_summaries costing 0.75 and 0.50
+    When I read the key's spend over REST
+    Then spent_usd is "1.25" and requests is 2
+    # Same repository as the dashboard's spend column and the Usage tab,
+    # so the REST number and the UI agree by construction.
+
+  @integration @rest @spend
+  Scenario: The spend read validates its window
+    When I send `from` after `to`
+    Then the response status is 400
+
+  @integration @rest @spend
+  Scenario: Spend for an unknown key is a 404, not a zero
+    When I read spend for a key id that does not exist
+    Then the response status is 404
+
+  # ============================================================================
+  # Provider bindings (folded away in iter 110)
+  # ============================================================================
+
+  @integration @rest
+  Scenario: Provider binding routes are gone since the ModelProvider fold
+    When I send `GET /api/gateway/v1/providers`
+    Then the response status is 410
+    And the message points at /api/gateway-platform/v1/model-providers
 
   # ============================================================================
   # Cache rules (Lane B iter 41 — 547f96bdd)
@@ -151,8 +342,6 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 201
     And body.id is a 21-character nanoid (no prefix — `GatewayCacheRule.id @default(nanoid())`)
     And body.mode_enum = "FORCE"
-    # mode_enum is upper-case on wire for Prometheus label filtering convenience;
-    # action.mode remains lowercase (matches Kind enum in cacheoverride package).
     And body.archived_at is null
     And a GatewayChangeEvent (CACHE_RULE_CREATED) was emitted
 
@@ -165,8 +354,6 @@ Feature: Public REST API — /api/gateway/v1/*
       """
     Then the response status is 200
     And body.matchers equals exactly {"model": "claude-haiku-*"}
-    # The vk_tags field was NOT kept — PATCH on matchers/action is REPLACE semantics.
-    # Name, description, priority, enabled are field-level patches (merge).
 
   @integration @rest @cache-rules @unimplemented
   Scenario: DELETE is a soft archive and returns the archived row (not 204)
@@ -175,7 +362,6 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 200
     And body.archived_at is a non-null ISO-8601 timestamp
     And a GatewayChangeEvent (CACHE_RULE_DELETED) was emitted
-    # CLI scripts can confirm the archivedAt from the response without a re-GET.
 
   @integration @rest @cache-rules @unimplemented
   Scenario: GET /:id returns 404 for archived rules
@@ -191,120 +377,6 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 403 permission_denied
     And error.code references "gatewayCacheRules:create"
 
-  @integration @rest @cache-rules @unimplemented
-  Scenario: OpenAPI schema tags all cache-rules routes under "Cache Rules"
-    Given the OpenAPI spec at /api/gateway/v1/openapi.json
-    When I inspect paths for /cache-rules and /cache-rules/{id}
-    Then every operation has tag "Cache Rules"
-    And every operation has a `security` requirement naming the Bearer token
-
-  # ============================================================================
-  # Virtual keys
-  # ============================================================================
-
-  @integration @rest @unimplemented
-  Scenario: Create a virtual key
-    Given a gateway-provider-credential "mp_openai_primary" is bound on project "acme-prod"
-    When I send `POST /api/gateway/v1/virtual-keys` with token "sess_abc" and body:
-      """
-      {
-        "name": "ci-key",
-        "environment": "live",
-        "provider_model_provider_ids": ["mp_openai_primary"]
-      }
-      """
-    Then the response status is 201
-    And the body has a non-empty `secret` field starting with "vk-lw-"
-    And the body's `virtual_key.name` is "ci-key"
-    And the body's `virtual_key.prefix` + "..." + `virtual_key.last_four` reconstructs the secret-visible portion
-    And subsequent GET of the same key returns the virtual_key but NOT the secret
-
-  @integration @rest @unimplemented
-  Scenario: Reject VK creation without at least one provider
-    When I send `POST /api/gateway/v1/virtual-keys` with body:
-      """
-      { "name": "no-providers", "provider_model_provider_ids": [] }
-      """
-    Then the response status is 400
-    And error.type = "bad_request"
-    And error.code = "validation_error"
-
-  @integration @rest @unimplemented
-  Scenario: Rotate a virtual key
-    Given a virtual key "vk_1" exists on project "acme-prod"
-    When I send `POST /api/gateway/v1/virtual-keys/vk_1/rotate`
-    Then the response status is 200
-    And the body has a new `secret` (different from the previous one)
-    And the previous secret no longer validates against /resolve-key
-
-  @integration @rest @unimplemented
-  Scenario: Revoke a virtual key is idempotent
-    Given a virtual key "vk_1" exists with status "ACTIVE"
-    When I send `POST /api/gateway/v1/virtual-keys/vk_1/revoke`
-    Then the response status is 200 and `virtual_key.status` is "REVOKED"
-    When I send the same revoke call again
-    Then the response status is 200 and `virtual_key.status` is still "REVOKED"
-    And an AuditLog entry (gateway shape) exists for each of the two revoke calls
-
-  # ============================================================================
-  # Budgets
-  # ============================================================================
-
-  @integration @rest @unimplemented
-  Scenario: Create a hierarchical budget
-    When I send `POST /api/gateway/v1/budgets` with body:
-      """
-      {
-        "scope": { "kind": "TEAM", "team_id": "team_acme" },
-        "name": "acme team monthly",
-        "window": "MONTH",
-        "limit_usd": 5000,
-        "on_breach": "WARN"
-      }
-      """
-    Then the response status is 201
-    And the body has `budget.scope_type` = "TEAM"
-    And `budget.spent_usd` = "0"
-    And `budget.resets_at` is approximately 30 days from now
-
-  @integration @rest @unimplemented
-  Scenario: Archive a budget (soft-delete preserves history)
-    Given a budget "bgt_1" exists with 5 debited rows in the ledger
-    When I send `DELETE /api/gateway/v1/budgets/bgt_1`
-    Then the response status is 200
-    And `budget.archived_at` is non-null
-    And the 5 ledger rows still exist in the database
-    And subsequent `/budget/check` calls for the same scope do NOT count the archived budget
-
-  # ============================================================================
-  # Provider bindings
-  # ============================================================================
-
-  @integration @rest @unimplemented
-  Scenario: Bind a ModelProvider to the gateway
-    When I send `POST /api/gateway/v1/providers` with body:
-      """
-      {
-        "model_provider_id": "mp_openai",
-        "slot": "primary",
-        "rate_limit_rpm": 10000,
-        "rate_limit_tpm": 1000000,
-        "rotation_policy": "manual"
-      }
-      """
-    Then the response status is 201
-    And the body has `model_provider.id` starting with "mp_"
-    And subsequent `GET /providers` lists the new binding with `health_status` = "healthy"
-
-  @integration @rest @unimplemented
-  Scenario: Disable a provider binding stops it from being used on new VKs
-    Given a gateway-provider-credential "mp_openai_1" is bound and used by 2 VKs
-    When I send `DELETE /api/gateway/v1/providers/mp_openai_1`
-    Then the response status is 200
-    And `model_provider.disabled_at` is non-null
-    And existing VKs bound to mp_openai_1 still resolve successfully
-    But new `POST /virtual-keys` with `model_provider_ids: ["mp_openai_1"]` returns 400 with error.code = "provider_disabled"
-
   # ============================================================================
   # DTO shape (snake_case vs camelCase)
   # ============================================================================
@@ -315,35 +387,12 @@ Feature: Public REST API — /api/gateway/v1/*
     Then every field name is snake_case (organization_id, created_at, limit_usd, ...)
     And there are no camelCase fields
 
-  @unit @contract @unimplemented
-  Scenario: tRPC and REST return equivalent data for the same resource
-    Given a virtual key "vk_1" is fetched via tRPC `virtualKeys.getById`
-    And the same key is fetched via REST `GET /api/gateway/v1/virtual-keys/vk_1`
-    When the two DTOs are compared after normalising key casing
-    Then they describe the same data (same id, same name, same providers, same config, same timestamps)
-    And they were produced by the SAME `VirtualKeyService.getById` call in the service layer
-    And no business logic lives in either mapper
-
   # ============================================================================
-  # Machine actor + audit
-  # ============================================================================
-
-  @integration @audit @unimplemented
-  Scenario: Writes from REST are attributed to the resolved API-token user
-    Given API token "sess_abc" maps to user "alice@example.com"
-    When I send `POST /api/gateway/v1/virtual-keys` to create a key
-    Then an AuditLog entry is written with `userId` = alice's id
-    And `action` = "gateway.virtual_key.created"
-    And `targetKind` = "virtual_key"
-    And the audit entry is visible at /settings/audit-log under organization admin
-
-  # ============================================================================
-  # OpenAPI future
+  # OpenAPI
   # ============================================================================
 
   @unit @contract @roadmap @unimplemented
-  Scenario: REST routes will be annotated with hono-openapi (iter 6+)
-    When hono-openapi's `describeRoute` is wired on every handler
-    Then `GET /api/openapi/gateway-platform.json` returns a valid OpenAPI 3.1 schema
-    And the generated SDK types cover every request/response body shape used by the CLI
+  Scenario: Generated SDK types cover every request/response body shape used by the CLI
+    When hono-openapi's `describeRoute` output is generated for this app
+    Then the schema matches the DTOs the handlers actually return
     And the CLI's VirtualKeysApiService can be migrated from direct-fetch to the typed openapi client with zero behavioural change

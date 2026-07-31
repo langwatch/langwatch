@@ -1,5 +1,6 @@
 import { createClient } from "@clickhouse/client";
 import { ClickHouseLogger } from "~/server/clickhouse/clickhouseLogger";
+import { getClickHouseMaxOpenConnections } from "~/server/clickhouse/connectionPool";
 import type { ResilientClickHouseClient } from "./clickhouse/resilient-client";
 import { createResilientClickHouseClient } from "./clickhouse.resilient";
 
@@ -23,7 +24,7 @@ export function createClickHouseClientFromConfig(
   const raw = createClient({
     url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
-    max_open_connections: 25,
+    max_open_connections: getClickHouseMaxOpenConnections(),
     keep_alive: {
       enabled: true,
       idle_socket_ttl: 1500,

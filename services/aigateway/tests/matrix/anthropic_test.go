@@ -40,6 +40,28 @@ func TestAnthropic_StructuredOutputs(t *testing.T) {
 	runCell(t, anthropicCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
 
+// @scenario "client cap verifiably bounds output on the anthropic and bedrock lanes"
+// REPRO of the production canary finding: max_tokens: 5 through the
+// anthropic lane answered with ~26 completion tokens and finish_reason
+// "stop" because the translated lane dropped the alias and dispatched
+// uncapped. Both cap spellings, sync and streamed.
+// Spec: specs/ai-gateway/openai-param-compat.feature
+func TestAnthropic_MaxTokensCap(t *testing.T) {
+	runCapCell(t, anthropicCell(t, "cap_max_tokens", nil, false), "max_tokens", 16)
+}
+
+func TestAnthropic_MaxTokensCapStreamed(t *testing.T) {
+	runCapCell(t, anthropicCell(t, "cap_max_tokens_streamed", nil, true), "max_tokens", 16)
+}
+
+func TestAnthropic_MaxCompletionTokensCap(t *testing.T) {
+	runCapCell(t, anthropicCell(t, "cap_max_completion_tokens", nil, false), "max_completion_tokens", 16)
+}
+
+func TestAnthropic_MaxCompletionTokensCapStreamed(t *testing.T) {
+	runCapCell(t, anthropicCell(t, "cap_max_completion_tokens_streamed", nil, true), "max_completion_tokens", 16)
+}
+
 // @scenario "A real cached follow-up is billed at the cache rate, not full input price"
 func TestAnthropic_Cache(t *testing.T) {
 	// Anthropic cache cell hits /v1/messages with the native Anthropic body

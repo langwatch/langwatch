@@ -25,8 +25,12 @@
  *   3. exactly one allowed path (policy gate) - used silently.
  *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
  *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - default gateway,
- *      no prompt, no persist.
+ *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
+ *      no prompt, no persist. Nobody is there to consent to the gateway
+ *      billing model usage to the org, so it is never chosen implicitly.
+ *
+ * Cancelling the prompt in case 4 cancels the run rather than picking a
+ * path on the user's behalf.
  *
  * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
  * before they are forwarded to the real tool. Every other arg is
@@ -156,6 +160,11 @@ export interface ResolveWrapperPathResult {
   mode: WrapperMode;
   /** True when this run made a fresh interactive choice (and persisted it). */
   prompted: boolean;
+  /**
+   * True when the user cancelled the path prompt. `mode` is then a
+   * placeholder the caller must not act on; it should stop the run.
+   */
+  isAborted?: boolean;
 }
 
 /**
@@ -284,8 +293,12 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login - default to the gateway, no prompt.
-    return { mode: "gateway", prompted: false };
+    // Non-TTY / CI / forced-auto-login: nobody is there to answer, and the
+    // gateway bills model usage to the organization. Take the same option
+    // the prompt pre-selects, which costs nothing beyond telemetry. A CI
+    // job that wants the gateway asks for it with --tool-mode=gateway,
+    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode.
+    return { mode: "ingestion", prompted: false };
   }
 
   const res = await promptImpl({
@@ -312,9 +325,10 @@ export async function resolveWrapperPath(
 
   const chosen = tokenToMode(res?.path as string | undefined);
   if (!chosen) {
-    // User aborted the prompt (Ctrl-C / empty). Default to the gateway
-    // for this run without persisting, so the next run asks again.
-    return { mode: "gateway", prompted: false };
+    // User aborted the prompt (Ctrl-C / empty). Cancelling the question
+    // cancels the run: picking a path for them would either start the tool
+    // they just interrupted or bill their organization for it.
+    return { mode: "ingestion", prompted: false, isAborted: true };
   }
 
   // Remember the choice so subsequent runs don't prompt.

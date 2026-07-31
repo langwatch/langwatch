@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { app } from "../[[...route]]/app";
 
 describe("Scenarios API", () => {
@@ -78,9 +79,7 @@ describe("Scenarios API", () => {
   });
 
   afterEach(async () => {
-    await prisma.scenario.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["scenario", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },

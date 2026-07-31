@@ -22,6 +22,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
@@ -224,9 +225,7 @@ describe("Organization Invites Integration", () => {
 
   afterEach(async () => {
     // Clean up invites after each test
-    await prisma.organizationInvite.deleteMany({
-      where: { organizationId },
-    });
+    await cleanupTestRows(prisma, [["organizationInvite", { organizationId }]]);
     mockSendInviteEmail.mockClear();
     mockGetActivePlan.mockReset();
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
@@ -244,32 +243,25 @@ describe("Organization Invites Integration", () => {
     await resetApp();
 
     // Cleanup all test data
-    await prisma.organizationInvite.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.teamUser.deleteMany({
-      where: { teamId },
-    });
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.team.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.organization.deleteMany({
-      where: { id: organizationId },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: [
-            `invite-admin-${testNamespace}@test.com`,
-            `invite-member-${testNamespace}@test.com`,
-          ],
+    await cleanupTestRows(prisma, [
+      ["organizationInvite", { organizationId }],
+      ["roleBinding", { organizationId }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      [
+        "user",
+        {
+          email: {
+            in: [
+              `invite-admin-${testNamespace}@test.com`,
+              `invite-member-${testNamespace}@test.com`,
+            ],
+          },
         },
-      },
-    });
+      ],
+    ]);
   });
 
   // ============================================================================

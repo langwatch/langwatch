@@ -175,6 +175,45 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
+    // The query windows on trace OccurredAt, but evaluation_runs partitions on
+    // ScheduledAt (UpdatedAt on older deployments) — an OccurredAt filter prunes
+    // nothing there, so an unbounded JOIN subquery walks the tenant's ENTIRE
+    // evaluation history across every partition, including S3-tiered cold ones.
+    // Measured in production at ~900 executions / 6,400s of query time per
+    // 30min on a single worker pod before the bound existed.
+    it("bounds the evaluation_runs JOIN subquery on both candidate partition columns", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          {
+            metric:
+              "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as const,
+            key: "my-evaluator",
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // NULL-safe: legacy deployments carry ScheduledAt Nullable(DateTime64(3)),
+      // where a bare `ScheduledAt >= x` evaluates NULL for NULL rows and
+      // silently drops those evaluations from every graph.
+      expect(result.sql).toContain(
+        "(ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY)",
+      );
+      // Table-qualified: trace_summaries also has UpdatedAt, and a bare
+      // identifier would silently resolve against the outer scope.
+      expect(result.sql).toContain(
+        "evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY",
+      );
+      // The bound must reach the dedup inner scan too — it appears once in the
+      // outer subquery WHERE and once inside the IN-tuple dedup subquery.
+      const scheduledBounds =
+        result.sql.split("ScheduledAt >= {previousStart:DateTime64(3)}")
+          .length - 1;
+      expect(scheduledBounds).toBeGreaterThanOrEqual(2);
+    });
+
     // @regression issue #3088: When timeScale is "full" (summary widgets) with mixed eval and
     // trace metrics, the previous routing fell through to buildSubqueryTimeseriesQuery which
     // still joined evaluation_runs directly and inflated sum(ts.TotalCost) by the number of
@@ -336,8 +375,8 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Must route through the arrayJoin CTE path (Models array)
-      expect(result.sql).toContain("arrayJoin");
+      // Must route through the grouped CTE path (span-model partition join)
+      expect(result.sql).toContain("SpanModelKey");
       expect(result.sql).toContain("deduped_traces");
 
       // The CTE must project the column under the expected alias. A single
@@ -406,12 +445,12 @@ describe("aggregation-builder", () => {
 
     // @guard: prevent this class of bug from recurring silently. Any
     // trace-level column referenced via `${ts}.<Column>` in metric-translator
-    // MUST be registered in DEDUP_FIELD_MAPPINGS (which is consumed by
+    // MUST appear in a dedupSubstitutions() source (which is consumed by
     // transformMetricForDedup to rewrite outer references to the CTE alias)
-    // AND projected in the CTE (see aggregation-builder.ts:~1168). Columns
-    // not in this list are handled specially (see allowlist below). If a new
-    // trace-level metric is added and this test fails, either add the column
-    // to DEDUP_FIELD_MAPPINGS + CTE, or extend the allowlist with a reason.
+    // AND be projected in the CTE. Columns not in this list are handled
+    // specially (see allowlist below). If a new trace-level metric is added
+    // and this test fails, either add the column to the CTE select list +
+    // dedupSubstitutions, or extend the allowlist with a reason.
     it("every ${ts}.<Column> reference in metric-translator is handled", async () => {
       const fs = await import("node:fs/promises");
       const path = await import("node:path");
@@ -425,17 +464,20 @@ describe("aggregation-builder", () => {
         ),
       );
       // Columns handled by special cases in transformMetricForDedup, not by
-      // DEDUP_FIELD_MAPPINGS lookup. Keep this list minimal and documented.
+      // the substitution rewrite. Keep this list minimal and documented.
       const SPECIAL_CASE_ALLOWLIST = new Set([
         "TraceId", // -> uniqExact(trace_id)
-        "Attributes", // routed through extractReferencedEvaluationColumns / metadata path
         "OccurredAt", // used only in period/date boundaries, not in outer aggregations
       ]);
-      const { __testOnly_DEDUP_FIELD_MAPPINGS } = __testOnly__ as unknown as {
-        __testOnly_DEDUP_FIELD_MAPPINGS?: Record<string, string>;
+      const { dedupSubstitutions } = __testOnly__ as unknown as {
+        dedupSubstitutions: () => Array<{ source: string }>;
       };
       const registered = new Set(
-        Object.keys(__testOnly_DEDUP_FIELD_MAPPINGS ?? {}),
+        dedupSubstitutions().flatMap(({ source }) =>
+          Array.from(source.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map(
+            (m) => m[1]!,
+          ),
+        ),
       );
 
       const unhandled = [...referenced].filter(
@@ -601,18 +643,32 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("GROUP BY period, date, group_key");
     });
 
-    it("uses trace-level Models array for model grouping", () => {
+    it("partitions model grouping by each span's own model", () => {
       const input = {
         ...baseInput,
         groupBy: "metadata.model",
       };
       const result = buildTimeseriesQuery(input);
 
-      // Model grouping uses trace_summaries.Models (array) via arrayJoin
-      // instead of stored_spans to avoid double-counting trace metrics
-      expect(result.sql).not.toContain("JOIN stored_spans");
-      expect(result.sql).toContain("Models");
-      expect(result.sql).toContain("arrayJoin");
+      // Model grouping joins the span-model partition (one row per
+      // (trace, span model), additive metrics attributed per span) so buckets
+      // sum exactly to the ungrouped totals. The former arrayJoin over the
+      // trace-level Models array attributed each trace's FULL totals to every
+      // model it touched, over-counting multi-model traces.
+      expect(result.sql).toContain("LEFT JOIN");
+      expect(result.sql).toContain("FROM stored_spans");
+      expect(result.sql).toContain("SpanModelKey");
+      // Response model wins over request model, mirroring SpanCostService.
+      expect(result.sql).toContain("gen_ai.response.model");
+      expect(result.sql).toContain("gen_ai.request.model");
+      // The fold's redundant-usage gate must apply to the buckets too.
+      expect(result.sql).toContain(
+        "langwatch.reserved.skip_token_accumulation",
+      );
+      // Traces without span-model rows fall back to their primary model.
+      expect(result.sql).toContain(
+        "if(empty(ts.Models), 'unknown', ts.Models[1])",
+      );
     });
 
     it("includes all date parameters", () => {
@@ -1744,6 +1800,82 @@ describe("aggregation-builder", () => {
 
     it("returns false for an empty list", () => {
       expect(hasEvalMixedWithTraceMetrics([])).toBe(false);
+    });
+  });
+
+  // @regression: transformMetricForDedup used to replace the whole
+  // aggregation argument with the FIRST matching CTE column, so composite
+  // metrics silently collapsed: grouped total_tokens returned prompt_tokens
+  // only, grouped cost_billed returned the un-subtracted total. Every term
+  // must survive the rewrite.
+  describe("transformMetricForDedup composite metrics", () => {
+    const { transformMetricForDedup } = __testOnly__ as unknown as {
+      transformMetricForDedup: (expr: string, alias: string) => string;
+    };
+
+    it("keeps BOTH terms of total_tokens (prompt + completion)", () => {
+      const result = transformMetricForDedup(
+        `coalesce(sum((coalesce(ts.TotalPromptTokenCount, 0) + coalesce(ts.TotalCompletionTokenCount, 0))), 0) AS t`,
+        "t",
+      );
+      expect(result).toBe(
+        `coalesce(sum((coalesce(trace_prompt_tokens, 0) + coalesce(trace_completion_tokens, 0))), 0) AS t`,
+      );
+    });
+
+    it("keeps the subtraction in cost_billed (total - non-billed)", () => {
+      const result = transformMetricForDedup(
+        `coalesce(sum((coalesce(ts.TotalCost, 0) - coalesce(ts.NonBilledCost, if(ts.Attributes['langwatch.cost.non_billable'] = 'true', ts.TotalCost, 0), 0))), 0) AS t`,
+        "t",
+      );
+      expect(result).toBe(
+        `coalesce(sum((coalesce(trace_total_cost, 0) - trace_non_billed_cost)), 0) AS t`,
+      );
+    });
+
+    it("maps cost_non_billed to the non-billed CTE column, not the total", () => {
+      const result = transformMetricForDedup(
+        `coalesce(sum(coalesce(ts.NonBilledCost, if(ts.Attributes['langwatch.cost.non_billable'] = 'true', ts.TotalCost, 0), 0)), 0) AS t`,
+        "t",
+      );
+      expect(result).toBe(`coalesce(sum(trace_non_billed_cost), 0) AS t`);
+    });
+
+    it("rewrites cache token attribute reads to their CTE columns", () => {
+      const result = transformMetricForDedup(
+        `coalesce(sum(toUInt64OrZero(ts.Attributes['langwatch.reserved.cache_read_tokens'])), 0) AS t`,
+        "t",
+      );
+      expect(result).toBe(`coalesce(sum(trace_cache_read_tokens), 0) AS t`);
+    });
+
+    it("rewrites all four terms of total_processed_tokens", () => {
+      const result = transformMetricForDedup(
+        `coalesce(sum((coalesce(ts.TotalPromptTokenCount, 0) + coalesce(ts.TotalCompletionTokenCount, 0) + toUInt64OrZero(ts.Attributes['langwatch.reserved.cache_read_tokens']) + toUInt64OrZero(ts.Attributes['langwatch.reserved.cache_creation_tokens']))), 0) AS t`,
+        "t",
+      );
+      expect(result).toBe(
+        `coalesce(sum((coalesce(trace_prompt_tokens, 0) + coalesce(trace_completion_tokens, 0) + trace_cache_read_tokens + trace_cache_write_tokens)), 0) AS t`,
+      );
+    });
+
+    it("preserves non-sum aggregation structure", () => {
+      const result = transformMetricForDedup(
+        `quantileTDigest(0.9)((coalesce(ts.TotalPromptTokenCount, 0) + coalesce(ts.TotalCompletionTokenCount, 0))) AS t`,
+        "t",
+      );
+      expect(result).toBe(
+        `quantileTDigest(0.9)((coalesce(trace_prompt_tokens, 0) + coalesce(trace_completion_tokens, 0))) AS t`,
+      );
+    });
+
+    it("throws on a partially rewritable expression instead of emitting out-of-scope SQL", () => {
+      expect(() =>
+        transformMetricForDedup(
+          `sum(ts.TotalCost + ts.SomeBrandNewColumn) AS t`,
+          "t",
+        ),
+      ).toThrow(/could not fully rewrite/);
     });
   });
 });

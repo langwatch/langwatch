@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,8 @@ import (
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -53,6 +56,10 @@ type BifrostRouter struct {
 	discoveryOnce   sync.Once
 	discoveryHTTP   *http.Client
 	discoveryModels *modelsDiscoveryCache
+	// hostedCatalogs overrides hostedModelCatalogs (tests only), pointing
+	// hosted providers' catalog probes at local servers. nil means the
+	// production table; an empty non-nil map disables hosted probes.
+	hostedCatalogs map[domain.ProviderID]catalogProbe
 	// codexClient streams against OpenAI's codex backend (no overall
 	// timeout — turns run for minutes; cancellation rides the context).
 	codexClient *http.Client
@@ -261,8 +268,9 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		return nil, classifyChatBuildError(ctx, err)
 	}
+	stampParamsDropped(ctx, paramsDroppedFrom(dispatchCtx))
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
@@ -302,11 +310,63 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}
 
 	body, _ := sonic.Marshal(resp)
+	// Translated-lane response contract: a 200 must carry at least one
+	// choice, and a policy drop must be visible on the envelope. Scoped to
+	// the translated lanes: an OpenAI-compatible target can legitimately
+	// answer 200 with an empty choices array when its safety system blocks
+	// the output, and rewriting that into finish_reason "length" would
+	// report a truncation that never happened.
+	if _, translated := policyLaneFor(provider); translated {
+		body = ensureChoicesPresent(body)
+	}
+	body = injectParamsDropped(body, paramsDroppedFrom(dispatchCtx))
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
 		Usage:      extractUsage(resp),
 	}, nil
+}
+
+// ensureChoicesPresent repairs a 200 whose choices came back null or
+// empty. The gemini translator skips candidates whose content has no
+// parts (providers/gemini/chat.go, the thinking-exhausted-cap case), so
+// a model that spent the whole completion budget on thinking produced an
+// HTTP 200 with "choices": null, usage billed, and no signal anywhere: an
+// empty success that also breaks strict OpenAI parsers. Synthesizing a
+// finish_reason "length" choice with empty content makes the outcome what
+// an OpenAI client understands: the cap truncated the answer.
+func ensureChoicesPresent(body []byte) []byte {
+	choices := gjson.GetBytes(body, "choices")
+	if choices.IsArray() && len(choices.Array()) > 0 {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "choices", []map[string]any{{
+		"index": 0,
+		"message": map[string]any{
+			"role":    "assistant",
+			"content": "",
+		},
+		"finish_reason": "length",
+	}})
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// injectParamsDropped records the parameter-policy drop list on the
+// response envelope (extra_fields.params_dropped), alongside the
+// X-LangWatch-Params-Dropped header and the span attribute, so a dropped
+// parameter is observable from the response body alone.
+func injectParamsDropped(body []byte, dropped []string) []byte {
+	if len(dropped) == 0 {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "extra_fields.params_dropped", dropped)
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 // dispatchResponses routes /v1/responses traffic through Bifrost's
@@ -567,8 +627,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		return nil, classifyChatBuildError(ctx, err)
 	}
+	dropped := paramsDroppedFrom(dispatchCtx)
+	stampParamsDropped(ctx, dropped)
 
 	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
@@ -577,7 +639,33 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	return &bifrostStreamIterator{ch: ch}, nil
+	return &bifrostStreamIterator{ch: ch, paramsDropped: dropped}, nil
+}
+
+// classifyChatBuildError turns a buildChatRequest failure into the right
+// client-facing 400: parameter-policy refusals carry the policy's full
+// sentence under unsupported_parameter (the code OpenAI itself uses for
+// parameter rejections), everything else is a malformed client body.
+func classifyChatBuildError(ctx context.Context, err error) error {
+	var refusal *paramRefusalError
+	if errors.As(err, &refusal) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{"message": refusal.msg, "fault": "customer"})
+	}
+	// Everything else buildChatRequest can reject is a client-body problem
+	// (unparseable JSON, malformed params): classify it as a 400 the same
+	// way the embeddings lane does, not an internal error.
+	return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+}
+
+// stampParamsDropped records the policy drop list on the gateway's
+// request span so drops are visible on the trace, not only on the
+// response envelope. Parameter names are shape metadata, never content.
+func stampParamsDropped(ctx context.Context, dropped []string) {
+	if len(dropped) == 0 {
+		return
+	}
+	trace.SpanFromContext(ctx).SetAttributes(
+		attribute.StringSlice("langwatch.gateway.params_dropped", dropped))
 }
 
 // dispatchMessagesStream raw-forwards a streaming /v1/messages request
@@ -774,6 +862,25 @@ func rawForwardCtx(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeyUseRawRequestBody, true)
 	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeySendBackRawResponse, true)
 	return ctx
+}
+
+// paramsDroppedCtxKey carries the parameter-policy drop list from the
+// parse layer to the response path, so the drop can be signaled on the
+// response envelope, header, and span.
+type paramsDroppedCtxKey struct{}
+
+func withParamsDropped(ctx context.Context, dropped []string) context.Context {
+	if len(dropped) == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, paramsDroppedCtxKey{}, dropped)
+}
+
+// paramsDroppedFrom returns the drop list recorded by the parameter
+// policy, nil when nothing was dropped.
+func paramsDroppedFrom(ctx context.Context) []string {
+	dropped, _ := ctx.Value(paramsDroppedCtxKey{}).([]string)
+	return dropped
 }
 
 // rawResponseBytes extracts the provider's native chat-completion
@@ -1530,6 +1637,11 @@ type bifrostStreamIterator struct {
 	// first delta, driving the leading-role repair in ensureLeadingRoleDelta
 	// (see chat_stream_role.go). Lazily allocated on the first chat chunk.
 	roleSeenByChoice map[int]bool
+	// paramsDropped is the parameter-policy drop list for this request;
+	// injected into the final usage-bearing chunk so streamed responses
+	// carry the same extra_fields.params_dropped signal as sync ones.
+	// Never set on raw-framing passthrough streams.
+	paramsDropped []string
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1554,10 +1666,14 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		if chunk.BifrostChatResponse != nil {
 			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
-			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
 				it.usage = extractUsage(chunk.BifrostChatResponse)
+				// The usage-bearing final chunk carries the policy drop
+				// signal, mirroring extra_fields.params_dropped on sync
+				// responses.
+				data = injectParamsDropped(data, it.paramsDropped)
 			}
+			it.current = data
 		} else if chunk.BifrostResponsesStreamResponse != nil {
 			// Responses API stream frames (response.created /
 			// response.output_text.delta / response.completed / ...).

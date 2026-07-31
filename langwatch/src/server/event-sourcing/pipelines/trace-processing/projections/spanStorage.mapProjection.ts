@@ -15,6 +15,10 @@ import {
 import type { NormalizedSpan } from "../schemas/spans";
 import { deriveSpanCost } from "./services/span-cost.derivation";
 import { SpanCostService } from "./services/span-cost.service";
+import {
+  spanStorageMapGroupKey,
+  TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+} from "./spanStorageGroupKey";
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
@@ -38,7 +42,12 @@ export class SpanStorageMapProjection
   protected readonly events = spanEvents;
 
   override options = {
-    groupKeyFn: (event: { id: string }) => `span:${event.id}`,
+    // Shard-keyed lanes + coalescing (ADR-066): same span → same lane
+    // (redeliveries serialize), backed-up lanes drain in 256-event
+    // bulkAppend bites instead of one queue job per span. See
+    // spanStorageGroupKey.ts for the measured rationale.
+    groupKeyFn: spanStorageMapGroupKey,
+    coalesceMaxBatch: TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
   };
 
   constructor(deps: { store: AppendStore<NormalizedSpan> }) {

@@ -1,3 +1,4 @@
+{{- if .Values.langevals.enabled }}
 # Deployment for the LangWatch Evaluations service
 apiVersion: apps/v1
 kind: Deployment
@@ -43,10 +44,8 @@ spec:
       # Langevals does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
-      {{- with (coalesce .Values.langevals.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.langevals) | nindent 8 }}
 
       # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
       {{- with (coalesce .Values.langevals.nodeSelector .Values.global.scheduling.nodeSelector)}}
@@ -72,10 +71,15 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.langevals.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.langevals.extraInitContainers}}
       initContainers:
-        {{- with .Values.langevals.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
 
       containers:
         {{- with .Values.langevals.extraContainers}}
@@ -83,7 +87,7 @@ spec:
         {{- end }}
         - name: {{ .Release.Name }}-langevals
           securityContext:
-            {{- toYaml (coalesce .Values.langevals.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.langevals) | nindent 12 }}
           image: "{{ .Values.images.langevals.repository }}:{{ .Values.images.langevals.tag }}"
           imagePullPolicy: {{ .Values.images.langevals.pullPolicy }}
           ports:
@@ -136,6 +140,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langevals.scratchSizeLimit }}
         - name: cache-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langevals.scratchSizeLimit }}
+{{- end }}

@@ -82,7 +82,15 @@ export class EvaluationAnalyticsStore
     retentionDays: number;
     appliedEventIds: string[];
   } | null {
-    if (!hasPersistableSignal(state)) return null;
+    // ALWAYS writes. The old gate here refused a state with neither
+    // evaluationId nor evaluatorId — but the very next line stamps
+    // evaluationId from the aggregate id (which the executor asserts
+    // non-empty), so an unaddressable row was never actually reachable; the
+    // gate's real effect was to make row ABSENCE ambiguous, which forced the
+    // executor to treat every store miss as potentially-unpersisted state and
+    // pay an unwindowed fallback scan (79,861 in 30 days, none of which found
+    // anything) plus an `event_log` re-fold. A committed state now always has
+    // a row, so absence is authoritative (`trustAbsentMiss`).
     const stateWithId: EvaluationAnalyticsData = state.evaluationId
       ? state
       : { ...state, evaluationId: String(context.aggregateId) };
@@ -162,20 +170,4 @@ export class EvaluationAnalyticsStore
   ): Promise<EvaluationAnalyticsData | null> {
     return (await this.getWithApplied(aggregateId, context)).state;
   }
-}
-
-/**
- * Skip rows that have no observable signal yet — the fold may have run
- * once with a half-formed scheduled-only state. Persisting it would churn
- * the slim table for evaluations that never reach a terminal status.
- *
- * "Signal" = at least one of: terminal status reached, identity stamped
- * via `EvaluationReportedEvent` (which sets evaluatorType on its own), or
- * a non-empty evaluatorId from any earlier event. The conservative branch
- * (no evaluationId) is always a no-op so the store cannot persist a row
- * whose primary key is empty.
- */
-function hasPersistableSignal(state: EvaluationAnalyticsData): boolean {
-  if (!state.evaluationId && !state.evaluatorId) return false;
-  return true;
 }

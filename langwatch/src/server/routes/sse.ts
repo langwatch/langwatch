@@ -128,9 +128,12 @@ function buildReqShim(req: Request): any {
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      // Stream fan-out; per-message authorization happens upstream.
+      permissions: [],
+      credential: "session",
+    }),
   )
   .get("/sse/*", async (c) => {
     const raw = c.req.raw;

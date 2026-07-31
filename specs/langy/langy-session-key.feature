@@ -37,6 +37,39 @@ Feature: Per-session caller-scoped Langy key
     And it carries none of the actions I lack
 
   # ---------------------------------------------------------------------------
+  # Reach — the actions Langy is allowed to ask for on my behalf
+  # ---------------------------------------------------------------------------
+
+  Scenario: Langy can list the experiments in my project
+    Given I can see my project's experiments
+    When I ask Langy about my experiments
+    Then Langy lists them
+    And Langy is not refused for a permission I already hold
+
+  Scenario: Langy can start an experiment run without being able to delete experiments
+    Given I can run experiments in my project
+    When I ask Langy to run one
+    Then the run starts
+    And Langy still cannot delete my evaluations
+
+  Scenario: Langy is never refused something it is meant to be able to do for me
+    Given a task Langy is trusted to do on my behalf, on data I can already reach
+    When I ask Langy to do it
+    Then Langy is not turned away for lacking permission
+
+  Scenario: Langy cannot delete my work, even though I can
+    Given I can delete my own prompts
+    When I ask Langy to delete one
+    Then Langy cannot, and says so
+    And the prompt is still there
+
+  Scenario: Langy cannot read my project's secrets, even though I can
+    Given I can read my project's secrets
+    When I ask Langy what a secret's value is
+    Then Langy cannot, and says so
+    And no secret value appears in its answer
+
+  # ---------------------------------------------------------------------------
   # Guardrails
   # ---------------------------------------------------------------------------
 

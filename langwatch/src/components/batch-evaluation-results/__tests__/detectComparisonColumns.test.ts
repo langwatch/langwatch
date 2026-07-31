@@ -159,6 +159,44 @@ describe("detecting comparison columns", () => {
       });
     });
 
+    describe("when a row's candidates are a strict subset of the column's variants", () => {
+      // select_best_compare drops any candidate with no output for a given
+      // row, so a row can legitimately compare fewer candidates than the
+      // column's full variant list. Leaderboard aggregation (Bradley-Terry)
+      // needs the row's ACTUAL candidate set, not the column-wide union, or
+      // it fabricates a matchup that never happened.
+      it("records only the candidates actually compared on that row", () => {
+        const run = createRun([
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 0,
+            label: "concise-support-v2",
+            inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+          },
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 1,
+            label: "concise-support-v2",
+            inputs: candidatesInput(["target-a", "target-b"]),
+          },
+        ]);
+
+        const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+        expect(column.verdictsByRow[0]?.candidateIds).toEqual([
+          "target-a",
+          "target-b",
+          "target-c",
+        ]);
+        expect(column.verdictsByRow[1]?.candidateIds).toEqual([
+          "target-a",
+          "target-b",
+        ]);
+      });
+    });
+
     describe("when every row ties and inputs carry no candidate ids", () => {
       // "tie" is valid vocabulary under both the legacy 2-slot and current
       // N-way contract, so seeing it alone must NOT be treated as evidence
@@ -266,6 +304,42 @@ describe("detecting comparison columns", () => {
         ]);
       });
     });
+
+    describe("when the judge's label resolves to a padded, unnamed slot", () => {
+      // Distinguishes a genuine tie from a legacy slot letter with nothing
+      // real to resolve against — both leave winnerId null for a bar chart,
+      // but only the tie is real 0.5/0.5 evidence for Bradley-Terry
+      // aggregation; the unresolved slot must be excluded entirely.
+      it("flags the unresolved slot separately from a real tie", () => {
+        const run = createRun(
+          [
+            {
+              evaluator: "pw-1",
+              status: "processed",
+              index: 0,
+              label: "tie",
+              inputs: { candidate_a_id: "target-a" },
+            },
+            {
+              evaluator: "pw-1",
+              status: "processed",
+              index: 1,
+              label: "B",
+              inputs: { candidate_a_id: "target-a" },
+            },
+          ],
+          { targets: TWO_VARIANT_TARGETS, rowCount: 2 },
+        );
+
+        const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+        expect(column.verdictsByRow[0]?.winnerId).toBeNull();
+        expect(column.verdictsByRow[0]?.isUnresolved).toBe(false);
+
+        expect(column.verdictsByRow[1]?.winnerId).toBeNull();
+        expect(column.verdictsByRow[1]?.isUnresolved).toBe(true);
+      });
+    });
   });
 
   describe("given a run whose winner names no known target", () => {
@@ -310,5 +384,64 @@ describe("detecting comparison columns", () => {
 
       expect(transformBatchEvaluationData(run).comparisonColumns).toEqual([]);
     });
+  });
+});
+
+describe("rows the judge declined to call", () => {
+  /**
+   * Counted rather than discarded, because it is the explanation for a fit
+   * that later fails to connect. Swap-and-reconcile records no verdict when
+   * the judge's pick flips with the candidate order, and those rows take
+   * their evidence out of the win graph with them — enough of them and the
+   * leaderboard reports "not enough overlap to rank these" for a reason the
+   * reader would otherwise have no way to see.
+   */
+  it("counts a skipped comparison instead of dropping it silently", () => {
+    const run = createRun([
+      {
+        evaluator: "cmp-1",
+        status: "processed",
+        index: 0,
+        label: "concise-support-v2",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+      {
+        evaluator: "cmp-1",
+        status: "skipped",
+        index: 1,
+        details: "Order-sensitive verdict",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+      {
+        evaluator: "cmp-1",
+        status: "skipped",
+        index: 2,
+        details: "Order-sensitive verdict",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+    ]);
+
+    const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+    expect(column.rowsWithoutVerdict).toBe(2);
+    // The skipped rows still produce no verdict — they are counted, not
+    // resurrected as evidence.
+    expect(Object.keys(column.verdictsByRow)).toEqual(["0"]);
+  });
+
+  it("reports zero when the judge called every row", () => {
+    const run = createRun([
+      {
+        evaluator: "cmp-1",
+        status: "processed",
+        index: 0,
+        label: "concise-support-v2",
+        inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+      },
+    ]);
+
+    const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+    expect(column.rowsWithoutVerdict).toBe(0);
   });
 });

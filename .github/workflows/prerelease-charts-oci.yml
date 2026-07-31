@@ -1,0 +1,209 @@
+# Publishes every chart under charts/ to GHCR as an OCI artifact on each merge
+# to main, so a cluster can track main without waiting for a tagged release.
+#
+# Deliberately NOT folded into release-langwatch-chart.yml. That workflow feeds
+# the GitHub Pages Helm repo (chart-releaser writes a shared index.yaml) which
+# is the artifact self-hosters install from. Publishing a build per merge there
+# would grow that index without bound and force every `helm search`/`helm
+# upgrade` onto --devel to avoid picking up an untagged main build. OCI has no
+# shared index — each push is an independent tag — so prereleases and stable
+# releases cannot interfere with each other.
+#
+# Versions are `<chartVersion>-main.<run_number>.<run_attempt>.<shortSha>`,
+# e.g. 3.7.0-main.412.1.a1b2c3d. run_attempt is part of the identity because a
+# re-run reuses both run_number and sha while `helm package` is not
+# byte-reproducible; without it a re-run would republish one version string
+# with different bytes. That is a valid semver PRERELEASE, so it sorts BELOW
+# the eventual 3.7.0 and `helm upgrade` never selects it by accident, and it is
+# a valid OCI tag (semver build metadata, `+sha`, is not — `+` is not a legal
+# tag character, which is why the sha goes in the prerelease segment).
+name: prerelease-charts-oci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+      - ".github/workflows/prerelease-charts-oci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialise per branch: two merges in quick succession would otherwise race
+  # on `helm dependency build`, and the later push should win.
+  group: prerelease-charts-oci-${{ github.ref }}
+  # NOT cancel-in-progress. Cancelling lands between `helm push` and
+  # `cosign sign` often enough to matter, and there is no cleanup path: the
+  # chart stays in GHCR unsigned while the run reports "cancelled" rather than
+  # failed, so nothing retries and nothing reconciles it. A publish run drains.
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # workflow_dispatch can be triggered from ANY ref, and this job holds
+    # packages:write and id-token:write. Without this gate a manual run from a
+    # feature branch would push and SIGN a chart versioned `-main.<run>.<sha>`
+    # — an artifact that claims to come from main, carrying a valid Sigstore
+    # signature, built from unreviewed code. The version string is the whole
+    # trust signal for these prereleases, so it must not be forgeable by
+    # anyone who can click Run workflow.
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      # Required to push OCI artifacts to ghcr.io.
+      packages: write
+      # Keyless OIDC signing via Sigstore — see the signing step below.
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # This job performs no git operations, so the token has no reason to
+          # stay in .git/config where every later step (and anything they
+          # shell out to) can read it.
+          persist-credentials: false
+
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.19.0
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pinned to 2.x to match publish-docker-app and sign-release-images:
+          # cosign 3.x defaults to the OCI 1.1 referrers bundle format, which
+          # not every registry client resolves.
+          cosign-release: v2.6.3
+
+      - name: Log in to GHCR
+        # Secrets are passed through env rather than interpolated into the
+        # script body: `${{ ... }}` is substituted before the shell parses the
+        # line, so a value containing shell metacharacters would be executed
+        # rather than read.
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" \
+            | helm registry login ghcr.io \
+                --username "$GHCR_USER" \
+                --password-stdin
+
+          # Cosign needs its own login. `helm registry login` writes to Helm's
+          # registry config (~/.config/helm/registry/config.json); cosign reads
+          # the Docker config (~/.docker/config.json) and would otherwise get a
+          # 401 from ghcr.io when pushing the signature — AFTER the chart had
+          # already been pushed, leaving an unsigned artifact published and the
+          # job red.
+          printf '%s' "$GHCR_TOKEN" \
+            | cosign login ghcr.io \
+                --username "$GHCR_USER" \
+                --password-stdin
+
+      - name: Add upstream Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Package and push each chart
+        env:
+          # `github.repository_owner` is the org; lowercased because OCI
+          # reference paths must be lowercase and GitHub org names are not.
+          OWNER: ${{ github.repository_owner }}
+          RUN_NUMBER: ${{ github.run_number }}
+          # Re-running a workflow reuses run_number AND sha, but `helm package`
+          # is not byte-reproducible (tgz mtimes come from checkout), so without
+          # run_attempt a re-run silently republishes the SAME version string
+          # with different bytes and orphans the first run's signature.
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          # Used to pin the expected signing identity on verification, so a
+          # signature minted by some other repository's workflow is rejected.
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          # OCI reference paths must be lowercase; GitHub org names need not be.
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          registry="oci://ghcr.io/${OWNER_LC}/charts"
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          mkdir -p .oci-packages
+
+          # Leaf charts before the umbrella: `helm dependency build` on
+          # charts/langwatch resolves file://../<chart> paths from the working
+          # tree, so ordering only matters for the local build, not the push.
+          for chart_dir in charts/*/; do
+            [ -f "${chart_dir}Chart.yaml" ] || continue
+
+            # Read straight from Chart.yaml rather than `helm show chart`: the
+            # packaged filename is <name>-<version>.tgz using the chart NAME,
+            # which is not the directory name (charts/gateway is
+            # "langwatch-gateway"), and `helm show` needs dependencies resolved
+            # first, which is the step below.
+            # Strip surrounding quotes: Chart.yaml scalars are legitimately
+            # quotable (clickhouse-serverless quotes appVersion), and a quoted
+            # version yielded `"0.2.0"` verbatim — a malformed --version and a
+            # .tgz filename that does not exist.
+            read_chart_field() {
+              awk -v k="$2:" '$1==k{sub(/^[^:]*:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$1"
+            }
+            chart_name="$(read_chart_field "${chart_dir}Chart.yaml" name)"
+            base_version="$(read_chart_field "${chart_dir}Chart.yaml" version)"
+            if [ -z "$chart_name" ] || [ -z "$base_version" ]; then
+              echo "::error::could not read name/version from ${chart_dir}Chart.yaml"
+              exit 1
+            fi
+            version="${base_version}-main.${RUN_NUMBER}.${RUN_ATTEMPT}.${short_sha}"
+
+            echo "::group::${chart_name} -> ${version}"
+            helm dependency build "$chart_dir"
+
+            # Never sign something that cannot install. Without this, a template
+            # error merged to main still produces a cryptographically valid
+            # signature over a broken chart.
+            helm lint "$chart_dir" >/dev/null
+            helm template smoke "$chart_dir" >/dev/null
+            # --app-version deliberately NOT set: clickhouse-serverless declares
+            # appVersion "25.10.2.65" (the actual ClickHouse release), and
+            # overwriting it with a git sha both destroys that and claims a
+            # correspondence the chart does not have — its image tags come from
+            # values.yaml, not appVersion. The sha is already in the version.
+            helm package "$chart_dir" --version "$version" -d .oci-packages
+
+            # `helm push` prints the pushed digest to STDERR, not stdout, and
+            # signing must bind to the immutable digest rather than the tag —
+            # a tag can be moved, a digest cannot, so signing the tag would
+            # attest to whatever the tag points at when it is verified.
+            push_log="$(helm push ".oci-packages/${chart_name}-${version}.tgz" "$registry" 2>&1)"
+            echo "$push_log"
+            digest="$(printf '%s' "$push_log" | awk '$1=="Digest:"{print $2; exit}')"
+            if ! printf '%s' "$digest" | grep -qE '^sha256:[0-9a-f]{64}$'; then
+              # Shape-checked, not just non-empty: an unanchored match would
+              # happily hand `cosign sign` a ref instead of a digest if helm
+              # ever prints them on one line.
+              echo "::error::unexpected digest '${digest}' for ${chart_name}; refusing to sign"
+              exit 1
+            fi
+
+            # Keyless: the signature is bound to this workflow's OIDC identity,
+            # so there is no private key to store or rotate.
+            ref="ghcr.io/${OWNER_LC}/charts/${chart_name}@${digest}"
+            cosign sign --yes "$ref"
+
+            # Verify immediately, matching .github/scripts/sign-image.sh. Signing
+            # can "succeed" while producing something no consumer can verify —
+            # a transparency-log hiccup, or a bundle format the verifier does not
+            # accept (the reason cosign is pinned to 2.x here). Checking now
+            # turns that into a red build rather than a chart that only fails
+            # when someone tries to trust it.
+            cosign verify "$ref" \
+              --certificate-identity-regexp "^https://github.com/${OWNER_LC}/${REPO_NAME}/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              > /dev/null
+            echo "::endgroup::"
+
+            echo "- \`${registry}/${chart_name}:${version}\`" >> "$GITHUB_STEP_SUMMARY"
+          done

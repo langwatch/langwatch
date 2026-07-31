@@ -20,17 +20,23 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "../analytics/ChartTooltip";
+import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
 import {
   axisLabelProps,
+  buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
+  BatchResultRow,
+  BatchTargetColumn,
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
+import { useResultsGrouping } from "./useResultsGrouping";
+import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 import { WinRateChart } from "./WinRateChart";
 
 /** Metric types that can be displayed */
@@ -39,13 +45,20 @@ type MetricType =
   | "latency"
   | `score_${string}`
   | `pass_${string}`
-  | `comparison_${string}`;
+  | `comparison_${string}`
+  | `leaderboard_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type: "cost" | "latency" | "score" | "passRate" | "comparison";
+  type:
+    | "cost"
+    | "latency"
+    | "score"
+    | "passRate"
+    | "comparison"
+    | "leaderboard";
   evaluatorId?: string;
 };
 
@@ -121,6 +134,12 @@ type ComparisonChartsProps = {
    * below.
    */
   comparisonColumns?: BatchComparisonColumn[];
+  /**
+   * Rows for the primary run, needed by the Comparison leaderboard's
+   * cost/duration tradeoff chart. Single-run only for v1 — not threaded
+   * through per-run in `comparisonData`.
+   */
+  comparisonRows?: BatchResultRow[];
 };
 
 type EvaluatorMetrics = {
@@ -298,6 +317,83 @@ export const computeRunMetrics = (
   };
 };
 
+/**
+ * Which model each target ran on, and which model judged each comparison.
+ *
+ * Evaluators are keyed under BOTH ids on purpose. detectComparisonColumns keys
+ * a column-style comparison by its TARGET id, while an inline evaluator is
+ * keyed by its config id — so `column.evaluatorId` is one or the other
+ * depending on how the comparison was authored. Indexing only the config id
+ * silently missed every column-style comparison, which is the shape the
+ * workbench actually creates.
+ */
+const collectRunModels = (targetColumns: BatchTargetColumn[]) => {
+  const modelByTargetId: Record<string, string | null> = {};
+  const judgeModelByEvaluatorId: Record<string, string | null> = {};
+  for (const target of targetColumns) {
+    const model = target.model ?? null;
+    modelByTargetId[target.id] = model;
+    if (target.type !== "evaluator") continue;
+    judgeModelByEvaluatorId[target.id] = model;
+    if (target.evaluatorId) judgeModelByEvaluatorId[target.evaluatorId] = model;
+  }
+  return { modelByTargetId, judgeModelByEvaluatorId };
+};
+
+/** One metric entry per evaluator — its own score or pass-rate chart. */
+const perEvaluatorMetrics = ({
+  evaluators,
+  type,
+  idPrefix,
+  label,
+}: {
+  evaluators: { id: string; name: string }[];
+  type: MetricDefinition["type"];
+  idPrefix: string;
+  label: string;
+}): MetricDefinition[] =>
+  evaluators.map((ev) => ({
+    id: `${idPrefix}_${ev.id}` as MetricType,
+    name: `${ev.name} (${label})`,
+    type,
+    evaluatorId: ev.id,
+  }));
+
+/**
+ * Win-rate and Bradley-Terry leaderboard entries for the comparison columns,
+ * so both toggle through the same Metrics visibility system as their siblings
+ * (Cost / Latency / Score / Pass Rate).
+ *
+ * Two independent gates on the leaderboard, for two different reasons. The
+ * rollout flag decides whether this organization has the feature at all;
+ * variant count is a product rule that applies once it does — a 2-variant
+ * comparison is already a plain win-rate story, which the win-rate chart
+ * already tells. Additive to that chart, never a replacement, so both are
+ * offered for a 3+ comparison.
+ */
+const comparisonMetrics = ({
+  columns,
+  showLeaderboard,
+}: {
+  columns: BatchComparisonColumn[];
+  showLeaderboard: boolean;
+}): MetricDefinition[] => [
+  ...columns.map((column) => ({
+    id: `comparison_${column.evaluatorId}` as MetricType,
+    name: `${column.name} (Win Rate)`,
+    type: "comparison" as const,
+    evaluatorId: column.evaluatorId,
+  })),
+  ...(showLeaderboard ? columns : [])
+    .filter((column) => column.variants.length >= 3)
+    .map((column) => ({
+      id: `leaderboard_${column.evaluatorId}` as MetricType,
+      name: `${column.name} (Leaderboard)`,
+      type: "leaderboard" as const,
+      evaluatorId: column.evaluatorId,
+    })),
+];
+
 export const ComparisonCharts = ({
   comparisonData,
   isVisible: controlledVisible,
@@ -310,7 +406,13 @@ export const ComparisonCharts = ({
   onXAxisOptionChange,
   onTargetColorsChange,
   comparisonColumns,
+  comparisonRows,
 }: ComparisonChartsProps) => {
+  // Rollout gate for the Bradley-Terry leaderboard (#5103). Read here rather
+  // than passed in as a prop so the flag cannot drift from the two surfaces it
+  // controls, both of which live in this component.
+  const showComparisonLeaderboard = useShowComparisonLeaderboard();
+
   /**
    * The comparison evaluators on this page, which are excluded from the
    * candidate-oriented charts in two ways:
@@ -325,6 +427,22 @@ export const ComparisonCharts = ({
   const comparisonEvaluatorIds = useMemo(
     () => new Set((comparisonColumns ?? []).map((c) => c.evaluatorId)),
     [comparisonColumns],
+  );
+
+  /**
+   * Which model each target ran on, and which model judged each comparison,
+   * as recorded on the run itself.
+   *
+   * The leaderboard's self-preference check asks whether the judge shares a
+   * model family with a candidate. Both halves have to come off the run
+   * rather than off live config: an evaluator or prompt edited after the
+   * fact would otherwise retroactively change what an old run reports about
+   * itself, which is exactly the kind of quiet misattribution this panel
+   * exists to prevent.
+   */
+  const modelsFromRun = useMemo(
+    () => collectRunModels(comparisonData[0]?.data?.targetColumns ?? []),
+    [comparisonData],
   );
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
@@ -724,6 +842,23 @@ export const ComparisonCharts = ({
   // all share one x-axis of `chartData`.
   const axis = axisLabelProps(chartData.length);
 
+  // Bar labels, precomputed for the whole row rather than trimmed per tick.
+  // A tickFormatter only ever sees one value, so it cannot know that the
+  // other three bars share a prefix with this one — which is how these charts
+  // ended up rendering four bars all labelled "support-assista…" while their
+  // siblings rendered "(1) (2) (3) (4)". Same names, same trim, everywhere.
+  const axisLabelByName = useMemo(() => {
+    const names = chartData.map((d) => String(d.name));
+    const labels = buildAxisLabels(names, axis.maxLabelLength);
+    return new Map(names.map((name, i) => [name, labels[i] ?? name]));
+  }, [chartData, axis.maxLabelLength]);
+  const formatAxisTick = (value: unknown): string => {
+    const name = String(value);
+    return (
+      axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength)
+    );
+  };
+
   // Height is shared by every chart in the row, including the WinRateCharts
   // rendered alongside — and a win-rate chart's bar count (its variants, plus
   // Tie) is independent of `chartData`, which excludes comparison columns
@@ -773,54 +908,72 @@ export const ComparisonCharts = ({
   }, [runMetrics]);
 
   // Build available metrics list
-  const availableMetrics: MetricDefinition[] = useMemo(() => {
-    const metrics: MetricDefinition[] = [
+  const availableMetrics: MetricDefinition[] = useMemo(
+    () => [
       { id: "cost", name: "Total Cost", type: "cost" },
       { id: "latency", name: "Avg Latency", type: "latency" },
-    ];
-
-    // Add per-evaluator score metrics
-    for (const ev of scoreEvaluators) {
-      metrics.push({
-        id: `score_${ev.id}` as MetricType,
-        name: `${ev.name} (Score)`,
+      ...perEvaluatorMetrics({
+        evaluators: scoreEvaluators,
         type: "score",
-        evaluatorId: ev.id,
-      });
-    }
-
-    // Add per-evaluator pass rate metrics
-    for (const ev of passRateEvaluators) {
-      metrics.push({
-        id: `pass_${ev.id}` as MetricType,
-        name: `${ev.name} (Pass Rate)`,
+        idPrefix: "score",
+        label: "Score",
+      }),
+      ...perEvaluatorMetrics({
+        evaluators: passRateEvaluators,
         type: "passRate",
-        evaluatorId: ev.id,
-      });
-    }
+        idPrefix: "pass",
+        label: "Pass Rate",
+      }),
+      ...comparisonMetrics({
+        columns: comparisonColumns ?? [],
+        showLeaderboard: showComparisonLeaderboard,
+      }),
+    ],
+    [
+      scoreEvaluators,
+      passRateEvaluators,
+      comparisonColumns,
+      showComparisonLeaderboard,
+    ],
+  );
 
-    // Add per-comparison-evaluator win-rate metrics so users can toggle
-    // win-rate charts through the same Metrics visibility system as their
-    // siblings (Cost / Latency / Score / Pass Rate).
-    for (const column of comparisonColumns ?? []) {
-      metrics.push({
-        id: `comparison_${column.evaluatorId}` as MetricType,
-        name: `${column.name} (Win Rate)`,
-        type: "comparison",
-        evaluatorId: column.evaluatorId,
-      });
-    }
-
-    return metrics;
-  }, [scoreEvaluators, passRateEvaluators, comparisonColumns]);
-
-  // Initialize visible metrics to include all available metrics on first load
+  // Show every metric the run offers, including ones that appear later.
+  //
+  // The previous guard keyed off `internalVisibleMetrics.size <= 2`, which
+  // fails in both directions. A metric that becomes available after the first
+  // load — a comparison column arriving with run data, an evaluator finishing
+  // — was never switched on, because by then the set had grown past two; a
+  // chart nobody knows to look for is a chart nobody finds. And since the
+  // initial set is exactly {cost, latency}, a run offering only those two kept
+  // the guard true forever, setting a fresh Set on every pass.
+  //
+  // Track which ids have already been offered instead. Newly-offered metrics
+  // switch on once; anything the user has since unchecked stays unchecked,
+  // because it is already in `seen`.
+  const seenMetricIdsRef = useRef<Set<MetricType>>(new Set());
   useEffect(() => {
-    if (availableMetrics.length > 0 && internalVisibleMetrics.size <= 2) {
-      const allMetricIds = new Set(availableMetrics.map((m) => m.id));
-      setInternalVisibleMetrics(allMetricIds);
-    }
+    const unseen = availableMetrics
+      .map((m) => m.id)
+      .filter((id) => !seenMetricIdsRef.current.has(id));
+    if (unseen.length === 0) return;
+
+    for (const id of unseen) seenMetricIdsRef.current.add(id);
+    setInternalVisibleMetrics((current) => {
+      const next = new Set(current);
+      for (const id of unseen) next.add(id);
+      return next;
+    });
   }, [availableMetrics]);
+
+  // Generic metadata keys come from the shared hook so the chart and
+  // ComparisonTable use identical discovery (and adding a third surface
+  // later only needs to import the same hook). The hook excludes the
+  // reserved keys (model / prompt_id / prompt / version), which we
+  // surface here under their dedicated labels.
+  const { availableKeys: targetMetadataKeys } = useResultsGrouping({
+    source: "target-metadata",
+    comparisonData,
+  });
 
   // Get available X-axis options from target properties and metadata
   const xAxisOptions = useMemo(() => {
@@ -834,44 +987,35 @@ export const ComparisonCharts = ({
       options.push({ value: "target", label: "Target" });
     }
 
-    // Track which properties/metadata keys exist across all targets
+    // Detect "Model" and "Prompt" — these reserve their own labels and
+    // can come from top-level columns or metadata aliases.
     let hasModel = false;
-    let hasPrompt = false; // Prompt option combines promptId + version
-    const metadataKeys = new Set<string>();
-
+    let hasPrompt = false;
     for (const run of runMetrics) {
       for (const targetCol of run.targetColumns) {
-        // Check top-level target properties
         if (targetCol.model) hasModel = true;
         if (targetCol.promptId) hasPrompt = true;
-
-        // Check metadata object
         if (targetCol.metadata) {
-          for (const key of Object.keys(targetCol.metadata)) {
-            if (key === "model") hasModel = true;
-            else if (key === "prompt_id" || key === "prompt") hasPrompt = true;
-            // Skip "version" as it's combined with prompt
-            else if (key !== "version") metadataKeys.add(key);
+          if ("model" in targetCol.metadata) hasModel = true;
+          if (
+            "prompt_id" in targetCol.metadata ||
+            "prompt" in targetCol.metadata
+          ) {
+            hasPrompt = true;
           }
         }
       }
     }
 
-    // Add common keys with nice labels
-    if (hasModel) {
-      options.push({ value: "model", label: "Model" });
-    }
-    if (hasPrompt) {
-      options.push({ value: "prompt", label: "Prompt" });
-    }
+    if (hasModel) options.push({ value: "model", label: "Model" });
+    if (hasPrompt) options.push({ value: "prompt", label: "Prompt" });
 
-    // Add remaining metadata keys
-    for (const key of metadataKeys) {
+    for (const key of targetMetadataKeys) {
       options.push({ value: key, label: key });
     }
 
     return options;
-  }, [runMetrics]);
+  }, [runMetrics, targetMetadataKeys]);
 
   // Show charts if:
   // 1. Multiple runs (compare mode)
@@ -1167,9 +1311,7 @@ export const ComparisonCharts = ({
                       angle={axis.angle}
                       textAnchor={axis.textAnchor}
                       height={axis.height}
-                      tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                      tickFormatter={formatAxisTick}
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1238,9 +1380,7 @@ export const ComparisonCharts = ({
                       angle={axis.angle}
                       textAnchor={axis.textAnchor}
                       height={axis.height}
-                      tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                      tickFormatter={formatAxisTick}
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1315,9 +1455,7 @@ export const ComparisonCharts = ({
                           angle={axis.angle}
                           textAnchor={axis.textAnchor}
                           height={axis.height}
-                          tickFormatter={(value) =>
-                            truncateLabel(String(value), axis.maxLabelLength)
-                          }
+                          tickFormatter={formatAxisTick}
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1367,6 +1505,34 @@ export const ComparisonCharts = ({
                 ),
             )}
 
+            {/* Bradley-Terry leaderboard chart (#5103) — a sibling of
+                WinRateChart, gated the same way through the Metrics
+                dropdown. The rollout flag is re-checked here rather than
+                left to visibleMetrics: a metric id already switched on from
+                a previous session would otherwise keep rendering the chart
+                after the flag was turned back off. */}
+            {showComparisonLeaderboard &&
+              comparisonColumns?.map(
+                (column) =>
+                  visibleMetrics.has(
+                    `leaderboard_${column.evaluatorId}` as MetricType,
+                  ) && (
+                    <ComparisonLeaderboardChart
+                      key={`leaderboard-${column.evaluatorId}`}
+                      column={column}
+                      rows={comparisonRows ?? []}
+                      chartHeight={chartHeight}
+                      targetColors={targetColors}
+                      modelByTargetId={modelsFromRun.modelByTargetId}
+                      judgeModel={
+                        modelsFromRun.judgeModelByEvaluatorId[
+                          column.evaluatorId
+                        ] ?? null
+                      }
+                    />
+                  ),
+              )}
+
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(
               (ev) =>
@@ -1412,9 +1578,7 @@ export const ComparisonCharts = ({
                           angle={axis.angle}
                           textAnchor={axis.textAnchor}
                           height={axis.height}
-                          tickFormatter={(value) =>
-                            truncateLabel(String(value), axis.maxLabelLength)
-                          }
+                          tickFormatter={formatAxisTick}
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}

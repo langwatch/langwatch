@@ -124,6 +124,33 @@ export {
   EvaluationsApiError,
 } from "./client-sdk/services/evaluations";
 
+// AI Gateway management API exports (virtual keys + budgets)
+export {
+  VirtualKeysApiService,
+  VirtualKeysApiError,
+  type VirtualKey,
+  type VirtualKeyScope,
+  type VirtualKeyScopeType,
+  type VirtualKeyRoutingMode,
+  type VirtualKeyBudgetInput,
+  type VirtualKeyWithSecret,
+  type VirtualKeySpendSummary,
+  type CreateVirtualKeyInput,
+  type UpdateVirtualKeyInput,
+} from "./client-sdk/services/virtual-keys/virtual-keys-api.service";
+export {
+  GatewayBudgetsApiService,
+  GatewayBudgetsApiError,
+  type GatewayBudget,
+  type GatewayBudgetList,
+  type BudgetScopeKind,
+  type BudgetWindow,
+  type BudgetOnBreach,
+  type CreateGatewayBudgetScope,
+  type CreateGatewayBudgetInput,
+  type UpdateGatewayBudgetInput,
+} from "./client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+
 export const logger = {
   ConsoleLogger,
   NoOpLogger,

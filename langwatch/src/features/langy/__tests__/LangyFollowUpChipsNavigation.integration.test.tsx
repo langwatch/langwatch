@@ -189,8 +189,11 @@ describe("a card's footer chips under the real app router", () => {
       expect(chip("Open in Annotations").getAttribute("href")).toBe(
         "/demo/annotations",
       );
+      // No --start-date/--end-date in the fixture's command, so the search
+      // covered the CLI's own default last-24h window — carried here as a
+      // rolling `preset=24h` rather than silently dropped (traceExplorerLink.ts).
       expect(chip("Alert me on this").getAttribute("href")).toBe(
-        "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
+        "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22&preset=24h",
       );
     });
 

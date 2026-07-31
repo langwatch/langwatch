@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -114,36 +115,14 @@ describe("Feature: Projects REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.project
-      .deleteMany({
-        where: { team: { organizationId: testOrganization.id } },
-      })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.apiKey
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({
-        where: { userId },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { organizationId: testOrganization.id },
-      })
-      .catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["project", { team: { organizationId: testOrganization.id } }],
+      ["roleBinding", { organizationId: testOrganization.id }],
+      ["apiKey", { organizationId: testOrganization.id }],
+      ["teamUser", { userId }],
+      ["organizationUser", { organizationId: testOrganization.id }],
+      ["team", { organizationId: testOrganization.id }],
+    ]);
     await prisma.organization
       .delete({
         where: { id: testOrganization.id },

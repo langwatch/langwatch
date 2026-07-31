@@ -27,6 +27,10 @@ import {
   verifySignature,
 } from "../../../../../ee/licensing";
 import {
+  canonicalPemKey,
+  mangledPemPastes,
+} from "../../../../../ee/licensing/__tests__/fixtures/mangledPemPastes";
+import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
@@ -38,6 +42,7 @@ import {
   GARBAGE_DATA,
   VALID_LICENSE_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
@@ -107,9 +112,9 @@ describe("License Router Integration", () => {
     });
 
     // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: adminUser.id },
-    });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId, userId: adminUser.id }],
+    ]);
     await prisma.roleBinding.create({
       data: {
         id: `rb-lic-admin-${nanoid(8)}`,
@@ -148,9 +153,9 @@ describe("License Router Integration", () => {
     });
 
     // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId, userId: memberUser.id },
-    });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId, userId: memberUser.id }],
+    ]);
     await prisma.roleBinding.create({
       data: {
         id: `rb-lic-member-${nanoid(8)}`,
@@ -183,23 +188,22 @@ describe("License Router Integration", () => {
 
   afterAll(async () => {
     // Cleanup
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.organization.deleteMany({
-      where: { slug: testOrgSlug },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: [
-            "license-router-admin@test.com",
-            "license-router-member@test.com",
-          ],
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { slug: testOrgSlug }],
+      [
+        "user",
+        {
+          email: {
+            in: [
+              "license-router-admin@test.com",
+              "license-router-member@test.com",
+            ],
+          },
         },
-      },
-    });
+      ],
+    ]);
   });
 
   afterEach(async () => {
@@ -503,6 +507,46 @@ describe("License Router Integration", () => {
       const parsedLicense = parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.type).toBe("ENTERPRISE");
       expect(parsedLicense?.data.plan.name).toBe("Enterprise");
+    });
+
+    describe("when the pasted private key carries stray whitespace", () => {
+      const pastes = mangledPemPastes(canonicalPemKey(TEST_PRIVATE_KEY));
+
+      for (const [description, privateKey] of Object.entries(pastes)) {
+        it(`generates a verifiable license from a key with ${description}`, async () => {
+          const result = await adminCaller.license.generate({
+            ...getValidInput(),
+            privateKey,
+          });
+
+          const parsedLicense = parseLicenseKey(result.licenseKey);
+          expect(parsedLicense).not.toBeNull();
+          expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+        });
+      }
+
+      it("generates a verifiable license from a public+private PEM bundle", async () => {
+        const result = await adminCaller.license.generate({
+          ...getValidInput(),
+          privateKey: `${TEST_PUBLIC_KEY}${TEST_PRIVATE_KEY}`,
+        });
+
+        const parsedLicense = parseLicenseKey(result.licenseKey);
+        expect(parsedLicense).not.toBeNull();
+        expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+      });
+    });
+
+    it("throws BAD_REQUEST with a keyable code when the private key is not a PEM key", async () => {
+      await expect(
+        adminCaller.license.generate({
+          ...getValidInput(),
+          privateKey: "not-a-private-key",
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        cause: { code: "license_signing_key_not_pem" },
+      });
     });
 
     it("throws BAD_REQUEST for past expiration date", async () => {

@@ -11,6 +11,7 @@ import type { RetroactiveUpdateService } from "../data-retention/retroactive/ret
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
+import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -100,6 +101,13 @@ export interface AppDependencies {
   };
   simulations: {
     runs: SimulationRunService;
+    /**
+     * CSV export of run history. A sibling of `runs` rather than a method on
+     * it: the export sweeps with its own keyset pagination and serializers,
+     * and the API layer should reach it here instead of assembling one from
+     * `runs.repository`.
+     */
+    export: ScenarioRunExportService;
   };
   suiteRuns: {
     runs: SuiteRunService;

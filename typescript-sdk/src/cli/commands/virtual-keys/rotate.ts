@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { virtualKeyDetailUrl } from "./_shared";
 import type { CommandResult } from "../../utils/output";
@@ -19,7 +19,7 @@ import type { CommandResult } from "../../utils/output";
 export const rotateVirtualKeyCommand = async (
   id: string,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new VirtualKeysApiService();
   const spinner = createSpinner(`Rotating virtual key "${id}"...`).start();
@@ -37,7 +37,7 @@ export const rotateVirtualKeyCommand = async (
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();
-        console.log(chalk.gray("Prefix: ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
+        console.log(chalk.gray("Prefix: ") + `${virtual_key.display_prefix}...`);
         const detailUrl = virtualKeyDetailUrl(virtual_key.id);
         if (detailUrl) {
           console.log(chalk.gray("View in UI: ") + chalk.cyan(detailUrl));

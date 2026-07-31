@@ -27,6 +27,8 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/bytedance/sonic"
+	bfanthropic "github.com/maximhq/bifrost/core/providers/anthropic"
+	bfproviderutils "github.com/maximhq/bifrost/core/providers/utils"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -148,7 +150,7 @@ func (r *BifrostRouter) dispatchBedrockVPCE(
 	cred domain.Credential,
 	endpoint string,
 ) (*domain.Response, error) {
-	input, err := r.buildConverseInput(ctx, req, provider, model, cred)
+	input, dropped, err := r.buildConverseInput(ctx, req, provider, model, cred)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +163,7 @@ func (r *BifrostRouter) dispatchBedrockVPCE(
 
 	bfResp := converseOutputToBifrost(out, model)
 	body, _ := sonic.Marshal(bfResp)
+	body = injectParamsDropped(body, dropped)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: 200,
@@ -180,7 +183,7 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 	cred domain.Credential,
 	endpoint string,
 ) (domain.StreamIterator, error) {
-	input, err := r.buildConverseInput(ctx, req, provider, model, cred)
+	input, dropped, err := r.buildConverseInput(ctx, req, provider, model, cred)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +203,10 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 	}
 
 	return &bedrockStreamIterator{
-		ctx:    ctx,
-		stream: out.GetStream(),
-		model:  model,
+		ctx:           ctx,
+		stream:        out.GetStream(),
+		model:         model,
+		paramsDropped: dropped,
 	}, nil
 }
 
@@ -214,25 +218,202 @@ func (r *BifrostRouter) buildConverseInput(
 	provider bfschemas.ModelProvider,
 	model string,
 	cred domain.Credential,
-) (*bedrockruntime.ConverseInput, error) {
-	bfReq, _, err := buildChatRequest(ctx, req, provider, model)
+) (*bedrockruntime.ConverseInput, []string, error) {
+	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, err
+		return nil, nil, classifyChatBuildError(ctx, err)
 	}
+	dropped := paramsDroppedFrom(dispatchCtx)
+	stampParamsDropped(ctx, dropped)
 
 	system, messages, err := mapBedrockMessages(bfReq.Input)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, model)
+	if err != nil {
+		return nil, nil, err
+	}
+	input := &bedrockruntime.ConverseInput{
+		ModelId:                      aws.String(bedrockModelID(model, cred)),
+		Messages:                     messages,
+		System:                       system,
+		InferenceConfig:              mapBedrockInferenceConfig(bfReq.Params),
+		ToolConfig:                   mapBedrockToolConfig(bfReq.Params),
+		AdditionalModelRequestFields: additional,
+	}
+	return input, dropped, nil
+}
+
+// mapBedrockAdditionalFields maps the neutral params the Converse API only
+// accepts through additionalModelRequestFields: extended thinking
+// (reasoning_effort / reasoning.max_tokens) and json_schema structured
+// output. Wire shapes mirror bifrost's own bedrock translator exactly
+// (providers/bedrock/utils.go), and the budget math reuses bifrost's
+// helpers so the two bedrock paths cannot drift apart. Returns nil when
+// neither feature is requested.
+//
+// One deliberate divergence from bifrost: when the caller sent no output
+// cap, the thinking budget is computed against the model's default
+// maximum WITHOUT writing that default into inferenceConfig.maxTokens.
+// Converse applies the same default on its own, so forcing the field adds
+// nothing except an output cap the caller never asked for.
+func mapBedrockAdditionalFields(ctx context.Context, params *bfschemas.ChatParameters, model string) (brdocument.Interface, error) {
+	if params == nil {
+		return nil, nil
+	}
+	fields := map[string]any{}
+
+	mapper := bedrockFieldMapper{fields: fields, params: params, model: model}
+	if err := mapper.applyReasoning(ctx); err != nil {
+		return nil, err
+	}
+	if err := mapper.applyResponseFormat(ctx); err != nil {
 		return nil, err
 	}
 
-	input := &bedrockruntime.ConverseInput{
-		ModelId:         aws.String(bedrockModelID(model, cred)),
-		Messages:        messages,
-		System:          system,
-		InferenceConfig: mapBedrockInferenceConfig(bfReq.Params),
-		ToolConfig:      mapBedrockToolConfig(bfReq.Params),
+	if len(fields) == 0 {
+		return nil, nil
 	}
-	return input, nil
+	return brdocument.NewLazyDocument(fields), nil
+}
+
+// bedrockFieldMapper builds one request's additionalModelRequestFields.
+type bedrockFieldMapper struct {
+	fields map[string]any
+	params *bfschemas.ChatParameters
+	model  string
+}
+
+// applyReasoning writes the thinking block for a reasoning request.
+// Non-Anthropic families reach here only if the parameter policy allowed
+// them (Nova); this endpoint serves Anthropic inference profiles, so keep
+// the honest refusal rather than guessing a mapping bifrost implements
+// differently per family.
+func (m bedrockFieldMapper) applyReasoning(ctx context.Context) error {
+	if m.params.Reasoning == nil {
+		return nil
+	}
+	if !bfschemas.IsAnthropicModel(m.model) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
+			"message": fmt.Sprintf("refusing to drop 'reasoning_effort' for bedrock/%s: the managed Bedrock endpoint maps reasoning for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"fault":   "customer",
+		})
+	}
+	if m.params.Reasoning.MaxTokens != nil {
+		return m.applyExplicitThinkingBudget(ctx)
+	}
+	return m.applyThinkingEffort(ctx)
+}
+
+// applyExplicitThinkingBudget honors a caller-sent reasoning.max_tokens.
+// The sentinel -1 means "the minimum the provider accepts".
+func (m bedrockFieldMapper) applyExplicitThinkingBudget(ctx context.Context) error {
+	budget := *m.params.Reasoning.MaxTokens
+	if budget == -1 {
+		budget = anthropicMinimumThinkingBudget
+	}
+	if budget < anthropicMinimumThinkingBudget {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"reason": fmt.Sprintf("reasoning.max_tokens must be >= %d for anthropic", anthropicMinimumThinkingBudget),
+		})
+	}
+	m.fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+	return nil
+}
+
+// applyThinkingEffort derives the thinking budget from reasoning_effort:
+// adaptive-thinking models take the effort natively, the rest get a budget
+// computed against the caller's output cap.
+func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
+	effort := ""
+	if m.params.Reasoning.Effort != nil {
+		effort = *m.params.Reasoning.Effort
+	}
+	if effort == "" || effort == "none" {
+		return nil
+	}
+	if bfanthropic.SupportsAdaptiveThinking(m.model) {
+		m.fields["thinking"] = map[string]any{"type": "adaptive"}
+		setOutputConfig(m.fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
+		return nil
+	}
+	maxTokens := bfproviderutils.GetMaxOutputTokensOrDefault(m.model, bedrockDefaultCompletionMaxTokens)
+	if m.params.MaxCompletionTokens != nil {
+		maxTokens = *m.params.MaxCompletionTokens
+	}
+	budget, err := bfproviderutils.GetBudgetTokensFromReasoningEffort(effort, anthropicMinimumThinkingBudget, maxTokens)
+	if err != nil {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+	}
+	m.fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+	return nil
+}
+
+// applyResponseFormat writes the output_config block for a json_schema
+// request, refusing the families this endpoint cannot enforce it for.
+func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
+	schema, _, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
+	if !ok {
+		return nil
+	}
+	if !bfschemas.IsAnthropicModel(m.model) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"fault":   "customer",
+		})
+	}
+	// Anthropic's output_config carries type + schema only, same as bifrost,
+	// so the schema name the caller sent has nowhere to go.
+	setOutputConfig(m.fields, "format", map[string]any{"type": "json_schema", "schema": schema})
+	return nil
+}
+
+// anthropicMinimumThinkingBudget and bedrockDefaultCompletionMaxTokens
+// mirror bifrost's anthropic.MinimumReasoningMaxTokens (1024) and
+// bedrock.DefaultCompletionMaxTokens (4096); the constants are not
+// exported in a shared place, so they are pinned here and by the policy
+// tests.
+const (
+	anthropicMinimumThinkingBudget    = 1024
+	bedrockDefaultCompletionMaxTokens = 4096
+)
+
+// setOutputConfig upserts a key under additionalModelRequestFields'
+// output_config object, preserving siblings (effort and format coexist on
+// adaptive-thinking structured-output requests).
+func setOutputConfig(fields map[string]any, key string, value any) {
+	cfg, _ := fields["output_config"].(map[string]any)
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+	cfg[key] = value
+	fields["output_config"] = cfg
+}
+
+// jsonSchemaFromResponseFormat extracts the schema object (and name) from
+// an OpenAI response_format of type json_schema. Returns ok false for
+// absent response_format or other types (json_object never reaches this
+// mapper: the parameter policy refuses it on the bedrock lane).
+func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok bool) {
+	if rf == nil {
+		return nil, "", false
+	}
+	m, isMap := (*rf).(map[string]interface{})
+	if !isMap || m["type"] != "json_schema" {
+		return nil, "", false
+	}
+	js, isMap := m["json_schema"].(map[string]interface{})
+	if !isMap {
+		return nil, "", false
+	}
+	name, _ = js["name"].(string)
+	schema, hasSchema := js["schema"]
+	if !hasSchema {
+		return nil, "", false
+	}
+	return schema, name, true
 }
 
 // mapBedrockMessages splits the neutral Bifrost message list into Bedrock's
@@ -618,6 +799,9 @@ type bedrockStreamIterator struct {
 	usage   domain.Usage
 	err     error
 	done    bool
+	// paramsDropped is the parameter-policy drop list; injected into the
+	// usage-bearing final chunk, mirroring the bifrost stream iterator.
+	paramsDropped []string
 
 	// toolIndex maps a Bedrock content-block index to the OpenAI tool-call
 	// index so multi-tool streams keep stable per-call indices in the deltas.
@@ -631,6 +815,12 @@ func (it *bedrockStreamIterator) Next(ctx context.Context) bool {
 		return false
 	}
 	data, _ := sonic.Marshal(resp)
+	if resp.Usage != nil {
+		// The usage-bearing final chunk carries the policy drop signal,
+		// mirroring extra_fields.params_dropped on sync responses and the
+		// bifrost stream iterator.
+		data = injectParamsDropped(data, it.paramsDropped)
+	}
 	it.current = data
 	return true
 }

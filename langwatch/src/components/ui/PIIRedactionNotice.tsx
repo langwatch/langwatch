@@ -1,6 +1,5 @@
 import { Alert, Link } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import NextLink from "~/utils/compat/next-link";
 
 /**
@@ -21,12 +20,8 @@ export function PIIRedactionNotice({
 }: {
   content: string | null | undefined;
 }) {
-  const { project } = useOrganizationTeamProject();
-
   if (!hasRedactionMarker(content)) return null;
-  const settingsHref = project?.slug
-    ? `/${project.slug}/settings`
-    : "/settings";
+  const settingsHref = "/settings/data-privacy";
 
   return (
     <Alert.Root status="info" size="sm" variant="subtle" width="full">

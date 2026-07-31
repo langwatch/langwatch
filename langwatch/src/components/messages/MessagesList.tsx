@@ -244,7 +244,11 @@ const ExpandableMessages = React.memo(
         }
       });
       setCardHeights(newHeights);
-      setTimeout(() => setTransitionsEnabled(true), 100);
+      const enableTransitionsTimeout = setTimeout(
+        () => setTransitionsEnabled(true),
+        100,
+      );
+      return () => clearTimeout(enableTransitionsTimeout);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
 

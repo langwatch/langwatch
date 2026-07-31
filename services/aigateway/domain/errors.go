@@ -79,4 +79,10 @@ const (
 	// Clients receive it as a 401 with this code so Langy can render the
 	// re-authenticate card instead of a generic provider error.
 	ErrCodexSessionExpired = herr.Code("codex_session_expired")
+	// ErrUnsupportedParameter means the parameter policy refused a request
+	// parameter for the target lane: either the request depends on it
+	// functionally and the lane cannot honor it, or drop_tuning_params is false
+	// and the lane has no mapping for it. The code matches OpenAI's own
+	// parameter rejections so SDK error handling stays familiar.
+	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
 )

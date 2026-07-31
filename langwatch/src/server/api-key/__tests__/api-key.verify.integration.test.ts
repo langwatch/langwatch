@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { ApiKeyService } from "../api-key.service";
 
@@ -81,15 +82,11 @@ describe("Feature: API key verification", () => {
   });
 
   afterAll(async () => {
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.apiKey
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["apiKey", { organizationId }],
+      ["organizationUser", { organizationId }],
+    ]);
     await prisma.organization
       .delete({ where: { id: organizationId } })
       .catch(() => {});

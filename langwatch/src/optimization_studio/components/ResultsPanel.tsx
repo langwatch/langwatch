@@ -135,12 +135,13 @@ export function EvaluationResults({
     if (evaluationState?.status === "running" && !experiment.data) {
       setKeepFetching(true);
     } else {
-      setTimeout(
+      const stopFetchingTimeout = setTimeout(
         () => {
           setKeepFetching(false);
         },
         experiment.data ? 0 : 15_000,
       );
+      return () => clearTimeout(stopFetchingTimeout);
     }
   }, [evaluationState?.status, experiment.data]);
 

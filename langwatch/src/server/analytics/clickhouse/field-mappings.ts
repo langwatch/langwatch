@@ -33,6 +33,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "TotalPromptTokenCount",
   "TotalCompletionTokenCount",
   "TokensPerSecond",
+  "SpanCount",
   "TraceName",
   "ContainsErrorStatus",
   "ErrorMessage",
@@ -492,15 +493,25 @@ export function getTableAlias(table: CHTable): string {
  *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
  *   ones). The caller passes the fragment matching its date regime; the referenced
  *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
+ * @param evalTimeFilter - Optional SQL fragment bounding the `evaluation_runs`
+ *   subquery's partition column (e.g. `AND ScheduledAt >= {startDate} - INTERVAL
+ *   7 DAY AND UpdatedAt >= {startDate} - INTERVAL 7 DAY`). Same disease as
+ *   `spanTimeFilter`: without it the subquery — and its IN-tuple dedup inner —
+ *   filter on `TenantId` only and walk the tenant's entire history across every
+ *   partition. Applied to BOTH the outer subquery and the dedup inner, since the
+ *   inner GROUP BY is the scan that actually walks the partitions. Ignored for
+ *   non-`evaluation_runs` tables.
  */
 export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
+  evalTimeFilter,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
+  evalTimeFilter?: string;
 }): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
@@ -517,13 +528,14 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
         : EVALUATION_ANALYTICS_COLUMNS;
+      const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId = {tenantId:String}${evalTimeBound}
           AND (TenantId, EvaluationId, UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM evaluation_runs
-            WHERE TenantId = {tenantId:String}
+            WHERE TenantId = {tenantId:String}${evalTimeBound}
             GROUP BY TenantId, EvaluationId
           )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;

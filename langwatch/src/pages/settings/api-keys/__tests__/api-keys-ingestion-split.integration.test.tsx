@@ -12,8 +12,10 @@
  * Verifies that:
  *  - Ingestion keys render under their own "Ingestion keys" heading, show the
  *    source tool, and expose revoke but no permissions/scope editor.
- *  - Regular keys render under the "API keys" heading.
+ *  - Regular keys render above that section, under the page heading, with no
+ *    heading of their own.
  *  - With no ingestion keys, no "Ingestion keys" heading appears (no change).
+ *  - Each key row carries the anchor id deep links target.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -205,7 +207,7 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
   describe("given the org has an ingestion key and a regular key", () => {
     describe("when navigating to Settings > API Keys", () => {
       /** @scenario Ingestion keys render in their own labeled section */
-      it("renders an 'Ingestion keys' heading and an 'API keys' heading", () => {
+      it("renders an 'Ingestion keys' heading", () => {
         mockApiKeyList.mockReturnValue({
           data: [
             makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
@@ -218,8 +220,27 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
         expect(
           screen.getByRole("heading", { name: "Ingestion keys" }),
         ).toBeInTheDocument();
+      });
+
+      /** @scenario The page carries a single title and subtitle */
+      it("gives the regular keys table no heading of its own, keeping the security warning", () => {
+        mockApiKeyList.mockReturnValue({
+          data: [
+            makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+            makeRegularKey("key-ci", "CI Pipeline"),
+          ],
+          isLoading: false,
+        });
+        renderSection();
+
         expect(
-          screen.getByRole("heading", { name: "API keys" }),
+          screen.queryByRole("heading", { name: "API keys" }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/Keys scoped to a user or service/),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByText(/Do not share your API keys/),
         ).toBeInTheDocument();
       });
 
@@ -275,11 +296,6 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
         expect(
           screen.queryByRole("heading", { name: "Ingestion keys" }),
         ).not.toBeInTheDocument();
-        // With no ingestion keys, the redundant "API keys" sub-heading is also
-        // suppressed so the single-section layout is unchanged.
-        expect(
-          screen.queryByRole("heading", { name: "API keys" }),
-        ).not.toBeInTheDocument();
       });
     });
   });
@@ -295,19 +311,28 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
       });
     });
 
-    /** @scenario API keys render above ingestion keys */
-    it("renders the API keys section above the Ingestion keys section", () => {
+    /** @scenario Ingestion keys render in their own labeled section */
+    it("renders the regular keys above the Ingestion keys section", () => {
       renderSection();
-      const apiHeading = screen.getByRole("heading", { name: "API keys" });
+      const regularKey = screen.getByText("CI Pipeline");
       const ingestHeading = screen.getByRole("heading", {
         name: "Ingestion keys",
       });
       // DOCUMENT_POSITION_FOLLOWING (4) means ingestHeading comes after the
-      // API keys heading in document order.
+      // regular key row in document order.
       expect(
-        apiHeading.compareDocumentPosition(ingestHeading) &
+        regularKey.compareDocumentPosition(ingestHeading) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+
+    /** @scenario Deep link opens the page on a specific key */
+    it("anchors every key row so a deep link can target it", () => {
+      const { container } = renderSection();
+      expect(container.querySelector("#api-key-key-ci")).toBeInTheDocument();
+      expect(
+        container.querySelector("#api-key-key-ingest"),
+      ).toBeInTheDocument();
     });
 
     /** @scenario Ingestion keys render in their own labeled section */

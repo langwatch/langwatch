@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.0.0...typescript-sdk@v1.1.0) (2026-07-31)
+
+
+### Features
+
+* **cli:** /me credentials just work after device login, authorize page fixes ([#6264](https://github.com/langwatch/langwatch/issues/6264)) ([a78f2f8](https://github.com/langwatch/langwatch/commit/a78f2f845cb29ddbc0d36e1032897cf40c4ca8a3))
+* **gateway:** align the REST provisioning surface with the service layer, six-scope budgets with live spend, per-key spend read, CLI n-by-n ([#6268](https://github.com/langwatch/langwatch/issues/6268)) ([5459a31](https://github.com/langwatch/langwatch/commit/5459a31a0f82a1c2579c084322fbaf46f290c985))
+* **langy:** agent-driven browser navigation — open the surfaced resource in place ([#5980](https://github.com/langwatch/langwatch/issues/5980)) ([a9b2f60](https://github.com/langwatch/langwatch/commit/a9b2f60fd810e9fdfd12a22c7de142939418626f))
+* launch day fixes: pre-provisioned tools, subscription-first CLI, first-trace redirect, opus-5 1m pricing, first-project affordance ([#6249](https://github.com/langwatch/langwatch/issues/6249)) ([98d8790](https://github.com/langwatch/langwatch/commit/98d87904c09ab9330b055260b1c6c98c87d1cbbc))
+
+
+### Bug Fixes
+
+* **cli:** latest login wins over stale tool wiring ([#6204](https://github.com/langwatch/langwatch/issues/6204)) ([f7bb069](https://github.com/langwatch/langwatch/commit/f7bb069462a1c72950dcc49d9025cd2f689d1891))
+* **cli:** never reroute a run onto the metered gateway path ([#6343](https://github.com/langwatch/langwatch/issues/6343)) ([30dcd1f](https://github.com/langwatch/langwatch/commit/30dcd1fc2f63f83153106bf96b3b5ab46f2a08b6))
+* **langy:** resolve the [#5741](https://github.com/langwatch/langwatch/issues/5741) retrospective findings across langy, langyagent, traces-v2 and the CLI daemon ([#5881](https://github.com/langwatch/langwatch/issues/5881)) ([#6275](https://github.com/langwatch/langwatch/issues/6275)) ([392d0be](https://github.com/langwatch/langwatch/commit/392d0bed8f8bb308a7096553a789cd1b81a724d8))
+* **me:** rename Sessions to Devices, keep simulations date window on set switch ([#6136](https://github.com/langwatch/langwatch/issues/6136)) ([7a9917a](https://github.com/langwatch/langwatch/commit/7a9917a13d07bd31c33bd8c0ccd9a84678c7cd41))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.37.0...typescript-sdk@v1.0.0) (2026-07-24)
 
 

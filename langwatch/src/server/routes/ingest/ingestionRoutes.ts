@@ -38,6 +38,11 @@ import {
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import {
+  enforceApiKeyIdOnLogRequest,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
+} from "@ee/governance/services/ingestKeyProvenance.utils";
 import { createLogger } from "@langwatch/observability";
 import type {
   IExportLogsServiceRequest,
@@ -323,9 +328,13 @@ async function extractCostEventsForSource(input: {
 }
 
 const secured = createServiceApp({ basePath: "/api/ingest" });
-const ingestAuth = handlerManagedAuth(
-  "ingestion source bearer secret resolved in-handler via authIngestionSource",
-);
+const ingestAuth = handlerManagedAuth({
+  reason:
+    "ingestion source bearer secret resolved in-handler via authIngestionSource",
+  // Per-source bearer secret, not an RBAC permission.
+  permissions: [],
+  credential: "internal",
+});
 
 /**
  * Resolve `Authorization: Bearer <secret>` against IngestionSource.
@@ -444,6 +453,17 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
           source.organizationId,
         );
         stampOriginAttrs(parsed.request, source);
+        // These endpoints authenticate with an ingestion-source bearer
+        // secret, so there is no ApiKey row to attribute the payload to.
+        // The attribute is still enforced rather than left alone: a
+        // payload-supplied copy has to be dropped, because redaction
+        // exempts that name from the secret-name deny-list.
+        enforceApiKeyIdOnTraceRequest(
+          parsed.request as unknown as Parameters<
+            typeof enforceApiKeyIdOnTraceRequest
+          >[0],
+          null,
+        );
         const result = await getApp().traces.collection.handleOtlpTraceRequest(
           govProject.id,
           parsed.request,
@@ -655,6 +675,12 @@ secured
             source.organizationId,
           );
           stampLogOriginAttrs(parsed.request, source);
+          enforceApiKeyIdOnLogRequest(
+            parsed.request as unknown as Parameters<
+              typeof enforceApiKeyIdOnLogRequest
+            >[0],
+            null,
+          );
           try {
             await getApp().traces.logCollection.handleOtlpLogRequest({
               tenantId: govProject.id,
@@ -924,6 +950,12 @@ secured
               source.organizationId,
             );
             stampMetricOriginAttrs({ request: parsed.request, source });
+            enforceApiKeyIdOnMetricRequest(
+              parsed.request as unknown as Parameters<
+                typeof enforceApiKeyIdOnMetricRequest
+              >[0],
+              null,
+            );
             const result =
               await getApp().traces.metricCollection.handleOtlpMetricRequest({
                 tenantId: govProject.id,
