@@ -34,7 +34,10 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
-    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   }),
 }));
 
@@ -60,7 +63,9 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
       forceTeamRoleGrantsEverything.mock.calls.length ||
       forceTeamRoleGrantsEverything.getMockImplementation()
         ? forceTeamRoleGrantsEverything(...args)
-        : (actual.teamRoleHasPermission as (...a: unknown[]) => boolean)(...args),
+        : (actual.teamRoleHasPermission as (...a: unknown[]) => boolean)(
+            ...args,
+          ),
   };
 });
 
@@ -109,10 +114,17 @@ function makePrisma({
         findUnique: vi.fn().mockResolvedValue(projectWithTeam),
       },
       team: {
-        findFirst: vi.fn().mockResolvedValue({ id: TEAM_ID, organizationId: ORG_ID }),
-        findUnique: vi.fn().mockResolvedValue({ id: TEAM_ID, organizationId: ORG_ID }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: TEAM_ID, organizationId: ORG_ID }),
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ id: TEAM_ID, organizationId: ORG_ID }),
       },
-      roleBinding: { count: roleBindingCountFn, findMany: vi.fn().mockResolvedValue([]) },
+      roleBinding: {
+        count: roleBindingCountFn,
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       teamUser: { findFirst: teamUserFindFirst },
       apiKey: { findMany: vi.fn().mockResolvedValue([]) },
     } as any,
@@ -171,7 +183,11 @@ describe("ApiKeyService.create() — ceiling for legacy-membership users", () =>
           permissionMode: "restricted",
           permissions: ["traces:create"],
           bindings: [
-            { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID } as any,
+            {
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: PROJECT_ID,
+            } as any,
           ],
         }),
       ).rejects.toThrow(/exceeds your own access/);
@@ -221,7 +237,11 @@ describe("ApiKeyService.create() — ceiling for legacy-membership users", () =>
           permissionMode: "restricted",
           permissions: ["organization:manage"],
           bindings: [
-            { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID } as any,
+            {
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: PROJECT_ID,
+            } as any,
           ],
         }),
       ).rejects.toThrow(/exceeds your own access/);
