@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   assertWebhookDelivered,
   sendWebhook,
+  type WebhookSendResult,
 } from "~/server/app-layer/automations/delivery/sendWebhook";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
@@ -232,6 +233,41 @@ const EMPTY_USAGE: SpendUsage = {
   reasoning_tokens: 0,
 };
 
+/** The columns admission's attribution owns. A row whose process instance
+ *  never saw an `admitted` event still needs every one of them, so each
+ *  falls back to the empty value the spend log stores. */
+function attributedColumns(
+  attribution: DeliverPayload["attribution"],
+): Pick<
+  SpendEventRow,
+  | "organizationId"
+  | "virtualKeyId"
+  | "principalUserId"
+  | "endUserId"
+  | "traceId"
+  | "requestType"
+  | "labels"
+  | "metadata"
+> {
+  return {
+    organizationId: attribution?.organization_id ?? "",
+    virtualKeyId: attribution?.virtual_key_id ?? "",
+    principalUserId: attribution?.principal_user_id ?? "",
+    endUserId: attribution?.end_user_id ?? "",
+    traceId: attribution?.trace_id ?? "",
+    requestType: attribution?.request_type ?? "",
+    labels: attribution?.labels ?? [],
+    metadata: attribution?.metadata ?? "",
+  };
+}
+
+/** The RESOLVED model identity when the outcome carried one, else the
+ *  identity admission requested. `fallback` is what a request that named
+ *  neither stores. */
+function resolvedModel(payload: DeliverPayload, fallback: string): string {
+  return payload.model || payload.attribution?.model || fallback;
+}
+
 /** The delivery view as a spend row, so the envelope mapper stays the one
  *  place the external contract is shaped. Rating happens here with the
  *  same deterministic service the fold uses, never by reading the fold's
@@ -242,23 +278,18 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     payload.status === "settled"
       ? { costNanoUsd: 0, rateVersion: "" }
       : rateSpendNanoUsd({
-          model: payload.model || payload.attribution?.model || "unknown",
+          model: resolvedModel(payload, "unknown"),
           usage,
           rateVersion: payload.rate_version,
         });
   return {
+    ...attributedColumns(payload.attribution),
     tenantId: payload.project_id,
     gatewayRequestId: payload.gateway_request_id,
-    organizationId: payload.attribution?.organization_id ?? "",
     teamId: "",
-    virtualKeyId: payload.attribution?.virtual_key_id ?? "",
-    principalUserId: payload.attribution?.principal_user_id ?? "",
-    endUserId: payload.attribution?.end_user_id ?? "",
-    traceId: payload.attribution?.trace_id ?? "",
-    model: payload.model || payload.attribution?.model || "",
+    model: resolvedModel(payload, ""),
     providerKey:
       payload.model_provider_id || payload.attribution?.model_provider_id || "",
-    requestType: payload.attribution?.request_type ?? "",
     tokensInput: usage.input_tokens,
     tokensOutput: usage.output_tokens,
     tokensCacheRead: usage.cache_read_input_tokens,
@@ -272,8 +303,6 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     httpStatus: payload.error?.http_status ?? 0,
     needsReconciliation: payload.status === "settled",
     settleReason: payload.settle_reason ?? "",
-    labels: payload.attribution?.labels ?? [],
-    metadata: payload.attribution?.metadata ?? "",
     durationMs: payload.duration_ms,
     occurredAt: new Date(payload.occurred_at),
   };
@@ -294,13 +323,18 @@ function batchIdFor(
   return `${endpointId}:${hash}`;
 }
 
+/** The instant a buffered envelope stops being held by the coalescing
+ *  delay. */
+function coalescingDeadline(
+  entry: PendingEnvelope,
+  endpoint: WebhookEndpointView,
+): number {
+  return entry.appendedAtMs + endpoint.maxBatchDelayMs;
+}
+
 /**
- * The coalescing core shared by the deliver and flush executors: append an
- * envelope (when given) to the endpoint's buffered stream, then ship as
- * many full-or-due batches as the in-flight cap allows, in one atomic
- * commit of buffer state + outbox messages.
- *
- * Shipping policy, per the adopted delivery-controls design:
+ * Split the stream's buffer into the batches shippable right now and what
+ * stays buffered, per the adopted delivery-controls design:
  * - a batch at max_batch_size ships immediately, delay never holds a full
  *   batch back;
  * - a partial batch ships once its oldest envelope has waited
@@ -309,6 +343,85 @@ function batchIdFor(
  *   accumulates buffer instead of parallel POSTs, and because full batches
  *   ship first the batch size CLIMBS toward its cap under backpressure,
  *   draining faster exactly when the receiver is behind.
+ */
+function planEndpointBatches({
+  organizationId,
+  projectId,
+  endpoint,
+  pending,
+  outstanding,
+  now,
+}: {
+  organizationId: string;
+  projectId: string;
+  endpoint: WebhookEndpointView;
+  pending: readonly PendingEnvelope[];
+  outstanding: number;
+  now: number;
+}): {
+  messages: NewOutboxMessage[];
+  remaining: PendingEnvelope[];
+  inFlight: number;
+} {
+  const messages: NewOutboxMessage[] = [];
+  const remaining = [...pending];
+  let inFlight = outstanding;
+  while (
+    remaining.length > 0 &&
+    inFlight < endpoint.maxInFlight &&
+    (remaining.length >= endpoint.maxBatchSize ||
+      endpoint.maxBatchDelayMs === 0 ||
+      coalescingDeadline(remaining[0]!, endpoint) <= now)
+  ) {
+    const batchEntries = remaining.splice(0, endpoint.maxBatchSize);
+    const batch = batchEntries.map((e) => e.envelope);
+    const batchId = batchIdFor(endpoint.id, batchEntries);
+    messages.push({
+      messageKey: `send:${batchId}`,
+      intentType: "sendBatch",
+      // Envelope data is JSON by construction (spendRowToEnvelope emits
+      // only JSON primitives); the cast crosses the JsonValue boundary.
+      payload: {
+        organizationId,
+        projectId,
+        endpointId: endpoint.id,
+        batchId,
+        envelopes: batch,
+      } as unknown as JsonValue,
+      traceCarrier: {},
+    });
+    inFlight++;
+  }
+  return { messages, remaining, inFlight };
+}
+
+/** Anything still buffered arms a wake: the coalescing deadline when the
+ *  delay is holding it, a short recheck when the in-flight cap is. */
+function nextStreamWakeAt({
+  endpoint,
+  remaining,
+  inFlight,
+  now,
+}: {
+  endpoint: WebhookEndpointView;
+  remaining: readonly PendingEnvelope[];
+  inFlight: number;
+  now: number;
+}): number | null {
+  const oldest = remaining[0];
+  if (!oldest) return null;
+  if (inFlight >= endpoint.maxInFlight) return now + WEBHOOK_FLUSH_RECHECK_MS;
+  return Math.max(
+    coalescingDeadline(oldest, endpoint),
+    now + WEBHOOK_FLUSH_RECHECK_MS,
+  );
+}
+
+/**
+ * The coalescing core shared by the deliver and flush executors: append an
+ * envelope (when given) to the endpoint's buffered stream, then ship as
+ * many full-or-due batches as the in-flight cap allows, in one atomic
+ * commit of buffer state + outbox messages.
  *
  * Redelivery safety: deliver appends carry an inbox sourceEventId (the
  * store absorbs duplicates), flushes are revision-guarded, and the batch
@@ -360,46 +473,14 @@ async function flushEndpointStream({
     (m) => m.intentType === "sendBatch" && m.status === "pending",
   ).length;
 
-  const messages: NewOutboxMessage[] = [];
-  let inFlight = outstanding;
-  const remaining = [...pending];
-  const dueAt = (entry: PendingEnvelope) =>
-    entry.appendedAtMs + endpoint.maxBatchDelayMs;
-  while (
-    remaining.length > 0 &&
-    inFlight < endpoint.maxInFlight &&
-    (remaining.length >= endpoint.maxBatchSize ||
-      endpoint.maxBatchDelayMs === 0 ||
-      dueAt(remaining[0]!) <= now)
-  ) {
-    const batchEntries = remaining.splice(0, endpoint.maxBatchSize);
-    const batch = batchEntries.map((e) => e.envelope);
-    const batchId = batchIdFor(endpoint.id, batchEntries);
-    messages.push({
-      messageKey: `send:${batchId}`,
-      intentType: "sendBatch",
-      // Envelope data is JSON by construction (spendRowToEnvelope emits
-      // only JSON primitives); the cast crosses the JsonValue boundary.
-      payload: {
-        organizationId,
-        projectId,
-        endpointId: endpoint.id,
-        batchId,
-        envelopes: batch,
-      } as unknown as JsonValue,
-      traceCarrier: {},
-    });
-    inFlight++;
-  }
-
-  // Anything still buffered arms a wake: the coalescing deadline when the
-  // delay is holding it, a short recheck when the in-flight cap is.
-  const nextWakeAt =
-    remaining.length === 0
-      ? null
-      : inFlight >= endpoint.maxInFlight
-        ? now + WEBHOOK_FLUSH_RECHECK_MS
-        : Math.max(dueAt(remaining[0]!), now + WEBHOOK_FLUSH_RECHECK_MS);
+  const { messages, remaining, inFlight } = planEndpointBatches({
+    organizationId,
+    projectId,
+    endpoint,
+    pending,
+    outstanding,
+    now,
+  });
 
   const result = await deps.processStore.commit<EndpointStreamState>({
     ref,
@@ -407,7 +488,7 @@ async function flushEndpointStream({
     sourceEventId: sourceEventId ?? null,
     expectedRevision: existing?.revision ?? 0,
     state: { pending: remaining },
-    nextWakeAt,
+    nextWakeAt: nextStreamWakeAt({ endpoint, remaining, inFlight, now }),
     messages,
     now,
   });
@@ -418,6 +499,31 @@ async function flushEndpointStream({
       `webhook stream flush hit a revision conflict on endpoint ${endpoint.id}; retrying`,
     );
   }
+}
+
+/** Settled requests are their own event type: an endpoint subscribed only
+ *  to completed never receives one, and a family or match-all subscription
+ *  receives both. */
+function deliveryEventType(status: DeliverPayload["status"]): string {
+  return status === "settled"
+    ? "gateway.request.settled"
+    : "gateway.request.completed";
+}
+
+/** The org's ACTIVE endpoints whose subscription covers this outcome. */
+async function endpointsSubscribedTo({
+  deps,
+  organizationId,
+  status,
+}: {
+  deps: WebhookDeliveryProcessDeps;
+  organizationId: string;
+  status: DeliverPayload["status"];
+}): Promise<WebhookEndpointView[]> {
+  const eventType = deliveryEventType(status);
+  return (
+    await deps.endpoints.getActiveByOrganization({ organizationId })
+  ).filter((e) => eventMatches(e.enabledEvents, eventType));
 }
 
 /**
@@ -445,16 +551,11 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
     const plan = await deps.getPlan(organizationId);
     if (plan.webhookEndpointsEnabled !== true) return;
 
-    // Settled requests are their own event type: an endpoint subscribed
-    // only to completed never receives one, and a family or match-all
-    // subscription receives both.
-    const eventType =
-      payload.status === "settled"
-        ? "gateway.request.settled"
-        : "gateway.request.completed";
-    const endpoints = (
-      await deps.endpoints.getActiveByOrganization({ organizationId })
-    ).filter((e) => eventMatches(e.enabledEvents, eventType));
+    const endpoints = await endpointsSubscribedTo({
+      deps,
+      organizationId,
+      status: payload.status,
+    });
     if (endpoints.length === 0) return;
 
     const row = deliverPayloadToRow(payload);
@@ -585,12 +686,122 @@ async function runMaintenanceIfDue(
 }
 
 /**
+ * POST one frozen batch through the SSRF-fenced signed sender.
+ *
+ * A transport-level failure (DNS, SSRF block, timeout) leaves no receiver
+ * status to store, so the attempt is recorded here and the error rethrown:
+ * DispatchError carries the retryable classification the dispatcher acts
+ * on.
+ */
+async function postWebhookBatch({
+  deps,
+  payload,
+  context,
+  endpoint,
+  startedAt,
+}: {
+  deps: WebhookDeliveryProcessDeps;
+  payload: SendBatchPayload;
+  context: IntentContext;
+  endpoint: WebhookEndpointView;
+  startedAt: number;
+}): Promise<WebhookSendResult> {
+  const secret = await deps.endpoints.getSigningSecret({
+    organizationId: payload.organizationId,
+    endpointId: payload.endpointId,
+  });
+  try {
+    return await sendWebhook({
+      url: endpoint.url,
+      body: JSON.stringify({ batch: payload.envelopes }),
+      triggerName: payload.endpointId,
+      contextLabel: `Webhook endpoint ${payload.endpointId}`,
+      projectId: payload.projectId,
+      eventId: payload.batchId,
+      signingSecret: secret,
+      attempt: context.attempt,
+      allowInsecureLocal: allowsInsecureLocalUrls(),
+    });
+  } catch (error) {
+    const retryable =
+      typeof error === "object" && error !== null
+        ? Reflect.get(error, "retryable") !== false
+        : true;
+    await deps.endpoints.recordDeliveryAttempt({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+      dispatchId: payload.batchId,
+      attempt: context.attempt,
+      eventCount: payload.envelopes.length,
+      outcome: retryable ? "retryable" : "terminal",
+      latencyMs: (deps.now ?? Date.now)() - startedAt,
+      error:
+        error instanceof Error ? error.message.slice(0, 500) : String(error),
+    });
+    throw error;
+  }
+}
+
+/**
+ * Record the receiver's answer and classify it: 2xx acks, 5xx/429/408
+ * retry along the ladder (Retry-After honored as a floor), other statuses
+ * retire the batch to the dead letter immediately. The endpoint's failure
+ * streak and the 72h auto-disable ride every recorded outcome.
+ */
+async function recordWebhookBatchOutcome({
+  deps,
+  payload,
+  context,
+  result,
+  latencyMs,
+}: {
+  deps: WebhookDeliveryProcessDeps;
+  payload: SendBatchPayload;
+  context: IntentContext;
+  result: WebhookSendResult;
+  latencyMs: number;
+}): Promise<void> {
+  const attempt = {
+    organizationId: payload.organizationId,
+    endpointId: payload.endpointId,
+    dispatchId: payload.batchId,
+    attempt: context.attempt,
+    eventCount: payload.envelopes.length,
+    responseStatus: result.status,
+    latencyMs,
+  };
+  if (result.status >= 200 && result.status < 300) {
+    await deps.endpoints.recordDeliveryAttempt({
+      ...attempt,
+      outcome: "success",
+    });
+    return;
+  }
+
+  const retryable =
+    result.status >= 500 || result.status === 429 || result.status === 408;
+  await deps.endpoints.recordDeliveryAttempt({
+    ...attempt,
+    outcome: retryable ? "retryable" : "terminal",
+    error: `HTTP ${result.status}`,
+    response: {
+      body: result.body.slice(0, 1000),
+      ...(result.retryAfterMs !== undefined
+        ? { retryAfterMs: result.retryAfterMs }
+        : {}),
+    },
+  });
+  // Throws DispatchError with the same classification just recorded; the
+  // dispatcher ladders retryables and dead-letters terminals immediately.
+  assertWebhookDelivered({
+    result,
+    triggerName: payload.endpointId,
+  });
+}
+
+/**
  * Level 2: deliver one frozen batch to one endpoint through the
- * SSRF-fenced signed sender, record the receiver's answer, and classify:
- * 2xx acks, 5xx/429/408 retry along the ladder (Retry-After honored as a
- * floor), other statuses retire the batch to the dead letter immediately.
- * The endpoint's failure streak and the 72h auto-disable ride every
- * recorded outcome.
+ * SSRF-fenced signed sender and record what the receiver answered.
  */
 export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -612,91 +823,138 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
       return;
     }
 
-    const secret = await deps.endpoints.getSigningSecret({
-      organizationId: payload.organizationId,
-      endpointId: payload.endpointId,
-    });
-    const body = JSON.stringify({ batch: payload.envelopes });
     const startedAt = (deps.now ?? Date.now)();
-
-    let status: number | undefined;
-    let responseBody = "";
-    let retryAfterMs: number | undefined;
-    try {
-      const result = await sendWebhook({
-        url: endpoint.url,
-        body,
-        triggerName: payload.endpointId,
-        contextLabel: `Webhook endpoint ${payload.endpointId}`,
-        projectId: payload.projectId,
-        eventId: payload.batchId,
-        signingSecret: secret,
-        attempt: context.attempt,
-        allowInsecureLocal: allowsInsecureLocalUrls(),
-      });
-      status = result.status;
-      responseBody = result.body;
-      retryAfterMs = result.retryAfterMs;
-    } catch (error) {
-      // Transport-level failure (DNS, SSRF block, timeout): no receiver
-      // status to store. DispatchError carries the retryable classification
-      // the dispatcher acts on.
-      const retryable =
-        typeof error === "object" && error !== null
-          ? Reflect.get(error, "retryable") !== false
-          : true;
-      await deps.endpoints.recordDeliveryAttempt({
-        organizationId: payload.organizationId,
-        endpointId: payload.endpointId,
-        dispatchId: payload.batchId,
-        attempt: context.attempt,
-        eventCount: payload.envelopes.length,
-        outcome: retryable ? "retryable" : "terminal",
-        latencyMs: (deps.now ?? Date.now)() - startedAt,
-        error:
-          error instanceof Error ? error.message.slice(0, 500) : String(error),
-      });
-      throw error;
-    }
-
-    const latencyMs = (deps.now ?? Date.now)() - startedAt;
-    if (status >= 200 && status < 300) {
-      await deps.endpoints.recordDeliveryAttempt({
-        organizationId: payload.organizationId,
-        endpointId: payload.endpointId,
-        dispatchId: payload.batchId,
-        attempt: context.attempt,
-        eventCount: payload.envelopes.length,
-        outcome: "success",
-        responseStatus: status,
-        latencyMs,
-      });
-      return;
-    }
-
-    const retryable = status >= 500 || status === 429 || status === 408;
-    await deps.endpoints.recordDeliveryAttempt({
-      organizationId: payload.organizationId,
-      endpointId: payload.endpointId,
-      dispatchId: payload.batchId,
-      attempt: context.attempt,
-      eventCount: payload.envelopes.length,
-      outcome: retryable ? "retryable" : "terminal",
-      responseStatus: status,
-      latencyMs,
-      error: `HTTP ${status}`,
-      response: {
-        body: responseBody.slice(0, 1000),
-        ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
-      },
+    const result = await postWebhookBatch({
+      deps,
+      payload,
+      context,
+      endpoint,
+      startedAt,
     });
-    // Throws DispatchError with the same classification just recorded; the
-    // dispatcher ladders retryables and dead-letters terminals immediately.
-    assertWebhookDelivered({
-      result: { status, body: responseBody, retryAfterMs },
-      triggerName: payload.endpointId,
+    await recordWebhookBatchOutcome({
+      deps,
+      payload,
+      context,
+      result,
+      latencyMs: (deps.now ?? Date.now)() - startedAt,
     });
   };
+}
+
+const WEBHOOK_DELIVERY_OUTBOX = {
+  maxAttempts: WEBHOOK_SEND_MAX_ATTEMPTS,
+  retryDelayMs: webhookRetryDelayMs,
+  // Sends are slow (a receiver can burn the full 10s timeout) and
+  // parallel-safe: batches are independent, and Stripe-style receivers
+  // must tolerate concurrent deliveries.
+  concurrency: 4,
+  batchSize: 8,
+  leaseDurationMs: 120_000,
+};
+
+/** The endpoint whose stream this wake belongs to, or null when the key is
+ *  a per-request instance (they never arm wakes) or the buffer no longer
+ *  names an organization to flush for. */
+function endpointFlushTarget(
+  state: WebhookDeliveryState,
+  key: string,
+): { endpointId: string; organizationId: string } | null {
+  if (!isEndpointStreamKey(key)) return null;
+  const stream = state as unknown as EndpointStreamState;
+  const organizationId = stream.pending[0]?.envelope.data?.organization_id;
+  if (typeof organizationId !== "string" || organizationId === "") return null;
+  return { endpointId: key.slice("endpoint:".length), organizationId };
+}
+
+/** What the process instance contributes to every deliver payload: the
+ *  project it runs in and the attribution admission stored. */
+interface DeliverInstance {
+  projectId: string;
+  attribution: SpendAttribution | null;
+}
+
+/** Every outcome fills the same deliver payload. Fields an outcome does
+ *  not carry stay at the log's empty values, so the envelope mapper never
+ *  special-cases a missing one. */
+function deliverPayloadFor(
+  outcome: Pick<
+    DeliverPayload,
+    "status" | "gateway_request_id" | "occurred_at"
+  > &
+    Partial<DeliverPayload>,
+  instance: DeliverInstance,
+): DeliverPayload {
+  return {
+    project_id: instance.projectId,
+    attribution: instance.attribution,
+    model: "",
+    model_provider_id: "",
+    usage: null,
+    rate_version: "",
+    duration_ms: 0,
+    error: null,
+    settle_reason: null,
+    ...outcome,
+  };
+}
+
+/** A confirmed request carries the resolved model identity, the usage it
+ *  billed, and the rate version it was priced at. */
+function confirmedDeliverPayload(
+  confirmed: ConfirmSpendCommandData,
+  instance: DeliverInstance,
+): DeliverPayload {
+  return deliverPayloadFor(
+    {
+      status: "confirmed",
+      gateway_request_id: confirmed.gateway_request_id,
+      occurred_at: confirmed.occurred_at,
+      model: confirmed.model,
+      model_provider_id: confirmed.model_provider_id,
+      usage: confirmed.usage,
+      rate_version: confirmed.rate_version,
+      duration_ms: confirmed.duration_ms,
+    },
+    instance,
+  );
+}
+
+/** A failed request carries whatever usage the provider reported before
+ *  the error, and no rate version: the deliver executor rates it. */
+function failedDeliverPayload(
+  failed: FailSpendCommandData,
+  instance: DeliverInstance,
+): DeliverPayload {
+  return deliverPayloadFor(
+    {
+      status: "failed",
+      gateway_request_id: failed.gateway_request_id,
+      occurred_at: failed.occurred_at,
+      model: failed.model,
+      model_provider_id: failed.model_provider_id,
+      usage: failed.usage,
+      duration_ms: failed.duration_ms,
+      error: failed.error,
+    },
+    instance,
+  );
+}
+
+/** A settled request is a reservation released without an outcome: no
+ *  model, no usage, and nothing to rate, only why it settled. */
+function settledDeliverPayload(
+  settled: SettleSpendCommandData,
+  instance: DeliverInstance,
+): DeliverPayload {
+  return deliverPayloadFor(
+    {
+      status: "settled",
+      gateway_request_id: settled.gateway_request_id,
+      occurred_at: settled.occurred_at,
+      settle_reason: settled.reason,
+    },
+    instance,
+  );
 }
 
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
@@ -735,91 +993,53 @@ export function webhookDeliveryPM(
           attribution: attributionFrom(data as AdmitSpendCommandData),
         },
       }))
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
-        const confirmed = data as ConfirmSpendCommandData;
-        return {
-          state,
-          intents: [
-            ctx.intents.deliver("deliver:confirmed", {
-              gateway_request_id: confirmed.gateway_request_id,
-              project_id: ctx.projectId,
-              status: "confirmed",
-              occurred_at: confirmed.occurred_at,
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => ({
+        state,
+        intents: [
+          ctx.intents.deliver(
+            "deliver:confirmed",
+            confirmedDeliverPayload(data as ConfirmSpendCommandData, {
+              projectId: ctx.projectId,
               attribution: state.attribution,
-              model: confirmed.model,
-              model_provider_id: confirmed.model_provider_id,
-              usage: confirmed.usage,
-              rate_version: confirmed.rate_version,
-              duration_ms: confirmed.duration_ms,
-              error: null,
-              settle_reason: null,
             }),
-          ],
-        };
-      })
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
-        const failed = data as FailSpendCommandData;
-        return {
-          state,
-          intents: [
-            ctx.intents.deliver("deliver:failed", {
-              gateway_request_id: failed.gateway_request_id,
-              project_id: ctx.projectId,
-              status: "failed",
-              occurred_at: failed.occurred_at,
+          ),
+        ],
+      }))
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => ({
+        state,
+        intents: [
+          ctx.intents.deliver(
+            "deliver:failed",
+            failedDeliverPayload(data as FailSpendCommandData, {
+              projectId: ctx.projectId,
               attribution: state.attribution,
-              model: failed.model,
-              model_provider_id: failed.model_provider_id,
-              usage: failed.usage,
-              rate_version: "",
-              duration_ms: failed.duration_ms,
-              error: failed.error,
-              settle_reason: null,
             }),
-          ],
-        };
-      })
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
-        const settled = data as SettleSpendCommandData;
-        return {
-          state,
-          intents: [
-            ctx.intents.deliver("deliver:settled", {
-              gateway_request_id: settled.gateway_request_id,
-              project_id: ctx.projectId,
-              status: "settled",
-              occurred_at: settled.occurred_at,
+          ),
+        ],
+      }))
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => ({
+        state,
+        intents: [
+          ctx.intents.deliver(
+            "deliver:settled",
+            settledDeliverPayload(data as SettleSpendCommandData, {
+              projectId: ctx.projectId,
               attribution: state.attribution,
-              model: "",
-              model_provider_id: "",
-              usage: null,
-              rate_version: "",
-              duration_ms: 0,
-              error: null,
-              settle_reason: settled.reason,
             }),
-          ],
-        };
-      })
+          ),
+        ],
+      }))
       // Endpoint streams arm wakes for their coalescing deadlines; the
-      // wake hands the flush to the I/O executor. Per-request instances
-      // never arm wakes, and unknown keys stand down harmlessly.
+      // wake hands the flush to the I/O executor.
       .onWake((state, ctx) => {
-        if (!isEndpointStreamKey(ctx.key)) return { state };
-        const stream = state as unknown as EndpointStreamState;
-        const endpointId = ctx.key.slice("endpoint:".length);
-        const organizationId =
-          stream.pending[0]?.envelope.data?.organization_id;
-        if (typeof organizationId !== "string" || organizationId === "") {
-          return { state };
-        }
+        const target = endpointFlushTarget(state, ctx.key);
+        if (!target) return { state };
         return {
           state,
           intents: [
             ctx.intents.flushEndpoint(`flush:${ctx.at}`, {
-              organizationId,
+              ...target,
               projectId: ctx.projectId,
-              endpointId,
               scheduledFor: ctx.at,
             }),
           ],
@@ -829,14 +1049,5 @@ export function webhookDeliveryPM(
       // metadata echo; no prompts or responses exist anywhere in this
       // pipeline, so the event data is safe to persist as the payload.
       .toPayload((event) => event.data as unknown as JsonValue)
-      .outbox({
-        maxAttempts: WEBHOOK_SEND_MAX_ATTEMPTS,
-        retryDelayMs: webhookRetryDelayMs,
-        // Sends are slow (a receiver can burn the full 10s timeout) and
-        // parallel-safe: batches are independent, and Stripe-style
-        // receivers must tolerate concurrent deliveries.
-        concurrency: 4,
-        batchSize: 8,
-        leaseDurationMs: 120_000,
-      });
+      .outbox(WEBHOOK_DELIVERY_OUTBOX);
 }
