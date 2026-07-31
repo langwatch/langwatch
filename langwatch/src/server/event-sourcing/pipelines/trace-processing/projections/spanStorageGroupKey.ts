@@ -4,7 +4,8 @@
  * The historic key was `span:${event.id}` — the EVENT id — which meant every
  * delivery formed its own single-event group. That bought maximum parallelism
  * at maximum cost: coalescing had nothing to batch (a backed-up tenant paid
- * one full queue job + one ClickHouse insert per span — the O(n²) drain floor
+ * one full queue job + one ClickHouse insert per span — a linear per-item
+ * drain cost whose constant is the whole overhead of a job, the drain floor
  * measured in the 2026-07-30/31 backlog, where spanStorage held ~118 of
  * ~1,030 busy fleet slots), and two deliveries of the SAME span could run in
  * parallel with no ordering guarantee.
