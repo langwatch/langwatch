@@ -1,3 +1,4 @@
+import { formatCost, formatDuration } from "../format";
 import type { ReportEvidence, RunSummary, Tone } from "../report.types";
 
 /**
@@ -138,18 +139,6 @@ function verdict(evidence: ReportEvidence): { text: string; tone: Tone } {
     text: `${plural(counts.failedCount, "scenario", "scenarios")} failed out of ${counts.settledCount}.`,
     tone: counts.failedCount > counts.passedCount ? "fail" : "warn",
   };
-}
-
-function formatCost(cost: number | null): string | null {
-  if (cost === null || cost <= 0) return null;
-  return cost < 0.01 ? "<$0.01" : `$${cost.toFixed(2)}`;
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 export function buildRunSummary({

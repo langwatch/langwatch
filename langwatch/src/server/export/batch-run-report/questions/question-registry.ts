@@ -2,6 +2,7 @@ import {
   bySeverityDescending,
   computeSeverityPrior,
 } from "../evidence/severity";
+import { formatDuration } from "../format";
 import type {
   Block,
   QuestionTier,
@@ -103,12 +104,6 @@ function scenarioNameFor({
   );
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
-}
-
 // ============================================================================
 // Past
 // ============================================================================
@@ -137,37 +132,17 @@ function trendPoints(
     : [...earlier, { label: "This run", value: evidence.passRate.value }];
 }
 
+/**
+ * What happened, per scenario.
+ *
+ * Deliberately does NOT restate the counts or redraw the outcome bar. Both sit
+ * two cards above this one, and a reader who has just been given the totals and
+ * the same chart twice reads the third copy as a different measurement and
+ * starts looking for the discrepancy. What this section owns is the row-level
+ * detail and the run's place in the sequence.
+ */
 function outcomeBlocks(evidence: ReportEvidence): Block[] {
-  const { counts } = evidence;
   const blocks: Block[] = [
-    {
-      kind: "stats",
-      stats: [
-        { label: "Scenarios", value: String(counts.totalCount) },
-        { label: "Passed", value: String(counts.passedCount) },
-        { label: "Failed", value: String(counts.failedCount) },
-        ...(counts.stalledCount > 0
-          ? [{ label: "Stalled", value: String(counts.stalledCount) }]
-          : []),
-        ...(counts.cancelledCount > 0
-          ? [{ label: "Cancelled", value: String(counts.cancelledCount) }]
-          : []),
-        { label: "Took", value: formatDuration(evidence.batch.durationMs) },
-      ],
-    },
-    {
-      kind: "bar",
-      segments: [
-        { label: "Passed", value: counts.passedCount, tone: "pass" },
-        { label: "Failed", value: counts.failedCount, tone: "fail" },
-        { label: "Stalled", value: counts.stalledCount, tone: "warn" },
-        { label: "Cancelled", value: counts.cancelledCount, tone: "muted" },
-      ].filter((segment) => segment.value > 0) as {
-        label: string;
-        value: number;
-        tone: "pass" | "fail" | "warn" | "muted";
-      }[],
-    },
     {
       kind: "table",
       columns: ["Scenario", "Outcome", "Criteria met", "Turns", "Took"],
