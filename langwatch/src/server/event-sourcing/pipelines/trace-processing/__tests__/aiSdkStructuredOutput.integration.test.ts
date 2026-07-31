@@ -84,7 +84,7 @@ describe.skipIf(!hasTestcontainers)(
   "AI SDK structured output through trace processing",
   () => {
     let tenantId: ReturnType<typeof createTestTenantId>;
-    let tenantIdString: string;
+    let tenantIdString: string | undefined;
     let traceSummaryStore: TraceSummaryStore;
     let spanStorageService: SpanStorageService;
 
@@ -105,10 +105,16 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
+      if (!tenantIdString) return;
       await cleanupTestDataForTenant(tenantIdString);
     });
 
     it("persists structured output on the LLM span and trace summary", async () => {
+      const currentTenantIdString = tenantIdString;
+      if (!currentTenantIdString) {
+        throw new Error("Test tenant was not initialized.");
+      }
+
       const traceId = `trace-ai-sdk-${Date.now()}`;
       const spanId = `span-ai-sdk-${Date.now()}`;
       const occurredAt = Date.now();
@@ -116,7 +122,7 @@ describe.skipIf(!hasTestcontainers)(
       const [event] = await command.handle({
         type: RECORD_SPAN_COMMAND_TYPE,
         aggregateId: traceId,
-        tenantId: tenantIdString,
+        tenantId: currentTenantIdString,
         data: {
           span: buildSpan(traceId, spanId, occurredAt),
           resource: null,
@@ -157,7 +163,7 @@ describe.skipIf(!hasTestcontainers)(
       );
 
       const storedSpans = await spanStorageService.getSpansByTraceId({
-        tenantId: tenantIdString,
+        tenantId: currentTenantIdString,
         traceId,
       });
 

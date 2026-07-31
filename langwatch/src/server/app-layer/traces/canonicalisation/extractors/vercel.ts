@@ -286,11 +286,12 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
       const responseAttr = attrs.take(ATTR_KEYS.AI_RESPONSE);
-      const responseTextAttr =
-        responseAttr === undefined || responseAttr === null
-          ? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
-          : undefined;
-      const response = responseAttr ?? responseTextAttr;
+      const hasUsableResponse =
+        isNonEmptyString(responseAttr) || isRecord(responseAttr);
+      const responseTextAttr = !hasUsableResponse
+        ? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
+        : undefined;
+      const response = hasUsableResponse ? responseAttr : responseTextAttr;
       const parsedResponseText =
         responseTextAttr !== undefined &&
         (isRecord(responseTextAttr) || Array.isArray(responseTextAttr));

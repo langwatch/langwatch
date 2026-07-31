@@ -181,6 +181,26 @@ describe("VercelExtractor", () => {
       ]);
     });
 
+    it("falls back to response text when the response attribute is empty", () => {
+      const objectPayload = { greeting: "Hallo" };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE]: "",
+          [ATTR_KEYS.AI_RESPONSE_TEXT]: JSON.stringify(objectPayload),
+        },
+        {
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
     it("handles a parsed JSON response text value", () => {
       const objectPayload = { text: "structured field" };
       const ctx = createExtractorContext(
