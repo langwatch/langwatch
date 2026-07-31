@@ -47,10 +47,12 @@ function AccuracyHeadline({
   metrics,
   annotatedRows,
   totalRows,
+  truncated,
 }: {
   metrics: ConfusionMatrixMetrics;
   annotatedRows: number;
   totalRows: number;
+  truncated?: boolean;
 }) {
   const { cohensKappa } = metrics;
   /** Below this, agreement is barely distinguishable from guessing. */
@@ -80,7 +82,12 @@ function AccuracyHeadline({
         </Text>
       </HStack>
       <Text fontSize="2xs" color="fg.muted">
+        {/* When the lookup was capped, `totalRows` is the slice that was
+            checked, not the whole run — same phrasing rule as the drawer's
+            coverage line, so the card never implies fuller coverage than
+            the drawer would admit to. */}
         accuracy · {annotatedRows} of {totalRows} rows
+        {truncated ? " checked" : ""}
       </Text>
     </HStack>
   );
@@ -168,13 +175,17 @@ export function ConfusionMatrixChart({
       role="group"
     >
       <HStack justify="space-between" marginBottom={2}>
+        {/* Carries the target name, matching this card's entry in the
+            metrics menu: the same judge scores every target, so a card
+            titled by the evaluator alone is indistinguishable from its
+            siblings. */}
         <Text
           fontSize="xs"
           fontWeight="medium"
           lineClamp={1}
-          title={`${evaluatorName} — agreement with reviewers`}
+          title={`${evaluatorName} vs reviewers — ${targetName}`}
         >
-          {evaluatorName} — agreement with reviewers
+          {evaluatorName} vs reviewers — {targetName}
         </Text>
         {/* Always visible, just quiet. Revealing this only on hover made the
             one route into the full matrix invisible until you happened to
@@ -199,6 +210,7 @@ export function ConfusionMatrixChart({
           metrics={metrics}
           annotatedRows={coverage.pairs.length}
           totalRows={coverage.totalRows}
+          truncated={coverage.truncated}
         />
         <MiniMatrix metrics={metrics} height={Math.max(chartHeight - 46, 60)} />
       </VStack>
