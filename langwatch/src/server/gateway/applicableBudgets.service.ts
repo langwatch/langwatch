@@ -14,8 +14,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 import {
-  budgetPeriodFloorMs,
   type BudgetSpendTarget,
+  budgetPeriodFloorMs,
   type GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
 import { resolveApplicableBudgets } from "./budgetResolution.service";

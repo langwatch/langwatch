@@ -225,7 +225,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       const budgetId = clauseField(clause, "budgetId");
       return (
         typeof budgetId === "string" ||
-        (budgetId != null && Array.isArray((budgetId as { in?: unknown }).in)) ||
+        (budgetId != null &&
+          Array.isArray((budgetId as { in?: unknown }).in)) ||
         clauseField(clause, "budgetId_bucketScopeId") !== undefined
       );
     },

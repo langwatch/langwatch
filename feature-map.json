@@ -850,6 +850,8 @@
                 "virtual-keys update",
                 "virtual-keys rotate",
                 "virtual-keys revoke",
+                "virtual-keys disable",
+                "virtual-keys enable",
                 "virtual-keys spend"
               ],
               "skill": null,
@@ -884,6 +886,7 @@
                 "gateway-budgets list",
                 "gateway-budgets create",
                 "gateway-budgets update",
+                "gateway-budgets reset",
                 "gateway-budgets archive"
               ],
               "skill": null,
@@ -961,7 +964,9 @@
               },
               "cli": [
                 "spend-events list",
-                "spend-events by-user"
+                "spend-events by-user",
+                "spend-events summary",
+                "spend-events replay"
               ],
               "skill": null,
               "docs": null

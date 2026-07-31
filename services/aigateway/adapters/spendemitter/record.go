@@ -48,7 +48,7 @@ type UsagePayload struct {
 // (resolution has not run yet when a request is admitted); the resolved
 // model and the dispatched provider identity travel on the outcome payload.
 type AdmittedPayload struct {
-	GatewayRequestID string   `json:"gateway_request_id"`
+	GatewayRequestID string `json:"gateway_request_id"`
 	// Unix epoch MILLISECONDS: the ingest schema types occurred_at as a
 	// bounded integer, never an RFC3339 string.
 	OccurredAtUnixMs int64    `json:"occurred_at"`

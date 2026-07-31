@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { eventMatches } from "@ee/webhooks/eventRegistry";
+import {
+  runWebhookSendBatch,
+  sendBatchSchema,
+  WEBHOOK_RETRY_LADDER_MS,
+  WEBHOOK_SEND_MAX_ATTEMPTS,
+  type WebhookDeliveryProcessDeps,
+  webhookRetryDelayMs,
+} from "@ee/webhooks/process-manager/webhookDelivery.process";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
-import type { NewOutboxMessage } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import type {
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
@@ -15,15 +22,8 @@ import {
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
 import type { GovernanceEventsProcessingEvent } from "~/server/event-sourcing/pipelines/governance-events/schemas/events";
-import { eventMatches } from "@ee/webhooks/eventRegistry";
-import {
-  runWebhookSendBatch,
-  sendBatchSchema,
-  WEBHOOK_RETRY_LADDER_MS,
-  WEBHOOK_SEND_MAX_ATTEMPTS,
-  webhookRetryDelayMs,
-  type WebhookDeliveryProcessDeps,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
+import type { NewOutboxMessage } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import {
   budgetCrossingToEnvelope,
   vkLifecycleToEnvelope,
@@ -31,7 +31,8 @@ import {
 
 const logger = createLogger("langwatch:governance:events-delivery");
 
-export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
+export const GOVERNANCE_EVENTS_PROCESS_NAME =
+  "governanceEventsDelivery" as const;
 
 // Referenced so the ladder constants stay a single import site for both
 // delivery processes; the outbox below uses the same retry function.
@@ -128,7 +129,11 @@ export function governanceEventsDeliveryPM(
   return (pm) =>
     pm
       .state<Record<string, JsonValue>>({})
-      .intent("deliverGovernance", deliverGovernanceSchema, runDeliverGovernance(deps))
+      .intent(
+        "deliverGovernance",
+        deliverGovernanceSchema,
+        runDeliverGovernance(deps),
+      )
       .intent("sendBatch", sendBatchSchema, runWebhookSendBatch(deps))
       .on(GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE, (state, data, ctx) => {
         const lifecycle = data as RecordVkLifecycleCommandData;

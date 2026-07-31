@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
-import { RecordBudgetCrossingCommand, RecordVkLifecycleCommand } from "~/server/event-sourcing/pipelines/governance-events/commands/governanceCommands";
+import {
+  RecordBudgetCrossingCommand,
+  RecordVkLifecycleCommand,
+} from "~/server/event-sourcing/pipelines/governance-events/commands/governanceCommands";
 import {
   budgetCrossingToEnvelope,
   vkLifecycleToEnvelope,

@@ -76,8 +76,10 @@ func TestContractAdmittedPayload(t *testing.T) {
 	// metadata as the raw JSON TEXT (a string). These two assertions ARE
 	// the cross-service wire contract; an RFC3339 string or an inlined
 	// object here means every admission gets rejected at the control plane.
-	assert.Equal(t, float64(at.UnixMilli()), payload["occurred_at"])
-	assert.Equal(t, `{"call_site":"executive_summary"}`, payload["metadata"])
+	assert.InDelta(t, float64(at.UnixMilli()), payload["occurred_at"], 0)
+	metadataRaw, isString := payload["metadata"].(string)
+	require.True(t, isString, "metadata must be the raw JSON TEXT, not an inlined object")
+	assert.JSONEq(t, `{"call_site":"executive_summary"}`, metadataRaw)
 	assert.Equal(t, []any{"customer:acme-172"}, payload["labels"])
 }
 

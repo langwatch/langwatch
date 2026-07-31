@@ -58,7 +58,11 @@ export type BudgetScope =
   | { kind: "GROUP"; groupId: string }
   // Template: each distinct external end user on the anchor gets the
   // budget's limit per window. The anchor is a virtual key or a project.
-  | { kind: "ATTRIBUTED_USER"; anchorVirtualKeyId?: string; anchorProjectId?: string };
+  | {
+      kind: "ATTRIBUTED_USER";
+      anchorVirtualKeyId?: string;
+      anchorProjectId?: string;
+    };
 
 export type CreateBudgetInput = {
   organizationId: string;

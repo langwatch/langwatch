@@ -121,6 +121,14 @@ export const goErrorCodes = {
    */
   credentials_required: { service: "langyagent", httpStatus: 428 },
   /**
+   * ErrEndUserRequired — A per-end-user budget template is active on this key
+   * and the request carried no end-user id: fail closed, a cap evadable by
+   * omitting a field is not a cap.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  end_user_required: { service: "aigateway" },
+  /**
    * ErrGatewayUnavailable — signals the AI Gateway returned an error or is
    * unreachable.
    *
@@ -364,11 +372,19 @@ export const goErrorCodes = {
    */
   upstream_http_error: { service: "nlpgo", httpStatus: 502 },
   /**
+   * ErrKeyDisabled — is the REVERSIBLE stop: the key material is intact and an
+   * administrator can re-enable it. Distinct from revoked (one-way) so tenant
+   * tooling can branch on which one it is.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  virtual_key_disabled: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrKeyRevoked
    *
    * @source services/aigateway/domain/errors.go
    */
-  virtual_key_revoked: { service: "aigateway" },
+  virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker's opencode did not
    * become ready within LANGY_READINESS_TIMEOUT_MS.

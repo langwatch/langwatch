@@ -10,11 +10,6 @@ import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "../schemas/constants";
-import {
   InMemoryProcessStore,
   type ProcessDefinition,
   ProcessManagerService,
@@ -31,6 +26,11 @@ import {
   type SpendSettlementState,
   spendSettlementPM,
 } from "../process-manager/spendSettlement.process";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "../schemas/constants";
 
 const ns = `settle-pm-${nanoid(8)}`;
 const T0 = Date.UTC(2026, 6, 21, 9, 0, 0);
@@ -144,7 +144,8 @@ beforeEach(() => {
   clock = T0;
   sendSettleSpend = vi.fn().mockResolvedValue(undefined);
   const deps: SpendSettlementProcessDeps = {
-    sendSettleSpend: sendSettleSpend as unknown as SpendSettlementProcessDeps["sendSettleSpend"],
+    sendSettleSpend:
+      sendSettleSpend as unknown as SpendSettlementProcessDeps["sendSettleSpend"],
     graceMs: GRACE_MS,
     now: () => clock,
   };
@@ -268,9 +269,16 @@ describe("settlement on the spend record (real ClickHouse)", () => {
     });
     const tenant = `settle-fold-${ns}`;
     const requestId = `req-${ns}`;
-    const context = { tenantId: createTenantId(tenant), aggregateId: requestId };
+    const context = {
+      tenantId: createTenantId(tenant),
+      aggregateId: requestId,
+    };
 
-    const makeEvent = (type: string, data: Record<string, unknown>, at: number) =>
+    const makeEvent = (
+      type: string,
+      data: Record<string, unknown>,
+      at: number,
+    ) =>
       EventUtils.createEvent({
         aggregateType: constants.GATEWAY_SPEND_AGGREGATE_TYPE,
         aggregateId: requestId,
@@ -286,35 +294,43 @@ describe("settlement on the spend record (real ClickHouse)", () => {
     try {
       // 1. Admission with no outcome: the record exists, cost unknown.
       const admittedState = projection.handleGatewaySpendAdmitted(
-        makeEvent(constants.GATEWAY_SPEND_ADMITTED_EVENT_TYPE, {
-          gateway_request_id: requestId,
-          occurred_at: T0,
-          organization_id: "org-settle",
-          tenantId: tenant,
-          virtual_key_id: "vk-settle",
-          principal_user_id: "",
-          end_user_id: "settle-user",
-          model: "openai/gpt-5",
-          model_provider_id: "prov-1",
-          trace_id: "",
-          request_type: "chat",
-          labels: [],
-          metadata: "",
-          pod_id: "pod-1",
-          pod_seq: 1,
-        }, T0),
+        makeEvent(
+          constants.GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+          {
+            gateway_request_id: requestId,
+            occurred_at: T0,
+            organization_id: "org-settle",
+            tenantId: tenant,
+            virtual_key_id: "vk-settle",
+            principal_user_id: "",
+            end_user_id: "settle-user",
+            model: "openai/gpt-5",
+            model_provider_id: "prov-1",
+            trace_id: "",
+            request_type: "chat",
+            labels: [],
+            metadata: "",
+            pod_id: "pod-1",
+            pod_seq: 1,
+          },
+          T0,
+        ),
         projection.init(),
       );
       await foldStore.store(admittedState, context);
 
       // 2. The sweeper settles: unknown is recorded, never zeroed away.
       const settledState = projection.handleGatewaySpendSettled(
-        makeEvent(constants.GATEWAY_SPEND_SETTLED_EVENT_TYPE, {
-          gateway_request_id: requestId,
-          occurred_at: T0 + GRACE_MS,
-          tenantId: tenant,
-          reason: "confirmation_deadline_expired",
-        }, T0 + GRACE_MS),
+        makeEvent(
+          constants.GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+          {
+            gateway_request_id: requestId,
+            occurred_at: T0 + GRACE_MS,
+            tenantId: tenant,
+            reason: "confirmation_deadline_expired",
+          },
+          T0 + GRACE_MS,
+        ),
         admittedState,
       );
       await foldStore.store(settledState, context);
@@ -336,22 +352,26 @@ describe("settlement on the spend record (real ClickHouse)", () => {
 
       // 3. The late confirmation supersedes: replace, never sum.
       const confirmedState = projection.handleGatewaySpendConfirmed(
-        makeEvent(constants.GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, {
-          gateway_request_id: requestId,
-          occurred_at: T0 + GRACE_MS + 5_000,
-          tenantId: tenant,
-          model: "openai/gpt-5",
-          model_provider_id: "prov-1",
-          usage: {
-            input_tokens: 500,
-            output_tokens: 100,
-            cache_read_input_tokens: 0,
-            cache_creation_input_tokens: 0,
-            reasoning_tokens: 0,
+        makeEvent(
+          constants.GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+          {
+            gateway_request_id: requestId,
+            occurred_at: T0 + GRACE_MS + 5_000,
+            tenantId: tenant,
+            model: "openai/gpt-5",
+            model_provider_id: "prov-1",
+            usage: {
+              input_tokens: 500,
+              output_tokens: 100,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+              reasoning_tokens: 0,
+            },
+            rate_version: "",
+            duration_ms: 2_000,
           },
-          rate_version: "",
-          duration_ms: 2_000,
-        }, T0 + GRACE_MS + 5_000),
+          T0 + GRACE_MS + 5_000,
+        ),
         settledState,
       );
       await foldStore.store(confirmedState, context);

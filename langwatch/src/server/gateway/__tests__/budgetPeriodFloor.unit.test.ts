@@ -33,7 +33,11 @@ describe("budgetPeriodFloorMs", () => {
   it("floors MANUAL always, reset calendars until the edge passes, unreset TOTAL never", () => {
     expect(
       budgetPeriodFloorMs(
-        { window: "MANUAL", currentPeriodStartedAt: boundary, lastResetAt: null },
+        {
+          window: "MANUAL",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+        },
         NOW,
       ),
     ).toBe(boundary.getTime());
@@ -66,13 +70,21 @@ describe("budgetPeriodFloorMs", () => {
     // semantics even though its stored boundary is its creation time.
     expect(
       budgetPeriodFloorMs(
-        { window: "TOTAL", currentPeriodStartedAt: boundary, lastResetAt: null },
+        {
+          window: "TOTAL",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+        },
         NOW,
       ),
     ).toBeUndefined();
     expect(
       budgetPeriodFloorMs(
-        { window: "MONTH", currentPeriodStartedAt: boundary, lastResetAt: null },
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+        },
         NOW,
       ),
     ).toBeUndefined();

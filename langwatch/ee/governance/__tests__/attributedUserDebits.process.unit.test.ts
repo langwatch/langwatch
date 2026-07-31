@@ -13,7 +13,14 @@ import { attributedUserDebitsPM } from "../process-manager/attributedUserDebits.
  * intent handler itself is covered by the detector/repository suites.
  */
 function capture() {
-  const handlers = new Map<string, (state: unknown, data: unknown, ctx: unknown) => { state: unknown; intents?: unknown[] }>();
+  const handlers = new Map<
+    string,
+    (
+      state: unknown,
+      data: unknown,
+      ctx: unknown,
+    ) => { state: unknown; intents?: unknown[] }
+  >();
   let initial: unknown;
   const builder = {
     state(s: unknown) {
@@ -34,9 +41,10 @@ function capture() {
       return builder;
     },
   };
-  attributedUserDebitsPM({ prisma: {} as never, budgetCHRepository: {} as never })(
-    builder as never,
-  );
+  attributedUserDebitsPM({
+    prisma: {} as never,
+    budgetCHRepository: {} as never,
+  })(builder as never);
   return { handlers, initial: () => initial };
 }
 
@@ -111,7 +119,15 @@ describe("attributed-user debits process", () => {
     const c2 = ctx();
     const silent = confirmed(
       withoutUser.state,
-      { gateway_request_id: "req_2", usage: null, rate_version: "", model: "gpt-x", model_provider_id: "", duration_ms: 1, occurred_at: 1 },
+      {
+        gateway_request_id: "req_2",
+        usage: null,
+        rate_version: "",
+        model: "gpt-x",
+        model_provider_id: "",
+        duration_ms: 1,
+        occurred_at: 1,
+      },
       c2,
     );
     expect(silent.intents ?? []).toHaveLength(0);

@@ -3,13 +3,13 @@
 import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, PrismaClient, VirtualKey } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { GOVERNANCE_EVENTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
 import type {
   BudgetCrossingKind,
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
   VkLifecycleAction,
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/commands";
+import { GOVERNANCE_EVENTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
 import {
   budgetPeriodFloorMs,
   currentPeriodStart,
@@ -26,12 +26,10 @@ const logger = createLogger("langwatch:governance:signals");
  * appended. The store-level idempotency keys make every retry safe.
  */
 
-function governanceCommands():
-  | Record<
-      string,
-      { send: (payload: unknown) => Promise<unknown> }
-    >
-  | null {
+function governanceCommands(): Record<
+  string,
+  { send: (payload: unknown) => Promise<unknown> }
+> | null {
   try {
     const pipeline = getApp().eventSourcing?.getPipeline(
       GOVERNANCE_EVENTS_PIPELINE_NAME,
@@ -168,16 +166,18 @@ export async function detectBudgetCrossings(
         periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
       };
     });
-    const spends = await deps.budgetCHRepository.getSpendForTargetsAcrossTenants(
-      projects.map((p) => p.id),
-      targets,
-      now,
-    );
+    const spends =
+      await deps.budgetCHRepository.getSpendForTargetsAcrossTenants(
+        projects.map((p) => p.id),
+        targets,
+        now,
+      );
     const spentByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
 
     for (const r of candidates) {
       const budget = budgetById.get(r.budgetId)!;
-      const spentUsd = Number.parseFloat(spentByBudget.get(r.budgetId) ?? "0") || 0;
+      const spentUsd =
+        Number.parseFloat(spentByBudget.get(r.budgetId) ?? "0") || 0;
       const limitUsd = Number.parseFloat(budget.limitUsd.toString()) || 0;
       if (limitUsd <= 0) continue;
       const pct = (spentUsd * 100) / limitUsd;

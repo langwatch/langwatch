@@ -7,9 +7,10 @@
  *
  * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
+
+import { TRPCError } from "@trpc/server";
 import { createHash, createHmac } from "crypto";
 import { nanoid } from "nanoid";
-import { TRPCError } from "@trpc/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
@@ -89,7 +90,9 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     } else {
       process.env.LW_GATEWAY_INTERNAL_SECRET = previousSecret;
     }
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });

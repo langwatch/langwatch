@@ -57,7 +57,7 @@ type Spool struct {
 
 	done   chan struct{}
 	closed atomic.Bool
-	wg   sync.WaitGroup
+	wg     sync.WaitGroup
 
 	logf func(format string, args ...any)
 
@@ -452,16 +452,16 @@ func (s *Spool) recover() error {
 
 func (s *Spool) maxSegOrdinalLocked() uint64 {
 	segs, _ := s.sealedSegmentsLocked()
-	var max uint64
+	var highest uint64
 	for _, seg := range segs {
 		base := filepath.Base(seg.path)
 		numeric := strings.TrimSuffix(strings.TrimPrefix(base, segPrefix), segSuffix)
 		var n uint64
-		if _, err := fmt.Sscanf(numeric, "%d", &n); err == nil && n > max {
-			max = n
+		if _, err := fmt.Sscanf(numeric, "%d", &n); err == nil && n > highest {
+			highest = n
 		}
 	}
-	return max
+	return highest
 }
 
 func (s *Spool) loadOrCreatePodID(override string) (string, error) {

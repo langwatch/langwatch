@@ -6,12 +6,12 @@ package spendemitter
 
 import (
 	"context"
-	"sync"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -134,7 +134,7 @@ func TestSpoolOverflowDropsOldest(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	stats := s.Stats()
-	assert.Greater(t, stats.DroppedOverflow, uint64(0), "overflow must be counted")
+	assert.Positive(t, stats.DroppedOverflow, "overflow must be counted")
 	segs := s.SealedSegments()
 	var totalSize int64
 	for _, seg := range segs {
@@ -156,7 +156,7 @@ func TestSpoolAppendNeverBlocks(t *testing.T) {
 	}
 	elapsed := time.Since(start)
 	assert.Less(t, elapsed, 500*time.Millisecond, "10k appends with a dead writer stay fast")
-	assert.Greater(t, s.Stats().DroppedIntake, uint64(0), "drops are counted, never silent")
+	assert.Positive(t, s.Stats().DroppedIntake, "drops are counted, never silent")
 }
 
 type stubShipper struct {

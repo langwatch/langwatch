@@ -38,11 +38,11 @@ import {
   budgetPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
 } from "~/server/gateway/budgetResolution.service";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";

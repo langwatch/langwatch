@@ -3,30 +3,30 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { spendRowToEnvelope } from "@ee/webhooks/envelope";
-import type { Organization } from "@prisma/client";
-import type { Context, Next } from "hono";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
-import { createOrgApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { prisma } from "~/server/db";
-import {
-  decodeSpendEventsCursor,
-  GatewaySpendEventsRepository,
-} from "~/server/gateway/spendEvents.clickhouse.repository";
-import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
-import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
+import { eventMatches } from "@ee/webhooks/eventRegistry";
 import {
   appendReplayToEndpointStream,
   type SendBatchPayload,
   type WebhookDeliveryProcessDeps,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import { eventMatches } from "@ee/webhooks/eventRegistry";
+import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
+import type { Organization } from "@prisma/client";
+import type { Context, Next } from "hono";
+import { describeRoute } from "hono-openapi";
 import { nanoid } from "nanoid";
+import { z } from "zod";
+import { createOrgApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import {
+  decodeSpendEventsCursor,
+  GatewaySpendEventsRepository,
+} from "~/server/gateway/spendEvents.clickhouse.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
@@ -269,87 +269,89 @@ const REPLAY_DESCRIPTION =
   "side, so prefer pull-and-diff for old ranges. The window is capped at 7 " +
   "days per call.";
 
-secured.access(requires("gatewaySpend:manage")).post(
-  "/spend-events/replay",
-  requireBillingPlan,
-  describeRoute({ description: REPLAY_DESCRIPTION }),
-  zValidator("json", replayBodySchema),
-  async (c) => {
-    const organization = c.get("organization") as Organization;
-    const body = c.req.valid("json");
+secured
+  .access(requires("gatewaySpend:manage"))
+  .post(
+    "/spend-events/replay",
+    requireBillingPlan,
+    describeRoute({ description: REPLAY_DESCRIPTION }),
+    zValidator("json", replayBodySchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
 
-    const endpoints = new WebhookEndpointService({ prisma });
-    const endpoint = await endpoints.getDeliverable({
-      organizationId: organization.id,
-      endpointId: body.endpoint_id,
-    });
-    if (!endpoint) {
-      throw new BadRequestError(
-        "unknown or inactive endpoint for this organization",
-      );
-    }
-
-    const events = new WebhookEventsService({
-      prisma,
-      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) throw new Error("ClickHouse is not configured");
-        return client;
-      }),
-    });
-    const deliveryDeps: WebhookDeliveryProcessDeps = {
-      processStore: new PrismaProcessStore(prisma),
-      endpoints,
-      getPlan: (organizationId) =>
-        getApp().planProvider.getActivePlan({ organizationId }),
-    };
-
-    // One replay identity per call: it salts batch ids and inbox source
-    // ids so redelivered envelopes cannot collide with their historical
-    // batches; the ENVELOPE ids stay untouched.
-    const replayId = nanoid(10);
-    let replayed = 0;
-    let cursor: string | null = null;
-    do {
-      const page = await events.getEmittedEvents({
+      const endpoints = new WebhookEndpointService({ prisma });
+      const endpoint = await endpoints.getDeliverable({
         organizationId: organization.id,
-        fromMs: body.from,
-        toMs: body.to,
-        cursor,
-        limit: 200,
+        endpointId: body.endpoint_id,
       });
-      for (const envelope of page.events) {
-        if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
-        if (replayed >= REPLAY_MAX_ENVELOPES) {
-          throw new BadRequestError(
-            `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
-          );
-        }
-        await appendReplayToEndpointStream({
-          deps: deliveryDeps,
-          organizationId: organization.id,
-          projectId: envelope.data.project_id as string,
-          endpoint,
-          envelope: envelope as SendBatchPayload["envelopes"][number],
-          replayId,
-        });
-        replayed++;
+      if (!endpoint) {
+        throw new BadRequestError(
+          "unknown or inactive endpoint for this organization",
+        );
       }
-      cursor = page.nextCursor;
-    } while (cursor);
 
-    return c.json({
-      data: {
-        endpoint_id: endpoint.id,
-        replay_id: replayId,
-        replayed,
-        window: {
-          from: new Date(body.from).toISOString(),
-          to: new Date(body.to).toISOString(),
+      const events = new WebhookEventsService({
+        prisma,
+        repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
+          const client = await getClickHouseClientForProject(tenantId);
+          if (!client) throw new Error("ClickHouse is not configured");
+          return client;
+        }),
+      });
+      const deliveryDeps: WebhookDeliveryProcessDeps = {
+        processStore: new PrismaProcessStore(prisma),
+        endpoints,
+        getPlan: (organizationId) =>
+          getApp().planProvider.getActivePlan({ organizationId }),
+      };
+
+      // One replay identity per call: it salts batch ids and inbox source
+      // ids so redelivered envelopes cannot collide with their historical
+      // batches; the ENVELOPE ids stay untouched.
+      const replayId = nanoid(10);
+      let replayed = 0;
+      let cursor: string | null = null;
+      do {
+        const page = await events.getEmittedEvents({
+          organizationId: organization.id,
+          fromMs: body.from,
+          toMs: body.to,
+          cursor,
+          limit: 200,
+        });
+        for (const envelope of page.events) {
+          if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
+          if (replayed >= REPLAY_MAX_ENVELOPES) {
+            throw new BadRequestError(
+              `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
+            );
+          }
+          await appendReplayToEndpointStream({
+            deps: deliveryDeps,
+            organizationId: organization.id,
+            projectId: envelope.data.project_id as string,
+            endpoint,
+            envelope: envelope as SendBatchPayload["envelopes"][number],
+            replayId,
+          });
+          replayed++;
+        }
+        cursor = page.nextCursor;
+      } while (cursor);
+
+      return c.json({
+        data: {
+          endpoint_id: endpoint.id,
+          replay_id: replayId,
+          replayed,
+          window: {
+            from: new Date(body.from).toISOString(),
+            to: new Date(body.to).toISOString(),
+          },
         },
-      },
-    });
-  },
-);
+      });
+    },
+  );
 
 export const app = secured.hono;

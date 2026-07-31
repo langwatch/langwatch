@@ -31,13 +31,11 @@ import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import { budgetPeriodFloorMs } from "~/server/gateway/budget.clickhouse.repository";
 import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
-import {
-  budgetPeriodFloorMs,
-} from "~/server/gateway/budget.clickhouse.repository";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -1548,7 +1546,9 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
         projects.map((p) => p.id),
         targets,
       );
-      const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
+      const spentByBudget = new Map(
+        spends.map((sp) => [sp.budgetId, sp.spentUsd]),
+      );
       return c.json({
         data: templates.map((t) => {
           const bucketScopeId = bucketScopeIdFor(

@@ -1,7 +1,7 @@
 import {
   ATTRIBUTED_DEBITS_PROCESS_NAME,
-  attributedUserDebitsPM,
   type AttributedDebitsProcessDeps,
+  attributedUserDebitsPM,
 } from "@ee/governance/process-manager/attributedUserDebits.process";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
@@ -17,6 +17,11 @@ import {
   SettleSpendCommand,
 } from "./commands/spendCommands";
 import {
+  SPEND_SETTLEMENT_PROCESS_NAME,
+  type SpendSettlementProcessDeps,
+  spendSettlementPM,
+} from "./process-manager/spendSettlement.process";
+import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
 } from "./projections/gatewaySpend.foldProjection";
@@ -25,11 +30,6 @@ import {
   GATEWAY_SPEND_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { GatewaySpendProcessingEvent } from "./schemas/events";
-import {
-  SPEND_SETTLEMENT_PROCESS_NAME,
-  spendSettlementPM,
-  type SpendSettlementProcessDeps,
-} from "./process-manager/spendSettlement.process";
 
 export interface GatewaySpendProcessingPipelineDeps {
   gatewaySpendStore: FoldProjectionStore<GatewaySpendState>;

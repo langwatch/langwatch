@@ -1,7 +1,6 @@
 export const GOVERNANCE_EVENTS_PIPELINE_NAME =
   "governance_events_processing" as const;
-export const GOVERNANCE_EVENTS_AGGREGATE_TYPE =
-  "governance_subject" as const;
+export const GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as const;
 
 export const RECORD_VK_LIFECYCLE_COMMAND_TYPE =
   "lw.governance.record_vk_lifecycle" as const;

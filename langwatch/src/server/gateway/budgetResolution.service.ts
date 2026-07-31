@@ -94,7 +94,10 @@ export async function resolveApplicableBudgets(
     (id): id is string => typeof id === "string" && id.length > 0,
   );
   if (templateAnchors.length > 0) {
-    ors.push({ scopeType: "ATTRIBUTED_USER", scopeId: { in: templateAnchors } });
+    ors.push({
+      scopeType: "ATTRIBUTED_USER",
+      scopeId: { in: templateAnchors },
+    });
   }
 
   // GROUP budgets only enforce through a member. A key with no principal

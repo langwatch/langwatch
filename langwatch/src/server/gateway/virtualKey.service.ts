@@ -11,6 +11,7 @@
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
 
+import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
 import type {
   GatewayBudget,
   Prisma,
@@ -21,8 +22,6 @@ import type {
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
-
-import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
@@ -534,45 +533,47 @@ export class VirtualKeyService {
     if (existing.status === "REVOKED") return existing;
     const before = serialiseForAudit(existing);
 
-    return this.prisma.$transaction(async (tx) => {
-      const vk = await this.repository.revoke(
-        input.id,
-        input.organizationId,
-        input.actorUserId,
-        tx,
-      );
-      // A dead key's cap is retired, not deleted: the ledger rows behind
-      // it are the spend record, and an admin asking "what did this key
-      // cost us before we killed it" needs the budget row to read them
-      // against. Archiving also stops the budget from showing up as an
-      // active control that nothing can ever spend against.
-      await this.archiveKeyBudgets(vk, input.actorUserId, tx);
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "VK_REVOKED",
-          virtualKeyId: vk.id,
-        },
-        tx,
-      );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId: null,
-          actorUserId: input.actorUserId,
-          action: "gateway.virtual_key.revoked",
-          targetKind: "virtual_key",
-          targetId: vk.id,
-          before,
-          after: serialiseForAudit(vk),
-        },
-        tx,
-      );
-      return vk;
-    }).then(async (vk) => {
-      await emitVkLifecycle(this.prisma, vk, "revoked");
-      return vk;
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const vk = await this.repository.revoke(
+          input.id,
+          input.organizationId,
+          input.actorUserId,
+          tx,
+        );
+        // A dead key's cap is retired, not deleted: the ledger rows behind
+        // it are the spend record, and an admin asking "what did this key
+        // cost us before we killed it" needs the budget row to read them
+        // against. Archiving also stops the budget from showing up as an
+        // active control that nothing can ever spend against.
+        await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "VK_REVOKED",
+            virtualKeyId: vk.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.revoked",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            before,
+            after: serialiseForAudit(vk),
+          },
+          tx,
+        );
+        return vk;
+      })
+      .then(async (vk) => {
+        await emitVkLifecycle(this.prisma, vk, "revoked");
+        return vk;
+      });
   }
 
   /**
@@ -597,40 +598,47 @@ export class VirtualKeyService {
       });
     }
     const before = serialiseForAudit(existing);
-    return this.prisma.$transaction(async (tx) => {
-      const vk = await this.repository.setDisabled(
-        input.id,
-        input.organizationId,
-        true,
-        input.reason ?? null,
-        tx,
-      );
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "VK_DISABLED",
-          virtualKeyId: vk.id,
-        },
-        tx,
-      );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId: null,
-          actorUserId: input.actorUserId,
-          action: "gateway.virtual_key.disabled",
-          targetKind: "virtual_key",
-          targetId: vk.id,
-          before,
-          after: serialiseForAudit(vk),
-        },
-        tx,
-      );
-      return vk;
-    }).then(async (vk) => {
-      await emitVkLifecycle(this.prisma, vk, "disabled", input.reason ?? null);
-      return vk;
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const vk = await this.repository.setDisabled(
+          input.id,
+          input.organizationId,
+          true,
+          input.reason ?? null,
+          tx,
+        );
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "VK_DISABLED",
+            virtualKeyId: vk.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.disabled",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            before,
+            after: serialiseForAudit(vk),
+          },
+          tx,
+        );
+        return vk;
+      })
+      .then(async (vk) => {
+        await emitVkLifecycle(
+          this.prisma,
+          vk,
+          "disabled",
+          input.reason ?? null,
+        );
+        return vk;
+      });
   }
 
   /** Reverse of disable: restores ACTIVE without touching anything else. */
@@ -648,40 +656,42 @@ export class VirtualKeyService {
       });
     }
     const before = serialiseForAudit(existing);
-    return this.prisma.$transaction(async (tx) => {
-      const vk = await this.repository.setDisabled(
-        input.id,
-        input.organizationId,
-        false,
-        null,
-        tx,
-      );
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "VK_ENABLED",
-          virtualKeyId: vk.id,
-        },
-        tx,
-      );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId: null,
-          actorUserId: input.actorUserId,
-          action: "gateway.virtual_key.enabled",
-          targetKind: "virtual_key",
-          targetId: vk.id,
-          before,
-          after: serialiseForAudit(vk),
-        },
-        tx,
-      );
-      return vk;
-    }).then(async (vk) => {
-      await emitVkLifecycle(this.prisma, vk, "enabled");
-      return vk;
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const vk = await this.repository.setDisabled(
+          input.id,
+          input.organizationId,
+          false,
+          null,
+          tx,
+        );
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "VK_ENABLED",
+            virtualKeyId: vk.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.enabled",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            before,
+            after: serialiseForAudit(vk),
+          },
+          tx,
+        );
+        return vk;
+      })
+      .then(async (vk) => {
+        await emitVkLifecycle(this.prisma, vk, "enabled");
+        return vk;
+      });
   }
 
   /** Advance `lastUsedAt` — called from resolve-key hot path. */

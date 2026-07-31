@@ -228,11 +228,11 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		}
 		flushEvery := time.Duration(cfg.SpendEmitter.FlushIntervalSeconds) * time.Second
 		spendSpool, err = spendemitter.Open(spendemitter.SpoolOptions{
-			Dir:             spoolDir,
-			MaxTotalBytes:   cfg.SpendEmitter.SpoolMaxBytes,
-			FlushEvery:      flushEvery,
-			PodID:           nodeID,
-			Logf:            func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+			Dir:           spoolDir,
+			MaxTotalBytes: cfg.SpendEmitter.SpoolMaxBytes,
+			FlushEvery:    flushEvery,
+			PodID:         nodeID,
+			Logf:          func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
 		})
 		if err != nil {
 			// Spend emission is best-effort billing telemetry: a bad spool

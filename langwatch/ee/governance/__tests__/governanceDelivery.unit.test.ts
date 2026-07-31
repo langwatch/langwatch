@@ -15,9 +15,9 @@ function harness(endpoints: Array<{ id: string; enabledEvents: string[] }>) {
       }),
     },
     endpoints: {
-      listActiveByOrganization: vi.fn().mockResolvedValue(
-        endpoints.map((e) => ({ ...e, status: "ACTIVE" })),
-      ),
+      listActiveByOrganization: vi
+        .fn()
+        .mockResolvedValue(endpoints.map((e) => ({ ...e, status: "ACTIVE" }))),
     },
     getPlan: vi.fn().mockResolvedValue({ webhookEndpoints: true }),
     now: () => 1_753_800_000_000,

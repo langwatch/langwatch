@@ -287,7 +287,9 @@ export class GatewayConfigMaterialiser {
         scope: scopeToWire(b.scopeType),
         scope_id: bucketScopeId,
         ...(principalUserId ? { principal_id: principalUserId } : {}),
-        ...(b.scopeType === "ATTRIBUTED_USER" ? { per_user: true as const } : {}),
+        ...(b.scopeType === "ATTRIBUTED_USER"
+          ? { per_user: true as const }
+          : {}),
         provider_key: b.providerKey,
         window: b.window.toLowerCase(),
         limit_micro_usd: decimalToMicroUSD(b.limitUsd),

@@ -19,9 +19,9 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import {
+  type BudgetDebitRow,
   budgetPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
-  type BudgetDebitRow,
 } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
 import { attributedUserBucketScopeId } from "../budgetResolution.service";
@@ -36,7 +36,10 @@ const VK_ID = `vk_attr_${suffix}`;
 let chRepo: GatewayBudgetClickHouseRepository;
 let service: GatewayBudgetService;
 
-function debitRow(over: Partial<BudgetDebitRow> & Pick<BudgetDebitRow, "budgetId" | "scopeId" | "gatewayRequestId">): BudgetDebitRow {
+function debitRow(
+  over: Partial<BudgetDebitRow> &
+    Pick<BudgetDebitRow, "budgetId" | "scopeId" | "gatewayRequestId">,
+): BudgetDebitRow {
   return {
     tenantId: PROJECT_ID,
     scope: "ATTRIBUTED_USER",
@@ -110,7 +113,9 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     await prisma.gatewayBudgetBucketBoundary.deleteMany({
       where: { organizationId: ORG_ID },
     });
-    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
@@ -318,7 +323,10 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
 
     const boundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
       where: {
-        budgetId_bucketScopeId: { budgetId: template.id, bucketScopeId: bucketA },
+        budgetId_bucketScopeId: {
+          budgetId: template.id,
+          bucketScopeId: bucketA,
+        },
       },
     });
     expect(boundary).not.toBeNull();

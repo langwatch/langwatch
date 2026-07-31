@@ -4,7 +4,6 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -20,12 +19,13 @@ import {
   NANO_USD_PER_USD,
   rateSpendNanoUsd,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { detectBudgetCrossings } from "../services/governanceSignals.service";
 import {
   budgetAppliesToProvider,
   resolveApplicableBudgets,
 } from "~/server/gateway/budgetResolution.service";
+import { detectBudgetCrossings } from "../services/governanceSignals.service";
 
 const logger = createLogger("langwatch:governance:attributed-user-debits");
 

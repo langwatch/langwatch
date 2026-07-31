@@ -28,16 +28,22 @@ function deps(spentByBudget: Record<string, string>, budgets: unknown[]) {
       },
     },
     budgetCHRepository: {
-      getSpendForTargetsAcrossTenants: vi
-        .fn()
-        .mockImplementation((_tenants: string[], targets: Array<{ budgetId: string; scope: string; scopeId: string }>) =>
+      getSpendForTargetsAcrossTenants: vi.fn().mockImplementation(
+        (
+          _tenants: string[],
+          targets: Array<{
+            budgetId: string;
+            scope: string;
+            scopeId: string;
+          }>,
+        ) =>
           targets.map((t) => ({
             budgetId: t.budgetId,
             scope: t.scope,
             scopeId: t.scopeId,
             spentUsd: spentByBudget[t.budgetId] ?? "0",
           })),
-        ),
+      ),
     },
   } as never;
 }
@@ -70,11 +76,16 @@ describe("budget crossing detection", () => {
   /** @scenario Crossing detection reads the boundary-aware figure */
   it("appends threshold at the warn line, breach at the limit, nothing below", async () => {
     await detectBudgetCrossings(
-      deps(
-        { b_low: "10.000000", b_warn: "85.000000", b_over: "120.000000" },
-        [budget("b_low"), budget("b_warn"), budget("b_over")],
-      ),
-      [row("b_low", "vk_anchor:u1"), row("b_warn", "vk_anchor:u2"), row("b_over", "vk_anchor:u3")],
+      deps({ b_low: "10.000000", b_warn: "85.000000", b_over: "120.000000" }, [
+        budget("b_low"),
+        budget("b_warn"),
+        budget("b_over"),
+      ]),
+      [
+        row("b_low", "vk_anchor:u1"),
+        row("b_warn", "vk_anchor:u2"),
+        row("b_over", "vk_anchor:u3"),
+      ],
     );
     const kinds = sendCrossing.mock.calls.map(
       (c) => [c[0].budget_id, c[0].kind] as const,
@@ -92,8 +103,15 @@ describe("budget crossing detection", () => {
 
   it("swallows detection failures so debits never depend on notifications", async () => {
     const failing = deps({}, [budget("b_1")]);
-    (failing as { budgetCHRepository: { getSpendForTargetsAcrossTenants: ReturnType<typeof vi.fn> } }).budgetCHRepository.getSpendForTargetsAcrossTenants =
-      vi.fn().mockRejectedValue(new Error("clickhouse down"));
+    (
+      failing as {
+        budgetCHRepository: {
+          getSpendForTargetsAcrossTenants: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).budgetCHRepository.getSpendForTargetsAcrossTenants = vi
+      .fn()
+      .mockRejectedValue(new Error("clickhouse down"));
     await expect(
       detectBudgetCrossings(failing, [row("b_1", "vk_anchor:u1")]),
     ).resolves.toBeUndefined();

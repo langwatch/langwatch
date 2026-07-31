@@ -12,7 +12,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  FileClock,
+  PauseCircle,
+  Pencil,
+  PlayCircle,
+  RotateCw,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,

@@ -452,7 +452,13 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         },
       });
       const payloads = messages
-        .map((m) => m.payload as { endpointId?: string; envelopes?: Array<{ id: string }> })
+        .map(
+          (m) =>
+            m.payload as {
+              endpointId?: string;
+              envelopes?: Array<{ id: string }>;
+            },
+        )
         .filter((p) => p.endpointId === endpointId);
       const ids = payloads.flatMap((p) => (p.envelopes ?? []).map((e) => e.id));
       expect(ids.sort()).toEqual([`${ns2}-a:completed`, `${ns2}-b:completed`]);

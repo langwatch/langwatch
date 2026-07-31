@@ -4,14 +4,11 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
-import {
-  WebhookEndpointService,
-  allowsInsecureLocalUrls,
-} from "@ee/webhooks/webhookEndpoint.service";
-import { createLogger } from "@langwatch/observability";
+import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+import { createLogger } from "@langwatch/observability";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
@@ -324,7 +321,9 @@ secured.access(requires("webhookEndpoints:manage")).post(
           attempt: 1,
           eventCount: 1,
           outcome:
-            result.status >= 200 && result.status < 300 ? "success" : "terminal",
+            result.status >= 200 && result.status < 300
+              ? "success"
+              : "terminal",
           responseStatus: result.status,
         });
       } catch (logError) {
@@ -352,7 +351,9 @@ secured.access(requires("webhookEndpoints:manage")).post(
           eventCount: 1,
           outcome: "terminal",
           error:
-            error instanceof Error ? error.message.slice(0, 500) : String(error),
+            error instanceof Error
+              ? error.message.slice(0, 500)
+              : String(error),
         });
       } catch (logError) {
         logger.warn({ error: logError }, "test-fire delivery log write failed");
