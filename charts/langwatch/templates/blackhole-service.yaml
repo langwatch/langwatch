@@ -1,0 +1,27 @@
+{{- /*
+The dead end that `ingress.blockedPaths` routes to: a Service with no selector,
+so nothing populates its Endpoints and the controller cannot forward anywhere.
+Both templates resolve prefixes through `langwatch.ingress.blockedPaths`, so
+they cannot disagree about whether the block is on.
+*/ -}}
+{{- if and .Values.ingress.enabled (include "langwatch.ingress.blockedPaths" . | fromJsonArray) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-blackhole
+  {{- /* Merged as a dict: a textual append would emit a colliding
+    `ingress.labels` key twice, which kubectl rejects. Operator labels win. */}}
+  {{- $labels := include "langwatch.labels" . | fromYaml }}
+  {{- $_ := set $labels "app.kubernetes.io/component" "ingress-blackhole" }}
+  labels:
+    {{- toYaml (mergeOverwrite $labels (deepCopy (.Values.ingress.labels | default dict))) | nindent 4 }}
+spec:
+  # Controllers targeting node ports (AWS LBC `target-type: instance`, GKE
+  # without NEG) reject a ClusterIP backend — see docs/self-hosting/security.
+  type: ClusterIP
+  # No selector on purpose.
+  ports:
+    - port: 80
+      protocol: TCP
+      name: http
+{{- end }}

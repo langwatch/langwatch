@@ -26,6 +26,25 @@ const tokenResolver = TokenResolver.create(prisma);
 const AUTH_REASON =
   "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling";
 
+// One policy per GRAIN, not one per file. A single shared policy would report
+// the same requirement for a read and a delete, which is worse than reporting
+// nothing: an audit reading the registry would believe it had the answer.
+const annotationsViewAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:view"],
+  credential: "apiKey",
+});
+const annotationsCreateAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:create"],
+  credential: "apiKey",
+});
+const annotationsManageAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["annotations:manage"],
+  credential: "apiKey",
+});
+
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
@@ -74,172 +93,161 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 // ---------- GET /api/annotations ----------
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .get("/annotations", async (c) => {
-    const auth = await authenticateRequest(c, "annotations:view");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
+secured.access(annotationsViewAuth).get("/annotations", async (c) => {
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
 
-    try {
-      const annotations = await prisma.annotation.findMany({
-        where: { projectId: project.id },
-      });
+  try {
+    const annotations = await prisma.annotation.findMany({
+      where: { projectId: project.id },
+    });
 
-      markUsed();
-      return c.json({ data: annotations ?? [] });
-    } catch (e) {
-      logger.error(
-        { error: e, projectId: project.id },
-        "error fetching annotations",
-      );
-      return c.json(
-        {
-          status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
-        },
-        500,
-      );
-    }
-  });
+    markUsed();
+    return c.json({ data: annotations ?? [] });
+  } catch (e) {
+    logger.error(
+      { error: e, projectId: project.id },
+      "error fetching annotations",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
+      500,
+    );
+  }
+});
 
 // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .get("/annotations/:id", async (c) => {
-    const auth = await authenticateRequest(c, "annotations:view");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
+secured.access(annotationsViewAuth).get("/annotations/:id", async (c) => {
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
 
-    try {
-      const annotationId = c.req.param("id");
-      const annotation = await prisma.annotation.findUnique({
-        where: { id: annotationId, projectId: project.id },
-      });
-      if (!annotation) {
-        return c.json(
-          { status: "error", message: "Annotation not found." },
-          404,
-        );
-      }
-      markUsed();
-      return c.json({ data: annotation });
-    } catch (e) {
-      logger.error(
-        { error: e, projectId: project.id },
-        "error fetching annotation",
-      );
+  try {
+    const annotationId = c.req.param("id");
+    const annotation = await prisma.annotation.findUnique({
+      where: { id: annotationId, projectId: project.id },
+    });
+    if (!annotation) {
+      return c.json({ status: "error", message: "Annotation not found." }, 404);
+    }
+    markUsed();
+    return c.json({ data: annotation });
+  } catch (e) {
+    logger.error(
+      { error: e, projectId: project.id },
+      "error fetching annotation",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
+      500,
+    );
+  }
+});
+
+secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
+  const auth = await authenticateRequest(c, "annotations:manage");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
+
+  try {
+    const annotationId = c.req.param("id");
+    await prisma.annotation.delete({
+      where: { id: annotationId, projectId: project.id },
+    });
+    markUsed();
+    return c.json({ status: "success", message: "Annotation deleted." });
+  } catch (e) {
+    logger.error(
+      { error: e, projectId: project.id },
+      "error deleting annotation",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "ID not found.",
+      },
+      500,
+    );
+  }
+});
+
+secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
+  const auth = await authenticateRequest(c, "annotations:manage");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
+
+  try {
+    const body = await c.req.json();
+    const comment = body.comment as string;
+    const isThumbsUp = body.isThumbsUp;
+    const annotationId = c.req.param("id");
+    const email = body.email as string;
+
+    if (!comment || typeof comment !== "string") {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message:
+            "[comment] is required in the request body and must be a string.",
         },
-        500,
+        400,
       );
     }
-  });
-
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .delete("/annotations/:id", async (c) => {
-    const auth = await authenticateRequest(c, "annotations:manage");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
-
-    try {
-      const annotationId = c.req.param("id");
-      await prisma.annotation.delete({
-        where: { id: annotationId, projectId: project.id },
-      });
-      markUsed();
-      return c.json({ status: "success", message: "Annotation deleted." });
-    } catch (e) {
-      logger.error(
-        { error: e, projectId: project.id },
-        "error deleting annotation",
-      );
+    if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "ID not found.",
+          message:
+            "[isThumbsUp] is required in the request body and must be a boolean.",
         },
-        500,
+        400,
       );
     }
-  });
 
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .patch("/annotations/:id", async (c) => {
-    const auth = await authenticateRequest(c, "annotations:manage");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
+    const patchAnnotation = await prisma.annotation.update({
+      where: { id: annotationId, projectId: project.id },
+      data: {
+        comment,
+        isThumbsUp,
+        email,
+      },
+    });
 
-    try {
-      const body = await c.req.json();
-      const comment = body.comment as string;
-      const isThumbsUp = body.isThumbsUp;
-      const annotationId = c.req.param("id");
-      const email = body.email as string;
-
-      if (!comment || typeof comment !== "string") {
-        return c.json(
-          {
-            status: "error",
-            message:
-              "[comment] is required in the request body and must be a string.",
-          },
-          400,
-        );
-      }
-      if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
-        return c.json(
-          {
-            status: "error",
-            message:
-              "[isThumbsUp] is required in the request body and must be a boolean.",
-          },
-          400,
-        );
-      }
-
-      const patchAnnotation = await prisma.annotation.update({
-        where: { id: annotationId, projectId: project.id },
-        data: {
-          comment,
-          isThumbsUp,
-          email,
-        },
-      });
-
-      markUsed();
-      return c.json({ data: patchAnnotation });
-    } catch (e) {
-      logger.error(
-        { error: e, projectId: project.id },
-        "error patching annotation",
-      );
-      return c.json(
-        {
-          status: "error",
-          message: e instanceof Error ? e.message : "Not found",
-        },
-        500,
-      );
-    }
-  });
+    markUsed();
+    return c.json({ data: patchAnnotation });
+  } catch (e) {
+    logger.error(
+      { error: e, projectId: project.id },
+      "error patching annotation",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Not found",
+      },
+      500,
+    );
+  }
+});
 
 // ---------- GET|POST /api/annotations/trace/:trace ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(annotationsViewAuth)
   .get("/annotations/trace/:trace", async (c) => {
     const auth = await authenticateRequest(c, "annotations:view");
     if ("error" in auth) {
@@ -271,7 +279,7 @@ secured
   });
 
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(annotationsCreateAuth)
   .post("/annotations/trace/:trace", async (c) => {
     // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
     // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS

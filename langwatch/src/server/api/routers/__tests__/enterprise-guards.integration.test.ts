@@ -30,10 +30,9 @@ import { prisma } from "../../../db";
 import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { grantOrganizationAdmin } from "./helpers/roleBindings";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
+describe("enterprise feature guards", () => {
   const testNamespace = `ent-guard-${nanoid(8)}`;
   let organizationId: string;
   let userId: string;
@@ -103,6 +102,15 @@ describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
       },
     });
 
+    // Without these the caller is refused at the permission gate and never
+    // reaches the enterprise guard each test here is about — see the helper.
+    await grantOrganizationAdmin({
+      prisma,
+      organizationId: organization.id,
+      userId: user.id,
+      teamId: team.id,
+    });
+
     // Create a custom role for tests that need one
     const role = await prisma.customRole.create({
       data: {
@@ -130,6 +138,16 @@ describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
+    // beforeAll assigns organizationId as its first statement; if it threw
+    // before that, Vitest still runs this afterAll, and Prisma treats an
+    // undefined filter value as "no filter" — every deleteMany below would
+    // match the whole table instead of just this run's rows.
+    if (!organizationId) return;
+
+    // First, and without a `.catch`: the bindings hold an FK to CustomRole, so
+    // a failure here would otherwise resurface as a confusing error on the
+    // customRole cleanup below, or vanish into a swallowed one.
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
     await prisma.teamUser
       .deleteMany({
         where: {

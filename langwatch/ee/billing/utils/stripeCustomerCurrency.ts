@@ -1,12 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { Currency } from "@prisma/client";
 import type Stripe from "stripe";
-import { toError } from "../../../src/utils/posthogErrorCapture";
 import {
-  BillingCurrencyUnavailableError,
   BillingCustomerDeletedError,
   UnsupportedBillingCurrencyError,
 } from "../errors";
+import { translateStripeError } from "../stripe/translateStripeError";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
@@ -25,20 +24,19 @@ const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
  * - `unsupported` — the customer is fixed to a currency we sell no prices in.
  * - `deleted`   — the billing customer no longer exists. Terminal: no
  *                 subscription can be attached to it in any currency.
- * - `unavailable` — we could not ask. Not evidence that they are unfixed.
  */
 export type CheckoutCurrencyResolution =
   | { status: "resolved"; currency: Currency }
   | { status: "unsupported"; stripeCurrency: string }
-  | { status: "deleted" }
-  | { status: "unavailable"; cause: Error };
+  | { status: "deleted" };
 
 /**
  * Establish the currency a checkout session must be created in.
  *
- * Callers must handle `unsupported` and `unavailable` before performing any
- * writes — neither can be turned into a working checkout, so proceeding only
- * trades one failure for the same failure plus orphaned pending records.
+ * Callers must handle `unsupported` and `deleted` before performing any writes —
+ * neither can be turned into a working checkout, so proceeding only trades one
+ * failure for the same failure plus orphaned pending records. A provider
+ * failure throws straight out of here, for the same reason.
  */
 export const resolveCheckoutCurrency = async ({
   stripe,
@@ -55,10 +53,10 @@ export const resolveCheckoutCurrency = async ({
   try {
     customer = await stripe.customers.retrieve(customerId);
   } catch (error) {
-    // Hand the original error back so the caller can attach it as a `reason`
-    // on the handled error — that is what carries the provider's own message
-    // to the logs, rather than a message copied into a fresh Error here.
-    return { status: "unavailable", cause: toError(error) };
+    // Only rate limiting and an unreachable provider are causes we can name.
+    // Anything else we genuinely do not understand, so it is rethrown as-is and
+    // degrades to unknown — still before any write, which is what matters here.
+    throw translateStripeError(error);
   }
 
   // A deleted customer is not an unfixed one. Stripe keeps returning the
@@ -117,9 +115,5 @@ export const requireCheckoutCurrency = (
       throw new UnsupportedBillingCurrencyError();
     case "deleted":
       throw new BillingCustomerDeletedError();
-    case "unavailable":
-      throw new BillingCurrencyUnavailableError({
-        reasons: [resolution.cause],
-      });
   }
 };

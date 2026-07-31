@@ -8,7 +8,11 @@ import {
   type Scope,
 } from "../virtualKey.authz";
 
-vi.mock("~/server/api/rbac", () => ({
+// Partial mock: the authz module also (transitively) pulls in the
+// role-binding resolver for API-key actors, which reads real exports like
+// `Resources` from this module at init time.
+vi.mock("~/server/api/rbac", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/api/rbac")>()),
   hasOrganizationPermission: vi.fn(),
   hasTeamPermission: vi.fn(),
   hasProjectPermission: vi.fn(),

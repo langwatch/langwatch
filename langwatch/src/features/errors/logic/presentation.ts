@@ -504,6 +504,19 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_signing_key_not_pem: {
+    title: "That doesn't look like a private key",
+    describe: () => "Paste the whole key, including its BEGIN and END lines.",
+  },
+  license_signing_key_encrypted: {
+    title: "That private key is passphrase-protected",
+    describe: () => "Use an unencrypted private key to sign licenses.",
+  },
+  license_signing_failed: {
+    title: "That private key couldn't sign the license",
+    describe: () =>
+      "Check it is the license signing key and was copied in full.",
+  },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
@@ -625,10 +638,11 @@ const presentations = {
     title: "This account's billing profile isn't active",
     describe: () => "We've been notified. Contact support to get set back up.",
   },
-  billing_currency_unavailable: {
-    // fault: provider. We couldn't confirm the billing currency, so we stopped
-    // before creating anything. Saying nothing was charged comes first.
-    title: "Couldn't confirm your billing currency",
+  billing_provider_unavailable: {
+    // fault: provider. Only raised for rate limiting or an unreachable
+    // provider, so waiting genuinely is the action — and nothing happened,
+    // which is the first thing anyone wants to know.
+    title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_billing_unavailable: {
@@ -1224,6 +1238,19 @@ const presentations = {
     title: "Spend isn't available for this key",
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
+  },
+  spend_source_unavailable: {
+    // The public REST spelling of the refusal above. Both doors answer the
+    // same way on a deployment with no per-key spend ledger; the wire code
+    // differs because the REST one is published in the management API docs
+    // and callers already branch on it.
+    title: "Spend isn't available for this key",
+    describe: () =>
+      "This deployment doesn't record spend per key, so there's no figure to show.",
+  },
+  cache_rule_not_found: {
+    title: "Cache rule not found",
+    describe: () => "It may have been archived by someone else.",
   },
   gateway_group_budget_unsupported: {
     // Refusing beats creating a cap that quietly means something else, so the

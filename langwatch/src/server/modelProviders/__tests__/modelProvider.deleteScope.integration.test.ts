@@ -26,10 +26,9 @@ import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService scope-aware deletion (real DB)",
   () => {
     const ns = `mp-del-${nanoid(8)}`;
@@ -241,7 +240,12 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               { id: created.id, projectId: projectAId, provider: "openai" },
               ctxFor(orgAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+            // `model_provider_not_found`, not the tRPC `NOT_FOUND` this once
+            // asserted: the service throws a HandledError now. The property
+            // under test is unchanged — a cross-tenant id is refused, and
+            // refused as "not found" so it can't be used to probe for
+            // existence.
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
 
           const row = await prisma.modelProvider.findUnique({
             where: { id: created.id },

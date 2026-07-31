@@ -284,8 +284,8 @@ describe("resolveWrapperPath", () => {
     });
 
     describe("when stdin is not a TTY", () => {
-      /** @scenario "Non-TTY defaults to the gateway" */
-      it("defaults to the gateway without prompting or persisting", async () => {
+      /** @scenario "Non-TTY takes the path that spends nothing" */
+      it("takes the OTLP path without prompting or persisting", async () => {
         const save = vi.fn();
         const out = await resolveWrapperPath({
           cfg: baseCfg(),
@@ -296,15 +296,29 @@ describe("resolveWrapperPath", () => {
           saveImpl: save,
           env: {},
         });
-        expect(out.mode).toBe("gateway");
+        // Nobody is there to answer, and the gateway bills the org.
+        expect(out.mode).toBe("ingestion");
         expect(out.prompted).toBe(false);
         expect(save).not.toHaveBeenCalled();
+      });
+
+      it("still honors an explicit gateway request", async () => {
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          override: "gateway",
+          isTTY: false,
+          promptImpl: neverPrompt,
+          env: {},
+        });
+        expect(out.mode).toBe("gateway");
       });
     });
 
     describe("when LANGWATCH_AUTO_LOGIN is forced on", () => {
       /** @scenario "LANGWATCH_AUTO_LOGIN skips the prompt" */
-      it("defaults to the gateway even on a TTY", async () => {
+      it("takes the OTLP path even on a TTY", async () => {
         const out = await resolveWrapperPath({
           cfg: baseCfg(),
           tool: "claude",
@@ -313,13 +327,14 @@ describe("resolveWrapperPath", () => {
           promptImpl: neverPrompt,
           env: { LANGWATCH_AUTO_LOGIN: "1" },
         });
-        expect(out.mode).toBe("gateway");
+        expect(out.mode).toBe("ingestion");
         expect(out.prompted).toBe(false);
       });
     });
 
     describe("when the user aborts the prompt", () => {
-      it("falls back to the gateway for this run without persisting", async () => {
+      /** @scenario "Cancelling the path prompt cancels the run" */
+      it("cancels the run instead of picking a path", async () => {
         const save = vi.fn();
         const abortPrompt = vi.fn(async () => ({})) as unknown as Parameters<
           typeof resolveWrapperPath
@@ -333,7 +348,8 @@ describe("resolveWrapperPath", () => {
           saveImpl: save,
           env: {},
         });
-        expect(out.mode).toBe("gateway");
+        expect(out.isAborted).toBe(true);
+        expect(out.mode).not.toBe("gateway");
         expect(out.prompted).toBe(false);
         expect(save).not.toHaveBeenCalled();
       });
@@ -341,10 +357,12 @@ describe("resolveWrapperPath", () => {
   });
 
   describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
-    // Copilot inverts every silent gateway default: Path A switches
-    // copilot into BYOK mode, moving spend off the user's paid Copilot
-    // seat onto the org's provider keys — not billing-neutral like the
-    // claude/codex base-URL swap. Explicit choices are honored unchanged.
+    // Copilot's gateway path switches it into BYOK mode, moving spend off
+    // the user's paid Copilot seat onto the org's provider keys — not
+    // billing-neutral like the claude/codex base-URL swap. The resolver is
+    // ingestion-first for every tool, which keeps copilot safe by default;
+    // these tests pin that copilot rides those defaults and that every
+    // gateway route names the seat bypass. Explicit choices are honored.
 
     /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
     it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {
@@ -385,26 +403,6 @@ describe("resolveWrapperPath", () => {
       };
       const values = promptArg.choices.map((c) => c.value);
       expect(values[promptArg.initial]).toBe("ingestion");
-    });
-
-    /** @scenario Aborting the copilot path prompt falls back to direct OTLP for this run */
-    it("falls back to ingestion (not gateway) when the copilot prompt is aborted", async () => {
-      const save = vi.fn();
-      const abortPrompt = vi.fn(async () => ({})) as unknown as Parameters<
-        typeof resolveWrapperPath
-      >[0]["promptImpl"];
-      const out = await resolveWrapperPath({
-        cfg: baseCfg(),
-        tool: "copilot",
-        args: [],
-        isTTY: true,
-        promptImpl: abortPrompt,
-        saveImpl: save,
-        env: {},
-      });
-      expect(out.mode).toBe("ingestion");
-      expect(out.prompted).toBe(false);
-      expect(save).not.toHaveBeenCalled();
     });
 
     /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
@@ -452,19 +450,6 @@ describe("resolveWrapperPath", () => {
       expect(out.mode).toBe("gateway");
       const written = write.mock.calls.map((c) => c[0]).join("");
       expect(written).toContain("Copilot seat");
-    });
-
-    /** @scenario Non-copilot tools keep the gateway default on non-interactive runs */
-    it("keeps the gateway default for non-copilot tools on non-TTY runs", async () => {
-      const out = await resolveWrapperPath({
-        cfg: baseCfg(),
-        tool: "claude",
-        args: [],
-        isTTY: false,
-        promptImpl: neverPrompt,
-        env: {},
-      });
-      expect(out.mode).toBe("gateway");
     });
   });
 

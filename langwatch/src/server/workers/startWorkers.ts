@@ -20,9 +20,9 @@ export interface WorkerHandle {
 export interface StartWorkersOptions {
   /**
    * Expose the worker prom-client registry over its own HTTP port. On for the
-   * standalone worker deployment (the web process scrapes it at
-   * `GET /workers/metrics`); off for the in-process dev mode, where the web
-   * server already serves the shared registry at `/metrics`.
+   * standalone worker deployment, where a scraper reaches the worker directly
+   * on the metrics port; off for the in-process dev mode, where the web server
+   * already serves the shared registry at `/metrics`.
    */
   shouldStartMetricsServer?: boolean;
 }
@@ -188,11 +188,18 @@ export function createWorkerMetricsHandler(
   };
 }
 
-// Expose the worker process's prom-client registry over HTTP so the web
-// process can scrape it at GET /workers/metrics (proxied in start.ts). In
-// the in-process dev mode this is skipped — the web server serves the same
-// (shared) registry at /metrics directly. The same listener serves the
-// unauthenticated liveness path the chart's probes call.
+// Expose the worker process's prom-client registry over HTTP on the worker
+// metrics port, behind the same bearer gate the web process uses. In a split
+// deployment this port is what a scraper talks to: the chart's Prometheus
+// scrape config targets the worker pod directly on it, NOT the web process's
+// `/workers/metrics` proxy — that proxy dials its own loopback, so it only
+// resolves when the workers share the web process (in-process dev mode).
+//
+// In that in-process mode this listener is skipped entirely; the web server
+// serves the same shared registry at /metrics.
+//
+// The same listener serves the unauthenticated liveness path the chart's
+// probes call.
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {

@@ -59,6 +59,7 @@ function makeAnalyticsRow(
     tenantId: "tenant-default",
     traceId: "trace-default",
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+    hasSignal: true,
     occurredAtMs: baseMs,
     createdAtMs: baseMs,
     updatedAtMs: baseMs,

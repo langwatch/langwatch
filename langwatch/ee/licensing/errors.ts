@@ -10,6 +10,9 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+
+import { remediation } from "~/server/app-layer/error-remediation";
+
 import { LICENSE_ERRORS, type LicenseError } from "./constants";
 
 /**
@@ -62,6 +65,76 @@ export class LicenseExpiredError extends HandledError {
       fault: "customer",
     });
     this.name = "LicenseExpiredError";
+  }
+}
+
+/**
+ * The signing key isn't a PEM private key — usually a public key, or a
+ * fragment that lost its delimiters on the way through a chat window.
+ *
+ * Separate from the two codes above because this is the *issuer's* key, not
+ * the customer's licence: the person seeing it is generating a licence, and
+ * what they have to fix is the thing they pasted.
+ */
+export class LicenseSigningKeyNotPemError extends HandledError {
+  declare readonly code: "license_signing_key_not_pem";
+
+  constructor() {
+    super(
+      "license_signing_key_not_pem",
+      "The provided license signing key is not a PEM private key",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("license_signing_key_not_pem"),
+      },
+    );
+    this.name = "LicenseSigningKeyNotPemError";
+  }
+}
+
+/** The signing key is passphrase-protected, so signing cannot use it as-is. */
+export class LicenseSigningKeyEncryptedError extends HandledError {
+  declare readonly code: "license_signing_key_encrypted";
+
+  constructor() {
+    super(
+      "license_signing_key_encrypted",
+      "The provided license signing key is passphrase-protected",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("license_signing_key_encrypted"),
+      },
+    );
+    this.name = "LicenseSigningKeyEncryptedError";
+  }
+}
+
+/**
+ * A well-formed PEM that OpenSSL still refused to sign with — wrong key type,
+ * a truncated body, or a public key wearing a private-key label.
+ *
+ * OpenSSL's own error is never re-thrown: it names internals and can quote key
+ * material. It rides along as a `reason`, which `serialize()` masks to
+ * `{ code: "unknown" }` — so it reaches the server logs and stops there, while
+ * the client only ever sees this error's code.
+ */
+export class LicenseSigningFailedError extends HandledError {
+  declare readonly code: "license_signing_failed";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "license_signing_failed",
+      "The provided license signing key could not be used to sign",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("license_signing_failed"),
+        ...options,
+      },
+    );
+    this.name = "LicenseSigningFailedError";
   }
 }
 

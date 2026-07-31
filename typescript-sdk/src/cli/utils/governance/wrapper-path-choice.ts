@@ -25,8 +25,12 @@
  *   3. exactly one allowed path (policy gate) - used silently.
  *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
  *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - default gateway,
- *      no prompt, no persist.
+ *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
+ *      no prompt, no persist. Nobody is there to consent to the gateway
+ *      billing model usage to the org, so it is never chosen implicitly.
+ *
+ * Cancelling the prompt in case 4 cancels the run rather than picking a
+ * path on the user's behalf.
  *
  * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
  * before they are forwarded to the real tool. Every other arg is
@@ -46,23 +50,6 @@ import {
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
-
-/**
- * The silent default when both paths are allowed and nothing is pinned.
- *
- * Every tool except copilot defaults to the gateway. Copilot inverts it
- * (ADR-039 Decision 3): its gateway path rides COPILOT_PROVIDER_* BYOK
- * env vars, which switch spend off the user's already-paid Copilot seat
- * onto the org's provider API keys — NOT billing-neutral the way the
- * claude/codex base-URL swap is (same API key either way there). A
- * silent default must never shift who pays, so copilot's three silent
- * gateway defaults (non-TTY fallback, prompt pre-selection, prompt
- * abort) all resolve to ingestion instead. Explicit choices — flag,
- * env, pinned mode, org policy — are honored unchanged.
- */
-function silentDefaultMode(tool: string): WrapperMode {
-  return tool === "copilot" ? "ingestion" : "gateway";
-}
 
 /**
  * Map a user-facing path token (`gateway` / `otlp`) to the internal
@@ -173,6 +160,11 @@ export interface ResolveWrapperPathResult {
   mode: WrapperMode;
   /** True when this run made a fresh interactive choice (and persisted it). */
   prompted: boolean;
+  /**
+   * True when the user cancelled the path prompt. `mode` is then a
+   * placeholder the caller must not act on; it should stop the run.
+   */
+  isAborted?: boolean;
 }
 
 /**
@@ -310,8 +302,14 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login - silent default, no prompt.
-    return { mode: silentDefaultMode(tool), prompted: false };
+    // Non-TTY / CI / forced-auto-login: nobody is there to answer, and the
+    // gateway bills model usage to the organization. Take the same option
+    // the prompt pre-selects, which costs nothing beyond telemetry. A CI
+    // job that wants the gateway asks for it with --tool-mode=gateway,
+    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode. This also keeps
+    // copilot billing-safe (ADR-039 D3): its gateway path rides
+    // COPILOT_PROVIDER_* BYOK keys, shifting spend off the user's seat.
+    return { mode: "ingestion", prompted: false };
   }
 
   const res = await promptImpl({
@@ -320,10 +318,7 @@ export async function resolveWrapperPath(
     message: pathChoiceMessage(tool),
     // Subscription (OTLP) first and pre-selected; API key (gateway) is the
     // explicit opt-in. Values stay "gateway"/"ingestion" - they are the
-    // persisted cfg.tool_mode vocabulary. Copilot is billing-safe under
-    // this default (silentDefaultMode(copilot) is ingestion too); the
-    // non-TTY / abort branches use silentDefaultMode so non-copilot tools
-    // keep the gateway default there.
+    // persisted cfg.tool_mode vocabulary.
     choices: [
       {
         title: otlpChoiceTitle(tool),
@@ -341,9 +336,10 @@ export async function resolveWrapperPath(
 
   const chosen = tokenToMode(res?.path as string | undefined);
   if (!chosen) {
-    // User aborted the prompt (Ctrl-C / empty). Fall back to the silent
-    // default for this run without persisting, so the next run asks again.
-    return { mode: silentDefaultMode(tool), prompted: false };
+    // User aborted the prompt (Ctrl-C / empty). Cancelling the question
+    // cancels the run: picking a path for them would either start the tool
+    // they just interrupted or bill their organization for it.
+    return { mode: "ingestion", prompted: false, isAborted: true };
   }
 
   // Remember the choice so subsequent runs don't prompt.

@@ -18,6 +18,12 @@ import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled
 import { type GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
+  canRefreshSession,
+  refreshSession,
+  refreshSessionIfExpired,
+  type SessionRefreshDeps,
+} from "./session-refresh";
+import {
   CLI_SURFACE_HEADER,
   CLI_SURFACE_VALUE,
 } from "./surface";
@@ -133,6 +139,49 @@ function throwGovernanceHttpError({
 
 export interface CliApiOptions {
   fetchImpl?: typeof fetch;
+  /** Seams for the automatic session refresh. Tests only. */
+  refreshDeps?: SessionRefreshDeps;
+}
+
+/** Copy shown when the session cannot be recovered without a fresh login. */
+export const SESSION_EXPIRED_MESSAGE =
+  "Session expired, run `langwatch login --device` again";
+
+/**
+ * Send an authenticated control-plane request, keeping the device
+ * session alive around it.
+ *
+ * The access token is short-lived and the refresh token is not, so a
+ * spent access token is a routine event rather than a logout: refresh
+ * proactively when the recorded expiry has passed, and refresh + retry
+ * once when the server rejects the token anyway (a revoked-then-rotated
+ * pair, or a clock the device disagrees with). Only a refresh the server
+ * itself rejects surfaces as a 401 to the caller.
+ */
+async function authorizedFetch(
+  cfg: GovernanceConfig,
+  url: string,
+  init: (token: string) => RequestInit,
+  opts: CliApiOptions,
+): Promise<Response> {
+  const f = opts.fetchImpl ?? fetch;
+  const deps: SessionRefreshDeps = {
+    fetchImpl: opts.fetchImpl,
+    ...opts.refreshDeps,
+  };
+  await refreshSessionIfExpired(cfg, deps);
+
+  const res = await f(url, init(cfg.access_token!));
+  if (res.status !== 401 || !canRefreshSession(cfg)) return res;
+
+  const outcome = await refreshSession(cfg, deps);
+  if (outcome.status !== "refreshed") return res;
+  // Replaying a POST/PUT/DELETE here is safe only because every
+  // control-plane handler validates the bearer before it touches state, so
+  // a 401 first attempt cannot have committed a write. That argument is
+  // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
+  // which can follow a partially applied write.
+  return f(url, init(cfg.access_token!));
 }
 
 async function getJSON<T>(
@@ -148,14 +197,18 @@ async function getJSON<T>(
     );
   }
   const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
-  const f = opts.fetchImpl ?? fetch;
-  const res = await f(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${cfg.access_token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await authorizedFetch(
+    cfg,
+    url,
+    (token) => ({
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    }),
+    opts,
+  );
   if (res.status === 401) {
     const body = await res.json().catch(() => undefined);
     throwGovernanceHttpError({
@@ -163,7 +216,7 @@ async function getJSON<T>(
       status: 401,
       body,
       code: "unauthorized",
-      message: "Session expired — run `langwatch login --device` again",
+      message: SESSION_EXPIRED_MESSAGE,
     });
   }
   if (res.status === 402) {
@@ -403,22 +456,25 @@ async function requestREST<T>(
     );
   }
   const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
-  const f = options.fetchImpl ?? fetch;
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${cfg.access_token}`,
-    Accept: "application/json",
+  const buildInit = (token: string): RequestInit => {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    };
+    if (options.mutating) {
+      headers[CLI_SURFACE_HEADER] = CLI_SURFACE_VALUE;
+    }
+    if (options.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+    return {
+      method,
+      headers,
+      body:
+        options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    };
   };
-  if (options.mutating) {
-    headers[CLI_SURFACE_HEADER] = CLI_SURFACE_VALUE;
-  }
-  if (options.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-  const res = await f(url, {
-    method,
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  const res = await authorizedFetch(cfg, url, buildInit, options);
   if (res.status === 204) return undefined as T;
   if (res.status === 401) {
     const body = await res.json().catch(() => undefined);
@@ -427,7 +483,7 @@ async function requestREST<T>(
       status: 401,
       body,
       code: "unauthorized",
-      message: "Session expired — run `langwatch login --device` again",
+      message: SESSION_EXPIRED_MESSAGE,
     });
   }
   if (res.status === 403) {

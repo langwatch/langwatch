@@ -33,6 +33,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "TotalPromptTokenCount",
   "TotalCompletionTokenCount",
   "TokensPerSecond",
+  "SpanCount",
   "TraceName",
   "ContainsErrorStatus",
   "ErrorMessage",
@@ -497,10 +498,12 @@ export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
+  evalTimeFilter,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
+  evalTimeFilter?: string;
 }): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
@@ -517,13 +520,24 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
         : EVALUATION_ANALYTICS_COLUMNS;
+      // `evaluation_runs` is PARTITION BY the same OccurredAt envelope the outer
+      // read is already bounded to, so without a predicate here BOTH scopes walk
+      // every partition — the outer read and, more expensively, the dedup's
+      // full-table GROUP BY. Rendered into both so they prune identically.
+      //
+      // The bound goes on the dedup too, which windows "latest version" to the
+      // frame rather than all of history: an evaluation whose newest row landed
+      // outside it reads back one version stale. That is a read-only analytics
+      // path — stale numbers, never a wrong write — and the ±2-day cushion the
+      // caller supplies covers the drift this table actually exhibits.
+      const timeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId = {tenantId:String}${timeBound}
           AND (TenantId, EvaluationId, UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM evaluation_runs
-            WHERE TenantId = {tenantId:String}
+            WHERE TenantId = {tenantId:String}${timeBound}
             GROUP BY TenantId, EvaluationId
           )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;

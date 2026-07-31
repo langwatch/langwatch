@@ -310,16 +310,15 @@ export async function resolveWrapperMode(
 	// INGESTION mode: ensure key + (for codex) toml.
 	const sourceType = SOURCE_TYPE_BY_TOOL[tool];
 	if (!sourceType) {
-		// No ingestion template defined for this tool (cursor is the
-		// current example - GUI app, no useful OTel). Fall through to
-		// gateway shape; the existing preflight will tell the user
-		// what's missing.
-		return {
-			mode: "gateway",
-			vars: gatewayVars,
-			clears: gatewayClears,
-			notice,
-		};
+		// No ingestion template for this tool (cursor is the current example:
+		// a GUI app whose agent panel no terminal env reaches). Say so instead
+		// of routing to the gateway, which would bill model usage to the org
+		// on the strength of a missing template.
+		throw new GovernanceCliError(
+			501,
+			"otel_direct_unsupported",
+			`Direct OTLP ingestion isn't supported for '${tool}' yet, so \`langwatch ${tool}\` cannot send telemetry on your own plan. Run it with --tool-mode=gateway to route through the LangWatch gateway instead.`,
+		);
 	}
 
 	// Defense-in-depth: the direct-OTLP gate above already routes to the

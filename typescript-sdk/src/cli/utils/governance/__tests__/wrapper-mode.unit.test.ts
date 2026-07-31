@@ -679,10 +679,11 @@ describe("resolveWrapperMode", () => {
 	});
 
 	describe("copilotSeatBypassSuffix()", () => {
-		// runWrapped's ingestion-mint-failure fallback appends this suffix to
-		// its stderr message (wrapper.ts); asserting the helper here keeps the
-		// who-pays wording pinned without simulating a full spawn.
-		/** @scenario Ingestion setup failure falling back to the gateway names the seat bypass */
+		// The policy-forced gateway notices (wrapper-mode's downgrade branch
+		// and wrapper-path-choice's single-allowed-path branch) append this
+		// suffix; asserting the helper here keeps the who-pays wording pinned
+		// without simulating a full spawn.
+		/** @scenario Policy-forced gateway routing for copilot names the seat bypass */
 		it("names the seat bypass for copilot and stays silent for other tools", async () => {
 			const { copilotSeatBypassSuffix } = await import("../wrapper-mode.js");
 			expect(copilotSeatBypassSuffix("copilot")).toContain("Copilot seat");

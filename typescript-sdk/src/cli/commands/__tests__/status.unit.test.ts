@@ -81,20 +81,21 @@ const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, 
   ...overrides,
 });
 
-/** The budgets endpoint can only see org/team/project scope, so status probes
- * virtual keys to decide whether the VK/principal blind spot has anything
- * behind it. A project with no keys has nothing hiding there. */
+/** The budgets endpoint returns every scope dimension with live spend plus
+ * the spend_available honesty flag; there is no VK/principal blind spot to
+ * probe for anymore. */
 const mockGatewayFetch = ({
   budgets = [] as unknown[],
-  virtualKeys = [] as unknown[],
-}: { budgets?: unknown[]; virtualKeys?: unknown[] } = {}) =>
+  spendAvailable = true,
+}: { budgets?: unknown[]; spendAvailable?: boolean } = {}) =>
   vi.fn().mockImplementation(async (input: unknown) => {
     const url = String(input);
     if (url.includes("/api/gateway/v1/budgets")) {
-      return { ok: true, status: 200, json: async () => ({ data: budgets }) };
-    }
-    if (url.includes("/api/gateway/v1/virtual-keys")) {
-      return { ok: true, status: 200, json: async () => ({ data: virtualKeys }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: budgets, spend_available: spendAvailable }),
+      };
     }
     return { ok: true, status: 200, json: async () => [{ id: "1" }] };
   }) as unknown as typeof fetch;
@@ -623,74 +624,65 @@ describe("statusCommand", () => {
       });
     });
 
-    describe("when the project has virtual keys the budgets endpoint cannot cover", () => {
-      it("declares the scope uncovered as a note without withholding the all-clear", async () => {
+    describe("when budgets live on the once-invisible scope dimensions", () => {
+      it("scores a virtual-key-scoped budget like any other", async () => {
         mockAllSuccess();
-        // GET /budgets returns org/team/project scope only, on every project
-        // forever — a standing limit of the API, not a check that failed. It is
-        // told to the user, but a healthy project still reads as healthy.
-        global.fetch = mockGatewayFetch({ virtualKeys: [{ id: "vk_1" }] });
+        // Before #6261 the REST list hid VIRTUAL_KEY/PRINCIPAL scopes, so a
+        // VK budget at 92% BLOCK was structurally invisible here. Now it is
+        // a row like any other and must gate the tick.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({ scope_type: "VIRTUAL_KEY", scope_id: "vk_1" }),
+          ],
+        });
 
         await statusCommand();
 
         const out = consoleLogSpy.mock.calls.flat().join("\n");
-        expect(out).toContain("virtual-key and principal budgets were not checked");
-        expect(out).toContain("(note — gateway budgets:");
-        expect(out).not.toContain("could not check gateway budgets");
-        expect(out).toContain("nothing needs your attention");
+        expect(out).toContain('budget "prod"');
+        expect(out).toContain("at 92%");
+        expect(out).not.toContain("nothing needs your attention");
       });
 
-      it("reports the key count from pagination rather than the page-1 length", async () => {
+      it("compares group spend against the per-member allowance times members", async () => {
         mockAllSuccess();
-        global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
-          const url = String(input);
-          if (url.includes("/api/gateway/v1/budgets")) {
-            return { ok: true, status: 200, json: async () => ({ data: [] }) };
-          }
-          if (url.includes("/api/gateway/v1/virtual-keys")) {
-            // 300 keys behind pagination — page 1 carries 3 of them.
-            return {
-              ok: true,
-              status: 200,
-              json: async () => ({
-                data: [{ id: "vk_1" }, { id: "vk_2" }, { id: "vk_3" }],
-                pagination: { totalHits: 300 },
-              }),
-            };
-          }
-          return { ok: true, status: 200, json: async () => [{ id: "1" }] };
-        }) as unknown as typeof fetch;
+        // GROUP rows: limit_usd is per member, spent_usd sums the group.
+        // $10/member x 2 members with $19 spent is 95%, not 190%.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              scope_type: "GROUP",
+              scope_id: "grp_1",
+              limit_usd: "10",
+              spent_usd: "19",
+              member_count: 2,
+            }),
+          ],
+        });
 
         await statusCommand();
 
         const out = consoleLogSpy.mock.calls.flat().join("\n");
-        expect(out).toContain("300 virtual keys");
-        expect(out).not.toContain("3 virtual keys");
+        expect(out).toContain('budget "prod"');
+        expect(out).toContain("at 95%");
+        expect(out).not.toContain("nothing needs your attention");
       });
 
-      it("keeps a failed virtual-keys probe an error that withholds the all-clear", async () => {
+      it("withholds utilization when the server could not total spend", async () => {
         mockAllSuccess();
-        const baseFetch = global.fetch;
-        global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
-          const url = String(input);
-          if (url.includes("/api/gateway/v1/virtual-keys")) {
-            // A probe that 403s is a check that did NOT run — unlike the
-            // structural blind spot, this one must still gate the tick.
-            return {
-              ok: false,
-              status: 403,
-              statusText: "Forbidden",
-              json: async () => ({ error: "Forbidden" }),
-            };
-          }
-          return baseFetch(input as Parameters<typeof fetch>[0]);
-        }) as unknown as typeof fetch;
+        // spend_available: false means spent_usd is NOT real spend — a
+        // healthy-looking 0% would be a lie, so the scan reports itself
+        // incomplete and withholds the tick.
+        global.fetch = mockGatewayFetch({
+          budgets: [budgetFixture({ spent_usd: "0" })],
+          spendAvailable: false,
+        });
 
         await statusCommand();
 
         const out = consoleLogSpy.mock.calls.flat().join("\n");
         expect(out).toContain("could not check gateway budgets");
-        expect(out).toContain("could not list virtual keys");
+        expect(out).toContain("spend could not be totalled");
         expect(out).not.toContain("nothing needs your attention");
       });
     });

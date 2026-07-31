@@ -68,9 +68,13 @@ const secured = createServiceApp({ basePath: "/api" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
-    ),
+    handlerManagedAuth({
+      reason:
+        "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
+      // Operator secret, not an RBAC permission.
+      permissions: [],
+      credential: "internal",
+    }),
   )
   .post("/ops/clickhouse/explain", async (c) => {
     const expected = process.env.LANGWATCH_OPS_API_KEY;
