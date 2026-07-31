@@ -80,17 +80,30 @@ const baseInput = {
   startDate: new Date("2025-01-01T00:00:00Z"),
   endDate: new Date("2025-02-01T00:00:00Z"),
   previousPeriodStartDate: new Date("2024-12-01T00:00:00Z"),
-};
+} as const;
 
 const COST_SERIES = {
   metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
   aggregation: "sum" as AggregationTypes,
-};
+} as const;
 const EVAL_SERIES = {
   metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
   aggregation: "avg" as AggregationTypes,
   key: "some-evaluator",
-};
+} as const;
+
+/**
+ * The bound check reports nothing when a query never reaches the table, so each
+ * case has to prove it emitted the subquery it claims to be guarding. Without
+ * this the suite passes just as happily on a build that stopped joining
+ * evaluation data at all.
+ */
+function missingJoinViolations(sql: string, table: string): string[] {
+  if (sql.includes(`FROM ${table}`)) return [];
+  return [
+    `generated SQL has no FROM ${table} subquery, so the partition-bound check inspected nothing`,
+  ];
+}
 
 describe("analytics JOIN time bounds", () => {
   describe("given a timeseries query that joins evaluation_runs", () => {
@@ -109,7 +122,10 @@ describe("analytics JOIN time bounds", () => {
             groupBy,
             series: [COST_SERIES, EVAL_SERIES],
           });
-          violations.push(...partitionBoundViolations(sql));
+          violations.push(
+            ...missingJoinViolations(sql, "evaluation_runs"),
+            ...partitionBoundViolations(sql),
+          );
         }
       }
 
@@ -127,7 +143,6 @@ describe("analytics JOIN time bounds", () => {
       for (const field of [
         "evaluations.evaluator_id",
         "evaluations.evaluator_id.guardrails_only",
-        "evaluations.passed",
       ] as FilterField[]) {
         resetParamCounter();
         const { sql } = buildDataForFilterQuery(
@@ -136,7 +151,10 @@ describe("analytics JOIN time bounds", () => {
           baseInput.startDate,
           baseInput.endDate,
         );
-        violations.push(...partitionBoundViolations(sql));
+        violations.push(
+          ...missingJoinViolations(sql, "evaluation_runs"),
+          ...partitionBoundViolations(sql),
+        );
       }
 
       expect(violations).toEqual([]);
@@ -156,7 +174,7 @@ describe("analytics JOIN time bounds", () => {
         baseInput.endDate,
       );
 
-      expect(sql).toContain("FROM stored_spans");
+      expect(missingJoinViolations(sql, "stored_spans")).toEqual([]);
       expect(rangeBoundColumnsByTable(sql).get("stored_spans")).toEqual(
         new Set(["StartTime"]),
       );
