@@ -16,6 +16,14 @@ vi.mock("~/components/WithPermissionGuard", () => ({
   withPermissionGuard: () => (component: unknown) => component,
 }));
 
+// Passthrough with a marker: the page must render INSIDE the gateway layout
+// on the happy path, not only hand it to the guard's denied fallback.
+vi.mock("~/components/gateway/AiGatewayLayout", () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="ai-gateway-layout">{children}</div>
+  ),
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org_1" },
@@ -88,6 +96,7 @@ describe("BillingEventsPage", () => {
   /** @scenario Ledger rows show token classes, cost, provider, and link to the trace */
   it("renders one ledger row with tokens, cost, provider, and the trace link", () => {
     renderPage();
+    expect(screen.getByTestId("ai-gateway-layout")).toBeInTheDocument();
     const table = screen.getByTestId("billing-events-table");
     expect(table).toHaveTextContent("Customer A key");
     expect(table).toHaveTextContent("enduser-9");

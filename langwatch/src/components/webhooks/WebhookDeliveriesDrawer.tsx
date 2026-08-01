@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -174,11 +174,13 @@ function DeliveryRow({ delivery }: { delivery: DeliveryView }) {
 
 /** The attempt log for the loaded pages, with Load more while a cursor is left. */
 function DeliveriesTable({
-  deliveries,
+  rows,
+  hasMore,
   isFetching,
   onLoadMore,
 }: {
-  deliveries: DeliveriesPage;
+  rows: DeliveryView[];
+  hasMore: boolean;
   isFetching: boolean;
   onLoadMore: () => void;
 }) {
@@ -197,12 +199,12 @@ function DeliveriesTable({
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {deliveries.deliveries.map((d) => (
+          {rows.map((d) => (
             <DeliveryRow key={d.id} delivery={d} />
           ))}
         </Table.Body>
       </Table.Root>
-      {deliveries.nextCursor && (
+      {hasMore && (
         <Button
           size="xs"
           variant="outline"
@@ -229,8 +231,16 @@ function useDeliveriesDrawerData(
   const [cursor, setCursor] = useState<
     { firedAt: Date; id: string } | undefined
   >(undefined);
+  // Loaded pages accumulate in load order, keyed by the cursor that fetched
+  // each, so Load more APPENDS below what the reader already scanned and a
+  // background refetch of the current page replaces its own slot instead of
+  // duplicating it. A fresh endpoint starts the accumulation over.
+  const [pages, setPages] = useState<
+    Array<{ key: string; rows: DeliveryView[] }>
+  >([]);
   useEffect(() => {
     setCursor(undefined);
+    setPages([]);
   }, [endpoint?.id]);
   const deliveries = api.webhookEndpoints.deliveries.useQuery(
     {
@@ -239,7 +249,31 @@ function useDeliveriesDrawerData(
       limit: DELIVERIES_PAGE_SIZE,
       cursor,
     },
-    { enabled: endpoint !== null },
+    { enabled: endpoint !== null, keepPreviousData: true },
+  );
+  const page = deliveries.data;
+  useEffect(() => {
+    if (!page) return;
+    const key = cursor
+      ? `${new Date(cursor.firedAt).toISOString()}:${cursor.id}`
+      : "first";
+    setPages((prev) => {
+      if (key === "first") return [{ key, rows: page.deliveries }];
+      const at = prev.findIndex((p) => p.key === key);
+      if (at >= 0) {
+        const next = [...prev];
+        next[at] = { key, rows: page.deliveries };
+        return next;
+      }
+      return [...prev, { key, rows: page.deliveries }];
+    });
+  }, [page, cursor]);
+  const rows = useMemo(
+    () =>
+      pages.length > 0
+        ? pages.flatMap((p) => p.rows)
+        : (page?.deliveries ?? []),
+    [pages, page],
   );
   const health = api.webhookEndpoints.health.useQuery(
     {
@@ -252,6 +286,8 @@ function useDeliveriesDrawerData(
   return {
     deliveries,
     health,
+    rows,
+    hasMore: page?.nextCursor != null,
     isFirstPage: cursor === undefined,
     loadMore: () => setCursor(deliveries.data?.nextCursor ?? undefined),
   };
@@ -273,10 +309,8 @@ export function WebhookDeliveriesDrawer({
   endpoint: EndpointView | null;
   onClose: () => void;
 }) {
-  const { deliveries, health, isFirstPage, loadMore } = useDeliveriesDrawerData(
-    organizationId,
-    endpoint,
-  );
+  const { deliveries, health, rows, hasMore, isFirstPage, loadMore } =
+    useDeliveriesDrawerData(organizationId, endpoint);
 
   return (
     <Drawer.Root
@@ -299,16 +333,15 @@ export function WebhookDeliveriesDrawer({
             )}
 
             {deliveries.isLoading && <Spinner size="sm" />}
-            {deliveries.data &&
-              deliveries.data.deliveries.length === 0 &&
-              isFirstPage && (
-                <Text fontSize="sm" color="fg.muted">
-                  No deliveries recorded in the last 30 days.
-                </Text>
-              )}
-            {deliveries.data && deliveries.data.deliveries.length > 0 && (
+            {deliveries.data && rows.length === 0 && isFirstPage && (
+              <Text fontSize="sm" color="fg.muted">
+                No deliveries recorded in the last 30 days.
+              </Text>
+            )}
+            {rows.length > 0 && (
               <DeliveriesTable
-                deliveries={deliveries.data}
+                rows={rows}
+                hasMore={hasMore}
                 isFetching={deliveries.isFetching}
                 onLoadMore={loadMore}
               />

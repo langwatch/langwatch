@@ -416,47 +416,49 @@ function BillingEventsPage() {
   const ledger = useBillingEventsLedger(project?.id ?? "");
 
   return (
-    <VStack gap={6} width="full" align="start" paddingY={6} paddingX={6}>
-      <HStack width="full" justify="space-between" flexWrap="wrap" gap={3}>
-        <Heading size="lg">Billing Events</Heading>
-        <PresetRangeButtons days={ledger.days} onSelect={ledger.setDays} />
-      </HStack>
+    <AiGatewayLayout>
+      <VStack gap={6} width="full" align="start" paddingY={6} paddingX={6}>
+        <HStack width="full" justify="space-between" flexWrap="wrap" gap={3}>
+          <Heading size="lg">Billing Events</Heading>
+          <PresetRangeButtons days={ledger.days} onSelect={ledger.setDays} />
+        </HStack>
 
-      <BillingEventFilters ledger={ledger} />
+        <BillingEventFilters ledger={ledger} />
 
-      {ledger.query.isLoading && <Spinner size="sm" />}
+        {ledger.query.isLoading && <Spinner size="sm" />}
 
-      {ledger.query.data?.clickHouseDisabled && (
-        <Text fontSize="sm" color="fg.muted">
-          Billing events need ClickHouse, which is not enabled on this
-          deployment.
-        </Text>
-      )}
+        {ledger.query.data?.clickHouseDisabled && (
+          <Text fontSize="sm" color="fg.muted">
+            Billing events need ClickHouse, which is not enabled on this
+            deployment.
+          </Text>
+        )}
 
-      {!ledger.query.isLoading &&
-        ledger.rows.length === 0 &&
-        !ledger.query.data?.clickHouseDisabled && <NoBillingEventsState />}
+        {!ledger.query.isLoading &&
+          ledger.rows.length === 0 &&
+          !ledger.query.data?.clickHouseDisabled && <NoBillingEventsState />}
 
-      {ledger.rows.length > 0 && (
-        <BillingEventsTable
-          rows={ledger.rows}
-          names={ledger.names}
-          projectSlug={project?.slug}
-        />
-      )}
+        {ledger.rows.length > 0 && (
+          <BillingEventsTable
+            rows={ledger.rows}
+            names={ledger.names}
+            projectSlug={project?.slug}
+          />
+        )}
 
-      {ledger.hasMore && (
-        <Button
-          size="sm"
-          variant="outline"
-          loading={ledger.query.isFetching}
-          onClick={ledger.loadMore}
-          data-testid="billing-events-load-more"
-        >
-          Load more
-        </Button>
-      )}
-    </VStack>
+        {ledger.hasMore && (
+          <Button
+            size="sm"
+            variant="outline"
+            loading={ledger.query.isFetching}
+            onClick={ledger.loadMore}
+            data-testid="billing-events-load-more"
+          >
+            Load more
+          </Button>
+        )}
+      </VStack>
+    </AiGatewayLayout>
   );
 }
 

@@ -101,6 +101,42 @@ describe("WebhookDeliveriesDrawer", () => {
     expect(lastCall).toMatchObject({ cursor });
   });
 
+  /** @scenario Load more appends the next page below the loaded rows */
+  it("appends the second page instead of replacing the first", async () => {
+    const cursor = { firedAt: new Date("2026-07-31T11:59:00.000Z"), id: "b" };
+    const row = (id: string, latencyMs: number) => ({
+      ...delivery(id),
+      latencyMs,
+    });
+    // Resolve per call by the cursor argument, so every render of a phase
+    // sees that phase's page. The two results are prebuilt so their identity
+    // is stable across renders, as react-query's are.
+    const pageOne = {
+      data: { deliveries: [row("a", 101), row("b", 102)], nextCursor: cursor },
+      isLoading: false,
+      isFetching: false,
+    };
+    const pageTwo = {
+      data: { deliveries: [row("c", 103), row("d", 104)], nextCursor: null },
+      isLoading: false,
+      isFetching: false,
+    };
+    useQuery.mockImplementation((input: { cursor?: unknown }) =>
+      input.cursor ? pageTwo : pageOne,
+    );
+    renderDrawer();
+    expect(screen.getByText("101ms")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("webhook-deliveries-load-more"));
+
+    for (const latency of ["101ms", "102ms", "103ms", "104ms"]) {
+      expect(screen.getByText(latency)).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByTestId("webhook-deliveries-load-more"),
+    ).not.toBeInTheDocument();
+  });
+
   /** @scenario No Load more when the page is the last */
   it("hides Load more when there is no next cursor", () => {
     useQuery.mockReturnValue({

@@ -3009,7 +3009,7 @@ Requires `gatewaySpend:manage`. The endpoint must be an active endpoint of your 
 
 ## The ledger UI
 
-**Settings > Gateway > Billing events** (`/settings/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, provider, status, and date range, with token classes and cost per row and drill-through to the trace. The delivery-health strip sits alongside, so an operator sees both what was metered and whether it reached the consumer. It is the screen to keep open during an integration bring-up: if the numbers here match your ledger, the pipeline works.
+**Settings > Gateway > Billing events** (`/settings/gateway/billing-events`) renders the spend ledger: cursor-paged, filterable by virtual key, end user, model, status, and date range, with token classes and cost per row and drill-through to the trace. Delivery health lives one screen over, on each endpoint's deliveries view under **Settings > Webhooks**, so the pair to keep open during an integration bring-up is this ledger beside your endpoint's health strip: if the numbers here match your ledger and the lag there stays near zero, the pipeline works.
 
 ## Operational notes
 
