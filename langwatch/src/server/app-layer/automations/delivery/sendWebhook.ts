@@ -118,7 +118,7 @@ function buildWebhookHeaders({
   testFire: boolean;
 }): Record<string, string> {
   // An unresolved kept sentinel means "the saved value" and should have been
-  // resolved by the caller (save / test-fire / decrypt-at-dispatch) — never
+  // resolved by the caller (save / test-fire / decrypt-at-dispatch); never
   // send the literal marker to the customer's endpoint.
   const resolvedHeaders = Object.fromEntries(
     Object.entries(headers).filter(
