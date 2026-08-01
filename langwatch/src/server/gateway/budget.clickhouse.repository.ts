@@ -37,9 +37,14 @@ const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
 /**
  * How far back the budget detail page's recent-activity panel looks. Wide
- * enough to cover any budget window the product offers (the longest is a
- * month) plus the previous few periods, narrow enough that the read prunes
- * to a handful of `toYYYYMM(OccurredAt)` partitions.
+ * enough to cover several periods of the longest recurring window the
+ * product offers, a month, and narrow enough that the read prunes to a
+ * handful of `toYYYYMM(OccurredAt)` partitions.
+ *
+ * A TOTAL-window budget never resets, so its history can run past this
+ * bound. The panel still shows only the last 90 days for it: it answers
+ * "what has been happening lately", not "everything this budget ever
+ * spent", which is what the totals on the same page are for.
  */
 const RECENT_EVENTS_LOOKBACK_DAYS = 90;
 
@@ -426,23 +431,22 @@ export class GatewayBudgetClickHouseRepository {
    * emitted a matching trace, so reading a single tenant would render
    * "No usage yet" on a budget that is actively debiting.
    *
-   * Bounded by `lookbackDays` on `OccurredAt`, the table's partition key:
-   * without it ClickHouse opens every monthly partition the budget has
-   * ever written to before it can sort and take the top rows. The panel
-   * asks for recent activity, so the window is part of the question, not
-   * a shortcut.
+   * Bounded by {@link RECENT_EVENTS_LOOKBACK_DAYS} on `OccurredAt`, the
+   * table's partition key: without it ClickHouse opens every monthly
+   * partition the budget has ever written to before it can sort and take
+   * the top rows. The panel asks for recent activity, so the window is
+   * part of the question, not a shortcut.
    */
   async recentEventsForBudget(
     tenantIds: string[],
     budgetId: string,
     limit = 20,
-    lookbackDays = RECENT_EVENTS_LOOKBACK_DAYS,
   ): Promise<LedgerEventRow[]> {
     if (tenantIds.length === 0) return [];
     const params: Record<string, string | number> = {
       budgetId,
       limit,
-      since: Date.now() - lookbackDays * 24 * 60 * 60 * 1000,
+      since: Date.now() - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
     };
     const tenantPlaceholders = tenantIds
       .map((id, i) => {

@@ -32,7 +32,7 @@ export type PersonalBudgetOverview = {
    * `budgets` only means "no budget binds you" once this is true; until
    * then a surface must not say so.
    */
-  resolved: boolean;
+  isResolved: boolean;
 };
 
 export type PersonalApiKeyRow = {
@@ -187,16 +187,16 @@ export function usePersonalContext(): PersonalContext {
 
   // While the read is in flight or after it failed, gatewayAccess true +
   // empty budgets keeps every budget surface blank rather than flashing a
-  // "no access" state. `resolved` is what separates that from a member
+  // "no access" state. `isResolved` is what separates that from a member
   // who genuinely has no budget, so the empty-state copy cannot claim
   // "no budgets apply" about a request that never came back.
   const budgetOverview = useMemo<PersonalBudgetOverview>(() => {
     const raw = budgetOverviewQuery.data;
-    if (!raw) return { gatewayAccess: true, budgets: [], resolved: false };
+    if (!raw) return { gatewayAccess: true, budgets: [], isResolved: false };
     return {
       gatewayAccess: raw.gatewayAccess,
       budgets: raw.gatewayAccess ? raw.budgets : [],
-      resolved: true,
+      isResolved: true,
     };
   }, [budgetOverviewQuery.data]);
 

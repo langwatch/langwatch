@@ -357,7 +357,7 @@ function MySettingsPage() {
           <SectionCard title="Budgets that apply to you">
             {ctx.budgetOverview.budgets.length > 0 ? (
               <BudgetOverviewList items={ctx.budgetOverview.budgets} />
-            ) : ctx.budgetOverview.resolved ? (
+            ) : ctx.budgetOverview.isResolved ? (
               <VStack align="start" gap={1}>
                 <Text fontSize="sm" color="fg.muted">
                   No budgets apply to your usage yet.

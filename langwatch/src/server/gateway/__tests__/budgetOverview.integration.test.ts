@@ -372,8 +372,8 @@ describe("budget overview (real PG + CH + Redis)", () => {
     // The device-session record the CLI's bearer token resolves through,
     // so any test here can call the REST endpoint the CLI calls.
     const { connection: redis } = await import("~/server/redis");
-    expect(redis).toBeTruthy();
-    await redis!.set(
+    if (!redis) throw new Error("these tests need a real Redis connection");
+    await redis.set(
       `lwcli:access:${ACCESS_TOKEN}`,
       JSON.stringify({
         user_id: USER_ID,
