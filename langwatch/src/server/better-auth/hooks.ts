@@ -142,7 +142,10 @@ export const afterUserCreate = async ({
   // added to the org".
   const ssoAllowed = await platformSSOAllowed();
   if (!ssoAllowed) {
-    logger.info(
+    // warn, matching the gate's own denial-resolution level in sso-gate.ts:
+    // both lines have the same root cause, so an operator grepping warn for
+    // "why is federation not happening" must not find only half of it.
+    logger.warn(
       { domain },
       "Skipped ssoDomain auto-join: platform SSO gate denies (no genuine license)",
     );

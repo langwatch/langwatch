@@ -91,10 +91,33 @@ export const isPasswordResetPath = (pathname: string): boolean =>
  * rewrite (`redirectURI` pinned in index.ts), so a path-prefix middleware on
  * `/oauth2/*` alone would miss it entirely.
  */
+/**
+ * True for the only paths whose outcome the license gate can change: the
+ * password-reset pair and the email-auth pair (refused while the gate allows)
+ * and the SSO-initiation/callback set (refused while it denies).
+ *
+ * Everything else better-auth mounts, session reads and sign-out most of all,
+ * returns from the hook unchanged in both gate states. Asking first would make
+ * those requests wait on a licensing-store read that cannot affect them, so
+ * a store that is merely slow would stall signed-in users.
+ */
+export const isGateDependentPath = (url: string): boolean => {
+  const pathname = normalizedRequestPathname(url);
+  return (
+    isPasswordResetPath(pathname) ||
+    isEmailAuthPath(pathname) ||
+    isGatedSsoPath(url)
+  );
+};
+
 export const isGatedSsoPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);
   if (endsWithAny(pathname, GATED_SSO_INITIATION_SUFFIXES)) {
     return true;
   }
-  return requestPathname(url).includes("/callback/");
+  // Normalized, so a callback segment only counts when a provider segment
+  // follows it. `/delete-user/callback/` is a local account route that ends
+  // in the word, and matching it here would refuse account deletion on an
+  // unlicensed deployment.
+  return pathname.includes("/callback/");
 };

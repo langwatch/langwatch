@@ -144,6 +144,32 @@ Feature: License-Gated SSO
     Then their existing session continues to work
     And only new sign-in attempts are subject to the gate
 
+  @unit
+  Scenario: A slow licensing store does not hold up signed-in users
+    Given a self-hosted deployment configured with an enterprise IdP
+    And the licensing store is answering slowly rather than failing
+    When a signed-in user's browser reads their session or signs them out
+    Then the request completes without waiting on the licensing store
+
+  @unit
+  Scenario: A licensing store that never answers stops being waited on
+    Given a self-hosted deployment configured with an enterprise IdP
+    And the licensing store accepts the query but never answers
+    When a user tries to sign in through the identity provider
+    Then the attempt is refused rather than left hanging
+    And the deployment retries the store on the next attempt
+
+  # ============================================================================
+  # Upgrade safety
+  # ============================================================================
+
+  @unit
+  Scenario: A new federating route cannot appear without being classified
+    Given the sign-in library mounts a set of routes
+    When an upgrade adds, renames or removes one of them
+    Then the deployment refuses to build until that route is classified
+    And routes that start or continue an identity-provider login are refused while unlicensed
+
   # ============================================================================
   # SaaS and multi-org
   # ============================================================================

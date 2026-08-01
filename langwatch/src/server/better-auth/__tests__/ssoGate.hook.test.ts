@@ -251,5 +251,28 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
         ).resolves.toBeUndefined();
       }
     });
+
+    /** @scenario A slow licensing store does not hold up signed-in users */
+    it("answers session traffic without consulting the gate at all", async () => {
+      // A gate that never settles: if the hook awaited it, these would hang
+      // rather than resolve, which is precisely the availability failure a
+      // mocked-resolved gate can never surface.
+      vi.mocked(platformSSOAllowed).mockReturnValue(new Promise(() => {}));
+
+      for (const path of [
+        "/get-session",
+        "/sign-out",
+        "/list-sessions",
+        "/revoke-session",
+        "/update-user",
+        "/list-accounts",
+      ]) {
+        await expect(
+          runBeforeHook(ctxFor(`https://host/api/auth${path}`)),
+        ).resolves.toBeUndefined();
+      }
+
+      expect(platformSSOAllowed).not.toHaveBeenCalled();
+    });
   });
 });

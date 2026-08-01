@@ -55242,7 +55242,18 @@ Prefer configuration over a UI step? Set the key as an environment variable inst
 LANGWATCH_LICENSE_KEY=<your signed license key>
 ```
 
-This is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+On Helm, the chart takes it inline or from a Secret you already manage:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
 <Step title="Restart the deployment">

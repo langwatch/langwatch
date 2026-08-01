@@ -152,13 +152,48 @@ async function anyOrgHasSignedLicense(): Promise<boolean> {
 }
 
 /**
+ * Ceiling on the licensing-store scan. A store that is slow rather than
+ * broken would otherwise hold the first SSO request open indefinitely, since
+ * nothing downstream of the gate imposes a deadline of its own. Timing out
+ * lands on the same "deny for now, retry on the next request" path a hard DB
+ * error already takes, so a store that recovers self-heals without a restart.
+ */
+const GATE_EVALUATION_TIMEOUT_MS = 5_000;
+
+class SsoGateTimeoutError extends Error {
+  constructor() {
+    super(
+      `SSO gate evaluation exceeded ${GATE_EVALUATION_TIMEOUT_MS}ms; treating the licensing store as unreachable`,
+    );
+    this.name = "SsoGateTimeoutError";
+  }
+}
+
+/**
  * Composes the DB/env-dependent half of the gate (everything except the
  * `IS_SAAS` short-circuit, which must never touch the DB at all —
  * MINOR-4 / the "IS_SAAS never touches DB" invariant).
  */
 async function computeGate(): Promise<boolean> {
   if (hasSignedInstanceLicense(env.LANGWATCH_LICENSE_KEY)) return true;
-  return anyOrgHasSignedLicense();
+
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      anyOrgHasSignedLicense(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new SsoGateTimeoutError()),
+          GATE_EVALUATION_TIMEOUT_MS,
+        );
+        // The losing leg of a Promise.race keeps running; without unref a
+        // pending timer would hold the event loop open past the answer.
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**

@@ -24,6 +24,7 @@ import { revokeAllSessionsForUser } from "./revokeSessions";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
+  isGateDependentPath,
   isGatedSsoPath,
   isPasswordResetPath,
   normalizedRequestPathname,
@@ -705,6 +706,10 @@ export const auth = betterAuth({
       }
 
       const isResetPath = isPasswordResetPath(pathname);
+
+      // Nothing below this line can change the answer for the rest of the
+      // route table, so it never waits on the gate (see `isGateDependentPath`).
+      if (!isGateDependentPath(url)) return;
 
       if (await platformSSOAllowed()) {
         // Gate ALLOW (site #3): refuse the routes that would otherwise mint a

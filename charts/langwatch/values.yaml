@@ -397,6 +397,31 @@ app:
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
           secretKeyRef: { name: "", key: "" }
 
+  # Enterprise license, applied to the whole instance.
+  #
+  # Leave empty to run the open source edition: unlimited people, projects,
+  # teams and history, with no license needed. A license adds the enterprise
+  # security surface (SSO, SCIM provisioning, audit logs) and support.
+  # See https://docs.langwatch.ai/self-hosting/licensing
+  #
+  # The alternative to setting it here is activating the same key per
+  # organization in Settings > License, which suits a single-tenant install
+  # but has to be repeated for every organization the instance hosts.
+  ## @extra app.license Enterprise license configuration.
+  ## @param app.license.key.value [string] License key issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
+  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
+  license:
+    key:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+    # Overrides the built-in verification key. Almost no deployment sets
+    # this: it is for installs whose licenses are signed by their own chain.
+    publicKey:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl

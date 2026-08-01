@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
+  isGateDependentPath,
   isGatedSsoPath,
   isPasswordResetPath,
   normalizedRequestPathname,
@@ -117,6 +118,57 @@ describe("ssoPathGate (ADR-027 pure path predicates)", () => {
         expect(isGatedSsoPath(`${host}/oauth2/authorize`)).toBe(false);
         expect(isGatedSsoPath(`${host}/get-session`)).toBe(false);
         expect(isGatedSsoPath(`${host}/sign-in/email`)).toBe(false);
+      });
+    });
+
+    describe("given an account route that merely ends in the word callback", () => {
+      it("does not match, with or without a trailing slash", () => {
+        expect(isGatedSsoPath(`${host}/delete-user/callback`)).toBe(false);
+        expect(isGatedSsoPath(`${host}/delete-user/callback/?token=x`)).toBe(
+          false,
+        );
+      });
+    });
+  });
+
+  describe("isGateDependentPath", () => {
+    describe("given a route the gate can refuse in one state or the other", () => {
+      it("matches the reset pair, the email-auth pair and the SSO set", () => {
+        for (const path of [
+          "/request-password-reset",
+          "/reset-password",
+          "/sign-in/email",
+          "/sign-up/email",
+          "/sign-in/social",
+          "/sign-in/oauth2",
+          "/link-social",
+          "/oauth2/link",
+          "/callback/auth0?code=abc",
+          "/oauth2/callback/okta?code=abc",
+        ]) {
+          expect(isGateDependentPath(`${host}${path}`)).toBe(true);
+        }
+      });
+    });
+
+    describe("given session, account or health traffic", () => {
+      it("does not match, so those never wait on the licensing store", () => {
+        for (const path of [
+          "/get-session",
+          "/sign-out",
+          "/list-sessions",
+          "/revoke-session",
+          "/revoke-sessions",
+          "/revoke-other-sessions",
+          "/update-user",
+          "/list-accounts",
+          "/account-info",
+          "/delete-user",
+          "/delete-user/callback",
+          "/ok",
+        ]) {
+          expect(isGateDependentPath(`${host}${path}`)).toBe(false);
+        }
       });
     });
   });

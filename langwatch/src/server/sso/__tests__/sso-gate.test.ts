@@ -227,6 +227,34 @@ describe("platformSSOAllowed", () => {
     });
   });
 
+  describe("given the licensing store accepts the query but never answers", () => {
+    /** @scenario A licensing store that never answers stops being waited on */
+    it("gives up on a deadline and retries on the next attempt rather than hanging", async () => {
+      vi.useFakeTimers();
+      try {
+        const findOrganizationsWithLicense = vi
+          .fn()
+          .mockReturnValueOnce(new Promise(() => {}))
+          .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }]);
+        __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
+        vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
+        vi.mocked(verifySignature).mockReturnValue(true);
+        vi.mocked(isExpired).mockReturnValue(false);
+
+        const firstAttempt = platformSSOAllowed();
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        // A timeout takes the same path a hard store error does: deny now,
+        // do not memoize, so a store that comes back needs no restart.
+        expect(await firstAttempt).toBe(false);
+        expect(await platformSSOAllowed()).toBe(true);
+        expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("given two concurrent first-requests before the first resolution", () => {
     /** @scenario Self-hosted with a genuine org license keeps SSO working with zero action */
     it("shares one in-flight promise: reads the store once and both converge (MINOR-5)", async () => {
