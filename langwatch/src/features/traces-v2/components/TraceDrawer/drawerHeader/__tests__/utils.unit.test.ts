@@ -7,54 +7,68 @@
 import { describe, expect, it } from "vitest";
 import { readNumberAttribute } from "../utils";
 
+const RESERVED_SUM = "langwatch.reserved.cache_read_tokens";
+const RAW_PER_SPAN = "gen_ai.usage.cache_read.input_tokens";
+
 describe("readNumberAttribute", () => {
-  describe("given the trace carries the key", () => {
-    it("parses the stringified number the fold wrote", () => {
-      expect(
-        readNumberAttribute(
-          { "langwatch.reserved.context_size_tokens": "36297" },
-          "langwatch.reserved.context_size_tokens",
-        ),
-      ).toBe(36297);
+  describe("given the attribute map carries the key", () => {
+    describe("when one key is requested", () => {
+      it("parses the stringified number the fold wrote", () => {
+        expect(
+          readNumberAttribute(
+            { "langwatch.reserved.context_size_tokens": "36297" },
+            "langwatch.reserved.context_size_tokens",
+          ),
+        ).toBe(36297);
+      });
     });
   });
 
-  describe("given several keys are offered", () => {
-    it("takes the first one present, so a reserved sum beats the raw per-span key", () => {
-      expect(
-        readNumberAttribute(
-          { "gen_ai.usage.cache_read.input_tokens": "10" },
-          "langwatch.reserved.cache_read_tokens",
-          "gen_ai.usage.cache_read.input_tokens",
-        ),
-      ).toBe(10);
+  describe("given a reserved sum and a raw per-span key are both offered", () => {
+    describe("when only the raw key is present", () => {
+      it("falls through to it, so a trace folded before the sum landed still reads", () => {
+        expect(
+          readNumberAttribute(
+            { [RAW_PER_SPAN]: "10" },
+            RESERVED_SUM,
+            RAW_PER_SPAN,
+          ),
+        ).toBe(10);
+      });
     });
 
-    it("prefers the reserved sum when both are present", () => {
-      expect(
-        readNumberAttribute(
-          {
-            "langwatch.reserved.cache_read_tokens": "54740",
-            "gen_ai.usage.cache_read.input_tokens": "10",
-          },
-          "langwatch.reserved.cache_read_tokens",
-          "gen_ai.usage.cache_read.input_tokens",
-        ),
-      ).toBe(54740);
+    describe("when both are present", () => {
+      it("takes the reserved sum, since the raw key only carries one span's share", () => {
+        expect(
+          readNumberAttribute(
+            { [RESERVED_SUM]: "54740", [RAW_PER_SPAN]: "10" },
+            RESERVED_SUM,
+            RAW_PER_SPAN,
+          ),
+        ).toBe(54740);
+      });
+    });
+
+    describe("when the first key holds something that is not a number", () => {
+      it("keeps looking and takes the next key that parses", () => {
+        expect(
+          readNumberAttribute(
+            { [RESERVED_SUM]: "not-a-number", [RAW_PER_SPAN]: "7" },
+            RESERVED_SUM,
+            RAW_PER_SPAN,
+          ),
+        ).toBe(7);
+      });
     });
   });
 
-  describe("given the trace does not carry the key", () => {
-    it("returns null rather than zero, which a caller would render as a real reading", () => {
-      expect(
-        readNumberAttribute({}, "langwatch.reserved.context_size_tokens"),
-      ).toBeNull();
-    });
-
-    it("skips a value that is not a number and keeps looking", () => {
-      expect(readNumberAttribute({ a: "not-a-number", b: "7" }, "a", "b")).toBe(
-        7,
-      );
+  describe("given none of the requested keys are present", () => {
+    describe("when the value is read", () => {
+      it("returns null rather than zero, which a caller would render as a real reading", () => {
+        expect(
+          readNumberAttribute({}, "langwatch.reserved.context_size_tokens"),
+        ).toBeNull();
+      });
     });
   });
 });
