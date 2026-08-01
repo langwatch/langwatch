@@ -87,6 +87,13 @@ vi.mock("~/hooks/usePublicEnv", () => ({
   }),
 }));
 
+// The page also renders EnterpriseCapabilitiesSection, whose plan lookup would
+// otherwise reach for `api.limits` that this file's api mock does not carry.
+// That section has its own tests; here it only has to not throw.
+vi.mock("~/hooks/useActivePlan", () => ({
+  useActivePlan: () => ({ isEnterprise: false, isLoading: false }),
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { ssoProvider: null },
