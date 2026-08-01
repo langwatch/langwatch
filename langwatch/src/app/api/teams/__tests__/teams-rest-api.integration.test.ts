@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -79,10 +80,10 @@ async function deletePersonalWorkspaceColleague({
 }) {
   if (!colleagueUserId) return;
 
-  await prisma.organizationUser.deleteMany({
-    where: { organizationId, userId: colleagueUserId },
-  });
-  await prisma.user.deleteMany({ where: { id: colleagueUserId } });
+  await cleanupTestRows(prisma, [
+    ["organizationUser", { organizationId, userId: colleagueUserId }],
+    ["user", { id: colleagueUserId }],
+  ]);
 }
 
 describe("Feature: Teams REST API", () => {

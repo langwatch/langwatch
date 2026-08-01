@@ -57,6 +57,7 @@ import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -240,10 +241,12 @@ async function deleteFixture({
 }): Promise<void> {
   if (organizationId) {
     await deleteTeamOwnedRows(organizationId);
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { organizationId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+    ]);
   }
 
   const created = userIds.filter((id): id is string => !!id);

@@ -453,7 +453,7 @@ describe("given an organization with both personal and real workspaces", () => {
 
     afterAll(async () => {
       if (archivedTeamId) {
-        await prisma.team.deleteMany({ where: { id: archivedTeamId } });
+        await cleanupTestRows(prisma, [["team", { id: archivedTeamId }]]);
       }
     });
 
