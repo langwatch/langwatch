@@ -201,14 +201,11 @@ const ACCESS_DENIAL_CODES = new Set([
 /**
  * The codes that mean "your plan does not include any more of these".
  *
- * Both carry `{ limitType, current, max }`; they are two codes only because one
- * counts in Postgres and the other in ClickHouse, which is not a distinction
- * anybody reading a card should have to care about.
+ * Carries `{ limitType, current, max }`. A set rather than a single literal
+ * because the seat limits are the only capped resources left, and a second
+ * code would join here rather than fork the rendering.
  */
-const PLAN_LIMIT_CODES = new Set([
-  "resource_limit_exceeded",
-  "scenario_set_limit_exceeded",
-]);
+const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
 const normalizedCode = (domain: CliHandledError): string =>
   domain.code.trim().toLowerCase();

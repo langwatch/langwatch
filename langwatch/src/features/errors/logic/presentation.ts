@@ -616,10 +616,6 @@ const presentations = {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
   },
-  scenario_set_limit_exceeded: {
-    title: "You've hit the simulation set limit",
-    describe: () => "Delete an existing set, or upgrade your plan.",
-  },
   // ---- billing ----
   billing_customer_email_required: {
     title: "Add a billing email first",
