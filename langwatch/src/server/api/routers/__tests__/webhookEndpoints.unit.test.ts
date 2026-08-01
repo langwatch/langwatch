@@ -19,6 +19,15 @@ vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
+// Secret material at rest is AES-GCM under the deployment's
+// CREDENTIALS_SECRET. What the secret-once contract needs is that the
+// plaintext reaches create and rollSecret and no read path, so the cipher
+// stands in as an identity pair and the assertions hold anywhere.
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (value: string) => `encrypted:${value}`,
+  decrypt: (value: string) => value.replace(/^encrypted:/, ""),
+}));
+
 // Every checkOrganizationPermission call records its permission string and
 // denies the ones a test put into `denied`, so each procedure's scope
 // mapping is asserted against the real wiring, not a copy of it.
