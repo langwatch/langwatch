@@ -30,6 +30,9 @@ vi.mock("../../../auditLog", () => ({
 
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
   checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
+  // These cases are about the binding path; the legacy fallback grants
+  // nothing so the binding decision is the only one under test.
+  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
 }));
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {

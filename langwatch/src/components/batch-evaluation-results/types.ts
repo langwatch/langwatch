@@ -131,6 +131,24 @@ export type BatchComparisonVerdict = {
    * looked up (missing target / unresolved variant).
    */
   winnerOutput?: string | null;
+  /**
+   * Candidate ids the judge actually compared on THIS row (from the judge's
+   * own `inputs.candidates`), which can be a strict subset of the column's
+   * full `variants` — select_best_compare drops any candidate with no output
+   * for that row. Empty when the row's evaluation carried no candidate
+   * inputs (very old runs). Leaderboard aggregation must use this, not the
+   * column-wide variant list, or it fabricates matchups that never happened.
+   */
+  candidateIds?: string[];
+  /**
+   * True when `winnerId === null` because the judge's label failed to
+   * resolve to any known variant (a stale/unrecognized slot), as opposed to
+   * a genuine tie verdict. Both currently collapse to `winnerId: null` for
+   * every existing consumer (a bar chart doesn't need the distinction), but
+   * Bradley-Terry aggregation does: a real tie is 0.5/0.5 evidence, an
+   * unresolved label is no evidence and the row must be skipped entirely.
+   */
+  isUnresolved?: boolean;
 };
 
 /** One candidate participating in a comparison, in the order the judge saw them. */
@@ -155,6 +173,22 @@ export type BatchComparisonColumn = {
   variants: BatchComparisonVariant[];
   /** Per-row verdicts keyed by row index. Missing rows → no verdict. */
   verdictsByRow: Record<number, BatchComparisonVerdict>;
+  /**
+   * Rows the judge ran on and declined to call, rather than rows it never saw.
+   *
+   * Counted because the leading cause is now swap-and-reconcile: the judge is
+   * asked twice with the candidate order reversed, and a disagreement between
+   * the two is recorded as no verdict. That is the right call — a flip under
+   * order is not a tie — but the row's evidence leaves the win graph with it,
+   * and enough of them will fragment the graph into groups the fit is not
+   * entitled to rank across. Without this count the reader is told the run
+   * "does not have enough overlap to rank these" with the reason discarded.
+   *
+   * Optional so an absent count states nothing rather than asserting zero —
+   * `detectComparisonColumns` always sets it, but a column built any other
+   * way should make no claim about rows it never counted.
+   */
+  rowsWithoutVerdict?: number;
 };
 
 /**
@@ -489,7 +523,7 @@ export const transformBatchEvaluationData = (
  * exotic than that gets JSON-stringified so the cell still shows *something*
  * instead of "[object Object]".
  */
-const extractWinnerOutputText = (raw: unknown): string | null => {
+export const extractOutputText = (raw: unknown): string | null => {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "string") return raw;
   if (typeof raw !== "object") return String(raw);
@@ -612,11 +646,18 @@ const detectComparisonColumns = (
     );
   };
 
+  // Comparisons the judge ran and declined to call, per bucket key. Kept
+  // outside `buckets` because they are counted before a bucket exists — a run
+  // where EVERY row was declined has a count and no bucket at all.
+  const skippedByKey = new Map<string, number>();
+
   // Group by evaluator id + name so different comparison instances (same
   // evaluator type wired against different variant sets) stay separate.
   const buckets = new Map<
     string,
     {
+      /** The map key, carried so a column can find its own skipped count. */
+      key: string;
       evaluatorId: string;
       name: string;
       /** First-seen judge order of the candidates, from the judge's inputs. */
@@ -628,13 +669,25 @@ const detectComparisonColumns = (
         rowIndex: number;
         rawLabel: string;
         reasoning: string | null;
+        candidateIds: string[];
       }>;
     }
   >();
 
   for (const ev of evaluations) {
-    if (ev.status !== "processed") continue;
     const isForced = forcedComparisonEvaluatorIds.has(ev.evaluator);
+    if (ev.status !== "processed") {
+      // A comparison the judge RAN and declined to call. Recorded before the
+      // early return discards it, because it is the explanation for a graph
+      // that later fails to connect — see `rowsWithoutVerdict`.
+      if (ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced)) {
+        const skippedKey = ev.name
+          ? `${ev.evaluator}::${ev.name}`
+          : ev.evaluator;
+        skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
+      }
+      continue;
+    }
     const hasLabel = typeof ev.label === "string" && ev.label.length > 0;
     if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
 
@@ -657,6 +710,7 @@ const detectComparisonColumns = (
       // / winner column labeled "Comparison" instead of the raw `target_XYZ`
       // id when ev.name is null.
       bucket = {
+        key,
         evaluatorId: ev.evaluator,
         name: ev.name ?? targetNameById.get(ev.evaluator) ?? ev.evaluator,
         candidateIds: [],
@@ -669,10 +723,16 @@ const detectComparisonColumns = (
 
     // Snapshot the judge's own view of who it compared. Authoritative: it
     // names every candidate even when only one of them ever wins.
-    for (const id of readCandidateIds(
+    //
+    // Resolved fresh per row (not just merged into the column-wide
+    // `bucket.candidateIds` union below) — select_best_compare drops any
+    // candidate with no output for a given row, so row 7 may have compared
+    // only 2 of the column's 3 variants while row 8 compared all 3. Only the
+    // per-row set is truthful evidence for leaderboard aggregation.
+    const rowCandidateIds = readCandidateIds(
       (ev.inputs ?? {}) as Record<string, unknown>,
-    )) {
-      const resolved = resolveToTargetId(id) ?? id;
+    ).map((id) => resolveToTargetId(id) ?? id);
+    for (const resolved of rowCandidateIds) {
       if (!bucket.candidateIds.includes(resolved)) {
         bucket.candidateIds.push(resolved);
       }
@@ -691,6 +751,7 @@ const detectComparisonColumns = (
       rowIndex: ev.index,
       rawLabel: label,
       reasoning: ev.details ?? null,
+      candidateIds: rowCandidateIds,
     });
   }
 
@@ -723,8 +784,18 @@ const detectComparisonColumns = (
     }
 
     const verdictsByRow: Record<number, BatchComparisonVerdict> = {};
-    for (const { rowIndex, rawLabel, reasoning } of bucket.verdicts) {
+    for (const {
+      rowIndex,
+      rawLabel,
+      reasoning,
+      candidateIds,
+    } of bucket.verdicts) {
       let winnerId: string | null;
+      // Distinguished from a genuinely unresolved label below — both leave
+      // winnerId null for every existing (bar-chart) consumer, but a real
+      // tie is 0.5/0.5 evidence for Bradley-Terry aggregation while an
+      // unresolved label is no evidence at all and must be excluded.
+      let isUnresolved = false;
       if (rawLabel === "tie") {
         winnerId = null;
       } else {
@@ -741,6 +812,7 @@ const detectComparisonColumns = (
         });
         const isUnresolvedSlot =
           resolved === "" || resolved === "A" || resolved === "B";
+        isUnresolved = isUnresolvedSlot;
         winnerId = isUnresolvedSlot
           ? null
           : (resolveToTargetId(resolved) ?? resolved);
@@ -757,9 +829,9 @@ const detectComparisonColumns = (
         rowIndex,
         winnerId,
         reasoning,
-        winnerOutput: winnerCell
-          ? extractWinnerOutputText(winnerCell.output)
-          : null,
+        winnerOutput: winnerCell ? extractOutputText(winnerCell.output) : null,
+        candidateIds,
+        isUnresolved,
       };
     }
 
@@ -768,6 +840,7 @@ const detectComparisonColumns = (
       name: bucket.name,
       variants,
       verdictsByRow,
+      rowsWithoutVerdict: skippedByKey.get(bucket.key) ?? 0,
     });
   }
   return columns;

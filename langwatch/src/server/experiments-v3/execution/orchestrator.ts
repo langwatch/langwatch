@@ -1145,12 +1145,12 @@ export async function* executeCell(
 
       // Map and yield target events
       for (const event of targetEvents) {
-        const mappedEvent = mapNlpEvent(
+        const mappedEvent = mapNlpEvent({
           event,
-          cell.rowIndex,
+          rowIndex: cell.rowIndex,
           targetNodes,
-          cellConfig,
-        );
+          config: cellConfig,
+        });
         if (!mappedEvent) continue;
         // The engine reports token usage but no cost (it has no price table),
         // so price the target's tokens here at the canonical model rate. This
@@ -1238,12 +1238,13 @@ export async function* executeCell(
 
           // Map and yield evaluator events
           for (const event of evaluatorEvents) {
-            const mappedEvent = mapNlpEvent(
+            const mappedEvent = mapNlpEvent({
               event,
-              cell.rowIndex,
+              rowIndex: cell.rowIndex,
               targetNodes,
-              cellConfig,
-            );
+              config: cellConfig,
+              evaluatorInputs,
+            });
             if (mappedEvent) {
               yield mappedEvent;
             }
@@ -1711,6 +1712,35 @@ export const buildTargetMetadata = ({
         model = loadedPrompt.model;
       }
     }
+    // Evaluator targets — the judge. Recorded onto the run for the same
+    // reason a prompt target's model is: the evaluator's config can be
+    // edited afterwards, and reading it live would retroactively
+    // misattribute every historical run to whatever model is configured
+    // today. The leaderboard's self-preference check depends on knowing
+    // which model actually judged, so a wrong answer here is worse than
+    // none.
+    else if (t.type === "evaluator" && t.targetEvaluatorId) {
+      // Unsaved edits first, exactly as the prompt branch above does and as
+      // `workflowBuilder` does when it decides what to actually RUN. Reading
+      // only the saved config meant a user who switched the judge model
+      // without saving ran on one model and recorded the other — and the
+      // recorded one is what feeds the leaderboard's self-preference check,
+      // so it would report independence from a model that never judged.
+      const settings =
+        (
+          t.localEvaluatorConfig as
+            | { settings?: { model?: unknown } }
+            | undefined
+        )?.settings ??
+        (
+          loadedEvaluators?.get(t.targetEvaluatorId)?.config as
+            | { settings?: { model?: unknown } }
+            | undefined
+        )?.settings;
+      if (typeof settings?.model === "string" && settings.model) {
+        model = settings.model;
+      }
+    }
 
     // Get name from loaded entity
     if (t.type === "prompt" && t.promptId) {
@@ -2122,6 +2152,8 @@ export async function* runOrchestrator(
               result.status === "processed" && result.cost
                 ? result.cost.amount
                 : null,
+            duration: event.duration ?? null,
+            inputs: event.inputs ?? null,
           })
           .catch((err) => {
             chDispatchFailures++;

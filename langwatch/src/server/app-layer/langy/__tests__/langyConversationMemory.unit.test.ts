@@ -499,7 +499,7 @@ describe("renderLangyConversationTranscript", () => {
 
     it("strips control characters that could restructure the block", () => {
       const block = renderLangyConversationTranscript({
-        messages: [said("user", "hi there\rfriend")],
+        messages: [said("user", "hi\u0000there\rfriend")],
       })!;
 
       expect(block).toContain("User: hi there friend");
