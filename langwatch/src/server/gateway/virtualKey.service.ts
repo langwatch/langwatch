@@ -315,7 +315,7 @@ export class VirtualKeyService {
       return vk;
     });
 
-    await emitVkLifecycle(this.prisma, created, "created");
+    await emitVkLifecycle(this.prisma, { vk: created, action: "created" });
     return { virtualKey: created, secret };
   }
 
@@ -571,7 +571,7 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(this.prisma, vk, "revoked");
+        await emitVkLifecycle(this.prisma, { vk, action: "revoked" });
         return vk;
       });
   }
@@ -601,10 +601,12 @@ export class VirtualKeyService {
     return this.prisma
       .$transaction(async (tx) => {
         const vk = await this.repository.setDisabled(
-          input.id,
-          input.organizationId,
-          true,
-          input.reason ?? null,
+          {
+            id: input.id,
+            organizationId: input.organizationId,
+            disabled: true,
+            reason: input.reason ?? null,
+          },
           tx,
         );
         await this.changeEvents.append(
@@ -631,12 +633,11 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(
-          this.prisma,
+        await emitVkLifecycle(this.prisma, {
           vk,
-          "disabled",
-          input.reason ?? null,
-        );
+          action: "disabled",
+          reason: input.reason ?? null,
+        });
         return vk;
       });
   }
@@ -659,10 +660,12 @@ export class VirtualKeyService {
     return this.prisma
       .$transaction(async (tx) => {
         const vk = await this.repository.setDisabled(
-          input.id,
-          input.organizationId,
-          false,
-          null,
+          {
+            id: input.id,
+            organizationId: input.organizationId,
+            disabled: false,
+            reason: null,
+          },
           tx,
         );
         await this.changeEvents.append(
@@ -689,7 +692,7 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(this.prisma, vk, "enabled");
+        await emitVkLifecycle(this.prisma, { vk, action: "enabled" });
         return vk;
       });
   }

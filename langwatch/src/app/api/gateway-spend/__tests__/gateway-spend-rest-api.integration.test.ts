@@ -25,6 +25,7 @@ import {
   GatewaySpendEventsRepository,
   type SpendEventRow,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
@@ -496,19 +497,23 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = previous;
       }
       if (endpointId) {
-        await prisma.processManagerOutbox.deleteMany({
-          where: {
-            projectId: { in: [project.id] },
-            messageKey: { contains: endpointId },
-          },
-        });
-        await prisma.processManagerInstance.deleteMany({
-          where: {
-            projectId: { in: [project.id] },
-            processKey: `endpoint:${endpointId}`,
-          },
-        });
-        await prisma.webhookEndpoint.deleteMany({ where: { id: endpointId } });
+        await cleanupTestRows(prisma, [
+          [
+            "processManagerOutbox",
+            {
+              projectId: { in: [project.id] },
+              messageKey: { contains: endpointId },
+            },
+          ],
+          [
+            "processManagerInstance",
+            {
+              projectId: { in: [project.id] },
+              processKey: `endpoint:${endpointId}`,
+            },
+          ],
+          ["webhookEndpoint", { id: endpointId }],
+        ]);
       }
     }
   });
