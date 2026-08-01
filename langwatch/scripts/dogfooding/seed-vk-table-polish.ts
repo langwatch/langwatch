@@ -90,6 +90,13 @@ async function resolveTarget(wanted?: string): Promise<SeedTarget> {
  * deletes are synchronous for the same reason: an accepted-but-unfinished
  * mutation is indistinguishable from a completed one, and the next run
  * would read the old money.
+ *
+ * The sweep matches virtual-key ScopeIds and nothing else. The fixture's
+ * ORGANIZATION and GROUP budgets bucket under the organization id and
+ * under `groupId:principalUserId`, and those buckets carry every member's
+ * real spend rather than only this fixture's. Widening the sweep to reach
+ * them would delete other people's money, so they are left in place and
+ * their totals carry across runs.
  */
 async function purgePrevious(target: SeedTarget) {
   const previous = await prisma.virtualKey.findMany({
