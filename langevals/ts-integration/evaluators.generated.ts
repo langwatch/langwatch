@@ -241,25 +241,27 @@ export const evaluatorsSchema = z.object({
           "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
         )
         .default(2048),
-      rubrics: z.array(z.object({ description: z.string() })).default([
-        { description: "The response is incorrect, irrelevant." },
-        {
-          description:
-            "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
-        },
-        {
-          description:
-            "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
-        },
-      ]),
+      rubrics: z
+        .array(z.object({ description: z.string() }))
+        .default([
+          { description: "The response is incorrect, irrelevant." },
+          {
+            description:
+              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+          },
+        ]),
     }),
   }),
   "ragas/sql_query_equivalence": z.object({
@@ -876,6 +878,18 @@ export const evaluatorsSchema = z.object({
         .default([]),
     }),
   }),
+  "langevals/query_resolution": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+    }),
+  }),
   "langevals/select_best_compare": z.object({
     settings: z.object({
       model: z
@@ -916,18 +930,18 @@ export const evaluatorsSchema = z.object({
         .array(z.union([z.literal("cost"), z.literal("duration")]))
         .describe("Per-candidate metrics to inject into the judge prompt")
         .default([]),
-    }),
-  }),
-  "langevals/query_resolution": z.object({
-    settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
+      temperature: z
         .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+        .describe(
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        )
+        .default(0.0),
+      swap_and_reconcile: z
+        .boolean()
+        .describe(
+          "Check each row twice, the second time with the candidate order reversed, and record no result for that row when the two disagree \u2014 rather than a tie, which would claim the candidates are equally good. Doubles judge-call cost per row (literature: swapping candidate order alone flips 10-30% of verdicts on contested rows).",
+        )
+        .default(true),
     }),
   }),
   "langevals/sentiment": z.object({
@@ -1004,13 +1018,7 @@ export type EvaluatorDefinition<T extends EvaluatorTypes> = {
   name: string;
   description: string;
   category:
-    | "quality"
-    | "rag"
-    | "safety"
-    | "policy"
-    | "other"
-    | "custom"
-    | "similarity";
+    "quality" | "rag" | "safety" | "policy" | "other" | "custom" | "similarity";
   docsUrl?: string;
   isGuardrail: boolean;
   requiredFields: string[];
@@ -2341,19 +2349,44 @@ better one. Superseded by Comparison, which judges two or more candidates.
       },
     },
   },
+  "langevals/query_resolution": {
+    name: `Query Resolution`,
+    description: `
+This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user.
+`,
+    category: "quality",
+    docsUrl: "",
+    isGuardrail: false,
+    requiredFields: ["conversation"],
+    optionalFields: [],
+    settings: {
+      model: {
+        description: "The model to use for evaluation",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description: "Max tokens allowed for evaluation",
+        default: 128000,
+      },
+    },
+    envVars: [],
+    result: {},
+  },
   "langevals/select_best_compare": {
     name: `Comparison`,
     description: `
 Compare two or more candidate outputs and pick the best one, optionally
 against a reference answer. The judge sees every candidate at once and
 explains why the winner is better. Candidate order is shuffled so that a
-candidate's position never sways the verdict.
+candidate's position never sways the verdict, and by default each row is
+checked twice — once more with the order reversed — recording no result
+for that row when the two checks disagree, rather than guessing.
 `,
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: ["candidates"],
-    optionalFields: ["input", "golden", "row_index"],
+    requiredFields: [],
+    optionalFields: ["input", "golden", "candidates", "row_index"],
     settings: {
       model: {
         description: "The model to use for evaluation",
@@ -2388,6 +2421,16 @@ candidate's position never sways the verdict.
         description: "Per-candidate metrics to inject into the judge prompt",
         default: [],
       },
+      temperature: {
+        description:
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        default: 0.0,
+      },
+      swap_and_reconcile: {
+        description:
+          "Check each row twice, the second time with the candidate order reversed, and record no result for that row when the two disagree \u2014 rather than a tie, which would claim the candidates are equally good. Doubles judge-call cost per row (literature: swapping candidate order alone flips 10-30% of verdicts on contested rows).",
+        default: true,
+      },
     },
     envVars: [],
     result: {
@@ -2399,29 +2442,6 @@ candidate's position never sways the verdict.
           "The winning candidate id (matches the id supplied in entry.candidates), or 'tie'.",
       },
     },
-  },
-  "langevals/query_resolution": {
-    name: `Query Resolution`,
-    description: `
-This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user.
-`,
-    category: "quality",
-    docsUrl: "",
-    isGuardrail: false,
-    requiredFields: ["conversation"],
-    optionalFields: [],
-    settings: {
-      model: {
-        description: "The model to use for evaluation",
-        default: "openai/gpt-5-mini",
-      },
-      max_tokens: {
-        description: "Max tokens allowed for evaluation",
-        default: 128000,
-      },
-    },
-    envVars: [],
-    result: {},
   },
   "langevals/sentiment": {
     name: `Sentiment Evaluator`,

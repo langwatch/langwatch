@@ -18,6 +18,7 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
+import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 /** Valid values for the grouping dimension. */
@@ -101,34 +102,6 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   if (summary.failedCount > 0) return ScenarioRunStatus.FAILED;
   if (summary.cancelledCount > 0) return ScenarioRunStatus.CANCELLED;
   return ScenarioRunStatus.SUCCESS;
-}
-
-type RunStatusCategory =
-  | "success"
-  | "failure"
-  | "stalled"
-  | "cancelled"
-  | "in_progress"
-  | "queued";
-
-function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
-  switch (status) {
-    case ScenarioRunStatus.SUCCESS:
-      return "success";
-    case ScenarioRunStatus.ERROR:
-    case ScenarioRunStatus.FAILED:
-      return "failure";
-    case ScenarioRunStatus.STALLED:
-      return "stalled";
-    case ScenarioRunStatus.CANCELLED:
-      return "cancelled";
-    case ScenarioRunStatus.IN_PROGRESS:
-    case ScenarioRunStatus.PENDING:
-    case ScenarioRunStatus.RUNNING:
-      return "in_progress";
-    case ScenarioRunStatus.QUEUED:
-      return "queued";
-  }
 }
 
 const UNKNOWN_GROUP_KEY = "__unknown__";

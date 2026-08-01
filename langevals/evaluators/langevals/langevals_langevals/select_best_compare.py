@@ -3,8 +3,11 @@ Comparison: the native LLM-as-judge preference evaluator.
 
 Given 2+ candidate outputs (from different EvaluationsV3 target columns) and
 an optional golden reference, asks an LLM judge to pick the single best
-candidate in one judge call, with deterministic candidate-order shuffling
-(seeded by `row_index`) for position-bias mitigation.
+candidate, with deterministic candidate-order shuffling (seeded by
+`row_index`) for position-bias mitigation. By default (`swap_and_reconcile`),
+each row is judged twice — once in that shuffled order, once with the order
+fully reversed — and a disagreement between the two verdicts is treated as a
+tie rather than trusting either individual call.
 
 Two candidates is not a special case. This evaluator is the only comparison
 judge offered, superseding the two-slot `langevals/pairwise_compare` (#5100),
@@ -193,6 +196,21 @@ class SelectBestCompareSettings(LLMEvaluatorSettings):
         default=[],
         description="Per-candidate metrics to inject into the judge prompt",
     )
+    temperature: float = Field(
+        default=0.0,
+        description="Sampling temperature for the judge call. Lower is more deterministic.",
+    )
+    swap_and_reconcile: bool = Field(
+        default=True,
+        description=(
+            "Check each row twice, the second time with the candidate order "
+            "reversed, and record no result for that row when the two "
+            "disagree — rather than a tie, which would claim the candidates "
+            "are equally good. Doubles judge-call cost per row (literature: "
+            "swapping candidate order alone flips 10-30% of verdicts on "
+            "contested rows)."
+        ),
+    )
 
 
 class SelectBestCompareResult(EvaluationResult):
@@ -227,7 +245,9 @@ class SelectBestCompareEvaluator(
     Compare two or more candidate outputs and pick the best one, optionally
     against a reference answer. The judge sees every candidate at once and
     explains why the winner is better. Candidate order is shuffled so that a
-    candidate's position never sways the verdict.
+    candidate's position never sways the verdict, and by default each row is
+    checked twice — once more with the order reversed — recording no result
+    for that row when the two checks disagree, rather than guessing.
     """
 
     name = "Comparison"
@@ -258,9 +278,22 @@ class SelectBestCompareEvaluator(
         else:
             ordered = list(candidates)
 
-        verdict = self._judge(entry, ordered)
+        verdict = (
+            self._reconcile(entry, ordered)
+            if self.settings.swap_and_reconcile
+            else self._judge(entry, ordered)
+        )
 
         winner_id = verdict["winner"]
+
+        # No winner at all — reconciliation found the verdict was order-
+        # dependent and ties are disabled, so there is nothing to report. This
+        # is skipped rather than scored: `score=1.0` would read as a win for
+        # `label=None`, and `score=0.5` would be the tie the settings ruled
+        # out. An absent verdict must contribute no evidence either way.
+        if winner_id is None:
+            return EvaluationResultSkipped(details=verdict["reasoning"])
+
         score = 0.5 if winner_id == "tie" else 1.0
 
         return SelectBestCompareResult(
@@ -278,6 +311,128 @@ class SelectBestCompareEvaluator(
                 else None
             ),
         )
+
+    def _effective_temperature(self) -> float:
+        """
+        gpt-5-family models require temperature=1.0 and reject any other
+        value; every other model/provider gets the user's configured value
+        (default 0.0). `drop_params=True` at the call site tells litellm to
+        silently strip the param for any other model that doesn't support it,
+        rather than raising. Mirrors llm_answer_match.py's
+        `model_to_dspy_lm`.
+
+        Shared with `_reconcile`, which needs to know whether the judge was
+        actually pinned before it attributes a flipped verdict to anything.
+        """
+        return 1.0 if "gpt-5" in self.settings.model else self.settings.temperature
+
+    def _reconcile(
+        self,
+        entry: SelectBestCompareEntry,
+        ordered: list[CandidateInput],
+    ) -> dict:
+        """
+        Swap-and-reconcile: call `_judge` twice — once across `ordered` as
+        given, once with that same list fully reversed — and treat a
+        disagreement between the two verdicts as a tie rather than trusting
+        either individual call. `_judge` builds its own slot-to-candidate
+        mapping from whatever list it's handed and translates the judge's
+        slot pick back to the candidate's real id, so the reversed call
+        "just works" through that existing translation logic.
+
+        Returns the same `{"winner", "reasoning", "cost"}` shape `_judge`
+        returns, so callers don't need to know which path ran.
+        """
+        verdict1 = self._judge(entry, ordered)
+        verdict2 = self._judge(entry, list(reversed(ordered)))
+
+        winner1 = verdict1["winner"]
+        winner2 = verdict2["winner"]
+        cost1 = verdict1.get("cost")
+        cost2 = verdict2.get("cost")
+
+        # Cost stays None only when BOTH calls genuinely failed to compute a
+        # cost (mirrors the "cost stays None only when completion_cost
+        # genuinely failed" behavior in evaluate()'s Money(...) construction).
+        # A single failed call still contributes the other call's real cost.
+        total_cost = (
+            None if cost1 is None and cost2 is None else (cost1 or 0.0) + (cost2 or 0.0)
+        )
+
+        if winner1 == winner2:
+            # Same winner both times (including both "tie") — agreement.
+            #
+            # Phrased to match what actually varied, for the same reason the
+            # disagreement branch below is. At a pinned temperature the only
+            # difference between the two calls was candidate order, so
+            # surviving it is a statement about order. Above 0 the sampling
+            # varied too — which makes the agreement STRONGER, not weaker, but
+            # it is no longer a claim about order specifically.
+            confirmation = (
+                "Confirmed under order swap."
+                if self._effective_temperature() == 0.0
+                else "Confirmed on a second call with the candidate order reversed."
+            )
+            return {
+                "winner": winner1,
+                "reasoning": f"{confirmation} {verdict1['reasoning']}",
+                "cost": total_cost,
+            }
+
+        # Disagreement: the verdict flipped when candidate order flipped.
+        # Don't guess which direction was right — say so, and let the caller
+        # decide what an unresolvable row means for them.
+        # What changed between the two calls decides what we may blame.
+        #
+        # At temperature 0 the reversed call differs ONLY in candidate order,
+        # so "the verdict changed with candidate order" is a claim the run
+        # supports. Above 0 — which gpt-5-family models force, and they are
+        # the usual judge here — the two calls differ in candidate order AND
+        # in sampling, so the same sentence names a cause that was never
+        # isolated. The finding is identical either way: this row does not
+        # establish a winner. Only the explanation has to be earned.
+        pinned = self._effective_temperature() == 0.0
+        cause = (
+            "The verdict changed with candidate order, so this row does not "
+            "establish a winner."
+            if pinned
+            else (
+                "The verdict did not survive being asked again with the "
+                "candidate order reversed, so this row does not establish a "
+                "winner. This judge does not run at a fixed temperature, so "
+                "the disagreement is not necessarily caused by the order."
+            )
+        )
+        label = "Order-sensitive verdict" if pinned else "Unreproducible verdict"
+        details = (
+            f"{label}: original order picked {winner1} "
+            f"({verdict1['reasoning']}); reversed order picked {winner2} "
+            f"({verdict2['reasoning']}). {cause}"
+        )
+
+        # No winner, regardless of `allow_tie`.
+        #
+        # "They tied" and "we could not get a stable answer" are different
+        # claims, and only the second one is true here. The distinction is not
+        # cosmetic: a tie is real evidence, scored 0.5/0.5 into the pairwise
+        # tally that feeds the Bradley-Terry fit, so returning one from a
+        # reconciliation failure feeds the ranking a measurement the run never
+        # made. An absent verdict has to contribute nothing.
+        #
+        # This used to hinge on `allow_tie`, which made the evaluator state the
+        # objection itself and then act against it on the default path: with
+        # ties disabled it correctly refused to invent one, and with ties
+        # enabled — the default — it invented one anyway.
+        #
+        # Deliberately NOT "fall back to winner1" either: the disagreement IS
+        # the finding. Order-sensitivity is exactly what swap_and_reconcile
+        # exists to detect, so returning the original-order winner would hand
+        # back the artefact just demonstrated, silently.
+        return {
+            "winner": None,
+            "reasoning": details,
+            "cost": total_cost,
+        }
 
     def _judge(
         self,
@@ -354,8 +509,12 @@ class SelectBestCompareEvaluator(
         slot_labels = list(slot_to_candidate.keys())
         winner_enum = slot_labels + (["tie"] if self.settings.allow_tie else [])
 
+        effective_temperature = self._effective_temperature()
+
         response = completion(
             model=self.settings.model,
+            temperature=effective_temperature,
+            drop_params=True,
             messages=[
                 {
                     "role": "system",
@@ -363,7 +522,8 @@ class SelectBestCompareEvaluator(
                         "You are an impartial judge picking the best of "
                         "several candidate outputs. Reason briefly, then "
                         "pick the winning slot label using the provided "
-                        "function call."
+                        "function call. Judge the candidates' content only "
+                        "— ignore the order in which they are presented."
                     ),
                 },
                 {"role": "user", "content": rendered_prompt},

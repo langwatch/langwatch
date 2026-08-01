@@ -255,6 +255,14 @@ export type EvaluationV3Event =
       // evaluator nodes). DB-backed evaluators resolve their name at storage time.
       evaluatorName?: string;
       result: EvaluationV3EvaluatorResult;
+      duration?: number;
+      /**
+       * The request payload sent to the evaluator (e.g. a Comparison
+       * evaluator's ordered `candidates` list). Persisted so downstream
+       * aggregation can recover which variants were actually compared on
+       * this row, independent of which one won.
+       */
+      inputs?: Record<string, unknown>;
     }
   | { type: "progress"; completed: number; total: number }
   | {

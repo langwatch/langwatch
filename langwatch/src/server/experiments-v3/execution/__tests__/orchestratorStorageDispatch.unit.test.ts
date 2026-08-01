@@ -88,6 +88,63 @@ describe("buildTargetMetadata", () => {
       expect(target?.model).toBeNull();
     });
   });
+
+  describe("given an evaluator target", () => {
+    const evaluatorTarget = () =>
+      [
+        {
+          id: "target-judge",
+          type: "evaluator",
+          targetEvaluatorId: "evaluator-1",
+          mappings: {},
+        },
+      ] as unknown as EvaluationsV3State["targets"];
+
+    // The leaderboard's self-preference check asks whether the judge shares
+    // a model family with a candidate. Reading the evaluator's live config
+    // at render time would answer that question about today's config rather
+    // than the run's, so the judge model is pinned onto the run here.
+    /** @scenario "The judge model is the one that actually ran" */
+    it("records the judging model from the evaluator's settings", () => {
+      const [target] = buildTargetMetadata({
+        targets: evaluatorTarget(),
+        loadedPrompts: new Map<string, VersionedPrompt>(),
+        loadedAgents: emptyAgents,
+        loadedEvaluators: new Map([
+          [
+            "evaluator-1",
+            {
+              id: "evaluator-1",
+              name: "Comparison",
+              config: { settings: { model: "anthropic/claude-sonnet-5" } },
+            },
+          ],
+        ]),
+      });
+
+      expect(target?.model).toBe("anthropic/claude-sonnet-5");
+      expect(target?.name).toBe("Comparison");
+      expect(target?.evaluator_id).toBe("evaluator-1");
+    });
+
+    describe("when the evaluator config carries no model", () => {
+      it("leaves the model null rather than inventing one", () => {
+        const [target] = buildTargetMetadata({
+          targets: evaluatorTarget(),
+          loadedPrompts: new Map<string, VersionedPrompt>(),
+          loadedAgents: emptyAgents,
+          loadedEvaluators: new Map([
+            [
+              "evaluator-1",
+              { id: "evaluator-1", name: "Comparison", config: {} },
+            ],
+          ]),
+        });
+
+        expect(target?.model).toBeNull();
+      });
+    });
+  });
 });
 
 describe("buildTargetResultDispatch", () => {
