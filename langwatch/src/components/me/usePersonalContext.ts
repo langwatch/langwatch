@@ -28,9 +28,11 @@ export type PersonalBudgetOverview = {
   gatewayAccess: boolean;
   budgets: BudgetOverviewItemView[];
   /**
-   * False while the read is in flight or after it failed. An empty
-   * `budgets` only means "no budget binds you" once this is true; until
-   * then a surface must not say so.
+   * True once the server has answered at least once. An empty `budgets`
+   * only means "no budget binds you" while this holds; before it, the
+   * list is empty because nothing has come back yet and a surface must
+   * not say so. A later refetch that fails leaves the last answer
+   * standing rather than blanking a card the member is reading.
    */
   isResolved: boolean;
 };
@@ -185,11 +187,11 @@ export function usePersonalContext(): PersonalContext {
     [switcherData, orgId],
   );
 
-  // While the read is in flight or after it failed, gatewayAccess true +
-  // empty budgets keeps every budget surface blank rather than flashing a
-  // "no access" state. `isResolved` is what separates that from a member
-  // who genuinely has no budget, so the empty-state copy cannot claim
-  // "no budgets apply" about a request that never came back.
+  // Before the first answer, gatewayAccess true + empty budgets keeps
+  // every budget surface blank rather than flashing a "no access" state.
+  // `isResolved` is what separates that from a member who genuinely has
+  // no budget, so the empty-state copy cannot claim "no budgets apply"
+  // about a request that never came back.
   const budgetOverview = useMemo<PersonalBudgetOverview>(() => {
     const raw = budgetOverviewQuery.data;
     if (!raw) return { gatewayAccess: true, budgets: [], isResolved: false };
