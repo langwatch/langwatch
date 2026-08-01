@@ -249,6 +249,7 @@
             "group": "Help",
             "pages": [
               "pricing",
+              "pricing/billable-events",
               "support",
               "status"
             ]
@@ -801,6 +802,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/licensing",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]

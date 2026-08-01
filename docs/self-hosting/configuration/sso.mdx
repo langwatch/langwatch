@@ -3,7 +3,13 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+
+<Warning>
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out.
+
+The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+</Warning>
 
 ## Supported Providers
 
@@ -36,7 +42,9 @@ The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users r
 
 Reset links are sent through the same transactional email provider as the rest of LangWatch. Configure SendGrid or AWS SES as described in [Third-party integrations](/self-hosting/configuration/third-party-integrations) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled.
+When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+
+Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
 
 ### Auth0
 
