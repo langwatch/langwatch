@@ -7,9 +7,10 @@
  * (`applyForkedAgentToTarget`) are unit-tested in `./duplicateTarget.test.ts`.
  * This file exercises the *boundary* requested by the #5935 P2 review: the
  * ordered `agents.copy → workflow.publish → addTarget` path, plus the
- * post-copy `agents.delete` rollback / no-column path, with mocked tRPC
- * mutations so a wrong input, missed publish, or accidental shallow fallback
- * is caught.
+ * post-copy `agents.cascadeArchive` rollback (which archives BOTH the forked
+ * Agent row AND its linked Workflow/WorkflowVersion) / no-column path, with
+ * mocked tRPC mutations so a wrong input, missed publish, or accidental
+ * shallow fallback is caught.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,13 +43,13 @@ type MockMutateAsync = ReturnType<typeof vi.fn>;
 interface MutationStubs {
   copyAgent: { mutateAsync: MockMutateAsync };
   publishWorkflow: { mutateAsync: MockMutateAsync };
-  deleteAgent: { mutateAsync: MockMutateAsync };
+  cascadeArchiveAgent: { mutateAsync: MockMutateAsync };
 }
 
 const buildMutationStubs = (): MutationStubs => ({
   copyAgent: { mutateAsync: vi.fn() },
   publishWorkflow: { mutateAsync: vi.fn() },
-  deleteAgent: { mutateAsync: vi.fn() },
+  cascadeArchiveAgent: { mutateAsync: vi.fn() },
 });
 
 const workflowAgentTarget: TargetConfig = {
@@ -101,7 +102,7 @@ describe("executeForkAgentDuplicate", () => {
         workflowVersionId: "wv_forked",
       });
       stubs.publishWorkflow.mutateAsync.mockResolvedValue(undefined);
-      stubs.deleteAgent.mutateAsync.mockResolvedValue(undefined);
+      stubs.cascadeArchiveAgent.mutateAsync.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -135,7 +136,7 @@ describe("executeForkAgentDuplicate", () => {
           workflowId: "wf_forked",
           versionId: "wv_forked", // versionId (not workflowVersionId) per CodeRabbit round 1
         });
-        expect(stubs.deleteAgent.mutateAsync).not.toHaveBeenCalled();
+        expect(stubs.cascadeArchiveAgent.mutateAsync).not.toHaveBeenCalled();
         expect(addTarget).toHaveBeenCalledTimes(1);
 
         // Mutation ORDER by `invocationCallOrder` — the only signal that
@@ -209,7 +210,7 @@ describe("executeForkAgentDuplicate", () => {
         );
       });
 
-      it("rolls back via agents.delete and does NOT add the column when workflow.publish throws", async () => {
+      it("rolls back via agents.cascadeArchive (archives agent AND workflow) and does NOT add the column when workflow.publish throws", async () => {
         await executeForkAgentDuplicate({
           target: workflowAgentTarget,
           deps: {
@@ -222,9 +223,13 @@ describe("executeForkAgentDuplicate", () => {
 
         expect(stubs.copyAgent.mutateAsync).toHaveBeenCalledTimes(1);
         expect(stubs.publishWorkflow.mutateAsync).toHaveBeenCalledTimes(1);
-        // Rollback: deleteAgent is called with the FORKED agent id (not the source's).
-        expect(stubs.deleteAgent.mutateAsync).toHaveBeenCalledTimes(1);
-        expect(stubs.deleteAgent.mutateAsync).toHaveBeenCalledWith({
+        // Rollback: cascadeArchiveAgent is called with the FORKED agent id
+        // (not the source's). The server-side `agents.cascadeArchive`
+        // mutation archives the forked Agent AND its linked Workflow in a
+        // single transaction — this is the #5935 P2 fix that prevents
+        // orphaned workflows from accumulating across transient failures.
+        expect(stubs.cascadeArchiveAgent.mutateAsync).toHaveBeenCalledTimes(1);
+        expect(stubs.cascadeArchiveAgent.mutateAsync).toHaveBeenCalledWith({
           id: "agent_forked",
           projectId: "proj-1",
         });
@@ -240,20 +245,21 @@ describe("executeForkAgentDuplicate", () => {
           }),
         );
 
-        // Ordering: copy < publish-throw < delete-rollback. The rollback MUST
-        // run AFTER the failed publish, not before — otherwise we'd be
-        // deleting an Agent row whose workflow publish never even started.
+        // Ordering: copy < publish-throw < cascadeArchive-rollback. The
+        // rollback MUST run AFTER the failed publish, not before — otherwise
+        // we'd be archiving an Agent row whose workflow publish never even
+        // started.
         const copyOrder = stubs.copyAgent.mutateAsync.mock.invocationCallOrder[0];
         const publishOrder =
           stubs.publishWorkflow.mutateAsync.mock.invocationCallOrder[0];
         const rollbackOrder =
-          stubs.deleteAgent.mutateAsync.mock.invocationCallOrder[0];
+          stubs.cascadeArchiveAgent.mutateAsync.mock.invocationCallOrder[0];
         expect(copyOrder).toBeLessThan(publishOrder);
         expect(publishOrder).toBeLessThan(rollbackOrder);
       });
 
       it("still surfaces the failure toast when the rollback itself fails (swallowed-and-logged)", async () => {
-        stubs.deleteAgent.mutateAsync.mockRejectedValue(
+        stubs.cascadeArchiveAgent.mutateAsync.mockRejectedValue(
           new Error("rollback failed"),
         );
 
@@ -268,7 +274,7 @@ describe("executeForkAgentDuplicate", () => {
         });
 
         // Rollback was attempted (and failed) — the primary failure still wins.
-        expect(stubs.deleteAgent.mutateAsync).toHaveBeenCalledTimes(1);
+        expect(stubs.cascadeArchiveAgent.mutateAsync).toHaveBeenCalledTimes(1);
         expect(addTarget).not.toHaveBeenCalled();
         expect(toasterCreate).toHaveBeenCalledTimes(1);
       });
@@ -280,10 +286,10 @@ describe("executeForkAgentDuplicate", () => {
       });
 
       // If `agents.copy` itself fails (before any forked row exists), there
-      // is nothing to roll back — `agents.delete` must NOT be called. This
-      // guards against an accidental "always rollback" implementation that
-      // would attempt to delete the SOURCE agent id.
-      it("does NOT call agents.delete (nothing to roll back)", async () => {
+      // is nothing to roll back — `agents.cascadeArchive` must NOT be called.
+      // This guards against an accidental "always rollback" implementation
+      // that would attempt to archive the SOURCE agent id.
+      it("does NOT call agents.cascadeArchive (nothing to roll back)", async () => {
         await executeForkAgentDuplicate({
           target: workflowAgentTarget,
           deps: {
@@ -296,7 +302,7 @@ describe("executeForkAgentDuplicate", () => {
 
         expect(stubs.copyAgent.mutateAsync).toHaveBeenCalledTimes(1);
         expect(stubs.publishWorkflow.mutateAsync).not.toHaveBeenCalled();
-        expect(stubs.deleteAgent.mutateAsync).not.toHaveBeenCalled();
+        expect(stubs.cascadeArchiveAgent.mutateAsync).not.toHaveBeenCalled();
         expect(addTarget).not.toHaveBeenCalled();
         expect(toasterCreate).toHaveBeenCalledTimes(1);
       });
@@ -319,7 +325,7 @@ describe("executeForkAgentDuplicate", () => {
         id: "agent_forked_code",
       });
       stubs.publishWorkflow.mutateAsync.mockResolvedValue(undefined);
-      stubs.deleteAgent.mutateAsync.mockResolvedValue(undefined);
+      stubs.cascadeArchiveAgent.mutateAsync.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -344,7 +350,7 @@ describe("executeForkAgentDuplicate", () => {
 
         expect(stubs.copyAgent.mutateAsync).toHaveBeenCalledTimes(1);
         expect(stubs.publishWorkflow.mutateAsync).not.toHaveBeenCalled();
-        expect(stubs.deleteAgent.mutateAsync).not.toHaveBeenCalled();
+        expect(stubs.cascadeArchiveAgent.mutateAsync).not.toHaveBeenCalled();
         expect(addTarget).toHaveBeenCalledTimes(1);
 
         const newTarget = addTarget.mock.calls[0][0] as TargetConfig;
@@ -390,7 +396,7 @@ describe("executeForkAgentDuplicate", () => {
 
         expect(stubs.copyAgent.mutateAsync).not.toHaveBeenCalled();
         expect(stubs.publishWorkflow.mutateAsync).not.toHaveBeenCalled();
-        expect(stubs.deleteAgent.mutateAsync).not.toHaveBeenCalled();
+        expect(stubs.cascadeArchiveAgent.mutateAsync).not.toHaveBeenCalled();
         expect(addTarget).toHaveBeenCalledTimes(1);
 
         const newTarget = addTarget.mock.calls[0][0] as TargetConfig;

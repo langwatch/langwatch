@@ -42,7 +42,15 @@ export interface ForkAgentMutationDeps {
       versionId: string;
     }) => Promise<unknown>;
   };
-  deleteAgent: {
+  /**
+   * Compensating action for the rollback path. Must archive BOTH the forked
+   * Agent row AND the forked Workflow/WorkflowVersion rows that `agents.copy`
+   * created — `agents.cascadeArchive` does this in a single transaction. The
+   * older `agents.delete` only soft-deletes the Agent, leaving the workflow
+   * rows as orphans that accumulate across transient publish/addTarget
+   * failures (see #5935 P2 review on 2026-07-31).
+   */
+  cascadeArchiveAgent: {
     mutateAsync: (input: { id: string; projectId: string }) => Promise<unknown>;
   };
 }
@@ -73,11 +81,14 @@ export interface DuplicateTargetDeps extends ForkAgentMutationDeps {
  *   3. `addTarget`        — add the new column with the forked ids plugged in.
  *
  * If step 2 or 3 throws after step 1 has already created an Agent row, we
- * best-effort `agents.delete` the orphan (so it does not keep counting
- * against the license `agents` quota with no target referencing it) and then
- * re-throw so the outer catch surfaces the failure to the user. Rollback
- * errors are swallowed-and-logged — the post-copy failure is the primary
- * signal and we do not want to mask it with a secondary rollback failure.
+ * best-effort `agents.cascadeArchive` the orphan — archiving BOTH the Agent
+ * row AND the forked Workflow/WorkflowVersion that `agents.copy` created (in
+ * a single transaction) so neither license-quota `agents` nor orphans in the
+ * `workflow`/`workflowVersion` tables accumulate across transient failures —
+ * and then re-throw so the outer catch surfaces the failure to the user.
+ * Rollback errors are swallowed-and-logged — the post-copy failure is the
+ * primary signal and we do not want to mask it with a secondary rollback
+ * failure.
  *
  * On any failure (copy itself, or post-copy after rollback), the user sees a
  * toast and no column is added — the column pointing at the source agent would
@@ -121,15 +132,20 @@ export async function executeForkAgentDuplicate({
       } catch (postCopyErr) {
         // Best-effort rollback: don't leave an orphaned Agent/Workflow
         // counted against the license quota with no target referencing
-        // it. Swallow rollback errors — the post-copy failure is the
-        // primary signal and we don't want to mask it with a secondary
-        // rollback failure.
-        await deps.deleteAgent
+        // it. `agents.cascadeArchive` archives BOTH the forked Agent row
+        // AND its linked Workflow (and the workflow's latest version, via
+        // the existing cascadeArchive transaction in agents router) — this
+        // is the compensating action the #5935 P2 review asked for at the
+        // server boundary: a transient `workflow.publish` or `addTarget`
+        // failure must not leave a live copied workflow behind. Swallow
+        // rollback errors — the post-copy failure is the primary signal
+        // and we don't want to mask it with a secondary rollback failure.
+        await deps.cascadeArchiveAgent
           .mutateAsync({ id: copied.id, projectId: deps.projectId })
           .catch((rollbackErr) => {
             logger.error(
               { rollbackErr, orphanedAgentId: copied.id },
-              "Rollback failed after post-copy failure; orphaned Agent row remains",
+              "Rollback failed after post-copy failure; orphaned Agent + Workflow rows remain",
             );
           });
         throw postCopyErr;

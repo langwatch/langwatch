@@ -223,13 +223,11 @@ export function EvaluationsV3Table({
   const publishWorkflow = api.workflow.publish.useMutation();
   // Best-effort rollback on post-copy failure: if publish or addTarget
   // throws after `agents.copy` has already created the forked Agent (and,
-  // for workflow-type agents, the forked Workflow/Version), we delete the
-  // orphaned Agent so it doesn't keep counting against the license
-  // `agents` quota (`enforceLicenseLimit`) with no target referencing it.
-  // `agents.delete` is soft-delete; the orphaned workflow rows (if any)
-  // are out of scope here — they have no enforcement cost and are cleaned
-  // up separately by the existing workflow GC.
-  const deleteAgent = api.agents.delete.useMutation();
+  // for workflow-type agents, the forked Workflow/Version), we cascade-archive
+  // the orphaned Agent AND its linked Workflow in a single transaction —
+  // `agents.delete` only soft-deletes the Agent, leaving the forked workflow
+  // rows as orphans that accumulate across transient failures (#5935 P2).
+  const cascadeArchiveAgent = api.agents.cascadeArchive.useMutation();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
@@ -811,9 +809,9 @@ export function EvaluationsV3Table({
   // (two columns pointing at the same dbAgentId).
   //
   // The ordered `agents.copy → workflow.publish → addTarget` sequence and
-  // the best-effort `agents.delete` rollback on post-copy failure live in
-  // `utils/executeForkAgentDuplicate.ts` so they can be exercised by an
-  // integration test with mocked mutations (see #5935 P2 review).
+  // the best-effort `agents.cascadeArchive` rollback on post-copy failure
+  // live in `utils/executeForkAgentDuplicate.ts` so they can be exercised
+  // by an integration test with mocked mutations (see #5935 P2 review).
   const handleDuplicateTarget = useCallback(
     async (target: TargetConfig) => {
       // The component only renders inside a project-scoped route, so `project`
@@ -827,7 +825,7 @@ export function EvaluationsV3Table({
         deps: {
           copyAgent,
           publishWorkflow,
-          deleteAgent,
+          cascadeArchiveAgent,
           addTarget,
           openTargetEditor,
           projectId,
@@ -839,7 +837,7 @@ export function EvaluationsV3Table({
       openTargetEditor,
       copyAgent,
       publishWorkflow,
-      deleteAgent,
+      cascadeArchiveAgent,
       project?.id,
     ],
   );
