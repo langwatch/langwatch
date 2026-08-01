@@ -12,8 +12,7 @@ import type { CellDef } from "../../types";
  * into the millions, while a reader asking "how big was my context" means this
  * single number.
  */
-const EXPLANATION =
-  "Context carried into this trace's first model call. Unlike Tokens, it is not summed across calls.";
+const EXPLANATION = "Context carried into this trace's first model call.";
 
 function ContextSizeText({ row }: { row: TraceListItem }) {
   const tokens = row.contextSizeTokens ?? 0;

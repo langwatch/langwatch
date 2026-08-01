@@ -554,6 +554,14 @@ export const DrawerHeader = memo(function DrawerHeader({
   const reasoningEffort =
     trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
 
+  // How full the window already was when this trace's first model call ran.
+  // Sits before Tokens because it is the number a reader checks first: the
+  // sums that follow only mean something once you know what they started from.
+  const contextSizeTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.context_size_tokens",
+  );
+
   // Total tokens the model actually processed = input + output PLUS cache
   // read + cache write. Anthropic reports `input_tokens` as the NON-cached
   // portion, so the cache counts are additive, not a subset (which is why a
@@ -1154,6 +1162,19 @@ export const DrawerHeader = memo(function DrawerHeader({
               ) : (
                 <MetricPill label="Cost" value={formatCost(billedCost)} />
               )}
+            </Box>
+          </Tooltip>
+        )}
+        {contextSizeTokens != null && contextSizeTokens > 0 && (
+          <Tooltip
+            content="Context carried into this trace's first model call."
+            positioning={{ placement: "top" }}
+          >
+            <Box>
+              <MetricPill
+                label="Context size"
+                value={formatTokens(contextSizeTokens)}
+              />
             </Box>
           </Tooltip>
         )}
