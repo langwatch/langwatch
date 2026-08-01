@@ -282,28 +282,9 @@ export class GatewayConfigMaterialiser {
         tpm: config.rateLimits.tpm,
         rpd: config.rateLimits.rpd,
       },
-      budgets: budgets.map(({ budget: b, bucketScopeId, principalUserId }) => ({
-        id: b.id,
-        scope: scopeToWire(b.scopeType),
-        scope_id: bucketScopeId,
-        ...(principalUserId ? { principal_id: principalUserId } : {}),
-        ...(b.scopeType === "ATTRIBUTED_USER"
-          ? { per_user: true as const }
-          : {}),
-        provider_key: b.providerKey,
-        window: b.window.toLowerCase(),
-        limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-        // Templates carry no aggregate figure: spend is per end-user bucket
-        // and the gateway fetches the request's bucket on demand.
-        spent_micro_usd:
-          b.scopeType === "ATTRIBUTED_USER"
-            ? 0
-            : spendByBudgetId.has(b.id)
-              ? decimalUSDStringToMicroUSD(spendByBudgetId.get(b.id)!)
-              : decimalToMicroUSD(b.spentUsd),
-        resets_at: Math.floor(b.resetsAt.getTime() / 1000),
-        on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
-      })),
+      budgets: budgets.map((resolved) =>
+        budgetToWire(resolved, spendByBudgetId),
+      ),
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
@@ -732,6 +713,44 @@ function routingModeToWire(
     case "POLICY":
       return "policy";
   }
+}
+
+type BudgetWire = GatewayConfigPayload["budgets"][number];
+
+/**
+ * The current-period figure the bundle ships for one budget. Templates carry
+ * no aggregate: spend is per end-user bucket and the gateway fetches the
+ * request's bucket on demand. Every other scope takes the CH rollup when it
+ * was loaded, falling back to the PG column when it was not.
+ */
+function budgetSpentMicroUSD(
+  budget: GatewayBudget,
+  spendByBudgetId: Map<string, string>,
+): number {
+  if (budget.scopeType === "ATTRIBUTED_USER") return 0;
+  const rollup = spendByBudgetId.get(budget.id);
+  return rollup === undefined
+    ? decimalToMicroUSD(budget.spentUsd)
+    : decimalUSDStringToMicroUSD(rollup);
+}
+
+function budgetToWire(
+  { budget: b, bucketScopeId, principalUserId }: ResolvedBudget,
+  spendByBudgetId: Map<string, string>,
+): BudgetWire {
+  return {
+    id: b.id,
+    scope: scopeToWire(b.scopeType),
+    scope_id: bucketScopeId,
+    ...(principalUserId ? { principal_id: principalUserId } : {}),
+    ...(b.scopeType === "ATTRIBUTED_USER" ? { per_user: true as const } : {}),
+    provider_key: b.providerKey,
+    window: b.window.toLowerCase(),
+    limit_micro_usd: decimalToMicroUSD(b.limitUsd),
+    spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
+    resets_at: Math.floor(b.resetsAt.getTime() / 1000),
+    on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
+  };
 }
 
 type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];

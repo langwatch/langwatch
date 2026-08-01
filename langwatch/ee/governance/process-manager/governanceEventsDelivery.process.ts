@@ -68,6 +68,56 @@ const deliverGovernanceSchema = z.object({
 });
 type DeliverGovernancePayload = z.infer<typeof deliverGovernanceSchema>;
 
+/**
+ * Commits the one deterministic send an endpoint gets for an envelope.
+ * Each endpoint carries its own revision line, so a conflict means a
+ * concurrent writer moved that stream and the intent has to run again.
+ */
+async function commitEndpointSend(
+  deps: WebhookDeliveryProcessDeps,
+  options: {
+    payload: DeliverGovernancePayload;
+    endpointId: string;
+    now: number;
+  },
+): Promise<void> {
+  const { payload, endpointId, now } = options;
+  const ref = {
+    processName: GOVERNANCE_EVENTS_PROCESS_NAME,
+    projectId: payload.project_id,
+    processKey: `endpoint:${endpointId}`,
+  };
+  const existing = await deps.processStore.findByRef({ ref });
+  const batchId = `${endpointId}:${payload.envelope.id}`;
+  const message: NewOutboxMessage = {
+    messageKey: `send:${batchId}`,
+    intentType: "sendBatch",
+    payload: {
+      organizationId: payload.organization_id,
+      projectId: payload.project_id,
+      endpointId,
+      batchId,
+      envelopes: [payload.envelope],
+    } as unknown as JsonValue,
+    traceCarrier: {},
+  };
+  const result = await deps.processStore.commit({
+    ref,
+    tenantId: payload.project_id,
+    sourceEventId: `deliver:${batchId}`,
+    expectedRevision: existing?.revision ?? 0,
+    state: existing?.state ?? {},
+    nextWakeAt: existing?.nextWakeAt ?? null,
+    messages: [message],
+    now,
+  });
+  if (result.outcome === "revisionConflict") {
+    throw new Error(
+      `governance deliver hit a revision conflict on endpoint ${endpointId}; retrying`,
+    );
+  }
+}
+
 export function runDeliverGovernance(deps: WebhookDeliveryProcessDeps) {
   return async (
     payload: DeliverGovernancePayload,
@@ -85,40 +135,11 @@ export function runDeliverGovernance(deps: WebhookDeliveryProcessDeps) {
 
     const now = (deps.now ?? Date.now)();
     for (const endpoint of endpoints) {
-      const ref = {
-        processName: GOVERNANCE_EVENTS_PROCESS_NAME,
-        projectId: payload.project_id,
-        processKey: `endpoint:${endpoint.id}`,
-      };
-      const existing = await deps.processStore.findByRef({ ref });
-      const batchId = `${endpoint.id}:${payload.envelope.id}`;
-      const message: NewOutboxMessage = {
-        messageKey: `send:${batchId}`,
-        intentType: "sendBatch",
-        payload: {
-          organizationId: payload.organization_id,
-          projectId: payload.project_id,
-          endpointId: endpoint.id,
-          batchId,
-          envelopes: [payload.envelope],
-        } as unknown as JsonValue,
-        traceCarrier: {},
-      };
-      const result = await deps.processStore.commit({
-        ref,
-        tenantId: payload.project_id,
-        sourceEventId: `deliver:${batchId}`,
-        expectedRevision: existing?.revision ?? 0,
-        state: existing?.state ?? {},
-        nextWakeAt: existing?.nextWakeAt ?? null,
-        messages: [message],
+      await commitEndpointSend(deps, {
+        payload,
+        endpointId: endpoint.id,
         now,
       });
-      if (result.outcome === "revisionConflict") {
-        throw new Error(
-          `governance deliver hit a revision conflict on endpoint ${endpoint.id}; retrying`,
-        );
-      }
     }
   };
 }

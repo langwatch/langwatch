@@ -11,6 +11,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/commands";
 import { GOVERNANCE_EVENTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
 import {
+  type BudgetSpendTarget,
   budgetPeriodFloorMs,
   currentPeriodStart,
   type GatewayBudgetClickHouseRepository,
@@ -55,15 +56,21 @@ async function tenantProjectId(
   return project?.id ?? null;
 }
 
-export async function emitVkLifecycle(
-  prisma: PrismaClient,
+export interface VkLifecycleSignal {
   vk: Pick<
     VirtualKey,
     "id" | "organizationId" | "name" | "displayPrefix" | "traceProjectId"
-  >,
-  action: VkLifecycleAction,
-  reason?: string | null,
+  >;
+  action: VkLifecycleAction;
+  /** Operator note carried to the webhook, when the action has one. */
+  reason?: string | null;
+}
+
+export async function emitVkLifecycle(
+  prisma: PrismaClient,
+  signal: VkLifecycleSignal,
 ): Promise<void> {
+  const { vk, action } = signal;
   try {
     const commands = governanceCommands();
     if (!commands?.recordVkLifecycle) return;
@@ -80,7 +87,7 @@ export async function emitVkLifecycle(
       action,
       name: vk.name,
       display_prefix: vk.displayPrefix,
-      reason: reason ?? null,
+      reason: signal.reason ?? null,
       occurred_at: Date.now(),
     };
     await commands.recordVkLifecycle.send(payload);
@@ -99,6 +106,143 @@ export interface CrossingCandidateRow {
   endUserId: string | null;
 }
 
+export interface CrossingDetectionDeps {
+  prisma: PrismaClient;
+  budgetCHRepository: GatewayBudgetClickHouseRepository;
+}
+
+/**
+ * What a crossing read needs out of Postgres: the live budgets behind the
+ * written rows, the projects whose ledger carries their spend, and the
+ * bucket boundaries that moved off the calendar.
+ */
+interface CrossingContext {
+  candidates: CrossingCandidateRow[];
+  budgetById: Map<string, GatewayBudget>;
+  boundaryByKey: Map<string, number>;
+  projectIds: string[];
+}
+
+/** Null when nothing is left to read: no live budget, or no project. */
+async function loadCrossingContext(
+  deps: CrossingDetectionDeps,
+  rows: CrossingCandidateRow[],
+): Promise<CrossingContext | null> {
+  const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
+  const budgets = await deps.prisma.gatewayBudget.findMany({
+    where: { id: { in: budgetIds }, archivedAt: null },
+  });
+  const budgetById = new Map<string, GatewayBudget>(
+    budgets.map((b) => [b.id, b]),
+  );
+  const candidates = rows.filter((r) => budgetById.has(r.budgetId));
+  if (candidates.length === 0) return null;
+
+  const orgIds = [...new Set(budgets.map((b) => b.organizationId))];
+  const projects = await deps.prisma.project.findMany({
+    where: { team: { organizationId: { in: orgIds } } },
+    select: { id: true },
+  });
+  if (projects.length === 0) return null;
+
+  const bucketBoundaries =
+    await deps.prisma.gatewayBudgetBucketBoundary.findMany({
+      where: {
+        organizationId: { in: orgIds },
+        budgetId: { in: budgetIds },
+      },
+    });
+  return {
+    candidates,
+    budgetById,
+    boundaryByKey: new Map(
+      bucketBoundaries.map((b) => [
+        `${b.budgetId}:${b.bucketScopeId}`,
+        b.periodStartedAt.getTime(),
+      ]),
+    ),
+    projectIds: projects.map((p) => p.id),
+  };
+}
+
+/**
+ * One spend target per written bucket, floored at the later of the
+ * budget's own period and the bucket's recorded boundary, so a bucket
+ * reset mid-period never reads spend from before its reset.
+ */
+function buildSpendTargets(
+  context: CrossingContext,
+  now: Date,
+): BudgetSpendTarget[] {
+  return context.candidates.map((r) => {
+    const budget = context.budgetById.get(r.budgetId)!;
+    const floors = [
+      budgetPeriodFloorMs(budget, now),
+      context.boundaryByKey.get(`${r.budgetId}:${r.bucketScopeId}`),
+    ].filter((n): n is number => typeof n === "number");
+    return {
+      budgetId: budget.id,
+      scope: budget.scopeType,
+      scopeId: r.bucketScopeId,
+      window: budget.window,
+      match: "exact" as const,
+      periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
+    };
+  });
+}
+
+/**
+ * Breached once spend reaches the limit, threshold at the soft warn line,
+ * nothing below it. A budget without a positive limit never crosses.
+ */
+function crossingKind(
+  spentUsd: number,
+  limitUsd: number,
+): BudgetCrossingKind | null {
+  if (limitUsd <= 0) return null;
+  const pct = (spentUsd * 100) / limitUsd;
+  if (pct >= 100) return "breached";
+  if (pct >= SoftWarnPercent) return "threshold_crossed";
+  return null;
+}
+
+/**
+ * The crossing command for one written bucket, or null when the bucket has
+ * not crossed. The period start is the bucket's own floor when it has one,
+ * so a moved boundary opens its own crossing window.
+ */
+function crossingFor(options: {
+  row: CrossingCandidateRow;
+  budget: GatewayBudget;
+  /** The bucket's ledger total, as the spend read returned it. */
+  spentUsd: string | undefined;
+  periodFloorMs: number | undefined;
+  now: Date;
+}): RecordBudgetCrossingCommandData | null {
+  const { row, budget, now } = options;
+  const spent = Number.parseFloat(options.spentUsd ?? "0") || 0;
+  const limit = Number.parseFloat(budget.limitUsd.toString()) || 0;
+  const kind = crossingKind(spent, limit);
+  if (!kind) return null;
+
+  return {
+    tenantId: row.tenantId,
+    organization_id: budget.organizationId,
+    budget_id: budget.id,
+    kind,
+    scope_type: budget.scopeType.toLowerCase(),
+    bucket_scope_id: row.bucketScopeId,
+    end_user_id: row.endUserId,
+    window: budget.window,
+    period_started_at_ms:
+      options.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),
+    limit_usd: limit.toFixed(6),
+    spent_usd: spent.toFixed(6),
+    on_breach: budget.onBreach === "BLOCK" ? "block" : "warn",
+    occurred_at: Date.now(),
+  };
+}
+
 /**
  * Post-debit crossing detection. Reads the written buckets' current-period
  * spend (boundary-aware), compares against each budget's warn threshold
@@ -108,10 +252,7 @@ export interface CrossingCandidateRow {
  * once-per-crossing-per-period rule.
  */
 export async function detectBudgetCrossings(
-  deps: {
-    prisma: PrismaClient;
-    budgetCHRepository: GatewayBudgetClickHouseRepository;
-  },
+  deps: CrossingDetectionDeps,
   rows: CrossingCandidateRow[],
 ): Promise<void> {
   if (rows.length === 0) return;
@@ -119,95 +260,33 @@ export async function detectBudgetCrossings(
     const commands = governanceCommands();
     if (!commands?.recordBudgetCrossing) return;
 
-    const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
-    const budgets = await deps.prisma.gatewayBudget.findMany({
-      where: { id: { in: budgetIds }, archivedAt: null },
-    });
-    const budgetById = new Map<string, GatewayBudget>(
-      budgets.map((b) => [b.id, b]),
-    );
-    const candidates = rows.filter((r) => budgetById.has(r.budgetId));
-    if (candidates.length === 0) return;
-
-    const orgIds = [...new Set(budgets.map((b) => b.organizationId))];
-    const projects = await deps.prisma.project.findMany({
-      where: { team: { organizationId: { in: orgIds } } },
-      select: { id: true },
-    });
-    if (projects.length === 0) return;
-
+    // One instant anchors the whole read: the period floors, the spend
+    // read and the stamped period start all have to agree.
     const now = new Date();
-    const bucketBoundaries =
-      await deps.prisma.gatewayBudgetBucketBoundary.findMany({
-        where: {
-          organizationId: { in: orgIds },
-          budgetId: { in: budgetIds },
-        },
-      });
-    const boundaryByKey = new Map(
-      bucketBoundaries.map((b) => [
-        `${b.budgetId}:${b.bucketScopeId}`,
-        b.periodStartedAt.getTime(),
-      ]),
-    );
+    const context = await loadCrossingContext(deps, rows);
+    if (!context) return;
 
-    const targets = candidates.map((r) => {
-      const budget = budgetById.get(r.budgetId)!;
-      const floors = [
-        budgetPeriodFloorMs(budget, now),
-        boundaryByKey.get(`${r.budgetId}:${r.bucketScopeId}`),
-      ].filter((n): n is number => typeof n === "number");
-      return {
-        budgetId: budget.id,
-        scope: budget.scopeType,
-        scopeId: r.bucketScopeId,
-        window: budget.window,
-        match: "exact" as const,
-        periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
-      };
-    });
+    const targets = buildSpendTargets(context, now);
     const spends =
       await deps.budgetCHRepository.getSpendForTargetsAcrossTenants(
-        projects.map((p) => p.id),
+        context.projectIds,
         targets,
         now,
       );
     const spentByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
 
-    for (const r of candidates) {
-      const budget = budgetById.get(r.budgetId)!;
-      const spentUsd =
-        Number.parseFloat(spentByBudget.get(r.budgetId) ?? "0") || 0;
-      const limitUsd = Number.parseFloat(budget.limitUsd.toString()) || 0;
-      if (limitUsd <= 0) continue;
-      const pct = (spentUsd * 100) / limitUsd;
-      let kind: BudgetCrossingKind | null = null;
-      if (pct >= 100) kind = "breached";
-      else if (pct >= SoftWarnPercent) kind = "threshold_crossed";
-      if (!kind) continue;
-
-      const floor = targets.find(
-        (t) => t.budgetId === r.budgetId && t.scopeId === r.bucketScopeId,
-      )?.periodFloorMs;
-      const periodStartedAtMs =
-        floor ?? currentPeriodStart(budget.window, now).getTime();
-
-      const payload: RecordBudgetCrossingCommandData = {
-        tenantId: r.tenantId,
-        organization_id: budget.organizationId,
-        budget_id: budget.id,
-        kind,
-        scope_type: budget.scopeType.toLowerCase(),
-        bucket_scope_id: r.bucketScopeId,
-        end_user_id: r.endUserId,
-        window: budget.window,
-        period_started_at_ms: periodStartedAtMs,
-        limit_usd: limitUsd.toFixed(6),
-        spent_usd: spentUsd.toFixed(6),
-        on_breach: budget.onBreach === "BLOCK" ? "block" : "warn",
-        occurred_at: Date.now(),
-      };
-      await commands.recordBudgetCrossing.send(payload);
+    for (const r of context.candidates) {
+      const crossing = crossingFor({
+        row: r,
+        budget: context.budgetById.get(r.budgetId)!,
+        spentUsd: spentByBudget.get(r.budgetId),
+        periodFloorMs: targets.find(
+          (t) => t.budgetId === r.budgetId && t.scopeId === r.bucketScopeId,
+        )?.periodFloorMs,
+        now,
+      });
+      if (!crossing) continue;
+      await commands.recordBudgetCrossing.send(crossing);
     }
   } catch (error) {
     logger.warn(

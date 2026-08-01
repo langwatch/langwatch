@@ -58,6 +58,37 @@ import { app } from "../[[...route]]/app";
 const ns = `billing-api-${nanoid(8)}`;
 const baseTime = Date.UTC(2026, 0, 10, 12, 0, 0);
 
+/**
+ * Spend rows are tenant-namespaced in ClickHouse, so teardown deletes per
+ * tenant. A tenant id is absent when its fixture never got created, and the
+ * client itself is unset when the containers never came up.
+ */
+async function dropSpendRowsForTenants(
+  tenantIds: Array<string | undefined>,
+): Promise<void> {
+  if (!chClient) return;
+  for (const tenantId of tenantIds) {
+    if (!tenantId) continue;
+    await chClient.command({
+      query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenantId}'`,
+    });
+  }
+}
+
+/** The rows referencing an organization that block deleting it. */
+async function deleteOrganizationDependents(
+  organizations: Array<Organization | undefined>,
+): Promise<void> {
+  for (const org of organizations) {
+    if (!org) continue;
+    await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
+    await prisma.apiKey.deleteMany({ where: { organizationId: org.id } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: org.id },
+    });
+  }
+}
+
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;
   let foreignOrganization: Organization;
@@ -247,39 +278,20 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     // A failed beforeAll leaves the fixtures unset; surfacing the original
     // failure beats a TypeError from teardown.
     if (!organization?.id) return;
-    if (chClient) {
-      for (const tenant of [project?.id, foreignProject?.id]) {
-        if (!tenant) continue;
-        await chClient.command({
-          query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenant}'`,
-        });
-      }
-    }
-    for (const org of [organization, foreignOrganization]) {
-      if (!org) continue;
-      await prisma.roleBinding.deleteMany({
-        where: { organizationId: org.id },
-      });
-      await prisma.apiKey.deleteMany({ where: { organizationId: org.id } });
-      await prisma.organizationUser.deleteMany({
-        where: { organizationId: org.id },
-      });
-    }
-    await prisma.project.deleteMany({
-      where: { id: { in: [project?.id ?? "", foreignProject?.id ?? ""] } },
-    });
+    await dropSpendRowsForTenants([project?.id, foreignProject?.id]);
+    await deleteOrganizationDependents([organization, foreignOrganization]);
+    const projectIds = [project?.id ?? "", foreignProject?.id ?? ""];
+    const organizationIds = [
+      organization?.id ?? "",
+      foreignOrganization?.id ?? "",
+    ];
+    await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
     await prisma.team.deleteMany({
-      where: {
-        organizationId: {
-          in: [organization?.id ?? "", foreignOrganization?.id ?? ""],
-        },
-      },
+      where: { organizationId: { in: organizationIds } },
     });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.organization.deleteMany({
-      where: {
-        id: { in: [organization?.id ?? "", foreignOrganization?.id ?? ""] },
-      },
+      where: { id: { in: organizationIds } },
     });
     await stopTestContainers();
   });

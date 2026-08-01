@@ -68,6 +68,15 @@ export type CreateVirtualKeyData = {
   purpose?: "USER" | "LANGY";
 };
 
+export type SetVirtualKeyDisabledData = {
+  id: string;
+  organizationId: string;
+  /** True parks the key as DISABLED; false returns it to ACTIVE. */
+  disabled: boolean;
+  /** Operator note kept on the row while disabled; cleared on re-enable. */
+  reason: string | null;
+};
+
 export class VirtualKeyRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -344,20 +353,17 @@ export class VirtualKeyRepository {
   }
 
   async setDisabled(
-    id: string,
-    organizationId: string,
-    disabled: boolean,
-    reason: string | null,
+    data: SetVirtualKeyDisabledData,
     tx?: Prisma.TransactionClient,
   ): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
-      where: { id, organizationId },
-      data: disabled
+      where: { id: data.id, organizationId: data.organizationId },
+      data: data.disabled
         ? {
             status: "DISABLED",
             disabledAt: new Date(),
-            disabledReason: reason,
+            disabledReason: data.reason,
             revision: { increment: 1n },
           }
         : {

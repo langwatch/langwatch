@@ -20,12 +20,19 @@ import {
   rateSpendNanoUsd,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
-import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type {
+  BudgetDebitRow,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
 import {
   budgetAppliesToProvider,
+  type ResolvedBudget,
   resolveApplicableBudgets,
 } from "~/server/gateway/budgetResolution.service";
-import { detectBudgetCrossings } from "../services/governanceSignals.service";
+import {
+  type CrossingCandidateRow,
+  detectBudgetCrossings,
+} from "../services/governanceSignals.service";
 
 const logger = createLogger("langwatch:governance:attributed-user-debits");
 
@@ -93,58 +100,111 @@ export interface AttributedDebitsProcessDeps {
   budgetCHRepository: GatewayBudgetClickHouseRepository;
 }
 
+/**
+ * The ATTRIBUTED_USER templates this request debits: the end user must
+ * have resolved a bucket, and a provider-filtered template only sees its
+ * own provider's traffic.
+ */
+async function resolveAttributedTemplates(
+  prisma: PrismaClient,
+  payload: WriteAttributedDebitsPayload,
+  providerKey: string | null,
+): Promise<ResolvedBudget[]> {
+  const resolved = await resolveApplicableBudgets(prisma, {
+    organizationId: payload.organization_id,
+    virtualKeyId: payload.virtual_key_id,
+    projectId: payload.project_id,
+    endUserId: payload.end_user_id,
+  });
+  return resolved.filter(
+    (r) =>
+      r.budget.scopeType === "ATTRIBUTED_USER" &&
+      r.endUserId !== null &&
+      budgetAppliesToProvider(r.budget, providerKey),
+  );
+}
+
+/**
+ * One ledger debit per matching template, every row priced from the same
+ * rated cost. An outcome that carries no usage rates as zero tokens: the
+ * row still lands so the per-request insert probe can see it.
+ */
+function buildAttributedDebitRows(
+  payload: WriteAttributedDebitsPayload,
+  templates: ResolvedBudget[],
+  providerKey: string | null,
+): BudgetDebitRow[] {
+  const usage = payload.usage ?? {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    reasoning_tokens: 0,
+  };
+  const rated = rateSpendNanoUsd({
+    model: payload.model || "unknown",
+    usage,
+    rateVersion: payload.rate_version,
+  });
+  const amountUsd = (rated.costNanoUsd / NANO_USD_PER_USD).toFixed(6);
+  return templates.map((t) => ({
+    tenantId: payload.project_id,
+    budgetId: t.budget.id,
+    scope: t.budget.scopeType,
+    scopeId: t.bucketScopeId,
+    window: t.budget.window,
+    virtualKeyId: payload.virtual_key_id,
+    providerKey,
+    gatewayRequestId: payload.gateway_request_id,
+    amountUsd,
+    tokensInput: usage.input_tokens,
+    tokensOutput: usage.output_tokens,
+    tokensCacheRead: usage.cache_read_input_tokens,
+    tokensCacheWrite: usage.cache_creation_input_tokens,
+    model: payload.model || "unknown",
+    durationMs: payload.duration_ms,
+    status: payload.status === "failed" ? "PROVIDER_ERROR" : "SUCCESS",
+    occurredAt: new Date(payload.occurred_at),
+  }));
+}
+
+/**
+ * The buckets this request wrote, deduped per (budget, bucket): several
+ * templates can land on the same bucket and one crossing read answers for
+ * all of them.
+ */
+function crossingCandidates(
+  payload: WriteAttributedDebitsPayload,
+  templates: ResolvedBudget[],
+): CrossingCandidateRow[] {
+  return [
+    ...new Map(
+      templates.map((t) => [
+        `${t.budget.id}:${t.bucketScopeId}`,
+        {
+          tenantId: payload.project_id,
+          budgetId: t.budget.id,
+          bucketScopeId: t.bucketScopeId,
+          endUserId: payload.end_user_id,
+        },
+      ]),
+    ).values(),
+  ];
+}
+
 export function runWriteAttributedDebits(deps: AttributedDebitsProcessDeps) {
   return async (payload: WriteAttributedDebitsPayload): Promise<void> => {
-    const resolved = await resolveApplicableBudgets(deps.prisma, {
-      organizationId: payload.organization_id,
-      virtualKeyId: payload.virtual_key_id,
-      projectId: payload.project_id,
-      endUserId: payload.end_user_id,
-    });
     const providerKey = payload.model_provider_id || null;
-    const templates = resolved.filter(
-      (r) =>
-        r.budget.scopeType === "ATTRIBUTED_USER" &&
-        r.endUserId !== null &&
-        budgetAppliesToProvider(r.budget, providerKey),
+    const templates = await resolveAttributedTemplates(
+      deps.prisma,
+      payload,
+      providerKey,
     );
     if (templates.length === 0) return;
 
-    const usage = payload.usage ?? {
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-      reasoning_tokens: 0,
-    };
-    const rated = rateSpendNanoUsd({
-      model: payload.model || "unknown",
-      usage,
-      rateVersion: payload.rate_version,
-    });
-    const amountUsd = (rated.costNanoUsd / NANO_USD_PER_USD).toFixed(6);
-
     try {
       await deps.budgetCHRepository.insertDebitsForBudgets(
-        templates.map((t) => ({
-          tenantId: payload.project_id,
-          budgetId: t.budget.id,
-          scope: t.budget.scopeType,
-          scopeId: t.bucketScopeId,
-          window: t.budget.window,
-          virtualKeyId: payload.virtual_key_id,
-          providerKey,
-          gatewayRequestId: payload.gateway_request_id,
-          amountUsd,
-          tokensInput: usage.input_tokens,
-          tokensOutput: usage.output_tokens,
-          tokensCacheRead: usage.cache_read_input_tokens,
-          tokensCacheWrite: usage.cache_creation_input_tokens,
-          model: payload.model || "unknown",
-          durationMs: payload.duration_ms,
-          status: payload.status === "failed" ? "PROVIDER_ERROR" : "SUCCESS",
-          occurredAt: new Date(payload.occurred_at),
-        })),
+        buildAttributedDebitRows(payload, templates, providerKey),
       );
     } catch (error) {
       logger.error(
@@ -162,19 +222,40 @@ export function runWriteAttributedDebits(deps: AttributedDebitsProcessDeps) {
     // Post-debit crossing detection (threshold/breach webhook families).
     // Best effort inside its own service: a notification can never fail
     // the debit path, and store-level idempotency makes retries safe.
-    await detectBudgetCrossings(deps, [
-      ...new Map(
-        templates.map((t) => [
-          `${t.budget.id}:${t.bucketScopeId}`,
-          {
-            tenantId: payload.project_id,
-            budgetId: t.budget.id,
-            bucketScopeId: t.bucketScopeId,
-            endUserId: payload.end_user_id,
-          },
-        ]),
-      ).values(),
-    ]);
+    await detectBudgetCrossings(deps, crossingCandidates(payload, templates));
+  };
+}
+
+/** The two outcomes a request can reach, each carrying its own command. */
+type SpendOutcome =
+  | { status: "confirmed"; data: ConfirmSpendCommandData }
+  | { status: "failed"; data: FailSpendCommandData };
+
+/**
+ * The debit payload for one outcome. A failure still debits whatever
+ * tokens the provider billed before erroring, and carries no rate version
+ * because nothing priced it.
+ */
+function writeDebitsPayload(
+  state: AttributedDebitsState,
+  projectId: string,
+  outcome: SpendOutcome,
+): WriteAttributedDebitsPayload {
+  const { data } = outcome;
+  return {
+    gateway_request_id: data.gateway_request_id,
+    project_id: projectId,
+    organization_id: state.organizationId,
+    virtual_key_id: state.virtualKeyId,
+    end_user_id: state.endUserId,
+    model: data.model,
+    model_provider_id: data.model_provider_id,
+    usage: data.usage,
+    rate_version:
+      outcome.status === "confirmed" ? outcome.data.rate_version : "",
+    status: outcome.status,
+    duration_ms: data.duration_ms,
+    occurred_at: data.occurred_at,
   };
 }
 
@@ -209,47 +290,31 @@ export function attributedUserDebitsPM(
       })
       .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
         if (!state.endUserId) return { state };
-        const confirmed = data as ConfirmSpendCommandData;
         return {
           state,
           intents: [
-            ctx.intents.writeDebits("debits:confirmed", {
-              gateway_request_id: confirmed.gateway_request_id,
-              project_id: ctx.projectId,
-              organization_id: state.organizationId,
-              virtual_key_id: state.virtualKeyId,
-              end_user_id: state.endUserId,
-              model: confirmed.model,
-              model_provider_id: confirmed.model_provider_id,
-              usage: confirmed.usage,
-              rate_version: confirmed.rate_version,
-              status: "confirmed",
-              duration_ms: confirmed.duration_ms,
-              occurred_at: confirmed.occurred_at,
-            }),
+            ctx.intents.writeDebits(
+              "debits:confirmed",
+              writeDebitsPayload(state, ctx.projectId, {
+                status: "confirmed",
+                data: data as ConfirmSpendCommandData,
+              }),
+            ),
           ],
         };
       })
       .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
         if (!state.endUserId) return { state };
-        const failed = data as FailSpendCommandData;
         return {
           state,
           intents: [
-            ctx.intents.writeDebits("debits:failed", {
-              gateway_request_id: failed.gateway_request_id,
-              project_id: ctx.projectId,
-              organization_id: state.organizationId,
-              virtual_key_id: state.virtualKeyId,
-              end_user_id: state.endUserId,
-              model: failed.model,
-              model_provider_id: failed.model_provider_id,
-              usage: failed.usage,
-              rate_version: "",
-              status: "failed",
-              duration_ms: failed.duration_ms,
-              occurred_at: failed.occurred_at,
-            }),
+            ctx.intents.writeDebits(
+              "debits:failed",
+              writeDebitsPayload(state, ctx.projectId, {
+                status: "failed",
+                data: data as FailSpendCommandData,
+              }),
+            ),
           ],
         };
       })

@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
+  type HandleResult,
   InMemoryProcessStore,
   type ProcessDefinition,
   ProcessManagerService,
@@ -52,12 +53,17 @@ function buildDefinition(deps: SpendSettlementProcessDeps) {
   ) as ProcessDefinition<SpendSettlementState>;
 }
 
-function envelopeFor(
-  requestId: string,
-  eventType: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): ProcessEventEnvelope {
+function envelopeFor({
+  requestId,
+  eventType,
+  data,
+  occurredAt,
+}: {
+  requestId: string;
+  eventType: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): ProcessEventEnvelope {
   return {
     eventId: `${eventType}:${requestId}`,
     eventType,
@@ -70,39 +76,47 @@ function envelopeFor(
 }
 
 function admitted(requestId: string): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-    { gateway_request_id: requestId, occurred_at: T0 },
-    T0,
-  );
+    eventType: GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+    data: { gateway_request_id: requestId, occurred_at: T0 },
+    occurredAt: T0,
+  });
 }
 
 function confirmed(requestId: string, at: number): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-    { gateway_request_id: requestId, occurred_at: at },
-    at,
-  );
+    eventType: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+    data: { gateway_request_id: requestId, occurred_at: at },
+    occurredAt: at,
+  });
 }
 
 function settled(requestId: string, at: number): ProcessEventEnvelope {
-  return envelopeFor(
+  return envelopeFor({
     requestId,
-    GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-    {
+    eventType: GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+    data: {
       gateway_request_id: requestId,
       occurred_at: at,
       reason: "confirmation_deadline_expired",
     },
-    at,
-  );
+    occurredAt: at,
+  });
 }
 
-async function consume(envelope: ProcessEventEnvelope): Promise<void> {
+/**
+ * Feeds one envelope through the process manager and reports the commit
+ * outcome. Every caller asserts it is not a revisionConflict: a conflict
+ * silently drops the event, which would make the rest of the case pass
+ * against a process instance that never saw it.
+ */
+async function consume(
+  envelope: ProcessEventEnvelope,
+): Promise<HandleResult["outcome"]> {
   const result = await service.handleEvent({ envelope, now: clock });
-  expect(result.outcome).not.toBe("revisionConflict");
+  return result.outcome;
 }
 
 async function instanceFor(requestId: string) {
@@ -171,7 +185,7 @@ describe("spend settlement sweeper", () => {
   /** @scenario An unconfirmed admission settles when the grace expires */
   it("arms admission + grace and settles on a silent wake", async () => {
     const requestId = `${ns}-silent`;
-    await consume(admitted(requestId));
+    expect(await consume(admitted(requestId))).not.toBe("revisionConflict");
 
     const armed = await instanceFor(requestId);
     expect(armed?.nextWakeAt).toBe(T0 + GRACE_MS);
@@ -190,7 +204,9 @@ describe("spend settlement sweeper", () => {
 
     // The settled event coming back around closes the instance for good:
     // a stray second wake stands down.
-    await consume(settled(requestId, clock));
+    expect(await consume(settled(requestId, clock))).not.toBe(
+      "revisionConflict",
+    );
     const closed = await instanceFor(requestId);
     expect(closed?.state.resolved).toBe(true);
     expect(closed?.nextWakeAt).toBeNull();
@@ -199,9 +215,11 @@ describe("spend settlement sweeper", () => {
   /** @scenario A confirmation inside the grace stands the sweeper down */
   it("clears the wake when the confirmation arrives in time", async () => {
     const requestId = `${ns}-confirmed`;
-    await consume(admitted(requestId));
+    expect(await consume(admitted(requestId))).not.toBe("revisionConflict");
     clock = T0 + 5_000;
-    await consume(confirmed(requestId, clock));
+    expect(await consume(confirmed(requestId, clock))).not.toBe(
+      "revisionConflict",
+    );
 
     const instance = await instanceFor(requestId);
     expect(instance?.state.resolved).toBe(true);
@@ -217,8 +235,10 @@ describe("spend settlement sweeper", () => {
   it("does not arm when the outcome was seen before the admission", async () => {
     const requestId = `${ns}-raced`;
     clock = T0 + 1_000;
-    await consume(confirmed(requestId, clock));
-    await consume(admitted(requestId));
+    expect(await consume(confirmed(requestId, clock))).not.toBe(
+      "revisionConflict",
+    );
+    expect(await consume(admitted(requestId))).not.toBe("revisionConflict");
 
     const instance = await instanceFor(requestId);
     expect(instance?.state.resolved).toBe(true);
@@ -228,7 +248,7 @@ describe("spend settlement sweeper", () => {
   /** @scenario Duplicate wakes cannot double-settle */
   it("issues settle exactly once across duplicate wakes", async () => {
     const requestId = `${ns}-dupe`;
-    await consume(admitted(requestId));
+    expect(await consume(admitted(requestId))).not.toBe("revisionConflict");
     clock = T0 + GRACE_MS + 1;
     expect(await fireWake(requestId)).toBe(true);
     // The first wake consumed nextWakeAt; a second due scan finds nothing.

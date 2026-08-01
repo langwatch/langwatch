@@ -37,6 +37,30 @@ function messageKeyOf(identity: OutboxMessageIdentity): string {
 }
 
 /**
+ * A dead message belonging to one process instance, optionally narrowed to a
+ * message-key prefix. An absent prefix matches every dead message of the
+ * instance.
+ */
+function isRequeueTarget(
+  message: StoredMessage,
+  target: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+  },
+): boolean {
+  if (message.processName !== target.processName) return false;
+  if (message.projectId !== target.projectId) return false;
+  if (message.processKey !== target.processKey) return false;
+  if (message.status !== "dead") return false;
+  return (
+    !target.messageKeyPrefix ||
+    message.messageKey.startsWith(target.messageKeyPrefix)
+  );
+}
+
+/**
  * In-memory ProcessStore for unit tests. Each call is
  * synchronous under the hood, so every `commit` is trivially atomic — the
  * same all-or-nothing contract the Postgres implementation must provide in
@@ -243,15 +267,7 @@ export class InMemoryProcessStore implements ProcessStore {
   }): Promise<number> {
     let requeued = 0;
     for (const message of this.messages.values()) {
-      if (message.processName !== params.processName) continue;
-      if (message.projectId !== params.projectId) continue;
-      if (message.processKey !== params.processKey) continue;
-      if (message.status !== "dead") continue;
-      if (
-        params.messageKeyPrefix &&
-        !message.messageKey.startsWith(params.messageKeyPrefix)
-      )
-        continue;
+      if (!isRequeueTarget(message, params)) continue;
       message.status = "pending";
       message.attempts = 0;
       message.nextAttemptAt = params.now;

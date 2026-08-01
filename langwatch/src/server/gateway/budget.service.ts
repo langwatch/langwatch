@@ -913,6 +913,64 @@ export class GatewayBudgetService {
   }
 
   /**
+   * The single-end-user branch of {@link reset}: moves one bucket's boundary
+   * on an attributed-user template and audits it under the same
+   * `gateway.budget.reset` action, carrying the bucket the operator reset.
+   * The template's own boundary and every other bucket stay where they are.
+   */
+  private async resetAttributedUserBucket(params: {
+    existing: GatewayBudget;
+    endUserId: string;
+    organizationId: string;
+    actorUserId: string;
+    reason?: string | null;
+    before: Prisma.InputJsonValue;
+    now: Date;
+  }): Promise<void> {
+    const { existing, organizationId, before, now } = params;
+    if (existing.scopeType !== "ATTRIBUTED_USER") {
+      throw new GatewayScopeOrgMismatchError("attributed-user budget");
+    }
+    const bucketScopeId = bucketScopeIdFor(
+      existing,
+      attributedUserBucketScopeId(existing.scopeId, params.endUserId),
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.gatewayBudgetBucketBoundary.upsert({
+        where: {
+          budgetId_bucketScopeId: {
+            budgetId: existing.id,
+            bucketScopeId,
+          },
+        },
+        create: {
+          organizationId,
+          budgetId: existing.id,
+          bucketScopeId,
+          periodStartedAt: now,
+        },
+        update: { periodStartedAt: now },
+      });
+      await this.auditLog.append(
+        {
+          organizationId,
+          actorUserId: params.actorUserId,
+          action: "gateway.budget.reset",
+          targetKind: "budget",
+          targetId: existing.id,
+          before,
+          after: {
+            row: serializeRowForAudit(existing),
+            resetBucketScopeId: bucketScopeId,
+            resetReason: params.reason ?? null,
+          },
+        },
+        tx,
+      );
+    });
+  }
+
+  /**
    * Move a budget's period boundary to now. NEVER mutates recorded spend:
    * the ledger and every emitted billing event are immutable, so
    * reconciliation is unaffected by resets; the boundary move alone is
@@ -936,45 +994,14 @@ export class GatewayBudgetService {
     const now = new Date();
 
     if (input.endUserId) {
-      if (existing.scopeType !== "ATTRIBUTED_USER") {
-        throw new GatewayScopeOrgMismatchError("attributed-user budget");
-      }
-      const bucketScopeId = bucketScopeIdFor(
+      await this.resetAttributedUserBucket({
         existing,
-        attributedUserBucketScopeId(existing.scopeId, input.endUserId),
-      );
-      await this.prisma.$transaction(async (tx) => {
-        await tx.gatewayBudgetBucketBoundary.upsert({
-          where: {
-            budgetId_bucketScopeId: {
-              budgetId: existing.id,
-              bucketScopeId,
-            },
-          },
-          create: {
-            organizationId: input.organizationId,
-            budgetId: existing.id,
-            bucketScopeId,
-            periodStartedAt: now,
-          },
-          update: { periodStartedAt: now },
-        });
-        await this.auditLog.append(
-          {
-            organizationId: input.organizationId,
-            actorUserId: input.actorUserId,
-            action: "gateway.budget.reset",
-            targetKind: "budget",
-            targetId: existing.id,
-            before,
-            after: {
-              row: serializeRowForAudit(existing),
-              resetBucketScopeId: bucketScopeId,
-              resetReason: input.reason ?? null,
-            },
-          },
-          tx,
-        );
+        endUserId: input.endUserId,
+        organizationId: input.organizationId,
+        actorUserId: input.actorUserId,
+        reason: input.reason,
+        before,
+        now,
       });
       return existing;
     }

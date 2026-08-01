@@ -64,6 +64,88 @@ function privateIpLiteral(url: string): string | null {
 }
 
 /**
+ * Terminally blocks the two destinations the webhook channel refuses before it
+ * opens a connection: a URL that fails the shape check (scheme, port), and a
+ * host that is a private / loopback IP literal, including bracketed IPv6. The
+ * SSRF validator on the send itself fails both closed as well, but as a
+ * retryable "unresolvable host" instead of the permanent block they are.
+ * `allowInsecureLocal` skips both, matching the relaxed validator the same flag
+ * selects for the send.
+ */
+function assertWebhookUrlAllowed({
+  url,
+  label,
+  allowInsecureLocal,
+}: {
+  url: string;
+  label: string;
+  allowInsecureLocal: boolean;
+}): void {
+  const shapeProblem = allowInsecureLocal ? null : validateWebhookUrlShape(url);
+  if (shapeProblem) {
+    throw new DispatchError({
+      message: `${label}: ${shapeProblem}`,
+      retryable: false,
+    });
+  }
+  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
+  if (privateLiteral) {
+    throw new DispatchError({
+      message: `${label}: the destination "${privateLiteral}" is a private or loopback address, which is not allowed.`,
+      retryable: false,
+    });
+  }
+}
+
+/**
+ * The outbound header set: the customer's static headers, sanitized again here
+ * as defense in depth over the save-time sanitize, plus the LangWatch envelope
+ * (event id, optional signature, delivery attempt, test-fire marker).
+ */
+function buildWebhookHeaders({
+  headers,
+  body,
+  eventId,
+  signingSecret,
+  attempt,
+  testFire,
+}: {
+  headers: Record<string, string>;
+  body: string;
+  eventId: string;
+  signingSecret?: string;
+  attempt?: number;
+  testFire: boolean;
+}): Record<string, string> {
+  // An unresolved kept sentinel means "the saved value" and should have been
+  // resolved by the caller (save / test-fire / decrypt-at-dispatch) — never
+  // send the literal marker to the customer's endpoint.
+  const resolvedHeaders = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT,
+    ),
+  );
+  return {
+    ...sanitizeWebhookHeaders(resolvedHeaders),
+    "Content-Type": "application/json",
+    "X-LangWatch-Event-Id": eventId,
+    ...(signingSecret
+      ? {
+          [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
+            secret: signingSecret,
+            body,
+            timestampSeconds: Math.floor(Date.now() / 1000),
+          }),
+        }
+      : {}),
+    ...(attempt !== undefined
+      ? { "X-LangWatch-Delivery-Attempt": String(attempt) }
+      : {}),
+    ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
+  };
+}
+
+/**
  * Per-project hourly cap on real webhook dispatches (ADR-040 §4) — a backstop
  * against an immediate-cadence trigger firing per-match turning our worker
  * fleet into an outbound flood. A safety limit, not a billing knob; promote to
@@ -145,23 +227,7 @@ export async function sendWebhook({
   allowInsecureLocal = false,
 }: WebhookSendInput): Promise<WebhookSendResult> {
   const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
-  const shapeProblem = allowInsecureLocal ? null : validateWebhookUrlShape(url);
-  if (shapeProblem) {
-    throw new DispatchError({
-      message: `${label}: ${shapeProblem}`,
-      retryable: false,
-    });
-  }
-  // Terminal-block a private/loopback IP literal (incl. bracketed IPv6) up
-  // front — the SSRF validator below fails these closed too, but as a
-  // retryable "unresolvable host" rather than the permanent block it is.
-  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
-  if (privateLiteral) {
-    throw new DispatchError({
-      message: `${label}: the destination "${privateLiteral}" is a private or loopback address, which is not allowed.`,
-      retryable: false,
-    });
-  }
+  assertWebhookUrlAllowed({ url, label, allowInsecureLocal });
   // Per-project dispatch cap (ADR-040 §4) — a real fire only; test fires ride
   // the drawer's per-user limit. Over the cap throws RETRYABLE with a
   // Retry-After to the window reset: a legitimate burst backs off and drains,
@@ -180,38 +246,20 @@ export async function sendWebhook({
       });
     }
   }
-  // An unresolved kept sentinel means "the saved value" and should have been
-  // resolved by the caller (save / test-fire / decrypt-at-dispatch) — never
-  // send the literal marker to the customer's endpoint.
-  const resolvedHeaders = Object.fromEntries(
-    Object.entries(headers).filter(
-      ([, value]) => value !== WEBHOOK_HEADER_VALUE_KEPT,
-    ),
-  );
   // Stable across retries when the caller supplies it (dispatch); a fresh id
   // for a test fire, which has no retries to dedupe.
   const resolvedEventId = eventId ?? randomUUID();
   const response = await sendHttpDestination({
     url,
     method,
-    headers: {
-      ...sanitizeWebhookHeaders(resolvedHeaders),
-      "Content-Type": "application/json",
-      "X-LangWatch-Event-Id": resolvedEventId,
-      ...(signingSecret
-        ? {
-            [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
-              secret: signingSecret,
-              body,
-              timestampSeconds: Math.floor(Date.now() / 1000),
-            }),
-          }
-        : {}),
-      ...(attempt !== undefined
-        ? { "X-LangWatch-Delivery-Attempt": String(attempt) }
-        : {}),
-      ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
-    },
+    headers: buildWebhookHeaders({
+      headers,
+      body,
+      eventId: resolvedEventId,
+      signingSecret,
+      attempt,
+      testFire,
+    }),
     body,
     contextLabel: label,
     validateUrl: allowInsecureLocal

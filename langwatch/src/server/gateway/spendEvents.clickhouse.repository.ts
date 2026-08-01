@@ -157,6 +157,67 @@ export interface SpendEventsPageFilters {
   status?: string;
 }
 
+/**
+ * The cursor and filter predicates of a spend-events walk, as clause fragments
+ * already carrying their leading AND plus the bound parameters they name. Each
+ * fragment is optional; an absent filter contributes neither a clause nor a
+ * parameter, so the query never binds a placeholder it does not reference.
+ */
+function buildSpendEventsWalkFilter({
+  decoded,
+  fromMs,
+  toMs,
+  virtualKeyId,
+  endUserId,
+  model,
+  status,
+}: {
+  decoded: SpendEventsCursor | null;
+  fromMs?: number;
+  toMs?: number;
+  virtualKeyId?: string;
+  endUserId?: string;
+  model?: string;
+  status?: string;
+}): { clauses: string[]; params: Record<string, unknown> } {
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (decoded) {
+    clauses.push(
+      "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
+    );
+    params.cursorEventTs = decoded.eventTimestampMs;
+    params.cursorRequestId = decoded.gatewayRequestId;
+  }
+  if (fromMs !== undefined) {
+    clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+    params.fromMs = fromMs;
+  }
+  if (toMs !== undefined) {
+    clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+    params.toMs = toMs;
+  }
+  if (virtualKeyId !== undefined) {
+    clauses.push("AND VirtualKeyId = {virtualKeyId:String}");
+    params.virtualKeyId = virtualKeyId;
+  }
+  if (endUserId !== undefined) {
+    clauses.push("AND EndUserId = {endUserId:String}");
+    params.endUserId = endUserId;
+  }
+  if (model !== undefined) {
+    clauses.push("AND Model = {model:String}");
+    params.model = model;
+  }
+  const statusFilter =
+    status !== undefined ? normalizeStatusFilter(status) : undefined;
+  if (statusFilter !== undefined) {
+    clauses.push("AND Status = {status:String}");
+    params.status = statusFilter;
+  }
+  return { clauses, params };
+}
+
 export class GatewaySpendEventsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -455,43 +516,20 @@ export class GatewaySpendEventsRepository {
     const client = await this.resolveClient(tenantIds[0]!);
     const decoded = cursor ? decodeSpendEventsCursor(cursor) : null;
 
-    const clauses: string[] = [];
-    const params: Record<string, unknown> = { tenantIds, limit };
-    if (decoded) {
-      clauses.push(
-        "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
-      );
-      params.cursorEventTs = decoded.eventTimestampMs;
-      params.cursorRequestId = decoded.gatewayRequestId;
-    }
-    if (fromMs !== undefined) {
-      clauses.push(
-        "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
-      );
-      params.fromMs = fromMs;
-    }
-    if (toMs !== undefined) {
-      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
-      params.toMs = toMs;
-    }
-    if (virtualKeyId !== undefined) {
-      clauses.push("AND VirtualKeyId = {virtualKeyId:String}");
-      params.virtualKeyId = virtualKeyId;
-    }
-    if (endUserId !== undefined) {
-      clauses.push("AND EndUserId = {endUserId:String}");
-      params.endUserId = endUserId;
-    }
-    if (model !== undefined) {
-      clauses.push("AND Model = {model:String}");
-      params.model = model;
-    }
-    const statusFilter =
-      status !== undefined ? normalizeStatusFilter(status) : undefined;
-    if (statusFilter !== undefined) {
-      clauses.push("AND Status = {status:String}");
-      params.status = statusFilter;
-    }
+    const { clauses, params: filterParams } = buildSpendEventsWalkFilter({
+      decoded,
+      fromMs,
+      toMs,
+      virtualKeyId,
+      endUserId,
+      model,
+      status,
+    });
+    const params: Record<string, unknown> = {
+      tenantIds,
+      limit,
+      ...filterParams,
+    };
 
     const result = await client.query({
       query: `
