@@ -217,6 +217,13 @@ export class ReplayService {
     return replayOptimized({ ctx: this.ctx, config, callbacks });
   }
 
+  /**
+   * Drop the projection's replay markers: the completed set and the in-flight
+   * cutoff hash. Every replay path already does this when it finishes cleanly;
+   * calling it before a run turns that run into a rebuild from scratch, since
+   * the completed set is what makes discovery skip aggregates an earlier
+   * (possibly aborted) run had finished.
+   */
   async cleanup(projectionName: string): Promise<void> {
     await cleanupAll({ redis: this.ctx.redis, projectionName });
   }

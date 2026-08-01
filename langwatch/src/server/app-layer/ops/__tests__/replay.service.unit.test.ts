@@ -64,6 +64,11 @@ type StubbedRuntime = ReturnType<typeof createReplayRuntime>;
 function stubRuntime(
   replayOptimized: StubbedRuntime["service"]["replayOptimized"],
 ) {
+  const cleanup = vi.fn(async () => undefined);
+  const checkPreviousRun = vi.fn(async () => ({
+    completedCount: 7,
+    markerCount: 0,
+  }));
   mockedCreateReplayRuntime.mockReturnValue({
     projections: [
       {
@@ -78,9 +83,14 @@ function stubRuntime(
     ],
     mapProjections: [],
     stateProjections: [],
-    service: { replayOptimized } as StubbedRuntime["service"],
+    service: {
+      replayOptimized,
+      cleanup,
+      checkPreviousRun,
+    } as unknown as StubbedRuntime["service"],
     close: vi.fn(async () => undefined),
   } satisfies StubbedRuntime);
+  return { cleanup };
 }
 
 function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
@@ -135,6 +145,100 @@ function buildProgress(
 }
 
 describe("ops ReplayService", () => {
+  describe("given replay markers left behind by an earlier run", () => {
+    describe("when a full rebuild starts", () => {
+      it("clears the selected projections' markers before replaying", async () => {
+        const repo = createFakeRepo();
+        const service = new ReplayService(repo);
+        const callOrder: string[] = [];
+        const { cleanup } = stubRuntime(
+          vi.fn(async () => {
+            callOrder.push("replay");
+            return {
+              aggregatesReplayed: 1,
+              totalEvents: 3,
+              batchErrors: 0,
+            };
+          }),
+        );
+        cleanup.mockImplementation(async () => {
+          callOrder.push("cleanup");
+        });
+
+        await service.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-01-01",
+          tenantIds: [],
+          fullRebuild: true,
+          description: "post-migration rebuild",
+          userName: "tester",
+        });
+
+        await vi.waitFor(async () => {
+          expect((await service.getStatus()).state).toBe("completed");
+        });
+        expect(cleanup).toHaveBeenCalledWith("traceSummary");
+        expect(callOrder).toEqual(["cleanup", "replay"]);
+      });
+    });
+
+    describe("when clearing the markers fails", () => {
+      it("fails the run instead of replaying against them", async () => {
+        const repo = createFakeRepo();
+        const service = new ReplayService(repo);
+        const replayOptimized = vi.fn(async () => ({
+          aggregatesReplayed: 1,
+          totalEvents: 3,
+          batchErrors: 0,
+        }));
+        const { cleanup } = stubRuntime(replayOptimized);
+        cleanup.mockRejectedValue(new Error("redis unavailable"));
+
+        await service.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-01-01",
+          tenantIds: [],
+          fullRebuild: true,
+          description: "post-migration rebuild",
+          userName: "tester",
+        });
+
+        await vi.waitFor(async () => {
+          expect((await service.getStatus()).state).toBe("failed");
+        });
+        expect((await service.getStatus()).error).toBe("redis unavailable");
+        expect(replayOptimized).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a default run starts", () => {
+      it("preserves the markers so the run resumes where it stopped", async () => {
+        const repo = createFakeRepo();
+        const service = new ReplayService(repo);
+        const { cleanup } = stubRuntime(
+          vi.fn(async () => ({
+            aggregatesReplayed: 1,
+            totalEvents: 3,
+            batchErrors: 0,
+          })),
+        );
+
+        await service.startReplay({
+          projectionNames: ["traceSummary"],
+          since: "2026-01-01",
+          tenantIds: [],
+          description: "resume",
+          userName: "tester",
+        });
+
+        await vi.waitFor(async () => {
+          expect((await service.getStatus()).state).toBe("completed");
+        });
+        expect(cleanup).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   it("routes operational state projections through the safe normal replay path", async () => {
     const repo = createFakeRepo();
     const service = new ReplayService(repo);

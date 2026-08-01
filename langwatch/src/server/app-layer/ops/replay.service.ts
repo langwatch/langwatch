@@ -53,6 +53,25 @@ export class ReplayService {
     since: string;
     tenantIds: string[];
     aggregateIds?: string[];
+    /**
+     * Rebuild from scratch instead of resuming: clear the selected
+     * projections' replay markers (completed set and in-flight cutoffs) under
+     * the replay lock, before discovery, so every discovered aggregate is
+     * replayed rather than skipped as already done.
+     *
+     * Required whenever the target tables no longer hold the rows those
+     * markers vouch for: tables truncated by hand, or swapped empty by a
+     * migration. Markers from an earlier aborted run survive on purpose so a
+     * plain re-run resumes where it stopped; against emptied tables that same
+     * behaviour drops the skipped aggregates' history with a successful-looking
+     * run and no error.
+     *
+     * Only safe when the target tables are empty for the replayed scope: map
+     * projections append increments, so replaying an aggregate whose rows are
+     * still present double counts. Leave unset to resume a partially failed
+     * run whose written rows are still in place.
+     */
+    fullRebuild?: boolean;
     description: string;
     userName: string;
   }): Promise<{ runId: string }> {
@@ -118,6 +137,7 @@ export class ReplayService {
     since: string;
     tenantIds: string[];
     aggregateIds?: string[];
+    fullRebuild?: boolean;
     description: string;
     userName: string;
   }): Promise<void> {
@@ -171,6 +191,33 @@ export class ReplayService {
           historyCtx: params,
         });
         return;
+      }
+
+      if (params.fullRebuild) {
+        // Under the replay lock and before discovery: drop the markers a
+        // resume would consult, so no aggregate is skipped as already done.
+        // See the fullRebuild doc on startReplay for when this is required.
+        // A failure here aborts the run rather than replaying against stale
+        // markers, which is the silent-skip this flag exists to prevent.
+        for (const projection of [
+          ...selectedProjections,
+          ...selectedMapProjections,
+          ...selectedStateProjections,
+        ]) {
+          const projectionName = projection.projectionName;
+          const cleared =
+            await runtime.service.checkPreviousRun(projectionName);
+          await runtime.service.cleanup(projectionName);
+          logger.info(
+            {
+              runId: params.runId,
+              projectionName,
+              completedMarkersCleared: cleared.completedCount,
+              inFlightMarkersCleared: cleared.markerCount,
+            },
+            "Cleared replay markers for full rebuild",
+          );
+        }
       }
 
       let cancelledFlag = false;
