@@ -32,6 +32,15 @@ vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
+// The tRPC error-audit middleware writes through the real prisma singleton, so
+// a mutation that throws here reaches a live client and fails with a Prisma
+// validation error that masks the assertion. Shard-order dependent: on its own
+// this file passes, batched with a test that initializes the app singleton it
+// does not.
+vi.mock("~/server/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("~/utils/getClientIp", () => ({
   getClientIp: vi.fn(() => "127.0.0.1"),
 }));
