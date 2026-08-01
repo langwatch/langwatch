@@ -1,5 +1,4 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import type React from "react";
 import { memo } from "react";
 import { RowButton } from "./RowButton";
 

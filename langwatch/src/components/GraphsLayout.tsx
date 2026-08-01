@@ -1,4 +1,4 @@
-import { Container, Heading, HStack, VStack } from "@chakra-ui/react";
+import { Container, HStack, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -93,7 +93,11 @@ export default function GraphsLayout({
             )}
           </VStack>
         </VStack>
-        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4} paddingBottom={16}>
+        <Container
+          maxWidth={showFilters ? "1612" : "1200"}
+          padding={4}
+          paddingBottom={16}
+        >
           {children}
         </Container>
       </HStack>

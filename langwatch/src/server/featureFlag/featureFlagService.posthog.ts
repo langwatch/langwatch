@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "../posthog";
 import {
   FEATURE_FLAG_CACHE_TTL_MS,
@@ -170,5 +170,4 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   isAvailable(): boolean {
     return this.posthog !== null;
   }
-
 }

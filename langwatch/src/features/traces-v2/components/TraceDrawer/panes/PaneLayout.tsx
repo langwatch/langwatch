@@ -104,7 +104,7 @@ export function PaneLayout({
   const detailPanelRef = useRef<ImperativePanelHandle>(null);
   const ctxBodyGroupRef = useRef<HTMLDivElement>(null);
   const ctxContentRef = useRef<HTMLDivElement>(null);
-  const ctxHeaderRef = useRef<HTMLButtonElement>(null);
+  const ctxHeaderRef = useRef<HTMLDivElement>(null);
 
   // Mouse-capture leak guard. If the operator drags a resize handle
   // off the browser window and releases the mouse out there, the

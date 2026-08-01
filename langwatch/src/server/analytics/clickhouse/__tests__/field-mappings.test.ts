@@ -1,32 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildJoinClause,
   fieldMappings,
-  getFieldMapping,
-  getTableForField,
   getColumnExpression,
-  requiresJoin,
+  getFieldMapping,
   getFieldsRequiringTable,
   getTableAlias,
-  buildJoinClause,
+  getTableForField,
   qualifiedColumn,
+  requiresJoin,
   tableAliases,
 } from "../field-mappings";
 
 describe("field-mappings", () => {
   describe("fieldMappings", () => {
     it("has mappings for trace identity fields", () => {
-      expect(fieldMappings["trace_id"]).toBeDefined();
-      expect(fieldMappings["trace_id"]?.table).toBe("trace_summaries");
-      expect(fieldMappings["trace_id"]?.column).toBe("TraceId");
+      expect(fieldMappings.trace_id).toBeDefined();
+      expect(fieldMappings.trace_id?.table).toBe("trace_summaries");
+      expect(fieldMappings.trace_id?.column).toBe("TraceId");
 
-      expect(fieldMappings["project_id"]).toBeDefined();
-      expect(fieldMappings["project_id"]?.column).toBe("TenantId");
+      expect(fieldMappings.project_id).toBeDefined();
+      expect(fieldMappings.project_id?.column).toBe("TenantId");
     });
 
     it("has mappings for metadata fields", () => {
       expect(fieldMappings["metadata.user_id"]).toBeDefined();
       expect(fieldMappings["metadata.user_id"]?.column).toBe(
-        "Attributes['langwatch.user_id']"
+        "Attributes['langwatch.user_id']",
       );
       expect(fieldMappings["metadata.user_id"]?.mapValueType).toBe("string");
 
@@ -37,7 +37,7 @@ describe("field-mappings", () => {
     it("has mappings for performance metrics", () => {
       expect(fieldMappings["metrics.total_time_ms"]).toBeDefined();
       expect(fieldMappings["metrics.total_time_ms"]?.column).toBe(
-        "TotalDurationMs"
+        "TotalDurationMs",
       );
 
       expect(fieldMappings["metrics.total_cost"]).toBeDefined();
@@ -52,17 +52,17 @@ describe("field-mappings", () => {
       expect(fieldMappings["spans.model"]).toBeDefined();
       expect(fieldMappings["spans.model"]?.table).toBe("stored_spans");
       expect(fieldMappings["spans.model"]?.column).toBe(
-        "SpanAttributes['gen_ai.request.model']"
+        "SpanAttributes['gen_ai.request.model']",
       );
     });
 
     it("has mappings for evaluation fields with evaluation_runs table", () => {
       expect(fieldMappings["evaluations.evaluator_id"]).toBeDefined();
       expect(fieldMappings["evaluations.evaluator_id"]?.table).toBe(
-        "evaluation_runs"
+        "evaluation_runs",
       );
       expect(fieldMappings["evaluations.evaluator_id"]?.column).toBe(
-        "EvaluatorId"
+        "EvaluatorId",
       );
 
       expect(fieldMappings["evaluations.score"]).toBeDefined();
@@ -103,7 +103,7 @@ describe("field-mappings", () => {
 
     it("returns evaluation_runs for evaluation fields", () => {
       expect(getTableForField("evaluations.evaluator_id")).toBe(
-        "evaluation_runs"
+        "evaluation_runs",
       );
       expect(getTableForField("evaluations.score")).toBe("evaluation_runs");
     });
@@ -121,7 +121,7 @@ describe("field-mappings", () => {
 
     it("returns map access expression for metadata fields", () => {
       expect(getColumnExpression("metadata.user_id")).toBe(
-        "Attributes['langwatch.user_id']"
+        "Attributes['langwatch.user_id']",
       );
     });
 
@@ -180,11 +180,11 @@ describe("field-mappings", () => {
 
   describe("buildJoinClause", () => {
     it("returns empty string for trace_summaries", () => {
-      expect(buildJoinClause("trace_summaries")).toBe("");
+      expect(buildJoinClause({ table: "trace_summaries" })).toBe("");
     });
 
     it("builds correct JOIN for stored_spans with column pruning", () => {
-      const join = buildJoinClause("stored_spans");
+      const join = buildJoinClause({ table: "stored_spans" });
       expect(join).toContain("FROM stored_spans");
       expect(join).toContain("TenantId = {tenantId:String}");
       expect(join).toContain("ts.TenantId = ss.TenantId");
@@ -194,11 +194,69 @@ describe("field-mappings", () => {
     });
 
     it("builds correct JOIN for evaluation_runs", () => {
-      const join = buildJoinClause("evaluation_runs");
+      const join = buildJoinClause({ table: "evaluation_runs" });
       expect(join).toContain("FROM evaluation_runs");
       expect(join).toContain("GROUP BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
+    });
+
+    it("leaves the stored_spans JOIN unbounded on StartTime when no filter is passed", () => {
+      const join = buildJoinClause({ table: "stored_spans" });
+      // StartTime is a selected column, but there must be no StartTime predicate:
+      // the WHERE ends right after the tenant filter.
+      expect(join).not.toContain("StartTime >=");
+      expect(join).not.toContain("StartTime <");
+      expect(join).toContain("WHERE TenantId = {tenantId:String}) ss");
+    });
+
+    it("injects the span time filter into the stored_spans JOIN when provided", () => {
+      const filter =
+        "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
+      const join = buildJoinClause({
+        table: "stored_spans",
+        spanTimeFilter: filter,
+      });
+      // The bound lands inside the subquery WHERE, before the closing paren/alias.
+      expect(join).toContain(`TenantId = {tenantId:String} ${filter})`);
+    });
+
+    it("ignores the span time filter for evaluation_runs", () => {
+      const filter = "AND StartTime >= {startDate:DateTime64(3)}";
+      const join = buildJoinClause({
+        table: "evaluation_runs",
+        spanTimeFilter: filter,
+      });
+      expect(join).not.toContain("StartTime");
+    });
+
+    it("applies the eval time filter to BOTH the evaluation_runs subquery and its dedup inner", () => {
+      const filter =
+        "AND ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY " +
+        "AND UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
+      const join = buildJoinClause({
+        table: "evaluation_runs",
+        evalTimeFilter: filter,
+      });
+      // The dedup inner GROUP BY is the scan that walks partitions — a bound
+      // only on the outer subquery would leave the full-history scan in place.
+      const occurrences = join.split(filter).length - 1;
+      expect(occurrences).toBe(2);
+    });
+
+    it("leaves the evaluation_runs JOIN unbounded when no eval filter is passed", () => {
+      const join = buildJoinClause({ table: "evaluation_runs" });
+      expect(join).not.toContain("ScheduledAt >=");
+      expect(join).not.toContain("UpdatedAt >= {");
+    });
+
+    it("ignores the eval time filter for stored_spans", () => {
+      const filter = "AND ScheduledAt >= {startDate:DateTime64(3)}";
+      const join = buildJoinClause({
+        table: "stored_spans",
+        evalTimeFilter: filter,
+      });
+      expect(join).not.toContain("ScheduledAt");
     });
   });
 
@@ -206,7 +264,9 @@ describe("field-mappings", () => {
     it("prefixes simple columns with table alias", () => {
       expect(qualifiedColumn("trace_id")).toBe("ts.TraceId");
       expect(qualifiedColumn("spans.span_id")).toBe("ss.SpanId");
-      expect(qualifiedColumn("evaluations.evaluator_id")).toBe("es.EvaluatorId");
+      expect(qualifiedColumn("evaluations.evaluator_id")).toBe(
+        "es.EvaluatorId",
+      );
     });
 
     it("handles map access columns correctly", () => {

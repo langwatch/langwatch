@@ -71,6 +71,7 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Prompt Not Found Anywhere", () => {
+    /** @scenario "Prompt not found anywhere throws error" */
     it("throws error when prompt does NOT exist locally or on server", async () => {
       // Given prompt does NOT exist locally or on server
       const ghostHandle = "ghost-prompt";
@@ -86,6 +87,7 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Always Fetch - Happy Path", () => {
+    /** @scenario "ALWAYS_FETCH returns server prompt" */
     it("calls API first and returns server version", async () => {
       // Given prompt exists locally and on server
       promptsApiService.get.mockResolvedValue(mockServerPrompt);
@@ -105,6 +107,7 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Always Fetch - API Failure Fallback", () => {
+    /** @scenario "ALWAYS_FETCH falls back to local when API fails" */
     it("returns local version upon API failure", async () => {
       // Given API is down but prompt exists locally
       promptsApiService.get.mockRejectedValue(new Error("API error"));
@@ -123,6 +126,7 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Materialized Only", () => {
+    /** @scenario "MATERIALIZED_ONLY throws when local file not found" */
     it("does NOT call API and throws error when prompt not found locally", async () => {
       // Given prompt does NOT exist locally
       localPromptsService.get.mockResolvedValue(null);
@@ -135,6 +139,7 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).not.toHaveBeenCalled();
     });
 
+    /** @scenario "MATERIALIZED_ONLY returns local prompt without API call" */
     it("returns local prompt when it exists", async () => {
       // Given prompt exists locally
       localPromptsService.get.mockResolvedValue(mockLocalPrompt);
@@ -178,6 +183,7 @@ describe("Prompt Retrieval", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    /** @scenario "CACHE_TTL returns cached version before expiration" */
     it("returns cached version and does NOT call API within TTL", async () => {
       // Given prompt was fetched 4 minutes ago with TTL of 5 minutes
       promptsApiService.get.mockResolvedValue(mockServerPrompt);
@@ -203,6 +209,7 @@ describe("Prompt Retrieval", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    /** @scenario "CACHE_TTL refetches after expiration" */
     it("ignores cache and fetches from API after TTL expires", async () => {
       // Given prompt was fetched 6 minutes ago with TTL of 5 minutes
       promptsApiService.get.mockResolvedValue(mockServerPrompt);
@@ -227,6 +234,7 @@ describe("Prompt Retrieval", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    /** @scenario "CACHE_TTL falls back to local when API fails" */
     it("returns local version when API is down", async () => {
       // Given API is down and prompt exists locally
       promptsApiService.get.mockRejectedValue(new Error("API error"));
@@ -265,6 +273,7 @@ describe("Prompt Retrieval", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    /** @scenario "CACHE_TTL caches versions independently" */
     it("caches versions independently (different versions do not collide)", async () => {
       // Given "my-prompt" version "1" was cached
       const v1Prompt = promptResponseFactory.build({ handle: testHandle, version: 1 });

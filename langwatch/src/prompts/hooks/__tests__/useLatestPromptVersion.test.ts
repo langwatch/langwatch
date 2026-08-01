@@ -46,6 +46,54 @@ describe("useLatestPromptVersion", () => {
     });
   });
 
+  describe("when the caller opts out of live refetch", () => {
+    it("disables window-focus refetch so N mounted instances don't re-storm", () => {
+      mockUseQuery.mockReturnValue({
+        data: { version: 3 },
+        isLoading: false,
+        isFetching: false,
+      });
+
+      renderHook(() =>
+        useLatestPromptVersion({
+          configId: "config-123",
+          currentVersion: 3,
+          isLiveRefetchEnabled: false,
+        }),
+      );
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ idOrHandle: "config-123" }),
+        expect.objectContaining({
+          refetchOnWindowFocus: false,
+          staleTime: 30_000,
+        }),
+      );
+    });
+  });
+
+  describe("when the caller leaves live refetch at its default", () => {
+    it("keeps window-focus refetch so another session's version still lands", () => {
+      mockUseQuery.mockReturnValue({
+        data: { version: 3 },
+        isLoading: false,
+        isFetching: false,
+      });
+
+      renderHook(() =>
+        useLatestPromptVersion({ configId: "config-123", currentVersion: 3 }),
+      );
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ idOrHandle: "config-123" }),
+        expect.objectContaining({
+          refetchOnWindowFocus: true,
+          staleTime: 0,
+        }),
+      );
+    });
+  });
+
   describe("when current version matches latest", () => {
     it("returns isOutdated as false", () => {
       mockUseQuery.mockReturnValue({

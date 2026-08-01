@@ -1,0 +1,37 @@
+{%- capture _summary -%}
+{{ digest.count }} match{% if digest.count != 1 %}es{% endif %}{% if digest.windowStart %} · window {{ digest.windowStart | date: "%H:%M" }}–{{ digest.windowEnd | date: "%H:%M" }}{% endif %}
+{%- endcapture -%}
+{%- capture _seeall -%}
+<{{ project.url }}/messages|See all {{ digest.count }} in LangWatch ↗>
+{%- endcapture -%}
+{%- capture _rows -%}
+{%- for m in matches limit: 20 -%}
+,[
+  { "type": "raw_text", "text": {{ m.evaluation.score | default: "—" | append: "" | json }} },
+  { "type": "raw_text", "text": {{ m.evaluation.evaluatorName | default: "—" | append: "" | json }} },
+  { "type": "raw_text", "text": {{ m.trace.input | truncate: 80 | default: "—" | append: "" | json }} },
+  { "type": "rich_text", "elements": [{ "type": "rich_text_section", "elements": [{ "type": "link", "url": {{ m.trace.url | json }}, "text": "View" }] }] }
+]
+{%- endfor -%}
+{%- endcapture -%}
+{%- capture _list -%}
+{%- for m in matches limit: 10 -%}
+{% if m.evaluation %}`{{ m.evaluation.score | default: "—" }}` *{{ m.evaluation.evaluatorName | default: "eval" | mrkdwn_escape }}* · {% endif %}_{{ m.trace.input | truncate: 80 | mrkdwn_escape }}_ · <{{ m.trace.url }}|↗>{% unless forloop.last %}
+{% endunless %}
+{%- endfor -%}
+{%- endcapture -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] },
+  { "type": "data_table", "caption": {{ _summary | json }}, "rows": [
+    [
+      { "type": "raw_text", "text": "Score" },
+      { "type": "raw_text", "text": "Evaluator" },
+      { "type": "raw_text", "text": "Input" },
+      { "type": "raw_text", "text": "Link" }
+    ]
+    {{ _rows }}
+  ] },
+  { "type": "section", "text": { "type": "mrkdwn", "text": {{ _list | json }} } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _seeall | json }} }] }
+]

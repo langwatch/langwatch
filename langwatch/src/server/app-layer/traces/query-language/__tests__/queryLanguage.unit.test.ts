@@ -452,7 +452,7 @@ describe("validateAst", () => {
             location: { start: 0, end: 0 },
           },
           location: { start: 0, end: 0 },
-          // biome-ignore lint/suspicious/noExplicitAny: structural subset is sufficient for the validator
+          // Structural subset is sufficient for the validator.
         } as any),
       ).toBe("Missing value after `:`");
     });

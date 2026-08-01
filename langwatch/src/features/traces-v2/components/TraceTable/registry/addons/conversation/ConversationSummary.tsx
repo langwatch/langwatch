@@ -2,7 +2,6 @@ import { Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
 import {
-  abbreviateModel,
   formatCost,
   formatTokens,
   formatWallClock,
@@ -25,19 +24,16 @@ function pluralise(count: number, singular: string, plural: string): string {
 export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   const endTime = endTimestamp(group);
   return (
-    <HStack
-      gap={3}
-      flexWrap="wrap"
-      textStyle="xs"
-      color="fg.subtle"
-    >
+    <HStack gap={3} flexWrap="wrap" textStyle="xs" color="fg.subtle">
       <Text>{group.traces.length} turns</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{abbreviateModel(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalCost > 0 && (
@@ -82,7 +78,9 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{abbreviateModel(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalSpans > 0 && (

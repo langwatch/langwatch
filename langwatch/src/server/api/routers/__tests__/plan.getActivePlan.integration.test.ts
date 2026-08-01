@@ -9,24 +9,29 @@
  */
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
 import {
-  PlanProviderService,
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { prisma } from "../../../db";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
-// Skip when running with testcontainers only (no PostgreSQL)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
+describe("plan.getActivePlan integration", () => {
   const testNamespace = `plan-active-${nanoid(8)}`;
   let organizationId: string;
   let userId: string;
@@ -98,21 +103,31 @@ describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
   });
 
   afterAll(async () => {
-    await prisma.teamUser.deleteMany({
-      where: { team: { slug: `--test-team-${testNamespace}` } },
-    }).catch(() => {});
-    await prisma.team.deleteMany({
-      where: { slug: `--test-team-${testNamespace}` },
-    }).catch(() => {});
-    await prisma.organizationUser.deleteMany({
-      where: { organization: { slug: `--test-org-${testNamespace}` } },
-    }).catch(() => {});
-    await prisma.organization.deleteMany({
-      where: { slug: `--test-org-${testNamespace}` },
-    }).catch(() => {});
-    await prisma.user.deleteMany({
-      where: { email: `test-${testNamespace}@example.com` },
-    }).catch(() => {});
+    await prisma.teamUser
+      .deleteMany({
+        where: { team: { slug: `--test-team-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({
+        where: { slug: `--test-team-${testNamespace}` },
+      })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({
+        where: { organization: { slug: `--test-org-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({
+        where: { slug: `--test-org-${testNamespace}` },
+      })
+      .catch(() => {});
+    await prisma.user
+      .deleteMany({
+        where: { email: `test-${testNamespace}@example.com` },
+      })
+      .catch(() => {});
   });
 
   describe("when organization has an active plan", () => {

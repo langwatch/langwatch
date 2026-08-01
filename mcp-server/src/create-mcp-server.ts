@@ -1,8 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import packageJson from "../package.json" assert { type: "json" };
+import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.js";
+import { fetchDocumentation } from "./documentation-fetch.js";
 import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
@@ -70,20 +71,46 @@ function registerTools(server: McpServer): void {
         ),
     },
     withToolLogging("fetch_langwatch_docs", async ({ url }) => {
-      let urlToFetch = url || "https://langwatch.ai/docs/llms.txt";
-      if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-        urlToFetch += ".md";
-      }
-      if (!urlToFetch.startsWith("http")) {
-        if (!urlToFetch.startsWith("/")) {
-          urlToFetch = "/" + urlToFetch;
-        }
-        urlToFetch = "https://langwatch.ai/docs" + urlToFetch;
-      }
-      const response = await fetch(urlToFetch);
+      const text = await fetchDocumentation("langwatch", url);
+      return { content: [{ type: "text", text }] };
+    })
+  );
 
+  server.tool(
+    "report_issue",
+    "Report an issue to the LangWatch team: anything that did not work, confused you, or took trial and error while using LangWatch (docs, MCP tools, CLI, SDKs, the platform). Use it whenever you struggled, it is how rough edges get fixed for every agent. Ask the user for permission first, then call with user_approved=true. Works without an API key. Put VERBATIM error messages in the summary; optionally attach raw session content. Secrets, API keys, emails and phone numbers are redacted locally before anything is sent.",
+    {
+      user_approved: z
+        .boolean()
+        .describe(
+          "Must be true, and only after the user explicitly agreed to send this report to LangWatch"
+        ),
+      title: z.string().max(300).describe("One-line description of the issue"),
+      summary: z
+        .string()
+        .optional()
+        .describe(
+          "What you were trying to do, what went wrong (verbatim errors), and what you had to figure out the hard way"
+        ),
+      session_content: z
+        .string()
+        .optional()
+        .describe(
+          "Optional raw session transcript or log excerpt (JSONL or plain text); redacted locally before sending"
+        ),
+      contact_email: z
+        .string()
+        .optional()
+        .describe("Optional contact email for follow-up"),
+      agent: z
+        .string()
+        .optional()
+        .describe("Which coding agent this is, e.g. claude-code, codex, cursor"),
+    },
+    withToolLogging("report_issue", async (params) => {
+      const { handleReportIssue } = await import("./tools/report-issue.js");
       return {
-        content: [{ type: "text", text: await response.text() }],
+        content: [{ type: "text", text: await handleReportIssue(params) }],
       };
     })
   );
@@ -100,21 +127,8 @@ function registerTools(server: McpServer): void {
         ),
     },
     withToolLogging("fetch_scenario_docs", async ({ url }) => {
-      let urlToFetch = url || "https://langwatch.ai/scenario/llms.txt";
-      if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-        urlToFetch += ".md";
-      }
-      if (!urlToFetch.startsWith("http")) {
-        if (!urlToFetch.startsWith("/")) {
-          urlToFetch = "/" + urlToFetch;
-        }
-        urlToFetch = "https://langwatch.ai" + urlToFetch;
-      }
-      const response = await fetch(urlToFetch);
-
-      return {
-        content: [{ type: "text", text: await response.text() }],
-      };
+      const text = await fetchDocumentation("scenario", url);
+      return { content: [{ type: "text", text }] };
     })
   );
 
@@ -139,7 +153,7 @@ function registerTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_judge') to get its full schema details"
+          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details"
         ),
     },
     async ({ category, evaluatorType }) => {

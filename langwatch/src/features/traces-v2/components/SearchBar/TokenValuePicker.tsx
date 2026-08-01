@@ -12,9 +12,12 @@ import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
+import { dedupeByValue } from "../../utils/dedupeByValue";
 
 const MAX_VALUES_PER_PAGE = 60;
 const POPOVER_WIDTH = 320;
@@ -59,6 +62,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const seededOpenKey = useRef<string | null>(null);
+  // Anchor (`field:start`) the `filter` has been (re)seeded for. Gates the
+  // server query so a direct chip-to-chip switch can't fire for the new field
+  // carrying the previous chip's text — `anchor` changes one render before the
+  // reseed effect below resets `filter`. Same keyed-ref idiom as seededOpenKey.
+  const filterSeededAnchorKey = useRef<string | null>(null);
 
   // Prefill the input with the chip's current value so the user can edit it
   // as text (not just filter the list) — clicking a chip should let you tweak
@@ -67,6 +75,9 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   useEffect(() => {
     setFilter(anchor?.currentValue ?? "");
     setActiveIndex(0);
+    filterSeededAnchorKey.current = anchor
+      ? `${anchor.field}:${anchor.location.start}`
+      : null;
   }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
 
   // Focus the search input when the picker OPENS — deferred to the next
@@ -91,29 +102,84 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     return () => cancelAnimationFrame(raf);
   }, [anchor?.field, anchor?.location.start]);
 
-  const values = useMemo(() => {
-    if (!anchor) return [];
-    const cat = facets.find(
+  // Resolve this chip's field to a categorical descriptor. Lifted above the
+  // value memo so the server-search hook's `enabled` can depend on it.
+  // `facetValues` only accepts categorical facets, so a non-categorical /
+  // unknown field leaves `cat` undefined and the picker shows nothing.
+  const cat = useMemo(() => {
+    if (!anchor) return undefined;
+    const found = facets.find(
       (d) => d.kind === "categorical" && d.key === anchor.field,
     );
-    if (!cat || cat.kind !== "categorical") return [];
-    const q = filter.trim().toLowerCase();
-    // While the input still holds the unedited current value (or is empty),
-    // show the FULL list so the picker still reads as a dropdown of
-    // alternatives — only narrow once the user actually edits the text.
-    // Match against value AND label so typing the friendly name (e.g.
-    // "Faithfulness") finds the id-keyed row ("ragas/faithfulness") —
-    // mirrors the sidebar facet section's search behaviour.
-    const pristine = q === "" || q === anchor.currentValue.trim().toLowerCase();
-    const filtered = pristine
+    return found && found.kind === "categorical" ? found : undefined;
+  }, [facets, anchor]);
+
+  // "Pristine" = the input still holds the chip's unedited value (or is
+  // empty). While pristine the picker reads as a dropdown of alternatives —
+  // show the full preloaded top-N and DON'T hit the server. Once the user
+  // edits the text we switch to a server-side prefix search so a value beyond
+  // the preloaded top-N can be found and picked.
+  const pristine =
+    !anchor ||
+    filter.trim() === "" ||
+    filter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
+
+  // Debounce the typed text before it hits the server — a per-keystroke
+  // `facetValues` prefix scan over a high-cardinality facet is a real
+  // ClickHouse round-trip. The client-side substring filter in the `values`
+  // memo below stays on the live `filter` for instant local narrowing; only
+  // this server query reads the debounced value. `serverPristine` mirrors
+  // `pristine` on the debounced text so the query doesn't fire until typing
+  // settles.
+  const debouncedFilter = useDebouncedValue(filter, 300);
+  const serverPristine =
+    !anchor ||
+    debouncedFilter.trim() === "" ||
+    debouncedFilter.trim().toLowerCase() ===
+      anchor.currentValue.trim().toLowerCase();
+
+  // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the
+  // debounced gate waits for typing to settle before fetching, the live gate
+  // disables the query the instant the text returns to the chip's value so a
+  // stale prefix can't keep firing for the debounce window. Also gated on the
+  // filter having been (re)seeded for the CURRENT anchor — a chip-to-chip switch
+  // changes `anchor.field` one render before the reseed effect resets `filter`,
+  // so without this the query would fire for the new field with the old text.
+  const serverSearch = useFacetSearch({
+    facetKey: anchor?.field ?? "",
+    prefix: debouncedFilter,
+    enabled:
+      !!cat &&
+      !pristine &&
+      !serverPristine &&
+      filterSeededAnchorKey.current ===
+        (anchor ? `${anchor.field}:${anchor.location.start}` : null),
+  });
+
+  const values = useMemo(() => {
+    if (!anchor || !cat) return [];
+    // Pristine → the preloaded alternatives, shown unfiltered as a dropdown.
+    // Edited → SUPPLEMENT the preloaded top-N with the server prefix results
+    // (union, preloaded first so it wins on a shared value), then narrow by the
+    // live (undebounced) substring filter: a server prefix hit is also a
+    // substring match so it survives, while a substring living WITHIN a
+    // preloaded value (which the server's anchored prefix match misses) is
+    // still found locally. Annotated to the common shape so `.map` resolves
+    // over the two source arrays without a union-of-arrays call error.
+    const source: { value: string; label?: string; count: number }[] = pristine
       ? cat.topValues
-      : cat.topValues.filter(
-          (v) =>
-            v.value.toLowerCase().includes(q) ||
-            (v.label?.toLowerCase().includes(q) ?? false),
-        );
-    return filtered.slice(0, MAX_VALUES_PER_PAGE);
-  }, [facets, anchor, filter]);
+      : dedupeByValue([...cat.topValues, ...serverSearch.values]);
+    const q = pristine ? "" : filter.trim().toLowerCase();
+    return source
+      .filter(
+        (v) =>
+          !q ||
+          v.value.toLowerCase().includes(q) ||
+          (v.label?.toLowerCase().includes(q) ?? false),
+      )
+      .map((v) => ({ value: v.value, label: v.label, count: v.count }))
+      .slice(0, MAX_VALUES_PER_PAGE);
+  }, [anchor, cat, pristine, serverSearch.values, filter]);
 
   // On open, move the highlight onto the current value's row so ↑↓ starts
   // from where the user is and a bare Enter re-commits the current value (a

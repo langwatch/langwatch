@@ -16,9 +16,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { RunRow } from "../RunRow";
-import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
+import { ScenarioTargetRow } from "../ScenarioTargetRow";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -35,7 +39,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("displays the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.PENDING,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -51,7 +58,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("displays the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.IN_PROGRESS, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.IN_PROGRESS,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -70,7 +80,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
       // Only QUEUED, PENDING, and IN_PROGRESS are cancellable.
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.STALLED, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -87,7 +100,9 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("does not display the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -103,7 +118,9 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("does not display the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.FAILED })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -119,7 +136,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("does not display the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
           onCancel={vi.fn()}
@@ -135,7 +155,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
     it("does not display the cancel button", () => {
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.PENDING,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={vi.fn()}
         />,
@@ -156,7 +179,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
       render(
         <ScenarioTargetRow
-          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.PENDING,
+            durationInMs: 0,
+          })}
           targetName="Agent"
           onClick={onClick}
           onCancel={onCancel}
@@ -181,15 +207,26 @@ describe("<RunRow/> cancel all button", () => {
     it("displays the Cancel All button", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "r1", status: ScenarioRunStatus.PENDING, durationInMs: 0 }),
-          makeScenarioRunData({ scenarioRunId: "r2", status: ScenarioRunStatus.SUCCESS }),
+          makeScenarioRunData({
+            scenarioRunId: "r1",
+            status: ScenarioRunStatus.PENDING,
+            durationInMs: 0,
+          }),
+          makeScenarioRunData({
+            scenarioRunId: "r2",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
         ],
       });
 
       render(
         <RunRow
           batchRun={batchRun}
-          summary={makeSummary({ inProgressCount: 1, passedCount: 1, totalCount: 2 })}
+          summary={makeSummary({
+            inProgressCount: 1,
+            passedCount: 1,
+            totalCount: 2,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Agent"}
@@ -207,15 +244,25 @@ describe("<RunRow/> cancel all button", () => {
     it("does not display the Cancel All button", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "r1", status: ScenarioRunStatus.SUCCESS }),
-          makeScenarioRunData({ scenarioRunId: "r2", status: ScenarioRunStatus.FAILED }),
+          makeScenarioRunData({
+            scenarioRunId: "r1",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+          makeScenarioRunData({
+            scenarioRunId: "r2",
+            status: ScenarioRunStatus.FAILED,
+          }),
         ],
       });
 
       render(
         <RunRow
           batchRun={batchRun}
-          summary={makeSummary({ passedCount: 1, failedCount: 1, totalCount: 2 })}
+          summary={makeSummary({
+            passedCount: 1,
+            failedCount: 1,
+            totalCount: 2,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Agent"}
@@ -233,15 +280,28 @@ describe("<RunRow/> cancel all button", () => {
     it("does not display the Cancel All button", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "r1", status: ScenarioRunStatus.CANCELLED, durationInMs: 0 }),
-          makeScenarioRunData({ scenarioRunId: "r2", status: ScenarioRunStatus.CANCELLED, durationInMs: 0 }),
+          makeScenarioRunData({
+            scenarioRunId: "r1",
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          }),
+          makeScenarioRunData({
+            scenarioRunId: "r2",
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          }),
         ],
       });
 
       render(
         <RunRow
           batchRun={batchRun}
-          summary={makeSummary({ cancelledCount: 2, totalCount: 2, passedCount: 0, passRate: 0 })}
+          summary={makeSummary({
+            cancelledCount: 2,
+            totalCount: 2,
+            passedCount: 0,
+            passRate: 0,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Agent"}
@@ -259,14 +319,23 @@ describe("<RunRow/> cancel all button", () => {
     it("does not display the Cancel All button", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "r1", status: ScenarioRunStatus.PENDING, durationInMs: 0 }),
+          makeScenarioRunData({
+            scenarioRunId: "r1",
+            status: ScenarioRunStatus.PENDING,
+            durationInMs: 0,
+          }),
         ],
       });
 
       render(
         <RunRow
           batchRun={batchRun}
-          summary={makeSummary({ inProgressCount: 1, totalCount: 1, passedCount: 0, passRate: 0 })}
+          summary={makeSummary({
+            inProgressCount: 1,
+            totalCount: 1,
+            passedCount: 0,
+            passRate: 0,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Agent"}
@@ -290,14 +359,23 @@ describe("<RunRow/> cancel all button", () => {
 
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "r1", status: ScenarioRunStatus.IN_PROGRESS, durationInMs: 0 }),
+          makeScenarioRunData({
+            scenarioRunId: "r1",
+            status: ScenarioRunStatus.IN_PROGRESS,
+            durationInMs: 0,
+          }),
         ],
       });
 
       render(
         <RunRow
           batchRun={batchRun}
-          summary={makeSummary({ inProgressCount: 1, totalCount: 1, passedCount: 0, passRate: 0 })}
+          summary={makeSummary({
+            inProgressCount: 1,
+            totalCount: 1,
+            passedCount: 0,
+            passRate: 0,
+          })}
           isExpanded={false}
           onToggle={onToggle}
           resolveTargetName={() => "Agent"}

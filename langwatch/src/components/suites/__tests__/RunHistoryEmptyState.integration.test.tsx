@@ -8,6 +8,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
+
 import { RunHistoryPanel } from "../RunHistoryPanel";
 
 // Hoisted mocks
@@ -16,10 +23,15 @@ const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
+      getSuiteRunFreshness: { useQuery: vi.fn(() => ({ data: undefined })) },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
       cancelJob: {
         useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -34,11 +46,23 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
+    export: {
+      onScenarioRunExportProgress: { useSubscription: vi.fn() },
+    },
   },
 }));
 
 vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
+  useSSESubscription: vi.fn(() => ({
+    connectionState: "disconnected",
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  })),
 }));
 
 vi.mock("~/hooks/usePageVisibility", () => ({
@@ -63,14 +87,6 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
   }),
-}));
-
-vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePageVisibility", () => ({
-  usePageVisibility: () => true,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -102,16 +118,55 @@ describe("<RunHistoryPanel/>", () => {
     /** @scenario "Empty state displays when suite has no runs" */
     it("displays an empty state message indicating no runs exist", () => {
       render(
-        <RunHistoryPanel
-          scenarioSetId={scenarioSetId}
-          period={widePeriod}
-        />,
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
         { wrapper: Wrapper },
       );
 
       expect(
         screen.getByText("Run this suite to see results here."),
       ).toBeInTheDocument();
+    });
+
+    /**
+     * Exporting here would write a header and no rows, which reads as a broken
+     * export rather than an empty one. Asserted against the panel rather than
+     * the filter bar on its own, because the panel is what decides — the bar
+     * only renders the flag it is handed.
+     */
+    /** @scenario Export is unavailable when no runs match */
+    it("disables Export CSV rather than offering a header-only file", () => {
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByRole("button", { name: /export csv/i }),
+      ).toBeDisabled();
+    });
+  });
+
+  describe("given no runs on the loaded pages but more still to fetch", () => {
+    /**
+     * The loaded pages are not the whole history. Filter to a scenario whose
+     * runs sit further back and the fetched pages hold none of them, while the
+     * server-side sweep would return every one — so a zero count here means
+     * "not yet" rather than "none", and disabling the export would refuse a
+     * request that would have produced a file.
+     */
+    it("keeps Export CSV enabled, because the sweep may still match", () => {
+      mockGetSuiteRunData.mockReturnValue({
+        data: { runs: [], scenarioSetIds: {}, hasMore: true, changed: true },
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeEnabled();
     });
   });
 
@@ -146,10 +201,7 @@ describe("<RunHistoryPanel/>", () => {
     /** @scenario "Empty state disappears when runs exist" */
     it("does not display the empty state and shows run results", () => {
       render(
-        <RunHistoryPanel
-          scenarioSetId={scenarioSetId}
-          period={widePeriod}
-        />,
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
         { wrapper: Wrapper },
       );
 
@@ -177,10 +229,7 @@ describe("<RunHistoryPanel/>", () => {
       };
 
       render(
-        <RunHistoryPanel
-          scenarioSetId={scenarioSetId}
-          period={narrowPeriod}
-        />,
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={narrowPeriod} />,
         { wrapper: Wrapper },
       );
 

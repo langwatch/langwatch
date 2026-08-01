@@ -1,14 +1,21 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+} from "../../clients/clickhouse/windowed-read";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type { TraceSummaryRepository } from "./trace-summary.repository";
+import type {
+  FindByTraceIdOptions,
+  TraceSummaryRepository,
+} from "./trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
 
@@ -35,7 +42,11 @@ export class TraceSummaryClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
+  async upsert(
+    data: TraceSummaryData,
+    tenantId: string,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.upsert",
@@ -75,7 +86,11 @@ export class TraceSummaryClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
+    entries: Array<{
+      data: TraceSummaryData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -86,21 +101,23 @@ export class TraceSummaryClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId =
-          IdUtils.generateDeterministicTraceSummaryIdFromData(
+      const records = entries.map(
+        ({ data, tenantId: tid, retentionDays: rd }) => {
+          const projectionId =
+            IdUtils.generateDeterministicTraceSummaryIdFromData(
+              tid,
+              data.traceId,
+              data.occurredAt,
+            );
+          return this.toClickHouseRecord(
+            data,
             tid,
-            data.traceId,
-            data.occurredAt,
+            projectionId,
+            TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+            rd,
           );
-        return this.toClickHouseRecord(
-          data,
-          tid,
-          projectionId,
-          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-          rd,
-        );
-      });
+        },
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -122,40 +139,121 @@ export class TraceSummaryClickHouseRepository
   async findByTraceId(
     tenantId: string,
     traceId: string,
-    options?: { occurredAtMs?: number },
+    options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.findByTraceId",
     );
 
-    // First attempt: when the caller has a rough timestamp, narrow the
-    // scan to a ±2-day window around it for partition pruning. The
-    // IO/Attributes columns are heavy and without pruning ClickHouse
-    // scans every partition including cold S3 tier — this trims drawer-
-    // open latency from ~1s to ~100ms.
+    // Fold read-back path (ADR-066): an explicit window is applied verbatim
+    // with NO internal fallback — the caller (the fold executor) owns the miss
+    // retry, so a second recovery ladder here would re-run the resolve seek on
+    // results the executor is about to re-read unwindowed anyway. Mapped onto
+    // queryWindowed with `fallback: "none"` so the read still lands on
+    // `clickhouse_windowed_read_total` exactly once. The centre/half-width
+    // round-trip is exact: fromMs/toMs are integers, so their mean and
+    // half-difference are exactly representable and reconstruct the bounds.
+    if (options?.window) {
+      const { fromMs, toMs } = options.window;
+      try {
+        return await queryWindowed<TraceSummaryData | null>({
+          table: TABLE_NAME,
+          hintMs: (fromMs + toMs) / 2,
+          windowMs: (toMs - fromMs) / 2,
+          fallback: "none",
+          isEmpty: (result) => result === null,
+          run: async (window) =>
+            // With a hint and `fallback: "none"` the fragment is always
+            // present; the null arm exists only to satisfy the contract.
+            window
+              ? await this.queryByTraceId(tenantId, traceId, {
+                  fromMs: window.fromMs,
+                  toMs: window.toMs,
+                })
+              : null,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error(
+          { tenantId, traceId, error: errorMessage },
+          "Failed to get trace summary from ClickHouse",
+        );
+        throw error;
+      }
+    }
+
+    // One logical read with two stages, mapped onto queryWindowed so the
+    // outcome lands on `clickhouse_windowed_read_total{table}` exactly once per
+    // call:
     //
-    // The hint is *best-effort*. If the hint window misses (clock skew,
-    // stale URL, the row's `timestamp` ≠ trace's actual OccurredAt) we
-    // fall back to an unconstrained scan so the drawer doesn't 404 on a
-    // trace that genuinely exists. The fallback is the slow path; the
-    // happy path stays fast.
-    const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+    //  - Hinted stage (the windowed `run`): when the caller threaded a rough
+    //    timestamp, narrow the heavy read to a ±2-day window around it for
+    //    partition pruning. The IO/Attributes columns are heavy and without
+    //    pruning ClickHouse scans every partition including cold S3 tier — this
+    //    trims drawer-open latency from ~1s to ~100ms. A hit here is the fast
+    //    happy path (outcome `hit`).
+    //  - Fallback stage (the unbounded `run`): the hint is *best-effort*. If the
+    //    hint window misses (clock skew, stale URL, the row's `timestamp` ≠
+    //    trace's actual OccurredAt), or when there was no hint at all, resolve
+    //    the real OccurredAt via a cheap sort-key seek and bound the retry so
+    //    the drawer doesn't 404 on a trace that genuinely exists. This is the
+    //    slow path (outcome `unbounded_hit`/`unbounded_empty`, or `unwindowed`
+    //    when no hint was ever supplied).
+    //
+    // The resolve+retry lives inside the fallback `run`, so the cheap seek fires
+    // only when the hinted stage misses (or is skipped) — never on the happy
+    // path, keeping exactly the same SQL attempts in the same order as before.
     const hasHint = options?.occurredAtMs !== undefined;
 
     try {
-      if (hasHint) {
-        const hinted = await this.queryByTraceId(tenantId, traceId, {
-          fromMs: options!.occurredAtMs! - PARTITION_WINDOW_MS,
-          toMs: options!.occurredAtMs! + PARTITION_WINDOW_MS,
-        });
-        if (hinted) return hinted;
-        logger.debug(
-          { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
-          "Trace summary not found in hint window — retrying without partition prune",
-        );
-      }
-      return await this.queryByTraceId(tenantId, traceId);
+      return await queryWindowed<TraceSummaryData | null>({
+        table: TABLE_NAME,
+        hintMs: options?.occurredAtMs ?? null,
+        fallback: "unbounded",
+        isEmpty: (result) => result === null,
+        run: async (window) => {
+          if (window) {
+            return await this.queryByTraceId(tenantId, traceId, {
+              fromMs: window.fromMs,
+              toMs: window.toMs,
+            });
+          }
+          // Fallback stage: the hint window missed, or there was no hint.
+          if (hasHint) {
+            logger.debug(
+              { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
+              "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
+            );
+          }
+          // Resolve the trace's OccurredAt from a cheap sort-key seek and bound
+          // the heavy read, instead of scanning every weekly partition (incl.
+          // cold S3). OccurredAt is the trace's occurrence time and is stable
+          // across versions (it's the `PARTITION BY toYearWeek(OccurredAt)`
+          // key), so the ±2-day window always contains the row — no unbounded
+          // fallback is needed for normal rows. A trace genuinely absent returns
+          // null from the light scan without ever issuing the heavy read;
+          // historical sentinel rows still use the legacy unbounded fallback to
+          // preserve correctness.
+          const resolved = await this.resolveOccurredAtMs({
+            tenantId,
+            traceId,
+          });
+          if (!resolved.found) return null;
+          if (resolved.occurredAtMs === undefined) {
+            logger.debug(
+              { tenantId, traceId },
+              "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
+            );
+            return await this.queryByTraceId(tenantId, traceId);
+          }
+          return await this.queryByTraceId(tenantId, traceId, {
+            fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
+            toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
+          });
+        },
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -165,6 +263,61 @@ export class TraceSummaryClickHouseRepository
       );
       throw error;
     }
+  }
+
+  /**
+   * Resolve a trace's OccurredAt (the `PARTITION BY toYearWeek(...)` column)
+   * so {@link findByTraceId} can prune partitions even when the caller never
+   * threaded an `occurredAtMs` hint (or the hint window missed). The table is
+   * `ORDER BY (TenantId, TraceId)`, so this is a sort-key point seek over a
+   * couple of granules of small columns — far cheaper than letting the heavy
+   * single-trace read fall back to scanning every weekly partition (incl. cold
+   * S3). For a not-yet-projected / absent trace this also lets the caller skip
+   * the heavy read entirely. Rows that still carry the historical
+   * `OccurredAt = 0` sentinel are reported as found without a usable timestamp
+   * so the caller can preserve correctness with the legacy unbounded fallback.
+   */
+  private async resolveOccurredAtMs({
+    tenantId,
+    traceId,
+  }: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<{ found: boolean; occurredAtMs?: number }> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          count() AS rowCount,
+          toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+      `,
+      query_params: { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      rowCount: string | number;
+      occurredAtMs: string | number | null;
+    }>;
+    const rowCountRaw = rows[0]?.rowCount;
+    const raw = rows[0]?.occurredAtMs;
+    const rowCount =
+      typeof rowCountRaw === "string"
+        ? Number(rowCountRaw)
+        : (rowCountRaw ?? NaN);
+    if (!Number.isFinite(rowCount) || rowCount <= 0) {
+      return { found: false };
+    }
+    if (raw === null || raw === undefined) return { found: true };
+    // A positive OccurredAt can safely bound the read. Historical rows with the
+    // epoch sentinel (0) must fall back to the legacy unbounded lookup because
+    // they do exist but have no usable partition key.
+    const ms = typeof raw === "string" ? Number(raw) : raw;
+    return Number.isFinite(ms) && ms > 0
+      ? { found: true, occurredAtMs: ms }
+      : { found: true };
   }
 
   private async queryByTraceId(

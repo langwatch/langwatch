@@ -115,7 +115,11 @@ export function registerValidator(
       }
 
       const leading = /^([ \t]+)/.exec(line);
-      if (leading && /\t/.test(leading[1] ?? "") && / /.test(leading[1] ?? "")) {
+      if (
+        leading &&
+        /\t/.test(leading[1] ?? "") &&
+        / /.test(leading[1] ?? "")
+      ) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
           code: MIXED_INDENT,
@@ -240,10 +244,12 @@ export function registerValidator(
   };
 
   const onChangeDisposers: IDisposable[] = [];
-  const onCreate = monaco.editor.onDidCreateModel((model) => {
-    validate(model);
-    onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
-  });
+  const onCreate = monaco.editor.onDidCreateModel(
+    (model: editor.ITextModel) => {
+      validate(model);
+      onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
+    },
+  );
   for (const model of monaco.editor.getModels()) {
     validate(model);
     onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));

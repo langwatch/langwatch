@@ -26,38 +26,21 @@ export const DEFAULT_MEMBERS_LITE = 1;
 export const FREE_VISIBILITY_DAYS = 14;
 
 /**
- * LICENSE_ERRORS: Standardized error messages for license validation.
- * Used across validation.ts and types.ts to ensure consistency.
+ * LICENSE_ERRORS: the verdicts `validateLicense` reports.
+ *
+ * These are SERVER discriminants, not copy. What a customer reads about an
+ * invalid or expired licence comes from the code-keyed presentation registry
+ * (`license_key_invalid` / `license_expired`), reached via
+ * `licenseValidationError` in `./errors`. The prose-keyed lookup that used to
+ * live here — `LICENSE_ERROR_MESSAGES` and `getUserFriendlyLicenseError` —
+ * string-matched these literals to pick a sentence, which made the customer's
+ * copy depend on the exact wording of an internal enum.
  */
 export const LICENSE_ERRORS = {
   INVALID_FORMAT: "Invalid license format",
   INVALID_SIGNATURE: "Invalid signature",
   EXPIRED: "License expired",
 } as const;
-
-/**
- * User-friendly error messages for display in the UI.
- * Maps technical errors to human-readable messages.
- */
-export const LICENSE_ERROR_MESSAGES = {
-  [LICENSE_ERRORS.INVALID_FORMAT]:
-    "The license key is invalid or has been tampered with. Please check the key and try again.",
-  [LICENSE_ERRORS.INVALID_SIGNATURE]:
-    "The license key is invalid or has been tampered with. Please check the key and try again.",
-  [LICENSE_ERRORS.EXPIRED]:
-    "This license has expired. Please contact support to renew your license.",
-} as const;
-
-/**
- * Returns a user-friendly error message for a given license error.
- * Falls back to the original error if not found in the mapping.
- */
-export function getUserFriendlyLicenseError(error: string): string {
-  return (
-    LICENSE_ERROR_MESSAGES[error as keyof typeof LICENSE_ERROR_MESSAGES] ??
-    error
-  );
-}
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 

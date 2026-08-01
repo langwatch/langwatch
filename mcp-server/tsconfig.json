@@ -12,7 +12,8 @@
     "checkJs": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "rootDir": "..",
     // The evaluator catalog we import (langevals/ts-integration/evaluators.generated.ts)
     // is Zod-first and imports `zod`, but lives outside this package's
     // node_modules tree, so plain resolution cannot find it. Point `zod` at this

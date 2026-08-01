@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.5.0",
+  "version": "3.8.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
@@ -33,11 +33,15 @@
   "files": [
     "packages/server/dist/",
     "packages/server/templates/",
+    "packages/handled-error/",
+    "packages/langy/",
     "langwatch/",
     "langevals/",
     "python-sdk/",
     "mcp-server/",
     "scripts/",
+    "skills/",
+    "feature-map.json",
     "README.md",
     "LICENSE.md"
   ],

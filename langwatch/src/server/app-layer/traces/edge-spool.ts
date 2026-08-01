@@ -53,7 +53,12 @@ export async function maybeSpool({
   const spoolBody = Buffer.from(serialized, "utf8");
 
   try {
-    const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body: spoolBody });
+    const spoolRef = await blobStore.putSpool({
+      projectId,
+      traceId,
+      spanId,
+      body: spoolBody,
+    });
 
     // Return oversized command: spoolRef set, span attributes cleared (only id fields remain)
     return {
@@ -66,10 +71,11 @@ export async function maybeSpool({
     };
   } catch {
     // Fail-open: S3 PUT failed — send full inline payload, log warn
-    logger.warn(
-      "oversize protection skipped; queue carries full payload",
-      { traceId, spanId, byteLength },
-    );
+    logger.warn("oversize protection skipped; queue carries full payload", {
+      traceId,
+      spanId,
+      byteLength,
+    });
     return data;
   }
 }

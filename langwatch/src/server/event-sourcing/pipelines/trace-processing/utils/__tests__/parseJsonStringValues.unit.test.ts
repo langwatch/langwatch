@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   parseJsonStringValues,
   sanitizeInvalidJsonEscapes,
@@ -17,7 +17,7 @@ describe("parseJsonStringValues", () => {
   describe("when given JSON array strings", () => {
     it("parses valid JSON arrays", () => {
       const result = parseJsonStringValues({
-        items: '[1, 2, 3]',
+        items: "[1, 2, 3]",
       });
       expect(result.items).toEqual([1, 2, 3]);
     });
@@ -89,8 +89,7 @@ describe("parseJsonStringValues", () => {
     });
 
     it("parses JSON with multiple PII tokens", () => {
-      const brokenJson =
-        '{"input":"Name: \\<PERSON>, SSN: \\<US_SSN>"}';
+      const brokenJson = '{"input":"Name: \\<PERSON>, SSN: \\<US_SSN>"}';
       const result = parseJsonStringValues({ data: brokenJson });
       expect(result.data).toEqual({
         input: "Name: <PERSON>, SSN: <US_SSN>",
@@ -111,29 +110,29 @@ describe("parseJsonStringValues", () => {
 describe("sanitizeInvalidJsonEscapes()", () => {
   describe("when given strings with PII-redaction escapes", () => {
     it("removes backslash before <", () => {
-      expect(sanitizeInvalidJsonEscapes('\\<US_DRIVER_LICENSE>')).toBe(
+      expect(sanitizeInvalidJsonEscapes("\\<US_DRIVER_LICENSE>")).toBe(
         "<US_DRIVER_LICENSE>",
       );
     });
 
     it("removes backslash before >", () => {
-      expect(sanitizeInvalidJsonEscapes('\\>tag')).toBe(">tag");
+      expect(sanitizeInvalidJsonEscapes("\\>tag")).toBe(">tag");
     });
 
     it("handles multiple PII tokens", () => {
-      expect(
-        sanitizeInvalidJsonEscapes('\\<PERSON> and \\<US_SSN>'),
-      ).toBe("<PERSON> and <US_SSN>");
+      expect(sanitizeInvalidJsonEscapes("\\<PERSON> and \\<US_SSN>")).toBe(
+        "<PERSON> and <US_SSN>",
+      );
     });
   });
 
   describe("when given strings with valid JSON escapes", () => {
     it("preserves \\n", () => {
-      expect(sanitizeInvalidJsonEscapes('\\n')).toBe("\\n");
+      expect(sanitizeInvalidJsonEscapes("\\n")).toBe("\\n");
     });
 
     it("preserves \\\\ (escaped backslash)", () => {
-      expect(sanitizeInvalidJsonEscapes('\\\\')).toBe("\\\\");
+      expect(sanitizeInvalidJsonEscapes("\\\\")).toBe("\\\\");
     });
 
     it('preserves \\"', () => {
@@ -141,7 +140,7 @@ describe("sanitizeInvalidJsonEscapes()", () => {
     });
 
     it("preserves \\uXXXX unicode escapes", () => {
-      expect(sanitizeInvalidJsonEscapes('\\u003C')).toBe("\\u003C");
+      expect(sanitizeInvalidJsonEscapes("\\u003C")).toBe("\\u003C");
     });
   });
 

@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:clickhouse:migrations");
 
@@ -328,7 +328,9 @@ async function bootstrapDatabase(
     const rows = await result.json();
     config.hasLocalPrimaryPolicy = rows.length > 0;
     if (!config.hasLocalPrimaryPolicy) {
-      logger.info("Storage policy 'local_primary' not found — migrations will use 'default' policy");
+      logger.info(
+        "Storage policy 'local_primary' not found — migrations will use 'default' policy",
+      );
     }
   });
 
@@ -358,6 +360,14 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.clusterName
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
+    CLICKHOUSE_ENGINE_AGGREGATING: config.clusterName
+      ? "ReplicatedAggregatingMergeTree()"
+      : "AggregatingMergeTree()",
+    // "1" when table data must go through Replicated engines to reach every
+    // replica. Migrations use this to gate statements that are only correct
+    // when a single node holds the complete dataset (e.g. carrying rows over
+    // from a plain-engine table, whose content is per-replica when clustered).
+    CLICKHOUSE_IS_REPLICATED: config.clusterName ? "1" : "0",
 
     // Storage policy: use 'local_primary' if available (production with S3 tiering),
     // otherwise omit the setting (uses ClickHouse default policy)

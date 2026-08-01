@@ -12,7 +12,8 @@
  * a non-zero exit code.
  *
  * OTEL isolation is achieved by:
- * 1. Parent sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars
+ * 1. Parent injects LANGWATCH_API_KEY (project.apiKey) and LANGWATCH_ENDPOINT
+ *    as env vars via buildChildProcessEnv in scenario.processor.ts
  * 2. This process imports @langwatch/scenario which calls setupObservability()
  *    at module load time, reading from those env vars
  * 3. Each child process gets its own OTEL TracerProvider
@@ -23,16 +24,16 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
-import { trace, type TracerProvider } from "@opentelemetry/api";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { ChildProcessJobData } from "./types";
-import { createModelFromParams } from "./model.factory";
-import { createAdapter } from "./serialized-adapter.registry";
-import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
-import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
+import { type TracerProvider, trace } from "@opentelemetry/api";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
+import { createModelFromParams } from "./model.factory";
+import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
+import { createAdapter } from "./serialized-adapter.registry";
+import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
+import { createTraceApiSpanQuery } from "./trace-api-span-query";
+import type { ChildProcessJobData } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -98,13 +99,14 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     target,
   } = jobData;
 
+  // These are injected as env vars by the parent process (scenario.processor.ts
+  // buildChildProcessEnv). They originate from prefetchScenarioData telemetry.
   const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
   const langwatchApiKey = process.env.LANGWATCH_API_KEY;
-  if (!langwatchEndpoint) {
-    throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
-  }
-  if (!langwatchApiKey) {
-    throw new Error("LANGWATCH_API_KEY env var is required but not set");
+  if (!langwatchEndpoint || !langwatchApiKey) {
+    throw new Error(
+      "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
+    );
   }
 
   const adapter = createAdapter({
@@ -143,7 +145,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           });
           return remoteSpanJudge;
         })()
-      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
+      : ScenarioRunner.judgeAgent({
+          criteria: scenario.criteria,
+          model: judgeModel,
+        });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -197,9 +202,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } = {
-    success: result.success,
-  };
+  const outputResult: { success: boolean; reasoning?: string; error?: string } =
+    {
+      success: result.success,
+    };
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
   }
@@ -217,7 +223,8 @@ async function flushOtelTraces(): Promise<void> {
     // The provider might be a ProxyTracerProvider wrapping the real one.
     // We need the concrete provider to access forceFlush/shutdown methods.
     const delegating = provider as DelegatingTracerProvider;
-    const concreteProvider = (delegating.getDelegate?.() ?? provider) as FlushableTracerProvider;
+    const concreteProvider = (delegating.getDelegate?.() ??
+      provider) as FlushableTracerProvider;
 
     // Try forceFlush first (preferred), then shutdown
     if (concreteProvider.forceFlush) {
@@ -238,12 +245,46 @@ async function flushOtelTraces(): Promise<void> {
   }
 }
 
+/**
+ * Flatten an error and its `cause` chain into a single string.
+ *
+ * Node's `fetch`/undici surface TLS and network failures as a generic
+ * `TypeError: fetch failed` whose real reason (e.g. "self-signed certificate in
+ * certificate chain", `SELF_SIGNED_CERT_IN_CHAIN`) lives on `error.cause`.
+ * Reporting only `error.message` would drop that signal, so the parent — and
+ * the failure classifier — would never see why the run died. Walk the chain and
+ * include any error `code` so the classification is accurate.
+ */
+function formatErrorWithCauses(error: unknown): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof Error) {
+      const code = (current as { code?: unknown }).code;
+      parts.push(
+        typeof code === "string"
+          ? `${current.message} (${code})`
+          : current.message,
+      );
+      current = (current as { cause?: unknown }).cause;
+    } else {
+      parts.push(String(current));
+      break;
+    }
+  }
+  return parts.filter((p) => p.length > 0).join(": ");
+}
+
 main().catch(async (error) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = formatErrorWithCauses(error);
   logger.error({ err: errorMessage }, "scenario execution failed");
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();
   // Output JSON error result to stdout for parent process to parse
-  process.stdout.write(JSON.stringify({ success: false, error: errorMessage }) + "\n");
+  process.stdout.write(
+    JSON.stringify({ success: false, error: errorMessage }) + "\n",
+  );
   process.exit(1);
 });

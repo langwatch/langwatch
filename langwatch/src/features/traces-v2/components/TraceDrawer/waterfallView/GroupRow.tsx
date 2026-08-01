@@ -2,9 +2,11 @@ import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
+import { formatDuration } from "../../../utils/formatters";
+import { isSkillSpan } from "../transcript/skillInvocation";
 import {
   GROUP_ROW_HEIGHT,
+  getSpanBarColor,
   getSpanPalette,
   INDENT_PX,
   type SiblingGroup,
@@ -33,8 +35,11 @@ export const GroupRow = memo(function GroupRow({
     () => onToggle(groupKey),
     [onToggle, groupKey],
   );
-  const color = (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
-  const palette = getSpanPalette(group.type);
+  // Skill runs fold like any repeated tool, but keep the purple skill accent
+  // so a folded row of skill invocations still reads as skills (see TreeRow).
+  const isSkill = isSkillSpan({ type: group.type, name: group.name });
+  const color = getSpanBarColor(group.type, group.name);
+  const palette = isSkill ? "purple" : getSpanPalette(group.type);
 
   return (
     <Tooltip
@@ -80,7 +85,9 @@ export const GroupRow = memo(function GroupRow({
         <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
           <HStack gap={1.5} minWidth={0}>
             <Text textStyle="xs" color="fg" truncate>
-              {group.name}
+              {group.toolName
+                ? `${group.name} · ${group.toolName}`
+                : group.name}
             </Text>
             <Text
               textStyle="2xs"

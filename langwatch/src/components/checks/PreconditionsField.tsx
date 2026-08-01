@@ -16,12 +16,12 @@ import type {
 } from "../../server/evaluations/types";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
-  RULE_LABELS,
   fieldRequiresKey,
   getAllowedRulesForField,
   getFieldOptionsByCategory,
   getFieldValueType,
   isRuleAllowedForField,
+  RULE_LABELS,
 } from "../preconditions/preconditionFieldUtils";
 import { SmallLabel } from "../SmallLabel";
 

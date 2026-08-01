@@ -45,7 +45,6 @@ vi.mock("../components/IntegrateDrawer", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
-import React from "react";
 import { IntegrationCTACard } from "../components/IntegrationCTACard";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────

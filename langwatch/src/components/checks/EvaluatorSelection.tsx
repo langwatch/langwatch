@@ -114,6 +114,7 @@ export function EvaluatorSelection({
         EvaluatorDefinition<any> & {
           beta?: boolean;
           missingEnvVars?: string[];
+          unavailable?: { reason: string; howToEnable: string };
         },
       ]
     >
@@ -174,9 +175,14 @@ export function EvaluatorSelection({
           <Tabs.Content key={category} value={category} paddingX={0}>
             <Grid templateColumns="repeat(3, 1fr)" gap={6}>
               {evaluators.map(([key, evaluator]) => {
+                // Two different reasons a card cannot be picked: the
+                // evaluator is not installed on this server at all, or it is
+                // installed but not configured. They read differently and are
+                // fixed differently, so they are shown differently.
                 const isDisabled =
-                  evaluator.missingEnvVars &&
-                  evaluator.missingEnvVars.length > 0;
+                  !!evaluator.unavailable ||
+                  (evaluator.missingEnvVars &&
+                    evaluator.missingEnvVars.length > 0);
 
                 return (
                   <GridItem
@@ -240,7 +246,23 @@ export function EvaluatorSelection({
                             evaluator.name}
                         </Heading>
                       </HStack>
-                      {evaluator.missingEnvVars &&
+                      {evaluator.unavailable && (
+                        <Tooltip
+                          content={evaluator.unavailable.howToEnable}
+                          positioning={{ placement: "top" }}
+                        >
+                          <Tag.Root
+                            colorPalette="orange"
+                            borderRadius="8px"
+                            padding="4px 8px"
+                            lineHeight="1.5em"
+                          >
+                            <Tag.Label>Not installed on this server</Tag.Label>
+                          </Tag.Root>
+                        </Tooltip>
+                      )}
+                      {!evaluator.unavailable &&
+                        evaluator.missingEnvVars &&
                         evaluator.missingEnvVars.length > 0 && (
                           <Tooltip
                             content={evaluator.missingEnvVars.join(", ")}

@@ -5,6 +5,14 @@ export interface HomeDestinationInput {
   resolverDestination: string;
   /** True when the user set an explicit pin via the picker (User.lastHomePath). */
   isOverride: boolean;
+  /**
+   * True when the org's primaryIntent decided the destination (ADR-038).
+   * Pins the destination KIND: /me passes through untouched and last-visited
+   * stickiness must never flip it to a project home (or vice versa). For a
+   * project-kind destination the last-visited project may still be
+   * substituted — intent decides the kind, not which project.
+   */
+  intentPinned: boolean;
   /** True when the governance UI (/me, /governance) is reachable for the org. */
   governanceUiEnabled: boolean;
   /** The implicit "last home visited" marker, written on each visit. */
@@ -33,11 +41,20 @@ export interface HomeDestinationInput {
 export function resolveHomeDestination({
   resolverDestination,
   isOverride,
+  intentPinned,
   governanceUiEnabled,
   lastVisitedHomeKind,
   lastProjectSlug,
 }: HomeDestinationInput): string {
   if (isOverride) return resolverDestination;
+
+  if (intentPinned) {
+    if (resolverDestination === "/me") return resolverDestination;
+    if (lastVisitedHomeKind === "project" && lastProjectSlug) {
+      return `/${lastProjectSlug}`;
+    }
+    return resolverDestination;
+  }
 
   if (
     governanceUiEnabled &&

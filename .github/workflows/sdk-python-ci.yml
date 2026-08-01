@@ -20,7 +20,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -28,16 +31,33 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the e2e
+          # step spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under python-sdk/. An SDK
+          # release PR still matches via python-sdk/CHANGELOG.md.
+          #
+          # NO NEGATION PATTERNS. dorny/paths-filter ORs a filter's patterns
+          # and evaluates each one independently, so a lone `!x` matches every
+          # path that is not `x` — which is every path. This filter carried
+          # `!python-sdk/src/langwatch/__version__.py` to keep a release-please
+          # version bump from paying for the suite; instead it made `relevant`
+          # true on every PR in the repo, and `test` ran its ~9 minutes on
+          # changes that never touched python-sdk/. Measured on a PR with zero
+          # python-sdk files: `Changes output set to ["relevant"]`.
+          #
+          # The exclusion is not expressible under OR semantics, so it is gone
+          # rather than rewritten: a release PR now runs the suite it was meant
+          # to skip, which costs one run per release instead of one per PR.
+          # specs/ci/path-filters.feature already forbids negation here.
+          push-strategy: diff
           filters: |
             relevant:
               - 'python-sdk/**'
-              - '!python-sdk/src/langwatch/__version__.py'
               - '.github/workflows/sdk-python-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes
@@ -48,12 +68,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: "python-sdk/uv.lock"
@@ -69,7 +89,14 @@ jobs:
         run: make test-unit
 
       - name: Run e2e tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         working-directory: python-sdk
         env:
           LANGWATCH_DEBUG: "true"
@@ -78,10 +105,14 @@ jobs:
           TEST_EVALUATION_SLUG: "test-evaluation"
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
-          GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key, and both base-URL spellings cover every
+          # client family in the examples (openai SDK and haystack read
+          # OPENAI_BASE_URL; litellm, dspy and langchain read
+          # OPENAI_API_BASE). Azure keeps its own endpoint above.
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
         run: |
           make test-e2e
           make cli-examples
@@ -97,12 +128,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: "python-sdk/uv.lock"

@@ -13,7 +13,7 @@ vi.mock(
 );
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("ora", () => ({
@@ -87,9 +87,11 @@ describe("experimentListCommand()", () => {
           },
         });
 
-        await experimentListCommand({ format: "json" });
-        const printed = logSpy.mock.calls.flat().join("\n");
-        expect(printed).toContain('"slug": "checkout-flow"');
+        const result = await experimentListCommand();
+        expect(result?.data).toMatchObject({
+          experiments: [{ slug: "checkout-flow" }],
+        });
+        expect(logSpy).not.toHaveBeenCalled();
       });
     });
 
@@ -118,7 +120,8 @@ describe("experimentListCommand()", () => {
           },
         });
 
-        await experimentListCommand({});
+        const result = await experimentListCommand();
+        result?.table();
         const printed = logSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("checkout-flow");
       });
@@ -137,7 +140,8 @@ describe("experimentListCommand()", () => {
             hasMore: false,
           },
         });
-        await experimentListCommand({});
+        const result = await experimentListCommand();
+        result?.table();
         const printed = logSpy.mock.calls.flat().join("\n");
         expect(printed.toLowerCase()).toContain("no experiments");
       });

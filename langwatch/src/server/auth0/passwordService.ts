@@ -1,4 +1,4 @@
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../env.mjs";
 
 const logger = createLogger("langwatch:auth0:password");
@@ -107,8 +107,7 @@ async function fetchAuth0(
       signal: AbortSignal.timeout(AUTH0_HTTP_TIMEOUT_MS),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     throw new Auth0ApiError({
       status: 502,
       code: "unknown",
@@ -315,8 +314,7 @@ function extractPasswordPolicyMessage(
   // Strip the "PasswordStrengthError: " prefix so the user sees a clean
   // sentence ("Password is too weak.") instead of the type tag.
   const colonIdx = message.indexOf(":");
-  const cleaned =
-    colonIdx >= 0 ? message.slice(colonIdx + 1).trim() : message;
+  const cleaned = colonIdx >= 0 ? message.slice(colonIdx + 1).trim() : message;
   return cleaned.length > 0
     ? `${cleaned} Please choose a stronger password (Auth0 tenant policy).`
     : "Auth0 rejected the new password as too weak. Please choose a stronger one.";

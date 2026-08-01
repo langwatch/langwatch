@@ -36,6 +36,11 @@ export interface TimeRange {
   presetId?: string;
 }
 
+export interface TraceListCursor {
+  sortValue: number;
+  traceId: string;
+}
+
 interface FilterState {
   /** The parsed query AST (liqe) — single source of truth */
   ast: LiqeQuery;
@@ -47,6 +52,8 @@ interface FilterState {
   timeRange: TimeRange;
   page: number;
   pageSize: number;
+  /** Cursor used to enter each visited batch. Page 1 intentionally uses null. */
+  pageCursors: Record<number, TraceListCursor | null>;
 
   /** Debounced version of queryText to drive network requests */
   debouncedQueryText: string;
@@ -176,6 +183,8 @@ interface FilterState {
   /** Roll forward an existing preset range without resetting page. */
   rollTimeRange: (range: TimeRange) => void;
   setPage: (page: number) => void;
+  setPageCursor: (page: number, cursor: TraceListCursor | null) => void;
+  resetPagination: () => void;
   setPageSize: (size: number) => void;
   clearAll: () => void;
   /** Update the debounced values (usually called by a global timer/effect) */
@@ -240,7 +249,12 @@ function safeParseAndSerialize(text: string): ParseResult {
 
 function applyMutation(state: FilterState, mutate: (text: string) => string) {
   const next = safeParseAndSerialize(mutate(state.queryText));
-  return { ...next, page: 1, lastAiTranslation: null };
+  return {
+    ...next,
+    page: 1,
+    pageCursors: { 1: null },
+    lastAiTranslation: null,
+  };
 }
 
 /**
@@ -256,6 +270,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   timeRange: INITIAL_TIME_RANGE,
   page: 1,
   pageSize: 50,
+  pageCursors: { 1: null },
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
@@ -292,7 +307,13 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       ) {
         return state;
       }
-      return { ...result, aiError: null, page: 1, lastAiTranslation: null };
+      return {
+        ...result,
+        aiError: null,
+        page: 1,
+        pageCursors: { 1: null },
+        lastAiTranslation: null,
+      };
     }),
 
   setQuery: (text, ast) =>
@@ -301,6 +322,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       queryText: text,
       parseError: null,
       page: 1,
+      pageCursors: { 1: null },
       lastAiTranslation: null,
     }),
 
@@ -315,10 +337,16 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           queryText: "",
           parseError: null,
           page: 1,
+          pageCursors: { 1: null },
           lastAiTranslation: null,
         };
       }
-      return { ...result, page: 1, lastAiTranslation: null };
+      return {
+        ...result,
+        page: 1,
+        pageCursors: { 1: null },
+        lastAiTranslation: null,
+      };
     }),
 
   toggleFacet: (field, value, options) =>
@@ -471,10 +499,17 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       ),
     ),
 
-  setTimeRange: (range) => set({ timeRange: range, page: 1 }),
+  setTimeRange: (range) =>
+    set({ timeRange: range, page: 1, pageCursors: { 1: null } }),
   rollTimeRange: (range) => set({ timeRange: range }),
   setPage: (page) => set({ page }),
-  setPageSize: (size) => set({ pageSize: size, page: 1 }),
+  setPageCursor: (page, cursor) =>
+    set((state) => ({
+      pageCursors: { ...state.pageCursors, [page]: cursor },
+    })),
+  resetPagination: () => set({ page: 1, pageCursors: { 1: null } }),
+  setPageSize: (size) =>
+    set({ pageSize: size, page: 1, pageCursors: { 1: null } }),
   clearAll: () =>
     set({
       ast: EMPTY_AST,
@@ -482,6 +517,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       parseError: null,
       aiError: null,
       page: 1,
+      pageCursors: { 1: null },
       lastAiTranslation: null,
     }),
 

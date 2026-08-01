@@ -30,60 +30,48 @@ describe.skipIf(process.env.CI)("Scenario Processor - Worker Spawning", () => {
     mockCollector.requests.length = 0;
   });
 
-  it(
-    "spawns child process that exits with defined code",
-    async () => {
-      const jobData = createTestJobData();
-      const env = {
-        LANGWATCH_API_KEY: "test-api-key",
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
-      };
+  it("spawns child process that exits with defined code", async () => {
+    const jobData = createTestJobData();
+    const env = {
+      LANGWATCH_API_KEY: "test-api-key",
+      LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+    };
 
-      const { exitCode } = await spawnChildProcessDirectly(jobData, env);
+    const { exitCode } = await spawnChildProcessDirectly(jobData, env);
 
-      expect(exitCode).toBeDefined();
-    },
-    60000
-  );
+    expect(exitCode).toBeDefined();
+  }, 60000);
 
-  it(
-    "receives serialized scenario data and returns result object",
-    async () => {
-      const jobData = createTestJobData();
-      const env = {
-        LANGWATCH_API_KEY: "test-api-key",
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
-      };
+  it("receives serialized scenario data and returns result object", async () => {
+    const jobData = createTestJobData();
+    const env = {
+      LANGWATCH_API_KEY: "test-api-key",
+      LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+    };
 
-      const { result } = await spawnChildProcessDirectly(jobData, env);
+    const { result } = await spawnChildProcessDirectly(jobData, env);
 
-      expect(typeof result.success).toBe("boolean");
-    },
-    60000
-  );
+    expect(typeof result.success).toBe("boolean");
+  }, 60000);
 
-  it(
-    "passes LiteLLM params to child process",
-    async () => {
-      const customModelParams = {
-        api_key: "custom-litellm-key",
-        model: "anthropic/claude-3-haiku",
-        api_base: "https://custom.api.com",
-      };
+  it("passes LiteLLM params to child process", async () => {
+    const customModelParams = {
+      api_key: "custom-litellm-key",
+      model: "anthropic/claude-3-haiku",
+      api_base: "https://custom.api.com",
+    };
 
-      const jobData = createTestJobData({
-        modelParams: customModelParams,
-      });
+    const jobData = createTestJobData({
+      modelParams: customModelParams,
+    });
 
-      const env = {
-        LANGWATCH_API_KEY: "test-api-key",
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
-      };
+    const env = {
+      LANGWATCH_API_KEY: "test-api-key",
+      LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+    };
 
-      const { result } = await spawnChildProcessDirectly(jobData, env);
+    const { result } = await spawnChildProcessDirectly(jobData, env);
 
-      expect(result).toBeDefined();
-    },
-    60000
-  );
+    expect(result).toBeDefined();
+  }, 60000);
 });

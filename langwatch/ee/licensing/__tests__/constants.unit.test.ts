@@ -3,58 +3,47 @@ import {
   CONTACT_SALES_URL,
   FREE_PLAN,
   LICENSE_ERRORS,
-  LICENSE_ERROR_MESSAGES,
   UNLIMITED_PLAN,
-  getUserFriendlyLicenseError,
 } from "../constants";
+import { licenseValidationError } from "../errors";
 
 /**
- * Tests for license error message utilities.
- * Verifies that user-friendly error messages are properly mapped.
+ * The prose-keyed `LICENSE_ERROR_MESSAGES` / `getUserFriendlyLicenseError`
+ * pair is gone: customer copy is keyed by error `code` in the presentation
+ * registry now, and the only thing that still reads a `LICENSE_ERRORS`
+ * literal is `licenseValidationError`, which maps a verdict onto that code.
+ * What is worth pinning is that mapping — and that it fails closed.
  */
+describe("licenseValidationError", () => {
+  describe("given a verdict from validateLicense", () => {
+    it("maps an expired licence to license_expired", () => {
+      expect(licenseValidationError(LICENSE_ERRORS.EXPIRED).code).toBe(
+        "license_expired",
+      );
+    });
 
-describe("LICENSE_ERROR_MESSAGES", () => {
-  it("maps INVALID_FORMAT to user-friendly message", () => {
-    expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.INVALID_FORMAT]).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
-    );
+    it("maps a malformed key to license_key_invalid", () => {
+      expect(licenseValidationError(LICENSE_ERRORS.INVALID_FORMAT).code).toBe(
+        "license_key_invalid",
+      );
+    });
+
+    it("maps a bad signature to license_key_invalid", () => {
+      expect(
+        licenseValidationError(LICENSE_ERRORS.INVALID_SIGNATURE).code,
+      ).toBe("license_key_invalid");
+    });
   });
 
-  it("maps INVALID_SIGNATURE to user-friendly message", () => {
-    expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.INVALID_SIGNATURE]).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
-    );
-  });
-
-  it("maps EXPIRED to user-friendly message", () => {
-    expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.EXPIRED]).toBe(
-      "This license has expired. Please contact support to renew your license."
-    );
-  });
-});
-
-describe("getUserFriendlyLicenseError", () => {
-  it("returns user-friendly message for invalid format", () => {
-    expect(getUserFriendlyLicenseError("Invalid license format")).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
-    );
-  });
-
-  it("returns user-friendly message for invalid signature", () => {
-    expect(getUserFriendlyLicenseError("Invalid signature")).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
-    );
-  });
-
-  it("returns user-friendly message for expired license", () => {
-    expect(getUserFriendlyLicenseError("License expired")).toBe(
-      "This license has expired. Please contact support to renew your license."
-    );
-  });
-
-  it("returns original error for unknown error messages", () => {
-    const unknownError = "Some unknown error";
-    expect(getUserFriendlyLicenseError(unknownError)).toBe(unknownError);
+  describe("when the verdict is one nothing here recognises", () => {
+    it("still rejects the licence rather than failing open", () => {
+      expect(licenseValidationError("something new").code).toBe(
+        "license_key_invalid",
+      );
+      expect(licenseValidationError(undefined).code).toBe(
+        "license_key_invalid",
+      );
+    });
   });
 });
 

@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type { TraceSummaryData } from "../types";
 
 export interface FindByTraceIdOptions {
@@ -8,12 +10,30 @@ export interface FindByTraceIdOptions {
    * is a hint — drift up to a few hours is fine.
    */
   occurredAtMs?: number;
+
+  /**
+   * An explicit time bound, applied verbatim with NO internal miss fallback —
+   * the caller declared the width (the fold's `options.readWindow`) and owns
+   * the retry (the fold executor re-reads without the window on a miss).
+   * Takes precedence over `occurredAtMs`, which exists for callers that only
+   * hold a point-in-time hint and want the repository to widen it AND recover
+   * a miss itself (resolve the trace's real OccurredAt, bound a retry).
+   */
+  window?: { fromMs: number; toMs: number };
 }
 
 export interface TraceSummaryRepository {
-  upsert(data: TraceSummaryData, tenantId: string, retentionDays?: number): Promise<void>;
+  upsert(
+    data: TraceSummaryData,
+    tenantId: string,
+    retentionDays?: number,
+  ): Promise<void>;
   upsertBatch?(
-    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
+    entries: Array<{
+      data: TraceSummaryData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
   ): Promise<void>;
   findByTraceId(
     tenantId: string,

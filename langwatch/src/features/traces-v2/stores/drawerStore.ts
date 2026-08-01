@@ -1,6 +1,11 @@
 import { create } from "zustand";
 
-export type DrawerViewMode = "trace" | "summary" | "conversation";
+export type DrawerViewMode =
+  | "trace"
+  | "summary"
+  | "conversation"
+  | "terminal"
+  | "session";
 // Flame was retired during the trace-view redesign on the grounds that
 // Waterfall already showed depth/parent/child — then brought back in
 // Round 3 because the time-weighted block layout reads completely
@@ -205,7 +210,16 @@ interface InitialFromURL extends DrawerUrlState {
 }
 
 function isViewMode(value: string | null): value is DrawerViewMode {
-  return value === "trace" || value === "summary" || value === "conversation";
+  // `terminal` and `session` belong here too: they are real modes, and leaving
+  // them out meant a shared `?mode=terminal` link quietly opened on Trace
+  // instead — the link looked like it worked, and landed somewhere else.
+  return (
+    value === "trace" ||
+    value === "summary" ||
+    value === "conversation" ||
+    value === "terminal" ||
+    value === "session"
+  );
 }
 
 function isVizTab(value: string | null): value is VizTab {

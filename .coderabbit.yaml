@@ -57,11 +57,13 @@ reviews:
     semgrep:
       enabled: true
       config_file: .semgrep/langwatch.yml
-    # Deterministic syntactic rules (AC3) — see .coderabbit/ast-grep/rules/.
+    # Deterministic syntactic rules (AC3). The ruleset is NOT CodeRabbit-owned —
+    # it lives at /.ast-grep/ and runs as a plain linter in CI and via
+    # `make lint-rules`. CodeRabbit is one consumer of it, not the gate.
     ast-grep:
       essential_rules: true
       rule_dirs:
-        - .coderabbit/ast-grep/rules
+        - .ast-grep/rules
 
   path_instructions:
     # ── AC4: structural ${...} guard ───────────────────────────────────────
@@ -107,7 +109,7 @@ reviews:
 
     # ── AC3: layering / convention rules (judgment, not syntax) ────────────
     # Syntactic checks (no `any`, inline import(), form.watch() in child,
-    # export * from re-export shims) live in .coderabbit/ast-grep/rules/.
+    # export * from re-export shims) live in /.ast-grep/rules/.
     # ClickHouse fully-qualified table names live in .semgrep/langwatch.yml.
     # path_instructions only carries the judgment calls.
     #

@@ -2,40 +2,36 @@
  * @vitest-environment node
  *
  * Integration tests for per-organization ClickHouse client routing.
- * Spins up two ClickHouse containers to verify that data is routed
- * to the correct instance based on env var configuration.
+ * Uses two isolated ClickHouse endpoints to verify that data is routed
+ * to the correct endpoint based on env var configuration. An endpoint is a
+ * database on the local server natively, and a container in CI; either way a
+ * client built for one cannot read the other's rows, which is the property
+ * these tests turn on.
  *
  * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
  */
-import {
-  ClickHouseContainer,
-  type StartedClickHouseContainer,
-} from "@testcontainers/clickhouse";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
+import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 
 const TEST_TABLE = "routing_test";
-const TEST_DATABASE = "test_routing";
 
-let sharedContainer: StartedClickHouseContainer;
-let privateContainer: StartedClickHouseContainer;
 let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
-let sharedUrl: string;
-let privateUrl: string;
 
 // The org IDs we'll use — set the env var BEFORE importing clickhouseClient
 const PRIVATE_ORG_ID = `test-private-org-${nanoid(6)}`;
 const SHARED_ORG_ID = `test-shared-org-${nanoid(6)}`;
 
+// Table names stay unqualified throughout: each endpoint's client carries its
+// own database in the connection URL, and that is precisely the separation
+// under test: a query can only ever reach the database its client was built
+// for.
 async function setupTestSchema(client: ClickHouseClient): Promise<void> {
   await client.command({
-    query: `CREATE DATABASE IF NOT EXISTS ${TEST_DATABASE}`,
-  });
-  await client.command({
-    query: `CREATE TABLE IF NOT EXISTS ${TEST_DATABASE}.${TEST_TABLE} (
+    query: `CREATE TABLE IF NOT EXISTS ${TEST_TABLE} (
       id String,
       project_id String,
       data String
@@ -49,19 +45,22 @@ async function insertTestRow(
   { id, projectId, data }: { id: string; projectId: string; data: string },
 ): Promise<void> {
   await client.insert({
-    table: `${TEST_DATABASE}.${TEST_TABLE}`,
+    table: TEST_TABLE,
     values: [{ id, project_id: projectId, data }],
     format: "JSONEachRow",
   });
 }
 
+// project_id leads the predicate even though the row id is already unique per
+// run: the tenant column is what every read of a real table is scoped by, and a
+// fixture is the first thing someone copies when writing the next one.
 async function queryTestRow(
   client: ClickHouseClient,
-  id: string,
+  { id, projectId }: { id: string; projectId: string },
 ): Promise<{ id: string; project_id: string; data: string }[]> {
   const result = await client.query({
-    query: `SELECT * FROM ${TEST_DATABASE}.${TEST_TABLE} WHERE id = {id:String}`,
-    query_params: { id },
+    query: `SELECT * FROM ${TEST_TABLE} WHERE project_id = {projectId:String} AND id = {id:String}`,
+    query_params: { projectId, id },
     format: "JSONEachRow",
   });
   return result.json();
@@ -125,24 +124,13 @@ vi.mock("../client", () => ({
 
 describe("ClickHouse routing via env vars", () => {
   beforeAll(async () => {
-    const [shared, private_] = await Promise.all([
-      new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
-        .withLabels({ "langwatch.test.routing": "shared" })
-        .withReuse()
-        .withStartupTimeout(120_000)
-        .start(),
-      new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
-        .withLabels({ "langwatch.test.routing": "private" })
-        .withReuse()
-        .withStartupTimeout(120_000)
-        .start(),
-    ]);
+    const [shared, private_] = await startTestClickHouseEndpoints({
+      suite: "ch-routing",
+      names: ["shared", "private"],
+    });
 
-    sharedContainer = shared;
-    privateContainer = private_;
-
-    sharedUrl = sharedContainer.getConnectionUrl();
-    privateUrl = privateContainer.getConnectionUrl();
+    const sharedUrl = shared!.url;
+    const privateUrl = private_!.url;
 
     // Set the private CH env var BEFORE importing clickhouseClient
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
@@ -164,18 +152,24 @@ describe("ClickHouse routing via env vars", () => {
   }, 300_000);
 
   afterAll(async () => {
-    const { clearCustomClientCache, clearProjectOrgCache } = await import("../clickhouseClient");
+    const { clearCustomClientCache, clearProjectOrgCache } = await import(
+      "../clickhouseClient"
+    );
     await clearCustomClientCache();
     clearProjectOrgCache();
 
     if (createdProjectIds.length > 0) {
-      await prisma.project.deleteMany({ where: { id: { in: createdProjectIds } } });
+      await prisma.project.deleteMany({
+        where: { id: { in: createdProjectIds } },
+      });
     }
     if (createdTeamIds.length > 0) {
       await prisma.team.deleteMany({ where: { id: { in: createdTeamIds } } });
     }
     if (createdOrgIds.length > 0) {
-      await prisma.organization.deleteMany({ where: { id: { in: createdOrgIds } } });
+      await prisma.organization.deleteMany({
+        where: { id: { in: createdOrgIds } },
+      });
     }
 
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
@@ -190,12 +184,15 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a standard org routes to the shared instance */
     /** @scenario Data written for a standard org does not appear in private */
     it("returns the shared (default) client", async () => {
-      const { getClickHouseClientForProject } = await import("../clickhouseClient");
+      const { getClickHouseClientForProject } = await import(
+        "../clickhouseClient"
+      );
 
-      const { projectId, organizationId, teamId } = await createTestOrgWithProject({
-        namespace: "no-custom",
-        organizationId: SHARED_ORG_ID,
-      });
+      const { projectId, organizationId, teamId } =
+        await createTestOrgWithProject({
+          namespace: "no-custom",
+          organizationId: SHARED_ORG_ID,
+        });
       createdProjectIds.push(projectId);
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
@@ -204,13 +201,20 @@ describe("ClickHouse routing via env vars", () => {
       expect(client).toBe(sharedClient);
 
       const rowId = `shared-${nanoid(8)}`;
-      await insertTestRow(client!, { id: rowId, projectId, data: "shared-data" });
+      await insertTestRow(client!, {
+        id: rowId,
+        projectId,
+        data: "shared-data",
+      });
 
-      const rows = await queryTestRow(sharedClient, rowId);
+      const rows = await queryTestRow(sharedClient, { id: rowId, projectId });
       expect(rows).toHaveLength(1);
       expect(rows[0]!.data).toBe("shared-data");
 
-      const privateRows = await queryTestRow(privateClient, rowId);
+      const privateRows = await queryTestRow(privateClient, {
+        id: rowId,
+        projectId,
+      });
       expect(privateRows).toHaveLength(0);
     });
   });
@@ -222,12 +226,15 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a private-CH org routes to the private instance */
     /** @scenario Data written for a private-CH org does not appear in shared */
     it("returns a client connected to the private instance", async () => {
-      const { getClickHouseClientForProject } = await import("../clickhouseClient");
+      const { getClickHouseClientForProject } = await import(
+        "../clickhouseClient"
+      );
 
-      const { projectId, organizationId, teamId } = await createTestOrgWithProject({
-        namespace: "with-private",
-        organizationId: PRIVATE_ORG_ID,
-      });
+      const { projectId, organizationId, teamId } =
+        await createTestOrgWithProject({
+          namespace: "with-private",
+          organizationId: PRIVATE_ORG_ID,
+        });
       createdProjectIds.push(projectId);
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
@@ -236,13 +243,23 @@ describe("ClickHouse routing via env vars", () => {
       expect(client).not.toBe(sharedClient);
 
       const rowId = `private-${nanoid(8)}`;
-      await insertTestRow(client!, { id: rowId, projectId, data: "private-data" });
+      await insertTestRow(client!, {
+        id: rowId,
+        projectId,
+        data: "private-data",
+      });
 
-      const privateRows = await queryTestRow(privateClient, rowId);
+      const privateRows = await queryTestRow(privateClient, {
+        id: rowId,
+        projectId,
+      });
       expect(privateRows).toHaveLength(1);
       expect(privateRows[0]!.data).toBe("private-data");
 
-      const sharedRows = await queryTestRow(sharedClient, rowId);
+      const sharedRows = await queryTestRow(sharedClient, {
+        id: rowId,
+        projectId,
+      });
       expect(sharedRows).toHaveLength(0);
     });
   });
@@ -264,7 +281,9 @@ describe("ClickHouse routing via env vars", () => {
 
   describe("when getClickHouseClientForOrganization is called", () => {
     it("routes to the private instance without any DB query", async () => {
-      const { getClickHouseClientForOrganization } = await import("../clickhouseClient");
+      const { getClickHouseClientForOrganization } = await import(
+        "../clickhouseClient"
+      );
 
       const client = await getClickHouseClientForOrganization(PRIVATE_ORG_ID);
       expect(client).not.toBeNull();

@@ -27,6 +27,7 @@ import {
 } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — declared before any imports that might trigger module load
@@ -39,18 +40,23 @@ import { prisma } from "~/server/db";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForSet, mockDeleteRun } = vi.hoisted(() => ({
-  mockGetRunIdsForSet: vi
-    .fn()
-    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
-  mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(
+  () => ({
+    mockGetRunIdsForSet: vi
+      .fn()
+      .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
+    mockDeleteRun: vi.fn().mockResolvedValue(undefined),
+    // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
+    // the seam between "route returned 201" and "the user sees the turn".
+    mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+  }),
+);
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     simulations: {
       startRun: vi.fn().mockResolvedValue(undefined),
-      messageSnapshot: vi.fn().mockResolvedValue(undefined),
+      messageSnapshot: mockMessageSnapshot,
       textMessageStart: vi.fn().mockResolvedValue(undefined),
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
@@ -117,7 +123,7 @@ const { mockLogInfo, mockLogWarn, mockLogError, mockLogDebug } = vi.hoisted(
   }),
 );
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: mockLogInfo,
     warn: mockLogWarn,
@@ -251,13 +257,76 @@ function makeMessageSnapshotWithInputAudio(scenarioRunId: string) {
   };
 }
 
+/**
+ * A SCENARIO_MESSAGE_SNAPSHOT whose message content is a multimodal image turn:
+ * `[text, {type:"image", image:"data:image/webp;base64,..."}]` — the AI-SDK
+ * shape the typescript scenario SDK ships for image attachments (scenario
+ * docs: multimodal-images). Validated by the same STRICT messages union that
+ * 400-rejected voice audio before #5149; images regressed the same way once
+ * the SDK stopped JSON-stringifying array content.
+ */
+function makeMessageSnapshotWithImage(scenarioRunId: string) {
+  const imageBase64 = Buffer.from("fake-webp-bytes").toString("base64");
+  return {
+    type: ScenarioEventType.MESSAGE_SNAPSHOT,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId,
+    scenarioSetId: "default",
+    messages: [
+      {
+        id: `msg-${nanoid(6)}`,
+        role: "user",
+        content: [
+          { type: "text", text: "What do you see in this image?" },
+          { type: "image", image: `data:image/webp;base64,${imageBase64}` },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * A SCENARIO_MESSAGE_SNAPSHOT whose message content carries an OpenAI
+ * ChatCompletion file part: `[text, {type:"file", file:{filename, file_data}}]`
+ * — the shape both scenario SDKs document for document attachments (scenario
+ * docs: multimodal-files).
+ */
+function makeMessageSnapshotWithOpenAiFile(scenarioRunId: string) {
+  const pdfBase64 = Buffer.from("%PDF-1.4 fake pdf bytes").toString("base64");
+  return {
+    type: ScenarioEventType.MESSAGE_SNAPSHOT,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId,
+    scenarioSetId: "default",
+    messages: [
+      {
+        id: `msg-${nanoid(6)}`,
+        role: "user",
+        content: [
+          { type: "text", text: "Please summarize this document." },
+          {
+            type: "file",
+            file: {
+              filename: "document.pdf",
+              file_data: `data:application/pdf;base64,${pdfBase64}`,
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
 
 let testApiKey: string;
 let testProjectId: string;
-let testProjectSlug: string;
 let orgId: string;
 let teamId: string;
 let previousBaseHost: string | undefined;
@@ -290,47 +359,22 @@ beforeAll(async () => {
   });
   testApiKey = created.apiKey;
   testProjectId = created.id;
-  testProjectSlug = created.slug;
 
   // Set BASE_HOST so the handler can build the redirect URL
   process.env.BASE_HOST = BASE_HOST;
 });
 
 afterAll(async () => {
-  // Best-effort cleanup. Some integration-suite postgres schemas do not
-  // include the unified API-key ApiKey table; deleting a project that has
-  // related ApiKey rows would FK-cascade through a missing table and
-  // throw. Swallowing here keeps test-suite teardown from masking real
-  // test failures with cleanup noise.
-  try {
-    await prisma.project.deleteMany({ where: { id: testProjectId } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: orgId } });
-  } catch (error) {
-    // The integration suite's postgres schema does not always include the
-    // unified API-key ApiKey table; deleting a project that has related ApiKey
-    // rows would FK-cascade through a missing table and throw P2003 (FK
-    // constraint failed) or P2021 (table does not exist). Swallow ONLY
-    // those two known shapes — anything else means cleanup is genuinely
-    // misconfigured and the test author needs to see the error.
-    const knownMissingFixture =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error.code === "P2003" || error.code === "P2021");
-    if (!knownMissingFixture) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Unexpected cleanup error in scenario-events-ingest integration suite:",
-        error,
-      );
-    }
-  }
   if (previousBaseHost === undefined) {
     delete process.env.BASE_HOST;
   } else {
     process.env.BASE_HOST = previousBaseHost;
   }
+  await cleanupTestRows(prisma, [
+    ["project", { id: testProjectId }],
+    ["team", { id: teamId }],
+    ["organization", { id: orgId }],
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -458,6 +502,152 @@ describe("POST /api/scenario-events (ingest)", () => {
     });
   });
 
+  describe("when a MESSAGE_SNAPSHOT carries an AI-SDK image turn (multimodal-images docs shape)", () => {
+    /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
+    it("returns 201 (not 400) and externalizes the image bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockMessageSnapshot.mockClear();
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "image/webp",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeMessageSnapshotWithImage(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      // Before the wire-leg fix this returned 400 — the scenarioEventSchema
+      // message union had no member accepting the AI-SDK
+      // `{type:"image", image}` part, so zValidator rejected the snapshot
+      // before extraction ever ran and the run showed zero turns in the UI.
+      expect(res.status).toBe(201);
+
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "image/webp",
+          purpose: "scenario_event",
+          bytes: Buffer.from("fake-webp-bytes"),
+        }),
+      );
+
+      // The dispatched snapshot carries the REWRITTEN payload: the image part
+      // references the stored object and no inline base64 survives — this is
+      // what the read path folds into the run the user sees.
+      expect(mockMessageSnapshot).toHaveBeenCalledOnce();
+      const dispatched = mockMessageSnapshot.mock.calls[0]?.[0] as {
+        messages: Array<{ content: Array<Record<string, unknown>> }>;
+      };
+      expect(dispatched.messages[0]?.content[1]).toEqual({
+        type: "image",
+        image: `/api/files/${testProjectId}/${extractedId}`,
+      });
+      expect(JSON.stringify(dispatched.messages)).not.toContain("base64,");
+    });
+  });
+
+  describe("when a MESSAGE_SNAPSHOT carries an AI-SDK file turn ({type:'file', mediaType, data})", () => {
+    /** @scenario "AI-SDK file parts with a document mediaType validate on the wire" */
+    it("returns 201 (not 400) and externalizes the file bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "application/pdf",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = {
+        type: ScenarioEventType.MESSAGE_SNAPSHOT,
+        timestamp: Date.now(),
+        batchRunId: `batch-${nanoid(6)}`,
+        scenarioId: `scenario-${nanoid(6)}`,
+        scenarioRunId,
+        scenarioSetId: "default",
+        messages: [
+          {
+            id: `msg-${nanoid(6)}`,
+            role: "user",
+            content: [
+              { type: "text", text: "Please summarize this document." },
+              {
+                type: "file",
+                mediaType: "application/pdf",
+                data: Buffer.from("%PDF-1.4 ai-sdk file bytes").toString(
+                  "base64",
+                ),
+                filename: "document.pdf",
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(201);
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "application/pdf",
+          purpose: "scenario_event",
+          bytes: Buffer.from("%PDF-1.4 ai-sdk file bytes"),
+        }),
+      );
+    });
+  });
+
+  describe("when a MESSAGE_SNAPSHOT carries an OpenAI file turn (multimodal-files docs shape)", () => {
+    /** @scenario "A simulated user message with a document attachment stays available under its original filename" */
+    it("returns 201 (not 400) and externalizes the file bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "application/pdf",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeMessageSnapshotWithOpenAiFile(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(res.status).toBe(201);
+
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "application/pdf",
+          purpose: "scenario_event",
+          bytes: Buffer.from("%PDF-1.4 fake pdf bytes"),
+        }),
+      );
+    });
+  });
+
   describe("when an event is posted without auth credentials", () => {
     it("returns 401", async () => {
       const body = makeRunStartedEvent();
@@ -527,14 +717,18 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   });
 
   describe("when no scenarioSetId is provided", () => {
-    /** @scenario "DELETE without scenarioSetId returns 400" */
-    it("returns 400 and archives nothing — never wipes the whole project", async () => {
+    /** @scenario "DELETE without scenarioSetId is refused" */
+    it("refuses the request and archives nothing — never wipes the whole project", async () => {
       const res = await app.request("/api/scenario-events", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
 
-      expect(res.status).toBe(400);
+      // 422, not 400: a request whose SHAPE is wrong is a schema failure, and
+      // the validation boundary now reports those as unprocessable with the
+      // offending fields attached. 400 is reserved for a body the parser could
+      // not read at all. What the test is really guarding is the line below.
+      expect(res.status).toBe(422);
       // The footgun guard: neither the run lookup nor any archive ran.
       expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
@@ -542,14 +736,14 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   });
 
   describe("when scenarioSetId is empty", () => {
-    /** @scenario "DELETE with empty scenarioSetId returns 400" */
-    it("returns 400 and archives nothing", async () => {
+    /** @scenario "DELETE with empty scenarioSetId is refused" */
+    it("refuses the request and archives nothing", async () => {
       const res = await app.request("/api/scenario-events?scenarioSetId=", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
     });

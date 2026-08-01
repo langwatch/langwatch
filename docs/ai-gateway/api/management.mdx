@@ -28,6 +28,8 @@ Self-hosted: replace the base with your control plane's DNS.
 GET /virtual-keys
 ```
 
+Returns every key visible to your credential: keys scoped to your project, its team, or the whole organization.
+
 Response:
 
 ```json
@@ -35,25 +37,29 @@ Response:
   "data": [
     {
       "id": "vk_01HZX...",
+      "organization_id": "org_01HZ...",
       "name": "prod-key",
       "description": null,
-      "environment": "live",
-      "prefix": "vk-lw-01H",
-      "last_four": "NZ0Z",
-      "status": "ACTIVE",
+      "status": "active",
+      "purpose": "user",
+      "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "project_id": "proj_01HZ...",
-      "organization_id": "org_01HZ...",
-      "provider_credential_ids": ["gpc_01HZ...", "gpc_01HZW..."],
-      "config": { /* model_aliases, cache, fallback, ... */ },
+      "trace_project_id": null,
+      "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
+      "routing_policy_id": null,
+      "routing_mode": "NONE",
+      "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
+      "revision": "3",
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
-      "revoked_at": null,
-      "last_used_at": "2026-04-18T21:03:12Z"
+      "last_used_at": "2026-04-18T21:03:12Z",
+      "revoked_at": null
     }
   ]
 }
 ```
+
+`purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
 
 ### Create
 
@@ -61,18 +67,25 @@ Response:
 POST /virtual-keys
 ```
 
-Body:
+Body (only `name` is required):
 
 ```json
 {
   "name": "ci-key",
   "description": "CI smoke tests",
-  "environment": "live",                         // or "test"
-  "principal_user_id": null,                     // optional
-  "provider_credential_ids": ["gpc_01HZ..."],    // required, min 1
-  "config": { /* optional partial config */ }
+  "principal_user_id": null,
+  "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
+  "routing_mode": "NONE",
+  "routing_policy_id": null,
+  "budget": { "limit_usd": "25", "window": "MONTH", "on_breach": "BLOCK" },
+  "config": { "providersAllowed": ["mp_openai..."] }
 }
 ```
+
+- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
+- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `DAY`, `WEEK`, `MONTH`.
+- `routing_mode` is one of `NONE` (default: no silent failover), `FALLBACK_ALL`, or `POLICY` (requires `routing_policy_id`).
 
 Response `201`:
 
@@ -93,6 +106,27 @@ GET /virtual-keys/:id
 
 Response: `{ "virtual_key": {...} }`. No secret.
 
+### Spend
+
+```
+GET /virtual-keys/:id/spend?from=2026-07-01T00:00:00Z&to=2026-07-15T00:00:00Z
+```
+
+Requires `gatewayUsage:view`. Both window params are optional; the default window is the current UTC calendar month. Reads the same cost path (`trace_summaries`) the dashboard reads, so this number and the UI agree by construction.
+
+Response:
+
+```json
+{
+  "virtual_key_id": "vk_01HZX...",
+  "spent_usd": "12.4531",
+  "requests": 1841,
+  "window": { "from": "2026-07-01T00:00:00.000Z", "to": "2026-07-15T00:00:00.000Z" }
+}
+```
+
+On deployments without a ClickHouse spend source the endpoint answers `412` with `error.code = "spend_source_unavailable"` rather than a `$0.00` that cannot be told apart from a zero-spend key.
+
 ### Update
 
 ```
@@ -101,14 +135,17 @@ PATCH /virtual-keys/:id
 
 Body (all fields optional):
 
-```json
+```jsonc
 {
   "name": "new-name",
-  "description": null,                         // null clears
-  "provider_credential_ids": ["gpc_...", "..."],
+  "scopes": [{ "scope_type": "TEAM", "scope_id": "team_..." }],
+  "routing_mode": "FALLBACK_ALL",
+  "budget": { "limit_usd": "50", "window": "MONTH" },
   "config": { /* partial, merges with existing */ }
 }
 ```
+
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
 
 ### Rotate
 
@@ -118,14 +155,14 @@ POST /virtual-keys/:id/rotate
 
 Response `200`:
 
-```json
+```jsonc
 {
   "virtual_key": { /* ... */ },
   "secret": "vk-lw-NEW..."
 }
 ```
 
-The previous secret stops authenticating immediately (modulo ~60 s of gateway L1 cache TTL).
+The previous secret keeps authenticating for a 24 h grace window so in-flight clients can roll over.
 
 ### Revoke
 
@@ -133,7 +170,7 @@ The previous secret stops authenticating immediately (modulo ~60 s of gateway L1
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status.
+Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets.
 
 ## Budgets
 
@@ -141,9 +178,43 @@ Idempotent: revoking an already-revoked VK returns `200` with the same status.
 
 ```
 GET /budgets
+GET /budgets?scope_type=VIRTUAL_KEY,PRINCIPAL
 ```
 
-Response: `{ "data": [{...}, ...] }`. Each entry has `limit_usd` and `spent_usd` as strings (decimal precision preserved).
+Returns every non-archived budget in your organization across all six scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+
+Response:
+
+```json
+{
+  "spend_available": true,
+  "data": [
+    {
+      "id": "bgt_01HZ...",
+      "organization_id": "org_01HZ...",
+      "scope_type": "VIRTUAL_KEY",
+      "scope_id": "vk_01HZX...",
+      "name": "customer-acme cap",
+      "description": null,
+      "window": "MONTH",
+      "on_breach": "BLOCK",
+      "limit_usd": "25",
+      "spent_usd": "12.4531",
+      "timezone": null,
+      "provider_key": null,
+      "current_period_started_at": "2026-07-01T00:00:00.000Z",
+      "resets_at": "2026-08-01T00:00:00.000Z",
+      "last_reset_at": null,
+      "archived_at": null,
+      "created_at": "2026-06-12T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` as real spend in that case.
+- `GROUP` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
+- `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
 
 ### Create
 
@@ -153,20 +224,25 @@ POST /budgets
 
 Body:
 
-```json
+```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL
-    "project_id": "proj_..."   // the id field depends on scope.kind
+    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP
+    "project_id": "proj_..."   // the id field depends on scope.kind:
+                               // organization_id | team_id | project_id |
+                               // virtual_key_id | principal_user_id | group_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
   "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
   "limit_usd": 5000,           // or "5000.00"
   "on_breach": "BLOCK",        // or WARN
-  "timezone": "Europe/Amsterdam"
+  "timezone": "Europe/Amsterdam",
+  "provider_key": null         // optional ModelProvider id to pin the budget to one provider
 }
 ```
+
+`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`.
 
 ### Update
 
@@ -174,7 +250,7 @@ Body:
 PATCH /budgets/:id
 ```
 
-Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
+Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope and window are immutable after create.
 
 ### Archive
 
@@ -182,76 +258,11 @@ Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
 DELETE /budgets/:id
 ```
 
-Soft archive: preserves ledger history, stops enforcement on new requests.
+Soft archive: preserves ledger history, stops enforcement on new requests. Returns the archived row with `archived_at` set.
 
 ## Provider bindings
 
-### List
-
-```
-GET /providers
-```
-
-Response:
-
-```json
-{
-  "data": [
-    {
-      "id": "gpc_01HZ...",
-      "model_provider_id": "mp_openai",
-      "model_provider_name": "openai",
-      "slot": "primary",
-      "rate_limit_rpm": 10000,
-      "rate_limit_tpm": 1000000,
-      "rate_limit_rpd": null,
-      "rotation_policy": "manual",
-      "fallback_priority_global": 10,
-      "health_status": "healthy",
-      "disabled_at": null,
-      "created_at": "2026-04-10T12:00:00Z"
-    }
-  ]
-}
-```
-
-### Create
-
-```
-POST /providers
-```
-
-Body:
-
-```json
-{
-  "model_provider_id": "mp_openai",   // the existing provider row id
-  "slot": "primary",                  // free-text
-  "rate_limit_rpm": 10000,
-  "rate_limit_tpm": 1000000,
-  "rate_limit_rpd": null,
-  "rotation_policy": "manual",        // v1 accepts "manual" only; auto + external_secret_store are v1.1
-  "extra_headers": null,
-  "provider_config": null,
-  "fallback_priority_global": 10
-}
-```
-
-Response `201`: `{ "provider_credential": { "id": "gpc_01HZ..." } }`.
-
-### Update
-
-```
-PATCH /providers/:id
-```
-
-### Disable
-
-```
-DELETE /providers/:id
-```
-
-Soft disable: existing VKs bound to this credential continue to resolve; new VK creation rejects this credential.
+The `/providers` routes are **gone** (`410`). Gateway provider bindings were folded into the platform-wide ModelProvider in iteration 110: configure credentials, rate limits, and fallback priority via `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id (`provider_key`).
 
 ## Cache rules
 
@@ -363,28 +374,28 @@ All responses follow the OpenAI-compatible envelope:
 {
   "error": {
     "type": "bad_request",
-    "code": "validation_error",
-    "message": "provider_credential_ids must contain at least 1 element"
+    "code": "trace_project_required",
+    "message": "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in..."
   }
 }
 ```
 
-See [API: Errors](/ai-gateway/api/errors) for the full type enum.
+`error.code` carries the machine code your integration can branch on (`validation_error`, `trace_project_required`, `routing_policy_required`, `scope_org_mismatch`, `group_budget_requires_clickhouse`, `spend_source_unavailable`, ...). See [API: Errors](/ai-gateway/api/errors) for the full type enum.
 
 Common management-side types:
 
 | HTTP | `type` | Meaning |
 |---|---|---|
-| 400 | `bad_request` | Validation, missing required field |
+| 400 | `bad_request` | Validation, missing required field, cross-org scope |
 | 401 | `unauthenticated` | Missing or invalid API token |
-| 403 | `permission_denied` | Token lacks the required RBAC scope |
-| 404 | `not_found` | Resource doesn't exist or isn't visible in this project |
-| 409 | `conflict` | Name collision on create, stale update (optimistic concurrency) |
-| 422 | `validation_error` | Semantic error (e.g. `window=MINUTE` but `limit_usd=100000`, impossibly large per-minute cap) |
+| 403 | `permission_denied` | Token lacks the required RBAC permission (route ceiling or per-scope) |
+| 404 | `not_found` | Resource doesn't exist or isn't visible to this credential |
+| 410 | `gone` | Route folded away (the `/providers` bindings) |
+| 412 | `precondition_failed` | Deployment lacks a required capability (`spend_source_unavailable`) |
 
 ## Audit
 
-Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `provider_binding`, `cache_rule`) to scope. Writes via API tokens are attributed to the API token's resolved user. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
+Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `cache_rule`) to scope. Writes via scoped API keys are attributed to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<projectId>`. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
 
 ## Rate limits
 
@@ -392,13 +403,11 @@ Management endpoints are rate-limited to 100 req/min/token. For bulk operations,
 
 ## Shared service layer
 
-Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `modelProviders.*`) call the same service classes on the server, `VirtualKeyService`, `GatewayBudgetService`, and the platform-wide ModelProvider service. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
-
-This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
+Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `gatewayUsage.*`) call the same service classes and pre-flight asserts on the server: `VirtualKeyService`, `GatewayBudgetService`, `GatewayUsageService`, and the scope-authorization helpers in `virtualKey.authz`. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase) and how the caller is identified (API credential vs browser session). Behaviour is identical, and the integration suite in `langwatch/src/app/api/gateway-platform/__tests__/` pins the refusals (`trace_project_required`, per-scope `permission_denied`, `group_budget_requires_clickhouse`, ...) so the two surfaces cannot drift apart again.
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas, which generate into the repository-wide OpenAPI 3.1 document (`docs/api-reference/openapiLangWatch.json`) rendered by the API-reference docs. The CLI's `VirtualKeysApiService` and `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a future improvement is to regenerate them from the OpenAPI output so drift fails at build time.
 
 ## See also
 

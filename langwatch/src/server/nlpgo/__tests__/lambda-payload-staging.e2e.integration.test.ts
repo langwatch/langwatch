@@ -38,15 +38,15 @@ import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  STAGED_PAYLOAD_HEADER,
   deleteStagedObject,
-  stagePayloadToS3,
+  STAGED_PAYLOAD_HEADER,
   type StagedObject,
+  stagePayloadToS3,
 } from "../../s3/stagePayload";
 import {
   hasGo,
-  startNlpgoSubprocess,
   type NlpgoSubprocess,
+  startNlpgoSubprocess,
 } from "./_nlpgoSubprocess";
 
 // AWS Lambda synchronous InvokeFunction Payload cap. A body over this fails

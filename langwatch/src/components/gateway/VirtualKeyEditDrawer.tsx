@@ -1,7 +1,5 @@
 import {
-  Box,
   Button,
-  Code,
   Field,
   HStack,
   Input,
@@ -13,22 +11,45 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-import { ModelMultiSelect } from "~/components/ModelMultiSelect";
+
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
 import {
-  ConfigureModelProvidersLink,
-  EligibleModelProvidersPreview,
-  EligibleModelProvidersSummary,
-} from "./EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
-import {
+  buildScopeHierarchy,
+  type OrgModelProvider,
+  resolveEligible,
   type VirtualKeyScopeEntry,
-  VirtualKeyScopePicker,
-} from "./VirtualKeyScopePicker";
+} from "./eligibleModelProviders";
+import { humanizeGatewayError } from "./gatewayErrorCopy";
+import {
+  budgetInvalidReason,
+  EMPTY_BUDGET,
+  VirtualKeyBudgetSection,
+  type VirtualKeyBudgetValue,
+  type VirtualKeyBudgetWindow,
+} from "./VirtualKeyBudgetSection";
+import { VirtualKeyOwnershipReadOnly } from "./VirtualKeyOwnershipSection";
+import {
+  ALL_PROVIDERS,
+  type ProviderAccessValue,
+  providerAccessInvalidReason,
+  providerAccessToConfig,
+  VirtualKeyProviderAccessSection,
+} from "./VirtualKeyProviderAccessSection";
+import {
+  routingValueFromKey,
+  VirtualKeyRoutingSection,
+  type VirtualKeyRoutingValue,
+} from "./VirtualKeyRoutingSection";
+import {
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 
 type VirtualKeyDetail = {
   id: string;
@@ -38,11 +59,15 @@ type VirtualKeyDetail = {
   status: "active" | "revoked";
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
+  routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
+  traceProjectId?: string | null;
+  principalUserId?: string | null;
+  principalUser?: { name: string | null; email: string | null } | null;
   config: {
     // null / undefined = no allowlist = every eligible model is allowed.
-    // A non-empty list restricts the VK (and the Langy picker) to exactly
-    // these `provider/model` ids.
     modelsAllowed?: string[] | null;
+    // null / undefined = every provider in scope, current and future.
+    providersAllowed?: string[] | null;
     cache?: { mode: "respect" | "force" | "disable"; ttlS: number };
     rateLimits?: {
       rpm: number | null;
@@ -63,16 +88,27 @@ type VirtualKeyEditDrawerProps = {
   onSaved: () => void;
 };
 
+const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
+
 export function VirtualKeyEditDrawer({
   organizationId,
   vk,
   onOpenChange,
   onSaved,
 }: VirtualKeyEditDrawerProps) {
-  const { organization, team, project } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
+  const [tagsCsv, setTagsCsv] = useState<string>("");
+  const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
+  const [budgetLoaded, setBudgetLoaded] = useState(false);
+  const [isBudgetDirty, setIsBudgetDirty] = useState(false);
+  const [hadManagedBudget, setHadManagedBudget] = useState(false);
+  const [providerAccess, setProviderAccess] =
+    useState<ProviderAccessValue>(ALL_PROVIDERS);
+  const [routing, setRouting] = useState<VirtualKeyRoutingValue>(
+    routingValueFromKey({ routingMode: "NONE", routingPolicyId: null }),
+  );
   const [cacheMode, setCacheMode] = useState<"respect" | "force" | "disable">(
     "respect",
   );
@@ -80,21 +116,33 @@ export function VirtualKeyEditDrawer({
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
-  const [tagsCsv, setTagsCsv] = useState<string>("");
-  const [modelsAllowed, setModelsAllowed] = useState<string[]>([]);
 
   useEffect(() => {
     if (!vk) return;
     setName(vk.name);
     setDescription(vk.description ?? "");
-    setRoutingPolicyId(vk.routingPolicyId ?? "");
+    setTagsCsv((vk.config.metadata?.tags ?? []).join(", "));
     setCacheMode(vk.config.cache?.mode ?? "respect");
     setCacheTtlS(vk.config.cache?.ttlS ?? 3600);
-    setTagsCsv((vk.config.metadata?.tags ?? []).join(", "));
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
-    setModelsAllowed(vk.config.modelsAllowed ?? []);
+    const providersAllowed = vk.config.providersAllowed ?? null;
+    setProviderAccess({
+      allProviders: !providersAllowed || providersAllowed.length === 0,
+      providerIds: providersAllowed ?? [],
+      modelsAllowed: vk.config.modelsAllowed ?? [],
+    });
+    setRouting(
+      routingValueFromKey({
+        routingMode: vk.routingMode ?? null,
+        routingPolicyId: vk.routingPolicyId,
+      }),
+    );
+    setBudget(EMPTY_BUDGET);
+    setBudgetLoaded(false);
+    setIsBudgetDirty(false);
+    setHadManagedBudget(false);
   }, [vk]);
 
   const availableTeams = useMemo(
@@ -123,34 +171,116 @@ export function VirtualKeyEditDrawer({
       { organizationId },
       { enabled: !!vk && !!organizationId },
     );
+  // The key's own budget, read from the same resolver that decides what
+  // the gateway enforces. Seeds the budget field once per open.
+  const applicableQuery = api.virtualKeys.applicableBudgets.useQuery(
+    {
+      organizationId,
+      scopes: vk?.scopes ?? [],
+      traceProjectId: vk?.traceProjectId ?? null,
+      principalUserId: vk?.principalUserId ?? null,
+      virtualKeyId: vk?.id ?? null,
+    },
+    { enabled: !!vk && !!organizationId && (vk?.scopes.length ?? 0) > 0 },
+  );
+  useEffect(() => {
+    // The stored value seeds the field only while the person has not
+    // typed: applicableBudgets resolves labels and ClickHouse spend, so
+    // it can land AFTER an edit began, and seeding then would silently
+    // replace what was typed with what was stored.
+    if (!vk || budgetLoaded || isBudgetDirty || !applicableQuery.data) return;
+    const own = applicableQuery.data.find(
+      (b) => b.managedByVirtualKeyId === vk.id && MANAGED_WINDOWS.has(b.window),
+    );
+    if (own) {
+      const limit = Number.parseFloat(own.limitUsd);
+      setBudget({
+        limitUsd: Number.isFinite(limit) ? String(limit) : own.limitUsd,
+        window: own.window as VirtualKeyBudgetWindow,
+      });
+      setHadManagedBudget(true);
+    }
+    setBudgetLoaded(true);
+  }, [vk, budgetLoaded, isBudgetDirty, applicableQuery.data]);
+
   const updateMutation = api.virtualKeys.update.useMutation({
     onSuccess: async () => {
       await utils.virtualKeys.list.invalidate({ organizationId });
+      await utils.virtualKeys.applicableBudgets.invalidate();
     },
   });
+
+  const providers = (orgProvidersQuery.data?.providers ??
+    []) as OrgModelProvider[];
+  const policies = (policiesQuery.data ?? []) as Array<{
+    id: string;
+    name: string;
+  }>;
+  const eligible = useMemo(
+    () =>
+      resolveEligible(
+        vk?.scopes ?? [],
+        providers,
+        buildScopeHierarchy(availableProjects, organizationId),
+      ),
+    [vk?.scopes, providers, availableProjects, organizationId],
+  );
+
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
 
   const close = () => {
     if (updateMutation.isPending) return;
     onOpenChange(false);
   };
 
+  const cannotSaveReason = (() => {
+    if (!name) return "Name is required.";
+    const budgetReason = budgetInvalidReason(budget);
+    if (budgetReason) return budgetReason;
+    // Until providers resolve, an explicit selection cannot be told
+    // apart from an empty one, and submitting would filter the picked
+    // ids against an empty eligible set and persist an empty allowlist.
+    // Hold the save until the list is real.
+    if (orgProvidersQuery.isLoading) {
+      return "Loading providers…";
+    }
+    const providerReason = providerAccessInvalidReason(
+      providerAccess,
+      eligible,
+    );
+    if (providerReason) return providerReason;
+    return null;
+  })();
+
   const submit = async () => {
     if (!vk) return;
-    if (!name) {
-      toaster.create({ title: "Name is required", type: "error" });
+    if (cannotSaveReason) {
+      toaster.create({ title: cannotSaveReason, type: "error" });
       return;
     }
     try {
+      const access = providerAccessToConfig(providerAccess, eligible);
+      const trimmedLimit = budget.limitUsd.trim();
       await updateMutation.mutateAsync({
         organizationId,
         id: vk.id,
         name,
         description: description || null,
-        routingPolicyId: routingPolicyId ? routingPolicyId : null,
+        routingMode: routing.mode,
+        routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
+        // Undefined leaves an absent budget alone; null archives one the
+        // key had; a value creates or updates it.
+        budget: trimmedLimit
+          ? {
+              limitUsd: trimmedLimit,
+              window: budget.window,
+            }
+          : hadManagedBudget
+            ? null
+            : undefined,
         config: {
-          // Empty selection ⇒ null (no allowlist = all eligible models),
-          // never [] (which the gateway would read as "allow zero models").
-          modelsAllowed: modelsAllowed.length > 0 ? modelsAllowed : null,
+          providersAllowed: access.providersAllowed,
+          modelsAllowed: access.modelsAllowed,
           cache: { mode: cacheMode, ttlS: cacheTtlS },
           rateLimits: {
             rpm: rpm ? Number.parseInt(rpm, 10) : null,
@@ -158,10 +288,7 @@ export function VirtualKeyEditDrawer({
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
           metadata: {
-            tags: tagsCsv
-              .split(",")
-              .map((t) => t.trim())
-              .filter((t) => t.length > 0),
+            tags: parseTagsCsv(tagsCsv),
           },
         },
       });
@@ -169,10 +296,7 @@ export function VirtualKeyEditDrawer({
       onOpenChange(false);
     } catch (error) {
       toaster.create({
-        title:
-          error instanceof Error
-            ? error.message
-            : "Failed to update virtual key",
+        title: humanizeGatewayError(error, "Failed to update virtual key"),
         type: "error",
       });
     }
@@ -191,12 +315,12 @@ export function VirtualKeyEditDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <VStack align="stretch" gap={5}>
+          <VStack align="stretch" gap={4}>
             <Field.Root required>
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking — the VK id + secret remain the same."
+                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking: the VK id + secret remain the same."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
@@ -217,126 +341,75 @@ export function VirtualKeyEditDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  description={VK_TAGS_FIELD_DESCRIPTION}
                   docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
                 />
               </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
                 placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              <Field.HelperText>
-                Comma-separated. Cache-control rules can match on{" "}
-                <code>vk_tags</code> as AND-subset, so rule matchers of{" "}
-                <code>["tier=enterprise"]</code> fire for any VK carrying that
-                tag.
-              </Field.HelperText>
+              {tagsNotice && (
+                <Field.HelperText color="orange.600">
+                  {tagsNotice}
+                </Field.HelperText>
+              )}
             </Field.Root>
 
-            <Separator />
             {vk && (
               <>
-                <VirtualKeyScopePicker
+                <Separator />
+                <VirtualKeyOwnershipReadOnly
                   scopes={vk.scopes}
-                  onScopesChange={() => undefined}
-                  isExisting
-                  organizationId={organizationId}
-                  organizationName={organization?.name}
-                  teamId={team?.id}
-                  teamName={team?.name}
-                  projectId={project?.id}
-                  projectName={project?.name}
-                  availableTeams={availableTeams}
-                  availableProjects={availableProjects}
+                  principal={
+                    vk.principalUserId && vk.principalUser
+                      ? vk.principalUser
+                      : undefined
+                  }
+                  ctx={{
+                    organizationName: organization?.name,
+                    availableTeams,
+                    availableProjects,
+                  }}
                 />
-                <EligibleModelProvidersSummary
+
+                <Separator />
+                <VirtualKeyBudgetSection
+                  value={budget}
+                  onChange={(next) => {
+                    setIsBudgetDirty(true);
+                    setBudget(next);
+                  }}
+                  organizationId={organizationId}
+                  scopes={vk.scopes}
+                  traceProjectId={vk.traceProjectId ?? null}
+                  principalUserId={vk.principalUserId ?? null}
+                  virtualKeyId={vk.id}
+                />
+
+                <Separator />
+                <VirtualKeyProviderAccessSection
+                  value={providerAccess}
+                  onChange={setProviderAccess}
                   scopes={vk.scopes}
                   organizationId={organizationId}
                   organizationName={organization?.name}
                   availableTeams={availableTeams}
                   availableProjects={availableProjects}
+                  providers={providers}
                   isLoading={orgProvidersQuery.isLoading}
-                  providers={(orgProvidersQuery.data?.providers ?? []) as any}
+                />
+
+                <Separator />
+                <VirtualKeyRoutingSection
+                  value={routing}
+                  onChange={setRouting}
+                  policies={policies}
                 />
               </>
-            )}
-
-            <Box>
-              <HStack mb={1.5} alignItems="center" gap={2}>
-                <ConfigureModelProvidersLink scopes={vk?.scopes ?? []} />
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Eligible model providers
-                </Text>
-              </HStack>
-              <EligibleModelProvidersPreview
-                scopes={vk?.scopes ?? []}
-                organizationId={organizationId}
-                organizationName={organization?.name}
-                availableTeams={availableTeams}
-                availableProjects={availableProjects}
-                isLoading={orgProvidersQuery.isLoading}
-                providers={(orgProvidersQuery.data?.providers ?? []) as any}
-              />
-            </Box>
-
-            <Field.Root>
-              <Field.Label>
-                Models {name ? `“${name}” ` : ""}can use
-                <FieldInfoTooltip
-                  description="Restrict this virtual key to specific models. Leave everything unchecked to allow every model the eligible providers can serve. For the Langy assistant this is exactly the set its sidebar model picker offers."
-                  docHref="/ai-gateway/virtual-keys"
-                />
-              </Field.Label>
-              {/* v1 limitation: the palette comes from the CURRENT project's
-                  providers (useModelSelectionOptions). That's correct for the
-                  current project's Langy VK — the common case — but editing a
-                  different project's VK from the org-wide list would show this
-                  project's palette. Per-VK-project sourcing is a follow-up. */}
-              <ModelMultiSelect
-                value={modelsAllowed}
-                onChange={setModelsAllowed}
-                mode="chat"
-              />
-              <Field.HelperText>
-                {modelsAllowed.length === 0
-                  ? "All eligible models allowed. Check models to restrict."
-                  : `${modelsAllowed.length} model${
-                      modelsAllowed.length === 1 ? "" : "s"
-                    } selected.`}
-              </Field.HelperText>
-            </Field.Root>
-
-            {((policiesQuery.data ?? []).length > 0 || routingPolicyId) && (
-              <Field.Root>
-                <Field.Label>
-                  Routing policy
-                  <FieldInfoTooltip
-                    description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Change is non-breaking — clients keep working with the new policy on the next /config refresh."
-                    docHref="/ai-gateway/routing-policies"
-                  />
-                </Field.Label>
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value={routingPolicyId}
-                    onChange={(e) => setRoutingPolicyId(e.target.value)}
-                  >
-                    <option value="">
-                      Default cascade (all eligible providers)
-                    </option>
-                    {(policiesQuery.data ?? []).map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
-                <Field.HelperText>
-                  Default cascade uses all eligible providers in fallback
-                  priority. Picking a policy constrains routing to its ordered
-                  provider list.
-                </Field.HelperText>
-              </Field.Root>
             )}
 
             <Separator />
@@ -345,17 +418,10 @@ export function VirtualKeyEditDrawer({
                 Cache control
               </Text>
               <FieldInfoTooltip
-                description="Per-VK default cache mode. Per-request X-LangWatch-Cache header + matching cache rules override. See the doc for the 3-layer precedence model and per-provider semantics."
+                description="Per-VK default cache mode; the X-LangWatch-Cache request header and matching cache rules override per request. Provider-agnostic: Anthropic uses explicit cache_control markers, OpenAI/Azure cache prompts automatically, Gemini supports cachedContent references."
                 docHref="/ai-gateway/cache-control"
               />
             </HStack>
-            <Text fontSize="xs" color="fg.muted">
-              Provider-agnostic: Anthropic uses explicit cache_control markers,
-              OpenAI/Azure cache prompts automatically, Gemini supports
-              cachedContent references. Mode here applies to every provider this
-              VK routes to; the X-LangWatch-Cache request header lets callers
-              override per-request.
-            </Text>
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
                 <Field.Label>Mode</Field.Label>
@@ -370,13 +436,13 @@ export function VirtualKeyEditDrawer({
                     }
                   >
                     <option value="respect">
-                      Respect — pass provider cache directives through unchanged
+                      Respect: pass provider cache directives through unchanged
                     </option>
                     <option value="disable">
-                      Disable — strip cache directives before dispatch
+                      Disable: strip cache directives before dispatch
                     </option>
                     <option value="force">
-                      Force — inject cache_control on Anthropic (OpenAI auto,
+                      Force: inject cache_control on Anthropic (OpenAI auto,
                       Gemini WARN)
                     </option>
                   </NativeSelect.Field>
@@ -399,20 +465,13 @@ export function VirtualKeyEditDrawer({
             <Separator />
             <HStack>
               <Text fontSize="sm" fontWeight="semibold">
-                Rate limits (blank = unlimited)
+                Rate limits
               </Text>
               <FieldInfoTooltip
-                description="Per-VK rpm/rpd on the gateway hot path. Independent of per-binding rate limits — whichever trips first blocks. TPM is v1.1 (requires token estimation + Redis cluster counters)."
+                description="Per-VK caps on the gateway hot path, blank = unlimited. Enforced in-memory on every gateway replica; on breach the gateway returns HTTP 429 with Retry-After and X-LangWatch-RateLimit-Dimension. Changes propagate to all replicas within ~60s."
                 docHref="/ai-gateway/rate-limits"
               />
             </HStack>
-            <Text fontSize="xs" color="fg.muted">
-              Enforced per-VK in-memory on every gateway replica. On breach the
-              gateway returns HTTP 429 with{" "}
-              <Code fontSize="xs">Retry-After</Code> and{" "}
-              <Code fontSize="xs">X-LangWatch-RateLimit-Dimension</Code>.
-              Changes propagate to all replicas within ~60s.
-            </Text>
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
                 <Field.Label>rpm</Field.Label>
@@ -425,18 +484,20 @@ export function VirtualKeyEditDrawer({
                 <Field.HelperText>Requests / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>tpm</Field.Label>
+                <Field.Label>
+                  tpm
+                  <FieldInfoTooltip
+                    description="Tokens / minute; requires pre-request token estimation and ships with Redis-coordinated cluster counters (v1.1)."
+                    docHref="/ai-gateway/rate-limits"
+                  />
+                </Field.Label>
                 <Input
                   value={tpm}
-                  onChange={(e) => setTpm(e.target.value)}
                   placeholder="deferred"
                   inputMode="numeric"
                   disabled
                 />
-                <Field.HelperText>
-                  Tokens / minute — requires pre-request token estimation; ships
-                  with Redis-coordinated cluster counters (v1.1).
-                </Field.HelperText>
+                <Field.HelperText>Tokens / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
                 <Field.Label>rpd</Field.Label>
@@ -453,6 +514,11 @@ export function VirtualKeyEditDrawer({
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">
+            {cannotSaveReason && (
+              <Text fontSize="xs" color="fg.muted">
+                {cannotSaveReason}
+              </Text>
+            )}
             <Spacer />
             <Button
               variant="ghost"
@@ -465,7 +531,7 @@ export function VirtualKeyEditDrawer({
               colorPalette="orange"
               onClick={submit}
               loading={updateMutation.isPending}
-              disabled={!name}
+              disabled={!!cannotSaveReason}
             >
               Save changes
             </Button>

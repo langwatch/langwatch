@@ -2,8 +2,8 @@ import {
   Box,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Spinner,
   Text,
@@ -11,8 +11,9 @@ import {
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
-import { SearchInput } from "~/components/ui/SearchInput";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { SearchInput } from "~/components/ui/SearchInput";
+import { HandledErrorAlert } from "~/features/errors";
 
 export interface PaginationState {
   page: number;
@@ -29,7 +30,16 @@ interface BackofficeTableProps {
   pagination?: PaginationState;
   isLoading?: boolean;
   isFetching?: boolean;
-  error?: Error | null;
+  /**
+   * The list query's failure, if any. Deliberately `unknown` — it is handed
+   * straight to `HandledErrorAlert`, which lifts the handled-error payload off
+   * whichever transport carried it rather than rendering `message`.
+   *
+   * These views fetch over plain `fetch` against the Hono `/api/admin/*`
+   * routes, so the payload arrives in the flat REST shape and `adminClient`
+   * copies it onto the thrown error for the reader to find.
+   */
+  error?: unknown;
   onCreate?: () => void;
   createLabel?: string;
   /** Slot for the <Table.Root>…</Table.Root> content. */
@@ -82,9 +92,10 @@ export function BackofficeTable({
         <Card.Body paddingY={0} paddingX={0}>
           {error ? (
             <Box paddingY={10} paddingX={4}>
-              <Text color="red.500" fontSize="sm">
-                {error.message}
-              </Text>
+              <HandledErrorAlert
+                error={error}
+                fallbackTitle={`Couldn't load ${title.toLowerCase()}`}
+              />
             </Box>
           ) : isLoading ? (
             <Box paddingY={10} textAlign="center">
@@ -109,9 +120,7 @@ export function BackofficeTable({
         </Card.Body>
       </Card.Root>
 
-      {pagination && pagination.total > 0 && (
-        <PaginationBar {...pagination} />
-      )}
+      {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
     </VStack>
   );
 }
@@ -172,7 +181,9 @@ export function formatDate(value: string | Date | null | undefined): string {
   return d.toLocaleDateString();
 }
 
-export function formatDateTime(value: string | Date | null | undefined): string {
+export function formatDateTime(
+  value: string | Date | null | undefined,
+): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";

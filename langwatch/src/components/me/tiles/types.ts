@@ -83,8 +83,5 @@ export interface AiToolEntry {
   iconAsset?: string | null;
   order: number;
   enabled: boolean;
-  config:
-    | CodingAssistantConfig
-    | ModelProviderConfig
-    | ExternalToolConfig;
+  config: CodingAssistantConfig | ModelProviderConfig | ExternalToolConfig;
 }

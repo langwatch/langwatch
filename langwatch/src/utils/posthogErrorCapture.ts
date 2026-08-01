@@ -3,7 +3,30 @@
  * for capturing exceptions and errors.
  */
 
+import { isSpanContextValid, trace } from "@opentelemetry/api";
 import posthog from "posthog-js";
+
+/**
+ * Trace identity of the span that was active where the error was captured, so a
+ * PostHog exception can be followed back to the trace it happened in — and from
+ * there, via `~/utils/grafanaLinks`, straight into Tempo.
+ *
+ * Without this an exception in PostHog and the request that caused it can only
+ * be joined by eyeballing timestamps, which is why these ids are attached
+ * unconditionally rather than being left to each call site.
+ *
+ * Returns nothing when there is no trace to name: during boot, inside a
+ * background timer, or in a browser with no provider registered. Claiming no
+ * trace is honest; claiming an invalid all-zero one is not.
+ */
+function activeTraceContext():
+  | { trace_id: string; span_id: string }
+  | undefined {
+  const spanContext = trace.getActiveSpan()?.spanContext();
+  if (!spanContext || !isSpanContextValid(spanContext)) return void 0;
+
+  return { trace_id: spanContext.traceId, span_id: spanContext.spanId };
+}
 
 // Lazy import for server-side PostHog to avoid bundling posthog-node in client code
 // This function is only called on the server side (when window is undefined)
@@ -72,6 +95,9 @@ export function captureMessage(
   const exceptionProperties = {
     ...properties,
     $exception_level: options?.level ?? "info",
+    // Last, so a colliding `extra`/`tags` key cannot quietly rewrite where this
+    // was captured.
+    ...activeTraceContext(),
   };
 
   // Try server-side PostHog first
@@ -133,6 +159,9 @@ export function captureException(
   const exceptionProperties = {
     ...properties,
     $exception_level: options?.level ?? "error",
+    // Last, so a colliding `extra`/`tags` key cannot quietly rewrite where this
+    // was captured.
+    ...activeTraceContext(),
   };
 
   // Try server-side PostHog first (for API routes, server components, etc.)

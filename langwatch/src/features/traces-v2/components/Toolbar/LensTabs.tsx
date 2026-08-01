@@ -1,4 +1,4 @@
-import { Box, Button, HStack, IconButton, Tabs, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
@@ -161,17 +161,22 @@ export const LensTabs: React.FC = () => {
             }
             positioning={{ placement: "bottom" }}
           >
-            <IconButton
+            {/* Reads as a real button (matching the time-range button) with a
+                "Filters" label, not a bare chevron the user has to decode. */}
+            <Button
               aria-label="Show filters sidebar"
-              variant="ghost"
-              size="2xs"
+              variant="outline"
+              size="xs"
+              fontWeight="medium"
+              gap={1.5}
               color="fg.subtle"
               onClick={toggleSidebar}
-              marginRight={1}
+              marginRight={2}
               flexShrink={0}
             >
               <PanelLeftOpen size={14} />
-            </IconButton>
+              Filters
+            </Button>
           </Tooltip>
         )}
         <Tabs.Root

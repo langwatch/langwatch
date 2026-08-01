@@ -12,7 +12,9 @@ import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry"
 
 vi.mock("~/server/api/routers/modelProviders.utils", () => ({
   getProjectModelProviders: vi.fn(),
-  prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gemini/gemini-1.5-pro", api_key: "test-key" }),
+  prepareLitellmParams: vi
+    .fn()
+    .mockResolvedValue({ model: "gemini/gemini-1.5-pro", api_key: "test-key" }),
   prepareEnvKeys: vi.fn().mockReturnValue({}),
 }));
 
@@ -20,11 +22,13 @@ vi.mock("~/server/modelProviders/resolveMaxTokensCeiling", () => ({
   resolveMaxTokensCeiling: vi.fn().mockReturnValue(null),
 }));
 
-import { setupModelEnv } from "../evaluation-execution.factories";
 import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
 import { EvaluatorConfigError } from "../errors";
+import { setupModelEnv } from "../evaluation-execution.factories";
 
-function buildProvider(overrides: Partial<MaybeStoredModelProvider> = {}): MaybeStoredModelProvider {
+function buildProvider(
+  overrides: Partial<MaybeStoredModelProvider> = {},
+): MaybeStoredModelProvider {
   return {
     provider: "gemini",
     enabled: true,
@@ -57,7 +61,11 @@ describe("setupModelEnv", () => {
       vi.mocked(getProjectModelProviders).mockResolvedValue({
         gemini: buildProvider({
           customModels: [
-            { modelId: "gemini-1.5-pro", displayName: "gemini-1.5-pro", mode: "chat" },
+            {
+              modelId: "gemini-1.5-pro",
+              displayName: "gemini-1.5-pro",
+              mode: "chat",
+            },
           ],
         }),
       });
@@ -71,7 +79,11 @@ describe("setupModelEnv", () => {
       vi.mocked(getProjectModelProviders).mockResolvedValue({
         gemini: buildProvider({
           customEmbeddingsModels: [
-            { modelId: "custom-embed", displayName: "custom-embed", mode: "embedding" },
+            {
+              modelId: "custom-embed",
+              displayName: "custom-embed",
+              mode: "embedding",
+            },
           ],
         }),
       });

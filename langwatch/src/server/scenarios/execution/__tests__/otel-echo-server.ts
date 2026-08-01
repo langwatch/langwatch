@@ -5,7 +5,7 @@
  * compatible with the HTTP agent adapter's expected format.
  */
 
-import { createServer, type Server, type IncomingHttpHeaders } from "node:http";
+import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 
 interface ReceivedRequest {
   method: string;

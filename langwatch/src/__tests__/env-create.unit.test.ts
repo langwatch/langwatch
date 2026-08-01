@@ -1,7 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { createEnv } from "@t3-oss/env-core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema } from "../env-create.mjs";
+import {
+  assertGatewaySecretsAllOrNone,
+  createEnvConfig,
+  gatewaySecretsSchema,
+  rumSampleRatioSchema,
+  storedObjectsBackendSchema,
+} from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -72,7 +80,9 @@ describe("assertGatewaySecretsAllOrNone", () => {
         LW_VIRTUAL_KEY_PEPPER: "a".repeat(32),
       }),
     ).toThrow();
-    const banner = errorSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+    const banner = errorSpy.mock.calls
+      .map((c: unknown[]) => c.join(" "))
+      .join("\n");
     expect(banner).toMatch(/AI Gateway secrets are partially configured/i);
     expect(banner).toMatch(/openssl rand -hex 32/);
   });
@@ -145,7 +155,8 @@ describe("gatewaySecretsSchema", () => {
           client: {},
           server: {
             LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
-            LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+            LW_GATEWAY_INTERNAL_SECRET:
+              gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
             LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
           },
           runtimeEnv: {
@@ -160,7 +171,11 @@ describe("gatewaySecretsSchema", () => {
       // The issues logged to console.error contain the field names and the
       // minimum constraint so the user can identify which keys need real secrets.
       const logged = errorSpy.mock.calls
-        .map((c: unknown[]) => c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "))
+        .map((c: unknown[]) =>
+          c
+            .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+            .join(" "),
+        )
         .join("\n");
       expect(logged).toMatch(/LW_VIRTUAL_KEY_PEPPER/);
       expect(logged).toMatch(/LW_GATEWAY_INTERNAL_SECRET/);
@@ -171,6 +186,131 @@ describe("gatewaySecretsSchema", () => {
       // logged issues. If a future Zod/t3-env release starts echoing the
       // received value, this assertion will fail — that's the trip-wire.
       expect(logged).not.toMatch(/REPLACE_ME/);
+    });
+  });
+});
+
+// Binds the spec scenario "A nonsensical share records rather than silently
+// collecting nothing" (specs/observability/browser-rum-trace-correlation.feature)
+// to the path a deployment actually takes. `SessionRatioSampler` clamps a
+// nonsense ratio too, but nothing out of range could ever reach it: the env
+// schema rejected the value first and `createEnv` turned that into a boot
+// failure, so a typo in an optional telemetry dial took the whole app down.
+// This exercises the real exported schema, so dropping the `.catch` fails here.
+describe("rumSampleRatioSchema", () => {
+  describe("given a share that cannot be read as a ratio", () => {
+    it.each([
+      ["a word", "banana"],
+      ["a ratio above one", "2"],
+      ["a negative ratio", "-1"],
+      ["blank, which is how an unset .env line reads", ""],
+    ])("records everything rather than refusing to boot on %s", (_case, value) => {
+      const parsed = rumSampleRatioSchema.safeParse(value);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBe(1);
+    });
+  });
+
+  describe("given a share that reads as a ratio", () => {
+    it.each([
+      ["a fraction", "0.25", 0.25],
+      ["zero, which is a deliberate choice rather than nonsense", "0", 0],
+      ["one", "1", 1],
+    ])("honours %s", (_case, value, expected) => {
+      expect(rumSampleRatioSchema.parse(value)).toBe(expected);
+    });
+  });
+});
+
+// Binds the spec scenarios "The env schema declares the Azure backend
+// variables as first-class keys" and "An unrecognized STORED_OBJECTS_BACKEND
+// value is rejected, not ignored" (AC37, issue #4133) to the real exported
+// schema — not an inline copy — so a mutation of the enum widening it back to
+// a free string fails here.
+describe("storedObjectsBackendSchema", () => {
+  describe("given the env-create source", () => {
+    /** @scenario "The env schema declares the Azure backend variables as first-class keys" */
+    it("declares STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER in both the schema and the runtime map", () => {
+      const source = fs.readFileSync(
+        path.join(__dirname, "..", "env-create.mjs"),
+        "utf-8",
+      );
+      // Both keys must be first-class env vars: declared in the zod server
+      // schema AND wired through runtimeEnv — otherwise application code
+      // would have to reach into process.env directly, which the repo bans.
+      // Assert the two DECLARATIONS, not how many times the name appears —
+      // a comment mentioning the variable twice would satisfy a count.
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/,
+      );
+      expect(source).toMatch(
+        /AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/,
+      );
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
+      );
+      expect(source).toMatch(
+        /AZURE_BLOB_CONTAINER:\s*process\.env\.AZURE_BLOB_CONTAINER/,
+      );
+    });
+  });
+
+  describe("given a supported value", () => {
+    it.each([["s3"], ["azure"]])("accepts %s", (value) => {
+      const parsed = storedObjectsBackendSchema.safeParse(value);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBe(value);
+    });
+  });
+
+  describe("given no value", () => {
+    /** @scenario "Azure env vars alone never flip the write destination" */
+    it("is optional — undefined is valid, not defaulted to azure or s3", () => {
+      const parsed = storedObjectsBackendSchema.safeParse(undefined);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBeUndefined();
+    });
+  });
+
+  describe("given a value outside the supported set", () => {
+    /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
+    it("fails validation rather than passing the value through untouched", () => {
+      const parsed = storedObjectsBackendSchema.safeParse("gcs");
+      expect(parsed.success).toBe(false);
+    });
+
+    /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
+    it("startup fails via createEnv, naming the variable and the supported values", () => {
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      try {
+        expect(() =>
+          createEnv({
+            clientPrefix: "VITE_PUBLIC_",
+            client: {},
+            server: { STORED_OBJECTS_BACKEND: storedObjectsBackendSchema },
+            runtimeEnv: { STORED_OBJECTS_BACKEND: "gcs" },
+            skipValidation: false,
+          }),
+        ).toThrow("Invalid environment variables");
+
+        const logged = errorSpy.mock.calls
+          .map((c: unknown[]) =>
+            c
+              .map((a) =>
+                typeof a === "object" ? JSON.stringify(a) : String(a),
+              )
+              .join(" "),
+          )
+          .join("\n");
+        expect(logged).toMatch(/STORED_OBJECTS_BACKEND/);
+        expect(logged).toMatch(/s3/);
+        expect(logged).toMatch(/azure/);
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 });

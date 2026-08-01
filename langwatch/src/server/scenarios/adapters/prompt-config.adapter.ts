@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
-import { createLogger } from "~/utils/logger/server";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import type { PromptService } from "../../prompt-config/prompt.service";
 
@@ -64,7 +64,10 @@ export class PromptConfigAdapter extends AgentAdapter {
         "Fetching Vercel AI model with project provider configuration",
       );
 
-      const model = await getVercelAIModel({ projectId: this.projectId, model: prompt.model });
+      const model = await getVercelAIModel({
+        projectId: this.projectId,
+        model: prompt.model,
+      });
 
       // 4. Generate response using Vercel AI SDK
       const result = await generateText({

@@ -3,11 +3,11 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createOriginGateReactor,
   createDeferredOriginHandler,
+  createOriginGateReactor,
+  type DeferredOriginPayload,
   makeDeferredJobId,
   type OriginGateReactorDeps,
-  type DeferredOriginPayload,
 } from "../originGate.reactor";
 
 function createFoldState(
@@ -79,11 +79,13 @@ function createEvent(
 
 function createContext(
   foldState: TraceSummaryData,
+  overrides: Partial<ReactorContext<TraceSummaryData>> = {},
 ): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
     foldState,
+    ...overrides,
   };
 }
 
@@ -141,7 +143,12 @@ describe("originGate reactor", () => {
     });
 
     it("skips for all origin types", async () => {
-      for (const origin of ["application", "evaluation", "simulation", "workflow"]) {
+      for (const origin of [
+        "application",
+        "evaluation",
+        "simulation",
+        "workflow",
+      ]) {
         const deps = createDeps();
         const reactor = createOriginGateReactor(deps);
         const state = createFoldState({
@@ -156,6 +163,7 @@ describe("originGate reactor", () => {
   });
 
   describe("when origin is absent (pure OTEL trace)", () => {
+    /** @scenario "Deferred check deduplicates per trace" */
     it("schedules deferred origin resolution with traceId as id", async () => {
       const deps = createDeps();
       const reactor = createOriginGateReactor(deps);
@@ -168,6 +176,21 @@ describe("originGate reactor", () => {
         tenantId: "tenant-1",
         traceId: "trace-1",
       });
+    });
+  });
+
+  describe("when the trace aggregate has an empty id", () => {
+    it("skips without scheduling", async () => {
+      const deps = createDeps();
+      const reactor = createOriginGateReactor(deps);
+      const state = createFoldState({ attributes: {} });
+
+      await reactor.handle(
+        createEvent({ aggregateId: "" }),
+        createContext(state, { aggregateId: "" }),
+      );
+
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 
@@ -229,6 +252,7 @@ describe("originGate reactor", () => {
 
 describe("createDeferredOriginHandler()", () => {
   describe("when called", () => {
+    /** @scenario 'Deferred check treats still-empty origin as "application"' */
     it("dispatches resolveOrigin command unconditionally", async () => {
       const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
       const handler = createDeferredOriginHandler(resolveOriginFn);
@@ -256,7 +280,9 @@ describe("createDeferredOriginHandler()", () => {
 
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
-      const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
+      const resolveOriginFn = vi
+        .fn()
+        .mockRejectedValue(new Error("command failed"));
       const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",

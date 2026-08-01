@@ -59,6 +59,14 @@ describe("RetroactiveUpdateService", () => {
           ),
         ).toBe(false);
 
+        expect(
+          issuedCalls.some((call) =>
+            (call.query as string).includes(
+              "ALTER TABLE langy_analytics_events",
+            ),
+          ),
+        ).toBe(true);
+
         // No NOT IN clause anywhere — no pin exclusion
         expect(
           issuedCalls.some((c) => (c.query as string).includes("NOT IN")),

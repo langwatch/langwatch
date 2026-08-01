@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { rateLimit, _resetMemoryRateLimitStore } from "../rateLimit";
+import { beforeEach, describe, expect, it } from "vitest";
+import { _resetMemoryRateLimitStore, rateLimit } from "../rateLimit";
 
 describe("rateLimit (in-memory fallback)", () => {
   beforeEach(() => {
@@ -39,17 +39,41 @@ describe("rateLimit (in-memory fallback)", () => {
 
   describe("when keys are distinct", () => {
     it("isolates limits between keys", async () => {
-      const a = await rateLimit({ key: "test:isolated:a", windowSeconds: 60, max: 1 });
-      const b = await rateLimit({ key: "test:isolated:b", windowSeconds: 60, max: 1 });
+      const a = await rateLimit({
+        key: "test:isolated:a",
+        windowSeconds: 60,
+        max: 1,
+      });
+      const b = await rateLimit({
+        key: "test:isolated:b",
+        windowSeconds: 60,
+        max: 1,
+      });
       expect(a.allowed).toBe(true);
       expect(b.allowed).toBe(true);
     });
 
     it("does not bleed counts across keys", async () => {
-      const a1 = await rateLimit({ key: "test:bleed:a", windowSeconds: 60, max: 2 });
-      const b1 = await rateLimit({ key: "test:bleed:b", windowSeconds: 60, max: 2 });
-      const a2 = await rateLimit({ key: "test:bleed:a", windowSeconds: 60, max: 2 });
-      const a3 = await rateLimit({ key: "test:bleed:a", windowSeconds: 60, max: 2 });
+      const a1 = await rateLimit({
+        key: "test:bleed:a",
+        windowSeconds: 60,
+        max: 2,
+      });
+      const b1 = await rateLimit({
+        key: "test:bleed:b",
+        windowSeconds: 60,
+        max: 2,
+      });
+      const a2 = await rateLimit({
+        key: "test:bleed:a",
+        windowSeconds: 60,
+        max: 2,
+      });
+      const a3 = await rateLimit({
+        key: "test:bleed:a",
+        windowSeconds: 60,
+        max: 2,
+      });
       expect(a1.allowed).toBe(true);
       expect(a2.allowed).toBe(true);
       expect(a3.allowed).toBe(false);

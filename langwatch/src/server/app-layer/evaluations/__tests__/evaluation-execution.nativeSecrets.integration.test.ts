@@ -24,6 +24,7 @@ function makeService(trace: Trace) {
   const traceService = {
     getTracesWithSpans: vi.fn().mockResolvedValue([trace]),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
+    getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
   } as unknown as TraceService;
   const modelEnvResolver: ModelEnvResolver = {
     resolveForEvaluator: vi.fn().mockResolvedValue({}),

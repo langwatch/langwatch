@@ -46,6 +46,33 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
     And user "carol@acme.com" unchecks every starter tool
     Then the import action is disabled
 
+  # Auto-provisioning means real catalogs are never empty, so the import
+  # affordance cannot hide behind the empty state: it stays reachable from
+  # a populated catalog behind a compact toggle. Import only ever adds
+  # starter tiles the catalog never had: tiles already present are skipped,
+  # and archived tiles count as present, so a re-import never undoes
+  # curation (+ Add tile recreates an archived tile deliberately).
+  @bdd @admin-catalog @starter-pack @integration
+  Scenario: a populated catalog still offers the starter pack import behind a toggle
+    Given the org-scoped catalog already has entries
+    When user "carol@acme.com" loads "/settings/governance/tool-catalog"
+    Then an "Import starter pack" button is shown instead of the empty-state callout
+    And clicking it reveals the starter tool checklist
+
+  @bdd @admin-catalog @starter-pack @integration
+  Scenario: re-importing the starter pack adds only tiles the catalog never had
+    Given the catalog has most starter tiles but lacks one entirely
+    When the starter pack is imported again
+    Then the catalog gains only the tile it lacked
+    And the tiles already in the catalog stay exactly as they were
+
+  @bdd @admin-catalog @starter-pack @integration
+  Scenario: an archived starter tile is not restored or duplicated by a re-import
+    Given the admin archived a starter tile
+    When the starter pack is imported again
+    Then the archived tile does not reappear anywhere in the catalog
+    And the catalog does not gain a second copy of it
+
   Scenario: admin sees populated catalog with scope badges
     Given the catalog has these admin-visible entries:
       | type             | displayName    | scope        | scopeId          | enabled |

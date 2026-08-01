@@ -2,10 +2,19 @@ import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
 
 /**
@@ -25,9 +34,44 @@ export interface KillSwitchOptions {
 }
 
 /**
+ * Queue serialization and append-coalescing options (ADR-066 pillar 2), shared
+ * by both {@link CommandHandlerOptions} declarations — the static-pipeline
+ * builder's here and the dispatcher's runtime shape. Declared once so the JSDoc
+ * for these fields lives in a single place; both interfaces extend it rather
+ * than hand-syncing two copies.
+ */
+export interface CommandSerializationOptions {
+  /**
+   * Serialize this command with every other command that enables the option
+   * for the same tenant and aggregate. This keeps command handling, event
+   * append, and projection staging atomic with respect to the next command
+   * for that aggregate while allowing other aggregates to run concurrently.
+   */
+  serializeByAggregate?: boolean;
+  /**
+   * Coalesce this producer's appends (ADR-066 pillar 2). When one aggregate can
+   * mint events faster than they drain — a hot trigger recording every match —
+   * set the max number of same-command jobs (including the dispatched one) to
+   * fold into a single multi-row insert. Leave unset (or ≤ 1) for a low-fan-in
+   * producer where one aggregate appends at most one event per human action:
+   * those append immediately, with the per-job path unchanged.
+   */
+  coalesceMaxBatch?: number;
+  /**
+   * Optional byte cap for a coalesced batch (ADR-066 pillar 2). The drain stops
+   * before a job that would push the batch past this size, keeping one insert
+   * inside the downstream flush budget; a job too large to fit becomes its own
+   * dispatch. Unset falls back to the GroupQueue default. Only consulted when
+   * `coalesceMaxBatch` enables coalescing.
+   */
+  coalesceMaxBytes?: number;
+}
+
+/**
  * Options for configuring a command handler in a static pipeline definition.
  */
-export interface CommandHandlerOptions<Payload = any> {
+export interface CommandHandlerOptions<Payload = any>
+  extends CommandSerializationOptions {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
@@ -85,6 +129,9 @@ export interface StaticPipelineDefinition<
     }
   >;
 
+  /** Default operational state projections registered via `.withProjection()`. */
+  stateProjections?: Map<string, StateProjectionDefinition<any, EventType>>;
+
   /** Map projections (stateless, transform individual events) registered in this pipeline */
   mapProjections: Map<
     string,
@@ -99,7 +146,10 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
+    handlerInstance?: import("../commands/command").CommandHandler<
+      any,
+      EventType
+    >;
     options?: CommandHandlerOptions;
   }>;
 
@@ -114,6 +164,12 @@ export interface StaticPipelineDefinition<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
   >;
+
+  /** Live event consumers that are independent of fold/map projections. */
+  eventSubscribers: Map<string, EventSubscriberDefinition<EventType>>;
+
+  /** Process managers mounted on this pipeline (ADR-049/052). */
+  processManagers: Map<string, ProcessManagerDefinition>;
 
   /** Feature flag service for kill switches */
   featureFlagService?: FeatureFlagServiceInterface;

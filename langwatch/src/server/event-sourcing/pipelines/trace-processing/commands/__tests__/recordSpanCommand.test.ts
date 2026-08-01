@@ -1,13 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../";
-import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
 import {
-	RECORD_SPAN_COMMAND_TYPE,
-	SPAN_RECEIVED_EVENT_TYPE,
+  enforceApiKeyIdOnTraceRequest,
+  PROVENANCE_ATTR_API_KEY_ID,
+  stampIngestKeyProvenanceOnTraceRequest,
+} from "@ee/governance/services/ingestKeyProvenance.utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type Command, createTenantId } from "../../../../";
+import type {
+  PIIRedactionLevel,
+  RecordSpanCommandData,
+} from "../../schemas/commands";
+import {
+  RECORD_SPAN_COMMAND_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
 import {
-	RecordSpanCommand,
-	type RecordSpanCommandDependencies,
+  RecordSpanCommand,
+  type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
 
 function createMockCommand(
@@ -196,9 +204,7 @@ describe("RecordSpanCommand", () => {
           async (span: {
             attributes: Array<{ key: string; value: { stringValue?: string } }>;
           }) => {
-            const attr = span.attributes.find(
-              (a) => a.key === "gen_ai.prompt",
-            );
+            const attr = span.attributes.find((a) => a.key === "gen_ai.prompt");
             if (attr?.value.stringValue) {
               attr.value.stringValue = "[REDACTED]";
             }
@@ -244,11 +250,9 @@ describe("RecordSpanCommand", () => {
       });
 
       it("does not mutate the original command data", async () => {
-        mockRedactSpan.mockImplementation(
-          async (span: { name: string }) => {
-            span.name = "[REDACTED]";
-          },
-        );
+        mockRedactSpan.mockImplementation(async (span: { name: string }) => {
+          span.name = "[REDACTED]";
+        });
 
         const command = createMockCommand("project-123", "trace-1", "span-1");
         const originalName = command.data.span.name;
@@ -262,18 +266,13 @@ describe("RecordSpanCommand", () => {
 
     describe("when reserved attributes are present", () => {
       it("strips langwatch.reserved.* attributes from span before processing", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-          [
-            {
-              key: "langwatch.reserved.pii_redaction_status",
-              value: { stringValue: "true" },
-            },
-            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
-          ],
-        );
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          {
+            key: "langwatch.reserved.pii_redaction_status",
+            value: { stringValue: "true" },
+          },
+          { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+        ]);
 
         const events = await handler.handle(command);
 
@@ -290,11 +289,7 @@ describe("RecordSpanCommand", () => {
       });
 
       it("strips langwatch.reserved.* attributes from events", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-        );
+        const command = createMockCommand("project-123", "trace-1", "span-1");
         command.data.span.events = [
           {
             timeUnixNano: { low: 0, high: 0 },
@@ -323,22 +318,17 @@ describe("RecordSpanCommand", () => {
         // The fix is a passthrough allowlist; this test pins the
         // attribute name as load-bearing — renaming or removing the
         // entry would silently re-break loop prevention in production.
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-          [
-            {
-              key: "langwatch.reserved.causality_depth",
-              value: { stringValue: "1" },
-            },
-            {
-              key: "langwatch.reserved.pii_redaction_status",
-              value: { stringValue: "true" },
-            },
-            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
-          ],
-        );
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          {
+            key: "langwatch.reserved.causality_depth",
+            value: { stringValue: "1" },
+          },
+          {
+            key: "langwatch.reserved.pii_redaction_status",
+            value: { stringValue: "true" },
+          },
+          { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+        ]);
 
         const events = await handler.handle(command);
 
@@ -356,18 +346,37 @@ describe("RecordSpanCommand", () => {
         expect(piiAttr).toBeUndefined();
       });
 
-      it("preserves original command data when stripping reserved attributes", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-          [
-            {
-              key: "langwatch.reserved.something",
-              value: { stringValue: "value" },
-            },
-          ],
+      /** @scenario A turn's usage is counted once across the worker and gateway views */
+      it("preserves langwatch.reserved.skip_token_accumulation on the emitted span (usage-dedup contract)", async () => {
+        // The Langy telemetry relay stamps this on mediated worker
+        // model-call spans: the gateway's gen_ai span in the same trace is
+        // the meter, and the trace-summary fold reads the stamp to count
+        // the usage once. Stripping it would silently double every Langy
+        // turn's token/cost totals.
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          {
+            key: "langwatch.reserved.skip_token_accumulation",
+            value: { stringValue: "true" },
+          },
+        ]);
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        const skipAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.reserved.skip_token_accumulation",
         );
+        expect(skipAttr).toBeDefined();
+        expect(skipAttr!.value).toEqual({ stringValue: "true" });
+      });
+
+      it("preserves original command data when stripping reserved attributes", async () => {
+        const command = createMockCommand("project-123", "trace-1", "span-1", [
+          {
+            key: "langwatch.reserved.something",
+            value: { stringValue: "value" },
+          },
+        ]);
 
         await handler.handle(command);
 
@@ -375,6 +384,54 @@ describe("RecordSpanCommand", () => {
         expect(command.data.span.attributes).toHaveLength(1);
         expect(command.data.span.attributes[0]!.key).toBe(
           "langwatch.reserved.something",
+        );
+      });
+    });
+
+    describe("when the receiver has written ingest provenance", () => {
+      // The receiver's output has to survive this handler intact. Both halves
+      // have been broken here before: the handler strips whole attribute
+      // namespaces, so a provenance name that lands in one is deleted between
+      // the receiver writing it and the span being stored.
+      async function emittedResourceAfterReceiver(apiKeyId: string | null) {
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const request = {
+          resourceSpans: [{ resource: command.data.resource }],
+        };
+        stampIngestKeyProvenanceOnTraceRequest(request, {
+          apiKeyId: "key_abc",
+          sourceType: "claude_code",
+          organizationId: "org_1",
+        });
+        enforceApiKeyIdOnTraceRequest(request, apiKeyId);
+        command.data.resource = request.resourceSpans[0]!.resource;
+
+        const events = await handler.handle(command);
+        return events[0]!.data.resource!.attributes;
+      }
+
+      /** @scenario The receiver-written API key id survives the ingestion pipeline */
+      it("keeps the API key id on the emitted resource", async () => {
+        const emitted = await emittedResourceAfterReceiver("key_abc");
+
+        const stampedId = emitted.find(
+          (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
+        );
+        expect(stampedId?.value.stringValue).toBe("key_abc");
+      });
+
+      it("keeps the ingest-key provenance attributes alongside it", async () => {
+        const emitted = await emittedResourceAfterReceiver("key_abc");
+
+        const source = emitted.find((a) => a.key === "langwatch.source");
+        expect(source?.value.stringValue).toBe("claude_code");
+      });
+
+      it("emits no API key id when the request had no ApiKey row", async () => {
+        const emitted = await emittedResourceAfterReceiver(null);
+
+        expect(emitted.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(
+          false,
         );
       });
     });

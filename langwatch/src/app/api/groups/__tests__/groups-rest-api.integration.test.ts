@@ -1,16 +1,17 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
   type Team,
+  TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Groups REST API", () => {
@@ -28,8 +29,7 @@ describe("Feature: Groups REST API", () => {
   });
 
   const api = {
-    get: (path: string) =>
-      app.request(path, { headers: authHeaders() }),
+    get: (path: string) => app.request(path, { headers: authHeaders() }),
     post: (path: string, body: unknown) =>
       app.request(path, {
         method: "POST",
@@ -124,30 +124,20 @@ describe("Feature: Groups REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.groupMembership.deleteMany({
-      where: { group: { organizationId: testOrganization.id } },
-    }).catch(() => {});
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.group.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.apiKey.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.team.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.user.deleteMany({
-      where: { id: { in: [userId, secondUserId] } },
-    }).catch(() => {});
-    await prisma.organization.delete({
-      where: { id: testOrganization.id },
-    }).catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["groupMembership", { group: { organizationId: testOrganization.id } }],
+      ["roleBinding", { organizationId: testOrganization.id }],
+      ["group", { organizationId: testOrganization.id }],
+      ["apiKey", { organizationId: testOrganization.id }],
+      ["organizationUser", { organizationId: testOrganization.id }],
+      ["team", { organizationId: testOrganization.id }],
+      ["user", { id: { in: [userId, secondUserId] } }],
+    ]);
+    await prisma.organization
+      .delete({
+        where: { id: testOrganization.id },
+      })
+      .catch(() => {});
   });
 
   describe("GET /api/groups", () => {
@@ -372,7 +362,9 @@ describe("Feature: Groups REST API", () => {
 
       const listRes = await api.get(`/api/groups/${memberGroupId}/members`);
       const body = await listRes.json();
-      expect(body.data.find((m: { userId: string }) => m.userId === secondUserId)).toBeUndefined();
+      expect(
+        body.data.find((m: { userId: string }) => m.userId === secondUserId),
+      ).toBeUndefined();
     });
 
     /** @scenario POST /api/groups/:id/members rejects adding to SCIM-managed group */
@@ -507,7 +499,9 @@ describe("Feature: Groups REST API", () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
 
       await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
-      await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
+      await prisma.organization
+        .delete({ where: { id: otherOrg.id } })
+        .catch(() => {});
     });
   });
 });

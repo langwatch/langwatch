@@ -1,19 +1,20 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
+import { resolveWelcomeRedirect } from "../utils/welcome-redirect";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
 
 export const WelcomeScreen: React.FC = () => {
@@ -45,67 +46,103 @@ export const WelcomeScreen: React.FC = () => {
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
 
+  // Same-origin continuation (e.g. the CLI device-approval page sends a
+  // fresh signup here with return_to=/cli/auth?user_code=… so the approval
+  // survives onboarding). Only relative in-app paths are honored.
+  const rawReturnTo = router.query.return_to;
+  const returnTo =
+    typeof rawReturnTo === "string" &&
+    rawReturnTo.startsWith("/") &&
+    !rawReturnTo.startsWith("//")
+      ? rawReturnTo
+      : null;
+
   useEffect(() => {
     // Wait until org data has finished loading before deciding
     if (organizationIsLoading) return;
 
-    const hasAnyProject =
-      organizations?.some((org) =>
-        org.teams.some((t) => t.projects.length > 0),
-      ) ?? false;
-    if (!hasAnyProject) {
+    const decision = resolveWelcomeRedirect({
+      organizations,
+      currentProjectSlug: project?.slug ?? null,
+    });
+
+    if (decision.kind === "onboard") {
       setOnboardingNeeded(true);
       return;
     }
-
-    const slug =
-      project?.slug ??
-      organizations?.flatMap((o) => o.teams).flatMap((t) => t.projects)[0]
-        ?.slug;
-    if (slug) {
-      setOnboardingNeeded(false);
-      void router.push(`/${slug}`);
-    } else {
-      setOnboardingNeeded(true);
-    }
-  }, [organizationIsLoading, organizations, project?.slug]);
+    setOnboardingNeeded(false);
+    void router.push(
+      returnTo ?? (decision.kind === "home" ? "/" : `/${decision.slug}`),
+    );
+  }, [organizationIsLoading, organizations, project?.slug, returnTo]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();
+    const isGovernanceTrack = form.intent === "AGENT_GOVERNANCE";
 
     initializeOrganization.mutate(
       {
         orgName: form.organizationName ?? "",
         phoneNumber: form.phoneNumber ?? "",
-        signUpData: {
-          usage: form.usageStyle,
-          solution: form.solutionType,
-          terms: form.agreement,
-          companySize: form.companySize,
-          yourRole: form.role,
-          featureUsage: form.selectedDesires.join("\n"),
-          ...form.attribution,
-        },
+        primaryIntent: form.intent,
+        // The governance track never shows the marketing screens, so its
+        // signUpData carries only terms + attribution. The LLMOps payload
+        // stays byte-identical to the pre-fork flow (ADR-038 I2).
+        signUpData: isGovernanceTrack
+          ? {
+              terms: form.agreement,
+              ...form.attribution,
+            }
+          : {
+              usage: form.usageStyle,
+              solution: form.solutionType,
+              terms: form.agreement,
+              companySize: form.companySize,
+              yourRole: form.role,
+              featureUsage: form.selectedDesires.join("\n"),
+              ...form.attribution,
+            },
       },
       {
         onSuccess: (response) => {
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
+            intent: form.intent,
           });
 
+          // A pending continuation (CLI device approval) outranks both
+          // track landings: finish what the user actually came to do.
+          if (returnTo) {
+            window.location.href = returnTo;
+            return;
+          }
+
+          if (isGovernanceTrack) {
+            // Land via "/" so the home resolver applies the org-intent rule
+            // (including the kill-switch fallback) instead of hardcoding /me.
+            window.location.href = "/";
+            return;
+          }
+
+          // LLMOps signups always get a project; the null case is the
+          // governance track, which returned above.
           const params = new URLSearchParams({
-            projectSlug: response.projectSlug,
+            projectSlug: response.projectSlug ?? "",
           });
 
           window.location.href = `/onboarding/product?${params.toString()}`;
         },
-        onError: () => {
-          toaster.create({
-            title: "Failed to proceed with onboarding",
-            description: "Please try again or contact support",
-            type: "error",
-            meta: { closable: true },
+        // Through the registry, not a hardcoded sentence. This threw the
+        // error away and told everyone to "try again or contact support" —
+        // advice that cannot resolve a plan limit, an address already in use,
+        // or a name that fails validation, which are the failures this call
+        // actually has. Signing up is the worst possible place to be told
+        // nothing.
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't finish setting up your organization",
           });
         },
       },
@@ -143,7 +180,14 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
+          <Box
+            position="relative"
+            overflow="hidden"
+            py="1"
+            px="2"
+            my="-1"
+            mx="-2"
+          >
             <AnimatePresence
               mode="popLayout"
               custom={direction}
@@ -191,6 +235,8 @@ export const WelcomeScreen: React.FC = () => {
                     total: flow.total,
                     isFirst: isFirstScreen,
                     isLast: isLastScreen,
+                    // Per-track funnel segmentation (ADR-038 I6)
+                    intent: formContextValue.intent ?? null,
                   }}
                   sendViewedEvent
                 >
@@ -209,7 +255,10 @@ export const WelcomeScreen: React.FC = () => {
             </AnimatePresence>
           </Box>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <motion.div
+            layout
+            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+          >
             <OnboardingNavigation
               currentScreenIndex={currentScreenIndex}
               onPrev={navigation.prevScreen}
@@ -224,7 +273,10 @@ export const WelcomeScreen: React.FC = () => {
             />
           </motion.div>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <motion.div
+            layout
+            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+          >
             <HStack justify="center" gap={1.5}>
               {flow.visibleScreens.map((_, idx) => (
                 <Box

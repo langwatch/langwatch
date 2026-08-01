@@ -6,7 +6,10 @@ import {
 
 type FixtureProvider = {
   provider: string;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  scopes: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
 };
 
 const orgOnly: FixtureProvider = {

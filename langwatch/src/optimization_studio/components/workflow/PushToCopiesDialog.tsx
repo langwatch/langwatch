@@ -66,7 +66,7 @@ export const PushToCopiesDialog = ({
       sourceName={workflowName}
       copies={availableCopies}
       isLoading={isLoading}
-      error={error ? { message: error.message } : null}
+      error={error}
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
       onPush={async () => {
@@ -85,9 +85,9 @@ export const PushToCopiesDialog = ({
       bodyIntro="Select which replicas to push the latest version to:"
       emptyMessage={
         <>
-          No replicas found. This may be because you don't have
-          workflows:update permission on the replica projects, or the
-          replicas have been archived.
+          No replicas found. This may be because you don't have workflows:update
+          permission on the replica projects, or the replicas have been
+          archived.
         </>
       }
       onSuccess={() => setSelectedCopyIds(new Set())}

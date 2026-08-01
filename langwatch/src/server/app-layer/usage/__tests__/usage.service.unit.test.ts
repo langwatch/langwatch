@@ -4,6 +4,7 @@ import { TtlCache } from "~/server/utils/ttlCache";
 import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { USAGE_UNKNOWN } from "../../../traces/usage-count";
 import type { OrganizationService } from "../../organizations/organization.service";
 import type { PlanResolver } from "../../subscription/plan-provider";
 import { UsageService } from "../usage.service";
@@ -132,6 +133,51 @@ describe("UsageService", () => {
         await expect(
           service.checkLimit({ teamId: "team-123" }),
         ).rejects.toThrow("Organization for team not found: team-123");
+      });
+    });
+
+    describe("when the counting store cannot report usage", () => {
+      beforeEach(() => {
+        mockEnv.IS_SAAS = true;
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
+        mockEventUsageService.getCountByProjects.mockResolvedValue(
+          USAGE_UNKNOWN,
+        );
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...FREE_PLAN,
+          maxMessagesPerMonth: 50_000,
+        });
+      });
+
+      /** @scenario Usage limits are not enforced against a count we could not take */
+      it("allows traffic rather than enforcing against a fabricated zero", async () => {
+        // The permissive outcome is deliberate: an outage in OUR counting
+        // store must not lock a paying customer out of their own product.
+        //
+        // What this pins is WHERE that decision is made. It used to be made by
+        // the counting service returning 0, which enforcement then read as "no
+        // usage" — the same answer, reached by accident, invisible in the logs,
+        // and equally applied to the usage page and the at-limit emails. Now
+        // the count is `unknown` all the way to here and this method decides.
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result).toEqual({ exceeded: false });
+      });
+
+      it("does not cache the unknown as a count", async () => {
+        // A cached unknown-as-zero would outlive the outage by the cache TTL,
+        // leaving enforcement off for minutes after ClickHouse came back.
+        await service.checkLimit({ teamId: "team-123" });
+
+        mockEventUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 90_000 },
+        ]);
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
       });
     });
 
@@ -278,6 +324,38 @@ describe("UsageService", () => {
         await service.checkLimit({ teamId: "team-123" });
 
         expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
+      });
+
+      /** @scenario Limit checks decide from one active plan snapshot */
+      it("uses one active plan snapshot for counting, threshold, and message wording", async () => {
+        const firstPlan: PlanInfo = {
+          ...FREE_PLAN,
+          planSource: "license",
+          free: false,
+          maxMessagesPerMonth: 1000,
+          usageUnit: "events",
+        };
+        const laterPlan: PlanInfo = {
+          ...FREE_PLAN,
+          planSource: "subscription",
+          free: false,
+          maxMessagesPerMonth: 2000,
+          usageUnit: "traces",
+        };
+        (mockPlanResolver as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(laterPlan)
+          .mockResolvedValueOnce(firstPlan);
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
+        expect(result.maxMessagesPerMonth).toBe(1000);
+        // "Monthly"/"events" only come from firstPlan (free: false, license
+        // override with usageUnit "events"); laterPlan would render "Free"/"traces".
+        expect(result.message).toContain(
+          "Monthly limit of 1000 events reached",
+        );
+        expect(mockPlanResolver).toHaveBeenCalledTimes(1);
       });
     });
 

@@ -110,7 +110,11 @@ export function CascadeArchiveDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content
+        bg="bg"
+        maxWidth="500px"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">

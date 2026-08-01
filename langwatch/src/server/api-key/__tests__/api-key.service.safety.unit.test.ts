@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
 
 vi.mock("../api-key-token.utils", () => ({
@@ -16,10 +16,16 @@ const mockCheckPermission = vi.fn().mockResolvedValue(true);
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
   checkRoleBindingPermission: (...args: unknown[]) =>
     mockCheckPermission(...args),
+  // These cases are about the binding path; the legacy fallback grants
+  // nothing so the binding decision is the only one under test.
+  resolveLegacyCeiling: () => ({ grants: () => false }),
 }));
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/rbac/custom-role-permissions")>();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/rbac/custom-role-permissions")
+    >();
   return {
     ...actual,
     parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
@@ -27,7 +33,7 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),
@@ -51,7 +57,12 @@ function buildPrisma() {
   const mockTx = {
     apiKey: {
       create: vi.fn().mockImplementation((args: any) => {
-        txState.createdApiKey = { id: "ak_new", ...args.data, createdAt: new Date(), updatedAt: new Date() };
+        txState.createdApiKey = {
+          id: "ak_new",
+          ...args.data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
         return txState.createdApiKey;
       }),
       findUnique: vi.fn().mockImplementation(() => ({
@@ -76,8 +87,13 @@ function buildPrisma() {
         return txState.createdCustomRole;
       }),
       update: vi.fn().mockImplementation((args: any) => {
-        const roleId = args.where?.id ?? txState.createdCustomRole?.id ?? "cr_updated";
-        txState.createdCustomRole = { id: roleId, ...txState.createdCustomRole, ...args.data };
+        const roleId =
+          args.where?.id ?? txState.createdCustomRole?.id ?? "cr_updated";
+        txState.createdCustomRole = {
+          id: roleId,
+          ...txState.createdCustomRole,
+          ...args.data,
+        };
         return txState.createdCustomRole;
       }),
       findFirst: vi.fn().mockResolvedValue(null),
@@ -88,7 +104,9 @@ function buildPrisma() {
 
   return {
     prisma: {
-      $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
+      $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+        fn(mockTx),
+      ),
       organizationUser: {
         findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
       },
@@ -96,7 +114,10 @@ function buildPrisma() {
         findFirst: vi.fn(),
         findUnique: vi.fn(),
         findMany: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockImplementation((args: any) => ({ id: args.where.id, ...args.data })),
+        update: vi.fn().mockImplementation((args: any) => ({
+          id: args.where.id,
+          ...args.data,
+        })),
       },
       roleBinding: {
         findFirst: vi.fn(),
@@ -135,7 +156,6 @@ function buildPrisma() {
 describe("ApiKeyService — safety invariants (mocked)", () => {
   let prisma: ReturnType<typeof buildPrisma>["prisma"];
   let mockTx: ReturnType<typeof buildPrisma>["mockTx"];
-  let txState: ReturnType<typeof buildPrisma>["txState"];
   let service: ApiKeyService;
 
   beforeEach(() => {
@@ -143,7 +163,6 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
     const built = buildPrisma();
     prisma = built.prisma;
     mockTx = built.mockTx;
-    txState = built.txState;
     service = ApiKeyService.create(prisma);
     mockCheckPermission.mockResolvedValue(true);
   });
@@ -161,7 +180,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["secrets:manage"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("exceeds your own access");
 
@@ -179,12 +200,16 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:view", "annotations:manage"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(result.token).toBeDefined();
 
-        expect(mockTx.apiKey.create).toHaveBeenCalledBefore(mockTx.customRole.create);
+        expect(mockTx.apiKey.create).toHaveBeenCalledBefore(
+          mockTx.customRole.create,
+        );
 
         expect(mockTx.customRole.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
@@ -203,12 +228,23 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           userId: USER_ID,
           organizationId: ORG_ID,
           permissionMode: "restricted",
-          permissions: ["workflows:manage", "annotations:view", "datasets:view"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          permissions: [
+            "workflows:manage",
+            "annotations:view",
+            "datasets:view",
+          ],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
-        const storedPermissions = mockTx.customRole.create.mock.calls[0]![0].data.permissions;
-        expect(storedPermissions).toEqual(["annotations:view", "datasets:view", "workflows:manage"]);
+        const storedPermissions =
+          mockTx.customRole.create.mock.calls[0]![0].data.permissions;
+        expect(storedPermissions).toEqual([
+          "annotations:view",
+          "datasets:view",
+          "workflows:manage",
+        ]);
       });
     });
 
@@ -227,7 +263,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["traces:view"],
-            bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "proj_other" }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "PROJECT", scopeId: "proj_other" },
+            ],
           }),
         ).rejects.toThrow("does not belong to this organization");
       });
@@ -241,7 +279,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:view"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         const roleName = mockTx.customRole.create.mock.calls[0]![0].data.name;
@@ -260,7 +300,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
       permissionMode: "restricted",
       revokedAt: null,
       roleBindings: [
-        { id: "rb_1", customRoleId: "cr_owned", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        {
+          id: "rb_1",
+          customRoleId: "cr_owned",
+          role: "CUSTOM",
+          scopeType: "ORGANIZATION",
+          scopeId: ORG_ID,
+        },
       ],
     };
 
@@ -268,7 +314,10 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
       it("updates the existing CustomRole in place", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
         mockTx.customRole.findFirst.mockResolvedValue({ id: "cr_owned" });
-        mockTx.apiKey.findUnique.mockResolvedValue({ ...existingKey, roleBindings: existingKey.roleBindings });
+        mockTx.apiKey.findUnique.mockResolvedValue({
+          ...existingKey,
+          roleBindings: existingKey.roleBindings,
+        });
 
         await service.update({
           id: "ak_existing",
@@ -277,7 +326,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["datasets:view", "datasets:manage"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(mockTx.customRole.update).toHaveBeenCalledWith(
@@ -291,7 +342,10 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
       it("creates a new CustomRole instead of mutating the shared one", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
         mockTx.customRole.findFirst.mockResolvedValue(null);
-        mockTx.apiKey.findUnique.mockResolvedValue({ ...existingKey, roleBindings: existingKey.roleBindings });
+        mockTx.apiKey.findUnique.mockResolvedValue({
+          ...existingKey,
+          roleBindings: existingKey.roleBindings,
+        });
 
         await service.update({
           id: "ak_existing",
@@ -300,13 +354,17 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:view"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(mockTx.customRole.update).not.toHaveBeenCalled();
         expect(mockTx.customRole.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
-            name: expect.stringMatching(/^apikey:ak_existing:apikeyrole_[0-9A-Za-z]+$/),
+            name: expect.stringMatching(
+              /^apikey:ak_existing:apikeyrole_[0-9A-Za-z]+$/,
+            ),
           }),
         });
       });
@@ -325,7 +383,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["secrets:manage"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("exceeds your own access");
 
@@ -344,12 +404,21 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_exclusive", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_exclusive",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithExclusive);
         mockTx.apiKey.findUnique.mockResolvedValue(keyWithExclusive);
-        mockTx.apiKey.update.mockResolvedValue({ id: "ak_1", revokedAt: new Date() });
+        mockTx.apiKey.update.mockResolvedValue({
+          id: "ak_1",
+          revokedAt: new Date(),
+        });
 
         await service.revoke({
           id: "ak_1",
@@ -376,12 +445,21 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_shared", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_shared",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithShared);
         mockTx.apiKey.findUnique.mockResolvedValue(keyWithShared);
-        mockTx.apiKey.update.mockResolvedValue({ id: "ak_1", revokedAt: new Date() });
+        mockTx.apiKey.update.mockResolvedValue({
+          id: "ak_1",
+          revokedAt: new Date(),
+        });
 
         await service.revoke({
           id: "ak_1",
@@ -408,12 +486,21 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: null,
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithNoCustom);
         mockTx.apiKey.findUnique.mockResolvedValue(keyWithNoCustom);
-        mockTx.apiKey.update.mockResolvedValue({ id: "ak_1", revokedAt: new Date() });
+        mockTx.apiKey.update.mockResolvedValue({
+          id: "ak_1",
+          revokedAt: new Date(),
+        });
 
         await service.revoke({
           id: "ak_1",
@@ -439,7 +526,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             userId: USER_ID,
             organizationId: ORG_ID,
             permissionMode: "all",
-            bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("exceeds your own access");
       });
@@ -454,7 +543,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           userId: USER_ID,
           organizationId: ORG_ID,
           permissionMode: "all",
-          bindings: [{ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(result.token).toBeDefined();
@@ -472,7 +563,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: [],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("CUSTOM bindings require at least one permission");
 
@@ -489,7 +582,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "all",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: null,
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -502,7 +601,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             permissionMode: "restricted",
             permissions: ["traces:view"],
           }),
-        ).rejects.toThrow("restricted mode requires bindings with at least one CUSTOM role");
+        ).rejects.toThrow(
+          "restricted mode requires bindings with at least one CUSTOM role",
+        );
 
         expect(prisma.$transaction).not.toHaveBeenCalled();
       });
@@ -517,7 +618,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "restricted",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -529,7 +636,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: [],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("CUSTOM bindings require at least one permission");
 
@@ -544,9 +653,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             userId: USER_ID,
             organizationId: ORG_ID,
             permissionMode: "restricted",
-            bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
-        ).rejects.toThrow("restricted mode requires at least one CUSTOM binding");
+        ).rejects.toThrow(
+          "restricted mode requires at least one CUSTOM binding",
+        );
 
         expect(prisma.$transaction).not.toHaveBeenCalled();
       });
@@ -561,9 +674,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["traces:view"],
-            bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
-        ).rejects.toThrow("restricted mode requires at least one CUSTOM binding");
+        ).rejects.toThrow(
+          "restricted mode requires at least one CUSTOM binding",
+        );
 
         expect(prisma.$transaction).not.toHaveBeenCalled();
       });
@@ -578,7 +695,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "all",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: null,
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -589,9 +712,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             callerIsAdmin: false,
             organizationId: ORG_ID,
             permissions: ["traces:view"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
-        ).rejects.toThrow("CUSTOM permissions require permissionMode 'restricted'");
+        ).rejects.toThrow(
+          "CUSTOM permissions require permissionMode 'restricted'",
+        );
 
         expect(prisma.$transaction).not.toHaveBeenCalled();
       });
@@ -608,7 +735,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["TRACES:VIEW"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("Invalid permission format");
 
@@ -625,7 +754,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["tracesview"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("Invalid permission format");
 
@@ -642,7 +773,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "restricted",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_1", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_1",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -654,7 +791,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["foo"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("Invalid permission format");
 
@@ -671,7 +810,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             organizationId: ORG_ID,
             permissionMode: "restricted",
             permissions: ["a:b:c"],
-            bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+            bindings: [
+              { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
           }),
         ).rejects.toThrow("Invalid permission format");
 
@@ -690,7 +831,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "restricted",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_orphan", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_orphan",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
         mockTx.apiKey.findUnique.mockResolvedValue({
@@ -698,7 +845,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           name: "Switched Key",
           permissionMode: "all",
           roleBindings: [
-            { id: "rb_2", customRoleId: null, role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_2",
+              customRoleId: null,
+              role: "ADMIN",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -708,7 +861,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           callerIsAdmin: false,
           organizationId: ORG_ID,
           permissionMode: "all",
-          bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(mockTx.customRole.deleteMany).toHaveBeenCalledWith({
@@ -730,7 +885,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           permissionMode: "restricted",
           revokedAt: null,
           roleBindings: [
-            { id: "rb_1", customRoleId: "cr_reused", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_1",
+              customRoleId: "cr_reused",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
         mockTx.customRole.findFirst.mockResolvedValue({ id: "cr_reused" });
@@ -739,7 +900,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           name: "Still Restricted",
           permissionMode: "restricted",
           roleBindings: [
-            { id: "rb_2", customRoleId: "cr_reused", role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            {
+              id: "rb_2",
+              customRoleId: "cr_reused",
+              role: "CUSTOM",
+              scopeType: "ORGANIZATION",
+              scopeId: ORG_ID,
+            },
           ],
         });
 
@@ -750,7 +917,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:view", "annotations:manage"],
-          bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
         });
 
         expect(mockTx.customRole.deleteMany).not.toHaveBeenCalled();
@@ -769,7 +938,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             userId: USER_ID,
             organizationId: ORG_ID,
             permissionMode: "all",
-            bindings: [{ role: "ADMIN", scopeType: "TEAM", scopeId: "team_unknown" }],
+            bindings: [
+              { role: "ADMIN", scopeType: "TEAM", scopeId: "team_unknown" },
+            ],
           }),
         ).rejects.toThrow("not found in this organization");
       });
@@ -783,7 +954,13 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             userId: USER_ID,
             organizationId: ORG_ID,
             permissionMode: "all",
-            bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_other" }],
+            bindings: [
+              {
+                role: "ADMIN",
+                scopeType: "ORGANIZATION",
+                scopeId: "org_other",
+              },
+            ],
           }),
         ).rejects.toThrow("Organization scope must match");
       });
@@ -799,7 +976,9 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             userId: USER_ID,
             organizationId: ORG_ID,
             permissionMode: "all",
-            bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: "proj_archived" }],
+            bindings: [
+              { role: "ADMIN", scopeType: "PROJECT", scopeId: "proj_archived" },
+            ],
           }),
         ).rejects.toThrow("not found or archived");
       });

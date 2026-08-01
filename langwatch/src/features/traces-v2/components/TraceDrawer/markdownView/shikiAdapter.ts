@@ -11,7 +11,7 @@ import {
 // highlighter on first use; every other Shiki language is lazy-loaded on
 // demand via `ensureShikiLangLoaded`. See
 // dev/docs/adr/027-trace-drawer-code-highlighting.md
-const SHIKI_BASE_LANGS = [
+export const SHIKI_BASE_LANGS = [
   "json",
   "markdown",
   "bash",
@@ -22,7 +22,7 @@ const SHIKI_BASE_LANGS = [
   "ini",
 ] as const;
 
-const SHIKI_THEMES = ["github-dark", "github-light"] as const;
+export const SHIKI_THEMES = ["github-dark", "github-light"] as const;
 
 type SharedShikiTheme = (typeof SHIKI_THEMES)[number];
 
@@ -182,12 +182,36 @@ export async function codeToHtml({
   code: string;
   lang: string;
 }): Promise<string> {
+  return codeToHtmlThemed({ code, lang, theme: "github-light" });
+}
+
+/**
+ * Same as {@link codeToHtml}, themed `github-dark` — for the one surface in
+ * the drawer that is ALWAYS dark regardless of the app's own colour mode
+ * (the Terminal tab's recreation of a real terminal screen).
+ */
+export async function codeToHtmlDark({
+  code,
+  lang,
+}: {
+  code: string;
+  lang: string;
+}): Promise<string> {
+  return codeToHtmlThemed({ code, lang, theme: "github-dark" });
+}
+
+async function codeToHtmlThemed({
+  code,
+  lang,
+  theme,
+}: {
+  code: string;
+  lang: string;
+  theme: "github-light" | "github-dark";
+}): Promise<string> {
   const canonical = normalizeShikiLang(lang);
   await ensureShikiLangLoaded(canonical);
   const highlighter = await getSharedHighlighter();
   ensureDisposeNeutered(highlighter);
-  return highlighter.codeToHtml(code, {
-    lang: canonical,
-    theme: "github-light",
-  });
+  return highlighter.codeToHtml(code, { lang: canonical, theme });
 }

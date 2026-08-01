@@ -79,6 +79,7 @@ describe("PromptService", () => {
 
     describe("given a prompt with auto-detected variables already synced", () => {
       describe("when the same prompt is synced again with the same text", () => {
+        /** @scenario 'CLI hardcoded "input" default is kept only when it appears in the template' */
         it("returns up_to_date because auto-detected inputs match stored inputs", async () => {
           // Remote has the auto-detected input from previous sync
           const existingPrompt = buildExistingPrompt({
@@ -87,10 +88,9 @@ describe("PromptService", () => {
             inputs: [{ identifier: "name", type: "str" as const }],
           });
 
-          vi.spyOn(
-            promptService,
-            "getPromptByIdOrHandle",
-          ).mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+            existingPrompt,
+          );
 
           mockRepository.compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -115,8 +115,7 @@ describe("PromptService", () => {
 
           // Verify the local config data passed to compare has the auto-detected
           // inputs merged and sorted, not just the CLI default
-          const [localArg] =
-            mockRepository.compareConfigContent.mock.calls[0]!;
+          const [localArg] = mockRepository.compareConfigContent.mock.calls[0]!;
           const inputIdentifiers = (localArg.inputs as any[]).map(
             (i: any) => i.identifier,
           );
@@ -132,19 +131,16 @@ describe("PromptService", () => {
           // Remote was synced with "alpha" and "zebra" (sorted)
           const existingPrompt = buildExistingPrompt({
             prompt: "{{alpha}} {{zebra}}",
-            messages: [
-              { role: "system", content: "{{alpha}} {{zebra}}" },
-            ],
+            messages: [{ role: "system", content: "{{alpha}} {{zebra}}" }],
             inputs: [
               { identifier: "alpha", type: "str" as const },
               { identifier: "zebra", type: "str" as const },
             ],
           });
 
-          vi.spyOn(
-            promptService,
-            "getPromptByIdOrHandle",
-          ).mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+            existingPrompt,
+          );
 
           mockRepository.compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -186,10 +182,9 @@ describe("PromptService", () => {
       describe("when synced with template variables", () => {
         /** @scenario CLI hardcoded "input" default is kept only when it appears in the template */
         it("creates the prompt with auto-detected inputs merged", async () => {
-          vi.spyOn(
-            promptService,
-            "getPromptByIdOrHandle",
-          ).mockResolvedValue(null);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+            null,
+          );
 
           const createdPrompt = buildExistingPrompt({ version: 1 });
           const createSpy = vi

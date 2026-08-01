@@ -1,12 +1,12 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
-import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { traced } from "../tracing";
 import { SuiteRunClickHouseRepository } from "./repositories/suite-run.clickhouse.repository";
 import {
@@ -46,8 +46,12 @@ export type SuiteRunTarget = {
 export class SuiteRunService {
   constructor(
     readonly repository: SuiteRunReadRepository,
-    private readonly startSuiteRunCommand: (data: StartSuiteRunCommandData) => Promise<void>,
-    private readonly queueSimulationRunCommand: (data: QueueRunCommandData) => Promise<void>,
+    private readonly startSuiteRunCommand: (
+      data: StartSuiteRunCommandData,
+    ) => Promise<void>,
+    private readonly queueSimulationRunCommand: (
+      data: QueueRunCommandData,
+    ) => Promise<void>,
   ) {}
 
   static create(params: {
@@ -58,7 +62,14 @@ export class SuiteRunService {
     const repo = params.resolveClickHouseClient
       ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
       : new NullSuiteRunReadRepository();
-    return traced(new SuiteRunService(repo, params.startSuiteRun, params.queueSimulationRun), "SuiteRunService");
+    return traced(
+      new SuiteRunService(
+        repo,
+        params.startSuiteRun,
+        params.queueSimulationRun,
+      ),
+      "SuiteRunService",
+    );
   }
 
   /**
@@ -122,7 +133,12 @@ export class SuiteRunService {
     // entries appear in ClickHouse immediately. The same IDs are passed to the
     // SDK via RunOptions.runId (see scenario-child-process.ts), ensuring the
     // SDK's events use matching aggregate IDs.
-    const items: Array<{ scenarioId: string; target: SuiteRunTarget; repeat: number; scenarioRunId: string }> = [];
+    const items: Array<{
+      scenarioId: string;
+      target: SuiteRunTarget;
+      repeat: number;
+      scenarioRunId: string;
+    }> = [];
     for (const scenarioId of activeScenarioIds) {
       for (const target of activeTargets) {
         for (let repeat = 0; repeat < repeatCount; repeat++) {
@@ -149,7 +165,10 @@ export class SuiteRunService {
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
-          target: { type: item.target.type, referenceId: item.target.referenceId },
+          target: {
+            type: item.target.type,
+            referenceId: item.target.referenceId,
+          },
           occurredAt: now,
         }),
       ),
@@ -191,5 +210,4 @@ export class SuiteRunService {
   }): Promise<SuiteRunStateData[]> {
     return this.repository.getBatchHistory(params);
   }
-
 }

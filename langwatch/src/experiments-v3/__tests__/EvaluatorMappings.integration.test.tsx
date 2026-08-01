@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,9 +55,15 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: () => "My Prompt",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (_target: { id: string }) => "My Prompt";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: (evaluator: { evaluatorType: string }) =>
     evaluator.evaluatorType === "legacy/ragas_answer_correctness"
@@ -406,9 +406,9 @@ describe("Evaluator Mappings", () => {
 
       // Wait for the table to render
       await waitFor(() => {
-        expect(screen.getAllByText("Ragas Answer Correctness").length).toBeGreaterThan(
-          0,
-        );
+        expect(
+          screen.getAllByText("Ragas Answer Correctness").length,
+        ).toBeGreaterThan(0);
       });
 
       // Alert icon should NOT be present (optional field missing is OK)

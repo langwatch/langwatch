@@ -1,5 +1,5 @@
-import type { LicensePlanLimits } from "./types";
 import { DEFAULT_LIMIT } from "./constants";
+import type { LicensePlanLimits } from "./types";
 
 /**
  * Plan templates only carry the limits that licenses actually encode now:
@@ -60,7 +60,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
  *          maxMembers must be supplied at generation time.
  */
 export function getPlanTemplate(
-  planType: string
+  planType: string,
 ): LicensePlanLimits | Omit<LicensePlanLimits, "maxMembers"> | null {
   switch (planType) {
     case "GROWTH":

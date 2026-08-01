@@ -38,11 +38,7 @@ function encode(lens: LensConfig): SerializedLens {
   };
 }
 
-function decode(
-  id: string,
-  name: string,
-  filters: unknown,
-): LensConfig | null {
+function decode(id: string, name: string, filters: unknown): LensConfig | null {
   if (!filters || typeof filters !== "object") return null;
   const f = filters as Partial<SerializedLens>;
   if (!Array.isArray(f.columns) || !Array.isArray(f.addons)) return null;

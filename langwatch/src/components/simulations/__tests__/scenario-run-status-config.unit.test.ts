@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { getIconAndColor } from "../ScenarioRunStatusIcon";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
   type ScenarioRunStatusConfig,
 } from "../scenario-run-status-config";
-import { getIconAndColor } from "../ScenarioRunStatusIcon";
 
 const allStatuses = Object.values(ScenarioRunStatus);
 
@@ -37,17 +37,16 @@ describe("scenario-run-status-config", () => {
         }
       });
 
-      it.each(allStatuses)(
-        "has colorPalette, label, isComplete, and fgColor for %s",
-        (status) => {
-          const config: ScenarioRunStatusConfig =
-            SCENARIO_RUN_STATUS_CONFIG[status];
-          expect(typeof config.colorPalette).toBe("string");
-          expect(typeof config.label).toBe("string");
-          expect(typeof config.isComplete).toBe("boolean");
-          expect(typeof config.fgColor).toBe("string");
-        },
-      );
+      it.each(
+        allStatuses,
+      )("has colorPalette, label, isComplete, and fgColor for %s", (status) => {
+        const config: ScenarioRunStatusConfig =
+          SCENARIO_RUN_STATUS_CONFIG[status];
+        expect(typeof config.colorPalette).toBe("string");
+        expect(typeof config.label).toBe("string");
+        expect(typeof config.isComplete).toBe("boolean");
+        expect(typeof config.fgColor).toBe("string");
+      });
     });
   });
 

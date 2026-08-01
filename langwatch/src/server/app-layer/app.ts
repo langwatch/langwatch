@@ -1,8 +1,12 @@
-import { createLogger } from "~/utils/logger/server";
-import { EventSourcing } from "../event-sourcing/eventSourcing";
+import { createLogger } from "@langwatch/observability";
+import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { AppConfig } from "./config";
-import type { AppDependencies, DataRetentionDependencies, OpsDependencies } from "./dependencies";
+import type {
+  AppDependencies,
+  DataRetentionDependencies,
+  OpsDependencies,
+} from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -16,10 +20,19 @@ export class App {
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
   readonly dspySteps: AppDependencies["dspySteps"];
-  readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
+  readonly simulations: AppDependencies["simulations"] &
+    AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  readonly topicClustering: AppDependencies["topicClustering"] &
+    AppCommands["topicClustering"];
+  readonly codingAgents: AppDependencies["codingAgents"] &
+    AppCommands["codingAgents"];
+  readonly commands: AppCommands;
+  readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
+  readonly triggerTemplates: AppDependencies["triggerTemplates"];
+  readonly emailSuppressions: AppDependencies["emailSuppressions"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -35,6 +48,7 @@ export class App {
   readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
+  readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -51,6 +65,8 @@ export class App {
     this.config = deps.config;
     this.experiments = deps.experiments;
     this.triggers = deps.triggers;
+    this.triggerTemplates = deps.triggerTemplates;
+    this.emailSuppressions = deps.emailSuppressions;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
@@ -70,10 +86,21 @@ export class App {
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.topicClustering = {
+      ...deps.topicClustering,
+      ...deps.commands.topicClustering,
+    };
+    this.codingAgents = {
+      ...deps.codingAgents,
+      ...deps.commands.codingAgents,
+    };
+    this.commands = deps.commands;
+    this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
+    this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }
@@ -101,7 +128,9 @@ export class App {
 }
 
 // Global access, thx turbopacc
-export const globalForApp = globalThis as unknown as { __langwatch_app: App | null };
+export const globalForApp = globalThis as unknown as {
+  __langwatch_app: App | null;
+};
 if (globalForApp.__langwatch_app === void 0) {
   globalForApp.__langwatch_app = null;
 }

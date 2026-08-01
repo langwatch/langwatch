@@ -10,23 +10,28 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
-
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { trackEvent } from "~/utils/tracking";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
-import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
+import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
+import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { trackEvent } from "~/utils/tracking";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {
   open?: boolean;
@@ -73,19 +78,20 @@ export function WorkflowSelectorForEvaluatorDrawer(
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
+  const form = useForm<FormData>({
     defaultValues: {
       name: props.evaluatorName ?? "",
       icon: defaultIcon,
       description: "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
 
   const icon = watch("icon");
   const name = watch("name");
@@ -100,15 +106,10 @@ export function WorkflowSelectorForEvaluatorDrawer(
         workflowId: evaluator.workflowId ?? "",
       });
     },
-    onError: (error) => {
-      // Skip toast if error was already handled by global license modal
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating evaluator",
-        description: error.message,
-        type: "error",
-      });
-    },
+    // No `onError` here on purpose: the only caller awaits `mutateAsync`
+    // inside `onSubmit`, and react-query runs both, so reporting in each
+    // stacks two identical toasts for one failure. The catch owns it — it
+    // has the headline that names the whole action.
   });
 
   const isSaving =
@@ -119,22 +120,15 @@ export function WorkflowSelectorForEvaluatorDrawer(
       if (!project) return;
 
       try {
-        // Create workflow from custom_evaluator template
+        // Create workflow from custom_evaluator template. LLM nodes without
+        // a model are materialized server-side from the project's resolved
+        // default.
         const template = customEvaluatorTemplate;
         const newWorkflow: Workflow = {
           ...template,
           name: data.name,
           description: data.description,
           icon: data.icon ?? defaultIcon,
-          default_llm: {
-            ...template.default_llm,
-            // Project-level default-model column is gone; the workflow
-            // engine resolves the actual model via the cascade at run
-            // time. We seed the new workflow's default with the global
-            // DEFAULT_MODEL placeholder so the editor renders something
-            // sensible before the user picks.
-            model: DEFAULT_MODEL,
-          },
         };
 
         const createdWorkflow = await createWorkflowMutation.mutateAsync({
@@ -161,13 +155,12 @@ export function WorkflowSelectorForEvaluatorDrawer(
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
-        // Skip toast if error was already handled by global license modal
-        if (isHandledByGlobalHandler(error)) return;
         console.error("Error creating workflow evaluator:", error);
-        toaster.create({
-          title: "Error",
-          description: "Failed to create workflow evaluator",
-          type: "error",
+        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+          return;
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't create workflow evaluator",
         });
       }
     },
@@ -178,6 +171,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
       createEvaluatorMutation,
       onClose,
       router,
+      form,
     ],
   );
 
@@ -225,7 +219,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
 
               <Box paddingX={6}>
                 <VStack gap={4} align="stretch">
-                  <Field.Root invalid={!!errors.name}>
+                  <FormServerError form={form} />
+
+                  <Field.Root invalid={!!errors.name || !!errors.icon}>
                     <EmojiPickerModal
                       open={emojiPicker.open}
                       onClose={emojiPicker.onClose}
@@ -249,7 +245,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
                         data-testid="evaluator-name-input"
                       />
                     </HStack>
-                    <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+                    <Field.ErrorText>
+                      {errors.name?.message ?? errors.icon?.message}
+                    </Field.ErrorText>
                   </Field.Root>
 
                   <Field.Root invalid={!!errors.description}>
@@ -273,9 +271,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
               </Button>
               <Button
                 colorPalette="green"
-                onClick={() => {
-                  void handleSubmit(onSubmit)();
-                }}
+                onClick={() => void handleSubmit(onSubmit)()}
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-evaluator-button"

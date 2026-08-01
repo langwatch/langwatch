@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { app } from "../[[...route]]/app";
 
 describe("Scenarios API", () => {
@@ -78,9 +79,7 @@ describe("Scenarios API", () => {
   });
 
   afterEach(async () => {
-    await prisma.scenario.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["scenario", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -187,7 +186,10 @@ describe("Scenarios API", () => {
           id: scenario.id,
           name: "Login Flow",
           situation: "User attempts to log in with valid credentials",
-          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
+          criteria: [
+            "Responds with a welcome message",
+            "Includes user name in greeting",
+          ],
           labels: ["auth", "happy-path"],
         });
       });
@@ -223,7 +225,10 @@ describe("Scenarios API", () => {
         expect(body).toMatchObject({
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
-          criteria: ["Responds with a welcome message", "Includes user name in greeting"],
+          criteria: [
+            "Responds with a welcome message",
+            "Includes user name in greeting",
+          ],
           labels: ["auth", "happy-path"],
         });
         expect(body).toHaveProperty("id");
@@ -303,7 +308,7 @@ describe("Scenarios API", () => {
             name: "",
           });
 
-          expect(res.status).toBe(400);
+          expect(res.status).toBe(422);
           const body = await res.json();
           expect(body).toHaveProperty("error");
         });
@@ -340,9 +345,7 @@ describe("Scenarios API", () => {
       });
 
       it("archives the scenario and returns success", async () => {
-        const res = await helpers.api.delete(
-          `/api/scenarios/${scenario.id}`
-        );
+        const res = await helpers.api.delete(`/api/scenarios/${scenario.id}`);
 
         expect(res.status).toBe(200);
         const body = await res.json();
@@ -363,9 +366,7 @@ describe("Scenarios API", () => {
 
     describe("when the scenario does not exist", () => {
       it("returns 404", async () => {
-        const res = await helpers.api.delete(
-          "/api/scenarios/nonexistent-id"
-        );
+        const res = await helpers.api.delete("/api/scenarios/nonexistent-id");
 
         expect(res.status).toBe(404);
         const body = await res.json();

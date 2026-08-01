@@ -3,10 +3,12 @@
  * These keep column definitions stable by avoiding closures over dynamic data.
  */
 import { Checkbox } from "@chakra-ui/react";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../types";
-import { PairwiseCompareCell } from "./PairwiseCompareCell";
+import { toComparisonConfig } from "../utils/normalizeComparison";
+import { ComparisonCell } from "./ComparisonCell";
 import { TargetCellContent } from "./TargetSection/TargetCell";
 import { TargetHeader } from "./TargetSection/TargetHeader";
 
@@ -119,6 +121,7 @@ export const TargetCellFromMeta = ({
         output: unknown;
         evaluators: Record<string, unknown>;
         error?: string | null;
+        domainError?: SerializedHandledError;
         isLoading?: boolean;
         traceId?: string | null;
         duration?: number | null;
@@ -131,15 +134,25 @@ export const TargetCellFromMeta = ({
 
   if (!target) return null;
 
-  if (target.pairwise) {
-    const variantATarget = tableMeta?.targetsMap.get(target.pairwise.variantA);
-    const variantBTarget = tableMeta?.targetsMap.get(target.pairwise.variantB);
+  // Column-style comparison targets render their verdict in place of an
+  // output. A legacy pairwise column normalizes to two variants here.
+  const comparison = toComparisonConfig(target);
+  if (comparison) {
+    const variantTargets = comparison.variants.map((id) =>
+      tableMeta?.targetsMap.get(id),
+    );
     return (
-      <PairwiseCompareCell
+      <ComparisonCell
         result={data?.evaluators?.[target.id]}
-        isLoading={data?.isLoading}
-        variantATarget={variantATarget}
-        variantBTarget={variantBTarget}
+        isLoading={
+          tableMeta?.isCellExecuting?.(rowIndex, targetId) ?? data?.isLoading
+        }
+        variantTargets={variantTargets}
+        onRun={
+          tableMeta?.handleRunCell
+            ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
+            : undefined
+        }
       />
     );
   }
@@ -150,6 +163,7 @@ export const TargetCellFromMeta = ({
       output={data?.output}
       evaluatorResults={data?.evaluators ?? {}}
       error={data?.error}
+      domainError={data?.domainError}
       isLoading={data?.isLoading}
       traceId={data?.traceId}
       duration={data?.duration}
@@ -181,9 +195,7 @@ export const TargetCellFromMeta = ({
               tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
           : undefined
       }
-      hasAnyTargetOutputs={
-        tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false
-      }
+      hasAnyTargetOutputs={tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false}
     />
   );
 };

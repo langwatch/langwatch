@@ -250,13 +250,13 @@ Feature: Suite Workflow — Create, Run, See Results
   # archived-scenario-exclusion.feature "Job count reflects only active scenarios and targets"
   # (removed per AUDIT_MANIFEST.md, #3458).
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run respects repeat count
     Given a suite with 2 scenarios, 1 target, and repeat count 3
     When the suite run is triggered
     Then 6 jobs are scheduled (2 scenarios × 1 target × 3 repeats)
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run uses suite ID as setId
     Given a suite with id "suite_abc123"
     When the suite run is triggered
@@ -286,7 +286,7 @@ Feature: Suite Workflow — Create, Run, See Results
   # (not an individual scenario×target pair). Runs are collapsible — expanding
   # shows the scenario × target breakdown as a summary preview.
   # Clicking a run navigates to the existing run detail page.
-  # Results are fetched from ElasticSearch filtered by the suite's setId.
+  # Results are fetched from the scenario-run read model filtered by the suite's setId.
   #
 
   @e2e @unimplemented
@@ -317,12 +317,9 @@ Feature: Suite Workflow — Create, Run, See Results
     When I expand the run row
     Then I see "100% (3/3)" for that pair
 
-  @integration @unimplemented
-  Scenario: Most recent run is expanded by default
-    Given suite "Critical Path" has 2 completed runs
-    When I view the run history
-    Then the most recent run is expanded
-    And the older run is collapsed
+  # Most-recent-run-expanded behavior is specced and bound in
+  # specs/suites/simulations-performance.feature ("Only the most recent
+  # execution starts expanded").
 
   @integration @unimplemented
   Scenario: Collapse and expand run rows

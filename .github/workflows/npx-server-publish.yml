@@ -50,14 +50,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           run_install: false
 
@@ -106,7 +106,7 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
-      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.4.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: "go.mod"
           cache: true
@@ -213,7 +213,37 @@ jobs:
             # crashes loading "@langwatch/mcp-server/create-mcp-server".
             "package/mcp-server/package.json"
             "package/mcp-server/dist/create-mcp-server.js"
+            # Langy reads the platform feature map at runtime
+            # (langwatch/src/shared/langy/featureMap.ts imports it from the
+            # repo root).
+            "package/feature-map.json"
+            # The app's prepare step imports the skills front-matter helper
+            # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
+            # source is .ts (tsx resolves the .js import specifier back to
+            # it); the tarball never ships a compiled .js, so asserting .js
+            # here always failed even on a correctly packaged tarball.
+            "package/skills/_lib/frontmatter.ts"
           )
+          # Every workspace package in the checkout must ship: a missing one
+          # leaves dangling pnpm links in the installed tree and the app dies
+          # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
+          # way (.npmignore still excluded langwatch/packages/ after runtime
+          # packages moved in). Both root packages/* and langwatch/packages/*
+          # are derived from a directory listing rather than named one by one,
+          # so a new package on either side is covered by this gate the day
+          # it appears, with nothing to remember to add here.
+          for pkgdir in langwatch/packages/*/ packages/*/; do
+            pkgdir="${pkgdir%/}"
+            [ -f "$pkgdir/package.json" ] || continue
+            # packages/server is this CLI itself, not a workspace dependency
+            # the app imports (langwatch's pnpm-workspace.yaml lists .,
+            # packages/*, ../mcp-server, ../packages/handled-error,
+            # ../packages/langy — never packages/server). Its package.json
+            # is deliberately excluded from files[]; only dist/ + templates/
+            # ship, already covered by the cli.cjs required path above.
+            [ "$pkgdir" = "packages/server" ] && continue
+            required+=("package/$pkgdir/package.json")
+          done
           forbidden=(
             "package/langwatch/node_modules"
             "package/langwatch/.next/cache"

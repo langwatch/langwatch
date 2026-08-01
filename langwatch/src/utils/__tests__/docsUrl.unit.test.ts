@@ -1,39 +1,67 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { docsUrl, getDocsBaseUrl } from "../docsUrl";
 
 describe("getDocsBaseUrl", () => {
-  it("returns localhost docs when control plane is on localhost", () => {
-    expect(getDocsBaseUrl("localhost")).toBe("http://localhost:3000");
+  describe("when resolving in a development build", () => {
+    /** @scenario A contributor's local checkout links to their own local docs */
+    it("returns localhost docs when control plane is on localhost", () => {
+      expect(getDocsBaseUrl({ hostname: "localhost", isDev: true })).toBe(
+        "http://localhost:3000",
+      );
+    });
+
+    it("returns localhost docs when on 127.0.0.1", () => {
+      expect(getDocsBaseUrl({ hostname: "127.0.0.1", isDev: true })).toBe(
+        "http://localhost:3000",
+      );
+    });
+
+    it("returns localhost docs when on 0.0.0.0", () => {
+      expect(getDocsBaseUrl({ hostname: "0.0.0.0", isDev: true })).toBe(
+        "http://localhost:3000",
+      );
+    });
+
+    it("returns production docs on a non-local hostname", () => {
+      expect(
+        getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: true }),
+      ).toBe("https://docs.langwatch.ai");
+    });
   });
 
-  it("returns localhost docs when on 127.0.0.1", () => {
-    expect(getDocsBaseUrl("127.0.0.1")).toBe("http://localhost:3000");
-  });
+  describe("when resolving in a production build", () => {
+    /** @scenario A packaged self-hosted install links to real documentation */
+    it("returns production docs when a self-hosted server is on localhost", () => {
+      expect(getDocsBaseUrl({ hostname: "localhost", isDev: false })).toBe(
+        "https://docs.langwatch.ai",
+      );
+    });
 
-  it("returns localhost docs when on 0.0.0.0", () => {
-    expect(getDocsBaseUrl("0.0.0.0")).toBe("http://localhost:3000");
-  });
+    it("returns production docs on app.langwatch.ai", () => {
+      expect(
+        getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }),
+      ).toBe("https://docs.langwatch.ai");
+    });
 
-  it("returns production docs on app.langwatch.ai", () => {
-    expect(getDocsBaseUrl("app.langwatch.ai")).toBe("https://docs.langwatch.ai");
-  });
-
-  it("returns production docs on a customer's self-hosted DNS", () => {
-    expect(getDocsBaseUrl("langwatch.acme.internal")).toBe(
-      "https://docs.langwatch.ai",
-    );
+    it("returns production docs on a customer's self-hosted DNS", () => {
+      expect(
+        getDocsBaseUrl({ hostname: "langwatch.acme.internal", isDev: false }),
+      ).toBe("https://docs.langwatch.ai");
+    });
   });
 
   it("returns production docs in a no-window environment (Node, future SSR)", () => {
-    expect(getDocsBaseUrl(undefined)).toBe("https://docs.langwatch.ai");
+    expect(getDocsBaseUrl({ hostname: undefined, isDev: false })).toBe(
+      "https://docs.langwatch.ai",
+    );
   });
 });
 
 describe("docsUrl", () => {
   it("joins the base with a leading-slash path", () => {
-    // No hostname injection; relies on the no-window fallback returning
-    // the production base. Production callers omit the hostname arg.
+    // No overrides; relies on the no-window fallback returning the
+    // production base. Production callers omit them entirely.
     expect(docsUrl("/ai-governance/anomaly-rules")).toBe(
       "https://docs.langwatch.ai/ai-governance/anomaly-rules",
     );

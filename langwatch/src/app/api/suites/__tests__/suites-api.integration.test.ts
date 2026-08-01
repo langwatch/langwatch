@@ -1,14 +1,21 @@
-import type { Organization, Project, Scenario, SimulationSuite, Team } from "@prisma/client";
+import type {
+  Organization,
+  Project,
+  Scenario,
+  SimulationSuite,
+  Team,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -97,14 +104,10 @@ describe("Feature: Suites REST API", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.simulationSuite.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.scenario.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [
+      ["simulationSuite", { projectId: testProjectId }],
+      ["scenario", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });
@@ -129,12 +132,14 @@ describe("Feature: Suites REST API", () => {
     });
   }
 
-  async function createSuite(overrides: Partial<{
-    name: string;
-    scenarioIds: string[];
-    targets: unknown;
-    archivedAt: Date | null;
-  }> = {}): Promise<SimulationSuite> {
+  async function createSuite(
+    overrides: Partial<{
+      name: string;
+      scenarioIds: string[];
+      targets: unknown;
+      archivedAt: Date | null;
+    }> = {},
+  ): Promise<SimulationSuite> {
     const scenario = await createScenario("Test Scenario");
     return prisma.simulationSuite.create({
       data: {
@@ -143,7 +148,9 @@ describe("Feature: Suites REST API", () => {
         name: overrides.name ?? "Test Suite",
         slug: `test-suite-${nanoid()}`,
         scenarioIds: overrides.scenarioIds ?? [scenario.id],
-        targets: overrides.targets ?? [{ type: "http", referenceId: "agent_test" }],
+        targets: overrides.targets ?? [
+          { type: "http", referenceId: "agent_test" },
+        ],
         repeatCount: 1,
         labels: [],
         archivedAt: overrides.archivedAt ?? null,
@@ -281,7 +288,10 @@ describe("Feature: Suites REST API", () => {
     it("creates a copy of the suite", async () => {
       const suite = await createSuite({ name: "Original" });
 
-      const res = await helpers.api.post(`/api/suites/${suite.id}/duplicate`, {});
+      const res = await helpers.api.post(
+        `/api/suites/${suite.id}/duplicate`,
+        {},
+      );
 
       expect(res.status).toBe(201);
       const body = await res.json();

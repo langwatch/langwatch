@@ -10,7 +10,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { trackEvent } from "../../utils/tracking";
-import { UpgradeModal } from "../UpgradeModal";
+import { UpgradeModal } from "../UpgradeModalContent";
 import { toaster } from "../ui/toaster";
 
 const { pushMock, previewProrationMock, subscriptionEnabled } = vi.hoisted(

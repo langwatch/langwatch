@@ -6,6 +6,13 @@
  *
  * Covers @integration scenarios from specs/members/update-pending-invitation.feature
  */
+
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { nanoid } from "nanoid";
 import {
   afterAll,
   afterEach,
@@ -15,15 +22,14 @@ import {
   it,
   vi,
 } from "vitest";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
+import { INVITE_EXPIRATION_MS } from "../../../invites/invite.service";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { INVITE_EXPIRATION_MS } from "../../../invites/invite.service";
-import { createTestApp } from "../../../app-layer/presets";
-import { globalForApp, resetApp } from "../../../app-layer/app";
-import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
 // vi.hoisted runs before vi.mock hoisting, so these are available in mock factories
 const { mockSendInviteEmail, mockGetActivePlan } = vi.hoisted(() => ({
@@ -38,8 +44,7 @@ vi.mock("../../../mailer/inviteEmail", () => ({
 
 // Mock SENDGRID_API_KEY to enable email sending path
 vi.mock("../../../../env.mjs", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("../../../../env.mjs")>();
+  const original = await importOriginal<typeof import("../../../../env.mjs")>();
   return {
     ...original,
     env: {
@@ -220,9 +225,7 @@ describe("Organization Invites Integration", () => {
 
   afterEach(async () => {
     // Clean up invites after each test
-    await prisma.organizationInvite.deleteMany({
-      where: { organizationId },
-    });
+    await cleanupTestRows(prisma, [["organizationInvite", { organizationId }]]);
     mockSendInviteEmail.mockClear();
     mockGetActivePlan.mockReset();
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
@@ -240,32 +243,25 @@ describe("Organization Invites Integration", () => {
     await resetApp();
 
     // Cleanup all test data
-    await prisma.organizationInvite.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.teamUser.deleteMany({
-      where: { teamId },
-    });
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.team.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.organization.deleteMany({
-      where: { id: organizationId },
-    });
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: [
-            `invite-admin-${testNamespace}@test.com`,
-            `invite-member-${testNamespace}@test.com`,
-          ],
+    await cleanupTestRows(prisma, [
+      ["organizationInvite", { organizationId }],
+      ["roleBinding", { organizationId }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      [
+        "user",
+        {
+          email: {
+            in: [
+              `invite-admin-${testNamespace}@test.com`,
+              `invite-member-${testNamespace}@test.com`,
+            ],
+          },
         },
-      },
-    });
+      ],
+    ]);
   });
 
   // ============================================================================
@@ -287,7 +283,7 @@ describe("Organization Invites Integration", () => {
                 teamIds: teamId,
               },
             ],
-          })
+          }),
         ).rejects.toThrow();
       });
     });
@@ -409,7 +405,7 @@ describe("Organization Invites Integration", () => {
                 teamIds: teamId,
               },
             ],
-          })
+          }),
         ).rejects.toMatchObject({
           code: "BAD_REQUEST",
           message: expect.stringContaining("already exists"),
@@ -427,13 +423,12 @@ describe("Organization Invites Integration", () => {
       /** @scenario "Approving an invitation sets expiration and status" */
       it("transitions status to PENDING", async () => {
         // Create WAITING_APPROVAL invite
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
 
         const result = await adminCaller.organization.approveInvite({
           inviteId: results[0]!.invite.id,
@@ -446,13 +441,12 @@ describe("Organization Invites Integration", () => {
       it("sets 48-hour expiration", async () => {
         const beforeApproval = Date.now();
 
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
 
         const result = await adminCaller.organization.approveInvite({
           inviteId: results[0]!.invite.id,
@@ -469,13 +463,12 @@ describe("Organization Invites Integration", () => {
 
       /** @scenario "Email is sent when admin approves an invitation request" */
       it("sends invitation email", async () => {
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
 
         await adminCaller.organization.approveInvite({
           inviteId: results[0]!.invite.id,
@@ -485,7 +478,7 @@ describe("Organization Invites Integration", () => {
         expect(mockSendInviteEmail).toHaveBeenCalledWith(
           expect.objectContaining({
             email: "user@example.com",
-          })
+          }),
         );
       });
     });
@@ -511,7 +504,7 @@ describe("Organization Invites Integration", () => {
           memberCaller.organization.approveInvite({
             inviteId: invite.id,
             organizationId,
-          })
+          }),
         ).rejects.toMatchObject({
           code: "UNAUTHORIZED",
         });
@@ -523,17 +516,16 @@ describe("Organization Invites Integration", () => {
         // Create WAITING_APPROVAL invite while limits are generous
         mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
 
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              {
-                email: "late-limit@example.com",
-                role: "MEMBER",
-                teamIds: teamId,
-              },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            {
+              email: "late-limit@example.com",
+              role: "MEMBER",
+              teamIds: teamId,
+            },
+          ],
+        });
 
         const inviteId = results[0]!.invite.id;
 
@@ -545,16 +537,15 @@ describe("Organization Invites Integration", () => {
           adminCaller.organization.approveInvite({
             inviteId,
             organizationId,
-          })
+          }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
         });
 
         // Verify the invite remains in WAITING_APPROVAL status (not transitioned)
-        const unchangedInvite =
-          await prisma.organizationInvite.findFirst({
-            where: { id: inviteId, organizationId },
-          });
+        const unchangedInvite = await prisma.organizationInvite.findFirst({
+          where: { id: inviteId, organizationId },
+        });
         expect(unchangedInvite?.status).toBe("WAITING_APPROVAL");
       });
     });
@@ -660,7 +651,7 @@ describe("Organization Invites Integration", () => {
           });
 
         const waitingInvite = invites.find(
-          (i) => i.email === "waiting-req@example.com"
+          (i) => i.email === "waiting-req@example.com",
         );
         expect(waitingInvite?.requestedByUser).toBeDefined();
         expect(waitingInvite?.requestedByUser?.name).toBe("Invite Member");
@@ -738,13 +729,13 @@ describe("Organization Invites Integration", () => {
 
         // The failed one has emailNotSent = true
         const failedResult = results.find(
-          (r) => r.invite.email === "fail-email@example.com"
+          (r) => r.invite.email === "fail-email@example.com",
         );
         expect(failedResult?.emailNotSent).toBe(true);
 
         // The successful one has emailNotSent = false
         const okResult = results.find(
-          (r) => r.invite.email === "ok-email@example.com"
+          (r) => r.invite.email === "ok-email@example.com",
         );
         expect(okResult?.emailNotSent).toBe(false);
       });
@@ -760,17 +751,16 @@ describe("Organization Invites Integration", () => {
       /** @scenario "Email failure during approval does not revert the approval" */
       it("still approves the invitation", async () => {
         // Create WAITING_APPROVAL invite
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
 
         // Make email sending fail
         mockSendInviteEmail.mockRejectedValue(
-          new Error("Email service unavailable")
+          new Error("Email service unavailable"),
         );
 
         const result = await adminCaller.organization.approveInvite({
@@ -789,16 +779,15 @@ describe("Organization Invites Integration", () => {
       });
 
       it("returns emailNotSent as fallback indicator", async () => {
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
 
         mockSendInviteEmail.mockRejectedValue(
-          new Error("Email service unavailable")
+          new Error("Email service unavailable"),
         );
 
         const result = await adminCaller.organization.approveInvite({
@@ -821,17 +810,16 @@ describe("Organization Invites Integration", () => {
         // Step 1: Create WAITING_APPROVAL invite while limits are generous
         mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
 
-        const results =
-          await memberCaller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              {
-                email: "approval-limit@example.com",
-                role: "MEMBER",
-                teamIds: teamId,
-              },
-            ],
-          });
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            {
+              email: "approval-limit@example.com",
+              role: "MEMBER",
+              teamIds: teamId,
+            },
+          ],
+        });
 
         const inviteId = results[0]!.invite.id;
 
@@ -846,7 +834,7 @@ describe("Organization Invites Integration", () => {
           adminCaller.organization.approveInvite({
             inviteId,
             organizationId,
-          })
+          }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
         });
@@ -881,7 +869,7 @@ describe("Organization Invites Integration", () => {
             invites: [
               { email: "new@example.com", role: "MEMBER", teamIds: teamId },
             ],
-          })
+          }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
         });

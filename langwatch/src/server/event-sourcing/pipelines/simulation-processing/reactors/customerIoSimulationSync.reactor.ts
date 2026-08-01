@@ -1,9 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
+import {
+  captureException,
+  toError,
+} from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
-import { createLogger } from "../../../../../utils/logger/server";
-import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/events";
@@ -42,8 +48,7 @@ export function createCustomerIoSimulationSyncReactor(
   return {
     name: "customerIoSimulationSync",
     options: {
-      makeJobId: (payload) =>
-        `cio-sim-sync-${payload.event.tenantId}`,
+      makeJobId: (payload) => `cio-sim-sync-${payload.event.tenantId}`,
       ttl: CIO_REACTOR_DEBOUNCE_TTL_MS,
     },
 
@@ -59,7 +64,8 @@ export function createCustomerIoSimulationSyncReactor(
       const { tenantId: projectId } = context;
 
       try {
-        const { userId, organizationId } = await deps.projects.resolveOrgAdmin(projectId);
+        const { userId, organizationId } =
+          await deps.projects.resolveOrgAdmin(projectId);
 
         if (!userId || !organizationId) {
           logger.warn(
@@ -87,33 +93,52 @@ export function createCustomerIoSimulationSyncReactor(
         if (isFirstSimulation) {
           // Fire-and-forget: do not block reactor processing
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              has_simulations: true,
-              simulation_count: 1,
-              first_simulation_at: now,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                has_simulations: true,
+                simulation_count: 1,
+                first_simulation_at: now,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for first simulation");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for first simulation",
+              );
               captureException(toError(error));
             });
           void deps.nurturing
-            .trackEvent({ userId, event: "first_simulation_ran", properties: {
-              project_id: projectId,
-            }})
+            .trackEvent({
+              userId,
+              event: "first_simulation_ran",
+              properties: {
+                project_id: projectId,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to track first_simulation_ran event");
+              logger.error(
+                { projectId, error },
+                "Failed to track first_simulation_ran event",
+              );
               captureException(toError(error));
             });
         } else {
           const newCount = existingCount + 1;
           // Fire-and-forget: do not block reactor processing
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              simulation_count: newCount,
-              last_simulation_at: now,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                simulation_count: newCount,
+                last_simulation_at: now,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for simulation update");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for simulation update",
+              );
               captureException(toError(error));
             });
         }

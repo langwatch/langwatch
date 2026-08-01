@@ -16,27 +16,41 @@ import DepartmentsPage from "~/pages/settings/governance/departments";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
-const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(() => ({
-  ffEnabled: { current: true },
-  departmentList: {
-    current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
-      id: string;
-      name: string;
-    }>,
-  },
-  assignments: {
-    current: {
-      users: [] as Array<{ id: string; name: string; departmentId: string | null }>,
-      teams: [] as Array<{ id: string; name: string; departmentId: string | null }>,
-      projects: [] as Array<{ id: string; name: string; departmentId: string | null }>,
+const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(
+  () => ({
+    ffEnabled: { current: true },
+    departmentList: {
+      current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+        id: string;
+        name: string;
+      }>,
     },
-  },
-  mutations: {
-    assignUser: vi.fn(async () => ({})),
-    assignTeam: vi.fn(async () => ({})),
-    assignProject: vi.fn(async () => ({})),
-  },
-}));
+    assignments: {
+      current: {
+        users: [] as Array<{
+          id: string;
+          name: string;
+          departmentId: string | null;
+        }>,
+        teams: [] as Array<{
+          id: string;
+          name: string;
+          departmentId: string | null;
+        }>,
+        projects: [] as Array<{
+          id: string;
+          name: string;
+          departmentId: string | null;
+        }>,
+      },
+    },
+    mutations: {
+      assignUser: vi.fn(async () => ({})),
+      assignTeam: vi.fn(async () => ({})),
+      assignProject: vi.fn(async () => ({})),
+    },
+  }),
+);
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: ffEnabled.current, isLoading: false }),
@@ -68,10 +82,16 @@ vi.mock("~/utils/api", () => ({
       rename: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       archive: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       assignUser: {
-        useMutation: () => ({ mutateAsync: mutations.assignUser, isPending: false }),
+        useMutation: () => ({
+          mutateAsync: mutations.assignUser,
+          isPending: false,
+        }),
       },
       assignTeam: {
-        useMutation: () => ({ mutateAsync: mutations.assignTeam, isPending: false }),
+        useMutation: () => ({
+          mutateAsync: mutations.assignTeam,
+          isPending: false,
+        }),
       },
       assignProject: {
         useMutation: () => ({
@@ -116,9 +136,7 @@ vi.mock("~/components/ui/link", () => ({
 }));
 
 function renderWithChakra(node: ReactNode) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{node}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
 }
 
 describe("department assignment UI", () => {

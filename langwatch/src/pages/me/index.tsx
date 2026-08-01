@@ -9,21 +9,23 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
+import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
+import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { Tooltip } from "~/components/ui/tooltip";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import Head from "~/utils/compat/next-head";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
@@ -46,8 +48,6 @@ function MyUsagePage() {
     organizationName,
   } = ctx;
 
-  const isOverBudget = budget.status === "exceeded";
-
   // "Spent this month" leads with the actually-billed amount; the theoretical
   // bundled portion (e.g. Claude Max usage that isn't billed per token) is most
   // of a coding-assistant user's spend and would mislead as the headline, so it
@@ -56,15 +56,7 @@ function MyUsagePage() {
     0,
     summary.spentThisMonthUsd - summary.billedThisMonthUsd,
   );
-  const budgetSubline = isOverBudget
-    ? "Limit reached"
-    : summary.budgetUsd !== null
-      ? `of ${fmtUsd(summary.budgetUsd)} budget`
-      : "No budget set";
-  const spentSubline =
-    bundledThisMonthUsd > 0
-      ? `${fmtUsd(bundledThisMonthUsd)} bundled · ${budgetSubline}`
-      : budgetSubline;
+  const spentCardSubline = spentSubline({ bundledUsd: bundledThisMonthUsd });
 
   // Two cost series across the spend charts: the theoretical list-price total
   // (includes bundled / not-billed-per-token usage like Claude Max) and the
@@ -124,6 +116,9 @@ function MyUsagePage() {
             </Text>
           </VStack>
           <Spacer />
+          {/* Renders only once the personal project has traces: exploration
+              of usage that exists, not another setup entry point. */}
+          <ConnectYourAgentButton projectId={personalProjectId} />
         </HStack>
 
         {budget.status === "exceeded" && (
@@ -148,8 +143,7 @@ function MyUsagePage() {
           <SummaryCard
             title="Spent this month"
             value={fmtUsd(summary.billedThisMonthUsd)}
-            subline={spentSubline}
-            tone={isOverBudget ? "red" : "default"}
+            subline={spentCardSubline}
           />
           <SummaryCard
             title="Requests this month"
@@ -239,7 +233,11 @@ function MyUsagePage() {
                   );
                 })}
               </HStack>
-              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
+              <HStack
+                justifyContent="space-between"
+                fontSize="xs"
+                color="fg.muted"
+              >
                 <Text>{spendByDay[0]?.day}</Text>
                 <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
               </HStack>
@@ -308,15 +306,8 @@ function MyUsagePage() {
                         )}
                       </Box>
                     </Tooltip>
-                    <VStack
-                      gap={0}
-                      align="end"
-                      minWidth="90px"
-                      fontSize="sm"
-                    >
-                      {showBilled && (
-                        <Text>{fmtUsd(tool.billedUsd)}</Text>
-                      )}
+                    <VStack gap={0} align="end" minWidth="90px" fontSize="sm">
+                      {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
                       {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
                         <Text color="fg.subtle" fontSize="xs">
                           {fmtUsd(tool.usd - tool.billedUsd)} bundled
@@ -327,6 +318,14 @@ function MyUsagePage() {
                 );
               })}
             </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Coding-agent usage (last 30 days)">
+          {personalProjectId ? (
+            <CodingAgentUsageContent projectId={personalProjectId} />
+          ) : (
+            <EmptyState message="No coding-agent usage yet" />
           )}
         </SectionCard>
 
@@ -349,12 +348,12 @@ function SummaryCard({
   title,
   value,
   subline,
-  tone = "default",
 }: {
   title: string;
   value: string;
-  subline: string;
-  tone?: "default" | "red";
+  /** Omitted or empty renders no second line at all, so the card keeps its
+   *  shape instead of reserving a blank row. */
+  subline?: string;
 }) {
   return (
     <Box
@@ -364,20 +363,22 @@ function SummaryCard({
       padding={4}
       backgroundColor="bg.subtle"
     >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+      <Text
+        fontSize="xs"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="wider"
+      >
         {title}
       </Text>
-      <Text
-        fontSize="2xl"
-        fontWeight="semibold"
-        marginTop={1}
-        color={tone === "red" ? "red.500" : "fg"}
-      >
+      <Text fontSize="2xl" fontWeight="semibold" marginTop={1} color="fg">
         {value}
       </Text>
-      <Text fontSize="sm" color={tone === "red" ? "red.500" : "fg.muted"} marginTop={1}>
-        {subline}
-      </Text>
+      {subline ? (
+        <Text fontSize="sm" color="fg.muted" marginTop={1}>
+          {subline}
+        </Text>
+      ) : null}
     </Box>
   );
 }
@@ -445,7 +446,12 @@ function BudgetBanner({
   const colors =
     tone === "red"
       ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
-      : { bg: "yellow.50", border: "yellow.200", title: "yellow.800", text: "yellow.800" };
+      : {
+          bg: "yellow.50",
+          border: "yellow.200",
+          title: "yellow.800",
+          text: "yellow.800",
+        };
 
   return (
     <Box
@@ -532,7 +538,12 @@ function LegendChip({
       _hover={{ opacity: active ? 0.8 : 0.65 }}
       title={active ? `Hide ${label}` : `Show ${label}`}
     >
-      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
+      <Box
+        width="10px"
+        height="10px"
+        borderRadius="sm"
+        backgroundColor={color}
+      />
       <Text
         color="fg.muted"
         textDecoration={active ? undefined : "line-through"}

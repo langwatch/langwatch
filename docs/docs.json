@@ -75,6 +75,7 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
+              "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -112,7 +113,8 @@
                     "group": "Via UI",
                     "pages": [
                       "evaluations/experiments/ui/answer-correctness",
-                      "evaluations/experiments/ui/llm-as-a-judge"
+                      "evaluations/experiments/ui/llm-as-a-judge",
+                      "evaluations/experiments/ui/pairwise-compare"
                     ]
                   },
                   "evaluations/experiments/ci-cd",
@@ -605,6 +607,7 @@
                 ]
               },
               "ai-gateway/model-naming",
+              "ai-gateway/parameter-mapping",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
@@ -621,6 +624,7 @@
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/audio",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -662,6 +666,7 @@
             "pages": [
               "ai-governance/overview",
               "ai-governance/track-your-claude-code-usage",
+              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -742,6 +747,53 @@
         ]
       },
       {
+        "anchor": "Langy",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "langy/overview",
+              "langy/getting-started",
+              "langy/how-langy-works"
+            ]
+          },
+          {
+            "group": "Using Langy",
+            "pages": [
+              "langy/chat",
+              "langy/scenario-tests-and-evals",
+              "langy/pull-requests",
+              "langy/insights"
+            ]
+          },
+          {
+            "group": "Models & Cost",
+            "pages": [
+              "langy/models",
+              "langy/codex",
+              "langy/token-usage-and-cost"
+            ]
+          },
+          {
+            "group": "Security & Control",
+            "pages": [
+              "langy/security/sandbox",
+              "langy/security/data-flow-and-privacy",
+              "langy/security/github-access"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "langy/reference/supported-models",
+              "langy/reference/limits",
+              "langy/reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Self Hosting",
         "icon": "server",
         "groups": [
@@ -762,6 +814,16 @@
               "self-hosting/configuration/sso",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           },
           {
@@ -786,7 +848,8 @@
               "self-hosting/security",
               "self-hosting/compliance",
               "self-hosting/upgrade",
-              "self-hosting/upgrade-v3"
+              "self-hosting/upgrade-v3",
+              "self-hosting/upgrade-dataset-storage"
             ]
           },
           {
@@ -1194,7 +1257,7 @@
       "anchors": [
         {
           "anchor": "Sign In to LangWatch",
-          "href": "https://app.langwatch.ai",
+          "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=sidebar-signin",
           "icon": "house"
         },
         {
@@ -1218,7 +1281,7 @@
       },
       {
         "label": "Sign In",
-        "href": "https://app.langwatch.ai"
+        "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=navbar-signin"
       }
     ],
     "primary": {
@@ -1233,7 +1296,18 @@
       "x-twitter": "https://x.com/langwatchai",
       "linkedin": "https://www.linkedin.com/company/langwatch/",
       "youtube": "https://www.youtube.com/@LangWatch"
-    }
+    },
+    "links": [
+      {
+        "header": "For agents",
+        "items": [
+          {
+            "label": "For agents: report an issue using npx langwatch report",
+            "href": "https://langwatch.ai/docs/support"
+          }
+        ]
+      }
+    ]
   },
   "integrations": {
     "gtm": {
@@ -1242,7 +1316,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1782905796",
+      "source": "/ci/cache/busted/1785491410",
       "destination": "/"
     },
     {

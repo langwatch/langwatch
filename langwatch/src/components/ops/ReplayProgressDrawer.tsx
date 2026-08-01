@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Badge,
   Box,
@@ -11,21 +10,27 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
+import { useMemo } from "react";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
+import { formatDuration } from "~/components/ops/shared/formatters";
 import {
-  DrawerRoot,
-  DrawerContent,
-  DrawerHeader,
+  PHASE_ICONS,
+  PHASE_LABELS,
+  PhaseTimeline,
+} from "~/components/ops/shared/PhaseTimeline";
+import {
   DrawerBody,
-  DrawerFooter,
   DrawerCloseTrigger,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerRoot,
   DrawerTitle,
 } from "~/components/ui/drawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
-import { formatDuration } from "~/components/ops/shared/formatters";
-import { PhaseTimeline, PHASE_ICONS, PHASE_LABELS } from "~/components/ops/shared/PhaseTimeline";
+import { useRouter } from "~/utils/compat/next-router";
 
 export function ReplayProgressDrawer({
   open,
@@ -47,6 +52,10 @@ export function ReplayProgressDrawer({
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
+  const activeProjectionNames = parseActiveProjections(
+    status?.currentProjection,
+  );
+  const activeProjections = new Set(activeProjectionNames);
 
   const stateColor =
     status?.state === "completed"
@@ -59,17 +68,18 @@ export function ReplayProgressDrawer({
 
   const progressPercent =
     status && status.aggregatesTotal > 0
-      ? Math.round(
-          (status.aggregatesProcessed / status.aggregatesTotal) * 100,
-        )
+      ? Math.round((status.aggregatesProcessed / status.aggregatesTotal) * 100)
       : 0;
 
   const throughputRate = useMemo(() => {
     if (!status?.startedAt || !status.eventsProcessed) return null;
-    const elapsed = (Date.now() - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt
+      ? new Date(status.completedAt).getTime()
+      : Date.now();
+    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
-  }, [status?.startedAt, status?.eventsProcessed]);
+  }, [status?.startedAt, status?.completedAt, status?.eventsProcessed]);
 
   return (
     <DrawerRoot
@@ -102,7 +112,11 @@ export function ReplayProgressDrawer({
               {/* Phase timeline */}
               <PhaseTimeline
                 currentPhase={status.currentPhase}
-                completedState={status.state !== "running" ? status.state as "completed" | "failed" | "cancelled" : null}
+                completedState={
+                  status.state !== "running"
+                    ? (status.state as "completed" | "failed" | "cancelled")
+                    : null
+                }
               />
 
               {/* Current phase detail */}
@@ -115,9 +129,11 @@ export function ReplayProgressDrawer({
                     <Text textStyle="sm" fontWeight="medium">
                       {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
                     </Text>
-                    {status.currentProjection && (
+                    {activeProjectionNames.length > 0 && (
                       <Text textStyle="xs" color="fg.muted">
-                        {status.currentProjection}
+                        {activeProjectionNames.length === 1
+                          ? activeProjectionNames[0]
+                          : `${activeProjectionNames.length} projections`}
                       </Text>
                     )}
                   </VStack>
@@ -132,7 +148,9 @@ export function ReplayProgressDrawer({
                       Aggregates
                     </Text>
                     <Text textStyle="xs" fontWeight="medium">
-                      {status.aggregatesProcessed.toLocaleString()} / {status.aggregatesTotal.toLocaleString()} ({progressPercent}%)
+                      {status.aggregatesProcessed.toLocaleString()} /{" "}
+                      {status.aggregatesTotal.toLocaleString()} (
+                      {progressPercent}%)
                     </Text>
                   </HStack>
                   <Progress.Root
@@ -174,7 +192,9 @@ export function ReplayProgressDrawer({
                 <Stat.Root>
                   <Stat.Label>Elapsed</Stat.Label>
                   <Stat.ValueText textStyle="lg">
-                    {status.startedAt ? formatDuration(status.startedAt) : "—"}
+                    {status.startedAt
+                      ? formatDuration(status.startedAt, status.completedAt)
+                      : "—"}
                   </Stat.ValueText>
                 </Stat.Root>
               </HStack>
@@ -189,8 +209,16 @@ export function ReplayProgressDrawer({
                     <Badge
                       key={name}
                       size="sm"
-                      variant={name === status.currentProjection ? "solid" : "subtle"}
-                      colorPalette={name === status.currentProjection ? "orange" : "gray"}
+                      variant={
+                        isRunning && activeProjections.has(name)
+                          ? "solid"
+                          : "subtle"
+                      }
+                      colorPalette={
+                        isRunning && activeProjections.has(name)
+                          ? "orange"
+                          : "gray"
+                      }
                     >
                       {name}
                     </Badge>
@@ -217,7 +245,12 @@ export function ReplayProgressDrawer({
                   borderWidth="1px"
                   borderColor="red.200"
                 >
-                  <Text textStyle="xs" fontWeight="medium" color="red.fg" marginBottom={1}>
+                  <Text
+                    textStyle="xs"
+                    fontWeight="medium"
+                    color="red.fg"
+                    marginBottom={1}
+                  >
                     Error
                   </Text>
                   <Text textStyle="xs" color="red.fg">

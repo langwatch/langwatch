@@ -1,5 +1,10 @@
-import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import {
+  Prisma,
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -14,6 +19,28 @@ export const TEAM_ROLE_PRIORITY: Record<TeamUserRole, number> = {
   [TeamUserRole.VIEWER]: 2,
   [TeamUserRole.CUSTOM]: 3,
 };
+
+/** The user fields every team-member projection selects (kept in one place so
+ * the shape can't drift across the three role-binding include sites). */
+const MEMBER_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+} as const satisfies Prisma.UserSelect;
+
+const principalInOrganizationWhere = (
+  organizationId: string,
+): Prisma.RoleBindingWhereInput => ({
+  OR: [
+    {
+      userId: { not: null },
+      user: { orgMemberships: { some: { organizationId } } },
+    },
+    { groupId: { not: null }, group: { organizationId } },
+    { apiKeyId: { not: null }, apiKey: { organizationId } },
+  ],
+});
 
 // Ascending, nulls last — matches Postgres `ORDER BY col ASC` (the ordering the
 // previous Prisma `orderBy` produced before members were resolved in memory).
@@ -172,12 +199,16 @@ export class TeamService {
 
     if (!team) return null;
 
-    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
-      organizationId,
-      teamIds: [team.id],
-    });
+    const byTeam =
+      await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+        organizationId,
+        teamIds: [team.id],
+      });
 
-    return { ...team, members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id) };
+    return {
+      ...team,
+      members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
+    };
   }
 
   /**
@@ -219,10 +250,11 @@ export class TeamService {
     });
 
     // Single binding query for all teams (no N+1), grouped by teamId.
-    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
-      organizationId,
-      teamIds: teams.map((team) => team.id),
-    });
+    const byTeam =
+      await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+        organizationId,
+        teamIds: teams.map((team) => team.id),
+      });
 
     return teams.map((team) => ({
       ...team,
@@ -251,10 +283,11 @@ export class TeamService {
 
     if (!team) return null;
 
-    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
-      organizationId,
-      teamIds: [team.id],
-    });
+    const byTeam =
+      await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+        organizationId,
+        teamIds: [team.id],
+      });
 
     const isMember = (byTeam.get(team.id) ?? []).some(
       (binding) => binding.userId === userId,
@@ -262,7 +295,11 @@ export class TeamService {
     return isMember ? team : null;
   }
 
-  async getTeamsWithRoleBindings({ organizationId }: { organizationId: string }) {
+  async getTeamsWithRoleBindings({
+    organizationId,
+  }: {
+    organizationId: string;
+  }) {
     const teams = await this.prisma.team.findMany({
       where: { organizationId, archivedAt: null },
       include: {
@@ -282,9 +319,10 @@ export class TeamService {
               organizationId,
               scopeType: RoleBindingScopeType.TEAM,
               scopeId: team.id,
+              ...principalInOrganizationWhere(organizationId),
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: MEMBER_USER_SELECT },
               group: { select: { id: true, name: true, scimSource: true } },
               apiKey: { select: { id: true, name: true } },
               customRole: { select: { id: true, name: true } },
@@ -296,9 +334,10 @@ export class TeamService {
                   organizationId,
                   scopeType: RoleBindingScopeType.PROJECT,
                   scopeId: { in: projectIds },
+                  ...principalInOrganizationWhere(organizationId),
                 },
                 include: {
-                  user: { select: { id: true, name: true, email: true } },
+                  user: { select: MEMBER_USER_SELECT },
                   group: { select: { id: true, name: true, scimSource: true } },
                   apiKey: { select: { id: true, name: true } },
                   customRole: { select: { id: true, name: true } },
@@ -320,12 +359,17 @@ export class TeamService {
             ...projectGroupBindings.map((b) => b.groupId!),
           ]),
         );
-        const groupMemberships = allGroupIds.length > 0
-          ? await this.prisma.groupMembership.findMany({
-              where: { groupId: { in: allGroupIds } },
-              include: { user: { select: { id: true, name: true, email: true } } },
-            })
-          : [];
+        const groupMemberships =
+          allGroupIds.length > 0
+            ? await this.prisma.groupMembership.findMany({
+                where: {
+                  groupId: { in: allGroupIds },
+                  group: { organizationId },
+                  user: { orgMemberships: { some: { organizationId } } },
+                },
+                include: { user: { select: MEMBER_USER_SELECT } },
+              })
+            : [];
 
         // ── Build directMembers: direct users + expanded group members ──
         const directUserBindings = teamBindings.filter((b) => b.userId);
@@ -361,6 +405,7 @@ export class TeamService {
               viaGroupName: b.group?.name ?? null,
               name: gm.user.name ?? gm.user.email ?? "Unknown",
               email: gm.user.email ?? null,
+              image: gm.user.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
@@ -376,6 +421,7 @@ export class TeamService {
             viaGroupName: null as string | null,
             name: b.user?.name ?? b.user?.email ?? b.apiKey?.name ?? "Unknown",
             email: b.user?.email ?? null,
+            image: b.user?.image ?? null,
             role: b.role,
             customRoleId: b.customRoleId,
             customRoleName: b.customRole?.name ?? null,
@@ -395,17 +441,21 @@ export class TeamService {
         );
 
         // ── Build projectOnlyAccess: users with project bindings but NO team binding ──
-        const projectOnlyMap = new Map<string, {
-          bindingId: string;
-          userId: string;
-          name: string;
-          email: string | null;
-          role: TeamUserRole;
-          customRoleId: string | null;
-          customRoleName: string | null;
-          projectId: string;
-          projectName: string;
-        }>();
+        const projectOnlyMap = new Map<
+          string,
+          {
+            bindingId: string;
+            userId: string;
+            name: string;
+            email: string | null;
+            image: string | null;
+            role: TeamUserRole;
+            customRoleId: string | null;
+            customRoleName: string | null;
+            projectId: string;
+            projectName: string;
+          }
+        >();
 
         for (const b of projectBindings) {
           if (!b.userId) continue;
@@ -419,6 +469,7 @@ export class TeamService {
               userId: b.userId,
               name: b.user?.name ?? b.userId,
               email: b.user?.email ?? null,
+              image: b.user?.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
@@ -429,19 +480,23 @@ export class TeamService {
         }
 
         // ── Build per-project access list ──
-        const projectAccess: Record<string, Array<{
-          bindingId: string | null;
-          userId: string | null;
-          groupId: string | null;
-          viaGroupName: string | null;
-          name: string;
-          email: string | null;
-          role: TeamUserRole;
-          customRoleId: string | null;
-          customRoleName: string | null;
-          source: "team" | "direct" | "override";
-          teamRole?: TeamUserRole;
-        }>> = {};
+        const projectAccess: Record<
+          string,
+          Array<{
+            bindingId: string | null;
+            userId: string | null;
+            groupId: string | null;
+            viaGroupName: string | null;
+            name: string;
+            email: string | null;
+            image: string | null;
+            role: TeamUserRole;
+            customRoleId: string | null;
+            customRoleName: string | null;
+            source: "team" | "direct" | "override";
+            teamRole?: TeamUserRole;
+          }>
+        > = {};
 
         for (const proj of team.projects) {
           const inherited = directMembers.map((m) => ({
@@ -451,6 +506,7 @@ export class TeamService {
             viaGroupName: m.viaGroupName,
             name: m.name,
             email: m.email,
+            image: m.image,
             role: m.role,
             customRoleId: m.customRoleId,
             customRoleName: m.customRoleName,
@@ -485,9 +541,11 @@ export class TeamService {
               bindingId: b.id,
               userId: b.userId,
               groupId: b.groupId,
-              viaGroupName: b.groupId ? b.group?.name ?? null : null,
-              name: b.user?.name ?? b.group?.name ?? b.apiKey?.name ?? "Unknown",
+              viaGroupName: b.groupId ? (b.group?.name ?? null) : null,
+              name:
+                b.user?.name ?? b.group?.name ?? b.apiKey?.name ?? "Unknown",
               email: b.user?.email ?? null,
+              image: b.user?.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
@@ -543,100 +601,113 @@ export class TeamService {
     userId: string;
     currentUserId: string;
   }) {
-    return this.prisma.$transaction(async (tx) => {
-      // Validate that the team exists
-      const team = await tx.team.findUnique({
-        where: { id: teamId },
-        select: { id: true, name: true, organizationId: true },
-      });
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Validate that the team exists
+        const team = await tx.team.findUnique({
+          where: { id: teamId },
+          select: { id: true, name: true, organizationId: true },
+        });
 
-      if (!team) {
-        throw new NotFoundError("team_not_found", "Team", teamId);
-      }
-
-      // Compute the effective set of admin userIds — direct user ADMIN
-      // bindings plus members of any group with an ADMIN binding on this
-      // team. Counting only direct user bindings (as we used to) ignores
-      // SCIM/group admins and would incorrectly treat a team with a single
-      // direct admin + group-expanded admins as having only one admin.
-      const effectiveAdminUserIds = await computeEffectiveAdminUserIds(
-        tx,
-        team.organizationId,
-        teamId,
-      );
-
-      if (effectiveAdminUserIds.size === 0) {
-        throw new ValidationError("No admin found for this team");
-      }
-
-      // Check if the target user is currently a direct member of the team
-      const targetBinding = await tx.roleBinding.findFirst({
-        where: {
-          organizationId: team.organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          userId,
-        },
-        select: { role: true },
-      });
-
-      if (!targetBinding) {
-        throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
-      }
-
-      // Project the post-removal admin set. Removing the target's direct
-      // binding only changes things if they aren't also an admin via a
-      // group membership on this team.
-      const targetStillAdminViaGroup = await isUserAdminViaGroup(
-        tx,
-        team.organizationId,
-        teamId,
-        userId,
-      );
-      const projectedAdminUserIds = new Set(effectiveAdminUserIds);
-      if (!targetStillAdminViaGroup) {
-        projectedAdminUserIds.delete(userId);
-      }
-
-      if (projectedAdminUserIds.size === 0) {
-        if (userId === currentUserId) {
-          throw new ValidationError("You cannot remove yourself from the last admin position in this team");
+        if (!team) {
+          throw new NotFoundError("team_not_found", "Team", teamId);
         }
 
-        throw new ValidationError("Cannot remove the last admin from this team");
-      }
+        // Compute the effective set of admin userIds — direct user ADMIN
+        // bindings plus members of any group with an ADMIN binding on this
+        // team. Counting only direct user bindings (as we used to) ignores
+        // SCIM/group admins and would incorrectly treat a team with a single
+        // direct admin + group-expanded admins as having only one admin.
+        const effectiveAdminUserIds = await computeEffectiveAdminUserIds(
+          tx,
+          team.organizationId,
+          teamId,
+        );
 
-      // Remove RoleBinding and legacy TeamUser row (if any) atomically
-      await Promise.all([
-        tx.roleBinding.deleteMany({
+        if (effectiveAdminUserIds.size === 0) {
+          throw new ValidationError("No admin found for this team");
+        }
+
+        // Check if the target user is currently a direct member of the team
+        const targetBinding = await tx.roleBinding.findFirst({
           where: {
             organizationId: team.organizationId,
-            userId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
+            userId,
           },
-        }),
-        tx.teamUser.deleteMany({
-          where: { userId, teamId },
-        }),
-      ]);
+          select: { role: true },
+        });
 
-      // Post-removal validation: ensure we still have at least one
-      // effective admin (direct or group-expanded).
-      const finalAdminUserIds = await computeEffectiveAdminUserIds(
-        tx,
-        team.organizationId,
-        teamId,
-      );
+        if (!targetBinding) {
+          throw new NotFoundError(
+            "team_membership_not_found",
+            "TeamMember",
+            userId,
+          );
+        }
 
-      if (finalAdminUserIds.size === 0) {
-        throw new ValidationError("Operation would result in no admins for this team");
-      }
+        // Project the post-removal admin set. Removing the target's direct
+        // binding only changes things if they aren't also an admin via a
+        // group membership on this team.
+        const targetStillAdminViaGroup = await isUserAdminViaGroup(
+          tx,
+          team.organizationId,
+          teamId,
+          userId,
+        );
+        const projectedAdminUserIds = new Set(effectiveAdminUserIds);
+        if (!targetStillAdminViaGroup) {
+          projectedAdminUserIds.delete(userId);
+        }
 
-      return {
-        success: true,
-        removedUserId: userId,
-      };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (projectedAdminUserIds.size === 0) {
+          if (userId === currentUserId) {
+            throw new ValidationError(
+              "You cannot remove yourself from the last admin position in this team",
+            );
+          }
+
+          throw new ValidationError(
+            "Cannot remove the last admin from this team",
+          );
+        }
+
+        // Remove RoleBinding and legacy TeamUser row (if any) atomically
+        await Promise.all([
+          tx.roleBinding.deleteMany({
+            where: {
+              organizationId: team.organizationId,
+              userId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: teamId,
+            },
+          }),
+          tx.teamUser.deleteMany({
+            where: { userId, teamId },
+          }),
+        ]);
+
+        // Post-removal validation: ensure we still have at least one
+        // effective admin (direct or group-expanded).
+        const finalAdminUserIds = await computeEffectiveAdminUserIds(
+          tx,
+          team.organizationId,
+          teamId,
+        );
+
+        if (finalAdminUserIds.size === 0) {
+          throw new ValidationError(
+            "Operation would result in no admins for this team",
+          );
+        }
+
+        return {
+          success: true,
+          removedUserId: userId,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

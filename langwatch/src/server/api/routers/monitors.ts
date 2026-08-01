@@ -3,6 +3,7 @@ import { EvaluationExecutionMode, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
+import { getApp } from "~/server/app-layer";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
@@ -10,11 +11,15 @@ import {
   type EvaluatorTypes,
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
+import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { currentVsPreviousDates } from "./analytics/common";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
+
+const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Generates a unique slug for a monitor.
@@ -100,6 +105,49 @@ export const monitorsRouter = createTRPCRouter({
       });
 
       return checks;
+    }),
+  getPerformanceForProject: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        timeZone: z.string().min(1).max(100).optional(),
+      }),
+    )
+    .use(checkProjectPermission("evaluations:view"))
+    .use(checkProjectPermission("analytics:view"))
+    .query(async ({ input, ctx }) => {
+      const monitors = await ctx.prisma.monitor.findMany({
+        where: { projectId: input.projectId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, checkType: true },
+      });
+
+      if (monitors.length === 0) return [];
+
+      const performanceMonitors = monitors.map((monitor) => ({
+        id: monitor.id,
+        isGuardrail:
+          getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
+      }));
+      const endMs = Date.now();
+      const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
+      // The previous window comes from the same helper the analytics page
+      // uses, so the trend comparison covers the exact same runs a user sees
+      // when they open the analytics page for this evaluation.
+      const { previousPeriodStartDate } = currentVsPreviousDates({
+        projectId: input.projectId,
+        startDate: currentStartMs,
+        endDate: endMs,
+        filters: {},
+      });
+      return getApp().evaluations.performance.getPerformance({
+        tenantId: input.projectId,
+        monitors: performanceMonitors,
+        previousStartMs: previousPeriodStartDate.getTime(),
+        currentStartMs,
+        endMs,
+        timeZone: input.timeZone ?? "UTC",
+      });
     }),
   toggle: protectedProcedure
     .input(

@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   EmptyState,
-  Heading,
   HStack,
   Spacer,
   Spinner,
@@ -18,6 +17,7 @@ import {
   Eye,
   Gauge,
   KeyRound,
+  LineChart,
   MoreVertical,
   Pencil,
   Plus,
@@ -29,8 +29,8 @@ import {
 import { useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
@@ -38,13 +38,18 @@ import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+
+/** Deep link from a key's spend to its Usage view over the same window. */
+function usageHrefForKey(virtualKeyId: string): string {
+  return `/settings/gateway/usage?vk=${virtualKeyId}&days=mtd`;
+}
 
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -55,6 +60,10 @@ type CreatedSecret = {
   id: string;
   name: string;
   secret: string;
+  // Resolver-safe `vendor/model` example for the reveal snippet, computed
+  // from the key's eligible providers at create time. Undefined for
+  // list-page rotations, where the snippet falls back to its default.
+  model?: string;
   // Differentiates mint flow (initial creation) from rotate — the
   // reveal dialog adds a 24h-grace banner on rotations.
   kind: "create" | "rotate";
@@ -78,6 +87,23 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
+  // Current-calendar-month spend per visible key, read from the same
+  // cost path the Usage tab reads. The click-through deep-links Usage's
+  // "This month" preset, the same UTC month-to-date window this column
+  // is computed over, so both surfaces show the same total. On a fetch
+  // error the cell shows n/a: an unread ledger must not render as a
+  // confident $0.00.
+  const spendQuery = api.virtualKeys.spendThisMonth.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId },
+  );
+  const spendByKeyId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of spendQuery.data ?? []) {
+      map.set(row.virtualKeyId, row.spentUsd);
+    }
+    return map;
+  }, [spendQuery.data]);
   const policyNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of policiesQuery.data ?? []) {
@@ -126,7 +152,6 @@ function VirtualKeysPage() {
   const [revoking, setRevoking] = useState<{
     id: string;
     name: string;
-    purpose: "user" | "langy";
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
@@ -156,10 +181,7 @@ function VirtualKeysPage() {
       });
       setRotating(null);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to rotate key",
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -172,10 +194,7 @@ function VirtualKeysPage() {
       });
       setRevoking(null);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to revoke key",
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" });
     }
   };
 
@@ -288,8 +307,11 @@ function VirtualKeysPage() {
                           <Table.ColumnHeader>Prefix</Table.ColumnHeader>
                           <Table.ColumnHeader>Status</Table.ColumnHeader>
                           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+                          <Table.ColumnHeader>Routing</Table.ColumnHeader>
                           <Table.ColumnHeader>
-                            Routing policy
+                            <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
+                              <Text as="span">Spent this month</Text>
+                            </Tooltip>
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Last used</Table.ColumnHeader>
                           <Table.ColumnHeader></Table.ColumnHeader>
@@ -316,18 +338,6 @@ function VirtualKeysPage() {
                                   >
                                     {vk.name}
                                   </Link>
-                                  {isLangyManagedVk(vk) && (
-                                    <Tooltip content="Auto-provisioned by LangWatch for the Langy in-product assistant. You can edit its model, fallbacks, budget, and rate limits like any other virtual key. Revoking it will break Langy until you create a new one.">
-                                      <Badge
-                                        variant="subtle"
-                                        colorPalette="purple"
-                                        fontSize="2xs"
-                                        data-testid="langy-vk-badge"
-                                      >
-                                        auto-managed
-                                      </Badge>
-                                    </Tooltip>
-                                  )}
                                 </HStack>
                                 {vk.description && (
                                   <Text fontSize="xs" color="fg.muted">
@@ -393,11 +403,66 @@ function VirtualKeysPage() {
                                   {policyNameById.get(vk.routingPolicyId) ??
                                     vk.routingPolicyId}
                                 </Badge>
+                              ) : vk.routingMode === "FALLBACK_ALL" ? (
+                                <Text fontSize="xs" color="fg.muted">
+                                  fallback: all providers
+                                </Text>
                               ) : (
                                 <Text fontSize="xs" color="fg.muted">
-                                  default cascade
+                                  no fallback
                                 </Text>
                               )}
+                            </Table.Cell>
+                            <Table.Cell
+                              onClick={(e) => e.stopPropagation()}
+                              cursor="default"
+                            >
+                              <Link
+                                className="group"
+                                href={usageHrefForKey(vk.id)}
+                                data-testid={`vk-spend-${vk.id}`}
+                                aria-label={`Usage for ${vk.name}, this month`}
+                                width="full"
+                              >
+                                <HStack
+                                  gap={1}
+                                  justify="space-between"
+                                  width="full"
+                                >
+                                  <Text
+                                    fontSize="sm"
+                                    fontVariantNumeric="tabular-nums"
+                                    color={
+                                      spendByKeyId.get(vk.id) &&
+                                      Number.parseFloat(
+                                        spendByKeyId.get(vk.id)!,
+                                      ) > 0
+                                        ? "fg"
+                                        : "fg.muted"
+                                    }
+                                    _groupHover={{
+                                      textDecoration: "underline",
+                                    }}
+                                  >
+                                    {spendQuery.isLoading
+                                      ? "…"
+                                      : spendQuery.isError
+                                        ? "n/a"
+                                        : formatBudgetUsd(
+                                            spendByKeyId.get(vk.id) ?? "0",
+                                          )}
+                                  </Text>
+                                  <Box
+                                    as="span"
+                                    data-testid={`vk-spend-chart-${vk.id}`}
+                                    color="fg.muted"
+                                    aria-hidden
+                                    _groupHover={{ color: "fg" }}
+                                  >
+                                    <LineChart size={14} />
+                                  </Box>
+                                </HStack>
+                              </Link>
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (
@@ -472,7 +537,6 @@ function VirtualKeysPage() {
                                           setRevoking({
                                             id: vk.id,
                                             name: vk.name,
-                                            purpose: vk.purpose,
                                           })
                                         }
                                       >
@@ -510,6 +574,7 @@ function VirtualKeysPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        model={revealSecret?.model}
         kind={revealSecret?.kind ?? "create"}
       />
       {orgId && (
@@ -543,15 +608,7 @@ function VirtualKeysPage() {
           if (!open) setRevoking(null);
         }}
         title={`Revoke ${revoking?.name ?? "virtual key"}?`}
-        message={
-          // The Langy VK is technically revocable like any other VK, but
-          // revoking it stops the in-product assistant cold. Lead with the
-          // Langy-specific consequence before the generic 401 warning so
-          // someone clicking through doesn't accidentally break Langy.
-          revoking && isLangyManagedVk(revoking)
-            ? "This is the auto-provisioned Langy virtual key. Revoking it will stop the in-product assistant from working until a new one is provisioned (it'll be re-created automatically on the next chat). Clients using this secret directly start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
-            : "Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
-        }
+        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
         confirmLabel="Revoke key"
         tone="danger"
         loading={revokeMutation.isPending}

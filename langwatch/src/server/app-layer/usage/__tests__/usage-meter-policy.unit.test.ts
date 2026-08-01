@@ -1,35 +1,30 @@
-import { describe, it, expect } from "vitest";
 import { PricingModel } from "@prisma/client";
-import {
-  resolveUsageMeter,
-  normalizeUsageUnit,
-} from "../usage-meter-policy";
+import { describe, expect, it } from "vitest";
+import { normalizeUsageUnit, resolveUsageMeter } from "../usage-meter-policy";
 
 describe("resolveUsageMeter", () => {
   describe("when paid organization (isFree=false)", () => {
     describe("when no license override", () => {
+      /** @scenario "Paid TIERED organization counts each trace as one unit" */
       it("returns traces for TIERED pricing model", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.TIERED,
           isFree: false,
           hasValidLicenseOverride: false,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("traces");
-        expect(decision.backend).toBe("clickhouse");
       });
 
+      /** @scenario "Paid SEAT_EVENT organization counts each span toward the limit" */
       it("returns events for SEAT_EVENT pricing model", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.SEAT_EVENT,
           isFree: false,
           hasValidLicenseOverride: false,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("events");
-        expect(decision.backend).toBe("clickhouse");
       });
 
       it("defaults to traces when pricingModel is null", () => {
@@ -37,7 +32,6 @@ describe("resolveUsageMeter", () => {
           pricingModel: null,
           isFree: false,
           hasValidLicenseOverride: false,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("traces");
@@ -45,13 +39,13 @@ describe("resolveUsageMeter", () => {
     });
 
     describe("when license override is active", () => {
+      /** @scenario "Licensed organization respects its own counting rule" */
       it("uses license usageUnit over pricingModel", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.TIERED,
           licenseUsageUnit: "events",
           isFree: false,
           hasValidLicenseOverride: true,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("events");
@@ -63,7 +57,6 @@ describe("resolveUsageMeter", () => {
           licenseUsageUnit: "EVENT",
           isFree: false,
           hasValidLicenseOverride: true,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("events");
@@ -75,7 +68,6 @@ describe("resolveUsageMeter", () => {
           licenseUsageUnit: undefined,
           isFree: false,
           hasValidLicenseOverride: true,
-          clickhouseAvailable: true,
         });
 
         expect(decision.usageUnit).toBe("events");
@@ -84,23 +76,23 @@ describe("resolveUsageMeter", () => {
   });
 
   describe("when free organization (isFree=true)", () => {
+    /** @scenario "Free TIERED organization counts each span toward the limit" */
     it("returns events for TIERED pricing model", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.TIERED,
         isFree: true,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.usageUnit).toBe("events");
     });
 
+    /** @scenario "Free SEAT_EVENT organization counts each span toward the limit" */
     it("returns events for SEAT_EVENT pricing model", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.SEAT_EVENT,
         isFree: true,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.usageUnit).toBe("events");
@@ -111,7 +103,6 @@ describe("resolveUsageMeter", () => {
         pricingModel: null,
         isFree: true,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.usageUnit).toBe("events");
@@ -123,49 +114,22 @@ describe("resolveUsageMeter", () => {
         licenseUsageUnit: "traces",
         isFree: true,
         hasValidLicenseOverride: true,
-        clickhouseAvailable: true,
       });
 
       expect(decision.usageUnit).toBe("traces");
     });
   });
 
-  describe("backend selection", () => {
-    it("prefers ClickHouse when available", () => {
-      const decision = resolveUsageMeter({
-        pricingModel: PricingModel.TIERED,
-        isFree: false,
-        hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
-      });
-
-      expect(decision.backend).toBe("clickhouse");
-    });
-
-    it("falls back to ElasticSearch when ClickHouse unavailable", () => {
-      const decision = resolveUsageMeter({
-        pricingModel: PricingModel.TIERED,
-        isFree: false,
-        hasValidLicenseOverride: false,
-        clickhouseAvailable: false,
-      });
-
-      expect(decision.backend).toBe("elasticsearch");
-    });
-  });
-
   describe("reason traceability", () => {
-    it("includes unit source and backend in reason", () => {
+    it("includes unit source in reason", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.TIERED,
         isFree: false,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.reason).toContain("unit=traces");
       expect(decision.reason).toContain("pricingModel(TIERED)");
-      expect(decision.reason).toContain("backend=clickhouse");
     });
 
     it("includes license source in reason when override active", () => {
@@ -174,7 +138,6 @@ describe("resolveUsageMeter", () => {
         licenseUsageUnit: "events",
         isFree: false,
         hasValidLicenseOverride: true,
-        clickhouseAvailable: true,
       });
 
       expect(decision.reason).toContain("license(events)");
@@ -185,7 +148,6 @@ describe("resolveUsageMeter", () => {
         pricingModel: PricingModel.TIERED,
         isFree: true,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.reason).toContain("from freeTier");
@@ -197,7 +159,6 @@ describe("resolveUsageMeter", () => {
         pricingModel: PricingModel.TIERED,
         isFree: false,
         hasValidLicenseOverride: false,
-        clickhouseAvailable: true,
       });
 
       expect(decision.reason).toContain("isFree=false");
@@ -212,7 +173,6 @@ describe("counting unit by organization profile", () => {
       pricingModel: PricingModel.TIERED,
       isFree: true,
       hasValidLicenseOverride: false,
-      clickhouseAvailable: true,
     });
 
     expect(decision.usageUnit).toBe("events");
@@ -224,7 +184,6 @@ describe("counting unit by organization profile", () => {
       pricingModel: PricingModel.SEAT_EVENT,
       isFree: true,
       hasValidLicenseOverride: false,
-      clickhouseAvailable: true,
     });
 
     expect(decision.usageUnit).toBe("events");
@@ -236,7 +195,6 @@ describe("counting unit by organization profile", () => {
       pricingModel: PricingModel.TIERED,
       isFree: false,
       hasValidLicenseOverride: false,
-      clickhouseAvailable: true,
     });
 
     expect(decision.usageUnit).toBe("traces");
@@ -248,7 +206,6 @@ describe("counting unit by organization profile", () => {
       pricingModel: PricingModel.SEAT_EVENT,
       isFree: false,
       hasValidLicenseOverride: false,
-      clickhouseAvailable: true,
     });
 
     expect(decision.usageUnit).toBe("events");
@@ -261,7 +218,6 @@ describe("counting unit by organization profile", () => {
       licenseUsageUnit: "traces",
       isFree: true,
       hasValidLicenseOverride: true,
-      clickhouseAvailable: true,
     });
 
     expect(decision.usageUnit).toBe("traces");

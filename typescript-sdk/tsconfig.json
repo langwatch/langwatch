@@ -34,6 +34,12 @@
         "./dist/**/*",
         "./examples/**/*",
         "./coverage/**/*",
-        "./__tests__/**/*"
+        "./__tests__/**/*",
+        // Bun-only build script (uses the `Bun` global + import attributes).
+        // It is compiled BY bun, never by tsc — and `pnpm build` runs
+        // `tsc --noEmit` over everything, so leaving it in would break the
+        // Node/tsup build for every contributor. Typechecked via `bun build`
+        // at the point of use instead.
+        "./scripts/build-cli-binary.ts"
     ]
 }

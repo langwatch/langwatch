@@ -3,26 +3,26 @@
  * This ensures consistency between the sidebar, quick access links, and recent items.
  */
 import {
+  Bird,
   BookText,
   Bot,
   CheckSquare,
   Drama,
-  Bird,
+  FlaskConical,
   FolderOpen,
   Home,
-  KeyRound,
   ListTree,
   type LucideIcon,
   Pencil,
   Percent,
   Play,
   PlayCircle,
-  Scan,
   Settings,
   Table,
   TrainFront,
   TrendingUp,
   Workflow,
+  Zap,
 } from "lucide-react";
 
 export type FeatureKey =
@@ -34,7 +34,8 @@ export type FeatureKey =
   | "scenarios"
   | "simulation_runs"
   | "suites"
-  | "evaluations"
+  | "experiments"
+  | "online_evaluations"
   | "workflows"
   | "prompts"
   | "datasets"
@@ -42,6 +43,7 @@ export type FeatureKey =
   | "settings"
   | "agents"
   | "evaluators"
+  | "automations"
   | "gateway";
 
 export type FeatureConfig = {
@@ -52,7 +54,7 @@ export type FeatureConfig = {
 
 /**
  * Central configuration for feature icons and colors.
- * Used by MainMenu, QuickAccessLinks, and RecentItemsSection.
+ * Used by MainMenu and RecentItemsSection.
  */
 export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   home: {
@@ -95,10 +97,15 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "pink.500",
     label: "Run Plans",
   },
-  evaluations: {
+  experiments: {
+    icon: FlaskConical,
+    color: "green.500",
+    label: "Experiments",
+  },
+  online_evaluations: {
     icon: CheckSquare,
     color: "green.500",
-    label: "Evaluations",
+    label: "Online Evaluations",
   },
   workflows: {
     icon: Workflow,
@@ -135,6 +142,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "green.500",
     label: "Evaluators",
   },
+  automations: {
+    icon: Zap,
+    color: "orange.500",
+    label: "Automations",
+  },
   gateway: {
     icon: TrainFront,
     color: "orange.500",
@@ -149,7 +161,7 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   prompt: "prompts",
   workflow: "workflows",
   dataset: "datasets",
-  evaluation: "evaluations",
+  evaluation: "online_evaluations",
   annotation: "annotations",
   simulation: "simulations",
 };

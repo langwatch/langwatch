@@ -8,13 +8,16 @@
  * Both were already Hono apps in App Router route.ts files.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { zValidator } from "@hono/zod-validator";
+import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import {
+  addEnvs,
+  LlmModelNotSetError,
+} from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import {
   type StudioClientEvent,
@@ -23,13 +26,12 @@ import {
 } from "~/optimization_studio/types/events";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 
@@ -39,9 +41,11 @@ const secured = createServiceApp({ basePath: "/api/workflows" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["workflows:manage"],
+      credential: "session",
+    }),
   )
   .post("/code-completion", async (c) => {
     const body = await c.req.json();
@@ -125,9 +129,11 @@ secured
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["workflows:manage"],
+      credential: "session",
+    }),
   )
   .post(
     "/post_event",
@@ -175,6 +181,14 @@ secured
         // so an expected, transient state doesn't page anyone.
         if (error instanceof DatasetNotReadyError) {
           return c.json({ error: error.message }, { status: 425 });
+        }
+        // A node reached dispatch without a model: fixable in the editor,
+        // not a server fault — 422 and no error capture.
+        if (error instanceof LlmModelNotSetError) {
+          return c.json(
+            { error: error.message, cause: error.cause },
+            { status: 422 },
+          );
         }
         logger.error({ error, projectId }, "error");
         captureException(toError(error), { extra: { projectId } });

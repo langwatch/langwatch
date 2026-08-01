@@ -1,6 +1,6 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,
@@ -46,7 +46,10 @@ function makeInsertRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function insertRow(ch: ClickHouseClient, row: ReturnType<typeof makeInsertRow>) {
+async function insertRow(
+  ch: ClickHouseClient,
+  row: ReturnType<typeof makeInsertRow>,
+) {
   await ch.insert({
     table: "simulation_runs",
     values: [row],
@@ -85,10 +88,13 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioRunId = `run-meta-${nanoid()}`;
         const metadata = { name: "My Scenario", custom_field: "value" };
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: scenarioRunId,
-          Metadata: JSON.stringify(metadata),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: scenarioRunId,
+            Metadata: JSON.stringify(metadata),
+          }),
+        );
 
         const result = await repo.getScenarioRunData({
           projectId: tenantId,
@@ -104,10 +110,13 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("returns null metadata", async () => {
         const scenarioRunId = `run-nometa-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: scenarioRunId,
-          Metadata: null,
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: scenarioRunId,
+            Metadata: null,
+          }),
+        );
 
         const result = await repo.getScenarioRunData({
           projectId: tenantId,
@@ -131,34 +140,104 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
-  describe("getScenarioRunDataByScenarioId()", () => {
-    describe("when rows have metadata", () => {
-      it("returns parsed metadata for each run", async () => {
-        const scenarioId = `scenario-byscid-${nanoid()}`;
-        const metadata1 = { env: "staging" };
-        const metadata2 = { env: "production" };
+  describe("findLastUpdatedAt()", () => {
+    describe("when runs exist with distinct UpdatedAt values", () => {
+      it("returns the max UpdatedAt, scoped to the set when requested", async () => {
+        const scenarioSetId = `set-freshness-${nanoid()}`;
+        const otherSetId = `set-freshness-other-${nanoid()}`;
+        const older = now - 60_000;
+        const newer = now - 1_000;
+        const newestElsewhere = now;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-byscid-1-${nanoid()}`,
-          ScenarioId: scenarioId,
-          Metadata: JSON.stringify(metadata1),
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-byscid-2-${nanoid()}`,
-          ScenarioId: scenarioId,
-          Metadata: JSON.stringify(metadata2),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: scenarioSetId,
+            UpdatedAt: new Date(older),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: scenarioSetId,
+            UpdatedAt: new Date(newer),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: otherSetId,
+            UpdatedAt: new Date(newestElsewhere),
+          }),
+        );
 
-        const result = await repo.getScenarioRunDataByScenarioId({
+        const scoped = await repo.findLastUpdatedAt({
           projectId: tenantId,
-          scenarioId,
+          scenarioSetId,
+          startDate: now - 86_400_000,
         });
+        expect(scoped).toBe(newer);
 
-        expect(result).not.toBeNull();
-        expect(result).toHaveLength(2);
-        const metadatas = result!.map((r) => r.metadata);
-        expect(metadatas).toContainEqual(metadata1);
-        expect(metadatas).toContainEqual(metadata2);
+        const unscoped = await repo.findLastUpdatedAt({
+          projectId: tenantId,
+          startDate: now - 86_400_000,
+        });
+        expect(unscoped).toBeGreaterThanOrEqual(newestElsewhere);
+      });
+    });
+
+    describe("when no rows match the window", () => {
+      it("returns 0", async () => {
+        const result = await repo.findLastUpdatedAt({
+          projectId: tenantId,
+          scenarioSetId: `set-freshness-empty-${nanoid()}`,
+          startDate: now - 86_400_000,
+        });
+        expect(result).toBe(0);
+      });
+    });
+  });
+
+  describe("getRunDataForScenarioSet() list projection", () => {
+    describe("when a run carries detail-only payloads", () => {
+      it("strips Reasoning, Error, and TraceIds from list rows while keeping criteria", async () => {
+        const scenarioSetId = `set-slim-${nanoid()}`;
+        const scenarioRunId = `run-slim-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: scenarioRunId,
+            ScenarioSetId: scenarioSetId,
+            Reasoning: "Multi-paragraph judge rationale",
+            Error: JSON.stringify({ message: "boom" }),
+            TraceIds: ["trace-heavy-1"],
+            MetCriteria: ["criterion-1"],
+            UnmetCriteria: ["criterion-2"],
+          }),
+        );
+
+        const listResult = await repo.getRunDataForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId,
+          limit: 10,
+        });
+        expect(listResult.runs).toHaveLength(1);
+        const listRun = listResult.runs[0]!;
+        expect(listRun.results?.reasoning).toBeUndefined();
+        expect(listRun.results?.error).toBeUndefined();
+        expect(listRun.messages.every((m) => !m.trace_id)).toBe(true);
+        expect(listRun.results?.metCriteria).toEqual(["criterion-1"]);
+        expect(listRun.results?.unmetCriteria).toEqual(["criterion-2"]);
+
+        const detailRun = await repo.getScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId,
+        });
+        expect(detailRun?.results?.reasoning).toBe(
+          "Multi-paragraph judge rationale",
+        );
+        expect(detailRun?.messages.some((m) => m.trace_id)).toBe(true);
       });
     });
   });
@@ -170,12 +249,15 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `set-forbatch-${nanoid()}`;
         const metadata = { model: "gpt-4", temperature: 0.7 };
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-forbatch-${nanoid()}`,
-          BatchRunId: batchRunId,
-          ScenarioSetId: scenarioSetId,
-          Metadata: JSON.stringify(metadata),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-forbatch-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: scenarioSetId,
+            Metadata: JSON.stringify(metadata),
+          }),
+        );
 
         const result = await repo.getRunDataForBatchRun({
           projectId: tenantId,
@@ -197,11 +279,14 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `set-allruns-${nanoid()}`;
         const metadata = { suite: "regression" };
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-allruns-${nanoid()}`,
-          ScenarioSetId: scenarioSetId,
-          Metadata: JSON.stringify(metadata),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-allruns-${nanoid()}`,
+            ScenarioSetId: scenarioSetId,
+            Metadata: JSON.stringify(metadata),
+          }),
+        );
 
         const result = await repo.getAllRunDataForScenarioSet({
           projectId: tenantId,
@@ -222,12 +307,15 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const batchRunId = `batch-paged-${nanoid()}`;
         const metadata = { page_test: true };
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-paged-${nanoid()}`,
-          BatchRunId: batchRunId,
-          ScenarioSetId: scenarioSetId,
-          Metadata: JSON.stringify(metadata),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-paged-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: scenarioSetId,
+            Metadata: JSON.stringify(metadata),
+          }),
+        );
 
         const result = await repo.getRunDataForScenarioSet({
           projectId: tenantId,
@@ -248,12 +336,15 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-allsuites-${nanoid()}`,
-          BatchRunId: batchRunId,
-          ScenarioSetId: scenarioSetId,
-          Metadata: JSON.stringify({ all_suites: true }),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-allsuites-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: scenarioSetId,
+            Metadata: JSON.stringify({ all_suites: true }),
+          }),
+        );
 
         const result = await repo.getRunDataForAllSuites({
           projectId: tenantId,
@@ -272,11 +363,14 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("normalizes the empty-string to 'default' in the scenarioSetIds map", async () => {
         const batchRunId = `batch-legacy-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-legacy-${nanoid()}`,
-          BatchRunId: batchRunId,
-          ScenarioSetId: "",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-legacy-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "",
+          }),
+        );
 
         const result = await repo.getRunDataForAllSuites({
           projectId: tenantId,
@@ -294,16 +388,22 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const batchEmpty = `batch-empty-${nanoid()}`;
         const batchDefault = `batch-default-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-empty-${nanoid()}`,
-          BatchRunId: batchEmpty,
-          ScenarioSetId: "",
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-default-${nanoid()}`,
-          BatchRunId: batchDefault,
-          ScenarioSetId: "default",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-empty-${nanoid()}`,
+            BatchRunId: batchEmpty,
+            ScenarioSetId: "",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-default-${nanoid()}`,
+            BatchRunId: batchDefault,
+            ScenarioSetId: "default",
+          }),
+        );
 
         const result = await repo.getRunDataForAllSuites({
           projectId: tenantId,
@@ -328,11 +428,14 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("does not throw 'Aggregate function ... found in WHERE' (regression for langwatch/langwatch#3265)", async () => {
         const batchRunId = `batch-regression-3265-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-regression-3265-${nanoid()}`,
-          BatchRunId: batchRunId,
-          ScenarioSetId: "",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-regression-3265-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "",
+          }),
+        );
 
         // The assertion that matters is that this call resolves without throwing.
         // Before the fix it threw a TRPCClientError wrapping the ClickHouse error.
@@ -357,48 +460,63 @@ describe("SimulationClickHouseRepository (integration)", () => {
       // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("aggregates pass/total across all batches", async () => {
         // Batch 1: 2 passed, 1 failed → 3 total
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ext-1a-${nanoid()}`,
-          BatchRunId: batch1,
-          ScenarioSetId: extSetId,
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 10000),
-          UpdatedAt: new Date(now - 10000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ext-1b-${nanoid()}`,
-          BatchRunId: batch1,
-          ScenarioSetId: extSetId,
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 9000),
-          UpdatedAt: new Date(now - 9000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ext-1c-${nanoid()}`,
-          BatchRunId: batch1,
-          ScenarioSetId: extSetId,
-          Status: "FAILED",
-          CreatedAt: new Date(now - 8000),
-          UpdatedAt: new Date(now - 8000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ext-1a-${nanoid()}`,
+            BatchRunId: batch1,
+            ScenarioSetId: extSetId,
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 10000),
+            UpdatedAt: new Date(now - 10000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ext-1b-${nanoid()}`,
+            BatchRunId: batch1,
+            ScenarioSetId: extSetId,
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 9000),
+            UpdatedAt: new Date(now - 9000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ext-1c-${nanoid()}`,
+            BatchRunId: batch1,
+            ScenarioSetId: extSetId,
+            Status: "FAILED",
+            CreatedAt: new Date(now - 8000),
+            UpdatedAt: new Date(now - 8000),
+          }),
+        );
 
         // Batch 2: 1 passed, 1 stalled → 2 total
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ext-2a-${nanoid()}`,
-          BatchRunId: batch2,
-          ScenarioSetId: extSetId,
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 3000),
-          UpdatedAt: new Date(now - 3000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ext-2b-${nanoid()}`,
-          BatchRunId: batch2,
-          ScenarioSetId: extSetId,
-          Status: "STALLED",
-          CreatedAt: new Date(now - 2000),
-          UpdatedAt: new Date(now - 2000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ext-2a-${nanoid()}`,
+            BatchRunId: batch2,
+            ScenarioSetId: extSetId,
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 3000),
+            UpdatedAt: new Date(now - 3000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ext-2b-${nanoid()}`,
+            BatchRunId: batch2,
+            ScenarioSetId: extSetId,
+            Status: "STALLED",
+            CreatedAt: new Date(now - 2000),
+            UpdatedAt: new Date(now - 2000),
+          }),
+        );
 
         const summaries = await repo.getExternalSetSummaries({
           projectId: tenantId,
@@ -418,18 +536,24 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const setId = `ext-allpass-${nanoid()}`;
         const batchId = `batch-allpass-${nanoid()}`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ap-1-${nanoid()}`,
-          BatchRunId: batchId,
-          ScenarioSetId: setId,
-          Status: "SUCCESS",
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-ap-2-${nanoid()}`,
-          BatchRunId: batchId,
-          ScenarioSetId: setId,
-          Status: "SUCCESS",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ap-1-${nanoid()}`,
+            BatchRunId: batchId,
+            ScenarioSetId: setId,
+            Status: "SUCCESS",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-ap-2-${nanoid()}`,
+            BatchRunId: batchId,
+            ScenarioSetId: setId,
+            Status: "SUCCESS",
+          }),
+        );
 
         const summaries = await repo.getExternalSetSummaries({
           projectId: tenantId,
@@ -451,32 +575,41 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
         // Old batch (40 days ago): 1 passed
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-old-${nanoid()}`,
-          BatchRunId: oldBatch,
-          ScenarioSetId: setId,
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
-          UpdatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-old-${nanoid()}`,
+            BatchRunId: oldBatch,
+            ScenarioSetId: setId,
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
+            UpdatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
+          }),
+        );
 
         // Recent batch (1 day ago): 1 passed, 1 failed
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-new-1-${nanoid()}`,
-          BatchRunId: recentBatch,
-          ScenarioSetId: setId,
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
-          UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-new-2-${nanoid()}`,
-          BatchRunId: recentBatch,
-          ScenarioSetId: setId,
-          Status: "FAILED",
-          CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
-          UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-new-1-${nanoid()}`,
+            BatchRunId: recentBatch,
+            ScenarioSetId: setId,
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+            UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-new-2-${nanoid()}`,
+            BatchRunId: recentBatch,
+            ScenarioSetId: setId,
+            Status: "FAILED",
+            CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+            UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+          }),
+        );
 
         // With 30-day filter: only the recent batch (2 runs, 1 passed)
         const filtered = await repo.getExternalSetSummaries({
@@ -493,7 +626,9 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const unfiltered = await repo.getExternalSetSummaries({
           projectId: tenantId,
         });
-        const unfilteredSummary = unfiltered.find((s) => s.scenarioSetId === setId);
+        const unfilteredSummary = unfiltered.find(
+          (s) => s.scenarioSetId === setId,
+        );
         expect(unfilteredSummary).toBeDefined();
         expect(unfilteredSummary!.totalCount).toBe(2);
         expect(unfilteredSummary!.passedCount).toBe(1);
@@ -504,18 +639,23 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("excludes them from external set summaries", async () => {
         const internalSetId = `__internal__suite-excl-${nanoid()}__suite`;
 
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-internal-${nanoid()}`,
-          BatchRunId: `batch-internal-${nanoid()}`,
-          ScenarioSetId: internalSetId,
-          Status: "SUCCESS",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-internal-${nanoid()}`,
+            BatchRunId: `batch-internal-${nanoid()}`,
+            ScenarioSetId: internalSetId,
+            Status: "SUCCESS",
+          }),
+        );
 
         const summaries = await repo.getExternalSetSummaries({
           projectId: tenantId,
         });
 
-        const internal = summaries.find((s) => s.scenarioSetId === internalSetId);
+        const internal = summaries.find(
+          (s) => s.scenarioSetId === internalSetId,
+        );
         expect(internal).toBeUndefined();
       });
     });
@@ -526,31 +666,39 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const batchNew = `batch-new-${nanoid()}`;
 
         // Legacy row: ScenarioSetId = ""
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-legacy-${nanoid()}`,
-          BatchRunId: batchLegacy,
-          ScenarioSetId: "",
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 5000),
-          UpdatedAt: new Date(now - 5000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-legacy-${nanoid()}`,
+            BatchRunId: batchLegacy,
+            ScenarioSetId: "",
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 5000),
+            UpdatedAt: new Date(now - 5000),
+          }),
+        );
 
         // New row: ScenarioSetId = "default"
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-newdefault-${nanoid()}`,
-          BatchRunId: batchNew,
-          ScenarioSetId: "default",
-          Status: "SUCCESS",
-          CreatedAt: new Date(now),
-          UpdatedAt: new Date(now),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-newdefault-${nanoid()}`,
+            BatchRunId: batchNew,
+            ScenarioSetId: "default",
+            Status: "SUCCESS",
+            CreatedAt: new Date(now),
+            UpdatedAt: new Date(now),
+          }),
+        );
 
         const summaries = await repo.getExternalSetSummaries({
           projectId: tenantId,
         });
 
         const legacyEntry = summaries.find((s) => s.scenarioSetId === "");
-        const defaultEntry = summaries.find((s) => s.scenarioSetId === "default");
+        const defaultEntry = summaries.find(
+          (s) => s.scenarioSetId === "default",
+        );
 
         expect(legacyEntry).toBeUndefined();
         expect(defaultEntry).toBeDefined();
@@ -565,24 +713,30 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const batchNew = `batch-sets-new-${nanoid()}`;
 
         // Legacy row: ScenarioSetId = ""
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-sets-legacy-${nanoid()}`,
-          BatchRunId: batchLegacy,
-          ScenarioSetId: "",
-          Status: "SUCCESS",
-          CreatedAt: new Date(now - 5000),
-          UpdatedAt: new Date(now - 5000),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-sets-legacy-${nanoid()}`,
+            BatchRunId: batchLegacy,
+            ScenarioSetId: "",
+            Status: "SUCCESS",
+            CreatedAt: new Date(now - 5000),
+            UpdatedAt: new Date(now - 5000),
+          }),
+        );
 
         // New row: ScenarioSetId = "default"
-        await insertRow(ch, makeInsertRow({
-          ScenarioRunId: `run-sets-newdefault-${nanoid()}`,
-          BatchRunId: batchNew,
-          ScenarioSetId: "default",
-          Status: "SUCCESS",
-          CreatedAt: new Date(now),
-          UpdatedAt: new Date(now),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-sets-newdefault-${nanoid()}`,
+            BatchRunId: batchNew,
+            ScenarioSetId: "default",
+            Status: "SUCCESS",
+            CreatedAt: new Date(now),
+            UpdatedAt: new Date(now),
+          }),
+        );
 
         const sets = await repo.getScenarioSetsData({ projectId: tenantId });
 
@@ -601,28 +755,37 @@ describe("SimulationClickHouseRepository (integration)", () => {
         const legacyTenantId = `test-distinct-${nanoid()}`;
 
         // Legacy row: ScenarioSetId = "" (written before coercion fix)
-        await insertRow(ch, makeInsertRow({
-          TenantId: legacyTenantId,
-          ScenarioRunId: `run-legacy-${nanoid()}`,
-          BatchRunId: `batch-legacy-${nanoid()}`,
-          ScenarioSetId: "",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: legacyTenantId,
+            ScenarioRunId: `run-legacy-${nanoid()}`,
+            BatchRunId: `batch-legacy-${nanoid()}`,
+            ScenarioSetId: "",
+          }),
+        );
 
         // New row: ScenarioSetId = "default"
-        await insertRow(ch, makeInsertRow({
-          TenantId: legacyTenantId,
-          ScenarioRunId: `run-new-${nanoid()}`,
-          BatchRunId: `batch-new-${nanoid()}`,
-          ScenarioSetId: "default",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: legacyTenantId,
+            ScenarioRunId: `run-new-${nanoid()}`,
+            BatchRunId: `batch-new-${nanoid()}`,
+            ScenarioSetId: "default",
+          }),
+        );
 
         // Custom set: must remain separate
-        await insertRow(ch, makeInsertRow({
-          TenantId: legacyTenantId,
-          ScenarioRunId: `run-custom-${nanoid()}`,
-          BatchRunId: `batch-custom-${nanoid()}`,
-          ScenarioSetId: "some-custom-set",
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: legacyTenantId,
+            ScenarioRunId: `run-custom-${nanoid()}`,
+            BatchRunId: `batch-custom-${nanoid()}`,
+            ScenarioSetId: "some-custom-set",
+          }),
+        );
 
         const result = await repo.getDistinctExternalSetIds({
           projectIds: [legacyTenantId],
@@ -643,43 +806,55 @@ describe("SimulationClickHouseRepository (integration)", () => {
         // set-revived: latest version un-archives the run -> set included.
         const revivedRun = `run-revived-${nanoid()}`;
         const revivedBatch = `batch-revived-${nanoid()}`;
-        await insertRow(ch, makeInsertRow({
-          TenantId: tenantId,
-          ScenarioRunId: revivedRun,
-          BatchRunId: revivedBatch,
-          ScenarioSetId: "set-revived",
-          ArchivedAt: new Date(Date.now() - 10_000),
-          UpdatedAt: new Date(Date.now() - 10_000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          TenantId: tenantId,
-          ScenarioRunId: revivedRun,
-          BatchRunId: revivedBatch,
-          ScenarioSetId: "set-revived",
-          ArchivedAt: null,
-          UpdatedAt: new Date(),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: tenantId,
+            ScenarioRunId: revivedRun,
+            BatchRunId: revivedBatch,
+            ScenarioSetId: "set-revived",
+            ArchivedAt: new Date(Date.now() - 10_000),
+            UpdatedAt: new Date(Date.now() - 10_000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: tenantId,
+            ScenarioRunId: revivedRun,
+            BatchRunId: revivedBatch,
+            ScenarioSetId: "set-revived",
+            ArchivedAt: null,
+            UpdatedAt: new Date(),
+          }),
+        );
 
         // set-archived: latest version archives the run -> set excluded, even
         // though an older non-archived version exists.
         const archivedRun = `run-archived-${nanoid()}`;
         const archivedBatch = `batch-archived-${nanoid()}`;
-        await insertRow(ch, makeInsertRow({
-          TenantId: tenantId,
-          ScenarioRunId: archivedRun,
-          BatchRunId: archivedBatch,
-          ScenarioSetId: "set-archived",
-          ArchivedAt: null,
-          UpdatedAt: new Date(Date.now() - 10_000),
-        }));
-        await insertRow(ch, makeInsertRow({
-          TenantId: tenantId,
-          ScenarioRunId: archivedRun,
-          BatchRunId: archivedBatch,
-          ScenarioSetId: "set-archived",
-          ArchivedAt: new Date(),
-          UpdatedAt: new Date(),
-        }));
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: tenantId,
+            ScenarioRunId: archivedRun,
+            BatchRunId: archivedBatch,
+            ScenarioSetId: "set-archived",
+            ArchivedAt: null,
+            UpdatedAt: new Date(Date.now() - 10_000),
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            TenantId: tenantId,
+            ScenarioRunId: archivedRun,
+            BatchRunId: archivedBatch,
+            ScenarioSetId: "set-archived",
+            ArchivedAt: new Date(),
+            UpdatedAt: new Date(),
+          }),
+        );
 
         const result = await repo.getDistinctExternalSetIds({
           projectIds: [tenantId],
@@ -936,6 +1111,111 @@ describe("SimulationClickHouseRepository (integration)", () => {
         for (const id of result.runIds) {
           expect(callerIds).toContain(id);
         }
+      });
+    });
+  });
+
+  describe("getBatchHistoryForScenarioSet()", () => {
+    describe("when a page spans batches from different weeks", () => {
+      it("returns every batch's items and bounds the heavy read to the page's StartedAt window", async () => {
+        const setId = `set-history-${nanoid()}`;
+        const eightWeeksMs = 8 * 7 * 24 * 60 * 60 * 1000;
+        const oldStartedAtMs = now - eightWeeksMs;
+        const oldDate = new Date(oldStartedAtMs);
+
+        // Older batch (a different weekly partition than the recent one).
+        const oldBatchRunId = `batch-old-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: oldBatchRunId,
+            StartedAt: oldDate,
+            CreatedAt: oldDate,
+            UpdatedAt: new Date(oldStartedAtMs + 1000),
+            FinishedAt: new Date(oldStartedAtMs + 1000),
+            "Messages.Id": ["msg-1", "msg-2"],
+            "Messages.Role": ["user", "assistant"],
+            "Messages.Content": ["old question", "old answer"],
+            "Messages.TraceId": ["trace-1", "trace-2"],
+            "Messages.Rest": ["{}", "{}"],
+          }),
+        );
+
+        // Recent batch (current weekly partition).
+        const recentBatchRunId = `batch-recent-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: recentBatchRunId,
+            "Messages.Id": ["msg-1", "msg-2"],
+            "Messages.Role": ["user", "assistant"],
+            "Messages.Content": ["new question", "new answer"],
+            "Messages.TraceId": ["trace-1", "trace-2"],
+            "Messages.Rest": ["{}", "{}"],
+          }),
+        );
+
+        // Capture the SQL the repository actually issues so we can assert the
+        // preview read is bounded (partition-pruned) rather than unconstrained.
+        const captured: {
+          query: string;
+          query_params?: Record<string, unknown>;
+        }[] = [];
+        const recordingClient = new Proxy(ch, {
+          get(target, prop, receiver) {
+            if (prop === "query") {
+              return (args: {
+                query: string;
+                query_params?: Record<string, unknown>;
+              }) => {
+                captured.push({
+                  query: args.query,
+                  query_params: args.query_params,
+                });
+                return (target.query as typeof target.query).call(target, args);
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        const recordingResilient = createResilientClickHouseClient({
+          client: recordingClient,
+        });
+        const recordingRepo = new SimulationClickHouseRepository(
+          async () => recordingResilient,
+        );
+
+        const result = await recordingRepo.getBatchHistoryForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId: setId,
+          limit: 10,
+        });
+
+        // Both batches (across both weeks) come back with their preview items.
+        const byId = new Map(result.batches.map((b) => [b.batchRunId, b]));
+        expect(byId.has(oldBatchRunId)).toBe(true);
+        expect(byId.has(recentBatchRunId)).toBe(true);
+        expect(byId.get(oldBatchRunId)!.items).toHaveLength(1);
+        expect(byId.get(recentBatchRunId)!.items).toHaveLength(1);
+        expect(
+          byId
+            .get(oldBatchRunId)!
+            .items[0]!.messagePreview.map((m) => m.content),
+        ).toEqual(["old question", "old answer"]);
+
+        // The heavy preview read carries an exact StartedAt envelope that spans
+        // both weeks (min = the old batch), so the older batch is not dropped.
+        const previewQuery = captured.find((c) =>
+          c.query.includes("MessagePreviewRoles"),
+        );
+        expect(previewQuery).toBeDefined();
+        expect(previewQuery!.query).toContain("StartedAt >=");
+        expect(previewQuery!.query).toContain("StartedAt <=");
+        expect(previewQuery!.query_params?.minStartedAtMs).toBe(
+          String(oldStartedAtMs),
+        );
       });
     });
   });

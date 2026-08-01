@@ -20,9 +20,15 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: () => "Test Target",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (_target: { id: string }) => "Test Target";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
@@ -476,9 +482,7 @@ describe("Validation edge cases", () => {
       mappings: {},
       localPromptConfig: {
         llm: { model: "gpt-4" },
-        messages: [
-          { role: "user", content: "Classify {{product_name}}" },
-        ],
+        messages: [{ role: "user", content: "Classify {{product_name}}" }],
         inputs: [{ identifier: "product_name", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
       },
@@ -529,9 +533,9 @@ describe("Validation edge cases", () => {
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // "input" is declared but never referenced -> not flagged at all.
-    expect(
-      result.missingMappings.some((m) => m.fieldId === "input"),
-    ).toBe(false);
+    expect(result.missingMappings.some((m) => m.fieldId === "input")).toBe(
+      false,
+    );
     // "product_name" IS referenced + declared + unmapped -> required.
     expect(
       result.missingMappings.find((m) => m.fieldId === "product_name")

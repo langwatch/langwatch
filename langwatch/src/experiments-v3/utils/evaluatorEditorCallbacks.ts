@@ -9,7 +9,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { LocalEvaluatorConfig, PairwiseEvaluatorConfig } from "../types";
+import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "../types";
 
 /**
  * Parameters to create evaluator editor callbacks.
@@ -32,9 +32,7 @@ import type { LocalEvaluatorConfig, PairwiseEvaluatorConfig } from "../types";
  */
 export type CreateEvaluatorEditorCallbacksParams = {
   /** Direct local-config sink (use this when no target id is available). */
-  onLocalConfigChange?: (
-    localConfig: LocalEvaluatorConfig | undefined,
-  ) => void;
+  onLocalConfigChange?: (localConfig: LocalEvaluatorConfig | undefined) => void;
   /** Target-bound convenience: requires `updateTarget` to also be provided. */
   targetId?: string;
   /** Target-bound convenience: requires `targetId` to also be provided. */
@@ -49,13 +47,12 @@ export type CreateEvaluatorEditorCallbacksParams = {
     mapping: UIFieldMapping | undefined,
   ) => void;
   /**
-   * Pairwise evaluator config sink (#5100). When present, the drawer
-   * renders PairwiseConfigForm instead of the generic per-row field
-   * mappings — pairwise evaluators don't have per-row sources for
-   * candidate_a_* / candidate_b_*, those come from two OTHER target
-   * outputs that the user picks via this form.
+   * Comparison evaluator config sink. When present, the drawer renders
+   * ComparisonConfigForm instead of the generic per-row field mappings — a
+   * comparison has no per-row source for `candidates`, they come from the
+   * OTHER target columns the user picks in this form.
    */
-  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+  onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -68,14 +65,12 @@ export type CreateEvaluatorEditorCallbacksParams = {
  * All fields are optional so callers only pay for what they use.
  */
 export type EvaluatorEditorCallbacksForTarget = {
-  onLocalConfigChange?: (
-    localConfig: LocalEvaluatorConfig | undefined,
-  ) => void;
+  onLocalConfigChange?: (localConfig: LocalEvaluatorConfig | undefined) => void;
   onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
-  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+  onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -120,7 +115,7 @@ export const createEvaluatorEditorCallbacks = ({
   targetId,
   updateTarget,
   onMappingChange,
-  onPairwiseChange,
+  onComparisonChange,
   onSave,
 }: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => {
   const callbacks: EvaluatorEditorCallbacksForTarget = {};
@@ -132,7 +127,7 @@ export const createEvaluatorEditorCallbacks = ({
     };
   }
   if (onMappingChange) callbacks.onMappingChange = onMappingChange;
-  if (onPairwiseChange) callbacks.onPairwiseChange = onPairwiseChange;
+  if (onComparisonChange) callbacks.onComparisonChange = onComparisonChange;
   if (onSave) callbacks.onSave = onSave;
   return callbacks;
 };

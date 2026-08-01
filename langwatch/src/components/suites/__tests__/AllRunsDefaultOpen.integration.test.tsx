@@ -6,9 +6,21 @@
  * @see specs/features/suites/all-runs-default-open.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
 
 vi.mock("~/hooks/useSSESubscription", () => ({
   useSSESubscription: () => ({
@@ -29,7 +41,10 @@ let capturedArchiveOnSuccess: (() => void) | undefined;
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() }, getSummaries: { invalidate: vi.fn() } },
+      suites: {
+        getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: vi.fn() },
+      },
     }),
     suites: {
       getAll: {
@@ -81,7 +96,12 @@ vi.mock("~/utils/api", () => ({
       },
       getSuiteRunData: {
         useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          data: {
+            runs: [],
+            scenarioSetIds: {},
+            hasMore: false,
+            nextCursor: undefined,
+          },
           isLoading: false,
           error: null,
         }),
@@ -116,7 +136,9 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
-let mockRouterQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
+let mockRouterQuery: Record<string, string | string[] | undefined> = {
+  project: "my-project",
+};
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
@@ -166,8 +188,6 @@ describe("All Runs default selection (Issue #1771)", () => {
 
   describe("when the page loads with no suite param in URL", () => {
     /** @scenario "All Runs is selected when page loads" */
-    /** @scenario "Run rows are expanded by default" */
-    /** @scenario "All runs panel rows are expanded by default" */
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
@@ -178,7 +198,9 @@ describe("All Runs default selection (Issue #1771)", () => {
       render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
-      expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("suite-detail-panel"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId("suite-empty-state")).not.toBeInTheDocument();
     });
   });
@@ -187,7 +209,10 @@ describe("All Runs default selection (Issue #1771)", () => {
     /** @scenario "All Runs is selected after deleting the current suite" */
     it("navigates to all-runs after archiving", async () => {
       // Start with a suite selected in the URL (catch-all path)
-      mockRouterQuery = { project: "my-project", path: ["run-plans", "my-suite"] };
+      mockRouterQuery = {
+        project: "my-project",
+        path: ["run-plans", "my-suite"],
+      };
 
       const { default: SimulationsPage } = await import(
         "~/components/suites/SimulationsPage"
@@ -215,7 +240,10 @@ describe("All Runs default selection (Issue #1771)", () => {
 
       // Archiving the currently selected suite navigates to all-runs
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project" } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations",
         { shallow: true },
       );

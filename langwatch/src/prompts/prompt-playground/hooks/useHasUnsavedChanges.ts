@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { api } from "~/utils/api";
-import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
+import { useTabById } from "../prompt-playground-store/useTabById";
 
 /**
  * Determines whether the prompt in the specified tab has unsaved changes.
@@ -18,15 +18,19 @@ import { useDraggableTabsBrowserStore } from "../prompt-playground-store/Draggab
  */
 export function useHasUnsavedChanges(tabId: string): boolean {
   const { project } = useOrganizationTeamProject();
-  const tab = useDraggableTabsBrowserStore((state) =>
-    state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
-  );
+  const tab = useTabById(tabId);
 
   // Cascade-resolved model for new-prompt defaults used when computing
   // baseline form values to compare against.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
+    {
+      enabled: !!project?.id,
+      // Project-level config; changes rarely. Don't re-fetch on every window
+      // focus — this hook runs in every open tab's always-mounted label.
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
   );
   const resolvedDefaultModel = resolvedDefault.data?.model;
 
@@ -46,6 +50,11 @@ export function useHasUnsavedChanges(tabId: string): boolean {
       },
       {
         enabled: !!configId && !!project?.id,
+        // This runs in every open tab's always-mounted label. The saved
+        // version is stable within a session (a save invalidates this key),
+        // so don't re-fetch it for every tab on each window focus.
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
       },
     );
 

@@ -1,4 +1,4 @@
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 
 /**
  * Permissive protections that allow all content categories to be visible, so the

@@ -27,7 +27,7 @@ groups:
         annotations:
           summary: "Gateway 5xx rate > 5% over 5m"
           description: |
-            End-user requests to the gateway are returning 5xx at {{ printf "%.1f" (mulScalar $value 100) }}%.
+            End-user requests to the gateway are returning 5xx at {{ $value | humanizePercentage }}.
             Check /readyz on pods, then upstream provider status.
 
       - alert: GatewayReadinessFlapping
@@ -46,7 +46,7 @@ groups:
       # ─── Provider health ─────────────────────────────────────────────────
 
       - alert: CircuitOpenTooLong
-        expr: gateway_circuit_state == 2
+        expr: gateway_circuit_state == 1
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
@@ -58,7 +58,7 @@ groups:
 
       - alert: ExcessiveFallback
         expr: |
-          sum(rate(gateway_provider_attempts_total{outcome="fallback"}[10m]))
+          sum(rate(gateway_provider_attempts_total{outcome="fallback_success"}[10m]))
             / sum(rate(gateway_provider_attempts_total[10m])) > 0.1
         for: 10m
         labels: { severity: warn, team: ai-platform }
@@ -79,75 +79,29 @@ groups:
         annotations:
           summary: "Streaming requests without usage reported"
           description: |
-            Streaming request completing without token counts means $0 is
-            being debited to the budget — budgets are silently bypassed.
-            OpenAI requires stream_options.include_usage=true on the client.
+            A streaming request completing without token counts records $0 of
+            cost on the span, so the ledger never accumulates it and budgets
+            are silently bypassed. OpenAI requires stream_options.include_usage
+            =true on the client.
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
-      - alert: BudgetDebitOutboxBacklog
-        expr: gateway_budget_debit_outbox_depth > 1000
-        for: 5m
-        labels: { severity: page, team: ai-platform }
-        annotations:
-          summary: "Budget debit outbox depth > 1000 for 5m"
-          description: |
-            Gateway can't reach the control plane /budget/debit endpoint fast
-            enough. Customer budgets are NOT being debited in real-time;
-            near-limit customers may be over-consuming. Check control-plane
-            health + gateway_budget_debit_outbox_dropped_total rate.
-
-      # --- Iter 21 outbox leading-indicator rules
-      # Fill-pct (depth/capacity) leads the absolute-depth rule above and
-      # catches pods with different capacities consistently.
-      - alert: BudgetOutboxFillPctHigh
+      # The gateway does not debit budgets. Cost rides the OTel span and the
+      # control plane's trace-fold reactor writes the ClickHouse ledger, so
+      # there is no gateway-side queue to alert on. The signal that
+      # enforcement is actually firing is the block counter below.
+      - alert: BudgetBlockSpike
         expr: |
-          max by (pod) (gateway_budget_debit_outbox_depth)
-            / max by (pod) (gateway_budget_debit_outbox_capacity) > 0.5
-        for: 5m
+          sum by (scope) (rate(gateway_budget_blocks_total[10m])) > 1
+        for: 10m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "Outbox fill-pct > 50% on {{ $labels.pod }} for 5m"
+          summary: "Budget scope {{ $labels.scope }} is blocking > 1 req/s over 10m"
           description: |
-            Approaching capacity. See production runbook Recipe 6, normal
-            bursts self-heal; sustained climb is usually flush failure.
-
-      # Flush-failure rate leads depth climb, catches slow/unreachable
-      # control plane BEFORE events back up enough to alert on depth.
-      - alert: BudgetOutboxFlushFailures
-        expr: rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0
-        for: 5m
-        labels: { severity: warn, team: ai-platform }
-        annotations:
-          summary: "Outbox flush failures for 5m on {{ $labels.pod }}"
-          description: |
-            Control plane is slow/unreachable; debits are re-enqueued and
-            safe, but latency to reconcile is growing. Investigate control-
-            plane /budget/debit latency before this turns into a depth alert.
-
-      # 4xx drops = silent data loss. Any non-zero rate is immediately
-      # actionable (signing drift / payload drift / control-plane bug).
-      - alert: BudgetOutbox4xxDrops
-        expr: increase(gateway_budget_debit_outbox_4xx_drops_total[15m]) > 0
-        labels: { severity: page, team: ai-platform }
-        annotations:
-          summary: "Outbox debits are being terminally dropped with 4xx"
-          description: |
-            Silent data loss. Debits are being permanently rejected by the
-            control plane. Most common: LW_GATEWAY_INTERNAL_SECRET drift
-            after rotation. See production runbook Recipe 6.
-
-      - alert: BudgetCheckLiveFailRate
-        expr: |
-          sum(rate(gateway_budget_check_live_total{outcome="transport_error"}[5m]))
-            / sum(rate(gateway_budget_check_live_total[5m])) > 0.2
-        for: 5m
-        labels: { severity: warn, team: ai-platform }
-        annotations:
-          summary: "Live /budget/check failing open > 20%"
-          description: |
-            Live reconciliation for near-limit scopes is timing out or erroring
-            and falling back to the cached snapshot. Near-limit customers may
-            briefly over-consume. Check control-plane /budget/check latency.
+            A hard-cap scope is rejecting sustained traffic. Either the limit
+            needs raising or a caller is looping. Precheck is local against the
+            cached bundle snapshot, so a scope that should be blocking but is
+            not means the bundle has not refreshed; check
+            gateway_control_plane_requests_total{endpoint="changes"}.
 
       # ─── Auth cache ──────────────────────────────────────────────────────
 
@@ -167,11 +121,10 @@ groups:
 
       # ─── Cost & anomaly ──────────────────────────────────────────────────
 
-      # Note: per-request cost anomaly detection requires a cost metric
-      # (e.g. gateway_cost_usd_total) that isn't in the current collector set.
-      # It's easier to derive cost anomalies from the GatewayBudgetLedger
-      # table in the control-plane warehouse rather than Prometheus, since
-      # cost attribution happens on the control-plane side after debit.
+      # Note: the registry carries no per-request cost metric, by design.
+      # Cost anomalies are easier to derive from the ledger table in the
+      # control-plane warehouse than from Prometheus, since cost attribution
+      # happens control-plane side when the trace-fold reactor folds the span.
       # See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────
@@ -184,7 +137,7 @@ groups:
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "> 10 req/s blocked by policy reason={{ $labels.reason }}"
+          summary: "> 10 req/s blocked by policy on direction={{ $labels.direction }}"
           description: |
             Legit block storm (a customer's runtime is trying a banned tool
             repeatedly) or a regression in the policy_rules config.
@@ -197,7 +150,7 @@ groups:
 The temptation with Prometheus rules is to alert on everything. Don't. Each rule above either:
 
 - **Represents real impact** (5xx rate, circuit open, usage missing), customers or budgets are actively affected.
-- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, outbox stale), things get worse soon if ignored.
+- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, stale bundle), things get worse soon if ignored.
 - **Is a cost guardrail** (streaming usage missing, cost anomaly), silent over-spend is a real failure mode for AI infra.
 
 Rules we explicitly **do NOT** have:
@@ -248,17 +201,54 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  # 5xx rate: every request errors, so the ratio pins at 1.0
   - interval: 1m
     input_series:
-      - series: 'gateway_http_requests_total{status="500"}'
-        values: '0 1 2 3 4 5 6 7 8 9 10'
-      - series: 'gateway_http_requests_total{status="200"}'
-        values: '0 0 0 0 0 0 0 0 0 0 0'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-4o"}'
+        values: '0+1x15'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-4o"}'
+        values: '0+0x15'
     alert_rule_test:
       - eval_time: 10m
         alertname: GatewayHighErrorRate
         exp_alerts:
           - exp_labels: { severity: page, team: ai-platform }
+
+  # gateway_circuit_state encodes the state in the value: 0 closed, 1 open,
+  # 2 half-open. Only value 1 means "open and short-circuiting".
+  - interval: 1m
+    input_series:
+      - series: 'gateway_circuit_state{credential_id="cred_openai_primary"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CircuitOpenTooLong
+        exp_alerts:
+          - exp_labels: { credential_id: cred_openai_primary, severity: page, team: ai-platform }
+
+  # Half the attempts land on a fallback slot, well past the 10% threshold.
+  - interval: 1m
+    input_series:
+      - series: 'gateway_provider_attempts_total{credential_id="cred_openai_primary", outcome="success"}'
+        values: '0+1x30'
+      - series: 'gateway_provider_attempts_total{credential_id="cred_anthropic_backup", outcome="fallback_success"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ExcessiveFallback
+        exp_alerts:
+          - exp_labels: { severity: warn, team: ai-platform }
+
+  # Budget precheck rejecting sustained traffic on one scope.
+  - interval: 1m
+    input_series:
+      - series: 'gateway_budget_blocks_total{scope="project:proj_acme"}'
+        values: '0+120x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: BudgetBlockSpike
+        exp_alerts:
+          - exp_labels: { scope: "project:proj_acme", severity: warn, team: ai-platform }
 ```
 
 ## Grafana dashboard
@@ -270,4 +260,4 @@ A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitorin
 - [Troubleshooting](/ai-gateway/troubleshooting): paged-at-3am runbook for each symptom.
 - [Observability](/ai-gateway/observability): span attributes + metric names surface.
 - [Streaming](/ai-gateway/streaming): the include_usage gotcha these alerts catch.
-- [Budgets](/ai-gateway/budgets): why budget_debit_outbox_age matters.
+- [Budgets](/ai-gateway/budgets): how spend reaches the ledger and what the precheck can see.

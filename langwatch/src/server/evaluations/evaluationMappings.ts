@@ -22,6 +22,20 @@ export const DEFAULT_MAPPINGS: MappingState = {
   expansions: [],
 };
 
+/**
+ * Whether any mapping entry reads the `evaluations` source. Callers use this
+ * to gate the prior-evaluations enrichment fetch (a heavy Inputs-projection
+ * ClickHouse read) on the mappings actually needing it. Legacy (pre-migration)
+ * mappings can never reference `evaluations`, so their shape safely returns
+ * false here.
+ */
+export const mappingsReadEvaluationsSource = (
+  mappings: MappingState | null,
+): boolean =>
+  Object.values(mappings?.mapping ?? {}).some(
+    (config) => "source" in config && config.source === "evaluations",
+  );
+
 export const migrateLegacyMappings = (
   mappings: Record<string, string>,
 ): MappingState => {

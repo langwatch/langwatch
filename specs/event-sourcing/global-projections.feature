@@ -1,7 +1,7 @@
 Feature: Global Projections and Reactors
 
   Global projections and reactors subscribe to events from all pipelines. They are used for
-  cross-pipeline metrics like billable event counts and SDK usage tracking.
+  cross-pipeline metrics like billable event counts.
 
   Scenario: Dispatched from any pipeline
     Given a global projection or reaction "projectDailyBillableEvents"

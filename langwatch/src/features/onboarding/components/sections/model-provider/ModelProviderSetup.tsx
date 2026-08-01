@@ -7,11 +7,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import type { ScopeAssignment } from "~/server/scopes/scope.types";
+import { CodexSignIn } from "../../../../../components/settings/CodexSignIn";
 import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { Switch } from "../../../../../components/ui/switch";
+import { useCredentialProbeGate } from "../../../../../hooks/useCredentialProbeGate";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
@@ -22,8 +26,6 @@ import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
-import { api } from "../../../../../utils/api";
-import { createLogger } from "../../../../../utils/logger";
 import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
@@ -36,7 +38,10 @@ import {
   getModelProvider,
   modelProviderRegistry,
 } from "../../../regions/model-providers/registry";
-import type { ModelProviderKey } from "../../../regions/model-providers/types";
+import type {
+  ModelProviderKey,
+  ModelProviderSurface,
+} from "../../../regions/model-providers/types";
 import { DocsLinks } from "../observability/DocsLinks";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
@@ -57,7 +62,7 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
-  variant: "evaluations" | "prompts" | "langy";
+  variant: ModelProviderSurface;
   /**
    * When provided, called after a successful save instead of the default
    * redirect. Lets the screen be embedded in a surface that stays put (e.g.
@@ -66,13 +71,11 @@ interface ModelProviderSetupProps {
   onComplete?: () => void;
 }
 
-const variantToDocsMapping: Record<
-  "evaluations" | "prompts" | "langy",
-  string
-> = {
+const variantToDocsMapping: Record<ModelProviderSurface, string> = {
   evaluations: "/llm-evaluation/overview",
   prompts: "/prompt-management/overview",
   langy: "/introduction",
+  onboarding: "/introduction",
 };
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
@@ -123,7 +126,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
     return fallbackProviderMeta ?? requestedMeta;
   }, [fallbackProviderMeta, modelProviderKey]);
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } =
+    useOrganizationTeamProject();
   const projectId = project?.id;
 
   const backendModelProviderKey = useMemo(() => {
@@ -168,6 +172,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
+    // A NEW provider saves at the widest scope the caller can manage, org
+    // for admins, else team, else project, the same default the settings
+    // form uses (the hook decides; an existing row keeps its stored scope).
+    // The embedded screens make that decision silently instead of showing a
+    // scope picker.
+    teamId: team?.id,
+    organizationId: organization?.id,
+    canManageOrganization: hasPermission("organization:manage"),
+    canManageTeam: hasPermission("team:manage"),
     enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {
@@ -176,7 +189,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
         return;
       }
       if (variant === "evaluations") {
-        window.location.href = "/@project/evaluations";
+        window.location.href = "/@project/online-evaluations";
       } else if (variant === "prompts") {
         window.location.href = "/@project/prompts";
       } else {
@@ -191,9 +204,11 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     [backendModelProviderKey],
   );
 
-  const { fields: derivedFields } = useModelProviderFields(
-    backendModelProviderKey,
-  );
+  const { fields: derivedFields } = useModelProviderFields({
+    providerKey: backendModelProviderKey,
+    values: state.customKeys,
+    useApiGateway: state.useApiGateway,
+  });
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -208,7 +223,18 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     backendModelProviderKey,
     state.customKeys,
     projectId,
+    organization?.id,
+    state.scopes,
   );
+
+  // The same gate the settings drawer uses. Without it this surface — which
+  // includes the "Langy needs a model to get started" step, where there is no
+  // skip — turns a refusal into a dead end.
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
+    useCredentialProbeGate({
+      customKeys: state.customKeys,
+      resetKey: modelProviderKey,
+    });
 
   useEffect(() => {
     setOpenAiValidationError(void 0);
@@ -326,19 +352,29 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
         );
     };
 
-    // ALWAYS validate API key on save
-    if (userEnteredNewApiKey) {
-      // User entered new API key - validate it (against custom or default URL)
-      const isValid = await validateApiKey();
-      if (!isValid) return;
-    } else if (customBaseUrl) {
-      // Stored/env key + custom URL - validate against custom URL
-      const isValid = await validateWithCustomUrl(customBaseUrl);
-      if (!isValid) return;
-    } else {
-      // Stored/env key + default URL - validate against default URL
-      const isValid = await validateWithCustomUrl();
-      if (!isValid) return;
+    // Probe only what the customer actually changed. Checking the stored
+    // credentials on every save makes unrelated edits — picking a model,
+    // renaming — depend on third-party uptime, and blocks them behind a key
+    // that has drifted out-of-band (rotated in the provider's console, hit a
+    // temporary 401). The settings drawer already worked this way.
+    //
+    // The gate on top of that: once the provider has refused these exact
+    // credentials, the next save goes through unprobed. This is the step the
+    // customer cannot skip past — the Langy gate has no "Skip for now" — so a
+    // probe that is wrong about a working key stranded them here entirely.
+    const credentialsChanged = userEnteredNewApiKey || hasNonApiKeyChanges;
+
+    if (credentialsChanged && probeRequired) {
+      const isValid = userEnteredNewApiKey
+        ? await validateApiKey()
+        : // A stored or env key against a base URL they just changed.
+          await validateWithCustomUrl(customBaseUrl);
+
+      if (!isValid) {
+        recordRefusal();
+        return;
+      }
+      clearRefusal();
     }
 
     submitForm();
@@ -353,6 +389,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     isUsingEnvVars,
     validateApiKey,
     validateWithCustomUrl,
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;
@@ -361,6 +400,33 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     return (
       <VStack align="stretch" gap={3}>
         <Spinner />
+      </VStack>
+    );
+  }
+
+  // OAuth-device providers (Codex) have no key fields: the sign-in flow IS
+  // the whole setup, and its completion writes the provider row (and, from
+  // these embedded surfaces, the coding-assistant defaults) server-side at
+  // the widest scope the caller can manage — the same silent decision the
+  // key-based path makes through useModelProviderForm.
+  if (meta.authFlow === "oauth-device") {
+    const codexScope: ScopeAssignment =
+      hasPermission("organization:manage") && organization?.id
+        ? { scopeType: "ORGANIZATION", scopeId: organization.id }
+        : hasPermission("team:manage") && team?.id
+          ? { scopeType: "TEAM", scopeId: team.id }
+          : { scopeType: "PROJECT", scopeId: projectId ?? "" };
+    return (
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="md" fontWeight="semibold">
+          Connect {meta.label}
+        </Text>
+        <CodexSignIn
+          projectId={projectId ?? ""}
+          scopes={[codexScope]}
+          setAsCodingDefaults
+          onConnected={() => onComplete?.()}
+        />
       </VStack>
     );
   }
@@ -382,8 +448,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             <Field.Root>
               <Switch
                 checked={state.useApiGateway}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  actions.setUseApiGateway(e.target.checked)
+                onCheckedChange={({ checked }) =>
+                  actions.setUseApiGateway(checked)
                 }
               >
                 Use API Gateway
@@ -487,14 +553,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           />
 
           <HStack justify="end">
+            {/* Same button as every settings drawer's Save (solid orange),
+                the surface variant read as an unrelated control here. */}
             <Button
               colorPalette="orange"
               onClick={handleSaveAndContinue}
               loading={state.isSaving || isValidatingApiKey}
-              variant="surface"
               size="sm"
             >
-              Save
+              {saveLabel}
             </Button>
           </HStack>
         </>

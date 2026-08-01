@@ -58,7 +58,10 @@ describe("FoldProjectionExecutor.execute", () => {
         ...context,
         occurredAtMs: 1000000,
       });
-      expect(store.store).toHaveBeenCalledWith({ count: 1 }, context);
+      expect(store.store).toHaveBeenCalledWith(
+        { count: 1 },
+        expect.objectContaining({ aggregateId: context.aggregateId }),
+      );
     });
   });
 
@@ -89,7 +92,10 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 6 });
-      expect(store.store).toHaveBeenCalledWith({ count: 6 }, context);
+      expect(store.store).toHaveBeenCalledWith(
+        { count: 6 },
+        expect.objectContaining({ aggregateId: context.aggregateId }),
+      );
     });
   });
 
@@ -121,7 +127,10 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 3 });
-      expect(store.store).toHaveBeenCalledWith({ count: 3 }, context);
+      expect(store.store).toHaveBeenCalledWith(
+        { count: 3 },
+        expect.objectContaining({ aggregateId: context.aggregateId }),
+      );
     });
   });
 

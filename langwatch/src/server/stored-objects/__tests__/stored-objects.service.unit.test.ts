@@ -38,7 +38,7 @@ vi.mock("~/server/metrics", () => ({
   storedObjectReadFailureCounter: { inc: vi.fn() },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -590,6 +590,47 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
       // The row's storage_uri is the authoritative read address (BYOC
       // invariant) — it must match what we just wrote to.
       const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+      expect(insertedRow.storage_uri).toBe(putUri);
+    });
+  });
+
+  describe("given STORED_OBJECTS_BACKEND=azure is configured with a complete Azure config", () => {
+    /**
+     * Covers the defaultMintStorageUri HALF of this scenario. The groupQueue
+     * blob store half is bound separately in tieredBlobStore.unit.test.ts —
+     * together they satisfy it; neither test covers both on its own.
+     */
+    /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
+    it("writes the object to an azure-blob address and persists that same address", async () => {
+      vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce(null);
+      const env = mockedEnv as Record<string, string | undefined>;
+      env.STORED_OBJECTS_BACKEND = "azure";
+      env.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+      env.AZURE_BLOB_ACCOUNT_KEY = "key-value";
+      env.AZURE_BLOB_CONTAINER = "lw-container";
+
+      try {
+        await service.storeFromBytes(STORE_PARAMS);
+      } finally {
+        env.STORED_OBJECTS_BACKEND = undefined;
+        env.AZURE_BLOB_ACCOUNT_NAME = undefined;
+        env.AZURE_BLOB_ACCOUNT_KEY = undefined;
+        env.AZURE_BLOB_CONTAINER = undefined;
+      }
+
+      const putUri = vi.mocked(registry.put).mock.calls[0]![0];
+      const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+
+      // Digest computed independently from the input bytes, not read off the
+      // row under test — otherwise a wrong sha256 would move both sides of
+      // the comparison together and the assertion would still pass.
+      const expectedSha256 = createHash("sha256")
+        .update(TEST_BYTES)
+        .digest("hex");
+      expect(insertedRow.sha256).toBe(expectedSha256);
+      expect(putUri).toBe(
+        `azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`,
+      );
       expect(insertedRow.storage_uri).toBe(putUri);
     });
   });

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { NewTracesPromo } from "./messages/NewTracesPromo";
+import { LegacyTracesDeprecationBanner } from "./messages/LegacyTracesDeprecationBanner";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -32,7 +32,8 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         commentState.resetComment();
       }}
     >
-      <Drawer.Content bg="bg"
+      <Drawer.Content
+        bg="bg"
         paddingX={0}
         maxWidth={traceView === "full" ? undefined : "70%"}
       >
@@ -42,7 +43,10 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           overflowY="auto"
           id="conversation-scroll-container"
         >
-          <NewTracesPromo variant="compact" traceId={props.traceId} />
+          <LegacyTracesDeprecationBanner
+            variant="compact"
+            traceId={props.traceId}
+          />
           <TraceDetails
             traceId={props.traceId}
             selectedTab={props.selectedTab}

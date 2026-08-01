@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getOriginColor, getOriginLabel, originColors } from "../originColors";
+import { getOriginColor, getOriginLabel } from "../originColors";
 
 describe("originColors", () => {
   describe("getOriginColor", () => {
+    /** @scenario "Origin colors follow the centralized originColors mapping" */
     it("returns blue for application origin", () => {
       const result = getOriginColor("application");
       expect(result).toEqual({

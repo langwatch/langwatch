@@ -27,15 +27,15 @@
  * against a secondary demo org already in the allowlist.
  */
 
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
 import { prisma as defaultPrisma } from "~/server/db";
-import { createLogger } from "~/utils/logger";
 import { seedBirdEye } from "./_actions/seedBirdEye";
 import { seedHeavyUsage } from "./_actions/seedHeavyUsage";
 import { verifyOrgIdentity } from "./_actions/verifyOrgIdentity";
 import { DemoOrgScope } from "./_lib/scopeGuard";
-import type { PrismaClient } from "@prisma/client";
 import {
   formatReport,
   reportHasFailures,
@@ -56,6 +56,7 @@ export function parseArgs(args: readonly string[]): ParsedArgs {
   let execute = false;
   let orgId: string | undefined;
   let reportPath: string | undefined;
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--execute") {

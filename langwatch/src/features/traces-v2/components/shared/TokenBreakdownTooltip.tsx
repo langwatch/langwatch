@@ -42,7 +42,10 @@ export function TokenBreakdownTooltipContent({
   return (
     <VStack align="stretch" gap={0.5} minWidth="180px">
       <TooltipRow label="Input" value={inputTokens?.toLocaleString() ?? "—"} />
-      <TooltipRow label="Output" value={outputTokens?.toLocaleString() ?? "—"} />
+      <TooltipRow
+        label="Output"
+        value={outputTokens?.toLocaleString() ?? "—"}
+      />
       {cacheReadTokens != null && (
         <TooltipRow
           label="Cache read"

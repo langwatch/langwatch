@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserService } from "../user.service";
 
 // Mock the redis connection so the revoke helper used by deactivate()
@@ -34,7 +34,9 @@ describe("UserService", () => {
     describe("when called with a valid user id", () => {
       it("sets deactivatedAt to the current timestamp", async () => {
         const mockUser = { id: "user-1", deactivatedAt: new Date() };
-        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUser,
+        );
 
         const result = await service.deactivate({ id: "user-1" });
 
@@ -51,7 +53,9 @@ describe("UserService", () => {
     describe("when called with a deactivated user", () => {
       it("clears deactivatedAt to null", async () => {
         const mockUser = { id: "user-1", deactivatedAt: null };
-        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUser,
+        );
 
         const result = await service.reactivate({ id: "user-1" });
 
@@ -68,18 +72,24 @@ describe("UserService", () => {
     describe("when the email exists", () => {
       it("returns the user", async () => {
         const mockUser = { id: "user-1", email: "alice@acme.com" };
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUser,
+        );
 
         const result = await service.findByEmail({ email: "alice@acme.com" });
 
         expect(result).toEqual(mockUser);
-        expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "alice@acme.com" } });
+        expect(prisma.user.findUnique).toHaveBeenCalledWith({
+          where: { email: "alice@acme.com" },
+        });
       });
     });
 
     describe("when the email does not exist", () => {
       it("returns null", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          null,
+        );
 
         const result = await service.findByEmail({ email: "unknown@acme.com" });
 
@@ -212,10 +222,19 @@ describe("UserService", () => {
   describe("create()", () => {
     describe("when called with name and email", () => {
       it("creates the user", async () => {
-        const mockUser = { id: "user-1", name: "Alice", email: "alice@acme.com" };
-        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
+        const mockUser = {
+          id: "user-1",
+          name: "Alice",
+          email: "alice@acme.com",
+        };
+        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockUser,
+        );
 
-        const result = await service.create({ name: "Alice", email: "alice@acme.com" });
+        const result = await service.create({
+          name: "Alice",
+          email: "alice@acme.com",
+        });
 
         expect(prisma.user.create).toHaveBeenCalledWith({
           data: { name: "Alice", email: "alice@acme.com" },

@@ -1,3 +1,12 @@
+# Standalone workspace: mcp-server is installed on its own in CI, the
+# release workflow, and its Dockerfile. Shared source-only contract packages
+# are bundled by tsup for publish.
+packages:
+  - .
+  - ../packages/handled-error
+  - ../langwatch/packages/redaction
+  - ../langwatch/packages/ssrf
+
 minimumReleaseAge: 10080
 
 overrides:

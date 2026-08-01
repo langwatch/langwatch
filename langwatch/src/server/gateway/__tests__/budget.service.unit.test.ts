@@ -1,4 +1,4 @@
-import { Prisma, type GatewayBudget, type PrismaClient } from "@prisma/client";
+import { type GatewayBudget, Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -291,7 +291,11 @@ describe("GatewayBudgetService.check", () => {
  * name. Covered under one describe so the full prism is visible.
  */
 describe("GatewayBudgetService.getDetail", () => {
-  type Findable = { findFirst: unknown; findUnique: unknown; findMany: unknown };
+  type Findable = {
+    findFirst: unknown;
+    findUnique: unknown;
+    findMany: unknown;
+  };
   function mockPrismaWithDetail(
     budget: GatewayBudget | null,
     scopeRow: unknown,
@@ -329,9 +333,7 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when the budget does not exist", () => {
     it("returns null", async () => {
-      const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(null, null),
-      );
+      const sut = GatewayBudgetService.create(mockPrismaWithDetail(null, null));
       const detail = await sut.getDetail("b_missing", "org_01");
       expect(detail).toBeNull();
     });
@@ -363,8 +365,9 @@ describe("GatewayBudgetService.getDetail", () => {
       );
       // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
       // Override project.findUnique to return the linkback slug.
-      (baseMock as unknown as { project: { findUnique: unknown } }).project.findUnique =
-        vi.fn(async () => ({ slug: "proj" }));
+      (
+        baseMock as unknown as { project: { findUnique: unknown } }
+      ).project.findUnique = vi.fn(async () => ({ slug: "proj" }));
       const sut = GatewayBudgetService.create(baseMock);
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget).toEqual({
@@ -431,10 +434,7 @@ describe("GatewayBudgetService.getDetail", () => {
   describe("ledger join", () => {
     it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
       const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget(),
-          { name: "Proj", slug: "proj" },
-        ),
+        mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),
         mockChRepoWithEvents([{ id: "l_01" }]),
       );
       const detail = await sut.getDetail("b_01", "org_01");

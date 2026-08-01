@@ -1,7 +1,8 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
+import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
-export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
+export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (
     error &&
     error instanceof TRPCClientError &&
@@ -12,6 +13,14 @@ export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
   return false;
 };
 
+/**
+ * Every error any global interceptor in `utils/api.tsx` has already surfaced —
+ * as a modal, or as its own bespoke toast. `isHandledByGlobalHandler` reads
+ * ONLY this set, so a new `markAsHandledBy…` cannot forget to enrol itself in
+ * a hand-maintained OR the way the first version did.
+ */
+const handledGlobally = new WeakSet<Error>();
+
 // Track handled errors without mutating them
 const handledLicenseErrors = new WeakSet<Error>();
 
@@ -21,6 +30,7 @@ const handledLicenseErrors = new WeakSet<Error>();
  */
 export function markAsHandledByLicenseHandler(error: Error): void {
   handledLicenseErrors.add(error);
+  handledGlobally.add(error);
 }
 
 /**
@@ -33,7 +43,7 @@ export function markAsHandledByLicenseHandler(error: Error): void {
  * const mutation = api.prompts.create.useMutation({
  *   onError: (error) => {
  *     if (isHandledByGlobalLicenseHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
+ *     showErrorToast({ error, fallbackTitle: "Couldn't save" });
  *   },
  * });
  * ```
@@ -48,15 +58,12 @@ export interface LimitExceededInfo {
   max: number;
 }
 
-/**
- * Extracts limit exceeded info from a TRPC error.
- * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
- */
 // --- Lite member restriction dedup ---
 const handledLiteMemberErrors = new WeakSet<Error>();
 
 export function markAsHandledByLiteMemberHandler(error: Error): void {
   handledLiteMemberErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByLiteMemberHandler(error: unknown): boolean {
@@ -64,26 +71,32 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 }
 
 /**
- * Check if an error was already handled by any global error handler
- * (license limit or lite member restriction).
- * Use this single check in component-level onError callbacks to avoid
- * showing duplicate error messages (toast + modal).
+ * Check if an error was already handled by any global error handler, which
+ * surface it as a modal or a bespoke toast — so reporting it again would
+ * duplicate it.
+ *
+ * Every interceptor in `utils/api.tsx` counts. This used to be a hand-written
+ * OR over the individual sets, and the first version listed only two of them,
+ * so a missing-model failure (which opens its own sticky toast naming the
+ * feature and linking to model settings) also drew a second, vaguer toast next
+ * to it — the exact duplication this guard exists to stop. It now reads the one
+ * `handledGlobally` set that every `markAsHandledBy…` writes to, so adding an
+ * interceptor cannot leave this stale.
+ *
+ * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
+ * already do, which is why the ~137 copies of this guard in `onError`
+ * callbacks are gone. Reach for it directly only when reporting an error some
+ * other way.
  *
  * @example
  * ```tsx
  * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => {
- *     if (isHandledByGlobalHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
- *   },
+ *   onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save" }),
  * });
  * ```
  */
 export function isHandledByGlobalHandler(error: unknown): boolean {
-  return (
-    isHandledByGlobalLicenseHandler(error) ||
-    isHandledByLiteMemberHandler(error)
-  );
+  return error instanceof Error && handledGlobally.has(error);
 }
 
 // --- Lite member restriction extractor ---
@@ -97,15 +110,22 @@ export function extractLiteMemberRestrictionInfo(
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
-  const domainError = error.data?.domainError as
-    | { kind?: string; meta?: { resource?: string } }
+  const handledError = error.data?.error as
+    | { code?: string; kind?: string; meta?: { resource?: string } }
     | undefined;
 
-  if (domainError?.kind !== "lite_member_restricted") return null;
+  // `kind` is the deprecated pre-`HandledError` discriminant, read as a
+  // fallback so this resolves across the transition (see SerializedHandledError).
+  const handledCode = handledError?.code ?? handledError?.kind;
+  if (handledCode !== "lite_member_restricted") return null;
 
-  return { resource: domainError.meta?.resource };
+  return { resource: handledError?.meta?.resource };
 }
 
+/**
+ * Extracts limit exceeded info from a TRPC error.
+ * Returns the info if the error is a FORBIDDEN error with limit data, null otherwise.
+ */
 export function extractLimitExceededInfo(
   error: unknown,
 ): LimitExceededInfo | null {
@@ -130,6 +150,7 @@ const handledMissingModelErrors = new WeakSet<Error>();
 
 export function markAsHandledByMissingModelHandler(error: Error): void {
   handledMissingModelErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByMissingModelHandler(error: unknown): boolean {
@@ -139,7 +160,7 @@ export function isHandledByMissingModelHandler(error: unknown): boolean {
 export interface MissingModelExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId?: string;
 }
 
@@ -171,7 +192,12 @@ export function extractMissingModelInfo(
   if (!cause.featureKey || !cause.role) return null;
 
   const role = cause.role as MissingModelExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 
@@ -188,6 +214,7 @@ const handledProviderDisabledErrors = new WeakSet<Error>();
 
 export function markAsHandledByProviderDisabledHandler(error: Error): void {
   handledProviderDisabledErrors.add(error);
+  handledGlobally.add(error);
 }
 
 export function isHandledByProviderDisabledHandler(error: unknown): boolean {
@@ -197,7 +224,7 @@ export function isHandledByProviderDisabledHandler(error: unknown): boolean {
 export interface ProviderDisabledExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId: string;
   resolvedScope: "project" | "team" | "organization";
   resolvedModel: string;
@@ -248,7 +275,12 @@ export function extractProviderDisabledInfo(
   }
 
   const role = cause.role as ProviderDisabledExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
   const resolvedScope =
@@ -287,9 +319,7 @@ export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
 export interface AiCallFailedExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
-  /** Best-effort short message from the provider/SDK. */
-  errorMessage?: string;
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 }
 
 export function extractAiCallFailedInfo(
@@ -302,14 +332,18 @@ export function extractAiCallFailedInfo(
         featureKey?: string;
         featureDisplayName?: string;
         role?: string;
-        errorMessage?: string;
       }
     | undefined;
 
   if (cause?.code !== AI_CALL_FAILED_CAUSE) return null;
   if (!cause.featureKey || !cause.role) return null;
   const role = cause.role as AiCallFailedExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 
@@ -317,6 +351,5 @@ export function extractAiCallFailedInfo(
     featureKey: cause.featureKey,
     featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
     role,
-    errorMessage: cause.errorMessage,
   };
 }

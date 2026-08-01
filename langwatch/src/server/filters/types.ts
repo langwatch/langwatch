@@ -1,7 +1,3 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([
@@ -52,7 +48,10 @@ export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
 export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 
 // Schema for validating trigger filter JSON structure — rejects unknown fields
-export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+export const triggerFiltersSchema = z.record(
+  filterFieldsEnum,
+  filterValueSchema,
+);
 
 /** Validates filter value structure without restricting field names. */
 export const triggerFiltersPermissiveSchema = z.record(
@@ -85,11 +84,6 @@ export const sanitizeTriggerFilters = (
 export type FilterDefinition = {
   name: string;
   urlKey: string;
-  query: (
-    values: string[],
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => QueryDslQueryContainer;
   single?: boolean;
   type?: "numeric";
   requiresKey?: {
@@ -97,15 +91,5 @@ export type FilterDefinition = {
   };
   requiresSubkey?: {
     filter: FilterField;
-  };
-  listMatch: {
-    aggregation: (
-      query: string | undefined,
-      key: string | undefined,
-      subkey: string | undefined,
-    ) => Record<string, AggregationsAggregationContainer>;
-    extract: (
-      result: Record<string, any>,
-    ) => { field: string; label: string; count: number }[];
   };
 };

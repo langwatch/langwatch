@@ -27,7 +27,12 @@ describe("<RunMetricsSummary/>", () => {
     it("displays Pass label with 100% and green circle", () => {
       render(
         <RunMetricsSummary
-          summary={makeSummary({ passRate: 100, passedCount: 3, totalCount: 3, completedCount: 3 })}
+          summary={makeSummary({
+            passRate: 100,
+            passedCount: 3,
+            totalCount: 3,
+            completedCount: 3,
+          })}
         />,
         { wrapper: Wrapper },
       );
@@ -41,7 +46,13 @@ describe("<RunMetricsSummary/>", () => {
     it("displays pass rate reflecting failures", () => {
       render(
         <RunMetricsSummary
-          summary={makeSummary({ passRate: 50, passedCount: 3, failedCount: 3, totalCount: 6, completedCount: 6 })}
+          summary={makeSummary({
+            passRate: 50,
+            passedCount: 3,
+            failedCount: 3,
+            totalCount: 6,
+            completedCount: 6,
+          })}
         />,
         { wrapper: Wrapper },
       );

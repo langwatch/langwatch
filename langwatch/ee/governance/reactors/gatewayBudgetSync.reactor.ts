@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
+import type { GatewayBudgetLedgerStatus, PrismaClient } from "@prisma/client";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type {
-  GatewayBudgetLedgerStatus,
-  PrismaClient,
-} from "@prisma/client";
-import {
+  ReactorContext,
+  ReactorDefinition,
+} from "~/server/event-sourcing/reactors/reactor.types";
+import type {
+  BudgetDebitRow,
   GatewayBudgetClickHouseRepository,
-  type BudgetDebitRow,
 } from "~/server/gateway/budget.clickhouse.repository";
 import type {
   ApplicableScopes,
   GatewayBudgetRepository,
 } from "~/server/gateway/budget.repository";
+import { budgetAppliesToProvider } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:gateway-budget-sync-reactor",
@@ -112,8 +113,7 @@ export function createGatewayBudgetSyncReactor(
         // row on every request.
         const now = new Date();
         const shouldTouch =
-          !vk.lastUsedAt ||
-          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
+          !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
         logger.info(
           {
             projectId,
@@ -179,7 +179,18 @@ export function createGatewayBudgetSyncReactor(
           virtualKeyId: vk.id,
           principalUserId: vk.principalUserId,
         };
-        const budgets = await deps.budgetRepository.applicableForRequest(scopes);
+        // The provider the gateway actually dispatched to. Absent on
+        // gateways that predate the field, in which case only unfiltered
+        // budgets accrue: attributing an unknown dispatch to a provider-
+        // filtered budget would be a guess, and a guess here silently
+        // mis-bills a governance control.
+        const dispatchedProviderKey =
+          foldState.attributes["langwatch.model_provider_id"] ?? null;
+
+        const resolved = await deps.budgetRepository.resolveForRequest(scopes);
+        const budgets = resolved.filter((r) =>
+          budgetAppliesToProvider(r.budget, dispatchedProviderKey),
+        );
         if (budgets.length === 0) return;
 
         const amountUsd = formatDecimal(foldState.totalCost ?? 0);
@@ -193,24 +204,27 @@ export function createGatewayBudgetSyncReactor(
             : "SUCCESS";
         const occurredAt = new Date(foldState.occurredAt);
 
-        const rows: BudgetDebitRow[] = budgets.map((b) => ({
-          tenantId: projectId,
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: b.scopeId,
-          window: b.window,
-          virtualKeyId: vk.id,
-          gatewayRequestId,
-          amountUsd,
-          tokensInput,
-          tokensOutput,
-          tokensCacheRead: 0,
-          tokensCacheWrite: 0,
-          model,
-          durationMs: Math.round(foldState.totalDurationMs ?? 0),
-          status,
-          occurredAt,
-        }));
+        const rows: BudgetDebitRow[] = budgets.map(
+          ({ budget: b, bucketScopeId }) => ({
+            tenantId: projectId,
+            budgetId: b.id,
+            scope: b.scopeType,
+            scopeId: bucketScopeId,
+            window: b.window,
+            virtualKeyId: vk.id,
+            providerKey: dispatchedProviderKey,
+            gatewayRequestId,
+            amountUsd,
+            tokensInput,
+            tokensOutput,
+            tokensCacheRead: 0,
+            tokensCacheWrite: 0,
+            model,
+            durationMs: Math.round(foldState.totalDurationMs ?? 0),
+            status,
+            occurredAt,
+          }),
+        );
 
         await deps.budgetCHRepository.insertDebit(rows);
 
@@ -236,7 +250,7 @@ export function createGatewayBudgetSyncReactor(
             payload: {
               gatewayRequestId,
               virtualKeyId: vk.id,
-              budgetIds: budgets.map((b) => b.id),
+              budgetIds: budgets.map((r) => r.budget.id),
               amountUsd,
             },
           });

@@ -1,4 +1,6 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export type BudgetScopeKind =
@@ -6,7 +8,8 @@ export type BudgetScopeKind =
   | "TEAM"
   | "PROJECT"
   | "VIRTUAL_KEY"
-  | "PRINCIPAL";
+  | "PRINCIPAL"
+  | "GROUP";
 
 export type BudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
 export type BudgetOnBreach = "BLOCK" | "WARN";
@@ -20,14 +23,32 @@ export interface GatewayBudget {
   description: string | null;
   window: BudgetWindow;
   on_breach: BudgetOnBreach;
+  /**
+   * For GROUP rows this is the PER-MEMBER allowance, not a group total;
+   * `spent_usd` sums the whole group and `member_count` says how many
+   * members the allowance currently covers.
+   */
   limit_usd: string;
   spent_usd: string;
   timezone: string | null;
+  /** ModelProvider id the budget counts; null counts every provider. */
+  provider_key: string | null;
   current_period_started_at: string;
   resets_at: string;
   last_reset_at: string | null;
   archived_at: string | null;
   created_at: string;
+  /** GROUP rows only. */
+  member_count?: number;
+}
+
+export interface GatewayBudgetList {
+  budgets: GatewayBudget[];
+  /**
+   * False when spend could not be totalled — render "unavailable" rather
+   * than trusting `spent_usd` as real spend.
+   */
+  spend_available: boolean;
 }
 
 export type CreateGatewayBudgetScope =
@@ -35,7 +56,8 @@ export type CreateGatewayBudgetScope =
   | { kind: "TEAM"; team_id: string }
   | { kind: "PROJECT"; project_id: string }
   | { kind: "VIRTUAL_KEY"; virtual_key_id: string }
-  | { kind: "PRINCIPAL"; principal_user_id: string };
+  | { kind: "PRINCIPAL"; principal_user_id: string }
+  | { kind: "GROUP"; group_id: string };
 
 export interface CreateGatewayBudgetInput {
   scope: CreateGatewayBudgetScope;
@@ -45,6 +67,8 @@ export interface CreateGatewayBudgetInput {
   limit_usd: number | string;
   on_breach?: BudgetOnBreach;
   timezone?: string | null;
+  /** ModelProvider id to pin the budget to one provider. */
+  provider_key?: string | null;
 }
 
 export interface UpdateGatewayBudgetInput {
@@ -72,7 +96,7 @@ export class GatewayBudgetsApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private headers(): Record<string, string> {
@@ -99,17 +123,32 @@ export class GatewayBudgetsApiService {
         error: parsedBody,
         options: { status: response.status },
       });
+      throwIfHandledError({
+        operation,
+        error: parsedBody,
+        status: response.status,
+        message,
+      });
       throw new GatewayBudgetsApiError(message, operation, parsedBody);
     }
     return (await response.json()) as T;
   }
 
-  async list(): Promise<GatewayBudget[]> {
-    const { data } = await this.request<{ data: GatewayBudget[] }>(
-      "list gateway budgets",
-      "/api/gateway/v1/budgets",
-    );
-    return data;
+  /**
+   * Every non-archived budget in the organization across all six scope
+   * types, optionally filtered by `scopeTypes`.
+   */
+  async list(options?: {
+    scopeTypes?: BudgetScopeKind[];
+  }): Promise<GatewayBudgetList> {
+    const filter = options?.scopeTypes?.length
+      ? `?scope_type=${options.scopeTypes.join(",")}`
+      : "";
+    const { data, spend_available } = await this.request<{
+      data: GatewayBudget[];
+      spend_available: boolean;
+    }>("list gateway budgets", `/api/gateway/v1/budgets${filter}`);
+    return { budgets: data, spend_available };
   }
 
   async create(input: CreateGatewayBudgetInput): Promise<GatewayBudget> {

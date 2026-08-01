@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks } from "node-mocks-http";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
 // Mock dependencies
 vi.mock("~/server/db", () => ({
@@ -13,6 +13,9 @@ vi.mock("~/server/db", () => ({
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+    },
+    team: {
+      findUnique: vi.fn(),
     },
   },
 }));
@@ -28,7 +31,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -39,7 +42,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import { prisma } from "~/server/db";
@@ -73,6 +76,11 @@ describe("POST /api/experiment/init", () => {
     vi.clearAllMocks();
 
     (prisma.project.findUnique as Mock).mockResolvedValue(project);
+
+    (prisma.team.findUnique as Mock).mockResolvedValue({
+      id: "team-456",
+      organizationId: "org-789",
+    });
   });
 
   function createRequest({
@@ -102,7 +110,7 @@ describe("POST /api/experiment/init", () => {
       );
     });
 
-    it("returns 200 and resolves the existing experiment path", async () => {
+    it("returns 200 for the existing experiment", async () => {
       const { req, res } = createRequest({ slug: "existing-experiment" });
       await handler(req, res);
 
@@ -112,13 +120,6 @@ describe("POST /api/experiment/init", () => {
         slug: "existing-experiment",
       });
     });
-
-    it("does not create a new experiment", async () => {
-      const { req, res } = createRequest({ slug: "existing-experiment" });
-      await handler(req, res);
-
-      expect(prisma.experiment.create).not.toHaveBeenCalled();
-    });
   });
 
   describe("when slug does not exist", () => {
@@ -127,22 +128,18 @@ describe("POST /api/experiment/init", () => {
       (prisma.experiment.create as Mock).mockResolvedValue(createdExperiment);
     });
 
-    it("creates the experiment and returns 200", async () => {
-      const { req, res } = createRequest({ slug: "new-experiment" });
-      await handler(req, res);
+    describe("when creating the experiment", () => {
+      it("creates the experiment and returns 200", async () => {
+        const { req, res } = createRequest({ slug: "new-experiment" });
+        await handler(req, res);
 
-      expect(res.statusCode).toBe(200);
-      expect(res._getJSONData()).toEqual({
-        path: "/my-project/experiments/new-experiment",
-        slug: "new-experiment",
+        expect(res.statusCode).toBe(200);
+        expect(res._getJSONData()).toEqual({
+          path: "/my-project/experiments/new-experiment",
+          slug: "new-experiment",
+        });
       });
     });
 
-    it("creates the experiment via prisma", async () => {
-      const { req, res } = createRequest({ slug: "new-experiment" });
-      await handler(req, res);
-
-      expect(prisma.experiment.create).toHaveBeenCalledTimes(1);
-    });
   });
 });

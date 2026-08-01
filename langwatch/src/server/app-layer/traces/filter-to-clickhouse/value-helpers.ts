@@ -109,3 +109,58 @@ export function validateAttributeKey(key: string): void {
 export function wrap(sql: string, negated: boolean): string {
   return negated ? `NOT (${sql})` : sql;
 }
+
+// ---------------------------------------------------------------------------
+// In-memory helpers (used by the field defs' `evaluateInMemory` side)
+// ---------------------------------------------------------------------------
+
+/**
+ * Own-property read of an attribute map, mirroring ClickHouse's
+ * `Attributes[<key>]` — own keys only, `''` when the key is absent.
+ *
+ * Filter keys are user-supplied, so a bare `attrs[key]` resolves `constructor`
+ * / `toString` / `__proto__` off `Object.prototype` and hands back a function
+ * (or the prototype object) that ClickHouse would never produce. That is not
+ * cosmetic: `has:attribute.constructor` read `(attrs[key] ?? "") !== ""` as
+ * `true` on every trace while the compiled `Attributes['constructor'] != ''`
+ * matched none of them.
+ */
+export function readAttribute(
+  attrs: Record<string, string>,
+  key: string,
+): string {
+  return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * In-memory equivalent of the `LIKE` match the wildcard translators emit: the
+ * SQL side turns a user `*` into `%` and does a full-string `LIKE`, so here we
+ * split on `*`, escape the literal segments, and anchor the resulting regex.
+ */
+export function likeMatch(actual: string, pattern: string): boolean {
+  const regex = pattern.split("*").map(escapeRegExp).join(".*");
+  return new RegExp(`^${regex}$`).test(actual);
+}
+
+/**
+ * Parses a JSON-encoded string array stored on `Attributes` (`langwatch.labels`
+ * / `langwatch.prompt_ids`), mirroring the trigger matcher's `parseJsonArray`.
+ * `JSON.parse` already strips the surrounding quotes the SQL side trims with
+ * `trim(BOTH '"' FROM …)`. Returns `null` for absent/malformed values.
+ */
+export function parseJsonStringArray(raw: string | undefined): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((v): v is string => typeof v === "string");
+    }
+  } catch {
+    // Not valid JSON — treat as absent.
+  }
+  return null;
+}

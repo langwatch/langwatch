@@ -22,14 +22,17 @@ const MODEL_ALIASES: Record<string, string> = {
   "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
   "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
   "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
-  "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620"
+  "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620",
 };
 
 /**
  * Providers that need dot-to-dash translation for their model IDs.
  * Anthropic models use dots in llmModels.json but LiteLLM expects dashes.
+ * Custom providers are excluded: their model ids are arbitrary customer
+ * strings (e.g. vLLM serving "Qwen/Qwen2.5-32B-Instruct") and rewriting
+ * dots would send a model id the endpoint doesn't recognize.
  */
-const PROVIDERS_NEEDING_TRANSLATION = ["anthropic", "custom"];
+const PROVIDERS_NEEDING_TRANSLATION = ["anthropic"];
 
 /**
  * Extracts the provider from a model ID string.

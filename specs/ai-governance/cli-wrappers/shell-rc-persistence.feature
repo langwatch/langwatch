@@ -1,13 +1,29 @@
-Feature: Persist the OTLP telemetry exports to the user's shell rc file
-  `langwatch login` is auth-only: it never prompts to edit the shell rc,
-  because the device session is already authoritative in config.json.
+Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
+  `langwatch login` is auth-only: it never prompts to persist telemetry
+  env, because the device session is already authoritative in config.json.
 
-  The shell-rc persist offer instead fires from the `langwatch <tool>`
-  wrapper, and ONLY when the tool resolves to Path B (ingestion / direct
-  OTLP). At that point the wrapper has computed the tool's OTEL_EXPORTER_*
-  env, and offers to install it into the shell rc so a plain `<tool>`
-  invocation (without the `langwatch` prefix) inherits the exporter env and
-  captures telemetry automatically on every subsequent session.
+  The persist offer instead fires from the `langwatch <tool>` wrapper, and
+  ONLY when the tool resolves to Path B (ingestion / direct OTLP). At that
+  point the wrapper has computed the tool's OTEL_EXPORTER_* env, and offers
+  to install it so a plain `<tool>` invocation (without the `langwatch`
+  prefix) inherits the exporter env and captures telemetry automatically
+  on every subsequent session.
+
+  For tools with a native app-scoped telemetry target the wrapper writes
+  there rather than the profile-root shell rc, so a plain `<tool>` picks it
+  up without editing `.zshrc` and leaking the vars into every other shell
+  child:
+    - `claude` → `~/.claude/settings.json`'s `env` object (read on every
+      invocation).
+    - `codex` → `~/.codex/config.toml`'s `[otel.trace_exporter.otlp-http]`
+      block, which takes an inline `headers` field, so the ingest token
+      lives beside the endpoint in one 0600 file.
+  Tools with no config-file env target (`gemini`, `opencode`) instead get a
+  shell function installed in the rc that sets the telemetry env ONLY for that
+  tool's invocations, since their OTEL vars use generic names a global
+  `export` would otherwise leak into every shell child. `cursor` is
+  gateway-only (`allow_otel_direct=false`), so Path B ingestion never resolves
+  for it and it never persists a telemetry env block.
 
   As a developer running `langwatch claude` over a subscription (Path B),
   I want to optionally install the telemetry exports once, idempotently,
@@ -17,96 +33,201 @@ Feature: Persist the OTLP telemetry exports to the user's shell rc file
     Given the langwatch CLI is installed
     And the user has signed in with `langwatch login`
 
-  Rule: login itself never prompts to persist the shell rc
+  Rule: login itself never prompts to persist telemetry env
 
     Scenario: `langwatch login` is auth-only
       When `langwatch login` completes
-      Then the CLI does NOT prompt to persist a shell rc block
-      And no edit is made to ~/.zshrc / ~/.bashrc / fish config
+      Then the CLI does NOT prompt to persist a telemetry env block
+      And no edit is made to ~/.claude/settings.json, ~/.zshrc, ~/.bashrc,
+        or the fish config
 
   Rule: the offer fires from the wrapper only in ingestion mode
 
     Scenario: Gateway mode does not offer to persist telemetry exports
       Given `langwatch claude` resolves to gateway mode (Path A)
       When the wrapper finishes setting up
-      Then the CLI does NOT prompt to persist a shell rc block
+      Then the CLI does NOT prompt to persist a telemetry env block
 
     Scenario: Ingestion mode offers to install the telemetry exports
       Given `langwatch claude` resolves to ingestion mode (Path B)
       And the shell does not already export OTEL_EXPORTER_OTLP_ENDPOINT
       When the wrapper finishes setting up
-      Then the CLI offers to install the telemetry exports into the shell rc
+      Then the CLI offers to install the telemetry exports
       And the prompt is framed as installing telemetry so a plain `claude`
         captures automatically next time
 
-  Rule: The prompt only fires when the shell isn't already configured
+  Rule: The prompt only fires when the target isn't already configured
 
     Scenario: Skip the prompt when the OTLP exporter env is already set
       Given the user's current shell already exports OTEL_EXPORTER_OTLP_ENDPOINT
       When `langwatch claude` resolves to ingestion mode
-      Then the CLI does NOT prompt to persist the shell rc block
+      Then the CLI does NOT prompt to persist the telemetry env block
 
     Scenario: Skip the prompt when the user previously chose "never"
       Given the langwatch config carries `shell_rc_preference: "skip"`
       When `langwatch claude` resolves to ingestion mode
       Then the CLI does NOT prompt
 
+  Rule: `langwatch claude` persists to ~/.claude/settings.json (native env block)
+
+    Scenario: Persist target for claude is the Claude Code settings file
+      Given `langwatch claude` resolves to ingestion mode
+      And ~/.claude/settings.json does not yet carry the OTLP exporter env
+      When the wrapper offers to persist telemetry exports
+      Then the prompt names "~/.claude/settings.json" as the target
+      And the prompt does NOT name ~/.zshrc, ~/.bashrc, or the fish config
+      # Rationale: dumping LANGWATCH env into the shell rc leaks the vars into
+      # every other shell child. Claude Code reads the `env` block on every
+      # invocation, so writing there scopes the telemetry to `claude` runs
+      # only and leaves the profile root clean.
+
+    Scenario: Accept Y — merge the OTEL keys into settings.json's env block
+      Given ~/.claude/settings.json already contains user-authored settings
+      When the user types "y" at the persistence prompt
+      Then the file's top-level `env` object gains every OTEL_EXPORTER_OTLP_*
+        key with the run's computed values
+      And every other top-level key the user had (permissions, hooks, model,
+        …) is preserved verbatim
+      And opening a plain `claude` picks up the merged env on next run
+
+    Scenario: Create ~/.claude/settings.json when it doesn't exist yet
+      Given ~/.claude does not exist
+      When the user types "y" at the persistence prompt
+      Then ~/.claude is created
+      And ~/.claude/settings.json is written with exactly the OTEL keys
+        under an `env` object and no other user content invented
+
+    Scenario: Skip the prompt when settings.json already carries every OTEL key
+      Given ~/.claude/settings.json's `env` object already contains every
+        OTEL_EXPORTER_OTLP_* key with the current values
+      When `langwatch claude` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+    Scenario: A stale env block from a previous run is refreshed, not duplicated
+      Given ~/.claude/settings.json's `env` object holds a subset of the
+        current OTEL keys (or old endpoint URLs)
+      When the user types "y" at the persistence prompt
+      Then the file's `env` object reflects the LATEST OTEL values verbatim
+      And no duplicate keys or stale entries survive
+
+  Rule: `langwatch codex` persists to ~/.codex/config.toml (native [otel] block)
+
+    Scenario: Persist target for codex is the Codex config file
+      Given `langwatch codex` resolves to ingestion mode
+      And ~/.codex/config.toml does not yet carry the OTLP Authorization header
+      When the wrapper offers to persist telemetry exports
+      Then the prompt names "~/.codex/config.toml" as the target
+      And the prompt does NOT name ~/.zshrc, ~/.bashrc, or the fish config
+      # Rationale: codex reads its [otel] block from config.toml on every run,
+      # and the otlp-http trace exporter takes an inline `headers` field, so
+      # the ingest token scopes to `codex` runs only instead of leaking into
+      # every shell child via the profile rc.
+
+    Scenario: Accept Y — write the Authorization header into the [otel] block
+      Given ~/.codex/config.toml already carries the langwatch [otel] endpoint
+        block written when the wrapper set up (endpoint + protocol, no header)
+      When the user types "y" at the persistence prompt
+      Then the [otel.trace_exporter.otlp-http] block gains a `headers` entry
+        carrying `Authorization = "Bearer <ingest-token>"`
+      And any config the user authored outside the langwatch marker pair
+        is preserved verbatim
+      And running a plain `codex` captures telemetry with no shell edits
+
+    Scenario: The wrapper's unconditional [otel] write preserves a persisted header
+      Given a previous run persisted the Authorization header into config.toml
+      When `langwatch codex` sets up again and rewrites the [otel] block
+      Then the persisted `headers` entry survives the rewrite
+      And the persistence prompt does NOT re-appear
+
+    Scenario: Skip the prompt when config.toml already carries the header
+      Given ~/.codex/config.toml's [otel.trace_exporter.otlp-http] block
+        already carries the Authorization header
+      When `langwatch codex` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+  Rule: Tools without a config-file env target install a scoped shell function
+
+    Scenario Outline: Accept Y — write a scoped `<tool>` wrapper function
+      Given `langwatch <tool>` resolves to ingestion mode
+      When the user types "y" at the persistence prompt
+      Then the shell rc gains a marker-bracketed `<tool>()` function (or a
+        fish `function <tool>`) that sets the OTEL_EXPORTER_OTLP_* env and
+        then runs `command <tool>`
+      And the OTEL vars are NOT written as bare top-level `export`s
+      And running a plain `<tool>` captures telemetry, while other shell
+        children do not inherit the OTEL env
+      # Rationale: these tools' OTEL vars are generic OpenTelemetry names, so a
+      # global export would capture telemetry from every OTEL-aware process in
+      # the shell. The wrapper scopes them to `<tool>` runs only.
+
+      Examples:
+        | tool     |
+        | gemini   |
+        | opencode |
+
+    Scenario: Each tool's scoped wrapper lands under its own marker pair
+      Given ~/.zshrc already carries a scoped `gemini` wrapper from a prior run
+      When the user types "y" at the `opencode` persistence prompt
+      Then the `opencode` wrapper lands under its own marker pair
+      And the prior `gemini` wrapper is left intact
+
+    Scenario: Skip the prompt when the scoped wrapper already targets this endpoint
+      Given ~/.zshrc already carries the `<tool>` wrapper for the current
+        OTLP endpoint
+      When `langwatch <tool>` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+  Rule: cursor never persists telemetry env (gateway-only)
+
+    Scenario: cursor resolves to the gateway path, so no persist prompt fires
+      Given cursor's policy has `allow_otel_direct=false`
+      When the user runs `langwatch cursor`
+      Then it resolves to the gateway path (Path A)
+      And the CLI does NOT prompt to persist a telemetry env block
+
   Rule: The prompt is Y / n / never
 
-    Scenario: Accept Y — install the exports once
-      Given the user is on zsh
-      And ~/.zshrc does not yet contain the langwatch block
-      When `langwatch claude` resolves to ingestion mode
-      And the user types "y" at the persistence prompt
-      Then ~/.zshrc gains a block bracketed by
-        "# >>> langwatch begin >>>" and "# <<< langwatch end <<<"
-      And the block exports the OTEL_EXPORTER_OTLP_* telemetry env vars
-      And opening a fresh shell sources these vars so a plain `claude`
-        captures without re-running `langwatch claude`
-
     Scenario: Decline "n" — re-prompt next run
-      Given ~/.zshrc does not contain the langwatch block
+      Given the persist target does not yet carry the langwatch env
       When `langwatch claude` resolves to ingestion mode
       And the user types "n" at the persistence prompt
-      Then ~/.zshrc is unchanged
+      Then the persist target is unchanged
       And `shell_rc_preference` remains unset
       When the user runs `langwatch claude` in ingestion mode again later
       Then the persistence prompt re-appears
 
     Scenario: Decline "never" — silence the prompt forever on this machine
-      Given ~/.zshrc does not contain the langwatch block
+      Given the persist target does not yet carry the langwatch env
       When `langwatch claude` resolves to ingestion mode
       And the user types "never" at the persistence prompt
       Then the langwatch config persists `shell_rc_preference: "skip"`
-      And ~/.zshrc is unchanged
+      And the persist target is unchanged
       When the user runs `langwatch claude` in ingestion mode again later
       Then the persistence prompt does NOT re-appear
 
-  Rule: Re-running persistence is idempotent
+  Rule: Shell-rc fallback covers zsh, bash, and fish
 
-    Scenario: Second persist run replaces the existing block, no duplicates
-      Given ~/.zshrc already contains one langwatch block from a
-        previous run
+    Scenario Outline: Pick the right rc file per detected shell (fallback tools)
+      Given the user's $SHELL is "<shell>"
+      And the user runs `langwatch gemini` in ingestion mode
+      When the user types "y" at the persistence prompt
+      Then the langwatch block is written to "<rc_path>"
+
+      Examples:
+        | shell         | rc_path                        |
+        | /bin/zsh      | ~/.zshrc                       |
+        | /bin/bash     | ~/.bashrc                      |
+        | /usr/bin/fish | ~/.config/fish/config.fish     |
+
+    Scenario: Second shell-rc persist run replaces the existing block
+      Given ~/.zshrc already contains one langwatch block from a previous run
       When the user types "y" at the persistence prompt again
       Then ~/.zshrc still contains exactly one block bracketed by
         the begin/end markers
       And the block reflects the latest telemetry exports
 
-  Rule: Shell detection covers zsh, bash, and fish
-
-    Scenario Outline: Pick the right rc file per detected shell
-      Given the user's $SHELL is "<shell>"
-      When the user types "y" at the persistence prompt
-      Then the langwatch block is written to "<rc_path>"
-
-      Examples:
-        | shell    | rc_path                          |
-        | /bin/zsh | ~/.zshrc                         |
-        | /bin/bash| ~/.bashrc                        |
-        | /usr/bin/fish | ~/.config/fish/config.fish  |
-
-    Scenario: Unsupported shells skip silently
+    Scenario: Unsupported shells skip silently (for shell-rc fallback tools)
       Given the user's $SHELL points at an unsupported shell
         (cmd, powershell, nushell, etc.)
-      When `langwatch claude` resolves to ingestion mode
+      And the user runs `langwatch gemini` in ingestion mode
       Then the persistence flow is skipped entirely with no error

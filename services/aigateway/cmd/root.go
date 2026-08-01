@@ -6,6 +6,8 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/services/aigateway"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 )
 
@@ -17,6 +19,7 @@ func Root(ctx context.Context, _ []string) error {
 	}
 
 	info := contexts.MustGetServiceInfo(ctx)
+	info.Service = "langwatch-service-aigateway"
 	info.Environment = cfg.Environment
 	ctx = contexts.SetServiceInfo(ctx, *info)
 
@@ -30,11 +33,17 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithProviders(deps.Providers),
 		app.WithRateLimiter(deps.RateLimiter),
 		app.WithBudget(deps.BudgetChecker),
-		app.WithGuardrails(deps.ControlPlane),
+		// Wrapped so every guardrail verdict is counted, including the
+		// fail-open ones a plain allow would otherwise hide.
+		app.WithGuardrails(gatewaymetrics.WithGuardrailMetrics(deps.ControlPlane, deps.Metrics)),
 		app.WithPolicy(deps.Policy),
 		app.WithCache(deps.Cache),
 		app.WithModels(deps.Models),
-		app.WithTraces(deps.TraceBridge),
+		// Wrapped so the gateway's own span gets the model/usage/outcome
+		// metadata too — content stays on the customer-bound span only.
+		app.WithTraces(gatewaytracer.WithInternalStamping(deps.TraceBridge)),
+		app.WithMetrics(deps.Metrics),
+		app.WithCircuitBreaker(deps.Breaker),
 		app.WithLogger(deps.Logger),
 	)
 

@@ -16,7 +16,7 @@ interface ScopeChipProps {
  * loud chip.
  */
 export function ScopeChip({ scope }: ScopeChipProps) {
-  if (!scope || !scope.name) return null;
+  if (!scope?.name) return null;
   const label = scope.version ? `${scope.name} v${scope.version}` : scope.name;
   return (
     <Tooltip
@@ -42,12 +42,7 @@ export function ScopeChip({ scope }: ScopeChipProps) {
     >
       <HStack gap={1} flexShrink={0} cursor="help">
         <Icon as={LuPackage} boxSize={3} color="fg.subtle" />
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          truncate
-          maxWidth="320px"
-        >
+        <Text textStyle="2xs" color="fg.subtle" truncate maxWidth="320px">
           {label}
         </Text>
       </HStack>
@@ -70,7 +65,7 @@ function TooltipRow({ label, value }: { label: string; value: string }) {
 
 /** Standalone scope display used in expandable sections. */
 export function ScopeBlock({ scope }: { scope: InstrumentationScope | null }) {
-  if (!scope || !scope.name) {
+  if (!scope?.name) {
     return (
       <Text textStyle="xs" color="fg.subtle">
         No instrumentation scope reported.

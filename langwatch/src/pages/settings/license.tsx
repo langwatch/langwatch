@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import SettingsLayout from "../../components/SettingsLayout";
-import { LicenseStatus } from "../../components/LicenseStatus";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { LicenseStatus } from "../../components/LicenseStatus";
+import SettingsLayout from "../../components/SettingsLayout";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export default function License() {
   const { organization } = useOrganizationTeamProject();

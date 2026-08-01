@@ -7,6 +7,7 @@ import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import { PromptsApiError } from "./errors";
 import {
   extractStatusFromResponse,
@@ -94,8 +95,9 @@ export class PromptsApiService {
    * @throws {PromptsApiError}
    */
   private handleApiError(operation: string, error: any, status?: number): never {
+    const resolvedStatus = status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: status ?? extractStatusFromResponse(error),
+      status: resolvedStatus,
     } });
 
     throw new PromptsApiError(message, operation, error);
@@ -159,6 +161,14 @@ export class PromptsApiService {
       await this.get(id);
       return true;
     } catch (error) {
+      // A named 404 from the platform ("prompt_not_found") now arrives typed, so
+      // read the status off the domain error first. Without this, the very thing
+      // that makes the failure legible — the platform naming it — would stop
+      // `exists()` recognising a missing prompt and turn a `false` into a throw.
+      if (isLangWatchHandledError(error) && error.httpStatus === 404) {
+        return false;
+      }
+
       const originalError = error instanceof PromptsApiError ? error.originalError : null;
       const statusCode = originalError != null && typeof originalError === "object" && "statusCode" in originalError
         ? (originalError as { statusCode: unknown }).statusCode

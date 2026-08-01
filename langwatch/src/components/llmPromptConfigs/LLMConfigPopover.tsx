@@ -2,6 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { clampMaxTokens } from "../../utils/clampMaxTokens";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import {
   type Output,
@@ -9,8 +10,6 @@ import {
   type OutputType,
 } from "../outputs/OutputsSection";
 import { Popover } from "../ui/popover";
-
-
 import { ParameterRow } from "./ParameterRow";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
@@ -25,7 +24,6 @@ import {
   getMaxTokenLimit,
   normalizeMaxTokens,
 } from "./utils/tokenUtils";
-import { clampMaxTokens } from "../../utils/clampMaxTokens";
 
 // Re-export types for backward compatibility
 export type { LLMConfigValues } from "./types";
@@ -289,7 +287,12 @@ export function LLMConfigPopover({
         {/* Structured Outputs Section */}
         {showStructuredOutputs && onOutputsChange && (
           <VStack width="full" gap={2}>
-            <HStack width="full" justify="space-between" paddingX={2} paddingBottom={isStructuredOutputsEnabled ? 0 : 2}>
+            <HStack
+              width="full"
+              justify="space-between"
+              paddingX={2}
+              paddingBottom={isStructuredOutputsEnabled ? 0 : 2}
+            >
               <HStack
                 width="full"
                 align="start"
@@ -309,10 +312,14 @@ export function LLMConfigPopover({
                   role="switch"
                   aria-checked={isStructuredOutputsEnabled}
                   data-testid="structured-outputs-switch"
-                  data-state={isStructuredOutputsEnabled ? "checked" : "unchecked"}
+                  data-state={
+                    isStructuredOutputsEnabled ? "checked" : "unchecked"
+                  }
                   display="flex"
                   alignItems="center"
-                  justifyContent={isStructuredOutputsEnabled ? "flex-end" : "flex-start"}
+                  justifyContent={
+                    isStructuredOutputsEnabled ? "flex-end" : "flex-start"
+                  }
                   width="34px"
                   height="20px"
                   borderRadius="full"
@@ -335,7 +342,15 @@ export function LLMConfigPopover({
             </HStack>
 
             {isStructuredOutputsEnabled && outputs && (
-              <Box width="full" padding={2} paddingLeft={3} border="1px solid" borderColor="border" borderRadius="lg" background="bg">
+              <Box
+                width="full"
+                padding={2}
+                paddingLeft={3}
+                border="1px solid"
+                borderColor="border"
+                borderRadius="lg"
+                background="bg"
+              >
                 <OutputsSection
                   outputs={outputs}
                   onChange={onOutputsChange}

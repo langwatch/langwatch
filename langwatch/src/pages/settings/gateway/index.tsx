@@ -1,8 +1,7 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
-
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * AI Gateway index — default landing redirects to the virtual keys list.

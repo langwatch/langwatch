@@ -6,7 +6,7 @@
  * Env var format: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
  * JSON: { endpoint, bucket, accessKeyId, secretAccessKey }
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mockLogger = {
   info: vi.fn(),
@@ -15,7 +15,7 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => mockLogger,
 }));
 
@@ -57,11 +57,9 @@ describe("dataplane-s3", () => {
     describe("when valid JSON env vars are set", () => {
       /** @scenario Parse private S3 config from env var */
       it("parses a single org config", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).toEqual({
@@ -73,12 +71,10 @@ describe("dataplane-s3", () => {
       });
 
       it("parses multiple org configs", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
-        process.env["DATAPLANE_S3__beta__org456"] = VALID_CONFIG_2;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
+        process.env.DATAPLANE_S3__beta__org456 = VALID_CONFIG_2;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config1 = getS3ConfigForOrganization("org123");
         expect(config1).toEqual({
@@ -100,9 +96,7 @@ describe("dataplane-s3", () => {
       it("ignores the label portion of the env var name", async () => {
         process.env["DATAPLANE_S3__any-label-here__org123"] = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).not.toBeNull();
@@ -110,7 +104,7 @@ describe("dataplane-s3", () => {
       });
 
       it("logs info about loaded configs", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
         await import("../dataplane-s3");
 
@@ -124,11 +118,9 @@ describe("dataplane-s3", () => {
     describe("when invalid JSON env var is set", () => {
       /** @scenario Invalid JSON in S3 env var is logged and skipped */
       it("skips the invalid entry and logs a warning", async () => {
-        process.env["DATAPLANE_S3__bad__org999"] = "not-json";
+        process.env.DATAPLANE_S3__bad__org999 = "not-json";
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org999");
         expect(config).toBeNull();
@@ -141,14 +133,12 @@ describe("dataplane-s3", () => {
 
     describe("when env var has missing required fields", () => {
       it("skips the entry and logs a warning", async () => {
-        process.env["DATAPLANE_S3__partial__org888"] = JSON.stringify({
+        process.env.DATAPLANE_S3__partial__org888 = JSON.stringify({
           endpoint: "https://s3.amazonaws.com",
           // missing bucket, accessKeyId, secretAccessKey
         });
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org888");
         expect(config).toBeNull();
@@ -158,9 +148,7 @@ describe("dataplane-s3", () => {
 
     describe("when no DATAPLANE_S3 env vars are set", () => {
       it("returns null for any org", async () => {
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org-unknown");
         expect(config).toBeNull();
@@ -172,26 +160,20 @@ describe("dataplane-s3", () => {
     describe("when org has a private S3 configured", () => {
       /** @scenario Org with private S3 gets dedicated config */
       it("returns the private config", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org123");
         expect(config).not.toBeNull();
-        expect(config!.endpoint).toBe(
-          "https://s3.eu-central-1.amazonaws.com",
-        );
+        expect(config!.endpoint).toBe("https://s3.eu-central-1.amazonaws.com");
       });
     });
 
     describe("when org has no private S3 configured", () => {
       /** @scenario Org without private S3 gets shared config */
       it("returns null", async () => {
-        const { getS3ConfigForOrganization } = await import(
-          "../dataplane-s3"
-        );
+        const { getS3ConfigForOrganization } = await import("../dataplane-s3");
 
         const config = getS3ConfigForOrganization("org-nonexistent");
         expect(config).toBeNull();
@@ -203,7 +185,7 @@ describe("dataplane-s3", () => {
     describe("when project belongs to org with private S3", () => {
       /** @scenario Project in a private-S3 org routes to the private bucket */
       it("returns the private S3 config", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
         const { prisma } = await import("../db");
         vi.mocked(prisma.project.findUnique).mockResolvedValue({
@@ -246,7 +228,7 @@ describe("dataplane-s3", () => {
 
     describe("when called twice for the same project", () => {
       it("caches the org lookup and does not query DB again", async () => {
-        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env.DATAPLANE_S3__acme__org123 = VALID_CONFIG;
 
         const { prisma } = await import("../db");
         vi.mocked(prisma.project.findUnique).mockResolvedValue({

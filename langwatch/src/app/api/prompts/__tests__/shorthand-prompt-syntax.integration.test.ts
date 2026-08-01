@@ -2,15 +2,16 @@ import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
 /**
@@ -27,7 +28,10 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
   const makeRequest = (path: string, options?: RequestInit) =>
     app.request(path, {
-      headers: { "X-Auth-Token": testApiKey, "Content-Type": "application/json" },
+      headers: {
+        "X-Auth-Token": testApiKey,
+        "Content-Type": "application/json",
+      },
       ...options,
     });
 
@@ -58,7 +62,10 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
     testProject = await prisma.project.create({
-      data: { ...projectFactory.build({ slug: nanoid() }), teamId: testTeam.id },
+      data: {
+        ...projectFactory.build({ slug: nanoid() }),
+        teamId: testTeam.id,
+      },
     });
 
     testApiKey = testProject.apiKey;
@@ -71,9 +78,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
         config: { DEFAULT: "openai/gpt-4o-mini" },
         organizationId: testOrganization.id,
         scopes: {
-          create: [
-            { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
-          ],
+          create: [{ scopeType: "ORGANIZATION", scopeId: testOrganization.id }],
         },
       },
       select: { id: true },
@@ -82,27 +87,36 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
     await prisma.promptTag.createMany({
       data: [
-        { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "production" },
-        { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "staging" },
+        {
+          id: `ptag_${nanoid()}`,
+          organizationId: testOrganization.id,
+          name: "production",
+        },
+        {
+          id: `ptag_${nanoid()}`,
+          organizationId: testOrganization.id,
+          name: "staging",
+        },
       ],
     });
   });
 
   afterEach(async () => {
-    await prisma.promptTagAssignment.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.llmPromptConfig.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.modelDefaultConfigScope.deleteMany({
-      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
-    });
-    if (testDefaultConfigId) {
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { id: testDefaultConfigId },
-      });
-    }
+    await cleanupTestRows(prisma, [
+      ["promptTagAssignment", { projectId: testProjectId }],
+      ["llmPromptConfigVersion", { projectId: testProjectId }],
+      ["llmPromptConfig", { projectId: testProjectId }],
+      [
+        "modelDefaultConfigScope",
+        { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+      ],
+      ["modelDefaultConfig", { id: testDefaultConfigId }],
+    ]);
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
-    await prisma.promptTag.deleteMany({ where: { organizationId: testOrganization.id } });
+    await prisma.promptTag.deleteMany({
+      where: { organizationId: testOrganization.id },
+    });
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
@@ -139,7 +153,9 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       expect(v2.versionId).not.toBe(v1.versionId);
 
       // Resolve via shorthand — must return v1 (production), not v2 (latest)
-      const shorthandRes = await makeRequest("/api/prompts/pizza-prompt:production");
+      const shorthandRes = await makeRequest(
+        "/api/prompts/pizza-prompt:production",
+      );
       expect(shorthandRes.status).toBe(200);
       const body = await shorthandRes.json();
       expect(body.versionId).toBe(v1.versionId);
@@ -172,9 +188,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       });
       expect(createRes.status).toBe(200);
 
-      const res = await makeRequest(
-        "/api/prompts/pizza-prompt:2?version=3",
-      );
+      const res = await makeRequest("/api/prompts/pizza-prompt:2?version=3");
       expect(res.status).toBe(422);
       const body = await res.json();
       expect(body.error).toMatch(/conflict/i);

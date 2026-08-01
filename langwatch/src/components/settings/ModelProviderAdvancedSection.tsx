@@ -159,9 +159,7 @@ export function ModelProviderAdvancedSection({
   const formatDate = (d: Date | string | null | undefined): string => {
     if (!d) return "—";
     const date = typeof d === "string" ? new Date(d) : d;
-    return Number.isFinite(date.getTime())
-      ? date.toLocaleString()
-      : String(d);
+    return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(d);
   };
 
   return (
@@ -184,8 +182,8 @@ export function ModelProviderAdvancedSection({
           {!modelProviderId ? (
             <Box width="full" paddingY={2}>
               <Text fontSize="xs" color="gray.500">
-                Save the provider first to configure rate limits and
-                routing hints.
+                Save the provider first to configure rate limits and routing
+                hints.
               </Text>
             </Box>
           ) : (
@@ -239,8 +237,8 @@ export function ModelProviderAdvancedSection({
                   }
                 />
                 <Field.HelperText>
-                  Order used when a Virtual Key has no Routing Policy.
-                  Lower tries first. Tiebreak by creation order.
+                  Order used when a Virtual Key has no Routing Policy. Lower
+                  tries first. Tiebreak by creation order.
                 </Field.HelperText>
               </Field.Root>
 
@@ -262,8 +260,8 @@ export function ModelProviderAdvancedSection({
                   </Text>
                 ) : (
                   <Field.HelperText>
-                    Provider-specific routing hints. Bedrock region,
-                    Azure deployment override, etc.
+                    Provider-specific routing hints. Bedrock region, Azure
+                    deployment override, etc.
                   </Field.HelperText>
                 )}
               </Field.Root>

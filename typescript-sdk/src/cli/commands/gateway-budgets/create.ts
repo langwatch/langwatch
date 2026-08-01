@@ -1,28 +1,30 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   type BudgetOnBreach,
   type BudgetWindow,
   type CreateGatewayBudgetScope,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 export interface CreateGatewayBudgetOptions {
   name: string;
   description?: string;
-  scope: "organization" | "team" | "project" | "virtual-key" | "principal";
+  scope: "organization" | "team" | "project" | "virtual-key" | "principal" | "group";
   organization?: string;
   team?: string;
   project?: string;
   virtualKey?: string;
   principal?: string;
+  group?: string;
   window: string;
   limit: string;
   onBreach?: "block" | "warn";
   timezone?: string;
-  format?: string;
+  providerKey?: string;
 }
 
 const ALLOWED_WINDOWS: BudgetWindow[] = ["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"];
@@ -46,13 +48,22 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
     case "principal":
       if (!options.principal) throw new Error("--principal <id> required for scope=principal");
       return { kind: "PRINCIPAL", principal_user_id: options.principal };
+    case "group":
+      // Per-member allowance: --limit is what EACH member may spend.
+      // Requires a deployment with the ClickHouse spend ledger.
+      if (!options.group) throw new Error("--group <id> required for scope=group");
+      return { kind: "GROUP", group_id: options.group };
   }
 }
 
+/**
+ * Returns the created budget rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createGatewayBudgetCommand = async (
   options: CreateGatewayBudgetOptions,
-): Promise<void> => {
-  checkApiKey();
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   const upperWindow = options.window.toUpperCase() as BudgetWindow;
   if (!ALLOWED_WINDOWS.includes(upperWindow)) {
@@ -75,7 +86,7 @@ export const createGatewayBudgetCommand = async (
     : undefined;
 
   const service = new GatewayBudgetsApiService();
-  const spinner = ora(`Creating budget "${options.name}"...`).start();
+  const spinner = createSpinner(`Creating budget "${options.name}"...`).start();
 
   try {
     const budget = await service.create({
@@ -86,23 +97,30 @@ export const createGatewayBudgetCommand = async (
       limit_usd: options.limit,
       on_breach: onBreach,
       timezone: options.timezone ?? null,
+      provider_key: options.providerKey ?? null,
     });
 
     spinner.succeed(`Created budget "${chalk.cyan(budget.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(budget, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-    console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
-    console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
-    console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
-    console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
-    console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
-    console.log();
+    return {
+      data: budget,
+      table: () => {
+        const perMember = budget.scope_type === "GROUP";
+        console.log();
+        console.log(`${chalk.bold("ID:")}       ${budget.id}`);
+        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
+        console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
+        console.log(
+          `${chalk.bold("Limit:")}    $${budget.limit_usd}${perMember ? chalk.gray(` per member (${budget.member_count ?? 0} members)`) : ""}`,
+        );
+        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
+        if (budget.provider_key) {
+          console.log(`${chalk.bold("Provider:")} ${budget.provider_key}`);
+        }
+        console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "create gateway budget" });
     process.exit(1);

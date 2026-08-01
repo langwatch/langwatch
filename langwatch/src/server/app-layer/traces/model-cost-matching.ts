@@ -1,10 +1,10 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+} from "~/server/tracer/collector/cost";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 
 /**
@@ -49,6 +49,18 @@ export function computeSpanCost({
     0,
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]) ??
       0,
+  );
+
+  // Audio usage: TTS spans carry the characters synthesized, STT spans the
+  // seconds transcribed. These are the billable units for audio models that
+  // report no token usage at all.
+  const inputCharacters = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]) ?? 0,
+  );
+  const audioSeconds = Math.max(
+    0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]) ?? 0,
   );
 
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
@@ -102,7 +114,9 @@ export function computeSpanCost({
     (inputTokens > 0 ||
       outputTokens > 0 ||
       cacheReadTokens > 0 ||
-      cacheCreationTokens > 0)
+      cacheCreationTokens > 0 ||
+      inputCharacters > 0 ||
+      audioSeconds > 0)
   ) {
     const matched = matchModelCostWithFallbacks(
       resolvedModel,
@@ -115,6 +129,8 @@ export function computeSpanCost({
         outputTokens,
         cacheReadTokens,
         cacheCreationTokens,
+        inputCharacters,
+        audioSeconds,
       });
       if (computed !== undefined && computed > 0) return computed;
     }

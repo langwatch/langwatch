@@ -1,7 +1,7 @@
-import { coerceToNumber } from "~/utils/coerceToNumber";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 export const FIRST_TOKEN_EVENTS = new Set([
@@ -24,11 +24,12 @@ export const LAST_TOKEN_EVENTS = new Set([
 /**
  * Marker stamped by the receiver (resource-level) on traces whose LLM usage
  * is covered by a flat subscription rather than billed per token, or set
- * directly on a span by an instrumentation that knows a single call is
- * bundled. A span-level value overrides the resource-level default, so a
- * trace can mix billed and bundled spans.
+ * directly on a span by an extractor or instrumentation that knows a single
+ * call is bundled (the codex account provider's spans, for example). A
+ * span-level value overrides the resource-level default, so a trace can mix
+ * billed and bundled spans.
  */
-export const NON_BILLABLE_ATTR = "langwatch.cost.non_billable";
+export const NON_BILLABLE_ATTR = ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE;
 
 function markerIsTrue(value: unknown): boolean {
   return value === true || value === "true";

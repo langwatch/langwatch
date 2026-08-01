@@ -46,20 +46,25 @@ type ConfigFetcher interface {
 // listens for. Kept as a sealed string set so callers can switch
 // exhaustively without leaking control-plane internals into this package.
 const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
+	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
+	ChangeKindBudgetCreated          = "BUDGET_CREATED"
 	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
+	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
+	ChangeKindVirtualKeyCreated      = "VK_CREATED"
+	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
+	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
+	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
 // Mirrors the wire shape from the control plane's /changes endpoint.
 type CacheChange struct {
-	Kind                 string
-	VirtualKeyID         string
-	BudgetID             string
-	ProviderCredentialID string
-	ProjectID            string
-	Revision             string
+	Kind            string
+	VirtualKeyID    string
+	BudgetID        string
+	ModelProviderID string
+	ProjectID       string
+	Revision        string
 }
 
 // ChangePoller is the upstream that streams cache-invalidation events
@@ -70,6 +75,21 @@ type ChangePoller interface {
 }
 
 // Service is the three-tier auth resolver.
+// CacheMetrics counts how well the key cache is serving. Declared here
+// rather than imported so the resolver stays free of a metrics
+// dependency; the gateway's Prometheus recorder satisfies it.
+type CacheMetrics interface {
+	RecordAuthCacheLookup()
+	RecordAuthCacheHit(tier string)
+	RecordAuthCacheMiss(tier string)
+}
+
+// Cache tier names reported on the auth-cache metrics.
+const (
+	tierL1      = "l1"
+	tierL2Redis = "l2_redis"
+)
+
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
 	l2            L2Store
@@ -77,10 +97,12 @@ type Service struct {
 	configFetcher ConfigFetcher
 	changePoller  ChangePoller
 	logger        *zap.Logger
+	metrics       CacheMetrics
 
 	refreshThreshold time.Duration
 	softBump         time.Duration
 	hardGrace        time.Duration
+	configTTL        time.Duration
 
 	// Active orgs whose bundles are currently in L1. Populated on every
 	// storeL1, never cleared explicitly — entries that drop out of L1 via
@@ -107,6 +129,44 @@ type entry struct {
 	bundle        *domain.Bundle
 	softExpiresAt time.Time
 	hardExpiresAt time.Time
+	// configFetchedAt drives the config-staleness refresh: the bundle's
+	// auth (JWT exp) can outlive its config (credentials, base URLs,
+	// routing chain) by many minutes, and not every config mutation emits
+	// a change-feed event (e.g. direct DB writes). configRefreshing is the
+	// in-flight guard so at most one background config fetch runs per entry.
+	configFetchedAt  time.Time
+	configRefreshing bool
+}
+
+// configStale reports whether the entry's config is older than ttl.
+// ttl <= 0 disables staleness (never stale).
+func (e *entry) configStale(ttl time.Duration) bool {
+	if ttl <= 0 {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return time.Since(e.configFetchedAt) > ttl
+}
+
+// tryBeginConfigRefresh claims the per-entry config-refresh slot.
+func (e *entry) tryBeginConfigRefresh() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.configRefreshing {
+		return false
+	}
+	e.configRefreshing = true
+	return true
+}
+
+// endConfigRefresh releases the slot and stamps configFetchedAt so a
+// failed fetch retries only after the next full TTL, not on every request.
+func (e *entry) endConfigRefresh() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.configRefreshing = false
+	e.configFetchedAt = time.Now()
 }
 
 func (e *entry) softExpired() bool {
@@ -206,6 +266,16 @@ type Options struct {
 	L2            L2Store // optional, nil = skip L2
 	Resolver      KeyResolver
 	ConfigFetcher ConfigFetcher
+	// ConfigTTL is the max age of a cached bundle's config (credentials,
+	// base URLs, routing chain) before a background re-fetch. The change
+	// feed already evicts on admin mutations that emit events, but not
+	// every config change does (direct DB writes, mutations without a
+	// change-event kind) — this TTL is the safety net that bounds config
+	// staleness without a process restart. Default 60s. Negative disables.
+	ConfigTTL time.Duration
+	// Metrics counts cache lookups, hits and misses. Optional; nil skips
+	// the counting entirely.
+	Metrics CacheMetrics
 	// ChangePoller is the optional control-plane /changes subscriber.
 	// When non-nil, the service spawns a per-org poll loop on Start that
 	// evicts L1 entries whose cached config has been invalidated by an
@@ -233,6 +303,12 @@ func New(opts Options) (*Service, error) {
 	if opts.HardGrace == 0 {
 		opts.HardGrace = 6 * time.Hour
 	}
+	if opts.ConfigTTL == 0 {
+		opts.ConfigTTL = 60 * time.Second
+	}
+	if opts.ConfigTTL < 0 {
+		opts.ConfigTTL = 0 // disabled
+	}
 
 	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
 	if err != nil {
@@ -251,9 +327,11 @@ func New(opts Options) (*Service, error) {
 		configFetcher:    opts.ConfigFetcher,
 		changePoller:     opts.ChangePoller,
 		logger:           logger,
+		metrics:          opts.Metrics,
 		refreshThreshold: opts.RefreshThreshold,
 		softBump:         opts.SoftBump,
 		hardGrace:        opts.HardGrace,
+		configTTL:        opts.ConfigTTL,
 		stopCh:           make(chan struct{}),
 	}, nil
 }
@@ -270,43 +348,76 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	}
 
 	h := hashKey(rawKey)
+	s.recordLookup()
 
 	// L1: in-memory
 	if e, ok := s.l1.Get(h); ok {
 		switch {
 		case !e.softExpired():
 			// Fresh: serve, maybe trigger background refresh on near-expiry.
+			s.recordHit(tierL1)
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+				go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			}
 			return e.bundle, nil
 
 		case !e.hardExpired():
-			// Soft-expired but within hard grace. Try foreground refresh;
-			// stale-while-error on transport failure.
+			// Soft-expired but within hard grace. A foreground refresh is
+			// needed before the entry can serve, so it counts as a miss
+			// even when stale-while-error ends up serving the old bundle.
+			s.recordMiss(tierL1)
 			return s.refreshOrServeStale(ctx, rawKey, h, e)
 
 		default:
 			// Past hard cap: evict, fall through to fresh resolve.
+			s.recordMiss(tierL1)
 			s.l1.Remove(h)
 			s.logger.Error("auth_cache_hard_evict",
 				zap.String("vk_id", e.bundle.VirtualKeyID),
 				zap.String("reason", "hard_cap_exceeded_on_lookup"),
 			)
 		}
+	} else {
+		s.recordMiss(tierL1)
 	}
 
 	// L2: optional store
 	if s.l2 != nil {
 		hStr := string(h[:])
 		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
+			s.recordHit(tierL2Redis)
 			s.storeL1(h, bundle)
 			return bundle, nil
 		}
+		s.recordMiss(tierL2Redis)
 	}
 
 	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
+}
+
+// CacheLen reports how many virtual keys L1 is currently holding, so the
+// gateway can publish it as a gauge.
+func (s *Service) CacheLen() int { return s.l1.Len() }
+
+func (s *Service) recordLookup() {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheLookup()
+	}
+}
+
+func (s *Service) recordHit(tier string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheHit(tier)
+	}
+}
+
+func (s *Service) recordMiss(tier string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheMiss(tier)
+	}
 }
 
 // resolveFresh calls the upstream resolver and caches the result.
@@ -317,7 +428,11 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 	if err != nil {
 		return nil, err
 	}
-	s.populateConfig(ctx, bundle)
+	if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		// Cold miss: no stale entry to fall back on. Cache nothing — a
+		// bundle without its config is not a resolution result.
+		return nil, errConfigUnavailable(ctx, cfgErr)
+	}
 	s.storeL1(h, bundle)
 	if s.l2 != nil {
 		s.l2.Set(ctx, string(h[:]), bundle)
@@ -338,7 +453,14 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 
 	switch cls {
 	case classNone:
-		s.populateConfig(ctx, bundle)
+		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+			// The control plane authenticated the key but could not hand
+			// over its provider config. Serving the fresh, config-less
+			// bundle would surface as no_provider_configured for an org
+			// whose keys are fine — treat it as a transport failure and
+			// serve the stale entry's known-good credentials instead.
+			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
+		}
 		s.storeL1(h, bundle)
 		if s.l2 != nil {
 			s.l2.Set(ctx, string(h[:]), bundle)
@@ -355,46 +477,77 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 		return nil, err
 
 	default:
-		newSoft, bumped := stale.bumpSoft(s.softBump)
-		if !bumped {
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", vkID),
-				zap.String("reason", "hard_cap_exceeded"),
-				zap.Error(err),
-			)
-			return nil, err
-		}
-		s.logger.Warn("auth_cache_refresh_transport_failure",
-			zap.String("vk_id", vkID),
-			zap.Time("new_soft_expires_at", newSoft),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-			zap.Error(err),
-		)
-		s.logger.Info("auth_cache_serve_stale",
-			zap.String("vk_id", vkID),
-			zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-			zap.String("refresh_error_class", cls.String()),
-		)
-		return staleBundle, nil
+		return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, err)
 	}
 }
 
+// serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
+// bump the stale entry's soft expiry and keep serving it, or evict and fail
+// once the hard grace cap is exhausted. `cause` is what stopped the refresh —
+// a ResolveKey transport error or a config fetch failure after a good auth.
+func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale *entry, staleBundle *domain.Bundle, vkID string, hardExpiresAt time.Time, cls refreshErrorClass, cause error) (*domain.Bundle, error) {
+	newSoft, bumped := stale.bumpSoft(s.softBump)
+	if !bumped {
+		s.l1.Remove(h)
+		s.logger.Error("auth_cache_hard_evict",
+			zap.String("vk_id", vkID),
+			zap.String("reason", "hard_cap_exceeded"),
+			zap.Error(cause),
+		)
+		if cls == classNone {
+			return nil, errConfigUnavailable(ctx, cause)
+		}
+		return nil, cause
+	}
+	// classNone here means the auth succeeded and the CONFIG fetch failed;
+	// log that instead of a misleading "none" error class.
+	classLabel := cls.String()
+	if cls == classNone {
+		classLabel = "config_fetch_failed"
+	}
+	s.logger.Warn("auth_cache_refresh_transport_failure",
+		zap.String("vk_id", vkID),
+		zap.Time("new_soft_expires_at", newSoft),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.Error(cause),
+	)
+	s.logger.Info("auth_cache_serve_stale",
+		zap.String("vk_id", vkID),
+		zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.String("refresh_error_class", classLabel),
+	)
+	return staleBundle, nil
+}
+
 // populateConfig eagerly fetches the bundle's config and merges it into the
-// bundle. Failure here is non-fatal — the bundle still serves with empty
-// config.Credentials, and downstream resolution will surface its own error.
-func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) {
+// bundle. A failure leaves the bundle without credentials, so callers must
+// not cache or serve the bundle as-is: dispatch would answer the terminal
+// no_provider_configured ("add a provider API key in Settings") for an org
+// whose keys are fine, and a cached config-less bundle keeps giving that
+// answer until it expires — on every node that shares the L2 cache.
+func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) error {
 	if bundle == nil {
-		return
+		return nil
 	}
 	cfg, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID)
 	if err != nil {
 		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
-		return
+		return err
 	}
 	bundle.Config = cfg
 	bundle.Credentials = cfg.Credentials
+	return nil
+}
+
+// errConfigUnavailable is the fail-closed answer when the control plane
+// authenticated the key but could not hand over its provider config and no
+// stale entry exists to serve instead. Transport-class on purpose: the
+// client should retry, not go check its provider settings.
+func errConfigUnavailable(ctx context.Context, err error) error {
+	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+		"message": "control plane unavailable while loading this key's provider configuration — retry shortly",
+	}, err)
 }
 
 // Start launches the background refresh loop and (when configured) the
@@ -420,9 +573,10 @@ func (s *Service) Stop() {
 
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
 	s.l1.Add(h, &entry{
-		bundle:        bundle,
-		softExpiresAt: bundle.ExpiresAt,
-		hardExpiresAt: bundle.ExpiresAt.Add(s.hardGrace),
+		bundle:          bundle,
+		softExpiresAt:   bundle.ExpiresAt,
+		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
+		configFetchedAt: time.Now(),
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape — if
@@ -466,7 +620,7 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 				return true
 			}
 			for _, ch := range changes {
-				s.applyChange(ch)
+				s.applyChange(orgID, ch)
 			}
 			if nextRev != "" {
 				cursor.since = nextRev
@@ -496,39 +650,43 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
-func (s *Service) applyChange(ch CacheChange) {
+func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		if ch.ProviderCredentialID == "" {
+		// The control plane emits ModelProvider.id. Config materialization puts
+		// that same ID in Credential.ID; ProviderID is only the provider type
+		// (for example "openai") and is not a cache invalidation join key.
+		if ch.ModelProviderID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			for _, c := range b.Config.Credentials {
-				if c.ID == ch.ProviderCredentialID {
+				if c.ID == ch.ModelProviderID {
 					return true
 				}
 			}
 			return false
-		}, "provider_binding_updated", ch.ProviderCredentialID)
-	case ChangeKindBudgetUpdated:
-		// BUDGET_UPDATED's project_id is the only stable join key
-		// (budget_id alone doesn't appear in the bundle; budgets nest
-		// under scopes). Evicting all bundles for the affected project
-		// is conservative but correct — the next request re-fetches
-		// the fresh limit/spent pair from the control plane.
-		if ch.ProjectID == "" {
+		}, "model_provider_updated", ch.ModelProviderID)
+	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
+		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
+		// every other scope omit it, so invalidate the polled organization in
+		// those cases rather than leaving a stale budget enforced until TTL.
+		if ch.ProjectID != "" {
+			s.evictWhere(func(b *domain.Bundle) bool {
+				return b.ProjectID == ch.ProjectID
+			}, "budget_updated", ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
-			return b.ProjectID == ch.ProjectID
-		}, "budget_updated", ch.ProjectID)
-	case ChangeKindVirtualKeyUpdated:
+			return b.OrganizationID == organizationID
+		}, "budget_updated", organizationID)
+	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked:
 		if ch.VirtualKeyID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_updated", ch.VirtualKeyID)
+		}, "virtual_key_config_updated", ch.VirtualKeyID)
 	}
 }
 
@@ -570,7 +728,14 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 
 	switch cls {
 	case classNone:
-		s.populateConfig(ctx, bundle)
+		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+			// Keep the existing entry serving its known-good credentials.
+			// Replacing it with a config-less bundle would proactively
+			// poison a perfectly healthy cache entry into answering
+			// no_provider_configured until expiry.
+			s.bumpEntryAfterTransportFailure(h, cfgErr)
+			return
+		}
 		s.storeL1(h, bundle)
 		if s.l2 != nil {
 			s.l2.Set(ctx, string(h[:]), bundle)
@@ -590,22 +755,76 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 		)
 
 	default:
-		e, ok := s.l1.Get(h)
-		if !ok {
-			return
-		}
-		newSoft, bumped := e.bumpSoft(s.softBump)
-		if !bumped {
-			return
-		}
-		_, _, hardExpiresAt := e.snapshot()
-		s.logger.Warn("auth_cache_refresh_transport_failure",
-			zap.String("vk_id", e.bundle.VirtualKeyID),
-			zap.Time("new_soft_expires_at", newSoft),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		s.bumpEntryAfterTransportFailure(h, err)
+	}
+}
+
+// bumpEntryAfterTransportFailure extends the soft expiry of an existing L1
+// entry after a background refresh failed for transport-class reasons (the
+// resolve call itself, or the config fetch after a good auth), keeping the
+// entry serving instead of letting it lapse.
+func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
+	e, ok := s.l1.Get(h)
+	if !ok {
+		return
+	}
+	newSoft, bumped := e.bumpSoft(s.softBump)
+	if !bumped {
+		return
+	}
+	_, _, hardExpiresAt := e.snapshot()
+	s.logger.Warn("auth_cache_refresh_transport_failure",
+		zap.String("vk_id", e.bundle.VirtualKeyID),
+		zap.Time("new_soft_expires_at", newSoft),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.Error(cause),
+	)
+}
+
+// refreshConfigBackground re-fetches only the bundle's config (not auth)
+// when it crosses ConfigTTL. On success the entry is replaced with a
+// shallow bundle copy carrying the fresh config — the entry's bundle
+// pointer stays immutable, so in-flight requests holding the old bundle
+// are unaffected. On failure the stale config keeps serving and the next
+// attempt waits a full TTL (endConfigRefresh stamps configFetchedAt).
+func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
+	defer e.endConfigRefresh()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	stale, _, _ := e.snapshot()
+	cfg, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID)
+	if err != nil {
+		s.logger.Warn("config_ttl_refresh_failed",
+			zap.String("vk_id", stale.VirtualKeyID),
 			zap.Error(err),
 		)
+		return
 	}
+
+	fresh := *stale
+	fresh.Config = cfg
+	fresh.Credentials = cfg.Credentials
+
+	// Guard against resurrecting an entry that another path evicted or
+	// replaced while FetchConfig was in flight: a change-feed eviction
+	// (VK/provider updated or revoked), an async auth rejection, or a
+	// foreground auth refresh that swapped in a newer bundle. If the live L1
+	// entry for h is no longer the one we started from, drop this result
+	// instead of writing a stale (possibly revoked) bundle back into L1/L2.
+	// Peek avoids perturbing LRU recency from this background goroutine.
+	if cur, ok := s.l1.Peek(h); !ok || cur != e {
+		s.logger.Debug("config_ttl_refresh_dropped_stale",
+			zap.String("vk_id", stale.VirtualKeyID),
+		)
+		return
+	}
+	s.storeL1(h, &fresh)
+	if s.l2 != nil {
+		s.l2.Set(ctx, string(h[:]), &fresh)
+	}
+	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 
 func (s *Service) loop(ctx context.Context) {

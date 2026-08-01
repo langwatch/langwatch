@@ -1,4 +1,4 @@
-import { detectSecretsInText } from "../../data-privacy/redaction/secretsRedaction";
+import { detectSecretsInText } from "@langwatch/redaction";
 import type { SingleEvaluationResult } from "../evaluators";
 import { collectStrings } from "./collectStrings";
 

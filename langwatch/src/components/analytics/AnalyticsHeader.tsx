@@ -1,8 +1,8 @@
-import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
+import { Box, HStack, Input, Spacer } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { LuListTree } from "react-icons/lu";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
@@ -110,15 +110,11 @@ export function AnalyticsHeader({
           <PageLayout.HeaderButton
             variant="ghost"
             onClick={() => {
+              // Trace Explorer keeps its time range in the URL fragment
+              // (#<lens>?from=<ms>&to=<ms>), so carry the analytics period
+              // over as an absolute range.
               void router.push(
-                {
-                  pathname: `/${project?.slug}/messages`,
-                  query: {
-                    ...router.query,
-                  },
-                },
-                undefined,
-                { shallow: true },
+                `/${project?.slug}/traces#all-traces?from=${startDate.getTime()}&to=${endDate.getTime()}`,
               );
             }}
           >

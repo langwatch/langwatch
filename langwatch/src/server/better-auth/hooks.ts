@@ -1,13 +1,19 @@
-import { Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
-import { APIError } from "better-auth/api";
 import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "../../utils/logger/server";
-import { captureException } from "../../utils/posthogErrorCapture";
-import { isSsoProviderMatch, extractEmailDomain } from "./sso";
-import { InviteService } from "~/server/invites/invite.service";
+import { createLogger } from "@langwatch/observability";
+import {
+  Prisma,
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";
+import { InviteService } from "~/server/invites/invite.service";
+import { trackServerEvent } from "~/server/posthog";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
+import { captureException } from "../../utils/posthogErrorCapture";
+import { extractEmailDomain, isSsoProviderMatch } from "./sso";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 
@@ -64,7 +70,10 @@ export const beforeUserCreate = async ({
   user,
 }: {
   prisma: PrismaClient;
-  user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
+  user: { email: string; deactivatedAt?: Date | null } & Record<
+    string,
+    unknown
+  >;
 }): Promise<boolean | void> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
@@ -75,8 +84,10 @@ export const beforeUserCreate = async ({
 };
 
 /**
- * Called after a new user is created. If the user's email domain matches an
- * organization with ssoDomain, auto-onboard the user:
+ * Called after a new user is created. Fires the `signed_up` analytics event
+ * for every new user (fire-and-forget, no-op without POSTHOG_KEY), then, if
+ * the user's email domain matches an organization with ssoDomain,
+ * auto-onboard the user:
  *
  *   - If a PENDING invite exists for (org, email), apply it — the invite's
  *     role and team assignments take precedence, and the invite is marked
@@ -107,6 +118,10 @@ export const afterUserCreate = async ({
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
 }): Promise<void> => {
+  // Same distinct_id posthog-js identifies with client-side (the user id),
+  // so this server event joins the browser person.
+  trackServerEvent({ userId: user.id, event: "signed_up" });
+
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
@@ -116,11 +131,12 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    const pendingInvite = await InviteService.create(prisma)
-      .findPendingByOrgAndEmail({
-        organizationId: org.id,
-        email: user.email,
-      });
+    const pendingInvite = await InviteService.create(
+      prisma,
+    ).findPendingByOrgAndEmail({
+      organizationId: org.id,
+      email: user.email,
+    });
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -449,7 +465,10 @@ export const beforeSessionCreate = async ({
     select: { deactivatedAt: true },
   });
   if (user?.deactivatedAt) {
-    logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: user deactivated",
+    );
     return false;
   }
 };
@@ -474,8 +493,14 @@ export const afterSessionCreate = async ({
   prisma: PrismaClient;
   userId: string;
   isImpersonationSession?: boolean;
-  fireActivityTrackingNurturing: (args: { userId: string; hasOrganization: boolean }) => void;
-  ensureUserSyncedToCio: (args: { userId: string; hasOrganization: boolean }) => void;
+  fireActivityTrackingNurturing: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
+  ensureUserSyncedToCio: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
 }): Promise<void> => {
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {
@@ -485,7 +510,10 @@ export const afterSessionCreate = async ({
         data: { lastLoginAt: new Date() },
       });
     } catch (err) {
-      logger.error({ err, userId }, "Failed to update lastLoginAt after session create");
+      logger.error(
+        { err, userId },
+        "Failed to update lastLoginAt after session create",
+      );
     }
   }
 
@@ -504,6 +532,9 @@ export const afterSessionCreate = async ({
       ensureUserSyncedToCio({ userId, hasOrganization });
     })
     .catch((err) => {
-      logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
+      logger.error(
+        { err, userId },
+        "Failed to fire nurturing hooks after session create",
+      );
     });
 };

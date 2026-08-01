@@ -5,13 +5,13 @@
  * before applying the invite. Non-PENDING statuses (PAYMENT_PENDING,
  * WAITING_APPROVAL) must be rejected with BAD_REQUEST.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { organizationRouter } from "../organization";
-import { createInnerTRPCContext } from "../../trpc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
 } from "../../../invites/errors";
+import { createInnerTRPCContext } from "../../trpc";
+import { organizationRouter } from "../organization";
 
 vi.mock("../../../../env.mjs", () => ({
   env: {
@@ -41,7 +41,11 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
     async ensure(_args: unknown) {
       return {
         team: { id: "stub-team", isPersonal: true, ownerUserId: "user-1" },
-        project: { id: "stub-project", isPersonal: true, ownerUserId: "user-1" },
+        project: {
+          id: "stub-project",
+          isPersonal: true,
+          ownerUserId: "user-1",
+        },
         created: false,
       };
     }
@@ -133,7 +137,9 @@ describe("organization.acceptInvite", () => {
           organizationUser: { createMany: vi.fn() },
           roleBinding: { deleteMany: vi.fn(), create: vi.fn() },
           organizationInvite: {
-            update: vi.fn().mockResolvedValue(makeInvite({ status: "ACCEPTED" })),
+            update: vi
+              .fn()
+              .mockResolvedValue(makeInvite({ status: "ACCEPTED" })),
             findFirst: vi.fn().mockResolvedValue(null),
           },
           project: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -156,13 +162,13 @@ describe("organization.acceptInvite", () => {
   describe("when invite status is PAYMENT_PENDING", () => {
     it("rejects with BAD_REQUEST", async () => {
       findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "PAYMENT_PENDING", expiration: null })
+        makeInvite({ status: "PAYMENT_PENDING", expiration: null }),
       );
 
       const caller = createCaller();
 
       await expect(
-        caller.acceptInvite({ inviteCode: "test-code" })
+        caller.acceptInvite({ inviteCode: "test-code" }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
         message: INVITE_NOT_READY_MESSAGE,
@@ -171,14 +177,12 @@ describe("organization.acceptInvite", () => {
 
     it("does not call the transaction", async () => {
       findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "PAYMENT_PENDING", expiration: null })
+        makeInvite({ status: "PAYMENT_PENDING", expiration: null }),
       );
 
       const caller = createCaller();
 
-      await caller
-        .acceptInvite({ inviteCode: "test-code" })
-        .catch(() => {});
+      await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(transactionMock).not.toHaveBeenCalled();
     });
@@ -187,13 +191,13 @@ describe("organization.acceptInvite", () => {
   describe("when invite status is WAITING_APPROVAL", () => {
     it("rejects with BAD_REQUEST", async () => {
       findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "WAITING_APPROVAL", expiration: null })
+        makeInvite({ status: "WAITING_APPROVAL", expiration: null }),
       );
 
       const caller = createCaller();
 
       await expect(
-        caller.acceptInvite({ inviteCode: "test-code" })
+        caller.acceptInvite({ inviteCode: "test-code" }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
         message: INVITE_NOT_READY_MESSAGE,
@@ -202,14 +206,12 @@ describe("organization.acceptInvite", () => {
 
     it("does not call the transaction", async () => {
       findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "WAITING_APPROVAL", expiration: null })
+        makeInvite({ status: "WAITING_APPROVAL", expiration: null }),
       );
 
       const caller = createCaller();
 
-      await caller
-        .acceptInvite({ inviteCode: "test-code" })
-        .catch(() => {});
+      await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
       expect(transactionMock).not.toHaveBeenCalled();
     });
@@ -222,7 +224,7 @@ describe("organization.acceptInvite", () => {
       const caller = createCaller();
 
       await expect(
-        caller.acceptInvite({ inviteCode: "test-code" })
+        caller.acceptInvite({ inviteCode: "test-code" }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
         message: INVITE_ALREADY_ACCEPTED_MESSAGE,

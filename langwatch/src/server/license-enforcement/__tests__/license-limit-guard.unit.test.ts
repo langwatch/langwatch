@@ -1,17 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 import {
   assertMemberTypeLimitNotExceeded,
   LICENSE_LIMIT_ERRORS,
   type MemberTypeLimits,
 } from "../license-limit-guard";
-import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 
 const { mockNotifyResourceLimitReached, mockCaptureException } = vi.hoisted(
   () => ({
     mockNotifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
     mockCaptureException: vi.fn(),
-  })
+  }),
 );
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -24,7 +24,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 describe("assertMemberTypeLimitNotExceeded", () => {
@@ -37,7 +37,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
 
   function createMockRepo(
     memberCount = 0,
-    membersLiteCount = 0
+    membersLiteCount = 0,
   ): ILicenseEnforcementRepository {
     return {
       getMemberCount: vi.fn().mockResolvedValue(memberCount),
@@ -50,7 +50,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
   function createLimits(
     maxMembers = 5,
     maxMembersLite = 10,
-    overrideAddingLimitations = false
+    overrideAddingLimitations = false,
   ): MemberTypeLimits {
     return { maxMembers, maxMembersLite, overrideAddingLimitations };
   }
@@ -64,7 +64,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "no-change",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "no-change",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "lite-to-full",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "lite-to-full",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
@@ -128,8 +128,8 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           "lite-to-full",
           organizationId,
           mockRepo,
-          limits
-        )
+          limits,
+        ),
       ).resolves.toBeUndefined();
 
       expect(mockRepo.getMemberCount).toHaveBeenCalledWith(organizationId);
@@ -143,7 +143,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "lite-to-full",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "lite-to-full",
         organizationId,
         mockRepo,
-        limits
+        limits,
       ).catch((e) => e);
 
       expect(error).toMatchObject({
@@ -180,7 +180,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "lite-to-full",
         organizationId,
         mockRepo,
-        limits
+        limits,
       ).catch(() => {});
 
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
@@ -200,8 +200,8 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           "lite-to-full",
           organizationId,
           mockRepo,
-          limits
-        )
+          limits,
+        ),
       ).rejects.toThrow(TRPCError);
     });
   });
@@ -216,8 +216,8 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           "full-to-lite",
           organizationId,
           mockRepo,
-          limits
-        )
+          limits,
+        ),
       ).resolves.toBeUndefined();
 
       expect(mockRepo.getMembersLiteCount).toHaveBeenCalledWith(organizationId);
@@ -231,7 +231,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "full-to-lite",
         organizationId,
         mockRepo,
-        limits
+        limits,
       );
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "full-to-lite",
         organizationId,
         mockRepo,
-        limits
+        limits,
       ).catch((e) => e);
 
       expect(error).toMatchObject({
@@ -267,7 +267,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         "full-to-lite",
         organizationId,
         mockRepo,
-        limits
+        limits,
       ).catch(() => {});
 
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
@@ -287,8 +287,8 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           "full-to-lite",
           organizationId,
           mockRepo,
-          limits
-        )
+          limits,
+        ),
       ).rejects.toThrow(TRPCError);
     });
   });

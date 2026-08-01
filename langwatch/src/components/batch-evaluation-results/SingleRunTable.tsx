@@ -13,11 +13,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
+import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
 import {
   type BatchTargetAggregate,
   computeAllBatchAggregates,
@@ -26,11 +28,14 @@ import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   calculateMinTableWidth,
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
   getTableStyles,
   inferColumnType,
-  ROW_HEIGHT,
+  type RowHeight,
 } from "./tableUtils";
 import type {
+  BatchComparisonColumn,
   BatchDatasetColumn,
   BatchEvaluationData,
   BatchResultRow,
@@ -46,6 +51,14 @@ type SingleRunTableProps = {
   hiddenColumns?: Set<string>;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Whether to render target output values (default true) */
+  showOutputs?: boolean;
+  /** Whether to render evaluator score chips (default true) */
+  showEvaluations?: boolean;
+  /** Whether to render the cost/latency readout (default true) */
+  showCostAndLatency?: boolean;
+  /** How much of each cell's collapsed content to show (default "m") */
+  rowHeight?: RowHeight;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -53,17 +66,44 @@ type SingleRunTableProps = {
 // Column helper for type-safe column definitions
 const columnHelper = createColumnHelper<BatchResultRow>();
 
+type BuildColumnsOptions = {
+  datasetColumns: BatchDatasetColumn[];
+  targetColumns: BatchTargetColumn[];
+  comparisonColumns: BatchComparisonColumn[];
+  aggregatesMap: Map<string, BatchTargetAggregate>;
+  rows: BatchResultRow[];
+  hiddenColumns: Set<string>;
+  showOutputs: boolean;
+  showEvaluations: boolean;
+  showCostAndLatency: boolean;
+  rowHeight: RowHeight;
+  targetColors?: Record<string, string>;
+};
+
 /**
  * Build columns for single run mode
  */
-const buildColumns = (
-  datasetColumns: BatchDatasetColumn[],
-  targetColumns: BatchTargetColumn[],
-  aggregatesMap: Map<string, BatchTargetAggregate>,
-  rows: BatchResultRow[],
-  hiddenColumns: Set<string>,
-  targetColors?: Record<string, string>,
-) => {
+const buildColumns = ({
+  datasetColumns,
+  targetColumns,
+  comparisonColumns,
+  aggregatesMap,
+  rows,
+  hiddenColumns,
+  showOutputs,
+  showEvaluations,
+  showCostAndLatency,
+  rowHeight,
+  targetColors,
+}: BuildColumnsOptions) => {
+  // Evaluator ids whose per-row chip is redundant with the dedicated Winner
+  // column below — the generic `EvaluatorResultChip` renders the comparison
+  // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
+  // report). Suppressing them in the target cell keeps the Winner column
+  // the single source of the comparison result.
+  const comparisonEvaluatorIds = new Set(
+    comparisonColumns.map((p) => p.evaluatorId),
+  );
   const columns = [];
 
   // Row number column
@@ -133,14 +173,36 @@ const buildColumns = (
           }
 
           // Use expandable cell for text content
-          return <ExpandableDatasetCell value={value} columnName={col.name} />;
+          return (
+            <ExpandableDatasetCell
+              value={value}
+              columnName={col.name}
+              rowHeight={rowHeight}
+            />
+          );
         },
       }),
     );
   }
 
-  // Target columns with headers that include summary
+  // Map each comparison column-target to its detected metadata so we
+  // can render the winner cell (badge + winning output + reasoning) INSIDE
+  // the comparison column's own cell — the user wants everything in one
+  // place, not split across a target column and a trailing Winner column.
+  const comparisonByTargetId = new Map(
+    comparisonColumns.map((p) => [p.evaluatorId, p]),
+  );
+
+  // Target columns with headers that include summary.
+  // Skip a column entirely when no target field is shown — unless it hosts
+  // a comparison verdict (Winner cell), which is independent of the field
+  // toggles and would otherwise vanish along with them, silently dropping
+  // the comparison result.
+  const showTargetColumns =
+    showOutputs || showEvaluations || showCostAndLatency;
   for (const targetCol of targetColumns) {
+    const comparisonMeta = comparisonByTargetId.get(targetCol.id);
+    if (!showTargetColumns && !comparisonMeta) continue;
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
 
@@ -156,8 +218,21 @@ const buildColumns = (
         ),
         size: 300,
         minSize: 200,
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
           const targetOutput = getValue();
+          // Comparison column-target cell: render the dedicated Winner cell
+          // (badge + winning output + reasoning) instead of the generic
+          // target output. That keeps everything the reader wants in one
+          // column so they don't need to scroll to a trailing Winner column.
+          if (comparisonMeta) {
+            return (
+              <ComparisonWinnerCell
+                column={comparisonMeta}
+                verdict={comparisonMeta.verdictsByRow[row.original.index]}
+                targetColors={targetColors}
+              />
+            );
+          }
           if (!targetOutput) {
             return (
               <Text fontSize="13px" color="fg.subtle">
@@ -165,8 +240,48 @@ const buildColumns = (
               </Text>
             );
           }
-          return <BatchTargetCell targetOutput={targetOutput} />;
+          return (
+            <BatchTargetCell
+              targetOutput={targetOutput}
+              suppressedEvaluatorIds={comparisonEvaluatorIds}
+              showOutput={showOutputs}
+              showEvaluations={showEvaluations}
+              showCostAndLatency={showCostAndLatency}
+              rowHeight={rowHeight}
+            />
+          );
         },
+      }),
+    );
+  }
+
+  // A comparison wired as an evaluator chip rather than as its own column has
+  // no target column to render its verdict inside, and its chip is suppressed
+  // above. Without a trailing Winner column the verdict would be invisible.
+  for (const column of trailingComparisonColumns(
+    comparisonColumns,
+    targetColumns,
+  )) {
+    columns.push(
+      columnHelper.display({
+        id: `comparison_${column.evaluatorId}`,
+        header: () => (
+          <HStack gap={1.5}>
+            <Swords size={14} />
+            <Text fontSize="12px" fontWeight="600">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        size: 240,
+        minSize: 200,
+        cell: ({ row }) => (
+          <ComparisonWinnerCell
+            column={column}
+            verdict={column.verdictsByRow[row.original.index]}
+            targetColors={targetColors}
+          />
+        ),
       }),
     );
   }
@@ -174,11 +289,27 @@ const buildColumns = (
   return columns;
 };
 
+/**
+ * Comparison columns that need a Winner column of their own — i.e. those that
+ * are not already rendered inside a matching target column.
+ */
+export const trailingComparisonColumns = (
+  comparisonColumns: BatchComparisonColumn[],
+  targetColumns: BatchTargetColumn[],
+): BatchComparisonColumn[] => {
+  const targetIds = new Set(targetColumns.map((t) => t.id));
+  return comparisonColumns.filter((c) => !targetIds.has(c.evaluatorId));
+};
+
 export function SingleRunTable({
   data,
   isLoading,
   hiddenColumns = new Set(),
   targetColors = {},
+  showOutputs = true,
+  showEvaluations = true,
+  showCostAndLatency = true,
+  rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
 }: SingleRunTableProps) {
   // Check if target colors should be shown (non-empty means X-axis is "target")
@@ -193,15 +324,30 @@ export function SingleRunTable({
   // Build columns from data
   const columns = useMemo(() => {
     if (!data) return [];
-    return buildColumns(
-      data.datasetColumns,
-      data.targetColumns,
+    return buildColumns({
+      datasetColumns: data.datasetColumns,
+      targetColumns: data.targetColumns,
+      comparisonColumns: data.comparisonColumns ?? [],
       aggregatesMap,
-      data.rows,
+      rows: data.rows,
       hiddenColumns,
-      showTargetColors ? targetColors : undefined,
-    );
-  }, [data, aggregatesMap, hiddenColumns, showTargetColors, targetColors]);
+      showOutputs,
+      showEvaluations,
+      showCostAndLatency,
+      rowHeight,
+      targetColors: showTargetColors ? targetColors : undefined,
+    });
+  }, [
+    data,
+    aggregatesMap,
+    hiddenColumns,
+    showOutputs,
+    showEvaluations,
+    showCostAndLatency,
+    rowHeight,
+    showTargetColors,
+    targetColors,
+  ]);
 
   // Memoize getCoreRowModel to prevent React scheduling loops
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
@@ -232,7 +378,11 @@ export function SingleRunTable({
     () => scrollContainer,
     [scrollContainer],
   );
-  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+  const estimatedRowHeight = ESTIMATED_ROW_HEIGHT_PX[rowHeight];
+  const estimateSize = useCallback(
+    () => estimatedRowHeight,
+    [estimatedRowHeight],
+  );
 
   // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
@@ -244,7 +394,8 @@ export function SingleRunTable({
     // Enable dynamic measurement - measures actual row heights as they render
     measureElement:
       typeof window !== "undefined"
-        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        ? (element) =>
+            element?.getBoundingClientRect().height ?? estimatedRowHeight
         : undefined,
   });
 
@@ -266,8 +417,28 @@ export function SingleRunTable({
   const datasetColCount = data.datasetColumns.filter(
     (c) => !hiddenColumns.has(c.name),
   ).length;
-  const targetColCount = data.targetColumns.length;
-  const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
+  // Target columns that don't host a comparison verdict collapse away when
+  // both output/evaluation sections are hidden — see the matching skip in
+  // buildColumns above.
+  const comparisonTargetIds = new Set(
+    (data.comparisonColumns ?? []).map((p) => p.evaluatorId),
+  );
+  const showTargetColumns =
+    showOutputs || showEvaluations || showCostAndLatency;
+  const targetColCount = showTargetColumns
+    ? data.targetColumns.length
+    : data.targetColumns.filter((t) => comparisonTargetIds.has(t.id)).length;
+  // Only the comparisons that get their own trailing column add width; one
+  // rendered inside a target column is already paid for by that column.
+  const comparisonColCount = trailingComparisonColumns(
+    data.comparisonColumns ?? [],
+    data.targetColumns,
+  ).length;
+  const minTableWidth = calculateMinTableWidth(
+    datasetColCount,
+    targetColCount,
+    comparisonColCount,
+  );
 
   const tableStyles = getTableStyles(minTableWidth);
   const virtualRows = rowVirtualizer.getVirtualItems();

@@ -24,7 +24,8 @@ describe("splitLeadingContextBlocks", () => {
     });
 
     it("handles attributes on the opening tag", () => {
-      const input = '<system-reminder priority="high">ctx</system-reminder>\n\nyo';
+      const input =
+        '<system-reminder priority="high">ctx</system-reminder>\n\nyo';
       const { context, body } = splitLeadingContextBlocks(input);
       expect(context).toBe(
         '<system-reminder priority="high">ctx</system-reminder>',
@@ -37,7 +38,9 @@ describe("splitLeadingContextBlocks", () => {
     it("returns the context with an empty body", () => {
       const input = "<system-reminder>only context here</system-reminder>";
       const { context, body } = splitLeadingContextBlocks(input);
-      expect(context).toBe("<system-reminder>only context here</system-reminder>");
+      expect(context).toBe(
+        "<system-reminder>only context here</system-reminder>",
+      );
       expect(body).toBe("");
     });
   });

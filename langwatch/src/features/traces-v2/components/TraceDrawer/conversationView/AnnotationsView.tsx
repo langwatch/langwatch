@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Flex,
   HStack,
@@ -10,11 +9,12 @@ import {
 } from "@chakra-ui/react";
 import { Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { UserAvatar } from "~/components/UserAvatar";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { AnnotationPopover } from "./AnnotationPopover";
 import type { ParsedTurn } from "./types";
@@ -160,11 +160,13 @@ function AnnotationRow({
     >
       <VStack align="stretch" gap={2}>
         <HStack>
-          <Avatar.Root size="xs" background="gray.solid" color="white">
-            <Avatar.Fallback
-              name={annotation.user?.name ?? annotation.email ?? "?"}
-            />
-          </Avatar.Root>
+          <UserAvatar
+            size="xs"
+            background="gray.solid"
+            color="white"
+            name={annotation.user?.name ?? annotation.email ?? "?"}
+            image={annotation.user?.image}
+          />
           <Text textStyle="xs" fontWeight="600">
             {annotation.user?.name ?? annotation.email ?? "anonymous"}
           </Text>

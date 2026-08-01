@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioAIGeneration } from "../ScenarioAIGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,8 +86,37 @@ describe("<ScenarioAIGeneration/>", () => {
   it("shows prompt view by default", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    expect(screen.getByText("Need Help?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+    expect(screen.getByText("Draft with AI")).toBeInTheDocument();
+    expect(
+      screen.getByText("Start from an idea, not a form."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /generate with ai/i }),
+    ).toBeInTheDocument();
+  });
+
+  describe("when a default model is resolved", () => {
+    it("shows which model generation uses, with a settings link", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      const caption = screen.getByTestId("scenario-ai-model-caption");
+      expect(caption).toHaveTextContent("Uses openai/gpt-4");
+      expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute(
+        "href",
+        "/settings/model-providers",
+      );
+    });
+  });
+
+  describe("when no default model resolves", () => {
+    it("does not render the model caption", () => {
+      setResolved(null);
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      expect(
+        screen.queryByTestId("scenario-ai-model-caption"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
 
@@ -107,13 +137,17 @@ describe("when resolved default is an Azure deployment not in registry", () => {
     it("does not show Model Provider Required warning", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      expect(screen.queryByText("Model Provider Required")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Model Provider Required"),
+      ).not.toBeInTheDocument();
     });
 
     it("does not disable the textarea when switching to input view", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       const textarea = screen.getByRole("textbox");
       expect(textarea).not.toBeDisabled();
@@ -136,7 +170,9 @@ describe("when resolved default is an Azure deployment not in registry", () => {
     it("treats model as disabled by disabling the textarea in input view", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       const textarea = screen.getByRole("textbox");
       expect(textarea).toBeDisabled();
@@ -172,8 +208,14 @@ describe("when no model providers are configured", () => {
     expect(primaryLink).toHaveAccessibleName("Configure model provider");
     expect(primaryLink).toHaveAttribute("href", "/settings/model-providers");
     expect(primaryLink).toHaveAttribute("target", "_blank");
-    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noopener"));
-    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+    expect(primaryLink).toHaveAttribute(
+      "rel",
+      expect.stringContaining("noopener"),
+    );
+    expect(primaryLink).toHaveAttribute(
+      "rel",
+      expect.stringContaining("noreferrer"),
+    );
   });
 
   it("keeps the inline explanatory text alongside the button", () => {
@@ -206,7 +248,9 @@ describe("given azure is the only enabled provider and resolved default is azure
     it("does not disable the textarea (healthy non-openai default)", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       const textarea = screen.getByRole("textbox");
       expect(textarea).not.toBeDisabled();
@@ -215,7 +259,9 @@ describe("given azure is the only enabled provider and resolved default is azure
     it("does not render API keys warning", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
     });
@@ -239,7 +285,9 @@ describe("given azure is the only enabled provider and resolved default is null"
     it("does not render API keys warning (misleading bug message)", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
     });
@@ -247,7 +295,9 @@ describe("given azure is the only enabled provider and resolved default is null"
     it("renders an error mentioning default model", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       expect(screen.getByText(/no default model set/i)).toBeInTheDocument();
     });
@@ -255,7 +305,9 @@ describe("given azure is the only enabled provider and resolved default is null"
     it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       const link = screen.getByTestId(
         "scenario-ai-configure-default-model-button",
@@ -264,7 +316,10 @@ describe("given azure is the only enabled provider and resolved default is null"
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
-      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+      expect(link).toHaveAttribute(
+        "rel",
+        expect.stringContaining("noreferrer"),
+      );
     });
   });
 });
@@ -286,7 +341,9 @@ describe("given azure is the only enabled provider and resolved default is opena
     it("does not render API keys warning (misleading bug message)", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
     });
@@ -294,15 +351,21 @@ describe("given azure is the only enabled provider and resolved default is opena
     it("renders an error mentioning the provider is disabled", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
-      expect(screen.getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/provider.*disabled|disabled.*provider/i),
+      ).toBeInTheDocument();
     });
 
     it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      );
 
       const link = screen.getByTestId(
         "scenario-ai-configure-default-model-button",
@@ -311,7 +374,10 @@ describe("given azure is the only enabled provider and resolved default is opena
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
-      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+      expect(link).toHaveAttribute(
+        "rel",
+        expect.stringContaining("noreferrer"),
+      );
     });
   });
 });
@@ -341,7 +407,9 @@ describe("given providers are still loading", () => {
     it("renders the Generate with AI button", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /generate with ai/i }),
+      ).toBeInTheDocument();
     });
   });
 });

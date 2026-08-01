@@ -17,8 +17,8 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import { ScenarioService } from "../scenario.service";
 import { ScenarioRepository } from "../scenario.repository";
+import { ScenarioService } from "../scenario.service";
 
 describe("ScenarioService", () => {
   const projectId = "test-project-id";
@@ -231,17 +231,12 @@ describe("ScenarioService", () => {
   });
 
   // ==========================================================================
-  // License Limits
+  // Active scenario counting
   // ==========================================================================
 
-  describe("license limit counting", () => {
+  describe("active scenario counting", () => {
     describe("when scenarios are archived", () => {
       it("excludes archived scenarios from a count of active scenarios", async () => {
-        const organization = await prisma.organization.findUnique({
-          where: { slug: "test-organization" },
-        });
-        expect(organization).not.toBeNull();
-
         // Create 3 active scenarios
         await createScenario({ name: "Active 1" });
         await createScenario({ name: "Active 2" });

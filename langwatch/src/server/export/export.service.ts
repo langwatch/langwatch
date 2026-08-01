@@ -8,19 +8,21 @@
  * Memory-efficient: only one batch of traces (up to 100) is held in memory at a time.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { Protections } from "~/server/elasticsearch/protections";
-import type { Trace, Evaluation } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
-import { createLogger } from "~/utils/logger/server";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
-  serializeTracesToSummaryCsv,
+  CSV_NEWLINE,
   serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
 } from "./serializers/csv-serializer";
 import {
-  serializeTraceToSummaryJson,
   serializeTraceToFullJson,
+  serializeTraceToSummaryJson,
 } from "./serializers/json-serializer";
 import type { ExportProgress, ExportRequest } from "./types";
 
@@ -57,9 +59,13 @@ export class ExportService {
     const { TraceService: TraceServiceImpl } = await import(
       "~/server/traces/trace.service"
     );
-    const resolvedPrisma =
-      prisma ?? (await import("~/server/db")).prisma;
-    const traceService = TraceServiceImpl.create(resolvedPrisma);
+    const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
+    // Export is a content-consuming read: wire blob-resolution deps so a full
+    // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
+    const traceService = TraceServiceImpl.create(
+      resolvedPrisma,
+      buildTraceBlobResolutionDeps(),
+    );
     return new ExportService({ traceService });
   }
 
@@ -112,7 +118,11 @@ export class ExportService {
     protections: Protections;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
-      { projectId: request.projectId, mode: request.mode, format: request.format },
+      {
+        projectId: request.projectId,
+        mode: request.mode,
+        format: request.format,
+      },
       "Starting trace export",
     );
 
@@ -145,6 +155,13 @@ export class ExportService {
         {
           downloadMode: true,
           includeSpans,
+          // DATA LOSS (#4991): summary mode reads no span content, but it still
+          // emits trace-level `trace.input`/`trace.output` (see the csv/json
+          // summary serializers) — so it is content-consuming too. Gating on
+          // `includeSpans` therefore shipped the truncated 64 KB preview for any
+          // offloaded trace, silently. Resolve for every export mode; the batch
+          // resolver keeps the extra event_log reads bounded.
+          resolveBlobs: true,
           scrollId: scrollId ?? null,
         },
       );
@@ -258,7 +275,12 @@ function serializeBatch({
 }): string {
   switch (request.format) {
     case "csv":
-      return serializeCsvBatch({ traces, request, evaluatorNames, includeHeader });
+      return serializeCsvBatch({
+        traces,
+        request,
+        evaluatorNames,
+        includeHeader,
+      });
     case "json":
       return serializeJsonBatch({ traces, request });
     default: {
@@ -304,13 +326,16 @@ function serializeJsonBatch({
 }): string {
   switch (request.mode) {
     case "summary":
-      return traces
-        .map((trace) => serializeTraceToSummaryJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces
+          .map((trace) => serializeTraceToSummaryJson({ trace }))
+          .join("\n") + "\n"
+      );
     case "full":
-      return traces
-        .map((trace) => serializeTraceToFullJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") +
+        "\n"
+      );
     default: {
       const _exhaustive: never = request.mode;
       throw new Error(`Unsupported mode: ${_exhaustive}`);
@@ -320,9 +345,16 @@ function serializeJsonBatch({
 
 /**
  * Remove the first line (header) from a CSV string.
+ *
+ * Must search for the same sequence the serializer wrote. Splitting on "\n"
+ * while the rows are terminated with "\r\n" leaves a stray carriage return at
+ * the head of the chunk, which becomes a phantom leading field.
+ *
+ * Exported for the batch-boundary tests, which concatenate chunks exactly as
+ * this service does. A test-local copy could pass while this regressed.
  */
-function stripCsvHeader(csv: string): string {
-  const firstNewline = csv.indexOf("\n");
-  if (firstNewline === -1) return "";
-  return csv.slice(firstNewline + 1);
+export function stripCsvHeader(csv: string): string {
+  const firstBreak = csv.indexOf(CSV_NEWLINE);
+  if (firstBreak === -1) return "";
+  return csv.slice(firstBreak + CSV_NEWLINE.length);
 }

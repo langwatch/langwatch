@@ -154,6 +154,7 @@ export async function getDefaultModelsSnapshot(
   const effective: Record<ModelRole, DefaultModelEffective | null> = {
     DEFAULT: null,
     FAST: null,
+    LANGY: null,
     EMBEDDINGS: null,
   };
   for (const role of MODEL_ROLES) {
@@ -343,9 +344,7 @@ export async function getDefaultModelsSnapshot(
   const seenProjectIds = Array.from(
     new Set(
       configRows.flatMap((c) =>
-        c.scopes
-          .filter((s) => s.scopeType === "PROJECT")
-          .map((s) => s.scopeId),
+        c.scopes.filter((s) => s.scopeType === "PROJECT").map((s) => s.scopeId),
       ),
     ),
   );
@@ -479,9 +478,7 @@ export async function getInheritedValuesForScopes(
     .filter((s) => s.scopeType === "ORGANIZATION")
     .map((s) => s.scopeId);
   if (pickedOrgIds.some((id) => id !== organizationId)) {
-    throw new Error(
-      "Scope organization does not match project organization.",
-    );
+    throw new Error("Scope organization does not match project organization.");
   }
   if (pickedTeamIds.length > 0) {
     const sameOrgTeams = await ctx.prisma.team.findMany({
@@ -498,9 +495,7 @@ export async function getInheritedValuesForScopes(
       select: { id: true },
     });
     if (sameOrgProjects.length !== new Set(pickedProjectIds).size) {
-      throw new Error(
-        "Scope project does not belong to project organization.",
-      );
+      throw new Error("Scope project does not belong to project organization.");
     }
   }
 
@@ -663,9 +658,9 @@ export async function getInheritedValuesForScopes(
       inherited[role] = hit;
       continue;
     }
-    const inferredModel = (
-      inferencePlan as Record<string, string | undefined>
-    )[role];
+    const inferredModel = (inferencePlan as Record<string, string | undefined>)[
+      role
+    ];
     if (inferredModel && inferenceProvider) {
       inherited[role] = {
         model: inferredModel,

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getPageCommands, pageCommandRegistry } from "../pageCommands";
 import { tracesPageCommands } from "../pageCommands/tracesPageCommands";
 
@@ -37,10 +37,10 @@ describe("pageCommands", () => {
   describe("tracesPageCommands", () => {
     it("contains view switching commands", () => {
       const listView = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-view-list"
+        (cmd) => cmd.id === "page-traces-view-list",
       );
       const tableView = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-view-table"
+        (cmd) => cmd.id === "page-traces-view-table",
       );
 
       expect(listView).toBeDefined();
@@ -52,13 +52,13 @@ describe("pageCommands", () => {
 
     it("contains date range commands", () => {
       const date7d = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-7d"
+        (cmd) => cmd.id === "page-traces-date-7d",
       );
       const date30d = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-30d"
+        (cmd) => cmd.id === "page-traces-date-30d",
       );
       const today = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-date-today"
+        (cmd) => cmd.id === "page-traces-date-today",
       );
 
       expect(date7d).toBeDefined();
@@ -73,7 +73,7 @@ describe("pageCommands", () => {
 
     it("contains clear filters command", () => {
       const clearFilters = tracesPageCommands.find(
-        (cmd) => cmd.id === "page-traces-clear-filters"
+        (cmd) => cmd.id === "page-traces-clear-filters",
       );
 
       expect(clearFilters).toBeDefined();
@@ -100,7 +100,7 @@ describe("pageCommands", () => {
   describe("pageCommandRegistry", () => {
     it("has registry for traces page", () => {
       expect(pageCommandRegistry["/[project]/messages"]).toBe(
-        tracesPageCommands
+        tracesPageCommands,
       );
     });
   });

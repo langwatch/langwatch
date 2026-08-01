@@ -13,7 +13,10 @@ permissions:
 
 concurrency:
   group: go-services-${{ github.ref_name }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -21,9 +24,10 @@ jobs:
     outputs:
       service: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.service }}
       chart: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.chart }}
+      langyagent: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.langyagent }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
@@ -39,6 +43,34 @@ jobs:
             chart:
               - 'charts/gateway/**'
               - '.github/workflows/go-services.yaml'
+            langyagent:
+              # The langyagent image bakes in the langwatch CLI, and that CLI is
+              # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
+              # typescript-sdk/ + skills/ + feature-map.json + a handful of
+              # langwatch/langevals source files (typescript-sdk/copy-types.sh +
+              # generate-skills-bundle.mjs). A change to any of those can break
+              # `docker build -f Dockerfile.langyagent` with no Go source
+              # touched — exactly the gap that shipped a broken build once
+              # (a new copy-types.sh input was never COPYed into the image).
+              # Validate the image build whenever any build input moves.
+              - 'services/langyagent/**'
+              - 'pkg/**'
+              - 'cmd/**'
+              - 'sdk-go/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Dockerfile.langyagent'
+              - 'typescript-sdk/**'
+              - 'packages/langy/**'
+              - 'skills/**'
+              - 'feature-map.json'
+              - 'langwatch/src/server/tracer/types.ts'
+              - 'langwatch/src/server/filters/types.ts'
+              - 'langwatch/src/server/evaluations/types.ts'
+              - 'langwatch/src/server/modelProviders/llmModels.json'
+              - 'langwatch/src/app/api/openapiLangWatch.json'
+              - 'langevals/ts-integration/evaluators.generated.ts'
+              - '.github/workflows/go-services.yaml'
 
   docker:
     needs: changes
@@ -46,21 +78,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v3
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v3
         with:
           platforms: arm64
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
           driver-opts: image=moby/buildkit:buildx-stable-1
 
       - name: Login to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -74,7 +106,7 @@ jobs:
           echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
         with:
           context: .
           file: Dockerfile.go_service
@@ -88,16 +120,49 @@ jobs:
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,scope=gateway,mode=max
 
+  langyagent:
+    needs: changes
+    if: ${{ needs.changes.outputs.langyagent == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          driver-opts: image=moby/buildkit:buildx-stable-1
+
+      # Build-only guard: this image is NEVER pushed from here. The langyagent
+      # image is published solely by publish-docker-app.yml on a `langwatch@*`
+      # release; this job exists to fail a PR fast when a build input breaks the
+      # image, not to produce an artifact. amd64 only — the failure modes we're
+      # guarding (a missing copy-types.sh input, an unresolved generated import,
+      # a broken Go compile) are arch-independent, so an emulated arm64 build
+      # would triple the runtime for no extra signal. Shares the release
+      # workflow's amd64 cache scope so PR builds warm from it.
+      - name: Build langyagent image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
+        with:
+          context: .
+          file: Dockerfile.langyagent
+          push: false
+          platforms: linux/amd64
+          build-args: |
+            SERVICE_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=langyagent-amd64
+          cache-to: type=gha,scope=langyagent-amd64,mode=max
+
   helm:
     needs: changes
     if: ${{ needs.changes.outputs.chart == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v4
         with:
           version: v3.18.0
 
@@ -133,12 +198,53 @@ jobs:
 
       - name: Assert gateway subchart renders under the umbrella
         run: |
-          if ! grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella.yaml; then
+          # Assert on the Source marker helm stamps on every rendered file, not on
+          # the gateway's pod label: sibling charts legitimately SELECT that label
+          # (langyagent's NetworkPolicy has an egress rule to the gateway), so a
+          # label grep answers "does anything mention the gateway", not "did the
+          # subchart render".
+          if ! grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella.yaml; then
             echo "umbrella chart did NOT include the gateway subchart — dependency broken?"
             exit 1
           fi
           if ! grep -q "targetPort: 5563" /tmp/umbrella.yaml; then
             echo "gateway Service targetPort !=5563 under the umbrella"
+            exit 1
+          fi
+
+      - name: Assert the gateway follows the release name to the control plane
+        working-directory: charts/langwatch
+        run: |
+          # A fixed control-plane address resolves only on an install named the
+          # same as ours, and the failure is silent: every pod healthy, then
+          # every virtual-key request refused. Render under a release name that
+          # is deliberately NOT "langwatch" so a hardcoded default cannot pass.
+          helm template lw . --set autogen.enabled=true --dry-run > /tmp/umbrella-lw.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://lw-app:5560"' /tmp/umbrella-lw.yaml; then
+            echo "gateway control-plane URL does not follow the release name:"
+            grep "LW_GATEWAY_BASE_URL" /tmp/umbrella-lw.yaml || echo "  (not rendered at all)"
+            exit 1
+          fi
+
+          # An address the operator set is theirs, not a starting point.
+          helm template lw . --set autogen.enabled=true \
+            --set gateway.controlPlane.baseUrl=http://elsewhere.internal:9000 --dry-run \
+            > /tmp/umbrella-cp-override.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://elsewhere.internal:9000"' /tmp/umbrella-cp-override.yaml; then
+            echo "an explicit gateway.controlPlane.baseUrl was overridden by the derived one"
+            exit 1
+          fi
+
+          # The derivation can only assume the default app port, so an app moved
+          # off it has to be refused rather than silently dialled.
+          if helm template lw . --set autogen.enabled=true --set app.service.port=8080 --dry-run \
+            > /tmp/umbrella-cp-port.yaml 2>&1; then
+            echo "a non-default app.service.port with no gateway.controlPlane.baseUrl should fail to render"
+            exit 1
+          fi
+          if ! grep -q "gateway.controlPlane.baseUrl" /tmp/umbrella-cp-port.yaml; then
+            echo "the refusal does not name the value that fixes it:"
+            cat /tmp/umbrella-cp-port.yaml
             exit 1
           fi
 
@@ -149,7 +255,7 @@ jobs:
 
       - name: Assert opt-out drops the gateway
         run: |
-          if grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella-no-gw.yaml; then
+          if grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella-no-gw.yaml; then
             echo "gateway.chartManaged=false should suppress the subchart"
             exit 1
           fi

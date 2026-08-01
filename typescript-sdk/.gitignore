@@ -17,3 +17,5 @@ tmp/
 prompts/.materialized
 
 langwatch-*.tgz
+
+.startup-profile/

@@ -1,9 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "../scenario-event.enums";
-import {
-  resolveRunStatus,
-  STALL_THRESHOLD_MS,
-} from "../stall-detection";
+import { resolveRunStatus, STALL_THRESHOLD_MS } from "../stall-detection";
 
 const NOW = Date.now();
 

@@ -1,9 +1,11 @@
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
+import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
+import { havenHmrGate } from "./vite/havenHmrGate";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -11,9 +13,16 @@ import { generate as generateSelfsigned } from "selfsigned";
 // The API server (`server.mts`) loads its own copy via `dotenv.config()`
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, ".env"), quiet: true });
+// Portless (haven) overlay wins: loaded after .env with override so the
+// resolved app port + api hostname take effect. Absent in non-portless runs.
+dotenv.config({
+  path: path.resolve(__dirname, ".env.portless"),
+  override: true,
+  quiet: true,
+});
 
-const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
+const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -23,6 +32,15 @@ const API_PORT = FRONTEND_PORT + 1000;
 // asks to trust the cert once for the whole local stack.
 const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
 const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
+// In portless (haven) mode the app and its API are ONE origin
+// (app.<slug>.langwatch.localhost): the SPA is served here and /api/* is proxied
+// straight to the API backend on loopback. Proxying to loopback (not the app's
+// own public hostname) avoids a self-proxy loop and needs no TLS/CA. Outside
+// portless we keep the legacy PORT+1000 target (or an explicit LANGWATCH_API_URL).
+const API_TARGET =
+  process.env.LANGWATCH_PORTLESS === "1"
+    ? `http://127.0.0.1:${process.env.LANGWATCH_API_PORT ?? API_PORT}`
+    : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors
@@ -31,9 +49,9 @@ const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
  * the race benign — whichever loses the race overwrites with the same
  * effective contents, and subsequent reads find a valid pair.
  */
-function loadDevHttpsCredentials():
-  | { cert: Buffer; key: Buffer }
-  | null {
+async function loadDevHttpsCredentials(): Promise<
+  { cert: Buffer; key: Buffer } | null
+> {
   if (!USE_HTTP2) return null;
 
   if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
@@ -53,10 +71,13 @@ function loadDevHttpsCredentials():
     return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
   }
 
-  const pems = generateSelfsigned(
+  // selfsigned v5 dropped the `days` option; use an explicit not-after date.
+  const notAfterDate = new Date();
+  notAfterDate.setDate(notAfterDate.getDate() + 825);
+  const pems = await generateSelfsigned(
     [{ name: "commonName", value: "localhost" }],
     {
-      days: 825,
+      notAfterDate,
       keySize: 2048,
       extensions: [
         {
@@ -75,23 +96,6 @@ function loadDevHttpsCredentials():
   writeFileSync(certPath, pems.cert);
   writeFileSync(keyPath, pems.private);
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
-}
-
-const devHttpsCredentials = loadDevHttpsCredentials();
-
-// Diagnostic: when Vite hot-restarts on a config change, the https block is
-// re-evaluated but in-process TLS state can land in a broken pair (server
-// listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
-// makes the post-restart scheme observable in `server.log`, so a "blank
-// page after editing config" failure mode is easy to diagnose without
-// digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
-// module graph and `.dev-certs/` if the cert pair is suspected.
-if (USE_HTTP2) {
-  console.log(
-    `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
-  );
-} else {
-  console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
@@ -121,19 +125,38 @@ function patchObjectInspectBrowserStub(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), patchObjectInspectBrowserStub()],
+export default defineConfig(async (): Promise<UserConfig> => {
+  const devHttpsCredentials = await loadDevHttpsCredentials();
+
+  // Diagnostic: when Vite hot-restarts on a config change, the https block is
+  // re-evaluated but in-process TLS state can land in a broken pair (server
+  // listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
+  // makes the post-restart scheme observable in `server.log`, so a "blank
+  // page after editing config" failure mode is easy to diagnose without
+  // digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
+  // module graph and `.dev-certs/` if the cert pair is suspected.
+  if (USE_HTTP2) {
+    console.log(
+      `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+    );
+  } else {
+    console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+  }
+
+  return {
+  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
-
-      // Browser stubs for Node.js-only modules
-      "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),
-      "pino": path.resolve(__dirname, "node_modules/pino/browser.js"),
     },
+    // ONE zod instance for the app AND linked workspace packages
+    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // z.record's key/value overload detection), so a second physical copy
+    // resolved from a package's own node_modules silently mis-parses.
+    dedupe: ["zod"],
   },
   define: {
     // Literal replacements for process.env references in browser code.
@@ -171,21 +194,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          // Keep the whole Shiki ecosystem in one self-contained chunk.
-          // Under the rolldown bundler the default split hoists Shiki's
-          // singleton factory into the entry chunk and leaves the Shiki
-          // chunk calling back into it at module top level. Because the
-          // entry eagerly loads Shiki, that call runs before the entry has
-          // initialized the export, throwing "undefined is not a function"
-          // at boot and white-screening the app. One chunk removes the
-          // cross-chunk cycle.
-          if (
-            /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/.test(
-              id,
-            )
-          ) {
-            return "shiki";
-          }
+          // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
+          // its guard test can exercise the real logic. It keeps the core + base
+          // grammars/themes eager and splits the other ~340 grammars into lazy
+          // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
+          // that used to load on every page. See that file for the boot-cycle
+          // rationale.
+          return shikiManualChunk(id);
         },
       },
     },
@@ -199,8 +214,32 @@ export default defineConfig({
         "**/dist/**",
         "**/.next/**",
         "**/coverage/**",
-        "**/server.log",
+        // Any dev-server tee target (server.log, server-qa.log, ...): the
+        // server appends on every request, so watching one turns each page
+        // load into a full-reload loop.
+        "**/server*.log",
+        // Working files agents keep under .claude/tmp, per the repo
+        // convention. A dev-server log teed there reloads the page on every
+        // request, same trap as above under a different name. Agent
+        // worktrees also live under .claude/worktrees, and chokidar
+        // matches ignore globs against full paths, so from a worktree
+        // root any pattern containing .claude/worktrees matches every
+        // file in the tree and blinds the watcher entirely. From a
+        // worktree only .claude/tmp is ignored (worktrees do not nest);
+        // from the main root the entire .claude tree, nested worktree
+        // copies included, stays ignored as before.
+        ...(process.cwd().includes("/.claude/")
+          ? ["**/.claude/tmp/**"]
+          : ["**/.claude/**"]),
       ],
+      // Docker-on-macOS bind mounts don't surface inotify events reliably,
+      // so Vite's default fs.watch sits silent on edits made from the host.
+      // Polling at 250ms is the standard workaround and HMR fires
+      // immediately. Native macOS / Linux hosts opt out via
+      // `LANGWATCH_VITE_NO_POLLING=1` to dodge the CPU tax.
+      ...(process.env.LANGWATCH_VITE_NO_POLLING === "1"
+        ? {}
+        : { usePolling: true, interval: 250 }),
     },
     // Frontend port (default 5560, configurable via PORT env var)
     host: true,
@@ -230,44 +269,68 @@ export default defineConfig({
     // production server (start.ts) listens on a single port so this
     // splitting is dev-only.
     proxy: {
+      // The tRPC WS transport enforces a same-origin allowlist (built from
+      // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
+      // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
+      // the WS handshake Origin so the backend sees a null/foreign origin and
+      // rejects every upgrade — silently breaking all WS-backed workbench
+      // state. A dedicated, earlier entry keeps the browser's real Origin.
+      "/api/trpc-ws": {
+        target: API_TARGET,
+        changeOrigin: false,
+        ws: true,
+        secure: false,
+      },
       "/api": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
         // Self-signed dev cert — don't fail the proxy on cert verification.
         // No-op when API is on plain HTTP.
         secure: false,
       },
-      "/mcp": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+      // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
+      // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
+      // sending it to the API server, which has no dev-mode page fallback.
+      // server.proxy regexes test against the full req.url (path + query),
+      // so the optional "(?:\?.*)?" is required or a query-bearing request
+      // like "/mcp?sessionId=..." falls through to the frontend instead.
+      "^/mcp(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      "^/mcp/health(?:\\?.*)?$": {
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/sse": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/messages": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/oauth": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-protected-resource": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
     },
   },
+  };
 });

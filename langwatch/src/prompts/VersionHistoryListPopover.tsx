@@ -5,23 +5,23 @@ import {
   Button,
   HStack,
   Separator,
-  Spacer,
   Spinner,
   Tag,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect } from "react";
+import { createLogger } from "@langwatch/observability";
+import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("VersionHistoryListPopover");
 
@@ -36,6 +36,8 @@ interface VersionHistoryItemData {
   commitMessage?: string;
   author?: {
     name: string | null;
+    email?: string | null;
+    image?: string | null;
   } | null;
 }
 
@@ -71,6 +73,75 @@ const VersionNumberBox = ({
 };
 
 /**
+ * Author line for a version: an avatar (SSO/OAuth photo → initials → generic
+ * silhouette), the author's display name, and a tooltip revealing who it is.
+ *
+ * The name falls back to the author's email, then to "Unknown author", so the
+ * row is never a bare, unlabelled icon. Versions created through the SDK/API
+ * have no author on record; that is stated in the tooltip rather than left
+ * blank (which previously rendered as a nameless silhouette with no hover).
+ */
+function VersionAuthor({
+  author,
+}: {
+  author?: VersionHistoryItemData["author"];
+}) {
+  const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
+
+  const name = author?.name?.trim() ? author.name.trim() : null;
+  const email = author?.email?.trim() ? author.email.trim() : null;
+  const image = author?.image ?? null;
+
+  const label = name ?? email ?? "Unknown author";
+  const isKnown = Boolean(name ?? email);
+  // OAuth/SSO image URLs can 404 or be CORS-blocked; fall back to initials
+  // instead of the browser's broken-image glyph (see PresenceAvatar).
+  const showImage = Boolean(image) && image !== brokenImageUrl;
+
+  const tooltipContent = !author ? (
+    "No author recorded for this version"
+  ) : (
+    <VStack gap={0} align="start">
+      <Text fontWeight={600}>{name ?? email ?? "Unknown author"}</Text>
+      {name && email && (
+        <Text fontSize="11px" opacity={0.8}>
+          {email}
+        </Text>
+      )}
+    </VStack>
+  );
+
+  return (
+    <Tooltip
+      content={tooltipContent}
+      positioning={{ placement: "top" }}
+      showArrow
+    >
+      <HStack fontSize="12px" gap={1.5} minWidth={0} cursor="default">
+        <Avatar.Root
+          size="2xs"
+          backgroundColor="orange.solid"
+          color="white"
+          width="16px"
+          height="16px"
+        >
+          {showImage && image && (
+            <Avatar.Image
+              src={image}
+              onError={() => setBrokenImageUrl(image)}
+            />
+          )}
+          <Avatar.Fallback name={name ?? ""} fontSize="6.4px" />
+        </Avatar.Root>
+        <Text lineClamp={1} color={isKnown ? "fg.muted" : "fg.subtle"}>
+          {label}
+        </Text>
+      </HStack>
+    </Tooltip>
+  );
+}
+
+/**
  * Individual version history item showing commit message, author and restore button
  */
 function VersionHistoryItem({
@@ -92,9 +163,19 @@ function VersionHistoryItem({
       <HStack width="full" gap={3} align="start">
         <VersionNumberBox version={data} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
-          <HStack width="full">
-            <HStack gap={2} flex={1} minWidth={0}>
-              <Text fontWeight={600} fontSize="13px" lineClamp={1}>
+          <HStack width="full" align="start">
+            <HStack gap={2} flex={1} minWidth={0} align="start">
+              <Text
+                fontWeight={600}
+                fontSize="13px"
+                wordBreak="break-word"
+                flex="1"
+                minWidth={0}
+                // Generous enough that the 200-char message the Save Version
+                // dialog allows never clips; still bounds a pathological
+                // message set via the API/SDK, which has no length limit.
+                lineClamp={8}
+              >
                 {data.commitMessage}
               </Text>
               {isCurrent && (
@@ -108,7 +189,6 @@ function VersionHistoryItem({
                 </Tag.Root>
               )}
             </HStack>
-            <Spacer />
             {/* Discard changes button - reloads current version (same as "Load this version") */}
             {isCurrent && hasUnsavedChanges && (
               <Button
@@ -125,21 +205,7 @@ function VersionHistoryItem({
               </Button>
             )}
           </HStack>
-          <HStack fontSize="12px">
-            <Avatar.Root
-              size="2xs"
-              backgroundColor="orange.solid"
-              color="white"
-              width="16px"
-              height="16px"
-            >
-              <Avatar.Fallback
-                name={data.author?.name ?? ""}
-                fontSize="6.4px"
-              />
-            </Avatar.Root>
-            {data.author?.name}
-          </HStack>
+          <VersionAuthor author={data.author} />
         </VStack>
         {!isCurrent && (
           <Tooltip
@@ -369,7 +435,7 @@ export function VersionHistoryListPopover({
         projectId: project?.id ?? "",
       },
       {
-        enabled: !!project?.id && !!configId,
+        enabled: open && !!project?.id && !!configId,
       },
     );
 
@@ -404,10 +470,9 @@ export function VersionHistoryListPopover({
           });
         } catch (error) {
           logger.error({ error }, "Error loading version");
-          toaster.error({
-            title: "Failed to load version",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't load this version",
           });
         }
       })();

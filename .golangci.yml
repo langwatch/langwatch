@@ -38,6 +38,15 @@ linters:
     # Security — static analysis for vulnerabilities.
     - gosec            # inspects source code for security problems
 
+    # House rules — the SRP limits /.coderabbit.yaml states as prose in its
+    # AC7 block. These carry a pre-existing baseline, so go-ci gates them via
+    # `--new-from-merge-base` (new and changed lines only), not the full tree.
+    # Delete the matching FAIL clauses from .coderabbit.yaml as each lands, or
+    # every violation gets reported twice — once here, once by the reviewer.
+    - funlen           # 60-line / 40-statement function cap
+    - gocognit         # cognitive complexity > 10
+    - revive           # argument-limit + doc comments on exported symbols
+
     # Hygiene — keeps the codebase tidy.
     - dupword          # repeated words in comments
     - misspell         # typos in identifiers and comments
@@ -63,6 +72,28 @@ linters:
 
     exhaustive:
       default-signifies-exhaustive: true
+
+    # Mirrors the TypeScript side: biome.new-code.jsonc caps functions at 60
+    # lines. Statements are capped too because a 60-line function of dense
+    # one-liners is the same SRP problem.
+    funlen:
+      lines: 60
+      statements: 40
+      ignore-comments: true
+
+    gocognit:
+      min-complexity: 10
+
+    revive:
+      rules:
+        # 3 positional params, matching biome's useMaxParams. Past that, a
+        # struct or options type reads better at the call site.
+        - name: argument-limit
+          arguments: [3]
+        # .coderabbit.yaml already demands doc comments on new exported Go
+        # symbols; this is that rule, deterministically.
+        - name: exported
+          arguments: ["sayRepetitiveInsteadOfStutters"]
 
     errorlint:
       asserts: false  # type assertions on error are fine internally
@@ -111,17 +142,44 @@ linters:
 
     rules:
       # Tests: relax rules that trade readability for strictness.
+      #
+      # funlen/gocognit are excluded because a table-driven test is one long
+      # function by design and splitting it to satisfy a line count makes it
+      # harder to read, not easier. revive's `exported` is excluded because
+      # test helpers are not API surface.
       - path: _test\.go
         linters:
           - errcheck
           - noctx
           - unparam
           - bodyclose
+          - funlen
+          - gocognit
+          - revive
 
       # paramTypeCombine is style, not a bug.
       - linters:
           - gocritic
         text: "paramTypeCombine"
+
+      # Prometheus counters are exact small integers that happen to be carried
+      # in a float64, so assert.Equal is the correct comparison and there is no
+      # representation error for float-compare to protect against.
+      #
+      # Scoped to this package rather than disabled globally, because
+      # float-compare is worth keeping wherever real float arithmetic happens.
+      #
+      # The linter's primary suggestion is also inapplicable here.
+      # assert.InEpsilon computes the error relative to the expected value, so
+      # it divides by zero and returns false for a zero expectation, verified:
+      # InEpsilon(0.0, 0.0, 0.0001) is false. Seven of these assertions check
+      # that a counter did NOT move, which is the point of the negative half of
+      # a metrics test, and rewriting those to InEpsilon would turn them into
+      # assertions that always fail.
+      - path: services/aigateway/adapters/gatewaymetrics/.*_test\.go
+        linters:
+          - testifylint
+        text: "float-compare"
 
 issues:
   max-issues-per-linter: 0

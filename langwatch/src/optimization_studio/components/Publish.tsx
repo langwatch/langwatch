@@ -18,7 +18,6 @@ import {
   ArrowUpCircle,
   ChevronDown,
   Code,
-  Play,
   Share2,
   XCircle,
 } from "react-feather";
@@ -447,10 +446,7 @@ function PublishModalContent({
 
   const formVersion = form.watch("version");
 
-  const {
-    versions,
-    versionToBeEvaluated,
-  } = useVersionState({
+  const { versions, versionToBeEvaluated } = useVersionState({
     project,
     form,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
@@ -609,78 +605,81 @@ function PublishModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content bg="bg"
-      as="form"
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onSubmit={form.handleSubmit(onSubmit)}
-      borderTop="5px solid"
-      borderColor="green.400"
-    >
-      <Dialog.Header>
-        <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
-      </Dialog.Header>
-      <Dialog.CloseTrigger />
-      <Dialog.Body>
-        <VStack align="start" width="full" gap={10}>
-          <Text fontSize="15px" color="black">
-            Publish your workflow to make it available via API, as a component
-            to other workflows, or as a custom evaluator.
-          </Text>
-          <VersionToBeUsed />
-        </VStack>
-      </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
-        <VStack align="start" width="full" gap={3}>
-          {hasProvidersWithoutCustomKeys && (
-            <AddModelProviderKey
-              runWhat="publish"
-              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-            />
-          )}
-          {!isPublished && (
-            <Tooltip content={isDisabled}>
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  variant="outline"
-                  type="submit"
-                  loading={commitVersion.isLoading || publishWorkflow.isLoading}
-                  disabled={!!isDisabled}
-                >
-                  <ArrowUpCircle size={16} />{" "}
-                  {isDisabled
-                    ? "Publish"
-                    : `Publish Version ${
-                        canSave
-                          ? formVersion
-                          : versionToBeEvaluated.version ?? ""
-                      }`}
-                </Button>
-              </HStack>
-            </Tooltip>
-          )}
-          {isPublished && (
-            <VStack align="start" width="full">
-              <Alert.Root status="success">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Description>New version published</Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-              <VStack width="full" align="start">
-                <Button
-                  colorPalette="green"
-                  onClick={() => openApiModal()}
-                  variant="outline"
-                >
-                  <Code size={16} /> View API Reference
-                </Button>
+      <Dialog.Content
+        bg="bg"
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={form.handleSubmit(onSubmit)}
+        borderTop="5px solid"
+        borderColor="green.400"
+      >
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <VStack align="start" width="full" gap={10}>
+            <Text fontSize="15px" color="black">
+              Publish your workflow to make it available via API, as a component
+              to other workflows, or as a custom evaluator.
+            </Text>
+            <VersionToBeUsed />
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
+          <VStack align="start" width="full" gap={3}>
+            {hasProvidersWithoutCustomKeys && (
+              <AddModelProviderKey
+                runWhat="publish"
+                nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+              />
+            )}
+            {!isPublished && (
+              <Tooltip content={isDisabled}>
+                <HStack width="full">
+                  <Spacer />
+                  <Button
+                    variant="outline"
+                    type="submit"
+                    loading={
+                      commitVersion.isLoading || publishWorkflow.isLoading
+                    }
+                    disabled={!!isDisabled}
+                  >
+                    <ArrowUpCircle size={16} />{" "}
+                    {isDisabled
+                      ? "Publish"
+                      : `Publish Version ${
+                          canSave
+                            ? formVersion
+                            : (versionToBeEvaluated.version ?? "")
+                        }`}
+                  </Button>
+                </HStack>
+              </Tooltip>
+            )}
+            {isPublished && (
+              <VStack align="start" width="full">
+                <Alert.Root status="success">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>New version published</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+                <VStack width="full" align="start">
+                  <Button
+                    colorPalette="green"
+                    onClick={() => openApiModal()}
+                    variant="outline"
+                  >
+                    <Code size={16} /> View API Reference
+                  </Button>
+                </VStack>
               </VStack>
-            </VStack>
-          )}
-        </VStack>
-      </Dialog.Footer>
-    </Dialog.Content>
+            )}
+          </VStack>
+        </Dialog.Footer>
+      </Dialog.Content>
     </FormProvider>
   );
 }

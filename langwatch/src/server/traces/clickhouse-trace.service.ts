@@ -1,13 +1,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+} from "~/server/app-layer/clients/clickhouse/windowed-read";
+import {
+  deserializeAttributes,
+  ensureStringRecord,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
 import {
   type ClickHouseEvaluationRunRow,
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
@@ -21,7 +30,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
+import type { Protections } from "~/server/traces/protections";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
   applyEventProtections,
@@ -59,6 +68,19 @@ export type ResolveTraceSpansFn = (
   projectId: string,
   normalizedSpans: NormalizedSpan[],
 ) => Promise<ResolvedTraceSpans>;
+
+/**
+ * Callback injected from TraceService that resolves offloaded blob refs for a
+ * WHOLE result set of traces in one bounded pass (#4991 bulk read paths). When
+ * present, the bulk read methods (getTracesWithSpans, enrichTracesWithSpans on
+ * the download path) use it so a large export/thread streams its event_log
+ * reads instead of fanning out an unbounded N×M burst. Falls back to the
+ * per-trace {@link ResolveTraceSpansFn} when absent.
+ */
+export type ResolveTraceSpansBatchFn = (
+  projectId: string,
+  spansPerTrace: NormalizedSpan[][],
+) => Promise<ResolvedTraceSpans[]>;
 
 /**
  * Cursor structure for keyset pagination.
@@ -203,6 +225,68 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
 }
 
 /**
+ * Thrown when no ClickHouse client can be resolved for a project — the only
+ * cause is a configuration problem (e.g. CLICKHOUSE_URL unset), never missing
+ * data. ClickHouse is the sole trace backend, so callers cannot fall back;
+ * they surface this as a configuration error.
+ */
+export class ClickHouseClientUnavailableError extends Error {
+  constructor(projectId: string) {
+    super(
+      `No ClickHouse client could be resolved for project "${projectId}" — check ClickHouse client configuration (CLICKHOUSE_URL)`,
+    );
+    this.name = "ClickHouseClientUnavailableError";
+  }
+}
+
+/**
+ * Thrown when an injected {@link ResolveTraceSpansBatchFn} breaks its contract by
+ * not returning exactly one resolution per input trace, in input order.
+ * `ResolvedTraceSpans` carries no trace identity of its own, so the pairing is
+ * purely positional and the type cannot enforce it — it is enforced at the call
+ * boundary instead. Never caused by data; always a resolver (or test-double) bug.
+ *
+ * The read paths flatten failures into a generic "Failed to fetch traces…"; both
+ * of them allowlist this class by `instanceof` and re-throw it unwrapped, so a
+ * contract violation reaches the caller with the mismatch intact rather than
+ * masquerading as a ClickHouse fetch failure.
+ */
+export class TraceSpansBatchResolverContractError extends Error {
+  private constructor(message: string) {
+    super(message);
+    this.name = "TraceSpansBatchResolverContractError";
+  }
+
+  /** Wrong number of resolutions — entries were dropped or invented. */
+  static cardinality({
+    got,
+    expected,
+  }: {
+    got: number;
+    expected: number;
+  }): TraceSpansBatchResolverContractError {
+    return new TraceSpansBatchResolverContractError(
+      `resolveTraceSpansBatch returned ${got} resolution(s) for ${expected} trace(s); it must return exactly one per input trace, in input order`,
+    );
+  }
+
+  /** Right count, wrong pairing — the silent-corruption case. */
+  static misaligned({
+    index,
+    expected,
+    got,
+  }: {
+    index: number;
+    expected: string;
+    got: string;
+  }): TraceSpansBatchResolverContractError {
+    return new TraceSpansBatchResolverContractError(
+      `resolveTraceSpansBatch returned ${got} at position ${index}, where ${expected} was supplied; resolutions must come back in input order`,
+    );
+  }
+}
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -222,11 +306,21 @@ export class ClickHouseTraceService {
    */
   private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
 
+  /**
+   * Optional bulk resolver for whole result sets (#4991). Preferred over
+   * {@link resolveTraceSpans} on the bulk read paths so a large export/thread
+   * resolves its blobs in one bounded-concurrency pass. When absent, the bulk
+   * paths fall back to the per-trace resolver.
+   */
+  private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
     resolveTraceSpans?: ResolveTraceSpansFn,
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
   ) {
     this.resolveTraceSpans = resolveTraceSpans;
+    this.resolveTraceSpansBatch = resolveTraceSpansBatch;
   }
 
   /**
@@ -235,9 +329,17 @@ export class ClickHouseTraceService {
    * The returned client is already wrapped with wrapWithDefaultSettings
    * by getClickHouseClientForProject, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
+   *
+   * @throws ClickHouseClientUnavailableError when no client resolves —
+   *   ClickHouse is the sole backend, so an unresolvable client is always a
+   *   configuration error, never a signal to fall back.
    */
-  private async resolveClient(projectId: string) {
-    return getClickHouseClientForProject(projectId);
+  private async resolveClient(projectId: string): Promise<ClickHouseClient> {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new ClickHouseClientUnavailableError(projectId);
+    }
+    return client;
   }
 
   /**
@@ -246,16 +348,17 @@ export class ClickHouseTraceService {
   static create(
     prisma: PrismaClient = defaultPrisma,
     resolveTraceSpans?: ResolveTraceSpansFn,
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
   ): ClickHouseTraceService {
-    return new ClickHouseTraceService(prisma, resolveTraceSpans);
+    return new ClickHouseTraceService(
+      prisma,
+      resolveTraceSpans,
+      resolveTraceSpansBatch,
+    );
   }
 
   /**
    * Get traces with spans for the given trace IDs.
-   *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
    *
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
@@ -268,7 +371,8 @@ export class ClickHouseTraceService {
    *   over-threshold IO values read back full (#4888). Default
    *   (undefined/false) maps the ≤64 KB preview as-is and issues zero
    *   event_log SELECTs.
-   * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects with spans
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpans(
     projectId: string,
@@ -276,17 +380,17 @@ export class ClickHouseTraceService {
     protections: Protections,
     occurredAt?: OccurredAtRange,
     opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
       },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
+        // Resolved up front (and discarded) so a configuration problem
+        // surfaces as ClickHouseClientUnavailableError rather than the
+        // generic fetch failure from the try/catch below.
+        await this.resolveClient(projectId);
 
         if (traceIds.length === 0) {
           return [];
@@ -305,18 +409,15 @@ export class ClickHouseTraceService {
             occurredAt,
           );
 
-          // Map to legacy Trace format and apply protections
-          const traces: Trace[] = [];
-          for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            const trace = await this.resolveAndMerge({
-              projectId,
-              summary,
-              spans,
-              protections,
-              resolveBlobs: opts?.resolveBlobs,
-            });
-            traces.push(trace);
-          }
+          // Map to legacy Trace format and apply protections. Blob resolution
+          // (when opted in) runs as a single bounded pass over the whole set so
+          // a large multi-trace read streams its event_log reads (#4991 AC6).
+          const traces = await this.resolveAndMergeMany({
+            projectId,
+            entries: [...tracesWithSpans.values()],
+            protections,
+            resolveBlobs: opts?.resolveBlobs,
+          });
 
           this.logger.debug(
             { projectId, traceCount: traces.length },
@@ -325,6 +426,11 @@ export class ClickHouseTraceService {
 
           return traces;
         } catch (error) {
+          // A resolver-contract violation is a code bug, not a fetch failure —
+          // surface it verbatim rather than flattening it into the generic
+          // message and losing the mismatch.
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -351,7 +457,7 @@ export class ClickHouseTraceService {
    * required — without it ClickHouse scans every partition (including cold
    * S3 storage) for every lookup miss.
    *
-   * Returns null if the ClickHouse client is not available for the project.
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async resolveTraceIdByPrefix({
     projectId,
@@ -367,15 +473,12 @@ export class ClickHouseTraceService {
     occurredAt: { from: number; to: number };
     /** Maximum distinct trace IDs to return (default 2 — enough to detect ambiguity) */
     limit?: number;
-  }): Promise<string[] | null> {
+  }): Promise<string[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           const result = await clickHouseClient.query({
@@ -421,20 +524,30 @@ export class ClickHouseTraceService {
    * Queries trace_summaries using the Attributes map to find traces
    * with matching thread_id (stored under various attribute keys).
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param projectId - The project ID
    * @param threadId - The thread ID to search for
    * @param protections - Field redaction protections
-   * @returns Array of Trace objects, or null if ClickHouse is not enabled
+   * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the
+   *   thread-detail read resolves full IO (#4991). Customer thread views that
+   *   construct without a blob resolver get a no-op. Defaults to false.
+   * @returns Array of Trace objects, **sorted chronologically by
+   *   `timestamps.started_at` ascending** (empty array if no matching traces).
+   *   The ordering is part of this method's contract, not an incidental detail:
+   *   the underlying bulk read returns trace-id order, and callers rely on the
+   *   chronological order this restores. The public-share branch of the
+   *   `getTracesByThreadId` tRPC route re-projects its authorized subset onto
+   *   this order rather than re-deriving one, so dropping the sort here would
+   *   silently mis-order that (anonymous, least-exercised) path. Pinned by
+   *   "returns traces sorted chronologically" in
+   *   clickhouse-trace.service-4991-bulk.unit.test.ts.
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
-  ): Promise<Trace[] | null> {
+    opts?: { resolveBlobs?: boolean },
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
       {
@@ -442,9 +555,6 @@ export class ClickHouseTraceService {
       },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         this.logger.debug(
           { projectId, threadId },
@@ -477,13 +587,16 @@ export class ClickHouseTraceService {
             return [];
           }
 
-          // Fetch full traces with spans
+          // Fetch full traces with spans. Forward resolveBlobs so the
+          // thread-detail read can resolve full IO (#4991); customer thread
+          // views with no resolver wired stay on the preview.
           const traces = await this.getTracesWithSpans(
             projectId,
             traceIds,
             protections,
+            undefined,
+            { resolveBlobs: opts?.resolveBlobs },
           );
-          if (!traces) return null;
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -493,6 +606,10 @@ export class ClickHouseTraceService {
           );
           return traces;
         } catch (error) {
+          // See getTracesWithSpans: a resolver-contract violation is a code bug,
+          // not a fetch failure — surface it verbatim.
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -513,24 +630,21 @@ export class ClickHouseTraceService {
    * Queries trace_summaries using the Attributes map to find traces
    * with matching thread_ids (stored under various attribute keys).
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param projectId - The project ID
    * @param threadIds - Array of thread IDs to search for
    * @param protections - Field redaction protections
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
    *   path can read full thread IO (#4888). Customer thread views construct
    *   without a blob resolver, so this is a no-op for them.
-   * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects with spans
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
       {
@@ -541,9 +655,6 @@ export class ClickHouseTraceService {
       },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         if (threadIds.length === 0) {
           return [];
@@ -590,7 +701,6 @@ export class ClickHouseTraceService {
             undefined,
             { resolveBlobs: opts?.resolveBlobs },
           );
-          if (!traces) return null;
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -600,6 +710,13 @@ export class ClickHouseTraceService {
           );
           return traces;
         } catch (error) {
+          // Third flattening catch on this class, and it sits ABOVE
+          // getTracesWithSpans — so a contract violation re-thrown unwrapped by
+          // that method lands here and would be flattened again. Allowlist it,
+          // same as the other two. (Live path: called with resolveBlobs from the
+          // thread router and the evaluation-execution service.)
+          if (error instanceof TraceSpansBatchResolverContractError)
+            throw error;
           this.logger.error(
             {
               projectId,
@@ -620,26 +737,20 @@ export class ClickHouseTraceService {
    * Uses keyset pagination for efficient cursor-based scrolling.
    * The scrollId encodes the last-seen (timestamp, traceId) pair.
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param input - Query parameters including filters, pagination, and sorting
    * @param protections - Field redaction protections
-   * @returns TracesForProjectResult or null if ClickHouse is not enabled
+   * @returns TracesForProjectResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},
-  ): Promise<TracesForProjectResult | null> {
+  ): Promise<TracesForProjectResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
       async (_span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           const pageSize = input.pageSize ?? 25;
@@ -767,13 +878,43 @@ export class ClickHouseTraceService {
               dateField,
             });
 
-          // When includeSpans is requested, fetch and attach actual spans
-          if (options.includeSpans && traces.length > 0) {
-            traces = await this.enrichTracesWithSpans(
+          // Spans are fetched when the caller wants them OR when it wants full
+          // IO — because those are not the same thing.
+          //
+          // Blob resolution lives inside the span read: the full (>64 KB) value
+          // is recoverable ONLY by de-offloading the spans' eventref pointers
+          // and recomputing trace IO from them. trace_summaries holds nothing
+          // but the 64 KB preview. So a content-consuming SUMMARY read — a
+          // summary-mode export, a spans-less download — must still fetch and
+          // resolve spans, then throw them away.
+          //
+          // Gating the fetch on includeSpans alone (as this did) made
+          // resolveBlobs INERT for exactly those callers: the flag was set, no
+          // event_log read was ever issued, and the truncated preview shipped
+          // silently. That is #4991 AC1's bug, surviving on the paths the fix
+          // was supposed to cover.
+          //
+          // resolveBlobs stays opt-in, so the list/search grid and the
+          // aggregations still issue ZERO event_log reads (#4888 AC2 /
+          // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
+          // whether or not they ask for spans.
+          const wantsSpans = options.includeSpans === true;
+          const wantsFullIo = options.resolveBlobs === true;
+
+          if ((wantsSpans || wantsFullIo) && traces.length > 0) {
+            const enriched = await this.enrichTracesWithSpans(
               traces,
               input.projectId,
               protections,
+              wantsFullIo,
             );
+
+            // A summary caller keeps the recomputed trace-level IO but not the
+            // spans it never asked for — the payload shape stays exactly as it
+            // was before this branch could run for them.
+            traces = wantsSpans
+              ? enriched
+              : enriched.map((trace) => ({ ...trace, spans: [] }));
           }
 
           // Generate new scrollId from last trace. The cursor seeks on the
@@ -834,7 +975,7 @@ export class ClickHouseTraceService {
           // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0 && clickHouseClient) {
+          if (traceIds.length > 0) {
             const evalRows = await this.fetchEvaluationRows({
               clickHouseClient,
               projectId: input.projectId,
@@ -866,7 +1007,7 @@ export class ClickHouseTraceService {
           // trace.events / trace.annotations off these same objects.
           if (projection?.needsEvents || projection?.needsAnnotations) {
             const pageTraces = groups.flat() as unknown as ProjectableTrace[];
-            if (projection.needsEvents && clickHouseClient) {
+            if (projection.needsEvents) {
               await this.enrichTracesWithEventsForProjection({
                 clickHouseClient,
                 projectId: input.projectId,
@@ -906,22 +1047,18 @@ export class ClickHouseTraceService {
   /**
    * Get topic and subtopic counts for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
-   *
    * @param input - Filter parameters including projectId and date range
-   * @returns TopicCountsResult or null if ClickHouse is not enabled
+   * @returns TopicCountsResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTopicCounts(
     input: AggregationFiltersInput,
-  ): Promise<TopicCountsResult | null> {
+  ): Promise<TopicCountsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Build date filter conditions
@@ -1011,22 +1148,18 @@ export class ClickHouseTraceService {
   /**
    * Get unique customers and labels for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
-   *
    * @param input - Filter parameters including projectId and date range
-   * @returns CustomersAndLabelsResult or null if ClickHouse is not enabled
+   * @returns CustomersAndLabelsResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getCustomersAndLabels(
     input: AggregationFiltersInput,
-  ): Promise<CustomersAndLabelsResult | null> {
+  ): Promise<CustomersAndLabelsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Build date filter conditions
@@ -1127,7 +1260,6 @@ export class ClickHouseTraceService {
    * Get a span for prompt studio by span ID.
    *
    * Returns null if:
-   * - ClickHouse is not enabled for the project
    * - The span is not found
    * - The span is not an LLM span
    *
@@ -1146,9 +1278,6 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Fetch ALL spans in the trace in a single query so we can
@@ -1391,21 +1520,18 @@ export class ClickHouseTraceService {
   /**
    * Get distinct span names and metadata keys for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getDistinctFieldNames(
     projectId: string,
     startDate: number,
     endDate: number,
-  ): Promise<DistinctFieldNamesResult | null> {
+  ): Promise<DistinctFieldNamesResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Get distinct span names from stored_spans
@@ -1560,9 +1686,6 @@ export class ClickHouseTraceService {
       },
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          throw new Error("ClickHouse client not available");
-        }
 
         // Additional filter conditions (already parameterized by the filter module)
         const extraFilters =
@@ -1588,6 +1711,12 @@ export class ClickHouseTraceService {
           return { traces: [], totalHits: 0, lastTrace: null };
         }
 
+        // Trace and span names are operation names rather than captured
+        // content, and a tool or agent identifier is often only there, so free
+        // text has to reach them too. They ride alongside the I/O columns
+        // instead of replacing them, and `searchQuery` is already lowercased
+        // and LIKE-escaped, so `lower(...)` on each side is the whole contract.
+        // Whether captured I/O may be searched at all is still decided above.
         const searchableColumns = [
           ...(protections.canSeeCapturedInput !== false
             ? ["lower(ifNull(ts.ComputedInput, ''))"]
@@ -1595,10 +1724,29 @@ export class ClickHouseTraceService {
           ...(protections.canSeeCapturedOutput !== false
             ? ["lower(ifNull(ts.ComputedOutput, ''))"]
             : []),
+          "lower(ifNull(ts.TraceName, ''))",
         ];
 
+        // Non-root span names live in `stored_spans`, probed with the same
+        // correlated EXISTS shape the span filters in `filter-conditions.ts`
+        // use. The StartTime bound keeps it partition-pruned instead of
+        // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
+        const spanNameSearch = `EXISTS (
+                    SELECT 1 FROM stored_spans sp
+                    WHERE sp.TenantId = ts.TenantId
+                      AND sp.TraceId = ts.TraceId
+                      AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
+                      AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
+                      AND lower(sp.SpanName) LIKE {searchQuery:String}
+                  )`;
+
         const searchFilter = effectiveQuery
-          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
+          ? ` AND (${[
+              ...searchableColumns.map(
+                (col) => `${col} LIKE {searchQuery:String}`,
+              ),
+              spanNameSearch,
+            ].join(" OR ")})`
           : "";
 
         // Date axis.
@@ -2261,39 +2409,159 @@ export class ClickHouseTraceService {
    *
    * @internal
    */
-  private async resolveAndMerge({
+  private async resolveAndMergeMany({
     projectId,
-    summary,
-    spans,
+    entries,
     protections,
     resolveBlobs,
   }: {
     projectId: string;
-    summary: TraceSummaryData;
-    spans: NormalizedSpan[];
+    entries: Array<{ summary: TraceSummaryData; spans: NormalizedSpan[] }>;
     protections: Protections;
     /**
-     * Per-call gate (#4888): resolve offloaded eventref pointers from event_log
-     * ONLY when true. The resolver is constructed on the instance, but the read
-     * path opts in per call so list/search/collapsed reads keep the preview and
-     * issue zero event_log SELECTs (ADR-022). Defaults to false.
+     * Per-call gate (#4888/#4991): resolve offloaded eventref pointers from
+     * event_log ONLY when true. The resolver is constructed on the instance,
+     * but the read path opts in per call so list/search/collapsed reads keep
+     * the preview and issue zero event_log SELECTs (ADR-022). Defaults to false.
      */
     resolveBlobs?: boolean;
-  }): Promise<Trace> {
-    let resolvedSpans = spans;
-    let recomputedInput: ExtractedIO | null = null;
-    let recomputedOutput: ExtractedIO | null = null;
+  }): Promise<Trace[]> {
+    const resolutions = await this.resolveSpansBatch({
+      projectId,
+      spansPerTrace: entries.map((e) => e.spans),
+      resolveBlobs,
+    });
 
-    if (resolveBlobs === true && this.resolveTraceSpans) {
-      const resolution = await this.resolveTraceSpans(projectId, spans);
-      resolvedSpans = resolution.resolvedSpans;
-      if (resolution.anyResolved) {
-        recomputedInput = resolution.recomputedInput;
-        recomputedOutput = resolution.recomputedOutput;
+    return entries.map((entry, i) =>
+      this.mergeResolvedTrace({
+        projectId,
+        summary: entry.summary,
+        resolution: resolutions[i]!,
+        protections,
+      }),
+    );
+  }
+
+  /**
+   * Resolve offloaded blob refs for a set of traces' spans, in one pass.
+   *
+   * Prefers the bulk {@link resolveTraceSpansBatch} (single bounded-concurrency
+   * sweep over event_log — #4991 AC6); falls back to the per-trace resolver
+   * when only that is wired (e.g. a CH service constructed with just the
+   * single-trace callback). When `resolveBlobs` is not true, returns
+   * passthrough resolutions (preview preserved, zero event_log reads — AC5).
+   *
+   * @internal
+   */
+  private async resolveSpansBatch({
+    projectId,
+    spansPerTrace,
+    resolveBlobs,
+  }: {
+    projectId: string;
+    spansPerTrace: NormalizedSpan[][];
+    resolveBlobs?: boolean;
+  }): Promise<ResolvedTraceSpans[]> {
+    if (resolveBlobs === true && this.resolveTraceSpansBatch) {
+      const resolutions = await this.resolveTraceSpansBatch(
+        projectId,
+        spansPerTrace,
+      );
+
+      // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
+      // trace, in input order" is a convention its type cannot enforce. Today's
+      // resolver honours it via .map, but a future resolver (or a test double)
+      // that drops or reorders entries would silently pair the wrong resolved
+      // spans with the wrong trace summary on this hot bulk-read path — shared
+      // by export, thread, and the dataset/sample builders. Fail loudly at the
+      // boundary, where the offending resolver is still nameable, instead of
+      // letting a downstream non-null assertion crash with no context (or not
+      // crash at all, and just scatter the wrong IO onto the wrong span).
+      if (resolutions.length !== spansPerTrace.length) {
+        throw TraceSpansBatchResolverContractError.cardinality({
+          got: resolutions.length,
+          expected: spansPerTrace.length,
+        });
       }
+
+      // Cardinality alone does NOT catch the silent-corruption case: a resolver
+      // that returns the right COUNT in the wrong ORDER scatters each trace's IO
+      // onto its neighbour. Both resolvers derive resolvedSpans by mapping over
+      // the input spans, so a conforming resolution carries (a) the same span
+      // count and (b) the trace identity the ResolvedTraceSpans type itself
+      // lacks. Check both: a trace CAN legitimately have zero spans (the read
+      // builds its map from summary rows), and such a trace has no identity to
+      // compare — but the span count still catches it being swapped with a
+      // spans-ful one, which is the case that would otherwise silently strip a
+      // real trace's spans. Two span-less traces transposed stay invisible, and
+      // are harmless: their resolutions are empty and interchangeable.
+      for (const [index, spans] of spansPerTrace.entries()) {
+        const resolution = resolutions[index];
+
+        if (resolution?.resolvedSpans.length !== spans.length) {
+          throw TraceSpansBatchResolverContractError.misaligned({
+            index,
+            expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
+            got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
+          });
+        }
+
+        const expected = spans[0]?.traceId;
+        const got = resolution.resolvedSpans[0]?.traceId;
+        if (expected !== undefined && got !== undefined && expected !== got) {
+          throw TraceSpansBatchResolverContractError.misaligned({
+            index,
+            expected: `trace "${expected}"`,
+            got: `trace "${got}"`,
+          });
+        }
+      }
+
+      return resolutions;
     }
 
-    const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
+    if (resolveBlobs === true && this.resolveTraceSpans) {
+      const resolutions: ResolvedTraceSpans[] = [];
+      for (const spans of spansPerTrace) {
+        resolutions.push(await this.resolveTraceSpans(projectId, spans));
+      }
+      return resolutions;
+    }
+
+    // No resolution opted in (or no resolver wired): keep the preview.
+    return spansPerTrace.map((spans) => ({
+      resolvedSpans: spans,
+      recomputedInput: null,
+      recomputedOutput: null,
+      anyResolved: false,
+    }));
+  }
+
+  /**
+   * Map one trace's resolved spans to the legacy Trace, patch recomputed I/O
+   * (when blobs were resolved), and apply field-redaction protections.
+   *
+   * @internal
+   */
+  private mergeResolvedTrace({
+    projectId,
+    summary,
+    resolution,
+    protections,
+  }: {
+    projectId: string;
+    summary: TraceSummaryData;
+    resolution: ResolvedTraceSpans;
+    protections: Protections;
+  }): Trace {
+    const recomputedInput: ExtractedIO | null = resolution.anyResolved
+      ? resolution.recomputedInput
+      : null;
+    const recomputedOutput: ExtractedIO | null = resolution.anyResolved
+      ? resolution.recomputedOutput
+      : null;
+
+    const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
     let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
 
     // When blobs were resolved, patch trace.input / trace.output with
@@ -2326,6 +2594,7 @@ export class ClickHouseTraceService {
     traces: Trace[],
     projectId: string,
     protections: Protections,
+    resolveBlobs = false,
   ): Promise<Trace[]> {
     const traceIds = traces.map((t) => t.trace_id);
     // The traces already carry their own timestamps, so derive the partition
@@ -2344,25 +2613,89 @@ export class ClickHouseTraceService {
       occurredAt,
     );
 
-    return Promise.all(
-      traces.map(async (trace) => {
-        const data = tracesWithSpans.get(trace.trace_id);
-        if (!data || data.spans.length === 0) {
-          return trace;
-        }
+    // Collect the traces that actually have spans, resolve+merge them as one
+    // bounded batch (#4991 AC6), then splice the results back in order. Traces
+    // whose spans are not found pass through unchanged.
+    //
+    // resolveBlobs is gated by the CALLER: the list/search grid leaves it false
+    // so it keeps the ≤64 KB preview and issues zero event_log SELECTs (#4888
+    // AC2 / ADR-022). Only the download/export path opts in (#4991 AC1).
+    const enrichable = traces
+      .map((trace, index) => ({
+        index,
+        data: tracesWithSpans.get(trace.trace_id),
+      }))
+      .filter(
+        (
+          e,
+        ): e is {
+          index: number;
+          data: { summary: TraceSummaryData; spans: NormalizedSpan[] };
+        } => !!e.data && e.data.spans.length > 0,
+      );
 
-        // List/search path (getAllTracesForProject): NEVER resolve blobs, even
-        // on a deps-carrying instance — keep the ≤64 KB preview and issue zero
-        // event_log SELECTs (#4888 AC2 / ADR-022 binding constraint).
-        return this.resolveAndMerge({
-          projectId,
-          summary: data.summary,
-          spans: data.spans,
-          protections,
-          resolveBlobs: false,
-        });
-      }),
-    );
+    const merged = await this.resolveAndMergeMany({
+      projectId,
+      entries: enrichable.map((e) => ({
+        summary: e.data.summary,
+        spans: e.data.spans,
+      })),
+      protections,
+      resolveBlobs,
+    });
+
+    const result = [...traces];
+    enrichable.forEach((e, i) => {
+      result[e.index] = merged[i]!;
+    });
+    return result;
+  }
+
+  /**
+   * Resolve the OccurredAt span of a set of traces from a cheap sort-key seek.
+   *
+   * trace_summaries is ORDER BY (TenantId, TraceId), so filtering on those two
+   * columns and reading only OccurredAt (a light column) lets ClickHouse answer
+   * min/max from the sort-key index without decoding heavy payload columns. The
+   * returned range then bounds the heavy summary read to the traces' weekly
+   * partitions. Returns undefined when no rows match (min/max default to epoch),
+   * so the caller keeps its previous unbounded behaviour rather than guessing.
+   *
+   * @internal
+   */
+  private async resolveOccurredAtRange({
+    client,
+    projectId,
+    traceIds,
+  }: {
+    client: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<OccurredAtRange | undefined> {
+    if (traceIds.length === 0) {
+      return undefined;
+    }
+    const result = await client.query({
+      query: `
+        SELECT
+          toUnixTimestamp64Milli(min(OccurredAt)) AS fromMs,
+          toUnixTimestamp64Milli(max(OccurredAt)) AS toMs
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN ({traceIds:Array(String)})
+      `,
+      query_params: { tenantId: projectId, traceIds },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      fromMs: number | null;
+      toMs: number | null;
+    }>;
+    const row = rows[0];
+    if (!row || !(Number(row.fromMs) > 0) || !(Number(row.toMs) > 0)) {
+      return undefined;
+    }
+    return { from: Number(row.fromMs), to: Number(row.toMs) };
   }
 
   /**
@@ -2388,9 +2721,34 @@ export class ClickHouseTraceService {
       },
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          throw new Error("ClickHouse client not available");
-        }
+
+        // Callers that already know the traces' time pass `occurredAt`; the
+        // thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds)
+        // only have trace ids. Without a window the summary read below filters on
+        // TraceId alone, which cannot prune partitions (trace_summaries is
+        // partitioned on OccurredAt) and so opens every weekly part incl. cold
+        // S3. Resolve the OccurredAt span from a cheap sort-key seek (light
+        // column only) and reuse it to bound the heavy read. Same resolve-from-
+        // sort-key shape as the single-trace read in the trace-summary repo.
+        const effectiveOccurredAt =
+          occurredAt ??
+          (await this.resolveOccurredAtRange({
+            client: clickHouseClient,
+            projectId,
+            traceIds,
+          }).catch((error) => {
+            // Fail open: the resolve is a pure optimization, so a transient
+            // failure must not break a read that previously succeeded. Fall
+            // back to the unbounded (slower but correct) summary read.
+            this.logger.warn(
+              {
+                projectId,
+                error: error instanceof Error ? error.message : error,
+              },
+              "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
+            );
+            return undefined;
+          }));
 
         // The summary + span reads pull heavy columns (ComputedInput/Output,
         // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
@@ -2409,23 +2767,28 @@ export class ClickHouseTraceService {
           // partitions and scans every part (incl. cold S3) to locate the rows.
           // A ±2-day margin around the caller's range is safe headroom; without
           // a hint we keep the original unbounded read.
-          const SUMMARY_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+          //
+          // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
+          // point, so map it onto queryWindowed's centre+half-width form: centre
+          // on the range midpoint and grow the half-width to cover half the range
+          // PLUS the ±2-day margin. The emitted fragment's bounds then land on
+          // exactly [from - 2d, to + 2d] — the same predicate the old local
+          // constant produced. Fallback "none": a resolve failure already left
+          // effectiveOccurredAt undefined (hint null -> unbounded read, warn
+          // logged at the resolve site), and a hinted-but-empty summary read is
+          // never widened here — an empty result is authoritative and the caller
+          // below skips the span scan.
           const hasSummaryWindow =
-            occurredAt !== undefined &&
-            occurredAt.from > 0 &&
-            occurredAt.to > 0;
-          const summaryTimeFilterOuter = hasSummaryWindow
-            ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND t.OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
-            : "";
-          const summaryTimeFilterInner = hasSummaryWindow
-            ? "AND OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
-            : "";
-          const summaryTimeParams = hasSummaryWindow
-            ? {
-                sumFromMs: occurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
-                sumToMs: occurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
-              }
-            : {};
+            effectiveOccurredAt !== undefined &&
+            effectiveOccurredAt.from > 0 &&
+            effectiveOccurredAt.to > 0;
+          const summaryHintMs = hasSummaryWindow
+            ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
+            : null;
+          const summaryWindowMs = hasSummaryWindow
+            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
+              DEFAULT_PARTITION_WINDOW_MS
+            : DEFAULT_PARTITION_WINDOW_MS;
 
           // Summaries first (light, one row per trace): they carry OccurredAt,
           // which bounds the heavy stored_spans scan below to the traces' weekly
@@ -2433,8 +2796,21 @@ export class ClickHouseTraceService {
           // StartTime always falls within its trace's lifetime, so a ±2-day window
           // around the summaries' OccurredAt range is safe headroom; when no
           // summary row is found we fall back to an unbounded span scan.
-          const summaryResult = await clickHouseClient.query({
-            query: `
+          const summaryRows = await queryWindowed<TraceSummaryRow[]>({
+            table: "trace_summaries",
+            hintMs: summaryHintMs,
+            windowMs: summaryWindowMs,
+            fallback: "none",
+            isEmpty: (rows) => rows.length === 0,
+            run: async (window) => {
+              const summaryTimeFilterOuter = window
+                ? window.sqlFor("t.OccurredAt")
+                : "";
+              const summaryTimeFilterInner = window
+                ? window.sqlFor("OccurredAt")
+                : "";
+              const summaryResult = await clickHouseClient.query({
+                query: `
         SELECT
           TraceId AS ts_TraceId,
           SpanCount AS ts_SpanCount,
@@ -2477,15 +2853,16 @@ export class ClickHouseTraceService {
           )
         ORDER BY t.TraceId
       `,
-            query_params: {
-              tenantId: projectId,
-              traceIds: batchTraceIds,
-              ...summaryTimeParams,
+                query_params: {
+                  tenantId: projectId,
+                  traceIds: batchTraceIds,
+                  ...(window?.params ?? {}),
+                },
+                format: "JSONEachRow",
+              });
+              return (await summaryResult.json()) as TraceSummaryRow[];
             },
-            format: "JSONEachRow",
           });
-
-          const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
 
           // No matched summaries: the result map is built solely from summary
           // rows, so the spans would be discarded anyway. Return early to skip the
@@ -2495,28 +2872,68 @@ export class ClickHouseTraceService {
             return new Map();
           }
 
+          // Parse spans
+          type SpanRow = {
+            SpanId: string;
+            TraceId: string;
+            TenantId: string;
+            ParentSpanId: string | null;
+            ParentTraceId: string | null;
+            ParentIsRemote: boolean | null;
+            Sampled: boolean;
+            StartTime: number;
+            EndTime: number;
+            DurationMs: number;
+            SpanName: string;
+            SpanKind: number;
+            ResourceAttributes: Record<string, unknown>;
+            SpanAttributes: Record<string, unknown>;
+            StatusCode: number | null;
+            StatusMessage: string | null;
+            ScopeName: string | null;
+            ScopeVersion: string | null;
+            Events_Timestamp: number[];
+            Events_Name: string[];
+            Events_Attributes: Record<string, unknown>[];
+            Links_TraceId: string[];
+            Links_SpanId: string[];
+            Links_Attributes: Record<string, unknown>[];
+          };
+
           // Bound the stored_spans scan to the weeks the matched traces occurred
-          // in (the cold-scan cost driver).
-          const SPAN_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+          // in (the cold-scan cost driver). Same range->window mapping as the
+          // summary read above: centre on the matched summaries' OccurredAt
+          // midpoint, half-width = half that range + the ±2-day margin, so the
+          // fragment lands on exactly [min - 2d, max + 2d]. Fallback "none": no
+          // matched OccurredAts -> hint null -> unbounded scan (the old
+          // hasWindow=false branch); a hinted-but-empty span read is
+          // authoritative and never widened.
           const occurredAts = summaryRows
             .map((r) => r.ts_OccurredAt)
             .filter((t): t is number => typeof t === "number" && t > 0);
           const hasWindow = occurredAts.length > 0;
-          const spanTimeFilterOuter = hasWindow
-            ? "AND t.StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-            : "";
-          const spanTimeFilterInner = hasWindow
-            ? "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-            : "";
-          const spanTimeParams = hasWindow
-            ? {
-                spanFromMs: Math.min(...occurredAts) - SPAN_PARTITION_WINDOW_MS,
-                spanToMs: Math.max(...occurredAts) + SPAN_PARTITION_WINDOW_MS,
-              }
-            : {};
+          const spanMinMs = hasWindow ? Math.min(...occurredAts) : 0;
+          const spanMaxMs = hasWindow ? Math.max(...occurredAts) : 0;
+          const spanHintMs = hasWindow ? (spanMinMs + spanMaxMs) / 2 : null;
+          const spanWindowMs = hasWindow
+            ? (spanMaxMs - spanMinMs) / 2 + DEFAULT_PARTITION_WINDOW_MS
+            : DEFAULT_PARTITION_WINDOW_MS;
 
-          const spansResult = await clickHouseClient.query({
-            query: `
+          const spanRows = await queryWindowed<SpanRow[]>({
+            table: "stored_spans",
+            hintMs: spanHintMs,
+            windowMs: spanWindowMs,
+            fallback: "none",
+            isEmpty: (rows) => rows.length === 0,
+            run: async (window) => {
+              const spanTimeFilterOuter = window
+                ? window.sqlFor("t.StartTime")
+                : "";
+              const spanTimeFilterInner = window
+                ? window.sqlFor("StartTime")
+                : "";
+              const spansResult = await clickHouseClient.query({
+                query: `
         SELECT
           SpanId,
           TraceId,
@@ -2557,42 +2974,16 @@ export class ClickHouseTraceService {
         ORDER BY t.TraceId, t.StartTime ASC
         LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
-            query_params: {
-              tenantId: projectId,
-              traceIds: batchTraceIds,
-              ...spanTimeParams,
+                query_params: {
+                  tenantId: projectId,
+                  traceIds: batchTraceIds,
+                  ...(window?.params ?? {}),
+                },
+                format: "JSONEachRow",
+              });
+              return (await spansResult.json()) as SpanRow[];
             },
-            format: "JSONEachRow",
           });
-
-          // Parse spans
-          type SpanRow = {
-            SpanId: string;
-            TraceId: string;
-            TenantId: string;
-            ParentSpanId: string | null;
-            ParentTraceId: string | null;
-            ParentIsRemote: boolean | null;
-            Sampled: boolean;
-            StartTime: number;
-            EndTime: number;
-            DurationMs: number;
-            SpanName: string;
-            SpanKind: number;
-            ResourceAttributes: Record<string, unknown>;
-            SpanAttributes: Record<string, unknown>;
-            StatusCode: number | null;
-            StatusMessage: string | null;
-            ScopeName: string | null;
-            ScopeVersion: string | null;
-            Events_Timestamp: number[];
-            Events_Name: string[];
-            Events_Attributes: Record<string, unknown>[];
-            Links_TraceId: string[];
-            Links_SpanId: string[];
-            Links_Attributes: Record<string, unknown>[];
-          };
-          const spanRows = (await spansResult.json()) as SpanRow[];
 
           // Group spans by TraceId
           const spansByTrace = new Map<string, NormalizedSpan[]>();
@@ -2724,95 +3115,6 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Extract NormalizedSpan from a joined row.
-   * @internal
-   */
-  private extractSpanFromRow(
-    row: JoinedTraceSpanRow,
-    tenantId: string,
-  ): NormalizedSpan {
-    // Reconstruct events array with proper typing
-    const events = (row.ss_Events_Timestamp ?? []).map((timestamp, index) => ({
-      name: row.ss_Events_Name?.[index] ?? "",
-      timeUnixMs: timestamp,
-      attributes: (row.ss_Events_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-    }));
-
-    // Reconstruct links array with proper typing
-    const links = (row.ss_Links_TraceId ?? []).map((linkTraceId, index) => ({
-      traceId: linkTraceId,
-      spanId: row.ss_Links_SpanId?.[index] ?? "",
-      attributes: (row.ss_Links_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-    }));
-
-    // Map numeric status code to enum
-    const statusCode =
-      row.ss_StatusCode !== null
-        ? (row.ss_StatusCode as NormalizedStatusCode)
-        : null;
-
-    // Map numeric span kind to enum
-    const kind = (row.ss_SpanKind ?? 0) as NormalizedSpanKind;
-
-    return {
-      id: row.ss_Id ?? "",
-      traceId: row.ss_TraceId ?? "",
-      spanId: row.ss_SpanId ?? "",
-      tenantId,
-      parentSpanId: row.ss_ParentSpanId,
-      parentTraceId: row.ss_ParentTraceId,
-      parentIsRemote: row.ss_ParentIsRemote,
-      sampled: row.ss_Sampled ?? true,
-      startTimeUnixMs: row.ss_StartTime ?? 0,
-      endTimeUnixMs: row.ss_EndTime ?? 0,
-      durationMs: row.ss_DurationMs ?? 0,
-      name: row.ss_SpanName ?? "",
-      kind,
-      resourceAttributes: (row.ss_ResourceAttributes ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-      spanAttributes: (row.ss_SpanAttributes ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-      events,
-      links,
-      statusMessage: row.ss_StatusMessage,
-      statusCode,
-      instrumentationScope: {
-        name: row.ss_ScopeName ?? "",
-        version: row.ss_ScopeVersion,
-      },
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    };
-  }
-
-  /**
    * Map a span row from a standalone spans query (no JOIN prefix) to NormalizedSpan.
    * @internal
    */
@@ -2848,27 +3150,17 @@ export class ClickHouseTraceService {
     const events = (row.Events_Timestamp ?? []).map((timestamp, index) => ({
       name: row.Events_Name?.[index] ?? "",
       timeUnixMs: timestamp,
-      attributes: (row.Events_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Events_Attributes?.[index] ?? {}),
+      ) as NormalizedSpan["events"][number]["attributes"],
     }));
 
     const links = (row.Links_TraceId ?? []).map((linkTraceId, index) => ({
       traceId: linkTraceId,
       spanId: row.Links_SpanId?.[index] ?? "",
-      attributes: (row.Links_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Links_Attributes?.[index] ?? {}),
+      ) as NormalizedSpan["links"][number]["attributes"],
     }));
 
     return {
@@ -2885,9 +3177,12 @@ export class ClickHouseTraceService {
       durationMs: row.DurationMs,
       name: row.SpanName,
       kind: row.SpanKind as NormalizedSpanKind,
-      resourceAttributes:
-        row.ResourceAttributes as NormalizedSpan["resourceAttributes"],
-      spanAttributes: row.SpanAttributes as NormalizedSpan["spanAttributes"],
+      resourceAttributes: deserializeAttributes(
+        ensureStringRecord(row.ResourceAttributes),
+      ) as NormalizedSpan["resourceAttributes"],
+      spanAttributes: deserializeAttributes(
+        ensureStringRecord(row.SpanAttributes),
+      ) as NormalizedSpan["spanAttributes"],
       statusCode: row.StatusCode as NormalizedStatusCode | null,
       statusMessage: row.StatusMessage,
       instrumentationScope: {
@@ -2899,6 +3194,8 @@ export class ClickHouseTraceService {
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
       droppedLinksCount: 0,
+      cost: null,
+      nonBilledCost: null,
     };
   }
 }
@@ -2981,8 +3278,16 @@ interface PromptStudioCandidateRow {
   StartTime: number;
 }
 
-function isClickHouseMemoryLimitError(error: unknown): boolean {
+export function isClickHouseMemoryLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  // The resilient client translates the raw driver error into a handled
+  // `query_memory_exceeded`, wrapping the original in `reasons`.
+  if (HandledError.isHandled(error)) {
+    return (
+      error.code === "query_memory_exceeded" ||
+      (error.reasons ?? []).some(isClickHouseMemoryLimitError)
+    );
+  }
   return (
     error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
     error.message.toLowerCase().includes("memory limit exceeded") ||

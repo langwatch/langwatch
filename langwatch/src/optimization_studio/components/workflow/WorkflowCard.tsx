@@ -1,17 +1,10 @@
-import {
-  Button,
-  Heading,
-  HStack,
-  Separator,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
+import { showErrorToast } from "~/features/errors";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { CascadeArchiveDialog } from "../../../components/CascadeArchiveDialog";
 import { Menu } from "../../../components/ui/menu";
@@ -20,7 +13,6 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
-import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
 import { PushToCopiesDialog } from "./PushToCopiesDialog";
@@ -152,17 +144,11 @@ export function WorkflowCard({
             },
           });
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Error updating workflow",
-            description: error.message || "Please try again later.",
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't update workflow from source",
+          }),
       },
     );
   }, [syncFromSource, workflowId, project, query, name]);
@@ -214,13 +200,11 @@ export function WorkflowCard({
               meta: { closable: true },
             });
           },
-          onError: () => {
-            toaster.create({
-              title: "Error deleting workflow",
-              description: "Please try again later.",
-              type: "error",
-            });
-          },
+          onError: (error) =>
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete workflow",
+            }),
         },
       );
     } else {
@@ -236,13 +220,11 @@ export function WorkflowCard({
               meta: { closable: true },
             });
           },
-          onError: () => {
-            toaster.create({
-              title: "Error deleting workflow",
-              description: "Please try again later.",
-              type: "error",
-            });
-          },
+          onError: (error) =>
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete workflow",
+            }),
         },
       );
     }
@@ -284,35 +266,29 @@ export function WorkflowCard({
                     positioning={{ placement: "right" }}
                     showArrow
                   >
-                    <Menu.Item
-                      value="sync"
-                      onClick={() => onSyncFromSource()}
-                    >
+                    <Menu.Item value="sync" onClick={() => onSyncFromSource()}>
                       <RefreshCw size={16} /> Update from source
                     </Menu.Item>
                   </Tooltip>
                 )}
                 {hasCopies && (
-                    <Menu.Item
-                      value="push"
-                      onClick={() => onPushToCopies()}
-                    >
-                      <ArrowUp size={16} /> Push to replicas
-                    </Menu.Item>
+                  <Menu.Item value="push" onClick={() => onPushToCopies()}>
+                    <ArrowUp size={16} /> Push to replicas
+                  </Menu.Item>
                 )}
-                  <Menu.Item
-                    value="copy"
-                    onClick={() => setIsCopyDialogOpen(true)}
-                  >
-                    <Copy size={16} /> Replicate to another project
-                  </Menu.Item>
-                  <Menu.Item
-                    value="delete"
-                    color="red.500"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                  >
-                    <Trash2 size={16} /> Delete
-                  </Menu.Item>
+                <Menu.Item
+                  value="copy"
+                  onClick={() => setIsCopyDialogOpen(true)}
+                >
+                  <Copy size={16} /> Replicate to another project
+                </Menu.Item>
+                <Menu.Item
+                  value="delete"
+                  color="red.500"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash2 size={16} /> Delete
+                </Menu.Item>
               </Menu.Content>
             </Menu.Root>
           )}

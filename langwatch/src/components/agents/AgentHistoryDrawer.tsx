@@ -26,7 +26,11 @@ const ACTION_META = {
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
 
 function actionMeta(action: string) {
-  return (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[action] ?? { label: action, icon: X };
+  return (
+    (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[
+      action
+    ] ?? { label: action, icon: X }
+  );
 }
 
 export function AgentHistoryDrawer({
@@ -45,7 +49,12 @@ export function AgentHistoryDrawer({
   );
 
   return (
-    <Drawer.Root open={true} placement="end" size="md" onOpenChange={closeDrawer}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="md"
+      onOpenChange={closeDrawer}
+    >
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
@@ -102,7 +111,9 @@ export function AgentHistoryDrawer({
                         {label}
                       </Text>
                       <Text color="fg.muted" fontSize="xs">
-                        {entry.user?.name ?? entry.user?.email ?? "Unknown user"}{" "}
+                        {entry.user?.name ??
+                          entry.user?.email ??
+                          "Unknown user"}{" "}
                         · {formatTimeAgo(new Date(entry.createdAt).getTime())}
                       </Text>
                     </VStack>

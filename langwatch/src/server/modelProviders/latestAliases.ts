@@ -14,6 +14,11 @@
  * anthropic, gemini. Azure/Bedrock customers pin specific deployment
  * names, so they are intentionally excluded.
  */
+import {
+  compareModelSortKeys,
+  type ModelSortKey,
+  rankOpenAIChatModel,
+} from "../../utils/modelTiers";
 import { llmModels } from "./loadModelCatalog";
 
 interface RegistryEntry {
@@ -29,7 +34,11 @@ const REGISTRY = (
 export const LATEST_ALIAS_SUFFIXES = ["latest", "latest-mini"] as const;
 export type LatestAliasSuffix = (typeof LATEST_ALIAS_SUFFIXES)[number];
 
-export const LATEST_ALIAS_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
+export const LATEST_ALIAS_PROVIDERS = [
+  "openai",
+  "anthropic",
+  "gemini",
+] as const;
 export type LatestAliasProvider = (typeof LATEST_ALIAS_PROVIDERS)[number];
 
 const ALIAS_PATTERN = new RegExp(
@@ -58,23 +67,21 @@ export function isLatestAlias(model: string): boolean {
 /**
  * Generic "newest chat model for this provider" picker. Callers supply
  * a parse function that decides whether a model id is in-scope and
- * extracts its (major, minor) sort key. The catalog walk, mode/provider
- * filter, and version sort are shared because all providers follow the
- * same shape — only the id grammar differs.
+ * extracts its sort key. The catalog walk, mode/provider filter, and
+ * version sort are shared because all providers follow the same shape —
+ * only the id grammar differs.
  */
 function pickLatestChat(
   provider: string,
-  parse: (id: string) => { major: number; minor: number } | null,
+  parse: (id: string) => ModelSortKey | null,
 ): string | undefined {
-  const candidates: { id: string; major: number; minor: number }[] = [];
+  const candidates: (ModelSortKey & { id: string })[] = [];
   for (const model of Object.values(REGISTRY)) {
     if (model.provider !== provider || model.mode !== "chat") continue;
     const parsed = parse(model.id);
     if (parsed) candidates.push({ id: model.id, ...parsed });
   }
-  candidates.sort((a, b) =>
-    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
-  );
+  candidates.sort(compareModelSortKeys);
   return candidates[0]?.id;
 }
 
@@ -84,7 +91,8 @@ function pickLatestChat(
  * not an alias OR if the registry has nothing matching the variant.
  *
  * Variants per provider:
- *   - openai     → `gpt-X.Y` (latest), `gpt-X.Y-mini` (latest-mini)
+ *   - openai     → flagship tier (latest), fast tier (latest-mini);
+ *                  see `utils/modelTiers` for the tier allow-lists
  *   - anthropic  → `claude-opus-X-Y` (latest), `claude-sonnet-X-Y` (latest-mini)
  *   - gemini     → `gemini-X.Y-pro` (latest), `gemini-X.Y-flash` (latest-mini)
  *
@@ -101,22 +109,19 @@ export function resolveLatestAlias(model: string): string | null {
   if (!parts) return null;
   const { provider, suffix } = parts;
   if (provider === "openai") {
+    const variant = suffix === "latest" ? "flagship" : "mini";
     return (
-      pickLatestChat("openai", (id) => {
-        const m = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/.exec(id);
-        if (!m) return null;
-        const variant = m[3]?.slice(1) ?? "";
-        if (suffix === "latest" && variant) return null;
-        if (suffix === "latest-mini" && variant !== "mini") return null;
-        return { major: Number(m[1]), minor: Number(m[2]) };
-      }) ?? null
+      pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ??
+      null
     );
   }
   if (provider === "anthropic") {
     const family = suffix === "latest" ? "opus" : "sonnet";
     return (
       pickLatestChat("anthropic", (id) => {
-        const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(id);
+        const m = new RegExp(
+          `^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`,
+        ).exec(id);
         if (!m) return null;
         return { major: Number(m[1]), minor: Number(m[2]) };
       }) ?? null
@@ -126,7 +131,12 @@ export function resolveLatestAlias(model: string): string | null {
     const allowed =
       suffix === "latest"
         ? new Set(["pro", "pro-preview"])
-        : new Set(["flash", "flash-lite", "flash-preview", "flash-lite-preview"]);
+        : new Set([
+            "flash",
+            "flash-lite",
+            "flash-preview",
+            "flash-lite-preview",
+          ]);
     return (
       pickLatestChat("gemini", (id) => {
         const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);

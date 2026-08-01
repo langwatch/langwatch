@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Instance, Ksuid } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -16,7 +17,6 @@ import {
   getStoredObjectWriteFailureCounter,
   storedObjectReadFailureCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import { ObjectNotFoundError } from "./errors";
 import {
   redactStorageUri,
@@ -25,7 +25,7 @@ import {
 import type { StorageRegistry } from "./storage-registry";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
-import { mintFileUri, mintS3Uri } from "./uri";
+import { mintAzureBlobUri, mintFileUri, mintS3Uri } from "./uri";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -69,11 +69,14 @@ export type MintStorageUri = (args: {
  * this service module does not encode the precedence rules itself.
  *
  * If `resolveProjectStorageDestination` throws (e.g. a transient DB
- * error while reading BYOC config), the error propagates — falling
- * back silently to the global bucket on a transient error would risk
- * spilling a BYOC tenant's bytes into the wrong account.
+ * error while reading BYOC config, or an incomplete Azure config when
+ * STORED_OBJECTS_BACKEND=azure), the error propagates — falling back
+ * silently to another destination on a misconfiguration or transient
+ * error would risk spilling a tenant's bytes into the wrong place.
+ *
+ * Exported so tests exercise the real production function directly.
  */
-async function defaultMintStorageUri({
+export async function defaultMintStorageUri({
   projectId,
   sha256,
 }: {
@@ -83,6 +86,14 @@ async function defaultMintStorageUri({
   const destination = await resolveProjectStorageDestination(projectId);
   if (destination.kind === "s3") {
     return mintS3Uri({ bucket: destination.bucket, projectId, sha256 });
+  }
+  if (destination.kind === "azure") {
+    return mintAzureBlobUri({
+      accountName: destination.accountName,
+      container: destination.container,
+      projectId,
+      sha256,
+    });
   }
   return mintFileUri({ root: destination.root, projectId, sha256 });
 }
@@ -334,6 +345,32 @@ export class StoredObjectsService {
           throw error;
         }
       },
+    );
+  }
+
+  /**
+   * Returns the storage-accounting byte ledger for a project (ADR-040): the
+   * summed `size_bytes` of the project's live stored objects, optionally scoped
+   * to one `purpose` (e.g. "evaluation_inputs"). This is the durable-object
+   * side of a tenant's storage usage, alongside the ClickHouse row bytes.
+   */
+  async getStorageUsageByProject({
+    projectId,
+    purpose,
+  }: {
+    projectId: string;
+    purpose?: string;
+  }): Promise<{ totalBytes: number; objectCount: number }> {
+    return tracer.withActiveSpan(
+      "StoredObjectsService.getStorageUsageByProject",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          ...(purpose ? { "stored_object.purpose": purpose } : {}),
+        },
+      },
+      async () => this.repository.sumSizeBytesByProject({ projectId, purpose }),
     );
   }
 

@@ -20,6 +20,7 @@ import (
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	streamFn   func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -30,8 +31,11 @@ func (m *mockProvider) DispatchStream(ctx context.Context, req *domain.Request, 
 	return m.streamFn(ctx, req, cred)
 }
 
-func (m *mockProvider) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, creds)
+	}
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {
@@ -46,14 +50,14 @@ func (m *mockRateLimiter) Allow(ctx context.Context, vkID string, limits domain.
 }
 
 type mockBudget struct {
-	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
+	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 }
 
-func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error) {
+func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
 	if m.precheckFn != nil {
 		return m.precheckFn(ctx, bundle)
 	}
-	return domain.BudgetAllow, nil
+	return domain.BudgetDecision{Verdict: domain.BudgetAllow}, nil
 }
 
 type mockGuardrails struct {
@@ -194,8 +198,8 @@ func TestHandleChat_BudgetBlocked(t *testing.T) {
 		},
 	}
 	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetBlock, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{Verdict: domain.BudgetBlock}, nil
 		},
 	}
 
@@ -217,8 +221,11 @@ func TestHandleChat_BudgetWarn(t *testing.T) {
 		},
 	}
 	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetWarn, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{
+				Verdict:  domain.BudgetWarn,
+				Warnings: []domain.BudgetWarning{{Scope: "project", PctUsed: 95}},
+			}, nil
 		},
 	}
 
@@ -230,7 +237,7 @@ func TestHandleChat_BudgetWarn(t *testing.T) {
 
 	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
-	assert.Contains(t, result.Meta.BudgetWarnings, "near_limit")
+	assert.Contains(t, result.Meta.BudgetWarnings, "project:95")
 }
 
 func TestHandleChat_GuardrailPreBlocked(t *testing.T) {
@@ -381,6 +388,71 @@ func TestHandleChat_FallbackOnProviderError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Equal(t, 1, result.Meta.FallbackCount)
+}
+
+func TestHandleChat_FallbackOnUpstream404(t *testing.T) {
+	callCount := 0
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			callCount++
+			if cred.ID == "cred-1" {
+				return nil, &domain.UpstreamError{StatusCode: 404, Message: "model not found"}
+			}
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "cred-1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		domain.Credential{ID: "cred-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 2
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	result, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.NoError(t, err)
+	assert.Equal(t, 2, callCount)
+	assert.Equal(t, 1, result.Meta.FallbackCount)
+}
+
+func TestHandleChat_TerminatesOnUpstream400(t *testing.T) {
+	callCount := 0
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			callCount++
+			if cred.ID == "cred-1" {
+				return nil, &domain.UpstreamError{StatusCode: 400, Message: "invalid request"}
+			}
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "cred-1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		domain.Credential{ID: "cred-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 2
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+
+	// A terminal 4xx (here a 400 "invalid request") must not fall back to the
+	// next credential: cred-1 is the only provider dialed, and the upstream
+	// status reaches the caller verbatim instead of being masked by a
+	// pointless retry on cred-2.
+	require.Error(t, err)
+	assert.Equal(t, 1, callCount)
+	var ue *domain.UpstreamError
+	require.ErrorAs(t, err, &ue)
+	assert.Equal(t, 400, ue.StatusCode)
 }
 
 func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {
@@ -558,6 +630,52 @@ func TestHandleChat_ModelAwareImplicitInfersProvider(t *testing.T) {
 	assert.Equal(t, domain.ProviderOpenAI, attempted[0])
 }
 
+// A bundle with zero provider credentials (the org never configured a
+// ModelProvider) must fail with the handled no_provider_configured error,
+// not fall through to Bifrost with a zero-value Credential — that surfaces
+// as an opaque "provider is required" 400 to the caller.
+func TestHandleChat_NoProviderConfigured(t *testing.T) {
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			t.Fatal("provider must not be dialed when the bundle has no credentials")
+			return nil, nil
+		},
+	}
+
+	bundle := testBundle()
+	bundle.Credentials = nil
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrNoProviderConfigured))
+}
+
+func TestHandleChatStream_NoProviderConfigured(t *testing.T) {
+	provider := &mockProvider{
+		streamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			t.Fatal("provider must not be dialed when the bundle has no credentials")
+			return nil, nil
+		},
+	}
+
+	bundle := testBundle()
+	bundle.Credentials = nil
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChatStream(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrNoProviderConfigured))
+}
+
 func TestPeekStream(t *testing.T) {
 	assert.True(t, PeekStream([]byte(`{"model":"gpt-4","stream":true}`)))
 	assert.False(t, PeekStream([]byte(`{"model":"gpt-4"}`)))
@@ -567,8 +685,8 @@ func TestPeekStream(t *testing.T) {
 // A forwarded upstream error must drive credential fallback by its real HTTP
 // status: terminal 4xx (e.g. an Anthropic "credit balance too low" 400) is
 // non-retryable so the gateway stops instead of burning the next key on a
-// pointless retry; 429 and 5xx stay retryable so the fallback chain still
-// kicks in.
+// pointless retry; 404 ("model not served here"), 429 and 5xx stay retryable
+// so the fallback chain still kicks in.
 func TestClassifyProviderError_UpstreamError(t *testing.T) {
 	cases := []struct {
 		status int
@@ -578,7 +696,7 @@ func TestClassifyProviderError_UpstreamError(t *testing.T) {
 		{401, retry.ReasonNonRetryable},
 		{402, retry.ReasonNonRetryable},
 		{403, retry.ReasonNonRetryable},
-		{404, retry.ReasonNonRetryable},
+		{404, retry.ReasonNotFound},
 		{422, retry.ReasonNonRetryable},
 		{429, retry.ReasonRateLimit},
 		{500, retry.ReasonRetryable5xx},

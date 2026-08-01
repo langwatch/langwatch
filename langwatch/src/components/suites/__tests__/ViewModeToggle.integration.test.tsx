@@ -12,14 +12,18 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { GroupRow } from "../GroupRow";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "../RunHistoryFilters";
 import { RunRow } from "../RunRow";
-import { GroupRow } from "../GroupRow";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
 import type { RunGroup, RunGroupSummary } from "../run-history-transforms";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -30,9 +34,7 @@ const emptyFilters: RunHistoryFilterValues = {
   passFailStatus: "",
 };
 
-const scenarioOptions = [
-  { id: "scen_1", name: "Angry refund request" },
-];
+const scenarioOptions = [{ id: "scen_1", name: "Angry refund request" }];
 
 function makeGroup(overrides: Partial<RunGroup> = {}): RunGroup {
   return {
@@ -218,12 +220,8 @@ describe("<RunRow/> view mode", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText(/Angry refund request/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/Policy violation/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Angry refund request/)).toBeInTheDocument();
+      expect(screen.getByText(/Policy violation/)).toBeInTheDocument();
     });
   });
 

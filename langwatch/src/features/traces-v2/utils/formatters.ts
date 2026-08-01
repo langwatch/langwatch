@@ -190,29 +190,6 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 }
 
-const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =
-  [
-    ["gpt-4o-mini", "4o-mini"],
-    ["gpt-4o", "4o"],
-    ["gpt-5-mini", "5-mini"],
-    ["claude-sonnet-4-20250514", "sonnet-4"],
-    ["claude-haiku-4-5-20251001", "haiku-4.5"],
-    ["gemini-2.5-pro", "2.5-pro"],
-    ["text-embedding-3-small", "emb-3-sm"],
-  ];
-
-export function abbreviateModel(model: string): string {
-  const slash = model.indexOf("/");
-  if (slash < 0) return model;
-  const provider = model.slice(0, slash);
-  const name = model.slice(slash + 1);
-  let shortName = name;
-  for (const [from, to] of MODEL_ABBREVIATIONS) {
-    shortName = shortName.replace(from, to);
-  }
-  return `${provider}/${shortName}`;
-}
-
 export function formatWallClock(startMs: number, endMs: number): string {
   const diff = Math.max(0, endMs - startMs);
   const secs = Math.floor(diff / 1_000);

@@ -120,9 +120,7 @@ describe("SpendSpikeAnomalyEvaluator — I/O integration against governance_kpis
     // per window = $1. Threshold = baseline ($1) * default ratio (2.0)
     // = $2. Current ($10) ≥ $2 → fire.
     for (let i = 1; i <= 6; i++) {
-      const baselineHour = new Date(
-        NOW.getTime() - (60 + i * 60) * 60 * 1000,
-      ); // T-2h, T-3h, … T-7h
+      const baselineHour = new Date(NOW.getTime() - (60 + i * 60) * 60 * 1000); // T-2h, T-3h, … T-7h
       await insertGovernanceKpiRow(ch, govProject.id, {
         sourceId: primarySourceId,
         sourceType: "otel_generic",

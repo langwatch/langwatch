@@ -19,6 +19,17 @@ Feature: AI Gateway — Budgets
   budget in breach blocks the request when its on_breach is "block", or lets it
   through with a warning header when its on_breach is "warn".
 
+  A budget that is close to its limit but not yet in breach warns without
+  blocking anything. The threshold is 80% of the limit, the same point at which
+  the dashboard banner and the CLI warning appear, so a customer never sees one
+  surface warn while another stays quiet. The warning rides on the response as
+  "X-LangWatch-Budget-Warning: <scope>:<pct>", one entry per budget over the
+  threshold, comma-separated when several apply. It is present on both
+  streaming and non-streaming responses, and on responses long enough that the
+  gateway has already started sending keep-alive bytes. Budgets that are only
+  approaching a hard cap warn too: the request still succeeds, and the header is
+  the only notice before the 402 starts.
+
   Spend is derived from traces. The gateway emits one OTel span per request
   carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
   The trace-processing pipeline enriches the span with cost (pricing catalog ×
@@ -78,8 +89,47 @@ Feature: AI Gateway — Budgets
     And 95.00 USD of spend has been attributed this month
     When a gateway request is processed
     Then the upstream provider is called
-    And the response includes header "X-LangWatch-Budget-Warning: project:95%"
+    And the response includes header "X-LangWatch-Budget-Warning: project:95"
     And the response body is the provider's response unchanged
+
+  @integration
+  Scenario: Streaming responses carry the warning header too
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
+    And 95.00 USD of spend has been attributed this month
+    When a gateway request is processed with streaming enabled
+    Then the response includes header "X-LangWatch-Budget-Warning: project:95"
+    And the stream is the provider's stream unchanged
+
+  @integration
+  Scenario: A hard cap warns on approach before it starts rejecting
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
+    And 85.86 USD of spend has been attributed this month
+    When a gateway request is processed
+    Then the upstream provider is called
+    And the response includes header "X-LangWatch-Budget-Warning: project:85"
+
+  @integration
+  Scenario: No warning header well under the limit
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
+    And 40.00 USD of spend has been attributed this month
+    When a gateway request is processed
+    Then the response carries no budget warning header
+
+  @integration
+  Scenario: A long-running completion still reports the warning
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
+    And 95.00 USD of spend has been attributed this month
+    When a gateway request takes long enough for the gateway to send keep-alive bytes
+    Then the response includes header "X-LangWatch-Budget-Warning: project:95"
+    And the gateway request id header is present as well
+
+  @integration
+  Scenario: Every applicable budget over the threshold is named
+    Given the organization is at 84% of its monthly limit with on_breach "block"
+    And the project is at 20% of its daily limit with on_breach "block"
+    And virtual key "prod-key" is at 99% of its daily limit with on_breach "warn"
+    When a gateway request is processed
+    Then the response includes header "X-LangWatch-Budget-Warning: organization:84,virtual_key:99"
 
   @integration
   Scenario: Most restrictive budget wins when multiple apply
@@ -140,6 +190,243 @@ Feature: AI Gateway — Budgets
       bounded to the current month's PeriodStart
     And the response returns { spent_usd: "42.00", remaining_usd: "58.00" }
     And no Postgres gatewayBudgetLedger row is read
+
+  # ============================================================================
+  # Spend must read back for every window offered
+  # ============================================================================
+  #
+  # Spend is written to the ledger by the trace fold and read back from the
+  # pre-aggregated rollup. The two sides bucket spend into periods, and they
+  # only ever agree if they compute the start of the period the same way. When
+  # they disagree the write lands in a bucket the read never looks at, so a
+  # budget accrues nothing forever, blocks nothing, and warns about nothing,
+  # while the UI reports a confident zero.
+
+  @integration
+  Scenario Outline: Spend recorded against a budget is visible on that budget
+    Given a budget with window "<window>" and limit $0.0001
+    When $0.001 of spend is recorded against it
+    Then the budget reports non-zero spend
+    And it reports itself as over its limit
+
+    Examples:
+      | window |
+      | minute |
+      | hour   |
+      | day    |
+      | week   |
+      | month  |
+      | total  |
+
+  # The ledger's OccurredAt column carries no timezone, so the rollup's
+  # period truncation follows the ClickHouse server timezone unless the
+  # view pins one. The reader always computes period starts in UTC. On a
+  # server whose default timezone is not UTC, an unpinned view buckets
+  # DAY, WEEK, and MONTH spend at local midnight while the reader asks
+  # for UTC midnight: the same never-readable-bucket failure, reachable
+  # by deployment configuration instead of code drift.
+  @integration
+  Scenario: Spend stays visible when the ClickHouse server does not run in UTC
+    Given the underlying spend store computes period boundaries in its own local timezone
+    And a budget for each of the day, week, and month windows
+    When spend is recorded against each budget
+    Then each budget reports non-zero spend
+
+  # Period boundaries are part of the rollup's key, and the rollup is what
+  # every read and every enforcement decision consults. When the key moves
+  # to UTC boundaries, spend already recorded under local boundaries must
+  # be carried across by rebuilding the rollup from the ledger, which keeps
+  # every debit. Otherwise an org that spent $800 of a $1000 monthly budget
+  # before the upgrade would read $0 after it and sail past its cap.
+  @integration
+  Scenario: Spend recorded before the rollup rebuild still counts after it
+    Given the underlying spend store computes period boundaries in its own local timezone
+    And day, week, and month budgets already carry recorded spend
+    When the deployment is upgraded to compute period boundaries in UTC
+    Then each budget reports exactly the spend recorded before the rebuild
+    And spend recorded on boundaries that were already UTC is unchanged
+    And a budget blocks when spend recorded before and after the rebuild together pass its limit
+
+  @integration
+  Scenario: A blocking budget blocks once its recorded spend passes the limit
+    Given project "gateway-demo" has a blocking budget of $0.0001 for today
+    When enough gateway traffic is recorded to pass $0.0001
+    Then a further request through "prod-key" is refused for going over budget
+    And the refusal names the budget that was exceeded
+
+  @integration
+  Scenario: A blocking budget warns before it blocks
+    Given project "gateway-demo" has a blocking budget of $0.0001 for today
+    When recorded spend reaches 80% of the limit but has not passed it
+    Then a request through "prod-key" still reaches the provider
+    And the response carries a budget warning
+
+  # ============================================================================
+  # Provider-filtered budgets
+  # ============================================================================
+  #
+  # A budget can name a provider, in which case it counts and constrains only
+  # what is dispatched to that provider. Because it constrains one vendor
+  # rather than the whole request, a breach removes that vendor from the
+  # candidates rather than refusing the call: with somewhere else to go the
+  # request is served, and only when nothing is left does it fail, naming
+  # the budget that emptied the list.
+
+  @integration
+  Scenario: A breached provider-filtered budget takes that provider out of the running
+    Given a key that can reach two providers
+    And a blocking budget on one of them that is over its limit
+    When a request arrives that either provider could serve
+    Then the request is served by the other provider
+    And no budget-exceeded error is returned
+
+  @integration
+  Scenario: A request with nowhere left to go is refused and says why
+    Given a key whose only usable provider has a breached blocking budget
+    When a request arrives
+    Then the request is refused for going over budget
+    And the refusal names the budget that ran out
+
+  @integration
+  Scenario: A warning-only provider budget lets the provider keep serving
+    Given a key that can reach one provider
+    And a warning budget on that provider that is over its limit
+    When a request arrives
+    Then the provider still serves it
+    And the response carries a budget warning naming that budget
+
+  @integration
+  Scenario: Spend is attributed to the provider that actually served the request
+    Given a budget that counts one provider only
+    And a budget on the same target that counts every provider
+    When a request is served by a different provider
+    Then only the unfiltered budget's spend goes up
+    # The debit records the provider it was dispatched to, so a filtered
+    # budget accrues its own spend and nobody else's.
+
+  # ============================================================================
+  # Where spend is read from
+  # ============================================================================
+  #
+  # Spend per key is read from the trace cost path, not from the budget
+  # ledger. The ledger exists per budget: it is written once per applicable
+  # budget, and not at all for a key nobody has capped. Reading a key's spend
+  # from it reported $0.00 for every uncapped key and multiplied the spend of
+  # every key covered more than once, and those are exactly the numbers the
+  # keys table shows and the Usage tab has to agree with.
+
+  @integration
+  Scenario: A key with no budget still reports what it spent
+    Given a virtual key with no budget of any kind covering it
+    When it is used and the traffic has been processed
+    Then its spend is visible on the key
+    And it is visible on the Usage tab
+
+  @integration
+  Scenario: A key covered by several budgets is not counted once per budget
+    Given a virtual key covered by an organization budget and a project budget
+    When it makes one request costing a known amount
+    Then its reported spend is that amount, not a multiple of it
+
+  @integration
+  Scenario: Spend from minutes ago is inside the window the page asks for
+    Given a request made a minute ago
+    When the last 30 days are requested
+    Then that request is included
+    # The pages ask for a rolling window ending now, not a window ending at
+    # the last complete day. Spend does not wait for a day boundary.
+
+  @integration
+  Scenario: The window start is inclusive and the window end is exclusive
+    Given a request made at a known instant
+    When a window starting at exactly that instant is requested
+    Then the request is included
+    And a window ending at exactly that instant excludes it
+
+  @integration
+  Scenario: A re-projected trace is counted once, at its latest cost
+    Given a trace whose cost was written once and then corrected
+    When spend is read before the two writes have been merged
+    Then the trace counts once, at the corrected cost
+
+  @unit
+  Scenario: A usage page left open keeps asking for a window that ends now
+    Given the usage page is open showing the last 30 days
+    When a day passes without the page being reloaded
+    Then the window it asks for still ends now
+    # A window frozen at page load is how a dashboard left open overnight
+    # ends up a day behind: the spend arrived, the page just stopped asking
+    # for it.
+
+  @unit
+  Scenario: The window keeps its length as it rolls
+    Given the usage page is showing the last 7 days
+    When the window rolls forward
+    Then it is still 7 days wide
+
+  @integration
+  Scenario: Spend is reported per key with its own daily and model split
+    Given a key with traffic across models
+    When its usage is requested
+    Then the total, the per-day split and the per-model split all come from the same source
+    # A total that disagrees with its own breakdown is worse than either.
+
+  @integration
+  Scenario: Spend that lands in the key's trace project is visible from anywhere in the organization
+    Given an organization-scoped key whose traces land in its trace project
+    When its usage is read while another project is selected
+    Then the Usage page reports the same spend the keys table shows
+    # Traces carry the tenant of the key's trace destination (for org- and
+    # team-scoped keys, the governance project), not of whichever project
+    # the viewer happens to have selected. Usage reads span the
+    # organization's projects for exactly the reason the spend column does;
+    # reading one project is how the page said "No usage" under a table
+    # full of spend.
+
+  @integration
+  Scenario: Changing the window or clearing the key filter keeps the browser on the usage page
+    Given the usage page is open filtered to one key
+    When the key filter is cleared or a different window is picked
+    Then the browser is still on the gateway usage page
+    And only the query string changed
+    # The filter controls rebuild their URL from the resolved route
+    # pattern. When the pattern resolver had no literal entry for the
+    # usage page, the /settings wildcard won and the rebuilt URL collapsed
+    # to the bare settings root, dropping the person out of the page they
+    # were filtering.
+
+  # ============================================================================
+  # Making a budget that cannot work visible
+  # ============================================================================
+
+  @integration
+  Scenario: A budget whose spend cannot be totalled says so instead of showing zero
+    Given a budget exists
+    But spend totals cannot be read right now
+    When I open the Budgets list
+    Then the budget does not claim "$0.00 spent, 0% of limit"
+    And it tells me its spend is unavailable
+
+  @visual
+  Scenario: The Budgets screen surfaces that spend is not being totalled
+    Given spend totals cannot be read right now
+    When I open the Budgets list
+    Then a notice tells me spend figures are unavailable and budgets are not being enforced
+
+  @integration
+  Scenario: A budget warns when no key can ever spend against it
+    Given project "gateway-demo" has a budget scoped to project "gateway-demo"
+    But every active key in the organization is scoped to team "platform"
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+    And the warning names which scopes the organization's keys actually use
+
+  @integration
+  Scenario: A budget that some key can spend against carries no warning
+    Given project "gateway-demo" has a budget scoped to project "gateway-demo"
+    And an active key is scoped to project "gateway-demo"
+    When I open the Budgets list
+    Then the budget carries no scope warning
 
   # ============================================================================
   # Window resets

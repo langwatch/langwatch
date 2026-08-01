@@ -1,3 +1,9 @@
+import { createLogger } from "@langwatch/observability";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+  type WindowFragment,
+} from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -14,90 +20,76 @@ import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
-import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
   LangwatchSignalBucket,
   ModelSpanSampleRow,
   ModelUsageStatsRow,
+  NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPage,
+  SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./span-storage.repository";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
+  MAX_DERIVATION_SPANS,
+  MAX_LIGHT_SPAN_READ_ROWS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
 /**
- * `stored_spans` is partitioned by `toYearWeek(StartTime)`. When the caller
- * passes an approximate trace timestamp we narrow the scan to a ±2-day
- * window around it — this keeps drawer reads on the warm partition tier
+ * Settings for every `stored_spans` insert.
+ *
+ * `input_format_json_throw_on_bad_escape_sequence: 0` is load-bearing.
+ * Span strings originate as JS UTF-16 and can carry a lone (unpaired) surrogate
+ * half (`\uD800`–`\uDFFF`) — a value truncated mid-emoji, or binary/garbage text
+ * an SDK captured as a string. `JSONEachRow` serializes such a half as a bare
+ * `\uD800`-style escape with no second part, which ClickHouse's JSON parser
+ * rejects by default ("missing second part of surrogate pair"), failing the
+ * whole insert. The pipeline then retries and dead-letters, and the span is lost
+ * forever (13 groups dead-lettered for one project in prod).
+ *
+ * With the setting at 0, ClickHouse keeps the bad escape sequence as-is instead
+ * of throwing — exactly what its own error message recommends. This is done at
+ * the insert boundary, per-batch and O(1), rather than walking and rewriting
+ * every string of every span (attribute keys/values, names, statuses, event
+ * names — unbounded per-span payload) on the hot ingest path just to pre-empt
+ * the parser. The rare malformed string is stored verbatim; every valid string
+ * is untouched.
+ */
+const SPAN_INSERT_SETTINGS = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  input_format_json_throw_on_bad_escape_sequence: 0,
+} as const;
+
+/**
+ * Renders the partition-pruning time predicate for a single-trace `stored_spans`
+ * read from a {@link WindowFragment} — or `null` for a time-unbounded scan (no
+ * predicate). `stored_spans` is partitioned by `toYearWeek(StartTime)`, so
+ * bounding `StartTime` to a window keeps drawer reads on the warm partition tier
  * instead of walking every weekly partition (incl. cold S3) on every query.
  *
- * Generous on purpose: long-running traces and clock skew should still hit
- * the hinted window. If they don't, callers retry without the hint.
+ * `sqlAnd` bounds the outer scan and `sqlAndInner` the dedup subquery — the same
+ * `StartTime` predicate on both so they prune to identical partitions. Both come
+ * from {@link WindowFragment.sqlFor}, keeping SQL and params in one place.
  */
-const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
-
-interface PartitionWindow {
-  fromMs: number;
-  toMs: number;
-}
-
-interface PartitionFragment {
+function partitionFragment(window: WindowFragment | null): {
   sqlAnd: string;
   sqlAndInner: string;
   params: Record<string, unknown>;
-}
-
-function partitionWindowFor(
-  hint: OccurredAtHint | undefined,
-): PartitionWindow | undefined {
-  if (hint?.occurredAtMs === undefined) return undefined;
-  return {
-    fromMs: hint.occurredAtMs - PARTITION_WINDOW_MS,
-    toMs: hint.occurredAtMs + PARTITION_WINDOW_MS,
-  };
-}
-
-function partitionFragment(
-  window: PartitionWindow | undefined,
-): PartitionFragment {
+} {
   if (!window) {
     return { sqlAnd: "", sqlAndInner: "", params: {} };
   }
-  return {
-    sqlAnd:
-      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
-    sqlAndInner:
-      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
-    params: { fromMs: window.fromMs, toMs: window.toMs },
-  };
-}
-
-/**
- * Run a hinted query first; if the hint window misses (e.g. long-running
- * trace, stale URL hint, clock skew), fall back to an unconstrained scan.
- * Avoids the slow path on the happy path while keeping correctness when
- * hints are wrong.
- */
-async function withPartitionHint<T>(
-  hint: OccurredAtHint | undefined,
-  isEmpty: (result: T) => boolean,
-  run: (window: PartitionWindow | undefined) => Promise<T>,
-): Promise<T> {
-  const window = partitionWindowFor(hint);
-  if (!window) return run(undefined);
-  const hinted = await run(window);
-  if (!isEmpty(hinted)) return hinted;
-  return run(undefined);
+  const predicate = window.sqlFor("StartTime");
+  return { sqlAnd: predicate, sqlAndInner: predicate, params: window.params };
 }
 
 /**
@@ -127,6 +119,8 @@ const FULL_SPAN_SELECT = `
   StatusMessage,
   ScopeName,
   ScopeVersion,
+  Cost,
+  NonBilledCost,
   arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
   \`Events.Name\` AS Events_Name,
   \`Events.Attributes\` AS Events_Attributes,
@@ -200,7 +194,20 @@ const SUMMARY_SPAN_SELECT = `
   SpanName,
   DurationMs,
   StatusCode,
-  SpanAttributes['langwatch.span.type'] AS SpanType,
+  coalesce(
+    nullIf(SpanAttributes['langwatch.span.type'], ''),
+    SpanAttributes['span.type']
+  ) AS SpanType,
+  coalesce(
+    nullIf(SpanAttributes['gen_ai.tool.name'], ''),
+    SpanAttributes['tool_name']
+  ) AS ToolName,
+  SpanAttributes['request_id'] AS RequestId,
+  SpanAttributes['query_source'] AS QuerySource,
+  coalesce(
+    nullIf(SpanAttributes['tool_use_id'], ''),
+    SpanAttributes['gen_ai.tool.call.id']
+  ) AS ToolUseId,
   SpanAttributes['gen_ai.request.model'] AS Model,
   SpanAttributes['gen_ai.response.model'] AS ResponseModel,
   SpanAttributes['gen_ai.usage.cost'] AS Cost,
@@ -208,12 +215,15 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
   SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
   SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
+  SpanAttributes['gen_ai.usage.input_chars'] AS InputChars,
+  SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
 `;
 
 /**
@@ -282,9 +292,16 @@ function mapModelSpanSampleRow(
  * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
  * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
  *
- * Kept as a function so optional extra predicates (partition window,
- * sinceStartTimeMs) are applied symmetrically in inner + outer scopes —
- * essential because the dedup must see the same row set as the outer scan.
+ * Kept as a function so an optional extra predicate (the partition-hint
+ * window, or the `since` readers' row-version bound) can be applied to the
+ * inner scope as well as the outer.
+ *
+ * Only pass a predicate that a span's versions cannot straddle. The subquery
+ * elects each span's latest version, so it has to see every version: bound it
+ * by something a re-projection can move — a span's StartTime, say — and it
+ * will elect a stale version whose row the outer filter then emits. This is
+ * why the span-tree cursor's `StartTime >=` bound is deliberately NOT passed
+ * in (see `findSpanSummariesPage`).
  */
 function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
@@ -323,6 +340,15 @@ export interface SpanSummaryQueryRow {
   DurationMs: number;
   StatusCode: number | null;
   SpanType: string;
+  // Semconv `gen_ai.tool.name` first, claude's bare `tool_name` second —
+  // whichever the emitter used, the waterfall can label the tool row.
+  ToolName: string;
+  // Claude joins: request_id ties llm_request spans to their api_* logs,
+  // query_source scopes positional prompt pairing, tool_use_id ties tool
+  // spans to tool_decision/tool_result logs. Server-side only.
+  RequestId: string;
+  QuerySource: string;
+  ToolUseId: string;
   Model: string;
   ResponseModel: string;
   // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
@@ -333,18 +359,32 @@ export interface SpanSummaryQueryRow {
   OutputTokens: string;
   CacheReadTokens: string;
   CacheCreationTokens: string;
+  InputChars: string;
+  AudioSeconds: string;
   CustomInputRate: string;
   CustomOutputRate: string;
   CustomCacheReadRate: string;
   CustomCacheCreationRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
+  UpdatedAtMs: number;
 }
 
 /** "" → null, malformed → null, otherwise the parsed number. */
 function attrNumber(raw: string): number | null {
   if (!raw) return null;
   const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Coerces a `Nullable(Float64)` column read from ClickHouse to `number | null`.
+ * JSONEachRow usually returns numbers, but a string can arrive depending on
+ * output settings; null/undefined and non-finite values map to null.
+ */
+function nullableFloat(raw: number | string | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = typeof raw === "string" ? Number(raw) : raw;
   return Number.isFinite(n) ? n : null;
 }
 
@@ -373,6 +413,8 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CacheReadTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
           row.CacheCreationTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
           row.CustomInputRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
@@ -397,6 +439,10 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     durationMs: Number(row.DurationMs),
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
+    toolName: row.ToolName || null,
+    requestId: row.RequestId || null,
+    querySource: row.QuerySource || null,
+    toolUseId: row.ToolUseId || null,
     model: row.Model || null,
     cost,
     inputTokens,
@@ -404,6 +450,7 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     cacheReadTokens,
     cacheCreationTokens,
     startTimeMs: Number(row.StartTimeMs),
+    updatedAtMs: Number(row.UpdatedAtMs),
   };
 }
 
@@ -504,8 +551,11 @@ function validateStatusCode(value: number | null): NormalizedStatusCode | null {
 /**
  * Ensures a ClickHouse Map(String, String) value is actually Record<string, string>.
  * Non-string values are dropped with a warning.
+ *
+ * Exported so every stored_spans read path shares the same row decoding.
+ * Pair with {@link deserializeAttributes}.
  */
-function ensureStringRecord(
+export function ensureStringRecord(
   raw: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
@@ -651,12 +701,21 @@ interface ClickHouseSpanRecord {
   DroppedAttributesCount: 0;
   DroppedEventsCount: 0;
   DroppedLinksCount: 0;
+  Cost: number | null;
+  NonBilledCost: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   _retention_days: number;
 }
 
-interface FullSpanRow {
+/**
+ * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
+ * Exported so the claim-check equivalence test can drive the REAL mapping
+ * rather than a hand-built stand-in — the whole claim-check design rests on a
+ * resolved span producing the same command as the inline one, and a
+ * column-mapping regression is exactly what that contract must catch.
+ */
+export interface FullSpanRow {
   SpanId: string;
   TraceId: string;
   TenantId: string;
@@ -675,6 +734,8 @@ interface FullSpanRow {
   StatusMessage: string | null;
   ScopeName: string | null;
   ScopeVersion: string | null;
+  Cost: number | null;
+  NonBilledCost: number | null;
   Events_Timestamp: number[];
   Events_Name: string[];
   Events_Attributes: Record<string, unknown>[];
@@ -683,7 +744,7 @@ interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
-function mapChRowToNormalized(row: FullSpanRow) {
+export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
     traceId: row.TraceId,
@@ -727,6 +788,10 @@ function mapChRowToNormalized(row: FullSpanRow) {
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
     droppedLinksCount: 0 as const,
+    // Nullable(Float64) round-trips as number | null over JSONEachRow, but a
+    // string can still arrive depending on settings — coerce defensively.
+    cost: nullableFloat(row.Cost),
+    nonBilledCost: nullableFloat(row.NonBilledCost),
   };
 }
 
@@ -746,7 +811,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -795,7 +860,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         table: TABLE_NAME,
         values: records,
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -829,8 +894,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const effectiveLimit = clampSpanReadLimit(limit);
 
     try {
-      return await withPartitionHint<Span[]>(
-        { occurredAtMs },
+      return await this.readTraceSpans<Span[]>(
+        { tenantId, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -895,8 +960,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // fallback covers a stale/wrong hint. The window (±2 days) dwarfs any real
     // trace duration, so a derivation read can't realistically split across it.
     try {
-      return await withPartitionHint<NormalizedSpan[]>(
-        { occurredAtMs },
+      return await this.readTraceSpans<NormalizedSpan[]>(
+        { tenantId, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -955,42 +1020,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await withPartitionHint<Span | null>(
-        { occurredAtMs },
+      return await this.readTraceSpans<Span | null>(
+        { tenantId, traceId, occurredAtMs },
         (span) => span === null,
         async (window) => {
-          const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
-          // Single-span fetch. WHERE pins (TenantId, TraceId, SpanId) - the
-          // primary key prefix - so we hit a tiny granule range. ORDER BY
-          // UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
-          // LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
-          // Links.*) are deferred past the LIMIT, so unmerged versions
-          // don't materialise them. Investigation numbers + the per-query
-          // lock that keeps the optimiser engaged live in
-          // SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
-          // rule predates LazilyRead and isn't load-bearing on this shape.
-          const result = await client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                AND SpanId = {spanId:String}
-                ${partition.sqlAnd}
-              ORDER BY UpdatedAt DESC
-              LIMIT 1
-            `,
-            query_params: { tenantId, traceId, spanId, ...partition.params },
-            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-            format: "JSONEachRow",
+          const row = await this.fetchNormalizedSpanRow({
+            tenantId,
+            traceId,
+            spanId,
+            window,
           });
-
-          const rows = (await result.json()) as FullSpanRow[];
-          if (rows.length === 0) return null;
-          const [span] = mapNormalizedSpansToSpans(
-            rows.map(mapChRowToNormalized),
-          );
+          if (row === null) return null;
+          const [span] = mapNormalizedSpansToSpans([row]);
           return span ?? null;
         },
       );
@@ -1008,6 +1049,115 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
+  /**
+   * Claim-check resolution read (ADR-069): the canonical single-span read for
+   * internal derivation consumers holding a `span_referenced` staging. A miss
+   * is an EXPECTED transient state here — the reference is often dequeued
+   * before the sibling spanStorage write lands — so `fallback: "none"` keeps a
+   * miss one cheap windowed probe (the caller throws into the queue's backoff)
+   * instead of an unbounded scan per retry.
+   *
+   * The hint must be the SPAN'S OWN start, not the ingest time of the event
+   * that referenced it: this table's partition column is `StartTime`, so a
+   * window centred on ingest time excludes any span whose duration plus export
+   * lag exceeded it — and spans export on end. Such a span would sit outside
+   * every retry's window forever. Callers pass the reference's parsed
+   * `startTimeUnixMs`, falling back to the envelope's occurredAt only when the
+   * wire span carried no parseable start.
+   *
+   * The hint is REQUIRED, not an {@link OccurredAtHint}: `fallback: "none"`
+   * only bounds the read when there is a window to stay inside. A hintless
+   * call would fall straight through to the unbounded fragment and scan every
+   * partition, cold S3 tier included — precisely what this read promises not
+   * to do, and per retry.
+   */
+  async findNormalizedSpanById({
+    tenantId,
+    traceId,
+    spanId,
+    occurredAtMs,
+  }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findNormalizedSpanById",
+    );
+
+    try {
+      return await queryWindowed<NormalizedSpan | null>({
+        table: TABLE_NAME,
+        hintMs: occurredAtMs,
+        windowMs: DEFAULT_PARTITION_WINDOW_MS,
+        fallback: "none",
+        isEmpty: (row) => row === null,
+        run: (window) =>
+          this.fetchNormalizedSpanRow({ tenantId, traceId, spanId, window }),
+      });
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          spanId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get normalized span by id from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Single-span fetch shared by {@link getSpanByIds} and
+   * {@link findNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
+   * primary key prefix - so we hit a tiny granule range. ORDER BY
+   * UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
+   * LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
+   * Links.*) are deferred past the LIMIT, so unmerged versions
+   * don't materialise them. Investigation numbers + the per-query
+   * lock that keeps the optimiser engaged live in
+   * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
+   * rule predates LazilyRead and isn't load-bearing on this shape.
+   *
+   * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
+   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
+   * with a CHANGED StartTime answers last-written-wins before a merge and
+   * largest-StartTime-wins after one. #6117 widened the blast radius by
+   * resolving claim-checks through this read, not just the UI.
+   */
+  private async fetchNormalizedSpanRow({
+    tenantId,
+    traceId,
+    spanId,
+    window,
+  }: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    window: WindowFragment | null;
+  }): Promise<NormalizedSpan | null> {
+    const partition = partitionFragment(window);
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${FULL_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          AND SpanId = {spanId:String}
+          ${partition.sqlAnd}
+        ORDER BY UpdatedAt DESC
+        LIMIT 1
+      `,
+      query_params: { tenantId, traceId, spanId, ...partition.params },
+      clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as FullSpanRow[];
+    if (rows.length === 0) return null;
+    return mapChRowToNormalized(rows[0]!);
+  }
+
   async findSpanResourcesByTraceId({
     tenantId,
     traceId,
@@ -1021,8 +1171,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpanResourcesByTraceId",
     );
 
-    return withPartitionHint<SpanResourceInfo[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanResourceInfo[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1045,6 +1195,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1118,10 +1269,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * authoritative: the trace has no matching events within its ±2-day span
    * window, and we do NOT rescan unbounded.
    *
-   * That unbounded-on-empty rescan (what {@link withPartitionHint} does) was
-   * itself a cold S3 partition walk: a trace legitimately *without* events made
-   * every such read scan the whole table. We only scan unbounded when the trace
-   * time is genuinely unknown (the trace isn't in `trace_summaries`).
+   * That is why the {@link queryWindowed} call uses `fallback: "none"`: the
+   * hinted window is single-shot, never widened on empty. The unbounded-on-empty
+   * rescan spans use was itself a cold S3 partition walk, and a trace legitimately
+   * *without* events would trigger it on every read. We only scan unbounded when
+   * the trace time is genuinely unknown (the trace isn't in `trace_summaries`),
+   * which is the `hintMs === null` branch inside `queryWindowed`.
    */
   private async readTraceEvents<T>(
     {
@@ -1129,11 +1282,67 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       traceId,
       occurredAtMs,
     }: { tenantId: string; traceId: string } & OccurredAtHint,
-    run: (window: PartitionWindow | undefined) => Promise<T>,
+    run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs =
       occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return run(partitionWindowFor({ occurredAtMs: hintMs }));
+    return queryWindowed<T>({
+      table: TABLE_NAME,
+      hintMs: hintMs ?? null,
+      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      fallback: "none",
+      // `fallback: "none"` never widens, so `isEmpty` is never consulted.
+      isEmpty: () => false,
+      run,
+    });
+  }
+
+  /**
+   * Partition-pruned execution for the single-trace `stored_spans` reads.
+   * Mirrors {@link readTraceEvents} for the no-hint case while preserving the
+   * existing hinted behaviour:
+   *
+   *   - Caller threaded an `occurredAtMs` hint: prune to its ±2-day window,
+   *     then fall back to an unbounded scan if the window misses, so a stale
+   *     URL hint or clock skew still resolves.
+   *   - No hint — back-stack / conversation-jump / deep-link drawer opens and
+   *     worker callers that never had one: resolve the trace's occurrence time
+   *     from `trace_summaries` and bound the read to its ±2-day span window
+   *     instead of scanning every weekly partition (incl. the cold S3 tier).
+   *
+   * Unlike {@link readTraceEvents}, an empty windowed result is NOT treated as
+   * authoritative here — hence `fallback: "unbounded"`: `trace_summaries.OccurredAt`
+   * is the trace's *start* (min over projected rows) and never widens, so a
+   * long-running trace can produce spans well past `OccurredAt + 2 days`. The
+   * `isEmpty`-driven fallback runs bounded first and only rescans unbounded if
+   * that comes back empty, so a trace whose spans all fall outside the window is
+   * still returned correctly (at the cost of one extra unbounded scan only in
+   * that case). Events cluster at the trace start so they can skip the fallback;
+   * spans cannot.
+   *
+   * Only when the trace time is genuinely unknown (the trace isn't in
+   * `trace_summaries`) do we go straight to the unbounded read — the
+   * `hintMs === null` branch inside {@link queryWindowed}.
+   */
+  private async readTraceSpans<T>(
+    {
+      tenantId,
+      traceId,
+      occurredAtMs,
+    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    isEmpty: (result: T) => boolean,
+    run: (window: WindowFragment | null) => Promise<T>,
+  ): Promise<T> {
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    return queryWindowed<T>({
+      table: TABLE_NAME,
+      hintMs: hintMs ?? null,
+      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      fallback: "unbounded",
+      isEmpty,
+      run,
+    });
   }
 
   async getTraceEventsByTraceId({
@@ -1186,6 +1395,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 Events_Name AS event_name,
                 Events_Attributes AS event_attrs
               ORDER BY event_timestamp ASC
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             `,
             query_params: { tenantId, traceId, ...partition.params },
             format: "JSONEachRow",
@@ -1381,8 +1591,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
     );
 
-    return withPartitionHint<SpanSummaryRow[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanSummaryRow[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1396,6 +1606,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1420,8 +1631,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId",
     );
 
-    return withPartitionHint<SpanLangwatchSignalsRow[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanLangwatchSignalsRow[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1450,6 +1661,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
+              -- Order before the cap so a runaway trace consistently yields the
+              -- same earliest-starting prefix; an unordered LIMIT would let
+              -- ClickHouse return an arbitrary subset that varies with merges
+              -- and part ordering, making which spans carry signals
+              -- nondeterministic across calls. Must be the raw StartTime
+              -- column — this subquery computes no StartTimeMs alias.
+              ORDER BY StartTime ASC
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
           query_params: { tenantId, traceId, ...partition.params },
@@ -1492,8 +1711,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpansPaginated",
     );
 
-    return withPartitionHint<{ spans: Span[]; total: number }>(
-      { occurredAtMs },
+    return this.readTraceSpans<{ spans: Span[]; total: number }>(
+      { tenantId, traceId, occurredAtMs },
       (result) => result.spans.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1559,7 +1778,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId,
     traceId,
     sinceStartTimeMs,
-    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
@@ -1570,166 +1788,208 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpansSince",
     );
 
-    return withPartitionHint<Span[]>(
-      { occurredAtMs },
-      (rows) => rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const sinceFilter =
-          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT ${FULL_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${sinceFilter}
-              ${partition.sqlAnd}
-              AND ${dedupInTuple(innerExtra)}
-            ORDER BY StartTime ASC
-          `,
-          query_params: {
-            tenantId,
-            traceId,
-            sinceStartTimeMs,
-            ...partition.params,
-          },
-          format: "JSONEachRow",
-        });
+    // Poll reader: `StartTime > sinceStartTimeMs` is already a partition-pruning
+    // lower bound, so this does NOT resolve or clamp to the trace's OccurredAt
+    // window. A `StartTime <= OccurredAt + 2d` upper bound would silently hide
+    // new spans on a trace still active more than 2 days after its
+    // trace_summaries.OccurredAt (the live delta view would just stop updating).
+    const sinceFilter =
+      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${FULL_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${sinceFilter}
+          AND ${dedupInTuple(sinceFilter)}
+        ORDER BY StartTime ASC
+        LIMIT ${MAX_DERIVATION_SPANS}
+      `,
+      query_params: { tenantId, traceId, sinceStartTimeMs },
+      format: "JSONEachRow",
+    });
 
-        const rows = (await result.json()) as FullSpanRow[];
-        return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
-      },
-    );
+    const rows = (await result.json()) as FullSpanRow[];
+    return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
-  async findSpanSummariesPaginated({
+  async findSpanSummariesPage({
     tenantId,
     traceId,
     limit,
-    offset,
+    cursor,
     occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     limit: number;
-    offset: number;
-  } & OccurredAtHint): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+    cursor?: SpanSummaryPageCursor;
+  } & OccurredAtHint): Promise<SpanSummaryPage> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.findSpanSummariesPaginated",
+      "SpanStorageClickHouseRepository.findSpanSummariesPage",
     );
 
-    return withPartitionHint<{ rows: SpanSummaryRow[]; total: number }>(
-      { occurredAtMs },
-      (result) => result.rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
-        // Same two-step rationale as findSpansPaginated, except the page
-        // query is already light (summary columns only). Splitting still
-        // helps because count() OVER () forces the deduped row set to be
-        // materialized in full before the LIMIT — a wasted scan when the
-        // user is on page N and we just want a number.
-        const [pageResult, countResult] = await Promise.all([
-          client.query({
-            query: `
-              SELECT ${SUMMARY_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-              ORDER BY StartTime ASC
-              LIMIT {limit:UInt32}
-              OFFSET {offset:UInt32}
-            `,
-            query_params: {
-              tenantId,
-              traceId,
-              limit,
-              offset,
-              ...partition.params,
-            },
-            format: "JSONEachRow",
-          }),
-          client.query({
-            query: `
-              SELECT count(DISTINCT SpanId) AS Total
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-            `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
-          }),
-        ]);
+    const effectiveLimit = clampSpanReadLimit(limit, {
+      max: MAX_LIGHT_SPAN_READ_ROWS,
+    });
 
-        const pageRows = await pageResult.json<SpanSummaryQueryRow>();
-        const countRows = (await countResult.json()) as Array<{
-          Total: number | string;
-        }>;
-        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
+    // This reader deliberately does NOT go through readTraceSpans /
+    // queryWindowed — a paged read breaks both of that seam's
+    // assumptions:
+    //
+    //   - Its ±2-day window has an UPPER bound, and a page that runs into it
+    //     comes back short-but-non-empty, which the router would read as
+    //     end-of-trace: every span a long-running trace produced past
+    //     `occurredAt + 2d` would be silently dropped. Pages therefore bound
+    //     StartTime from below only; forward partitions cost one primary-key
+    //     probe each (TraceId is 2nd in the ORDER BY key), not a scan.
+    //   - Its empty-means-hint-missed fallback can't tell a missed hint from
+    //     an exhausted cursor, so a legitimately empty page would rerun as an
+    //     unhinted rescan. Cursor pages carry an exact lower bound (the
+    //     cursor itself), so their result is authoritative and never falls
+    //     back; only the first page keeps the empty→unbounded retry, because
+    //     its lower bound comes from a hint that can be plain wrong (stale
+    //     URL, clock skew).
+    const runPage = async (
+      lowerBoundMs: number | undefined,
+    ): Promise<SpanSummaryPage> => {
+      const client = await this.resolveClient(tenantId);
+      const pageLowerBound =
+        lowerBoundMs !== undefined
+          ? `AND StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})`
+          : "";
+      // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
+      // the same millisecond expression the rows are ordered (and returned)
+      // by, so page boundaries are exact. `StartTime` is `DateTime64(3)` —
+      // already exactly milliseconds — so `toUnixTimestamp64Milli` is a
+      // representation change, not a lossy truncation, and no two rows can
+      // differ by less than the tuple can express.
+      //
+      // The coarse `StartTime >=` bound restates the tuple predicate on the
+      // raw partition key: `toYearWeek(StartTime)` partition pruning can't
+      // see through `toUnixTimestamp64Milli(...)`, so without it every page
+      // re-scans the partitions pagination already moved past — exactly the
+      // long-running multi-week traces that need paging.
+      //
+      // NEITHER cursor predicate may enter the dedup subquery. The subquery's
+      // job is to elect each span's LATEST version, which it can only do if it
+      // sees every version. Restricting it to `StartTime >= cursor` breaks
+      // that whenever a span was re-emitted with a corrected EARLIER start:
+      // the latest version then sorts below the bound, the inner scan elects a
+      // stale older version instead, and the outer tuple filter emits it
+      // happily — and the client's dedup is last-write-wins per spanId, so the
+      // stale row wins the waterfall row. (`pageLowerBound` does stay in: it
+      // is the ±2-day hint window applied identically to both scopes, and a
+      // correction would have to move a span's start by more than two days to
+      // slip past it — whereas the cursor bound advances into the trace on
+      // every single page.)
+      const cursorCoarseBound = cursor
+        ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
+        : "";
+      const cursorFilter = cursor
+        ? `${cursorCoarseBound}
+            AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
+        : "";
+      // Over-fetch one row past the page: `hasMore` comes from that row's
+      // existence, so an exact-multiple-of-page-size trace terminates without
+      // a follow-up empty fetch.
+      const result = await client.query({
+        query: `
+          SELECT ${SUMMARY_SPAN_SELECT}
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            ${pageLowerBound}
+            ${cursorFilter}
+            AND ${dedupInTuple(pageLowerBound)}
+          ORDER BY StartTimeMs ASC, SpanId ASC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          traceId,
+          limit: effectiveLimit + 1,
+          ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
+          ...(cursor
+            ? {
+                cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
+                cursorSpanId: cursor.spanId,
+              }
+            : {}),
+        },
+        format: "JSONEachRow",
+      });
 
-        return {
-          rows: pageRows.map(mapSpanSummaryRow),
-          total,
-        };
-      },
-    );
+      const rows = (await result.json<SpanSummaryQueryRow>()).map(
+        mapSpanSummaryRow,
+      );
+      return {
+        rows: rows.slice(0, effectiveLimit),
+        hasMore: rows.length > effectiveLimit,
+      };
+    };
+
+    if (cursor) return runPage(undefined);
+
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    if (hintMs === undefined) return runPage(undefined);
+    const bounded = await runPage(hintMs - DEFAULT_PARTITION_WINDOW_MS);
+    if (bounded.rows.length > 0) return bounded;
+    return runPage(undefined);
   }
 
   async findSpanSummariesSince({
     tenantId,
     traceId,
-    sinceStartTimeMs,
-    occurredAtMs,
+    sinceUpdatedAtMs,
   }: {
     tenantId: string;
     traceId: string;
-    sinceStartTimeMs: number;
+    sinceUpdatedAtMs: number;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    return withPartitionHint<SpanSummaryRow[]>(
-      { occurredAtMs },
-      (rows) => rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const sinceFilter =
-          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT ${SUMMARY_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${sinceFilter}
-              ${partition.sqlAnd}
-              AND ${dedupInTuple(innerExtra)}
-            ORDER BY StartTimeMs ASC
-          `,
-          query_params: {
-            tenantId,
-            traceId,
-            sinceStartTimeMs,
-            ...partition.params,
-          },
-          format: "JSONEachRow",
-        });
+    // Keyed on the ROW VERSION, not the span start. A span updated in place —
+    // end time, duration, status, cost, all re-projected as the span closes —
+    // keeps its StartTime, so a `StartTime >` poll can only ever see brand-new
+    // spans. The root span is the worst case: it starts first and ends last,
+    // so a start-keyed poll left its duration (and with it the waterfall's
+    // whole time scale) frozen at first projection until SSE reconnected.
+    //
+    // UpdatedAt is not the partition key, so this gives up partition pruning.
+    // The read stays cheap because (TenantId, TraceId) is the table's sort-key
+    // prefix and carries a bloom-filter index: partitions that hold none of
+    // this trace's rows are skipped on the index, not scanned.
+    //
+    // Deliberately NOT clamped to the trace's OccurredAt window: an upper
+    // bound would silently stop the live view on a long-running trace.
+    const sinceFilter =
+      "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${SUMMARY_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${sinceFilter}
+          AND ${dedupInTuple(sinceFilter)}
+        ORDER BY StartTimeMs ASC
+        LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
+      `,
+      query_params: { tenantId, traceId, sinceUpdatedAtMs },
+      format: "JSONEachRow",
+    });
 
-        const rows = await result.json<SpanSummaryQueryRow>();
-        return rows.map(mapSpanSummaryRow);
-      },
-    );
+    const rows = await result.json<SpanSummaryQueryRow>();
+    return rows.map(mapSpanSummaryRow);
   }
 
   async findModelUsageStats({
@@ -1909,6 +2169,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,
+      Cost: span.cost,
+      NonBilledCost: span.nonBilledCost,
       CreatedAt: new Date(),
       UpdatedAt: new Date(),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,

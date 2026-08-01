@@ -1,16 +1,17 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
   type Team,
+  TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Model Defaults REST API", () => {
@@ -126,9 +127,10 @@ describe("Feature: Model Defaults REST API", () => {
     // Scope cleanup to test data only — repo-wide mass-delete protection
     // (src/utils/dbMassDeleteProtection.ts) rejects deleteMany with an
     // empty where. Filter by the scope rows we created for this org.
-    await prisma.modelDefaultConfig
-      .deleteMany({
-        where: {
+    await cleanupTestRows(prisma, [
+      [
+        "modelDefaultConfig",
+        {
           scopes: {
             some: {
               OR: [
@@ -139,26 +141,16 @@ describe("Feature: Model Defaults REST API", () => {
             },
           },
         },
-      })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId: testOrganization.id } })
-      .catch(() => {});
-    await prisma.apiKey
-      .deleteMany({ where: { userId } })
-      .catch(() => {});
-    await prisma.project.delete({ where: { id: testProjectId } }).catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { teamId: testTeam.id } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId: testOrganization.id } })
-      .catch(() => {});
-    await prisma.user.delete({ where: { id: userId } }).catch(() => {});
-    await prisma.team.delete({ where: { id: testTeam.id } }).catch(() => {});
-    await prisma.organization
-      .delete({ where: { id: testOrganization.id } })
-      .catch(() => {});
+      ],
+      ["roleBinding", { organizationId: testOrganization.id }],
+      ["apiKey", { organizationId: testOrganization.id }],
+      ["project", { id: testProjectId }],
+      ["teamUser", { teamId: testTeam.id }],
+      ["organizationUser", { organizationId: testOrganization.id }],
+      ["team", { id: testTeam.id }],
+      ["organization", { id: testOrganization.id }],
+      ["user", { id: userId }],
+    ]);
   });
 
   describe("when no auth header is provided", () => {

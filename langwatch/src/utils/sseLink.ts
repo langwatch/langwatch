@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 import type { TRPCLink } from "@trpc/client";
 import { TRPCClientError } from "@trpc/client";
 import type { AnyRouter } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import superjson from "superjson";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:sse-link");
 
@@ -24,6 +24,37 @@ export interface SSELinkOptions {
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null;
+
+/**
+ * Classify one parsed SSE frame. A `type: "error"` frame is AMBIGUOUS: the
+ * route wrapper's PROTOCOL error (`{type:"error", message}`, the subscription
+ * generator threw, see routes/sse.ts) shares its discriminant with legitimate
+ * subscription DATA whose own union contains an error variant: the langy turn
+ * stream's terminal is `{type:"error", error:"<serialized domain error>"}`.
+ * The two shapes are disjoint (protocol always carries a string `message`,
+ * a domain entry carries `error` and no `message`), so split on that: a domain
+ * entry must flow to the subscriber as data, or every live-watched turn
+ * failure collapses into a dead subscription and the generic unknown card
+ * while the typed cause sits right there on the wire.
+ */
+export function classifySseFrame(
+  parsed: unknown,
+): "connected" | "complete" | "protocol-error" | "data" {
+  if (!isObject(parsed) || typeof parsed.type !== "string") return "data";
+  switch (parsed.type) {
+    case "connected":
+      return "connected";
+    case "complete":
+      return "complete";
+    case "error":
+      if (typeof parsed.message !== "string" && "error" in parsed) {
+        return "data";
+      }
+      return "protocol-error";
+    default:
+      return "data";
+  }
+}
 
 const toTrpcError = <TRouter extends AnyRouter>(
   err: unknown,
@@ -123,15 +154,14 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
             try {
               const parsed = superjson.parse(event.data) as SSEMessage;
 
-              if (isObject(parsed) && typeof parsed.type === "string") {
-                if (parsed.type === "connected") {
+              switch (classifySseFrame(parsed)) {
+                case "connected":
                   logger.debug(
                     { path: endpointUrl.pathname },
                     "SSE connection acknowledged",
                   );
                   return;
-                }
-                if (parsed.type === "complete") {
+                case "complete":
                   logger.info(
                     { path: endpointUrl.pathname },
                     "SSE stream completed",
@@ -139,10 +169,9 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
                   observer.complete();
                   close();
                   return;
-                }
-                if (parsed.type === "error") {
+                case "protocol-error": {
                   const msg =
-                    typeof parsed.message === "string"
+                    isObject(parsed) && typeof parsed.message === "string"
                       ? parsed.message
                       : "SSE Error";
                   logger.error(
@@ -153,6 +182,8 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
                   close();
                   return;
                 }
+                case "data":
+                  break;
               }
 
               logger.debug(

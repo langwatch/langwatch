@@ -11,10 +11,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RunRow } from "../RunRow";
 import { GroupRow } from "../GroupRow";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+import { RunRow } from "../RunRow";
 import type { RunGroup, RunGroupSummary } from "../run-history-transforms";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -26,9 +30,7 @@ function makeGroup(overrides: Partial<RunGroup> = {}): RunGroup {
     groupLabel: "Angry refund request",
     groupType: "scenario",
     timestamp: Date.now(),
-    scenarioRuns: [
-      makeScenarioRunData(),
-    ],
+    scenarioRuns: [makeScenarioRunData()],
     ...overrides,
   };
 }
@@ -99,7 +101,9 @@ describe("<RunRow/> borderless styling", () => {
 
       const header = screen.getByRole("button", { name: /Run from/ });
       // The sticky position is on the parent wrapper Box, not the button itself
-      expect(header.closest('[style*="sticky"]') ?? header.parentElement).toBeTruthy();
+      expect(
+        header.closest('[style*="sticky"]') ?? header.parentElement,
+      ).toBeTruthy();
     });
   });
 
@@ -169,7 +173,10 @@ describe("<GroupRow/> borderless styling", () => {
         name: /Angry refund request group/,
       });
       // Sticky is on the wrapper Box around the button, not the button itself
-      expect(header.closest("[class]")?.parentElement).toHaveStyle({ position: "sticky", top: "0px" });
+      expect(header.closest("[class]")?.parentElement).toHaveStyle({
+        position: "sticky",
+        top: "0px",
+      });
     });
   });
 });

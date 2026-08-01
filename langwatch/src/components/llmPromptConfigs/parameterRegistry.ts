@@ -271,8 +271,7 @@ parameterRegistry.register({
     options: ["low", "medium", "high"] as const,
     default: "medium",
     label: "Reasoning",
-    helper:
-      "How much the model thinks. Higher = more thorough but slower.",
+    helper: "How much the model thinks. Higher = more thorough but slower.",
     dynamicOptions: true,
   },
   icon: Brain,

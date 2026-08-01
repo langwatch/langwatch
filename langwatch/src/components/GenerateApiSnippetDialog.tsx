@@ -1,4 +1,4 @@
-import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useEffect, useState } from "react";

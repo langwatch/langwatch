@@ -5,10 +5,11 @@ import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -105,14 +106,10 @@ describe("Feature: Dashboard REST API", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.customGraph.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.dashboard.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [
+      ["customGraph", { projectId: testProjectId }],
+      ["dashboard", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });
@@ -140,7 +137,10 @@ describe("Feature: Dashboard REST API", () => {
     });
   }
 
-  async function createGraph(dashboardId: string, overrides?: { gridRow?: number; gridColumn?: number }) {
+  async function createGraph(
+    dashboardId: string,
+    overrides?: { gridRow?: number; gridColumn?: number },
+  ) {
     return await prisma.customGraph.create({
       data: {
         id: nanoid(),
@@ -293,10 +293,9 @@ describe("Feature: Dashboard REST API", () => {
     it("renames the dashboard", async () => {
       const dashboard = await createDashboard({ name: "Original Name" });
 
-      const res = await helpers.api.patch(
-        `/api/dashboards/${dashboard.id}`,
-        { name: "Updated Name" },
-      );
+      const res = await helpers.api.patch(`/api/dashboards/${dashboard.id}`, {
+        name: "Updated Name",
+      });
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -313,10 +312,9 @@ describe("Feature: Dashboard REST API", () => {
     it("returns 422 when name is empty", async () => {
       const dashboard = await createDashboard({ name: "Test" });
 
-      const res = await helpers.api.patch(
-        `/api/dashboards/${dashboard.id}`,
-        { name: "" },
-      );
+      const res = await helpers.api.patch(`/api/dashboards/${dashboard.id}`, {
+        name: "",
+      });
       expect(res.status).toBe(422);
     });
   });

@@ -35,21 +35,25 @@ export function ExpandedTextDialog({
             <Switch
               size="sm"
               checked={isFormatted}
-              onChange={() => setIsFormatted(!isFormatted)}
+              onCheckedChange={() => setIsFormatted(!isFormatted)}
             />
             <Text>Formatted</Text>
           </HStack>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
+        <Dialog.Body
+          paddingY={6}
+          paddingX={8}
+          overflow="auto"
+          maxHeight="calc(100vh - 200px)"
+        >
           {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
             ) : (
               <Markdown>
                 {typeof textExpanded === "string"
-                  ? textExpanded
-                      .replace(/(\n+)\\(\n+)/g, "$1$2")
+                  ? textExpanded.replace(/(\n+)\\(\n+)/g, "$1$2")
                   : JSON.stringify(textExpanded, null, 2)}
               </Markdown>
             )
@@ -86,8 +90,13 @@ export function HoverableBigText({
     );
   };
 
-  // Check on every rerender
-  setTimeout(checkOverflow, 100);
+  // Re-measure after every render, once the browser has laid the box out.
+  // The handle is cleared on unmount and before the next render's probe, so a
+  // pending measurement can never run against a torn-down document.
+  useEffect(() => {
+    const timeout = setTimeout(checkOverflow, 100);
+    return () => clearTimeout(timeout);
+  });
 
   return (
     <>

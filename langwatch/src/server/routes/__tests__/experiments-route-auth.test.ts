@@ -19,7 +19,7 @@
  * future reordering or re-introduction of a namespace-wide API-key guard that
  * shadows the session routes fails here.
  */
-import { Hono } from "hono";
+import type { Hono } from "hono";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // The execute endpoint authenticates by user session. Force "no session" so
@@ -40,7 +40,12 @@ const SESSION_GUARD_MESSAGE = "You must be logged in to access this endpoint.";
 const validExecuteBody = {
   projectId: "project_test",
   name: "regression-test",
-  dataset: { id: "dataset-1", name: "ds", type: "inline" as const, columns: [] },
+  dataset: {
+    id: "dataset-1",
+    name: "ds",
+    type: "inline" as const,
+    columns: [],
+  },
   targets: [],
   evaluators: [],
   scope: { type: "full" as const },

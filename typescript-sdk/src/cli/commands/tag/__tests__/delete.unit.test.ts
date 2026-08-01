@@ -6,7 +6,7 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("readline", () => ({
@@ -67,7 +67,8 @@ describe("tagDeleteCommand", () => {
       setupReadlineMock("canary");
       mockDeleteTag.mockResolvedValue(undefined);
 
-      await tagDeleteCommand("canary");
+      const result = await tagDeleteCommand("canary");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });
@@ -111,7 +112,8 @@ describe("tagDeleteCommand", () => {
     it("prints confirmation message", async () => {
       mockDeleteTag.mockResolvedValue(undefined);
 
-      await tagDeleteCommand("canary", { force: true });
+      const result = await tagDeleteCommand("canary", { force: true });
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });

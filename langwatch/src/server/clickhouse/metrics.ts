@@ -1,6 +1,6 @@
-import { Counter, Gauge, Histogram, register } from "prom-client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -38,6 +38,39 @@ export const incrementClickHouseQueryCount = (
   queryType: "SELECT" | "INSERT" | "OTHER",
   status: "success" | "error",
 ) => clickhouseQueryTotal.labels(queryType, status).inc();
+
+// Counter for windowed reads: the partition-pruning-window-with-fallback read
+// pattern (see app-layer/clients/clickhouse/windowed-read.ts). One increment
+// per queryWindowed call, tagged with the path it took:
+//   hit             - hinted window sufficed (cheap, no widening)
+//   widened_hit     - hinted window empty; a bounded lookback re-scan found rows
+//   widened_empty   - hinted window empty; bounded lookback re-scan also empty
+//   unbounded_hit   - hinted window empty; unbounded re-scan found rows
+//   unbounded_empty - hinted window empty; unbounded re-scan also empty
+//   unwindowed      - no hint; ran the fallback window directly
+//   error           - an attempt threw; the read failed rather than resolved
+// Exists to size how often reads fall off the cheap path before a rate limit is
+// chosen for the expensive ones.
+export type WindowedReadOutcome =
+  | "hit"
+  | "widened_hit"
+  | "widened_empty"
+  | "unbounded_hit"
+  | "unbounded_empty"
+  | "unwindowed"
+  | "error";
+
+register.removeSingleMetric("clickhouse_windowed_read_total");
+const clickhouseWindowedReadTotal = new Counter({
+  name: "clickhouse_windowed_read_total",
+  help: "Total number of ClickHouse windowed reads by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+});
+
+export const incrementWindowedReadCount = (
+  table: string,
+  outcome: WindowedReadOutcome,
+) => clickhouseWindowedReadTotal.labels(table, outcome).inc();
 
 // ============================================================================
 // Storage Metrics
@@ -171,10 +204,8 @@ const ensureBackupStatusTotal = (): Gauge<"status"> => {
   return clickhouseBackupStatusTotal;
 };
 
-export const setClickHouseBackupStatusCount = (
-  status: string,
-  count: number,
-) => ensureBackupStatusTotal().labels(status).set(count);
+export const setClickHouseBackupStatusCount = (status: string, count: number) =>
+  ensureBackupStatusTotal().labels(status).set(count);
 
 // Edge-triggered: collectStorageStats runs every 15s, so we'd otherwise
 // produce 5,760 identical warns/day if system.backups is unavailable.
@@ -226,7 +257,88 @@ const MONITORED_TABLES = [
   "llm_spans_tokens_usage",
   "evaluations",
   "events",
+  // ADR-040: offloaded evaluator inputs (and other externalized content) live
+  // here; monitoring its on-disk footprint surfaces the durable-object cost.
+  "stored_objects",
 ];
+
+/**
+ * Collects ClickHouse backup status from system.backup_log into the backup gauges.
+ * Extracted so collectStorageStats can gate it behind the explicit opt-in (see the
+ * call site).
+ *
+ * We deliberately query system.backup_log instead of system.backups: system.backups
+ * is an in-memory table that gets wiped on CH restart, which happens on every app
+ * deploy (the CH image tag is bumped by the build pipeline). After a restart the
+ * in-memory table is empty until the next scheduled backup runs, so a freshly-rolled
+ * worker pod sees zero rows and never emits the gauge, tripping the "Backup Reporting
+ * Absent" alert despite backups being healthy. system.backup_log is a persistent
+ * system table that retains entries across restarts.
+ */
+async function collectBackupStats(client: ClickHouseClient): Promise<void> {
+  try {
+    interface BackupStats {
+      status: string;
+      cnt: string;
+      last_success_time: string;
+      last_success_size: string;
+    }
+
+    const backupResult = await client.query({
+      query: `
+        SELECT
+          status,
+          count() as cnt,
+          maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
+          argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
+        FROM system.backup_log
+        GROUP BY status
+      `,
+    });
+
+    const backupRows = await backupResult.json<BackupStats>();
+
+    ensureBackupStatusTotal().reset();
+    for (const row of backupRows.data) {
+      setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
+
+      if (row.status === "BACKUP_CREATED" && row.last_success_time) {
+        const ts = new Date(row.last_success_time).getTime() / 1000;
+        if (!isNaN(ts) && ts > 0) {
+          setClickHouseBackupLastSuccessTimestamp(ts);
+        }
+        const size = parseInt(row.last_success_size, 10);
+        if (!isNaN(size)) {
+          setClickHouseBackupLastSizeBytes(size);
+        }
+      }
+    }
+
+    if (backupStatsCollectionFailing) {
+      logger.info(
+        "ClickHouse backup stats collection recovered from previous failure",
+      );
+      backupStatsCollectionFailing = false;
+    }
+  } catch (backupError) {
+    // Even where backups ARE configured the table can be transiently unavailable
+    // (a CH restart mid-tick), so a failure is handled, not fatal. Only
+    // deployments that opted in reach here, and they care — surface it
+    // edge-triggered, once, until it recovers.
+    if (!backupStatsCollectionFailing) {
+      logger.warn(
+        { error: backupError },
+        "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
+      );
+      backupStatsCollectionFailing = true;
+    } else {
+      logger.debug(
+        { error: backupError },
+        "Failed to collect ClickHouse backup stats from system.backup_log",
+      );
+    }
+  }
+}
 
 /**
  * Collects storage statistics for monitored tables.
@@ -261,78 +373,32 @@ export async function collectStorageStats(
 
     const rows = await result.json<TableStats>();
 
+    // Reset before repopulating (mirrors the per-disk gauges below). Without
+    // this, a table that TTL-drops to zero active parts — or is simply absent
+    // from one tick's `system.parts` result — keeps its last non-zero value
+    // forever, so `clickhouse_table_bytes`/`_rows`/`_parts` report phantom size
+    // long after the data is gone (these feed the DB-size and trace_summaries
+    // alerts). Placed after the query resolves so a query error keeps the last
+    // known values rather than zeroing them.
+    clickhouseTableRows.reset();
+    clickhouseTableBytes.reset();
+    clickhouseTableParts.reset();
     for (const row of rows.data) {
       setClickHouseTableRows(row.table, parseInt(row.total_rows, 10));
       setClickHouseTableBytes(row.table, parseInt(row.total_bytes, 10));
       setClickHouseTableParts(row.table, parseInt(row.parts_count, 10));
     }
 
-    // Collect backup status metrics from system.backup_log (persistent).
-    // We deliberately query system.backup_log instead of system.backups:
-    // system.backups is an in-memory table that gets wiped on CH restart,
-    // which happens on every app deploy (the CH image tag is bumped by the
-    // build pipeline). After a restart the in-memory table is empty until
-    // the next scheduled backup runs, so a freshly-rolled worker pod sees
-    // zero rows and never emits the gauge, tripping the "Backup Reporting
-    // Absent" alert despite backups being healthy. system.backup_log is a
-    // persistent system table that retains entries across restarts.
-    try {
-      interface BackupStats {
-        status: string;
-        cnt: string;
-        last_success_time: string;
-        last_success_size: string;
-      }
-
-      const backupResult = await client.query({
-        query: `
-          SELECT
-            status,
-            count() as cnt,
-            maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-            argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
-          FROM system.backup_log
-          GROUP BY status
-        `,
-      });
-
-      const backupRows = await backupResult.json<BackupStats>();
-
-      ensureBackupStatusTotal().reset();
-      for (const row of backupRows.data) {
-        setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
-
-        if (row.status === "BACKUP_CREATED" && row.last_success_time) {
-          const ts = new Date(row.last_success_time).getTime() / 1000;
-          if (!isNaN(ts) && ts > 0) {
-            setClickHouseBackupLastSuccessTimestamp(ts);
-          }
-          const size = parseInt(row.last_success_size, 10);
-          if (!isNaN(size)) {
-            setClickHouseBackupLastSizeBytes(size);
-          }
-        }
-      }
-
-      if (backupStatsCollectionFailing) {
-        logger.info(
-          "ClickHouse backup stats collection recovered from previous failure",
-        );
-        backupStatsCollectionFailing = false;
-      }
-    } catch (backupError) {
-      if (!backupStatsCollectionFailing) {
-        logger.warn(
-          { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
-        );
-        backupStatsCollectionFailing = true;
-      } else {
-        logger.debug(
-          { error: backupError },
-          "Failed to collect ClickHouse backup stats from system.backup_log",
-        );
-      }
+    // Backup status only exists where backups are configured (the production
+    // cluster, via clickhouse-serverless's backup cronjobs) — everywhere else this
+    // query just fails on every 15s tick for nothing, and NODE_ENV can't tell
+    // "has backups" from "staging/self-hosted production build". So the deployment
+    // that has backups opts in explicitly (set on the worker alongside the backup
+    // cronjobs). Gating here (not at one call site) covers both the app under
+    // haven's in-process workers and the standalone worker.
+    // See specs/ops/clickhouse-backup-metrics.feature.
+    if (process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED === "true") {
+      await collectBackupStats(client);
     }
 
     // Collect per-disk storage metrics
@@ -384,7 +450,7 @@ let storageStatsInterval: ReturnType<typeof setInterval> | null = null;
  */
 export function startStorageStatsCollection(
   client: ClickHouseClient,
-  intervalMs: number = 15000,
+  intervalMs = 15000,
 ): void {
   if (storageStatsInterval) {
     return; // Already running

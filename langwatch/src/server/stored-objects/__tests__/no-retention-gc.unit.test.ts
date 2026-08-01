@@ -4,10 +4,10 @@
  * Negative regression test for AC16:
  *   "No automatic retention, time-based GC, or orphan reaping runs"
  *
- * Asserts that no file under langwatch/src/server/background/ (the home
- * of all scheduled workers and queues) references the string "stored_objects"
- * in a way that would imply a background purge, GC, or retention job is
- * running against the stored_objects table.
+ * Asserts that no file under langwatch/src/server (outside the stored-objects
+ * module) references the string "stored_objects" in a way that would imply a
+ * background purge, GC, or retention job is running against the stored_objects
+ * table.
  *
  * WHY: The RFC explicitly forbids automatic time-based deletion. This test
  * codifies that contract as a regression net so that any future engineer who
@@ -76,6 +76,31 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // that documents the BinaryPart shape — it is not a GC or retention
   // reference. Audited: no delete/update/truncate on stored_objects.
   /^src\/server\/tracer\/types\.ts$/,
+  // evaluation-inputs-offload.ts stores and resolves oversized evaluator
+  // inputs through StoredObjectsService (ADR-040). Audited: write + read
+  // only; deletion happens solely via the existing project-delete cascade.
+  // Known gap (accepted in ADR-040, follow-up noted there): an offloaded
+  // evaluation-input object outlives its evaluation row's retention TTL - the
+  // row is GC'd on the normal data-retention schedule, but its stored object is
+  // only reclaimed by the project-delete cascade, so it can linger past the
+  // row. This is a deliberate trade-off (no per-object retention job yet), not a
+  // retention/GC/orphan-reaper that this test forbids.
+  /^src\/server\/app-layer\/evaluations\/evaluation-inputs-offload\.ts$/,
+  // clickhouse/metrics.ts lists stored_objects in MONITORED_TABLES for the
+  // ops size gauges. Audited: read-only system.parts aggregation.
+  /^src\/server\/clickhouse\/metrics\.ts$/,
+  // cold-scan-detector.ts lists stored_objects in TIME_PARTITIONED_TABLES,
+  // mapping it to the column that lets an unpruned READ be flagged. Audited:
+  // a static table -> column map used to inspect outbound query text; the
+  // module issues no query of its own, so no delete/update/truncate.
+  /^src\/server\/app-layer\/clients\/clickhouse\/cold-scan-detector\.ts$/,
+  // storage.ts and dataset-storage.ts mention the STORED_OBJECTS_BACKEND
+  // env toggle (issue #4133) in comments and a config-error message —
+  // matched by this scan only because the var name contains
+  // "stored_objects". Audited: destination selection only, no
+  // delete/update/truncate on the table.
+  /^src\/server\/storage\.ts$/,
+  /^src\/server\/datasets\/dataset-storage\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {
@@ -85,7 +110,9 @@ function isAllowlisted(rel: string): boolean {
 function findOffendingStoredObjectsRefs(absDir: string): string[] {
   const files = findSourceFiles(absDir);
   return files
-    .filter((filePath) => /stored_objects/i.test(fs.readFileSync(filePath, "utf8")))
+    .filter((filePath) =>
+      /stored_objects/i.test(fs.readFileSync(filePath, "utf8")),
+    )
     .map((f) => path.relative(REPO_ROOT, f))
     .filter((rel) => !isAllowlisted(rel));
 }
@@ -107,14 +134,6 @@ describe("AC16 — no automatic retention, GC, or orphan reaping for stored_obje
       //     update SCAN_ALLOWLIST with a one-line rationale, or
       //   - delete the reference.
       // AC16 forbids automatic retention, time-based GC, or orphan reaping.
-      expect(offending).toEqual([]);
-    });
-  });
-
-  describe("when the queue definitions are scanned for stored_objects references", () => {
-    it("finds no queue that enqueues stored_objects GC work", () => {
-      const queuesDir = path.join(REPO_ROOT, "src/server/background/queues");
-      const offending = findOffendingStoredObjectsRefs(queuesDir);
       expect(offending).toEqual([]);
     });
   });

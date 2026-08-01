@@ -1,19 +1,47 @@
 import { Currency } from "@prisma/client";
-import type { NextApiRequest } from "~/types/next-stubs";
 // @ts-ignore — no type definitions for geoip-country
 import geoip from "geoip-country";
+import type { NextApiRequest } from "~/types/next-stubs";
 
 const DEFAULT_CURRENCY = Currency.EUR;
 
 export const EUR_COUNTRIES = new Set([
-  "AT", "BE", "CY", "EE", "FI", "FR", "DE", "GR", "IE", "IT",
-  "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES",
-  "HR", "BG", "AD", "MC", "SM", "VA", "ME", "XK",
+  "AT",
+  "BE",
+  "CY",
+  "EE",
+  "FI",
+  "FR",
+  "DE",
+  "GR",
+  "IE",
+  "IT",
+  "LV",
+  "LT",
+  "LU",
+  "MT",
+  "NL",
+  "PT",
+  "SK",
+  "SI",
+  "ES",
+  "HR",
+  "BG",
+  "AD",
+  "MC",
+  "SM",
+  "VA",
+  "ME",
+  "XK",
 ]);
 
-export const getCurrencyFromCountry = (countryCode: string | null | undefined): Currency => {
+export const getCurrencyFromCountry = (
+  countryCode: string | null | undefined,
+): Currency => {
   if (!countryCode) return DEFAULT_CURRENCY;
-  return EUR_COUNTRIES.has(countryCode.toUpperCase()) ? Currency.EUR : Currency.USD;
+  return EUR_COUNTRIES.has(countryCode.toUpperCase())
+    ? Currency.EUR
+    : Currency.USD;
 };
 
 /**
@@ -68,14 +96,18 @@ export const detectCurrencyFromRequest = (
   // 1. Try CDN-injected country headers
   const vercelCountry = req?.headers?.["x-vercel-ip-country"];
   const cfCountry = req?.headers?.["cf-ipcountry"];
-  const headerCountry = (
-    typeof vercelCountry === "string" ? vercelCountry :
-    typeof cfCountry === "string" ? cfCountry :
-    null
-  );
+  const headerCountry =
+    typeof vercelCountry === "string"
+      ? vercelCountry
+      : typeof cfCountry === "string"
+        ? cfCountry
+        : null;
 
   if (headerCountry) {
-    return { currency: getCurrencyFromCountry(headerCountry), country: headerCountry };
+    return {
+      currency: getCurrencyFromCountry(headerCountry),
+      country: headerCountry,
+    };
   }
 
   // 2. Try geoip lookup from client IP
@@ -88,7 +120,10 @@ export const detectCurrencyFromRequest = (
   try {
     const geo = geoip.lookup(ip);
     if (geo?.country) {
-      return { currency: getCurrencyFromCountry(geo.country), country: geo.country };
+      return {
+        currency: getCurrencyFromCountry(geo.country),
+        country: geo.country,
+      };
     }
   } catch {
     // geoip lookup failed, fall through to default

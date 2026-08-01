@@ -8,11 +8,11 @@
  */
 
 import { on } from "node:events";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { createLogger } from "~/utils/logger/server";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, type Permission } from "../rbac";
 
 const logger = createLogger("langwatch:api:export");
 
@@ -26,21 +26,58 @@ export const exportProgressEventSchema = z.object({
 
 export type ExportProgressEvent = z.infer<typeof exportProgressEventSchema>;
 
-export const exportRouter = createTRPCRouter({
-  /**
-   * Subscribe to export progress events for a specific export.
-   *
-   * Filters events by exportId so the client only receives updates
-   * for its own export. Terminates when the export completes or errors.
-   */
-  onExportProgress: protectedProcedure
+/**
+ * The event this subscription should relay, or null when the payload is not
+ * ours to yield.
+ *
+ * Two reasons to drop one: it did not parse, or it belongs to a different
+ * export. The channel is per-tenant, so every concurrent export in a project
+ * lands here and the exportId is what separates them.
+ */
+function readProgressEvent({
+  raw,
+  exportId,
+  projectId,
+}: {
+  raw: string;
+  exportId: string;
+  projectId: string;
+}): ExportProgressEvent | null {
+  let parsed: ExportProgressEvent;
+  try {
+    parsed = JSON.parse(raw) as ExportProgressEvent;
+  } catch {
+    logger.warn(
+      { projectId, exportId },
+      "Ignoring invalid export progress event",
+    );
+    return null;
+  }
+
+  return parsed.exportId === exportId ? parsed : null;
+}
+
+/**
+ * Builds an export-progress subscription gated on a specific permission.
+ *
+ * Every export publishes to the same `export_progress` channel and is filtered
+ * by `exportId`, so the relay is identical for all of them — only the
+ * permission differs, because a scenario run export is authorized by
+ * `scenarios:view` and a trace export by `traces:view`. Factored rather than
+ * copied so the two cannot drift on filtering or teardown.
+ */
+function exportProgressSubscription(permission: Permission) {
+  return protectedProcedure
     .input(z.object({ projectId: z.string(), exportId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .use(checkProjectPermission(permission))
     .subscription(async function* (opts) {
       const { projectId, exportId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
-      logger.info({ projectId, exportId }, "Export progress subscription started");
+      logger.info(
+        { projectId, exportId },
+        "Export progress subscription started",
+      );
 
       try {
         for await (const eventArgs of on(emitter, "export_progress", {
@@ -49,18 +86,17 @@ export const exportRouter = createTRPCRouter({
         })) {
           const event = eventArgs[0] as { event: string; timestamp: number };
 
-          let parsed: ExportProgressEvent;
-          try {
-            parsed = JSON.parse(event.event) as ExportProgressEvent;
-          } catch {
-            logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
-            continue;
-          }
+          const parsed = readProgressEvent({
+            raw: event.event,
+            exportId,
+            projectId,
+          });
+          if (!parsed) continue;
 
-          // Only yield events for this specific export
-          if (parsed.exportId !== exportId) continue;
-
-          logger.debug({ projectId, exportId, event: parsed }, "Export progress event received");
+          logger.debug(
+            { projectId, exportId, event: parsed },
+            "Export progress event received",
+          );
           yield parsed;
 
           if (parsed.type === "done" || parsed.type === "error") {
@@ -68,7 +104,24 @@ export const exportRouter = createTRPCRouter({
           }
         }
       } finally {
-        logger.debug({ projectId, exportId }, "Export progress subscription cleanup");
+        logger.debug(
+          { projectId, exportId },
+          "Export progress subscription cleanup",
+        );
       }
-    }),
+    });
+}
+
+export const exportRouter = createTRPCRouter({
+  /**
+   * Trace export progress. Filters by exportId so a client only sees its own.
+   */
+  onExportProgress: exportProgressSubscription("traces:view"),
+
+  /**
+   * Scenario run export progress. Same relay, gated on `scenarios:view` — the
+   * permission the export endpoint itself checks, so someone who can export
+   * can also watch it finish.
+   */
+  onScenarioRunExportProgress: exportProgressSubscription("scenarios:view"),
 });

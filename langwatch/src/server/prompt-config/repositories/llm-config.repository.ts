@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
@@ -5,10 +6,9 @@ import type {
   PrismaClient,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
-import { createLogger } from "../../../utils/logger/server";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
 import {
@@ -44,7 +44,12 @@ export type CreateLlmConfigParams = Omit<
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
-    author?: { name: string } | null;
+    author?: {
+      id: string;
+      name: string | null;
+      email?: string | null;
+      image?: string | null;
+    } | null;
     runtimeParameters: Record<string, unknown>;
   };
   _count?: {
@@ -123,8 +128,9 @@ export class LlmConfigRepository {
             ...config,
             latestVersion: {
               ...parseLlmConfigVersion(rawVersion),
-              runtimeParameters:
-                parseRuntimeParameters(rawVersion.runtimeParameters),
+              runtimeParameters: parseRuntimeParameters(
+                rawVersion.runtimeParameters,
+              ),
             },
           };
         } catch (error) {
@@ -283,8 +289,9 @@ export class LlmConfigRepository {
         ...config,
         latestVersion: {
           ...parseLlmConfigVersion(rawVersion),
-          runtimeParameters:
-            parseRuntimeParameters(rawVersion.runtimeParameters),
+          runtimeParameters: parseRuntimeParameters(
+            rawVersion.runtimeParameters,
+          ),
         },
       };
     } catch (error) {
@@ -563,8 +570,9 @@ export class LlmConfigRepository {
         ...updatedConfig,
         latestVersion: {
           ...parseLlmConfigVersion(newVersion),
-          runtimeParameters:
-            parseRuntimeParameters(newVersion.runtimeParameters),
+          runtimeParameters: parseRuntimeParameters(
+            newVersion.runtimeParameters,
+          ),
         },
       };
     });
@@ -824,6 +832,21 @@ export class LlmConfigRepository {
   }
 
   /**
+   * Records the prompt a copy was made from, so the copy can later be synced
+   * from its source and the source can push updates to its copies.
+   */
+  async setCopiedFromPrompt(params: {
+    id: string;
+    projectId: string;
+    copiedFromPromptId: string;
+  }): Promise<void> {
+    await this.prisma.llmPromptConfig.update({
+      where: { id: params.id, projectId: params.projectId },
+      data: { copiedFromPromptId: params.copiedFromPromptId },
+    });
+  }
+
+  /**
    * Find which of the given IDs exist as non-deleted configs accessible
    * from the specified project or organization.
    * Returns the set of IDs that exist.
@@ -868,10 +891,15 @@ export class LlmConfigRepository {
     });
     return configs.map((c) => ({
       id: c.id,
-      name:
-        c.handle
-          ? this.removeHandlePrefixes(c.handle, input.projectId, input.organizationId) ?? c.name ?? c.id
-          : c.name ?? c.id,
+      name: c.handle
+        ? (this.removeHandlePrefixes(
+            c.handle,
+            input.projectId,
+            input.organizationId,
+          ) ??
+          c.name ??
+          c.id)
+        : (c.name ?? c.id),
     }));
   }
 

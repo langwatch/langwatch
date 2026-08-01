@@ -130,7 +130,10 @@ function ResetPasswordForm({ token }: { token: string }) {
                 }
               >
                 <VStack align="stretch" gap={1} width="full">
-                  <Input type="password" {...form.register("confirmPassword")} />
+                  <Input
+                    type="password"
+                    {...form.register("confirmPassword")}
+                  />
                   <FormErrorDisplay
                     error={form.formState.errors.confirmPassword}
                   />

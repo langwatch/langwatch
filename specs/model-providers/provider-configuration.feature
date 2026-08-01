@@ -65,6 +65,43 @@ Feature: Model Provider Configuration
     Then the "OPENAI_API_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the actual API key value is not displayed
 
+  @unit
+  Scenario: Plaintext API keys never reach the browser through any provider query
+    Given I have "openai" provider configured with API key "sk-actual123"
+    And I have "project:update" permission
+    When the app fetches the project's model providers from any page
+    Then the API key is masked in the response
+    And the plaintext API key does not appear anywhere in the response
+    And non-secret values like the base URL remain visible
+
+  @unit
+  Scenario: Preserve original extra header values when saving with masked placeholders
+    Given I have "custom" provider configured with extra headers
+    When I save the provider with header values still masked
+    Then the stored header values are preserved
+    And a masked header that matches no stored header is not saved
+
+  @unit
+  Scenario: A user without project view permission cannot list a project's providers
+    Given a project has "openai" provider configured with an API key
+    And I have no permissions on that project
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
+  @unit
+  Scenario: Access to a sibling project does not grant access to this project's providers
+    Given a project has "openai" provider configured with an API key
+    And I am an admin of a different project in the same organization
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
+  @unit
+  Scenario: Admin rights in another organization grant nothing across the tenancy boundary
+    Given a project has "openai" provider configured with an API key
+    And I am an admin of a different organization
+    When I request that project's model providers
+    Then the request is rejected as unauthorized
+
   @integration
   Scenario: Preserve original API key when saving with masked placeholder
     Given I have "openai" provider configured with API key "sk-actual123"
@@ -162,3 +199,76 @@ Feature: Model Provider Configuration
     And I see a validation error for "OPENAI_API_KEY"
     When I start typing in the "OPENAI_API_KEY" field
     Then the validation error is cleared
+
+  # A provider that reaches a self-hosted endpoint needs no API key: the
+  # endpoint decides. The drawer asks for exactly what the provider needs,
+  # so nobody has to invent a value to get past a required field, and no
+  # invented value travels to their server.
+
+  @integration
+  Scenario Outline: The API key stops being required once a base URL is entered
+    Given I open the model provider configuration drawer for "<provider>"
+    Then the API key field is marked required
+    When I enter "https://llm.acme.internal/v1" in the base URL field
+    Then the API key field is not marked required
+    And it is marked required again when I clear the base URL
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario Outline: A self-hosted endpoint is saved with no API key at all
+    Given I open the model provider configuration drawer for "<provider>"
+    When I enter "https://llm.acme.internal/v1" in the base URL field
+    And I leave the API key field empty
+    And I click "Save"
+    Then the provider is saved
+    And the API key is saved empty, so nothing is sent to my endpoint as a credential
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario Outline: Saving with neither an API key nor a base URL says what to enter
+    Given I open the model provider configuration drawer for "<provider>"
+    When I leave both credential fields empty
+    And I click "Save"
+    Then I see "Add an API key, or a base URL if your endpoint does not need one." next to the API key field
+    And the provider is not saved
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario: A provider with a single credential keeps its required marker
+    Given I open the model provider configuration drawer for "gemini"
+    Then the "GEMINI_API_KEY" field is marked required
+    And no base URL field is offered
+
+  # A stored base URL belongs to the customer like any other field: the
+  # drawer shows it as saved, and removing it is an ordinary edit. This
+  # pins a failure mode where emptying the field did not count as a change,
+  # so Save stayed disabled and the endpoint could never be taken off.
+  # Its sibling failure, an edit next to a masked key deleting that key, is
+  # pinned by "Preserve original API key when saving with masked
+  # placeholder" above.
+
+  @integration
+  Scenario Outline: Removing the base URL is a change that can be saved
+    Given I have "<provider>" configured with a saved API key and base URL "https://llm.acme.internal/v1"
+    When I open its model provider configuration drawer
+    Then the base URL field shows the stored value
+    When I clear the base URL field
+    Then I can save the removal
+    And the saved API key is still on file afterwards
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |

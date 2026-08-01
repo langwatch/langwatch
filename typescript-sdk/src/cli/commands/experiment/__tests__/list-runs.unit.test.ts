@@ -13,7 +13,7 @@ vi.mock(
 );
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("ora", () => ({
@@ -101,17 +101,16 @@ describe("experimentListRunsCommand()", () => {
         };
         mockListRuns.mockResolvedValue(payload);
 
-        await experimentListRunsCommand({
+        const result = await experimentListRunsCommand({
           experiment: "checkout-flow",
-          format: "json",
         });
 
         expect(mockListRuns).toHaveBeenCalledWith({
           experimentSlug: "checkout-flow",
           pageSize: 50,
         });
-        const printed = logSpy.mock.calls.flat().join("\n");
-        expect(printed).toContain('"runId": "run_1"');
+        expect(result?.data).toMatchObject({ runs: [{ runId: "run_1" }] });
+        expect(logSpy).not.toHaveBeenCalled();
       });
     });
 
@@ -142,7 +141,10 @@ describe("experimentListRunsCommand()", () => {
           },
         });
 
-        await experimentListRunsCommand({ experiment: "checkout-flow" });
+        const result = await experimentListRunsCommand({
+          experiment: "checkout-flow",
+        });
+        result?.table();
         const printed = logSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("run_visible");
       });

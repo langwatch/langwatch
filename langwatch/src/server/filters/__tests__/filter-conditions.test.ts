@@ -49,6 +49,7 @@ describe("clickHouseFilterConditions", () => {
     const expectedSql =
       "if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({f0_values:Array(String)})";
 
+    /** @scenario 'ClickHouse origin aggregation labels empty values as "application"' */
     it("maps empty/NULL origins to 'application' via ifNull, matching the dropdown", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();
@@ -590,6 +591,47 @@ describe("generateClickHouseFilterConditions", () => {
       // so no StartTime predicate is injected.
       expect(result.conditions[0]).not.toContain("sp.StartTime");
       expect(result.params).toHaveProperty("spanWindowStart");
+    });
+  });
+
+  describe("when a filter field has no ClickHouse condition builder", () => {
+    // Consumers treat hasUnsupportedFilters=true as a hard failure (e.g.
+    // clickhouse-trace.service throws) so that a stale saved-view field fails
+    // closed instead of silently widening the result set.
+    it("flags array-leaf filters as unsupported and emits no condition", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        ["some.stale_field" as FilterField]: ["value1"],
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.hasUnsupportedFilters).toBe(true);
+      expect(result.conditions).toEqual([]);
+      expect(result.params).toEqual({});
+    });
+
+    it("flags nested-object filters as unsupported and emits no condition", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        ["some.stale_field" as FilterField]: {
+          "key-1": ["value1"],
+        },
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.hasUnsupportedFilters).toBe(true);
+      expect(result.conditions).toEqual([]);
+      expect(result.params).toEqual({});
+    });
+
+    it("still emits conditions for the supported fields alongside the unsupported flag", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        "topics.topics": ["topic1"],
+        ["some.stale_field" as FilterField]: ["value1"],
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.hasUnsupportedFilters).toBe(true);
+      expect(result.conditions.length).toBe(1);
+      expect(result.conditions[0]).toContain("ts.TopicId IN");
     });
   });
 });

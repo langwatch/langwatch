@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { apiKeyRouter } from "../apiKey";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { apiKeyRouter } from "../apiKey";
 
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
@@ -30,12 +30,16 @@ vi.mock("../../../auditLog", () => ({
 
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
   checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
+  // These cases are about the binding path; the legacy fallback grants
+  // nothing so the binding decision is the only one under test.
+  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
 }));
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/server/rbac/custom-role-permissions")
-  >();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/rbac/custom-role-permissions")
+    >();
   return {
     ...actual,
     parseCustomRolePermissions: vi
@@ -44,7 +48,7 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),
@@ -102,8 +106,8 @@ function buildMockPrisma() {
   };
 
   return {
-    $transaction: vi.fn(
-      (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
+    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+      fn(mockTx),
     ),
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),

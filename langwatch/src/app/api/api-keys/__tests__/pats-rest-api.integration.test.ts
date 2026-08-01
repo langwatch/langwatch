@@ -1,16 +1,17 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
   type Team,
+  TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: API Keys REST API", () => {
@@ -28,8 +29,7 @@ describe("Feature: API Keys REST API", () => {
   });
 
   const api = {
-    get: (path: string) =>
-      app.request(path, { headers: authHeaders() }),
+    get: (path: string) => app.request(path, { headers: authHeaders() }),
     post: (path: string, body: unknown) =>
       app.request(path, {
         method: "POST",
@@ -123,24 +123,15 @@ describe("Feature: API Keys REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.apiKey.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.teamUser.deleteMany({
-      where: { userId },
-    }).catch(() => {});
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.team.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.organization.delete({
-      where: { id: testOrganization.id },
-    }).catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId: testOrganization.id }],
+      ["apiKey", { organizationId: testOrganization.id }],
+      ["teamUser", { userId }],
+      ["organizationUser", { organizationId: testOrganization.id }],
+      ["project", { team: { organizationId: testOrganization.id } }],
+      ["team", { organizationId: testOrganization.id }],
+      ["organization", { id: testOrganization.id }],
+    ]);
   });
 
   describe("Authentication", () => {

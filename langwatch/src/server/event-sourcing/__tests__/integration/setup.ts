@@ -51,11 +51,7 @@ try {
 
 // Now safe to import application code
 import { afterAll, beforeAll } from "vitest";
-import {
-  cleanupTestData,
-  startTestContainers,
-  stopTestContainers,
-} from "./testContainers";
+import { startTestContainers, stopTestContainers } from "./testContainers";
 
 /**
  * Global setup for integration tests.

@@ -51,11 +51,26 @@ export function SuiteContextMenu({
       minWidth="140px"
     >
       <VStack align="stretch" gap={0}>
-        <ContextMenuItem label="Edit" onClick={() => { onEdit(); onClose(); }} />
-        <ContextMenuItem label="Duplicate" onClick={() => { onDuplicate(); onClose(); }} />
+        <ContextMenuItem
+          label="Edit"
+          onClick={() => {
+            onEdit();
+            onClose();
+          }}
+        />
+        <ContextMenuItem
+          label="Duplicate"
+          onClick={() => {
+            onDuplicate();
+            onClose();
+          }}
+        />
         <ContextMenuItem
           label="Archive"
-          onClick={() => { onArchive(); onClose(); }}
+          onClick={() => {
+            onArchive();
+            onClose();
+          }}
           color="orange.fg"
         />
       </VStack>

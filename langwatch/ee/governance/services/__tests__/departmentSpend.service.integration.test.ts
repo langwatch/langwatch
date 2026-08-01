@@ -10,7 +10,7 @@
  * Binds the @birds-eye scenarios of departments.feature.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { type Organization } from "@prisma/client";
+import type { Organization } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -217,7 +217,9 @@ describe("ActivityMonitorService.spendByDepartment", () => {
 
   afterAll(async () => {
     await prisma.project
-      .deleteMany({ where: { team: { organizationId: { in: [org.id, crossOrg.id] } } } })
+      .deleteMany({
+        where: { team: { organizationId: { in: [org.id, crossOrg.id] } } },
+      })
       .catch(() => undefined);
     await prisma.team
       .deleteMany({ where: { organizationId: { in: [org.id, crossOrg.id] } } })
@@ -225,7 +227,9 @@ describe("ActivityMonitorService.spendByDepartment", () => {
     await prisma.organizationUser
       .deleteMany({ where: { organizationId: org.id } })
       .catch(() => undefined);
-    await prisma.user.deleteMany({ where: { id: ROBIN } }).catch(() => undefined);
+    await prisma.user
+      .deleteMany({ where: { id: ROBIN } })
+      .catch(() => undefined);
     await prisma.department
       .deleteMany({ where: { organizationId: { in: [org.id, crossOrg.id] } } })
       .catch(() => undefined);

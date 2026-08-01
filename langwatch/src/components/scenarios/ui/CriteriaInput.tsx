@@ -1,4 +1,12 @@
-import { Button, HStack, IconButton, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -86,7 +94,7 @@ export function CriteriaInput({
   };
 
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack align="stretch" gap={2} data-testid="criteria-list">
       {/* Existing criteria */}
       {value.map((criterion, index) =>
         editingIndex === index ? (

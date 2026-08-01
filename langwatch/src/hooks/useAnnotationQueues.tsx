@@ -1,8 +1,7 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { useRequiredSession } from "./useRequiredSession";
 
 export function useAnnotationQueues(
   {

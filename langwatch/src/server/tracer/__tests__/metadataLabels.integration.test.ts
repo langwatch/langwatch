@@ -14,10 +14,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import { describe, expect, it } from "vitest";
 import type { DeepPartial } from "../../../utils/types";
-import {
-  openTelemetryTraceRequestToTracesForCollection,
-  type TraceForCollection,
-} from "../otel.traces";
+import { openTelemetryTraceRequestToTracesForCollection } from "../otel.traces";
 
 /**
  * Helper to create a minimal OTEL trace request with the given span attributes.
@@ -923,13 +920,14 @@ function createOtelTraceWithResourceAttributes(
 }
 
 describe("Metadata Mapping - resource attributes", () => {
-  // The opencode OTel plugin (Langy worker) sets tags via OTLP *resource*
-  // attributes, so reserved keys must be hoisted from the resource the same
+  // OTLP exporters (the Langy worker relay among them) set reserved keys via
+  // *resource* attributes, so they must be hoisted from the resource the same
   // way they are from span attributes. See specs/langy/langy-otel-tracing.feature.
 
+  // @scenario "tag.tags in resource attributes becomes trace labels"
   it("maps tag.tags from resource attributes to labels", async () => {
     const request = createOtelTraceWithResourceAttributes([
-      { key: "tag.tags", value: { stringValue: "langy" } },
+      { key: "tag.tags", value: { stringValue: "checkout-flow" } },
     ]);
 
     const traces =
@@ -937,9 +935,10 @@ describe("Metadata Mapping - resource attributes", () => {
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
-    expect(trace.reservedTraceMetadata.labels).toEqual(["langy"]);
+    expect(trace.reservedTraceMetadata.labels).toEqual(["checkout-flow"]);
   });
 
+  // @scenario "langwatch.thread.id in resource attributes becomes thread_id"
   it("maps langwatch.thread.id from resource attributes to thread_id", async () => {
     const request = createOtelTraceWithResourceAttributes([
       { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
@@ -955,7 +954,7 @@ describe("Metadata Mapping - resource attributes", () => {
 
   it("keeps non-reserved resource attributes as custom metadata", async () => {
     const request = createOtelTraceWithResourceAttributes([
-      { key: "service.name", value: { stringValue: "langy-agent" } },
+      { key: "service.name", value: { stringValue: "langyagent" } },
     ]);
 
     const traces =
@@ -963,16 +962,16 @@ describe("Metadata Mapping - resource attributes", () => {
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
-    expect(trace.customMetadata["service.name"]).toBe("langy-agent");
+    expect(trace.customMetadata["service.name"]).toBe("langyagent");
     expect(trace.reservedTraceMetadata).not.toHaveProperty("service.name");
   });
 
   it("maps the Langy worker's resource attributes end to end", async () => {
-    // Exactly what services/langy-agent/server.js sets via
+    // Exactly what app-layer/langyagent/adapters/workerpool/worker.go sets via
     // OPENCODE_RESOURCE_ATTRIBUTES for a conversation.
     const request = createOtelTraceWithResourceAttributes([
       { key: "tag.tags", value: { stringValue: "langy" } },
-      { key: "service.name", value: { stringValue: "langy-agent" } },
+      { key: "service.name", value: { stringValue: "langyagent" } },
       { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
     ]);
 
@@ -983,6 +982,6 @@ describe("Metadata Mapping - resource attributes", () => {
     const trace = traces[0]!;
     expect(trace.reservedTraceMetadata.labels).toEqual(["langy"]);
     expect(trace.reservedTraceMetadata.thread_id).toBe("conv-123");
-    expect(trace.customMetadata["service.name"]).toBe("langy-agent");
+    expect(trace.customMetadata["service.name"]).toBe("langyagent");
   });
 });

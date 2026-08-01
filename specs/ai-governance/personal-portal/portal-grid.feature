@@ -41,8 +41,12 @@ Feature: AI Tools Portal — Grid layout on /me
     And the "Internal tools" section heading does NOT render
     And the "Model providers" section renders normally
 
-  Scenario: brand-new org with no catalog shows a member empty-state note
-    Given the org-scoped catalog is empty
+  # A brand-new org never reaches this state: the standard catalog is
+  # auto-provisioned at signup and lazily on the first portal load
+  # (see default-catalog.feature). The empty state below is only the
+  # fallback for a catalog curated down to no enabled tools.
+  Scenario: curated-empty catalog shows a member empty-state note
+    Given the org's catalog has no enabled tools left
     And no team-scoped entries are published for any of jane's teams
     And user "jane@acme.com" cannot manage the catalog (member, not admin)
     When user "jane@acme.com" loads "/me"
@@ -52,8 +56,8 @@ Feature: AI Tools Portal — Grid layout on /me
     And no tile sections render
     And the existing "My Usage" dashboard still renders below
 
-  Scenario: brand-new org shows the getting-started banner to a catalog admin
-    Given the org-scoped catalog is empty
+  Scenario: curated-empty catalog shows the getting-started banner to a catalog admin
+    Given the org's catalog has no enabled tools left
     And user "alice@acme.com" can manage the catalog (aiTools:manage)
     When user "alice@acme.com" loads "/me"
     Then the AI-governance getting-started banner renders

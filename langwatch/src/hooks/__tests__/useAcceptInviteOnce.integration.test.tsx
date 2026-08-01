@@ -9,8 +9,8 @@
  *   - An "Invite was already accepted" error must redirect home via a hard
  *     navigation (never during render) so the React "update during render"
  *     warning cannot fire from a downstream consumer.
- *   - A generic error must surface via `status: "error"` + `errorMessage` and
- *     must NOT trigger any navigation.
+ *   - A generic error must surface via `status: "error"` + the error itself
+ *     (never a string lifted off it) and must NOT trigger any navigation.
  */
 import "@testing-library/jest-dom/vitest";
 
@@ -34,8 +34,11 @@ const {
     captureExceptionSpy: vi.fn(),
     mockState: {
       handlers: {} as {
-        onSuccess?: (data: unknown) => void;
-        onError?: (error: { message: string }) => void;
+        onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
+        onError?: (
+          error: { message: string },
+          variables: { inviteCode: string },
+        ) => void;
       },
       mutation: {
         isLoading: false,
@@ -73,7 +76,7 @@ vi.mock("~/utils/hardRedirect", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: captureExceptionSpy,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import {
@@ -197,9 +200,10 @@ describe("useAcceptInviteOnce()", () => {
           mockState.mutation.error = {
             message: INVITE_ALREADY_ACCEPTED_MESSAGE,
           };
-          mockState.handlers.onError?.({
-            message: INVITE_ALREADY_ACCEPTED_MESSAGE,
-          });
+          mockState.handlers.onError?.(
+            { message: INVITE_ALREADY_ACCEPTED_MESSAGE },
+            { inviteCode: "invite-abc" },
+          );
         });
         rerender();
 
@@ -212,7 +216,7 @@ describe("useAcceptInviteOnce()", () => {
 
   describe("given the server returns a generic error", () => {
     describe("when onError fires", () => {
-      it("surfaces status='error' with the message, captures to PostHog, and does NOT navigate", () => {
+      it("surfaces status='error' with the error itself, captures to PostHog, and does NOT navigate", () => {
         const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
@@ -227,6 +231,7 @@ describe("useAcceptInviteOnce()", () => {
           // so toError() preserves the instance rather than stringifying to "[object Object]".
           mockState.handlers.onError?.(
             new Error("The invite has expired") as { message: string },
+            { inviteCode: "invite-abc" },
           );
         });
         rerender();
@@ -239,7 +244,90 @@ describe("useAcceptInviteOnce()", () => {
           }),
         );
         expect(result.current.status).toBe("error");
-        expect(result.current.errorMessage).toBe("The invite has expired");
+        expect(result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
+      });
+    });
+  });
+
+  describe("given the page subtree remounts after the mutation was dispatched", () => {
+    // Regression for langwatch/langwatch#5550: the module-scoped one-shot
+    // guard correctly blocks a re-submit after a remount, but the outcome
+    // must not be lost with the unmounted instance — otherwise the page
+    // dead-ends on the loading screen with the error only in the console.
+    describe("when the mutation had already failed before the remount", () => {
+      it("reports status='error' with the error on the remounted instance instead of dead-ending on 'loading'", () => {
+        const first = renderHook(() =>
+          useAcceptInviteOnce({
+            inviteCode: "invite-abc",
+            enabled: true,
+          }),
+        );
+
+        act(() => {
+          mockState.mutation.isError = true;
+          mockState.mutation.error = { message: "The invite has expired" };
+          mockState.handlers.onError?.(
+            new Error("The invite has expired") as { message: string },
+            { inviteCode: "invite-abc" },
+          );
+        });
+
+        first.unmount();
+        resetMutationState();
+
+        const second = renderHook(() =>
+          useAcceptInviteOnce({
+            inviteCode: "invite-abc",
+            enabled: true,
+          }),
+        );
+
+        expect(mutateSpy).toHaveBeenCalledTimes(1);
+        expect(second.result.current.status).toBe("error");
+        expect(second.result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
+      });
+    });
+
+    describe("when the mutation fails only after the remount", () => {
+      it("resolves the remounted instance to 'error' once the original instance's onError fires", () => {
+        renderHook(() =>
+          useAcceptInviteOnce({
+            inviteCode: "invite-abc",
+            enabled: true,
+          }),
+        );
+        // Capture the first instance's callbacks before the remount replaces
+        // them — react-query keeps the original mutation's options alive even
+        // after the component that dispatched it unmounts.
+        const firstHandlers = mockState.handlers;
+
+        cleanup();
+        resetMutationState();
+
+        const second = renderHook(() =>
+          useAcceptInviteOnce({
+            inviteCode: "invite-abc",
+            enabled: true,
+          }),
+        );
+
+        expect(second.result.current.status).toBe("loading");
+
+        act(() => {
+          firstHandlers.onError?.(
+            new Error("The invite has expired") as { message: string },
+            { inviteCode: "invite-abc" },
+          );
+        });
+
+        expect(second.result.current.status).toBe("error");
+        expect(second.result.current.error).toMatchObject({
+          message: "The invite has expired",
+        });
       });
     });
   });
@@ -256,10 +344,13 @@ describe("useAcceptInviteOnce()", () => {
 
         act(() => {
           mockState.mutation.isSuccess = true;
-          mockState.handlers.onSuccess?.({
-            invite: { organization: { name: "Acme" } },
-            project: { slug: "acme-prod" },
-          });
+          mockState.handlers.onSuccess?.(
+            {
+              invite: { organization: { name: "Acme" } },
+              project: { slug: "acme-prod" },
+            },
+            { inviteCode: "invite-abc" },
+          );
         });
         rerender();
 
@@ -282,10 +373,13 @@ describe("useAcceptInviteOnce()", () => {
 
         act(() => {
           mockState.mutation.isSuccess = true;
-          mockState.handlers.onSuccess?.({
-            invite: { organization: { name: "Acme" } },
-            project: null,
-          });
+          mockState.handlers.onSuccess?.(
+            {
+              invite: { organization: { name: "Acme" } },
+              project: null,
+            },
+            { inviteCode: "invite-abc" },
+          );
         });
         rerender();
 

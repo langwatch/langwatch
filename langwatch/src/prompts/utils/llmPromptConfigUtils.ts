@@ -5,13 +5,12 @@ import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type {
   Component,
-  LlmConfigParameter,
   LLMConfig,
+  LlmConfigParameter,
   LlmPromptConfigComponent,
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   formSchema,
   handleSchema,
@@ -30,6 +29,7 @@ import {
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
 } from "~/types";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { kebabCase } from "~/utils/stringCasing";
 
 import { generateUniqueIdentifier } from "./identifierUtils";

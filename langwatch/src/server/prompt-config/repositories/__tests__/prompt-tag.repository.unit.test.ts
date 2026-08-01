@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
+import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
 import {
-  validateTagName,
   PromptTagValidationError,
+  validateTagName,
 } from "../../prompt-tag.service";
 import { PROTECTED_TAGS, PromptTagRepository } from "../prompt-tag.repository";
-import type { PrismaClient } from "@prisma/client";
 
 function makeTag(overrides: Record<string, unknown> = {}) {
   return {
@@ -33,7 +33,10 @@ describe("PromptTagRepository", () => {
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
-        const result = await repo.findByName({ organizationId, name: "canary" });
+        const result = await repo.findByName({
+          organizationId,
+          name: "canary",
+        });
 
         expect(result).toEqual(tag);
         expect(mockPrisma.promptTag.findFirst).toHaveBeenCalledWith({
@@ -51,7 +54,10 @@ describe("PromptTagRepository", () => {
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
-        const result = await repo.findByName({ organizationId, name: "nonexistent" });
+        const result = await repo.findByName({
+          organizationId,
+          name: "nonexistent",
+        });
 
         expect(result).toBeNull();
       });
@@ -75,7 +81,9 @@ describe("PromptTagRepository", () => {
           },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) =>
+            fn(mockTx),
+          ),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
@@ -104,7 +112,9 @@ describe("PromptTagRepository", () => {
           promptTagAssignment: { deleteMany: vi.fn() },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) =>
+            fn(mockTx),
+          ),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
@@ -127,11 +137,17 @@ describe("PromptTagRepository", () => {
           },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+            fn(mockTx),
+          ),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
-        const result = await repo.rename({ organizationId, oldName: "canary", newName: "beta" });
+        const result = await repo.rename({
+          organizationId,
+          oldName: "canary",
+          newName: "beta",
+        });
 
         expect(result).toEqual(updatedTag);
         expect(mockTx.promptTag.update).toHaveBeenCalledWith({
@@ -152,12 +168,18 @@ describe("PromptTagRepository", () => {
           promptTagAssignment: { updateMany: vi.fn() },
         };
         const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
+          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+            fn(mockTx),
+          ),
         } as unknown as PrismaClient;
         const repo = new PromptTagRepository(mockPrisma);
 
         await expect(
-          repo.rename({ organizationId, oldName: "nonexistent", newName: "beta" }),
+          repo.rename({
+            organizationId,
+            oldName: "nonexistent",
+            newName: "beta",
+          }),
         ).rejects.toThrow(/not found/i);
       });
     });
@@ -221,9 +243,7 @@ describe("validateTagName()", () => {
 
   describe("when name contains invalid characters", () => {
     it("throws for names with spaces", () => {
-      expect(() => validateTagName("my tag")).toThrow(
-        PromptTagValidationError,
-      );
+      expect(() => validateTagName("my tag")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names with slashes", () => {
@@ -234,15 +254,11 @@ describe("validateTagName()", () => {
 
     /** @scenario "Validation rejects uppercase tag names" */
     it("throws for uppercase names", () => {
-      expect(() => validateTagName("CANARY")).toThrow(
-        PromptTagValidationError,
-      );
+      expect(() => validateTagName("CANARY")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names starting with a digit", () => {
-      expect(() => validateTagName("1abc")).toThrow(
-        PromptTagValidationError,
-      );
+      expect(() => validateTagName("1abc")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names with special chars", () => {

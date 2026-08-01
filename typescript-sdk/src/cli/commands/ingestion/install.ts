@@ -165,7 +165,15 @@ function buildEnvBlock(
     case "claude_code":
       return [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-        // Four claude-code OTel unlock knobs (all ON, collect-everything):
+        // Enhanced-telemetry beta: unlocks the real span-tracing signal
+        // (scope com.anthropic.claude_code.tracing — llm_request / tool /
+        // subagent.spawn spans) carrying agent_id + parent_agent_id, the
+        // only telemetry that ties a model call / tool run to the sub-agent
+        // that issued it. Without it OTEL_TRACES_EXPORTER is a no-op and the
+        // receiver collapses every sub-agent into one synthesized per-turn
+        // trace. Content still rides the log events, joined by request_id.
+        `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
+        // OTel content unlock knobs (all ON, collect-everything):
         //   OTEL_LOG_USER_PROMPTS=1     lifts user prompt text onto user_prompt events
         //   OTEL_LOG_TOOL_DETAILS=1     lifts tool metadata expansion onto tool_* events
         //   OTEL_LOG_TOOL_CONTENT=1     lifts tool_input (Bash command, Edit diff, file

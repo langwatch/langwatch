@@ -1,17 +1,18 @@
 import chalk from "chalk";
-import ora from "ora";
-import { checkApiKey } from "../../utils/apiKey";
+import { createSpinner } from "../../utils/spinner";
+import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Deletes (archives) a dataset by slug or ID.
  */
-export const deleteCommand = async (slugOrId: string, options?: { format?: string }): Promise<void> => {
-  checkApiKey();
+export const deleteCommand = async (slugOrId: string): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   const service = createDatasetService();
-  const spinner = ora(`Deleting dataset "${slugOrId}"...`).start();
+  const spinner = createSpinner(`Deleting dataset "${slugOrId}"...`).start();
 
   try {
     const dataset = await service.deleteDataset(slugOrId);
@@ -20,9 +21,13 @@ export const deleteCommand = async (slugOrId: string, options?: { format?: strin
       `Dataset "${chalk.cyan(dataset.name ?? slugOrId)}" (${dataset.slug ?? slugOrId}) has been archived`,
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(dataset, null, 2));
-    }
+    return {
+      data: dataset,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "delete dataset" });
   }

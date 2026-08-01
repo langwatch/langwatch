@@ -215,7 +215,6 @@ describe("EvaluatorChip", () => {
           const runItem = screen.getByText("Run").closest("[data-disabled]");
           expect(runItem).toBeInTheDocument();
         });
-
       });
     });
 
@@ -389,7 +388,6 @@ describe("EvaluatorChip", () => {
           .closest("[data-disabled]");
         expect(item).toBeInTheDocument();
       });
-
     });
 
     describe("when evaluator is running", () => {
@@ -473,6 +471,38 @@ describe("EvaluatorChip", () => {
           "Missing variable mappings - Click to configure",
         ),
       ).toBeInTheDocument();
+    });
+
+    // Regression: clicking the alert icon used to fall through to the
+    // chip's own Menu.Trigger (an uncontrolled Menu can start opening on
+    // pointerdown before the icon's onClick stopPropagation runs), so the
+    // click just toggled the dropdown instead of opening the edit drawer.
+    it("opens the edit drawer directly instead of the chip's dropdown menu", async () => {
+      const onEdit = vi.fn();
+      const user = userEvent.setup();
+      const evaluator = createEvaluator();
+
+      render(
+        <EvaluatorChip
+          evaluator={evaluator}
+          result={undefined}
+          hasMissingMappings
+          onEdit={onEdit}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const alert = screen.getByTestId(
+        `evaluator-missing-mapping-alert-${evaluator.id}`,
+      );
+      await user.click(alert);
+
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Edit Configuration")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Remove from Workbench"),
+      ).not.toBeInTheDocument();
     });
   });
 

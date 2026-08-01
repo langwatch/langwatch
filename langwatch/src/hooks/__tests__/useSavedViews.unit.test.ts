@@ -3,7 +3,6 @@
  */
 import { subDays } from "date-fns";
 import { describe, expect, it } from "vitest";
-import type { FilterParam } from "../useFilterParams";
 import type { FilterField } from "../../server/filters/types";
 import {
   DEFAULT_VIEWS,
@@ -13,6 +12,7 @@ import {
   normalizeFilterValue,
   type SavedView,
 } from "../savedViewsLogic";
+import type { FilterParam } from "../useFilterParams";
 
 describe("savedViewsLogic", () => {
   // --- normalizeFilterValue ---
@@ -35,11 +35,7 @@ describe("savedViewsLogic", () => {
 
     describe("when value is a non-empty array", () => {
       it("returns sorted array", () => {
-        expect(normalizeFilterValue(["c", "a", "b"])).toEqual([
-          "a",
-          "b",
-          "c",
-        ]);
+        expect(normalizeFilterValue(["c", "a", "b"])).toEqual(["a", "b", "c"]);
       });
     });
 
@@ -84,6 +80,7 @@ describe("savedViewsLogic", () => {
     });
 
     describe("when arrays have different order", () => {
+      /** @scenario "View matching ignores array order" */
       it("returns true (order-insensitive)", () => {
         const a: Partial<Record<FilterField, FilterParam>> = {
           "spans.model": ["gpt-4", "claude-3"],
@@ -135,10 +132,26 @@ describe("savedViewsLogic", () => {
 
   describe("findMatchingView()", () => {
     const customViews: SavedView[] = [
-      { id: "application", name: "Application", filters: { "traces.origin": ["application"] } },
-      { id: "evaluations", name: "Evaluations", filters: { "traces.origin": ["evaluation"] } },
-      { id: "simulations", name: "Simulations", filters: { "traces.origin": ["simulation"] } },
-      { id: "playground", name: "Playground", filters: { "traces.origin": ["playground"] } },
+      {
+        id: "application",
+        name: "Application",
+        filters: { "traces.origin": ["application"] },
+      },
+      {
+        id: "evaluations",
+        name: "Evaluations",
+        filters: { "traces.origin": ["evaluation"] },
+      },
+      {
+        id: "simulations",
+        name: "Simulations",
+        filters: { "traces.origin": ["simulation"] },
+      },
+      {
+        id: "playground",
+        name: "Playground",
+        filters: { "traces.origin": ["playground"] },
+      },
       {
         id: "custom-1",
         name: "Debug",
@@ -208,6 +221,7 @@ describe("savedViewsLogic", () => {
     });
 
     describe("when filters match a custom view", () => {
+      /** @scenario "Re-applying saved view's exact filters re-selects the badge" */
       it("returns the custom view id", () => {
         const result = findMatchingView({
           currentFilters: { "spans.model": ["gpt-4"] },
@@ -299,7 +313,11 @@ describe("savedViewsLogic", () => {
     describe("when view has no period", () => {
       it("matches regardless of URL dates", () => {
         const views: SavedView[] = [
-          { id: "no-period", name: "No Period", filters: { "spans.model": ["gpt-4"] } },
+          {
+            id: "no-period",
+            name: "No Period",
+            filters: { "spans.model": ["gpt-4"] },
+          },
         ];
 
         const result = findMatchingView({
@@ -315,7 +333,11 @@ describe("savedViewsLogic", () => {
 
       it("matches when URL has no date params", () => {
         const views: SavedView[] = [
-          { id: "no-period", name: "No Period", filters: { "spans.model": ["gpt-4"] } },
+          {
+            id: "no-period",
+            name: "No Period",
+            filters: { "spans.model": ["gpt-4"] },
+          },
         ];
 
         const result = findMatchingView({

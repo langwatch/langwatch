@@ -10,8 +10,9 @@
  * Note: Unit tests for getOrgRoleOptionsForUser are in
  * src/components/members/__tests__/getOrgRoleOptionsForUser.unit.test.ts
  */
-import { cleanup, render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WaitingApprovalActions } from "../../members/WaitingApprovalActions";
 

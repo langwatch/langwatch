@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LENS_CAPABILITIES, getCapability } from "./capabilities";
+import { getCapability, LENS_CAPABILITIES } from "./capabilities";
 
 /**
  * Wire-format schema for a freshly-configured lens, validated at the boundary

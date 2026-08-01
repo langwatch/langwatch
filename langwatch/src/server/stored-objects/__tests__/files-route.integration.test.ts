@@ -35,6 +35,7 @@ import {
 } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -86,7 +87,7 @@ vi.mock("~/server/rateLimit", () => ({
 }));
 
 // Suppress logger noise
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -203,33 +204,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Best-effort cleanup — see scenario-events-ingest test for rationale.
-  try {
-    await prisma.project.deleteMany({
-      where: { id: { in: [projectAId, projectBId] } },
-    });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: orgId } });
-  } catch (error) {
-    // The integration suite's postgres schema does not always include the
-    // unified API-key ApiKey table; deleting a project that has related ApiKey
-    // rows would FK-cascade through a missing table and throw P2003 (FK
-    // constraint failed) or P2021 (table does not exist). Swallow ONLY
-    // those two known shapes — anything else means cleanup is genuinely
-    // misconfigured and the test author needs to see the error.
-    const knownMissingFixture =
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error.code === "P2003" || error.code === "P2021");
-    if (!knownMissingFixture) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Unexpected cleanup error in files-route integration suite:",
-        error,
-      );
-    }
-  }
+  await cleanupTestRows(prisma, [
+    ["project", { id: { in: [projectAId, projectBId] } }],
+    ["team", { id: teamId }],
+    ["organization", { id: orgId }],
+  ]);
 });
 
 beforeEach(() => {
@@ -490,6 +469,75 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
         projectId: projectAId,
         id: fileId,
       });
+    });
+  });
+
+  describe("when the caller passes a filename query param (attachment chip)", () => {
+    /** @scenario "A document attachment renders as a labeled chip that opens the file in a new tab" */
+    it("uses the requested filename in Content-Disposition so viewer downloads keep the original name", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "%PDF-1.4 fake pdf bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "application/pdf",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=document.pdf`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Disposition")).toBe(
+        'inline; filename="document.pdf"',
+      );
+    });
+
+    it("sanitizes header-hostile filenames and falls back to the object id when nothing survives", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "application/pdf",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById
+        .mockResolvedValueOnce({ row, stream: makeReadableStream(content) })
+        .mockResolvedValueOnce({ row, stream: makeReadableStream(content) });
+
+      // CRLF + quote injection attempt — every hostile byte is replaced.
+      const hostile = encodeURIComponent('a"\r\nSet-Cookie: pwn=1;.pdf');
+      const res = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=${hostile}`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+      expect(res.status).toBe(200);
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      expect(disposition).not.toContain("\r");
+      expect(disposition).not.toContain("\n");
+      expect(disposition).not.toContain('a"');
+      expect(res.headers.get("Set-Cookie")).toBeNull();
+
+      // Hostile bytes are replaced (not stripped) — the header stays quoted
+      // ASCII with underscores standing in for every rejected character.
+      expect(disposition).toMatch(/^inline; filename="[A-Za-z0-9._-]+"$/);
+
+      // An empty filename param falls back to the object id.
+      const res2 = await app.request(
+        `/api/files/${projectAId}/${fileId}?filename=`,
+        { headers: { "X-Auth-Token": projectAKey } },
+      );
+      expect(res2.status).toBe(200);
+      expect(res2.headers.get("Content-Disposition")).toBe(
+        `inline; filename="${fileId}"`,
+      );
     });
   });
 

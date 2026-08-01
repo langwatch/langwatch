@@ -22,6 +22,11 @@
  *
  * Spec: specs/ai-gateway/license-gate-governance.feature
  */
+
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -29,19 +34,13 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
-
-import { prisma } from "~/server/db";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-
-import { appRouter } from "~/server/api/root";
-import { createInnerTRPCContext } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const ns = `lic-gate-${nanoid(8)}`;
 
@@ -73,7 +72,11 @@ beforeAll(async () => {
   });
   adminUserId = admin.id;
   await prisma.organizationUser.create({
-    data: { userId: admin.id, organizationId, role: OrganizationUserRole.ADMIN },
+    data: {
+      userId: admin.id,
+      organizationId,
+      role: OrganizationUserRole.ADMIN,
+    },
   });
   await prisma.teamUser.create({
     data: { userId: admin.id, teamId, role: TeamUserRole.ADMIN },
@@ -102,26 +105,26 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.roleBinding.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.teamUser
-    .deleteMany({ where: { team: { slug: { startsWith: `--lic-team-` } } } })
-    .catch(() => {});
-  await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.team.deleteMany({ where: { slug: { startsWith: `--lic-team-` } } }).catch(() => {});
-  await prisma.organization.deleteMany({ where: { slug: `--lic-${ns}` } }).catch(() => {});
-  await prisma.user
-    .deleteMany({
-      where: {
+  await cleanupTestRows(prisma, [
+    ["roleBinding", { organizationId }],
+    ["teamUser", { team: { organizationId } }],
+    ["organizationUser", { organizationId }],
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { slug: `--lic-${ns}` }],
+    [
+      "user",
+      {
         email: {
           in: [`lic-admin-${ns}@example.com`, `lic-member-${ns}@example.com`],
         },
       },
-    })
-    .catch(() => {});
+    ],
+  ]);
 });
 
-function configureApp(plan: PlanInfo) {
-  resetApp();
+async function configureApp(plan: PlanInfo) {
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
@@ -212,7 +215,13 @@ describe("license-gate on governance backend", () => {
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
-          message: expect.stringContaining("limited to 3"),
+          // On the handled cause, not the prose: the wire message is the code
+          // slug and the sentence is registry copy. `meta.max` is what lets a
+          // UI say the number without parsing it back out of a sentence.
+          cause: {
+            code: "ingestion_source_cap_reached",
+            meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
+          },
         });
 
         const overCap = await prisma.ingestionSource.findFirst({
@@ -222,9 +231,12 @@ describe("license-gate on governance backend", () => {
 
         // Clean up so the enterprise-plan suite below starts from a known
         // count (it asserts list() returns an array — value isn't pinned).
-        await prisma.ingestionSource.deleteMany({
-          where: { organizationId, name: { startsWith: `free-tier-` } },
-        });
+        await cleanupTestRows(prisma, [
+          [
+            "ingestionSource",
+            { organizationId, name: { startsWith: `free-tier-` } },
+          ],
+        ]);
       });
 
       it("forbids governance.ocsfExport", async () => {
@@ -291,7 +303,15 @@ describe("license-gate on governance backend", () => {
             name: "service-direct-blocked",
             actorUserId: adminUserId,
           }),
-        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          // The service is the layer under test here, so what it raises is a
+          // `HandledError` and not a tRPC object — which is the point: the
+          // callers this guard exists for (workers, webhook adapters) have no
+          // tRPC boundary to give a `TRPCError` meaning.
+        ).rejects.toMatchObject({
+          code: "ingestion_source_cap_reached",
+          httpStatus: 403,
+          meta: { max: NON_ENTERPRISE_INGESTION_SOURCE_CAP },
+        });
 
         const persisted = await prisma.ingestionSource.findFirst({
           where: { organizationId, name: "service-direct-blocked" },

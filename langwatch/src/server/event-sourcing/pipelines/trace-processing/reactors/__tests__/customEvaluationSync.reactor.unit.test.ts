@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
+import type {
+  SpanReceivedEvent,
+  TraceProcessingEvent,
+} from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import {
+  type CustomEvaluationSyncReactorDeps,
   createCustomEvaluationSyncReactor,
   extractEvaluationsFromSpan,
-  type CustomEvaluationSyncReactorDeps,
 } from "../customEvaluationSync.reactor";
 
 function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
@@ -453,8 +456,10 @@ describe("customEvaluationSync reactor", () => {
       await reactor.handle(event, createContext(createFoldState()));
       await reactor.handle(event, createContext(createFoldState()));
 
-      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0].evaluationId;
-      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0].evaluationId;
+      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0]
+        .evaluationId;
+      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0]
+        .evaluationId;
       expect(id1).toBe(id2);
     });
   });

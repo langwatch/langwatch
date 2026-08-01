@@ -2,9 +2,9 @@ import type { Prisma } from "@prisma/client";
 
 /**
  * Prisma `select` clauses used by the admin Hono routes for read operations
- * (getList / getOne). Credentials — Elasticsearch API key + URL, every S3
- * field — are intentionally omitted so secrets never reach the admin UI in
- * paginated list payloads or edit-drawer fetches.
+ * (getList / getOne). Credentials — every S3 field — are intentionally
+ * omitted so secrets never reach the admin UI in paginated list payloads
+ * or edit-drawer fetches.
  *
  * Operators can still *write* new credential values (the update payload
  * goes through `defaultHandler` which passes the whole `params.data`
@@ -26,7 +26,6 @@ export const ORGANIZATION_SAFE_SELECT = {
   usageSpendingMaxLimit: true,
   signupData: true,
   signedDPA: true,
-  useCustomElasticsearch: true,
   useCustomS3: true,
   sentPlanLimitAlert: true,
   ssoDomain: true,

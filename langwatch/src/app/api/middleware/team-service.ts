@@ -1,8 +1,7 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
-import { TeamRestService } from "~/server/app-layer/teams/team.service";
 import { PrismaTeamRepository } from "~/server/app-layer/teams/repositories/team.prisma.repository";
+import { TeamRestService } from "~/server/app-layer/teams/team.service";
+import { prisma } from "~/server/db";
 
 export type TeamServiceMiddlewareVariables = {
   teamService: TeamRestService;

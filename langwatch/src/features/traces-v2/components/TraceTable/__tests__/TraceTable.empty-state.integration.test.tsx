@@ -60,7 +60,9 @@ vi.mock("../GroupLensBody", () => ({
 }));
 
 vi.mock("../EmptyFilterState", () => ({
-  EmptyFilterState: () => <div data-testid="empty-filter-state">Nothing matches</div>,
+  EmptyFilterState: () => (
+    <div data-testid="empty-filter-state">Nothing matches</div>
+  ),
 }));
 
 vi.mock("../TraceTableLayout", () => ({
@@ -81,14 +83,22 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("../../../onboarding/store/onboardingStore", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
-    selector({ setupDismissedByProject: {}, setSetupDismissedForProject: vi.fn(), reset: vi.fn() }),
+    selector({
+      setupDismissedByProject: {},
+      setSetupDismissedForProject: vi.fn(),
+      reset: vi.fn(),
+    }),
 }));
 
 vi.mock("../../../stores/filterStore", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       queryText: "",
-      timeRange: { from: Date.now() - 3600000, to: Date.now(), label: "Last 1h" },
+      timeRange: {
+        from: Date.now() - 3600000,
+        to: Date.now(),
+        label: "Last 1h",
+      },
       clearAll: vi.fn(),
       setTimeRange: vi.fn(),
     }),
@@ -100,7 +110,7 @@ vi.mock("../QueryBreakdownChips", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
-import React from "react";
+import type React from "react";
 import { TraceTable } from "../TraceTable";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
@@ -164,7 +174,9 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
@@ -180,7 +192,9 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });
@@ -191,7 +205,9 @@ describe("<TraceTable /> empty-state gating", () => {
       it("renders the lens body, not EmptyFilterState", () => {
         mockTraceListResult = {
           ...mockTraceListResult,
-          data: [{ traceId: "trace-abc-123" }] as typeof mockTraceListResult.data,
+          data: [
+            { traceId: "trace-abc-123" },
+          ] as typeof mockTraceListResult.data,
           totalHits: 1,
           isFetching: false,
           isPreviousData: false,
@@ -199,7 +215,9 @@ describe("<TraceTable /> empty-state gating", () => {
 
         renderTable();
 
-        expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
       });
     });

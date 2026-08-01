@@ -24,9 +24,15 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../../../hooks/useTargetName", () => ({
-  useTargetName: () => "Web Search",
-}));
+vi.mock("../../../hooks/useTargetName", () => {
+  const useTargetName = (_target: { id: string }) => "Web Search";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 
 // Resolver returns a friendly name for the chained prompt target, and falls
 // back to the raw id when no entity/name is known.

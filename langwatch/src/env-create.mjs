@@ -13,10 +13,108 @@ export const gatewaySecretsSchema = {
   LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
 };
 
+/**
+ * Share of browser *sessions* recorded, 0..1. Sessions rather than traces so a
+ * recorded visit is complete; the decision also reaches the server, which drops
+ * the backend half of an unsampled browser trace. Defaults to all of them.
+ * See ADR-058.
+ *
+ * Blank in .env means "unset" — without the preprocess, `z.coerce` turns `""`
+ * into 0 and silently records nothing.
+ *
+ * A meaningless value falls back to recording everything rather than failing
+ * validation. Without the `catch`, `RUM_SAMPLE_RATIO=banana` (or `2`) refuses to
+ * parse and takes the whole app down at boot — an optional telemetry dial is not
+ * worth a deployment for, and the safe reading of nonsense is "record
+ * everything", per the spec scenario "A nonsensical share records rather than
+ * silently collecting nothing". An explicit `0` still means zero; only
+ * unparseable and out-of-range values land on the fallback.
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const rumSampleRatioSchema = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().min(0).max(1).default(1).catch(1),
+);
+
+/**
+ * Explicit stored-objects write-destination toggle (issue #4133). Constrained
+ * to a known set of values — NOT a free string — so an unrecognized value
+ * (typo, stale config) fails loud at boot, naming the variable and the
+ * supported set, instead of silently falling through
+ * `resolveProjectStorageDestination`'s precedence chain as if unset.
+ *
+ * Deliberately does NOT default to anything: absence means "let the
+ * BYOC -> S3_BUCKET_NAME -> local-FS precedence decide", never "azure".
+ * AZURE_BLOB_* presence alone must never flip the destination — only this
+ * toggle does (issue #4133 rejected implicit env-presence inference).
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const storedObjectsBackendSchema = z.enum(["s3", "azure"]).optional();
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
 };
+
+/**
+ * `BASE_HOST` / `NEXTAUTH_URL` are the app's own address. Every state-changing
+ * `/api/auth/*` call is matched against it (`server/routes/auth.ts` via
+ * `better-auth/originGate.ts`, and BetterAuth's own `baseURL` + `trustedOrigins`
+ * in `better-auth/index.ts`), so a value naming the wrong port turns every
+ * sign-in into `403 INVALID_ORIGIN`.
+ *
+ * In development the port is not knowable ahead of time: `.env` is committed
+ * with the default 5560 and a second checkout runs on whatever slot is free.
+ * `scripts/start.sh` exports the aligned value, but the entry points load `.env`
+ * with `override: true` afterwards (deliberately, so an explicitly pinned
+ * `LW_GATEWAY_PUBLIC_URL` and friends beat the launcher's derived defaults), and
+ * that puts 5560 back. Realigning here, after every `.env` file has loaded, is
+ * what makes the alignment stick, and it leaves every other `.env`-pinned value
+ * untouched.
+ *
+ * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
+ * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
+ * environment, a tunnel, or haven's `app.<slug>.langwatch.localhost`. Same rule
+ * as the shell-side twin `scripts/lib/sanitize-dev-env.sh`, which covers the
+ * Docker launchers.
+ *
+ * Mutates the env object so direct `process.env.BASE_HOST` readers (the MCP
+ * handler, the SSR API base, the scenario-events app) see the same address the
+ * auth layer does.
+ *
+ * @param {Record<string, string | undefined>} [processEnv]
+ * @returns {{ name: string, from: string, to: string }[]} the vars it realigned
+ */
+export function alignDevAuthUrlsToPort(processEnv = process.env) {
+  if (processEnv.NODE_ENV !== "development") return [];
+
+  const port = processEnv.LANGWATCH_APP_PORT ?? processEnv.PORT;
+  if (!port) return [];
+
+  const target = `http://localhost:${port}`;
+  const realigned = [];
+
+  for (const name of ["BASE_HOST", "NEXTAUTH_URL"]) {
+    const current = processEnv[name];
+    if (!current || current === target) continue;
+
+    let parsed;
+    try {
+      parsed = new URL(current);
+    } catch {
+      continue;
+    }
+    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost")
+      continue;
+
+    processEnv[name] = target;
+    realigned.push({ name, from: current, to: target });
+  }
+
+  return realigned;
+}
 
 // Memoize so double calls (env.mjs root + createAppConfigFromEnv) only validate once
 /** @type {any} */
@@ -24,6 +122,10 @@ let _env = null;
 
 export function createEnvConfig() {
   if (_env) return _env;
+
+  // Runs before validation reads process.env below, and every entry point loads
+  // its .env files before the app graph (and therefore this module) evaluates.
+  alignDevAuthUrlsToPort();
 
   _env = createEnv({
     // clientPrefix required by env-core to distinguish client/server vars
@@ -34,14 +136,19 @@ export function createEnvConfig() {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
       NODE_ENV: z.enum(["development", "test", "production"]),
-      ENVIRONMENT: z.string().optional().transform((val) => {
-        if (val) return val;
-        if (process.env.NODE_ENV === "production") {
-          console.warn("ENVIRONMENT is not set in production. Defaulting to 'local'.");
-        }
+      ENVIRONMENT: z
+        .string()
+        .optional()
+        .transform((val) => {
+          if (val) return val;
+          if (process.env.NODE_ENV === "production") {
+            console.warn(
+              "ENVIRONMENT is not set in production. Defaulting to 'local'.",
+            );
+          }
 
-        return "local";
-      }),
+          return "local";
+        }),
       BASE_HOST: optionalIfBuildTime(z.string().min(1)),
       NEXTAUTH_PROVIDER: z.string().optional(),
       NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
@@ -69,7 +176,8 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
-      LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_INTERNAL_SECRET:
+        gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
@@ -115,7 +223,8 @@ export function createEnvConfig() {
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
-      LANGWATCH_NLP_SERVICE: z.string().optional(),
+      LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
+      LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -129,10 +238,40 @@ export function createEnvConfig() {
       // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
       // stays valid; keep it short so a leaked URL doesn't grant
       // long-window access.
-      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
-      LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
-      EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      LANGEVALS_STAGING_TTL_SECONDS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(600),
+      EVAL_MAX_PAYLOAD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(16_000_000),
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(180_000_000),
+      // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
+      // Counts dispatches (one digest of N traces = 1), not traces or
+      // recipients. Only ever bites immediate-cadence triggers; digest
+      // cadences cannot exceed 12/hour.
+      TRIGGER_EMAIL_HOURLY_CAP: z.coerce.number().int().positive().default(100),
+      // ADR-031: per-PROJECT daily hard cap — a backstop ABOVE the per-trigger
+      // hourly cap, bounding the aggregate trigger-email volume a whole project
+      // can emit in 24h (SES sender-reputation protection). Counts RECIPIENTS
+      // (actual outbound email volume), not dispatches.
+      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -141,6 +280,12 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
+      // frontend telemetry volume, and the ingest route it exports to is
+      // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
+      RUM_ENABLED: z.boolean().optional(),
+      // See `rumSampleRatioSchema` above.
+      RUM_SAMPLE_RATIO: rumSampleRatioSchema,
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
@@ -187,12 +332,21 @@ export function createEnvConfig() {
       // service. Self-hosting operators running multi-pod deployments MUST
       // configure object storage instead — the local-FS path is dev-only.
       LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
-      // Azure Blob Storage — optional alternative to S3 for stored-objects.
-      // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
+      // Explicit stored-objects write-destination toggle. "s3" is the
+      // implicit default (existing BYOC -> S3_BUCKET_NAME -> local-FS
+      // precedence); "azure" opts a deployment into the Azure Blob backend.
+      // See storedObjectsBackendSchema above and
+      // resolveProjectStorageDestination for the full precedence rules.
+      STORED_OBJECTS_BACKEND: storedObjectsBackendSchema,
+      // Azure Blob Storage — optional alternative to S3 for stored-objects,
+      // selected ONLY by STORED_OBJECTS_BACKEND=azure above (never inferred
+      // from these vars being present). Set all four together when using
+      // the azure backend; AZURE_BLOB_ENDPOINT only needs to be set for
       // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
       AZURE_BLOB_ACCOUNT_NAME: z.string().optional(),
       AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
       AZURE_BLOB_ENDPOINT: z.string().optional(),
+      AZURE_BLOB_CONTAINER: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -208,13 +362,22 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
-      // GitHub App used by Langy to open PRs as the requesting user.
-      // Separate from the GITHUB_CLIENT_* identity-login app above. All
-      // optional: when unset, the Langy GitHub feature is silently off and
-      // unconnected users get a "Connect GitHub" reply. Issue #4747.
+      // GitHub App used by Langy to open bot-authored PRs on repositories the
+      // App is installed on. Separate from the GITHUB_CLIENT_* identity-login
+      // app above. All optional: when the private key is unset the Langy GitHub
+      // feature is silently off, the connect card explains it is unavailable,
+      // and no installation token can be minted. Issue #4747.
+      //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
+      //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
+      //                                app JWT used to mint installation tokens).
+      //   GITHUB_LANGY_WEBHOOK_SECRET— verifies X-Hub-Signature-256 on inbound
+      //                                installation webhooks.
+      //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
+      //                                github.com/apps/<slug>/installations/new.
       GITHUB_LANGY_APP_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_SECRET: z.string().optional(),
+      GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
+      GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
+      GITHUB_LANGY_APP_SLUG: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -276,6 +439,10 @@ export function createEnvConfig() {
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
       SLACK_CHANNEL_SIGNUPS: z.string().optional(),
       SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
+      // Agent issue-report alerts (bot token of the LangWatch Agents Slack
+      // app; alerts are skipped entirely when unset)
+      SLACK_BUG_REPORTS_BOT_TOKEN: z.string().optional(),
+      SLACK_BUG_REPORTS_CHANNEL: z.string().optional(),
 
       // SCIM
       AUTH0_SCIM_WEBHOOK_SECRET: z.string().optional(),
@@ -307,17 +474,24 @@ export function createEnvConfig() {
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
-      GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      GOOGLE_APPLICATION_CREDENTIALS:
+        process.env.GOOGLE_APPLICATION_CREDENTIALS,
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
-      LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_THRESHOLD_BYTES:
+        process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
+        process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
+      TRIGGER_EMAIL_TENANT_DAILY_CAP:
+        process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
@@ -328,6 +502,10 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      RUM_ENABLED:
+        process.env.RUM_ENABLED === "1" ||
+        process.env.RUM_ENABLED?.toLowerCase() === "true",
+      RUM_SAMPLE_RATIO: process.env.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
@@ -348,9 +526,11 @@ export function createEnvConfig() {
       S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+      STORED_OBJECTS_BACKEND: process.env.STORED_OBJECTS_BACKEND,
       AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
+      AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
@@ -373,8 +553,9 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       GITHUB_LANGY_APP_ID: process.env.GITHUB_LANGY_APP_ID,
-      GITHUB_LANGY_CLIENT_ID: process.env.GITHUB_LANGY_CLIENT_ID,
-      GITHUB_LANGY_CLIENT_SECRET: process.env.GITHUB_LANGY_CLIENT_SECRET,
+      GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
+      GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
+      GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -388,8 +569,10 @@ export function createEnvConfig() {
       LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-      STRIPE_LICENSE_PAYMENT_LINK_ID: process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
-      STRIPE_LICENSE_PAYMENT_LINK_URL: process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      STRIPE_LICENSE_PAYMENT_LINK_ID:
+        process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      STRIPE_LICENSE_PAYMENT_LINK_URL:
+        process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,
@@ -397,6 +580,8 @@ export function createEnvConfig() {
       CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
       CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
       SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
+      SLACK_BUG_REPORTS_BOT_TOKEN: process.env.SLACK_BUG_REPORTS_BOT_TOKEN,
+      SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,

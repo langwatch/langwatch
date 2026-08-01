@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { BudgetExceededBanner } from "../BudgetExceededBanner";
 
@@ -37,7 +37,9 @@ describe("BudgetExceededBanner", () => {
       // across nodes — assert against the alert's full textContent instead
       // of using a single getByText regex.
       const alertText = screen.getByRole("alert").textContent ?? "";
-      expect(alertText).toMatch(/of your\s+\$500\.00\s+monthly personal budget/i);
+      expect(alertText).toMatch(
+        /of your\s+\$500\.00\s+monthly personal budget/i,
+      );
     });
 
     it("uses role=alert + aria-live=assertive so screen readers announce it", () => {
@@ -79,9 +81,7 @@ describe("BudgetExceededBanner", () => {
       const link = screen.getByRole("link", {
         name: "platform-team@acme.com",
       });
-      expect(link.getAttribute("href")).toBe(
-        "mailto:platform-team@acme.com",
-      );
+      expect(link.getAttribute("href")).toBe("mailto:platform-team@acme.com");
     });
   });
 
@@ -123,9 +123,7 @@ describe("BudgetExceededBanner", () => {
       expect(
         screen.queryByRole("link", { name: /request increase/i }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText(/admin:/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/admin:/i)).not.toBeInTheDocument();
     });
   });
 
@@ -133,9 +131,7 @@ describe("BudgetExceededBanner", () => {
     it("normalizes to 'personal' in the copy (matches CLI wire shape)", () => {
       renderBanner({ scope: "virtual_key" });
 
-      expect(
-        screen.getByText(/personal budget/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/personal budget/i)).toBeInTheDocument();
     });
   });
 

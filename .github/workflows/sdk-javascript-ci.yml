@@ -15,10 +15,12 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  LANGWATCH_API_KEY: sk-lw-1234567890
   LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
@@ -27,15 +29,20 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the test
+          # and e2e steps spend real LLM money, so they must not run on
+          # pushes or release PRs that touched nothing under
+          # typescript-sdk/. An SDK release PR still matches via
+          # typescript-sdk/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'typescript-sdk/**'
               - '.github/workflows/sdk-javascript-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   ci:
     needs: changes
@@ -50,7 +57,7 @@ jobs:
         working-directory: typescript-sdk
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -60,7 +67,7 @@ jobs:
           install-dir: typescript-sdk
 
       - name: Install TypeScript Native Preview
-        run: pnpm install -D @typescript/native-preview
+        run: pnpm install -D -w @typescript/native-preview
 
       - name: Run lint check
         run: pnpm run lint
@@ -69,10 +76,22 @@ jobs:
         run: pnpm run build
 
       - name: Run tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         env:
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key and both base-URL spellings point the
+          # openai and langchain client families at it.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
@@ -101,7 +120,7 @@ jobs:
 
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:latest
+        image: clickhouse/clickhouse-server:25.10.2.65
         ports:
           - 8123:8123
         env:
@@ -144,12 +163,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: 10.24.0
 
@@ -192,6 +211,10 @@ jobs:
 
       - name: Seed test project
         working-directory: langwatch
+        env:
+          # Seed the credential the SDK test process receives without putting
+          # LANGWATCH_API_KEY on the platform process itself.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -213,6 +236,11 @@ jobs:
 
       - name: Start LangWatch server and worker
         working-directory: langwatch
+        env:
+          # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
+          # Platform processes refuse to boot with it set (the self-referencing
+          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          LANGWATCH_API_KEY: ""
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline
@@ -229,9 +257,22 @@ jobs:
         run: pnpm run build
 
       - name: Run e2e tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         env:
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          LANGWATCH_API_KEY: sk-lw-1234567890
+          # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
+          # gateway base URL). Step-scoped on purpose: the LangWatch app
+          # booted above must not inherit a gateway base URL.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e

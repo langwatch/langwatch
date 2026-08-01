@@ -37,7 +37,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
   formatTraceSummaryDigest: vi.fn().mockReturnValue("digest"),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -59,10 +59,14 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 });
 
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+    authMiddleware: async (
+      c: { set: (k: string, v: unknown) => void },
+      next: () => Promise<void>,
+    ) => {
       c.set("project", {
         id: "project-123",
         slug: "test-project",
@@ -71,7 +75,8 @@ vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
       c.set("apiKeyUserId", "user-456");
       await next();
     },
-    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) =>
+      next(),
   };
 });
 
@@ -134,10 +139,12 @@ describe("PATCH /:traceId/metadata", () => {
 
       const resourceAttrs = call.resource?.attributes ?? [];
       const attrMap = Object.fromEntries(
-        resourceAttrs.map((a: { key: string; value: { stringValue?: string } }) => [
-          a.key,
-          a.value.stringValue,
-        ]),
+        resourceAttrs.map(
+          (a: { key: string; value: { stringValue?: string } }) => [
+            a.key,
+            a.value.stringValue,
+          ],
+        ),
       );
       expect(attrMap["langwatch.user.id"]).toBe("new-user");
       expect(attrMap["langwatch.labels"]).toBe('["qa"]');
@@ -146,20 +153,20 @@ describe("PATCH /:traceId/metadata", () => {
 
   describe("when called with an empty metadata object", () => {
     /** @scenario PATCH endpoint rejects empty metadata object */
-    it("returns 400", async () => {
+    it("returns 422", async () => {
       const res = await patchMetadata("trace-abc", {});
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockRecordSpan).not.toHaveBeenCalled();
     });
   });
 
   describe("when called with an oversized metadata value", () => {
     /** @scenario PATCH endpoint rejects oversized metadata values */
-    it("returns 400 for values exceeding 4KB", async () => {
+    it("returns 422 for values exceeding 4KB", async () => {
       const res = await patchMetadata("trace-abc", {
         big_value: "x".repeat(4097),
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockRecordSpan).not.toHaveBeenCalled();
     });
   });
@@ -178,10 +185,12 @@ describe("PATCH /:traceId/metadata", () => {
       const call = mockRecordSpan.mock.calls[0]![0];
       const resourceAttrs = call.resource?.attributes ?? [];
       const attrMap = Object.fromEntries(
-        resourceAttrs.map((a: { key: string; value: { stringValue?: string } }) => [
-          a.key,
-          a.value.stringValue,
-        ]),
+        resourceAttrs.map(
+          (a: { key: string; value: { stringValue?: string } }) => [
+            a.key,
+            a.value.stringValue,
+          ],
+        ),
       );
       expect(attrMap["langwatch.user.id"]).toBe("u1");
       expect(attrMap["langwatch.customer.id"]).toBe("c1");
@@ -201,10 +210,12 @@ describe("PATCH /:traceId/metadata", () => {
       const call = mockRecordSpan.mock.calls[0]![0];
       const resourceAttrs = call.resource?.attributes ?? [];
       const attrMap = Object.fromEntries(
-        resourceAttrs.map((a: { key: string; value: { stringValue?: string } }) => [
-          a.key,
-          a.value.stringValue,
-        ]),
+        resourceAttrs.map(
+          (a: { key: string; value: { stringValue?: string } }) => [
+            a.key,
+            a.value.stringValue,
+          ],
+        ),
       );
       expect(attrMap["langwatch.metadata.environment"]).toBe("staging");
     });
@@ -223,10 +234,12 @@ describe("PATCH /:traceId/metadata", () => {
       const call = mockRecordSpan.mock.calls[0]![0];
       const resourceAttrs = call.resource?.attributes ?? [];
       const attrMap = Object.fromEntries(
-        resourceAttrs.map((a: { key: string; value: { stringValue?: string } }) => [
-          a.key,
-          a.value.stringValue,
-        ]),
+        resourceAttrs.map(
+          (a: { key: string; value: { stringValue?: string } }) => [
+            a.key,
+            a.value.stringValue,
+          ],
+        ),
       );
       expect(attrMap["langwatch.user.id"]).toBe("u1");
       expect(attrMap["langwatch.labels"]).toBe('["qa"]');

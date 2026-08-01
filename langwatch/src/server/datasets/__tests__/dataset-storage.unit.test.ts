@@ -9,6 +9,7 @@ vi.mock("~/server/stored-objects/project-storage-destination", () => ({
     resolveProjectStorageDestination(projectId),
 }));
 
+import { AzureDatasetStorage } from "../azure-dataset-storage";
 import { getDatasetStorage } from "../dataset-storage";
 import { LocalDatasetStorage } from "../local-dataset-storage";
 import { S3DatasetStorage } from "../s3-dataset-storage";
@@ -28,6 +29,21 @@ describe("getDatasetStorage()", () => {
       const storage = await getDatasetStorage("p1");
 
       expect(storage).toBeInstanceOf(S3DatasetStorage);
+    });
+  });
+
+  describe("when the project resolves to an azure destination", () => {
+    /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
+    it("returns the Azure implementation", async () => {
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "azure",
+        accountName: "lwacct",
+        container: "lw-container",
+      });
+
+      const storage = await getDatasetStorage("p1");
+
+      expect(storage).toBeInstanceOf(AzureDatasetStorage);
     });
   });
 

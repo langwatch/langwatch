@@ -35,6 +35,8 @@
  * cutover is confirmed (Decision 7 — "Drop-`DatasetRecord` migration", a
  * follow-up, not this rung).
  */
+
+import { createLogger } from "@langwatch/observability";
 import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
 import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
@@ -45,7 +47,6 @@ import {
 } from "../server/datasets/dataset-storage";
 import { prisma } from "../server/db";
 import { resolveProjectStorageDestination } from "../server/stored-objects/project-storage-destination";
-import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:tasks:backfillDatasetContentToS3");
 
@@ -147,7 +148,7 @@ export const migrateDatasetToS3 = async (
   const preCheck = await deps.prisma.dataset.findFirst({
     where: { id: dataset.id, projectId },
   });
-  if (!preCheck || preCheck.contentLayout !== "postgres") {
+  if (preCheck?.contentLayout !== "postgres") {
     logger.info(
       { datasetId: dataset.id, projectId },
       "Skipping dataset — already migrated (not on postgres layout)",
@@ -238,7 +239,7 @@ export const migrateDatasetToS3 = async (
       const current = await tx.dataset.findFirst({
         where: { id: dataset.id, projectId },
       });
-      if (!current || current.contentLayout !== "postgres") {
+      if (current?.contentLayout !== "postgres") {
         logger.info(
           { datasetId: dataset.id, projectId },
           "Skipping dataset — already migrated (not on postgres layout)",

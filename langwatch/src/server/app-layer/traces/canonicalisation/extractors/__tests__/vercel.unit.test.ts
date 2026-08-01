@@ -187,6 +187,7 @@ describe("VercelExtractor", () => {
   });
 
   describe("when the AI SDK reports cache token details", () => {
+    /** @scenario "A cached turn's input is split into fresh and cached buckets" */
     it("maps inputTokenDetails.cacheWriteTokens to gen_ai cache_creation (opencode Path B)", () => {
       const ctx = createExtractorContext(
         {
@@ -194,6 +195,7 @@ describe("VercelExtractor", () => {
             id: "claude-haiku-4-5",
             provider: "anthropic",
           }),
+          "gen_ai.usage.input_tokens": 13000,
           [ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS]: 12629,
           [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 0,
         },
@@ -212,6 +214,9 @@ describe("VercelExtractor", () => {
       expect(
         ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
       ).toBeUndefined();
+      // the canonical input is rewritten to the fresh remainder so the
+      // cache-write bucket adds on top instead of being counted twice
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(371);
     });
 
     it("maps inputTokenDetails.cacheReadTokens to gen_ai cache_read on a cached turn", () => {
@@ -221,6 +226,7 @@ describe("VercelExtractor", () => {
             id: "claude-haiku-4-5",
             provider: "anthropic",
           }),
+          "gen_ai.usage.input_tokens": 13000,
           [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 12629,
         },
         {
@@ -234,6 +240,7 @@ describe("VercelExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
         12629,
       );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(371);
     });
 
     it("falls back to the cachedInputTokens alias for the read count", () => {
@@ -243,6 +250,7 @@ describe("VercelExtractor", () => {
             id: "claude-haiku-4-5",
             provider: "anthropic",
           }),
+          "gen_ai.usage.input_tokens": 9000,
           [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
         },
         {
@@ -256,6 +264,74 @@ describe("VercelExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
         8745,
       );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(255);
+    });
+
+    /** @scenario "The SDK's own fresh-input count is trusted when reported" */
+    it("prefers the SDK's own noCacheTokens for the fresh input remainder", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.usage.input_tokens": 25449,
+          [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 20000,
+          [ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS]: 5449,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        20000,
+      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBe(5449);
+    });
+
+    /** @scenario "The cached split is counted once per LLM call" */
+    it("skips the mapping on the parent rollup span with no canonical input", () => {
+      // ai.streamText (the parent) repeats the same ai.usage.* rollup as
+      // the provider-call child but carries no gen_ai.usage.input_tokens;
+      // mapping cache onto it would count the cached share twice in the
+      // trace fold.
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_USAGE_INPUT_TOKENS]: 25449,
+          [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 20000,
+          [ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS]: 5449,
+        },
+        {
+          name: "ai.streamText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(
+        ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
+      ).toBeUndefined();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
+    });
+
+    /** @scenario "Reasoning tokens reported by the SDK reach the trace" */
+    it("maps the flat reasoningTokens count to gen_ai reasoning_tokens", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.usage.input_tokens": 9000,
+          [ATTR_KEYS.AI_USAGE_INPUT_TOKENS]: 9000,
+          [ATTR_KEYS.AI_USAGE_REASONING_TOKENS]: 384,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(384);
     });
   });
 

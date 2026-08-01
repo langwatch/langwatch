@@ -1,11 +1,14 @@
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -20,10 +23,12 @@ import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
+import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
+import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
-import { createLogger } from "~/utils/logger/server";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
@@ -32,6 +37,37 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 const logger = createLogger("langwatch:user-router");
 
 export const userRouter = createTRPCRouter({
+  getTraceExplorerTourPreference: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: user.tracesExplorerTourDismissedAt !== null,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
+  dismissTraceExplorerTour: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.update({
+        where: { id: userId },
+        data: { tracesExplorerTourDismissedAt: new Date() },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: true as const,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
   /**
    * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).
    * Exposed so the client can decide whether to render admin-only UI surfaces
@@ -119,6 +155,10 @@ export const userRouter = createTRPCRouter({
         });
         return created;
       });
+
+      // Email-mode signups bypass the BetterAuth user-create hooks, so the
+      // `signed_up` analytics event fires here instead.
+      trackServerEvent({ userId: newUser.id, event: "signed_up" });
 
       return { id: newUser.id };
     }),
@@ -423,6 +463,14 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (
+        input.userId !== ctx.session.user.id &&
+        !checkIsAdmin({ email: user.email })
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       // UserService.deactivate also force-revokes all the user's sessions
       // (Redis cache + DB) — see iter-24 progress notes for why.
       await UserService.create(ctx.prisma).deactivate({ id: input.userId });
@@ -432,7 +480,77 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      if (!checkIsAdmin({ email: user.email })) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
+      return { success: true };
+    }),
+
+  /**
+   * Uploads and sets the caller's own avatar photo. The image is stored in the
+   * S3-backed object store (owned by the user, under their personal workspace)
+   * and its serve URL is written to `User.image`, the field every avatar
+   * surface resolves through. `organizationId` scopes the personal-workspace
+   * resolution and is membership-checked below.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  setAvatar: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        // A base64 image data URL (`data:image/...;base64,...`) produced by the
+        // client crop/resize step. Deliberately NOT bounded with a `.max()`
+        // here: `parseAvatarDataUrl` rejects at exactly the same ceiling before
+        // it scans or decodes anything, so a `.max()` only wins the race and
+        // turns the specific `avatar_image_too_large` ("Pick one under 8 MB")
+        // into the anonymous `validation_error`. The point of that code is that
+        // both halves of the check answer with it, whichever caught the file.
+        imageDataUrl: z.string().min(1),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      // Throttle uploads per user — each writes bytes to object storage and
+      // updates the row; mirrors the changePassword budget shape.
+      const limit = await rateLimit({
+        key: `user.setAvatar:${ctx.session.user.id}`,
+        windowSeconds: 60,
+        max: 10,
+      });
+      if (!limit.allowed) {
+        throw new AvatarRateLimitedError();
+      }
+
+      // `AvatarValidationError` is a handled error, so `handledErrorMiddleware`
+      // carries its code and meta to the client on its own. Catching it here to
+      // rewrap it as a BAD_REQUEST would only replace the code with the raw
+      // message — the thing #5984 closed.
+      return await new UserAvatarService(ctx.prisma).setAvatar({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        imageDataUrl: input.imageDataUrl,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
+    }),
+
+  /**
+   * Clears the caller's uploaded avatar so surfaces fall back to their SSO
+   * photo (if any) and then their initials.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  removeAvatar: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      await new UserAvatarService(ctx.prisma).removeAvatar({
+        userId: ctx.session.user.id,
+      });
       return { success: true };
     }),
 
@@ -563,29 +681,42 @@ export const userRouter = createTRPCRouter({
 
       const usage = new PersonalUsageService();
 
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
+      // the org's hidden Governance Project tenant. Resolve it read-only
+      // so the PRINCIPAL-ledger union is scoped to this org's tenant.
+      const governanceProject = await findHiddenGovernanceProject({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
+
       // Run the rollup queries in parallel — they're independent and the
-      // CH server happily multiplexes. userId is threaded so
-      // PersonalUsageService can union ingestion-source ledger rows
-      // (Claude Code OTLP, etc.) keyed on PRINCIPAL-scope budgets where
-      // ScopeId=userId. Without it, the /me dashboard misses third-party
-      // traffic landing in the hidden governance project tenant. Recent
-      // activity itself is read directly from the personal project tenant
-      // by the /me table (tracesV2.list), so it isn't fetched here.
+      // CH server happily multiplexes. userId + ingestionTenantId are
+      // threaded so PersonalUsageService can union ingestion-source ledger
+      // rows keyed on PRINCIPAL-scope budgets where ScopeId=userId, scoped
+      // to this org's governance tenant. Without them, the /me dashboard
+      // misses third-party traffic landing in the hidden governance
+      // project tenant. Recent activity itself is read directly from the
+      // personal project tenant by the /me table (tracesV2.list), so it
+      // isn't fetched here.
+      const ingestionTenantId = governanceProject?.id;
       const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
         usage.summary({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
         usage.dailyBuckets({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
         usage.breakdownByModel({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
       ]);
 
@@ -775,10 +906,11 @@ export const userRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       if (!adminEmail) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "no_admin_found",
-        });
+        logger.warn(
+          { organizationId: input.organizationId },
+          "budget increase requested but the organization has no admin",
+        );
+        throw new NoAdminConfiguredError();
       }
       const [organization, requester] = await Promise.all([
         ctx.prisma.organization.findUnique({

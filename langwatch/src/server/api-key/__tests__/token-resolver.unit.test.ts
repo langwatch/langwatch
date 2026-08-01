@@ -1,10 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-
-import { TokenResolver } from "../token-resolver";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateApiKeyToken } from "../api-key-token.utils";
+import { TokenResolver } from "../token-resolver";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     warn: vi.fn(),
@@ -15,7 +14,8 @@ vi.mock("~/utils/logger/server", () => ({
 
 // A legacy project key whose random body happens to contain an underscore —
 // the regression shape: it must resolve via the project lookup, not 401
-const LEGACY_KEY_WITH_UNDERSCORE = "sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM";
+const LEGACY_KEY_WITH_UNDERSCORE =
+  "sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM";
 
 const project = {
   id: "project_1",

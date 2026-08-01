@@ -10,6 +10,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -62,14 +63,10 @@ describe("Feature: Dataset File Upload REST API", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.datasetRecord.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.dataset.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [
+      ["datasetRecord", { projectId: testProjectId }],
+      ["dataset", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });

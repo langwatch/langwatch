@@ -16,7 +16,11 @@ import type { Span } from "../../tracer/types";
 
 /** Field mapping for agent inputs — maps to a scenario source or a static value */
 export const FieldMappingSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("source"), sourceId: z.string(), path: z.array(z.string()) }),
+  z.object({
+    type: z.literal("source"),
+    sourceId: z.string(),
+    path: z.array(z.string()),
+  }),
   z.object({ type: z.literal("value"), value: z.string() }),
 ]);
 export type FieldMapping = z.infer<typeof FieldMappingSchema>;
@@ -37,7 +41,7 @@ export const PromptConfigDataSchema = z.object({
     z.object({
       role: z.enum(["user", "assistant"]),
       content: z.string(),
-    })
+    }),
   ),
   /** Model configured on prompt (if any). Used for model selection logic. */
   model: z.string().optional(),
@@ -91,7 +95,7 @@ export const HttpAgentDataSchema = z.object({
     z.object({
       key: z.string(),
       value: z.string(),
-    })
+    }),
   ),
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
@@ -116,13 +120,13 @@ export const CodeAgentDataSchema = z.object({
     z.object({
       identifier: z.string(),
       type: z.string(),
-    })
+    }),
   ),
   outputs: z.array(
     z.object({
       identifier: z.string(),
       type: z.string(),
-    })
+    }),
   ),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
@@ -156,14 +160,14 @@ export const WorkflowAgentDataSchema = z.object({
     z.object({
       identifier: z.string(),
       type: z.string(),
-    })
+    }),
   ),
   /** Ordered end-node outputs used for default/fallback output extraction. */
   outputs: z.array(
     z.object({
       identifier: z.string(),
       type: z.string(),
-    })
+    }),
   ),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),

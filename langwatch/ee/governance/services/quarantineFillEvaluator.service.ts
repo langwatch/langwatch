@@ -33,10 +33,9 @@
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
 
 import {
   GOVERNANCE_ATTR,
@@ -44,9 +43,7 @@ import {
 } from "./governanceAttributeKeys";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 
-const logger = createLogger(
-  "langwatch:governance:quarantine-fill-evaluator",
-);
+const logger = createLogger("langwatch:governance:quarantine-fill-evaluator");
 
 /**
  * Default sliding-window length for rate computation. 60 seconds

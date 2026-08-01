@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FREE_PLAN } from "../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import {
-  isEnterpriseTier,
-  isCustomRole,
   assertEnterprisePlan,
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+  isEnterpriseTier,
 } from "../enterprise";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 
 const mockGetActivePlan = vi.fn();
 
@@ -29,12 +29,16 @@ describe("enterprise", () => {
     describe("when plan type is not ENTERPRISE", () => {
       /** @scenario FREE plan is not recognized as enterprise */
       /** @scenario OPEN_SOURCE plan is not recognized as enterprise */
-      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH", "STARTER", ""])(
-        "returns false for %s",
-        (planType) => {
-          expect(isEnterpriseTier(planType)).toBe(false);
-        },
-      );
+      it.each([
+        "FREE",
+        "OPEN_SOURCE",
+        "PRO",
+        "GROWTH",
+        "STARTER",
+        "",
+      ])("returns false for %s", (planType) => {
+        expect(isEnterpriseTier(planType)).toBe(false);
+      });
     });
   });
 
@@ -44,12 +48,14 @@ describe("enterprise", () => {
     });
 
     describe("when role is not a custom role", () => {
-      it.each(["ADMIN", "MEMBER", "VIEWER", ""])(
-        "returns false for %s",
-        (role) => {
-          expect(isCustomRole(role)).toBe(false);
-        },
-      );
+      it.each([
+        "ADMIN",
+        "MEMBER",
+        "VIEWER",
+        "",
+      ])("returns false for %s", (role) => {
+        expect(isCustomRole(role)).toBe(false);
+      });
     });
   });
 
@@ -107,26 +113,28 @@ describe("enterprise", () => {
     });
 
     describe("when plan is not ENTERPRISE", () => {
-      it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH"])(
-        "throws FORBIDDEN for %s plan",
-        async (planType) => {
-          const plan: PlanInfo = {
-            ...FREE_PLAN,
-            type: planType,
-          };
-          mockGetActivePlan.mockResolvedValue(plan);
+      it.each([
+        "FREE",
+        "OPEN_SOURCE",
+        "PRO",
+        "GROWTH",
+      ])("throws FORBIDDEN for %s plan", async (planType) => {
+        const plan: PlanInfo = {
+          ...FREE_PLAN,
+          type: planType,
+        };
+        mockGetActivePlan.mockResolvedValue(plan);
 
-          await expect(
-            assertEnterprisePlan({
-              organizationId: "org-1",
-              errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
-        },
-      );
+        await expect(
+          assertEnterprisePlan({
+            organizationId: "org-1",
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      });
 
       it("uses the provided errorMessage", async () => {
         mockGetActivePlan.mockResolvedValue({

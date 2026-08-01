@@ -28,12 +28,16 @@ export function ExportProgress({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    let slideInFrame: number | undefined;
     if (isExporting) {
       // Trigger slide-in on next frame so transition applies
-      requestAnimationFrame(() => setVisible(true));
+      slideInFrame = requestAnimationFrame(() => setVisible(true));
     } else {
       setVisible(false);
     }
+    return () => {
+      if (slideInFrame !== undefined) cancelAnimationFrame(slideInFrame);
+    };
   }, [isExporting]);
 
   if (!isExporting) {
@@ -79,7 +83,8 @@ export function ExportProgress({
             </HStack>
           ) : (
             <Text textStyle="sm" color="fg">
-              Exported {exported.toLocaleString()} of {total.toLocaleString()} traces…
+              Exported {exported.toLocaleString()} of {total.toLocaleString()}{" "}
+              traces…
             </Text>
           )}
           {!isDone && onCancel && (

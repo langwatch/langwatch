@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FetchSSETimeoutError } from "./errors";
 import { fetchSSE } from "./fetchSSE";
 
-vi.mock("~/utils/logger", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) => ({
     error: vi.fn(),
     warn: vi.fn(),
@@ -59,7 +59,7 @@ describe("fetchSSE", () => {
     vi.useRealTimers();
   });
 
-  it("should make request with correct parameters", async () => {
+  it("makes request with correct parameters", async () => {
     const onEvent = vi.fn();
     await fetchSSE({
       endpoint: "/api/test",
@@ -80,7 +80,7 @@ describe("fetchSSE", () => {
     );
   });
 
-  it("should process events and handle stop condition", async () => {
+  it("processes events and handle stop condition", async () => {
     const onEvent = vi.fn();
     const shouldStopProcessing = vi.fn((event) => event.type === "stop");
 
@@ -113,7 +113,7 @@ describe("fetchSSE", () => {
 
   describe("error handling", () => {
     describe("with onError callback", () => {
-      it("should handle HTTP errors", async () => {
+      it("handles HTTP errors", async () => {
         const onError = vi.fn();
 
         mockFetchEventSource.mockImplementation(
@@ -138,7 +138,7 @@ describe("fetchSSE", () => {
         expect(onError).toHaveBeenCalledWith(expect.any(Error));
       });
 
-      it("should handle JSON parsing errors", async () => {
+      it("handles JSON parsing errors", async () => {
         const onError = vi.fn();
 
         mockFetchEventSource.mockImplementation(
@@ -168,7 +168,7 @@ describe("fetchSSE", () => {
         expect(onError).toHaveBeenCalledWith(expect.any(Error));
       });
 
-      it("should handle timeouts", async () => {
+      it("handles timeouts", async () => {
         vi.useFakeTimers();
         const onError = vi.fn();
 
@@ -204,7 +204,7 @@ describe("fetchSSE", () => {
     });
 
     describe("without onError callback", () => {
-      it("should throw errors when no onError callback is provided", async () => {
+      it("throws errors when no onError callback is provided", async () => {
         mockFetchEventSource.mockImplementation(
           (_url: string, options: FetchEventSourceMockOptions) => {
             void options.onopen({
@@ -230,7 +230,7 @@ describe("fetchSSE", () => {
         ).rejects.toThrow();
       });
 
-      it("should throw timeout errors when no onError callback is provided", async () => {
+      it("throws timeout errors when no onError callback is provided", async () => {
         vi.useFakeTimers();
 
         // Mock that never closes - will timeout
@@ -254,9 +254,8 @@ describe("fetchSSE", () => {
 
         // Attach the rejection handler BEFORE advancing timers
         // to avoid unhandled rejection warnings
-        const rejectionPromise = expect(ssePromise).rejects.toThrow(
-          FetchSSETimeoutError,
-        );
+        const rejectionPromise =
+          expect(ssePromise).rejects.toThrow(FetchSSETimeoutError);
 
         await vi.advanceTimersByTimeAsync(101);
         await rejectionPromise;

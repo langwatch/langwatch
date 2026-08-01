@@ -10,7 +10,7 @@ export type ServiceName =
   | "aigateway"
   | "langwatch"
   | "workers"
-  | "bullboard";
+  | "langyagent";
 
 export type ServicePaths = {
   log(name: ServiceName): string;

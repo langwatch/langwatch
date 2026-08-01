@@ -1,4 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
+import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import type { Projection } from "../../../";
 import {
   AbstractFoldProjection,
@@ -7,29 +9,27 @@ import {
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  SimulationRunQueuedEvent,
-  SimulationRunStartedEvent,
   SimulationMessageSnapshotEvent,
-  SimulationTextMessageStartEvent,
-  SimulationTextMessageEndEvent,
-  SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationTextMessageEndEvent,
+  SimulationTextMessageStartEvent,
 } from "../schemas/events";
 import {
-  SimulationRunQueuedEventSchema,
-  SimulationRunStartedEventSchema,
   SimulationMessageSnapshotEventSchema,
-  SimulationTextMessageStartEventSchema,
-  SimulationTextMessageEndEventSchema,
-  SimulationRunFinishedEventSchema,
-  SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationTextMessageStartEventSchema,
 } from "../schemas/events";
-import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
-import { createLogger } from "~/utils/logger/server";
 
 const projectionLogger = createLogger("simulationRunState.foldProjection");
 
@@ -143,7 +143,14 @@ export interface SimulationRunStateData {
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
   RoleLatencies: Record<string, number[]>;
-  TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
+  TraceMetrics: Record<
+    string,
+    {
+      totalCost: number;
+      roleCosts: Record<string, number>;
+      roleLatencies: Record<string, number>;
+    }
+  >;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -157,6 +164,61 @@ export interface SimulationRunStateData {
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
   data: SimulationRunStateData;
+}
+
+/**
+ * Guards a non-terminal Status transition once a run is already finished.
+ *
+ * Orphaned-run reconciliation writes a terminal `finished` event for a run
+ * whose worker died. If that worker's child process actually outlived its
+ * parent (reparented) and later POSTs a real started/snapshot whose
+ * client-supplied `occurredAt` is AFTER the reconciliation time, the event
+ * applies in-order (the executor only re-folds when occurredAt is STRICTLY
+ * less than what we've already seen) and would otherwise clobber Status back to
+ * a non-terminal value while FinishedAt stays set — an unrecoverable zombie the
+ * read-time stall path can no longer rescue (it only resolves runs with no
+ * FinishedAt).
+ *
+ * Once FinishedAt is set, Status stays terminal. Three things hold that line
+ * together, and all three are load-bearing:
+ *   1. this guard, at EVERY non-terminal Status writer — queued, started,
+ *      snapshot, and textMessageStart. Miss one and the invariant is gone: a
+ *      `queued` event folded after `finished` used to resurrect Status=QUEUED
+ *      with FinishedAt still set. If you add a handler that writes a
+ *      non-terminal Status, it goes through here too;
+ *   2. `handleSimulationRunFinished` returning early once FinishedAt is set, so
+ *      a run finishes exactly once;
+ *   3. that same handler refusing a non-terminal explicit status, since the
+ *      finished event's `status` is only typed `z.string().optional()` on the
+ *      internal event schema — any string can reach the fold.
+ */
+function statusAfter({
+  state,
+  candidate,
+}: {
+  state: SimulationRunStateData;
+  candidate: string;
+}): string {
+  return state.FinishedAt != null ? state.Status : candidate;
+}
+
+/**
+ * The statuses a run may hold once FinishedAt is set. A `finished` event whose
+ * explicit status is outside this set is not describing a finished run, so its
+ * status is discarded in favour of the verdict-derived one — writing it would
+ * strand the run non-terminal but finished, which nothing reconciles.
+ */
+const TERMINAL_STATUSES = new Set([
+  "SUCCESS",
+  "FAILURE",
+  "FAILED",
+  "ERROR",
+  "CANCELLED",
+  "STALLED",
+]);
+
+function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
 }
 
 const simulationRunEvents = [
@@ -179,8 +241,12 @@ const simulationRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SimulationRunStateFoldProjection
-  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
-  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+  extends AbstractFoldProjection<
+    SimulationRunStateData,
+    typeof simulationRunEvents
+  >
+  implements
+    FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
 {
   readonly name = "simulationRunState";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
@@ -235,9 +301,11 @@ export class SimulationRunStateFoldProjection
       BatchRunId: event.data.batchRunId,
       ScenarioSetId: event.data.scenarioSetId,
       Name: event.data.name ?? null,
-      Status: "QUEUED",
+      Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,
-      Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
+      Metadata: event.data.metadata
+        ? JSON.stringify(event.data.metadata)
+        : null,
       QueuedAt: event.occurredAt,
     };
   }
@@ -254,8 +322,10 @@ export class SimulationRunStateFoldProjection
       ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
-      Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
-      Status: "IN_PROGRESS",
+      Metadata:
+        state.Metadata ??
+        (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
+      Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
       StartedAt: event.occurredAt,
     };
   }
@@ -275,7 +345,9 @@ export class SimulationRunStateFoldProjection
       LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m, i) => {
         if (!isRecord(m)) {
-          throw new ValidationError(`Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`);
+          throw new ValidationError(
+            `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
+          );
         }
 
         // Content can be either:
@@ -322,7 +394,10 @@ export class SimulationRunStateFoldProjection
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
-      Status: event.data.status ?? state.Status,
+      Status: statusAfter({
+        state,
+        candidate: event.data.status ?? state.Status,
+      }),
     };
   }
 
@@ -357,7 +432,10 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      Status: statusAfter({
+        state,
+        candidate: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      }),
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
     };
@@ -390,7 +468,9 @@ export class SimulationRunStateFoldProjection
       }),
       TraceId: event.data.traceId ?? "",
       Rest: capOversizedString({
-        value: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+        value: buildMessageRestJson(
+          (event.data.message ?? {}) as Record<string, unknown>,
+        ),
         maxBytes: MAX_MESSAGE_REST_BYTES,
         field: "Rest",
         ctx,
@@ -441,13 +521,26 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunFinishedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
+    // A run finishes exactly once. A second `finished` — a child that outlived
+    // the parent this run's orphan reconciliation already failed — must not
+    // rewrite a terminal record the downstream reactors have already acted on,
+    // nor split it (an ERROR Status carrying the late child's SUCCESS Verdict).
+    if (state.FinishedAt != null) return state;
+
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
-    // Derive status: explicit status takes priority, otherwise derive from verdict
+    // Derive status: an explicit TERMINAL status takes priority, otherwise
+    // derive from verdict. The explicit status arrives from the scenario-events
+    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
+    // non-terminal members included. Taking it at face value would write a
+    // non-terminal Status alongside FinishedAt below, which is the one state
+    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
+    // and read-time stall detection skips it (it only resolves unfinished runs).
     let status: string;
-    if (event.data.status) {
-      status = event.data.status.toUpperCase();
+    const explicit = event.data.status?.toUpperCase();
+    if (explicit && isTerminalStatus(explicit)) {
+      status = explicit;
     } else if (verdict === "success") {
       status = "SUCCESS";
     } else if (verdict === "failure" || verdict === "inconclusive") {

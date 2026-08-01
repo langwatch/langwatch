@@ -13,14 +13,15 @@
 
 import type { Edge, Node } from "@xyflow/react";
 
-import type {
-  Code,
-  Entry,
-  Evaluator,
-  Field,
-  HttpComponentConfig,
-  Signature,
-  Workflow,
+import {
+  type Code,
+  type Entry,
+  type Evaluator,
+  type Field,
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+  type Signature,
+  type Workflow,
 } from "~/optimization_studio/types/dsl";
 import type {
   DatasetColumn,
@@ -96,16 +97,11 @@ export const stateToWorkflow = (
   );
 
   return {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     name: state.name,
     icon: "🧪",
     description: "Evaluation workflow",
     version: "1.0",
-    default_llm: {
-      model: "openai/gpt-4o-mini",
-      temperature: 0,
-      max_tokens: 2048,
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as Workflow["nodes"],
@@ -240,7 +236,9 @@ const createHttpNode = (
     data: {
       name: target.id, // Name is fetched from DB at execution time
       inputs: inputs as HttpComponentConfig["inputs"],
-      outputs: (target.outputs ?? [{ identifier: "output", type: "str" }]) as HttpComponentConfig["outputs"],
+      outputs: (target.outputs ?? [
+        { identifier: "output", type: "str" },
+      ]) as HttpComponentConfig["outputs"],
       // HTTP-specific config
       url: httpConfig.url,
       method: httpConfig.method,
@@ -411,7 +409,7 @@ export const getActiveDatasetData = (
   const activeDataset = state.datasets.find(
     (d) => d.id === state.activeDatasetId,
   );
-  if (!activeDataset || activeDataset.type !== "inline") {
+  if (activeDataset?.type !== "inline") {
     return undefined;
   }
   return activeDataset.inline;

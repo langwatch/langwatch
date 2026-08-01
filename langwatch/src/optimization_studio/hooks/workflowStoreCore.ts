@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   addEdge,
   applyEdgeChanges,
@@ -9,17 +10,15 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
-import type {
-  BaseComponent,
-  Component,
-  Entry,
-  Field,
-  LLMConfig,
-  Workflow,
+import {
+  type BaseComponent,
+  type Component,
+  type Entry,
+  type Field,
+  LATEST_SPEC_VERSION,
+  type Workflow,
 } from "../types/dsl";
 import { rewriteCodeSignature } from "../utils/codeSignature";
 import {
@@ -30,6 +29,7 @@ import {
 } from "../utils/controlFlow";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { canConvergeOnInput } from "../utils/edgeConvergence";
+import type { CodedExecutionFailure } from "../utils/executionStateError";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
 
 const logger = createLogger("langwatch:studio:workflowStore");
@@ -42,7 +42,6 @@ export type State = Workflow & {
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
   triggerValidation: boolean;
-  workflowSelected: boolean;
   /** The workflow state as of the last autosave. Used as the baseline for hasPendingChanges(). */
   autosavedWorkflow: Workflow | undefined;
   /** The workflow state as of the last manual commit (or version restore/load). Used as the baseline for checkCanCommitNewVersion(). */
@@ -152,32 +151,24 @@ export type WorkflowStore = State & {
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
   setTriggerValidation: (triggerValidation: boolean) => void;
-  setWorkflowSelected: (selected: boolean) => void;
   setOpenResultsPanelRequest: (
     request: "evaluations" | "optimizations" | "closed" | undefined,
   ) => void;
   setIsDraggingNode: (dragging: boolean) => void;
   setClickedNodeId: (id: string | null) => void;
-  stopWorkflowIfRunning: (message: string | undefined) => void;
+  stopWorkflowIfRunning: (failure: CodedExecutionFailure | undefined) => void;
   checkIfUnreachableErrorMessage: (message: string | undefined) => void;
-};
-
-const DEFAULT_LLM_CONFIG: LLMConfig = {
-  model: DEFAULT_MODEL,
-  temperature: 1.0,
-  max_tokens: DEFAULT_MAX_TOKENS,
 };
 
 export const initialDSL: Workflow = {
   workflow_id: undefined,
-  spec_version: "1.4",
+  spec_version: LATEST_SPEC_VERSION,
   name: "Loading...",
   icon: "🧩",
   description: "",
   version: "0.1",
   nodes: [],
   edges: [],
-  default_llm: DEFAULT_LLM_CONFIG,
   template_adapter: "default",
   enable_tracing: true,
   workflow_type: "workflow",
@@ -192,7 +183,6 @@ export const initialState: State = {
   socketStatus: "disconnected",
   propertiesExpanded: false,
   triggerValidation: false,
-  workflowSelected: false,
   autosavedWorkflow: undefined,
   lastCommittedWorkflow: undefined,
   currentVersionId: undefined,
@@ -213,7 +203,6 @@ export const getWorkflow = (state: State) => {
     icon: state.icon,
     description: state.description,
     version: state.version,
-    default_llm: state.default_llm,
     template_adapter: state.template_adapter,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
@@ -1064,7 +1053,6 @@ export const store = (
   deselectAllNodes: () => {
     set({
       nodes: get().nodes.map((node) => ({ ...node, selected: false })),
-      workflowSelected: false,
       clickedNodeId: null,
     });
   },
@@ -1073,15 +1061,6 @@ export const store = (
   },
   setTriggerValidation: (triggerValidation: boolean) => {
     set({ triggerValidation });
-  },
-  setWorkflowSelected: (selected: boolean) => {
-    set({ workflowSelected: selected });
-    if (selected) {
-      set({
-        nodes: get().nodes.map((node) => ({ ...node, selected: false })),
-        clickedNodeId: null,
-      });
-    }
   },
   setOpenResultsPanelRequest: (request) => {
     set({ openResultsPanelRequest: request });
@@ -1095,17 +1074,31 @@ export const store = (
   setClickedNodeId: (id: string | null) => {
     set({ clickedNodeId: id });
   },
-  stopWorkflowIfRunning: (message: string | undefined) => {
+  /**
+   * Fails the run and every node still running, with the SAME failure.
+   *
+   * Takes the coded failure, not just its message: the nodes it marks failed
+   * are casualties of one cause, so they inherit its `error_type` and
+   * `upstream_status` too. Passing only the string left them uncoded, and an
+   * uncoded state has no registry copy to render — so a failure we had named
+   * came out as raw engine text on every sibling node.
+   */
+  stopWorkflowIfRunning: (failure: CodedExecutionFailure | undefined) => {
+    const cause = {
+      error: failure?.error,
+      error_type: failure?.error_type,
+      upstream_status: failure?.upstream_status,
+    };
     get().setWorkflowExecutionState({
       status: "error",
-      error: message,
+      ...cause,
       timestamps: { finished_at: Date.now() },
     });
     for (const node of get().nodes) {
       if (node.data.execution_state?.status === "running") {
         get().setComponentExecutionState(node.id, {
           status: "error",
-          error: message,
+          ...cause,
           timestamps: { finished_at: Date.now() },
         });
       }

@@ -4,25 +4,36 @@
  * Provides CRUD, duplicate, archive, and run endpoints.
  */
 
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { SuiteService } from "~/server/suites/suite.service";
-import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
-import { SimulationFacade } from "~/server/simulations/simulation.facade";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { SuiteService } from "~/server/suites/suite.service";
+import { extractSuiteId } from "~/server/suites/suite-set-id";
 import { checkProjectPermission } from "../../rbac";
-import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
+import {
+  createSuiteSchema,
+  projectSchema,
+  suiteTargetSchema,
+  updateSuiteSchema,
+} from "./schemas";
+
+function createSuiteService(prisma: PrismaClient) {
+  return SuiteService.create({
+    prisma,
+    suiteRunService: getApp().suiteRuns.runs,
+  });
+}
 
 export const suiteRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       return service.create(input);
     }),
 
@@ -30,7 +41,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       return service.getAll(input);
     }),
 
@@ -38,7 +49,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -54,7 +65,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId, ...data } = input;
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       return service.update({ id, projectId, data });
     }),
 
@@ -62,30 +73,23 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       // Validate source suite exists before checking limits — avoids masking NOT_FOUND with a limit error
       const source = await service.getById(input);
       if (!source) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
       }
-      try {
-        return await service.duplicate(input);
-      } catch (error) {
-        if (error instanceof SuiteDomainError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
+      // A SuiteDomainError is a HandledError — left to propagate so the tRPC
+      // handled-error middleware maps its code and status, instead of
+      // flattening every suite failure into one NOT_FOUND with prose.
+      return await service.duplicate(input);
     }),
 
   archive: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
@@ -116,7 +120,7 @@ export const suiteRouter = createTRPCRouter({
           message: "Organization not found for project",
         });
       }
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       return service.resolveArchivedNames({
         ...input,
         organizationId,
@@ -124,15 +128,17 @@ export const suiteRouter = createTRPCRouter({
     }),
 
   run: protectedProcedure
-    .input(projectSchema.extend({
-      id: z.string(),
-      idempotencyKey: z.string(),
-      /** Optional client-generated batch run ID for immediate placeholder feedback */
-      batchRunId: z.string().optional(),
-    }))
+    .input(
+      projectSchema.extend({
+        id: z.string(),
+        idempotencyKey: z.string(),
+        /** Optional client-generated batch run ID for immediate placeholder feedback */
+        batchRunId: z.string().optional(),
+      }),
+    )
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      const service = createSuiteService(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -152,33 +158,23 @@ export const suiteRouter = createTRPCRouter({
         });
       }
 
-      try {
-        const result = await service.run({
-          suite,
-          projectId: input.projectId,
-          organizationId,
-          idempotencyKey: input.idempotencyKey,
-          batchRunId: input.batchRunId,
-        });
+      // No catch: a SuiteDomainError is a HandledError, so the tRPC
+      // handled-error middleware maps its code and status. Wrapping it in an
+      // INTERNAL_SERVER_ERROR here would drop the `cause` the middleware keys
+      // off, turning "every scenario is archived" — a customer-fault 422 the
+      // UI has a specific recovery action for — into an opaque 500.
+      const result = await service.run({
+        suite,
+        projectId: input.projectId,
+        organizationId,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+      });
 
-        return {
-          scheduled: true,
-          ...result,
-        };
-      } catch (error) {
-        if (error instanceof SuiteDomainError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
-      }
+      return {
+        scheduled: true,
+        ...result,
+      };
     }),
 
   getSummaries: protectedProcedure
@@ -194,8 +190,8 @@ export const suiteRouter = createTRPCRouter({
       const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
       const endDate = input.endDate ?? Date.now();
 
-      const facade = SimulationFacade.create();
-      const summaries = await facade.getInternalSuiteSummaries({
+      const simulationRuns = getApp().simulations.runs;
+      const summaries = await simulationRuns.getInternalSuiteSummaries({
         projectId: input.projectId,
         startDate,
         endDate,

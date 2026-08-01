@@ -272,7 +272,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
 
 - ✅ **CLI** (`langwatch login --device`, `langwatch claude/codex/
   cursor/gemini`, `langwatch whoami`, `langwatch me`,
-  `langwatch logout-device`, `langwatch init-shell`,
+  `langwatch logout`, `langwatch init-shell`,
   `langwatch request-increase`).
 - ✅ **Personal Workspace** (Team + Project with `isPersonal` flag).
 - ✅ **Personal Virtual Keys** (issued via the device-flow exchange).
@@ -466,14 +466,13 @@ renders live cards + per-user table + source-health strip.
 Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
 
-## Feature-flag gates (preview)
+## Feature-flag gates
 
-The governance preview is opt-in until the long-lived branch lands
-behind a single fence on each surface:
+Governance sits behind a single fence on each surface:
 
-- **Web app:** PostHog flag `release_ui_ai_governance_enabled`.
-  Off by default. Force-enable with
-  `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
+- **Web app:** the `release_ui_ai_governance_enabled` flag.
+  Enabled by default on self-hosted; on SaaS, PostHog release
+  conditions decide per organization.
   Existing AI Gateway menu surface stays on the unrelated
   `release_ui_ai_gateway_menu_enabled` flag, they ship
   independently.

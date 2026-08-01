@@ -10,18 +10,22 @@
  */
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
+import {
+  PersonalVirtualKeyAlreadyExistsError,
+  PersonalVirtualKeyService,
+} from "@ee/governance/services/personalVirtualKey.service";
 import { prisma } from "~/server/db";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
-import {
-  PersonalVirtualKeyService,
-  PersonalVirtualKeyAlreadyExistsError,
-} from "@ee/governance/services/personalVirtualKey.service";
 
-const CONTROL_PLANE = "http://localhost:5560";
+const CONTROL_PLANE =
+  process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
 const SANDBOX_CFG = "/tmp/dogfood-mint-config.json";
 const USER_EMAIL = "dogfood@acme.test";
 
-async function findUserAndOrg(): Promise<{ userId: string; organizationId: string }> {
+async function findUserAndOrg(): Promise<{
+  userId: string;
+  organizationId: string;
+}> {
   const user = await prisma.user.findFirst({ where: { email: USER_EMAIL } });
   if (!user) throw new Error(`user ${USER_EMAIL} not in DB`);
   const org = await prisma.organization.findFirst({ where: { slug: "acme" } });
@@ -37,7 +41,9 @@ async function main() {
     LANGWATCH_ENDPOINT: CONTROL_PLANE,
     LANGWATCH_BROWSER: "none",
   };
-  try { require("node:fs").unlinkSync(SANDBOX_CFG); } catch {}
+  try {
+    require("node:fs").unlinkSync(SANDBOX_CFG);
+  } catch {}
 
   // Resolve a viable user/org for the approve hop.
   const { userId, organizationId } = await findUserAndOrg();
@@ -62,7 +68,7 @@ async function main() {
     // Look for the URL with ?user_code= query param the CLI prints.
     if (!userCode) {
       const m = buf.match(/user_code=([A-Z0-9-]+)/i);
-      if (m && m[1]) userCode = m[1];
+      if (m?.[1]) userCode = m[1];
     }
   });
   child.stderr.setEncoding("utf8");
@@ -92,7 +98,9 @@ async function main() {
     child.kill("SIGTERM");
     throw new Error(`no device_code mapped for user_code ${userCode}`);
   }
-  console.error(`[runner] resolved user_code -> device_code (len ${deviceCode.length})`);
+  console.error(
+    `[runner] resolved user_code -> device_code (len ${deviceCode.length})`,
+  );
 
   // Mint a personal VK + approve the device-code, mirroring the
   // /api/auth/cli/approve handler. This invokes the SAME service code
@@ -113,10 +121,15 @@ async function main() {
         where: { organizationId, ownerUserId: userId, isPersonal: true },
         select: {
           id: true,
-          projects: { where: { isPersonal: true, archivedAt: null }, select: { id: true }, take: 1 },
+          projects: {
+            where: { isPersonal: true, archivedAt: null },
+            select: { id: true },
+            take: 1,
+          },
         },
       });
-      if (!workspace?.projects[0]) throw new Error("no personal workspace for additional-device path");
+      if (!workspace?.projects[0])
+        throw new Error("no personal workspace for additional-device path");
       issued = await service.issue({
         userId,
         organizationId,
@@ -144,22 +157,25 @@ async function main() {
   console.error(`[runner] approveDeviceCode flipped to approved`);
 
   // CLI polls every ~3s; wait for it to complete.
-  const exitCode: number = await new Promise(res => child.on("close", res));
+  const exitCode: number = await new Promise((res) => child.on("close", res));
   console.error(`[runner] CLI exited code=${exitCode}`);
 
   // Trail with `langwatch whoami` showing the lazy-minted VK.
   console.log("\n$ langwatch whoami");
-  const whoami = spawn(
-    "node",
-    ["typescript-sdk/dist/cli/index.js", "whoami"],
-    { env, stdio: ["ignore", "pipe", "pipe"], cwd: process.cwd() + "/.." },
-  );
-  whoami.stdout.on("data", c => process.stdout.write(c));
-  whoami.stderr.on("data", c => process.stderr.write(c));
-  await new Promise(res => whoami.on("close", res));
+  const whoami = spawn("node", ["typescript-sdk/dist/cli/index.js", "whoami"], {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    cwd: process.cwd() + "/..",
+  });
+  whoami.stdout.on("data", (c) => process.stdout.write(c));
+  whoami.stderr.on("data", (c) => process.stderr.write(c));
+  await new Promise((res) => whoami.on("close", res));
 
   await redis.quit();
   await prisma.$disconnect();
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

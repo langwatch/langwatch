@@ -23,28 +23,25 @@ Feature: Message/Trace Limit Enforcement with License
   # Caching Behavior
   # ============================================================================
 
-  # KEPT @unimplemented: TTL-based cache for trace counts is not yet
-  # implemented in TraceUsageService — current code calls Elasticsearch on
-  # every check. Adding the cache + tests requires deciding TTL window,
-  # invalidation strategy, and where to inject the clock. Out of parity
-  # scope; tracked as a future feature.
-  @unimplemented
+  # Bound: trace-usage.service.unit.test.ts — "returns cached value without
+  # querying ClickHouse". TraceUsageService caches the monthly count in a
+  # TtlCache keyed by organization + billing month.
   Scenario: Uses cached count within TTL
     Given the organization has a license with maxMessagesPerMonth 10000
     And the organization has 5000 traces this month
     And the count was cached 2 minutes ago
     When I check the trace limit for team "team-456"
-    Then the Elasticsearch query is not executed
+    Then the trace-count query is not executed
     And the cached count is returned
 
-  # KEPT @unimplemented: see preceding scenario — the trace-count cache
-  # itself does not exist in code yet.
+  # KEPT @unimplemented: the cache-hit path is tested, but there is no test
+  # exercising expiry (would need a fake clock / TTL advance).
   @unimplemented
   Scenario: Refreshes count after cache expires
     Given the organization has a license with maxMessagesPerMonth 10000
     And the count was cached 6 minutes ago
     When I check the trace limit for team "team-456"
-    Then the Elasticsearch query is executed
+    Then the trace-count query is executed
     And the cache is updated
 
   # ============================================================================

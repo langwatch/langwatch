@@ -1,10 +1,22 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import {
+  COLLAPSE_TIMELINE_BELOW_PX,
   type FlatRow,
   SIBLING_GROUP_THRESHOLD,
   type SiblingGroup,
   type WaterfallTreeNode,
 } from "./types";
+
+/**
+ * Whether the timeline/flame-graph panel fits. `0` means "not measured yet"
+ * (the ResizeObserver hasn't fired its first callback) — treated as "yes,
+ * show it" so a wide drawer doesn't flash collapsed-then-expanded on mount.
+ */
+export function shouldShowTimeline(containerWidthPx: number): boolean {
+  return (
+    containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX
+  );
+}
 
 export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
   const byId = new Map<string, SpanTreeNode>();
@@ -51,7 +63,15 @@ export function groupSiblings(
   const nameGroups = new Map<string, WaterfallTreeNode[]>();
   const order: string[] = [];
   for (const child of children) {
-    const key = `${child.span.name}::${child.span.type ?? "span"}`;
+    // toolName joins the key so a turn's tools fold per TOOL (Bash ×5,
+    // Read ×3), not into one anonymous claude_code.tool ×12 — the whole
+    // point of naming tool rows. JSON-encoded: names/types are arbitrary
+    // telemetry (rust `tokio::task` style), so delimiter joins can alias.
+    const key = JSON.stringify([
+      child.span.name,
+      child.span.type ?? "span",
+      child.span.toolName ?? "",
+    ]);
     if (!nameGroups.has(key)) {
       nameGroups.set(key, []);
       order.push(key);
@@ -69,6 +89,7 @@ export function groupSiblings(
       result.push({
         kind: "group",
         name: group[0]!.span.name,
+        toolName: group[0]!.span.toolName ?? null,
         type: group[0]!.span.type ?? "span",
         count: group.length,
         spans,
@@ -88,6 +109,29 @@ export function groupSiblings(
   return result;
 }
 
+/**
+ * Canonical identity for a sibling group. Includes every field
+ * `groupSiblings` folds by (name, type, toolName) plus the parent, so
+ * expansion state and React keys can never collide across distinct
+ * groups — two tool groups under one parent share `name` and differ
+ * only by `toolName`. JSON-encoded rather than delimiter-joined:
+ * span names and types are arbitrary telemetry, so any in-band
+ * separator could alias two distinct tuples.
+ */
+export function siblingGroupKey(group: {
+  parentSpanId: string | null;
+  name: string;
+  type: string;
+  toolName: string | null;
+}): string {
+  return JSON.stringify([
+    group.parentSpanId,
+    group.name,
+    group.type,
+    group.toolName ?? "",
+  ]);
+}
+
 export function flattenTree(
   nodes: WaterfallTreeNode[],
   collapsedIds: Set<string>,
@@ -101,7 +145,7 @@ export function flattenTree(
 
     for (const item of items) {
       if ("kind" in item && item.kind === "group") {
-        const groupKey = `${item.parentSpanId}::${item.name}`;
+        const groupKey = siblingGroupKey(item);
         result.push(item);
         if (expandedGroups.has(groupKey)) {
           for (const span of item.spans) {

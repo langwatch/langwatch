@@ -17,18 +17,17 @@
  * Capping oversized values here keeps the fold state small (KB, not MB) so
  * folding throughput stays high. This only needs to protect NEW traces.
  *
- * Why a size cap and not blob extraction
- * --------------------------------------
- * The existing `extractInlineMediaFromEvent` blob extractor walks the
- * structured chat `message` / `messages` content-part vocabulary used by the
- * scenario path. In the trace/OTLP path the equivalent payload is a flat,
- * already-serialized JSON string inside an attribute's `stringValue` (or a
- * `bytesValue`), not a structured content array. Reaching the extractor would
- * require speculatively JSON-parsing arbitrary attribute strings in the hottest
- * ingestion path and re-serializing them, which is fragile and CPU-heavy. It
- * also depends on a configured storage driver, which self-hosted deployments
- * may not have. So we cap by size instead: bounded, allocation-light, and
- * never throwing.
+ * Relationship to edge media extraction
+ * -------------------------------------
+ * Inline media parts (base64 audio turns, data-URI images, file attachments)
+ * are normally externalized BEFORE the command is staged, by
+ * `maybeExtractSpanMedia` (src/server/app-layer/traces/edge-media-extraction.ts)
+ * — media-marker gated, so only media-bearing payloads are ever JSON-parsed.
+ * This cap is the backstop for whatever still arrives oversized: extraction
+ * fail-open fallbacks, projects with the extraction flag off or content-drop
+ * policies (which skip edge extraction), and genuinely huge non-media values
+ * (giant params, embeddings). Capping by size stays bounded,
+ * allocation-light, and never throwing.
  *
  * Behaviour
  * ---------

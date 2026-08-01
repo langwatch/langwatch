@@ -17,6 +17,35 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
+// query) at the top level. This suite renders SearchBar without a tRPC
+// provider, so stub the hook out — server search has its own dedicated suite.
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
+// This suite exercises the inline search editor wiring, so Langy is gated
+// off — the gate hooks carry session/tRPC wiring this suite doesn't mount.
+// The Langy-owned ask affordance is covered by SearchBar.integration.
+vi.mock("~/features/langy/hooks/useShowLangy", () => ({
+  useShowLangy: () => false,
+}));
+vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => false,
+}));
+vi.mock("~/features/langy/stores/langyStore", () => {
+  const state = () => ({
+    isOpen: false,
+    askLangy: () => undefined,
+    openPanel: () => undefined,
+    attachContext: () => undefined,
+  });
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
+  useLangyStore.getState = state;
+  return { useLangyStore };
+});
+
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";
 

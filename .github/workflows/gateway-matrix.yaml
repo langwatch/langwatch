@@ -34,7 +34,7 @@ on:
       providers:
         description: 'Build tags (space-separated). Default = all six.'
         type: string
-        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings'
+        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio'
       run_id_label:
         description: 'Optional label appended to trace tags for grep.'
         type: string
@@ -115,6 +115,12 @@ jobs:
       # when VOYAGE_ENABLED is unset so this stays inert until then.
       TEST_VK_VOYAGE: ${{ secrets.MATRIX_TEST_VK_VOYAGE }}
       VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
+      # Audio cells (live_audio): ElevenLabs VK + a voice id for TTS. The
+      # audio_test.go cells t.Skip when unset, so this stays inert until
+      # the secrets are provisioned (seed with
+      # scripts/dogfood/audio/seed-audio-vk.ts).
+      TEST_VK_ELEVENLABS: ${{ secrets.MATRIX_TEST_VK_ELEVENLABS }}
+      ELEVENLABS_VOICE_ID: ${{ secrets.MATRIX_ELEVENLABS_VOICE_ID }}
       LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
 
     services:
@@ -144,14 +150,14 @@ jobs:
         ports: ['6379:6379']
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.4.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
         with:
@@ -201,7 +207,7 @@ jobs:
           # still produces useful coverage signal — a missing-cred
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
-          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings' }}
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio' }}
         run: |
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log

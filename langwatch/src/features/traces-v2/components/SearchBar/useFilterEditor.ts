@@ -20,6 +20,7 @@ import {
 import { FilterHighlight } from "./filterHighlight";
 import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import { handleKey } from "./handleKey";
+import { searchBarPlaceholder } from "./PlaceholderEditor";
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
@@ -179,12 +180,20 @@ interface UseFilterEditorParams {
     location: { start: number; end: number };
   }) => void;
   /**
-   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller is
-   * expected to enter AI mode with the captured text auto-submitted, so
-   * a typed free-text query becomes an Ask-AI invocation in one keystroke
-   * instead of requiring a separate click on the Ask AI button.
+   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller
+   * routes the captured text to the ask affordance — asked to Langy
+   * outright, or auto-submitted into AI mode — so a typed free-text query
+   * becomes an ask in one keystroke instead of requiring a separate click
+   * on the ask button.
    */
   onAiShortcut?: (currentText: string) => void;
+  /**
+   * Placeholder shown while the editor is empty. Defaults to the Ask AI
+   * wording; the SearchBar passes the Ask Langy variant when Langy owns
+   * the ask affordance. Read through a ref by the Placeholder extension,
+   * so the current value applies without re-initialising the editor.
+   */
+  placeholder?: string;
 }
 
 interface FilterEditorApi {
@@ -217,6 +226,7 @@ export function useFilterEditor({
   valueResolver,
   onTokenClick,
   onAiShortcut,
+  placeholder,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -241,6 +251,11 @@ export function useFilterEditor({
   const dismissedRef = useLatestRef(dropdownDismissed);
   const valueResolverRef = useLatestRef(valueResolver);
   const onAiShortcutRef = useLatestRef(onAiShortcut);
+  // Read by the Placeholder extension through a function, so the label keeps
+  // up with the caller (Ask AI ↔ Ask Langy) without re-initialising TipTap.
+  const placeholderRef = useLatestRef(
+    placeholder ?? searchBarPlaceholder("Ask AI"),
+  );
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
@@ -406,7 +421,7 @@ export function useFilterEditor({
       TiptapText,
       History,
       Placeholder.configure({
-        placeholder: "Search filters, free text, or Ask AI…",
+        placeholder: () => placeholderRef.current ?? "",
       }),
       FilterHighlight,
       AutoUppercaseOperators,

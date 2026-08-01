@@ -1,5 +1,5 @@
-import { parsePromptReference } from "~/server/traces/parsePromptReference";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { parsePromptReference } from "~/server/traces/parsePromptReference";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 const ATTR_PROMPT_SELECTED_ID = "langwatch.prompt.selected.id";

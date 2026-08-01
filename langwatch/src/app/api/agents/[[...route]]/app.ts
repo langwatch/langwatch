@@ -1,13 +1,13 @@
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import {
   type AgentComponentConfig,
   agentTypeSchema,
 } from "../../../../server/agents/agent.repository";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { createProjectApp, requires } from "~/server/api/security";
 import {
   type AgentServiceMiddlewareVariables,
   agentServiceMiddleware,
@@ -15,10 +15,22 @@ import {
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
 import { platformUrl } from "../../shared/platform-url";
 
-function agentPlatformUrl({ projectSlug, agentId, agentType }: { projectSlug: string; agentId: string; agentType: string }): string {
+function agentPlatformUrl({
+  projectSlug,
+  agentId,
+  agentType,
+}: {
+  projectSlug: string;
+  agentId: string;
+  agentType: string;
+}): string {
   const drawer = agentType === "http" ? "agentHttpEditor" : "agentCodeEditor";
-  return platformUrl({ projectSlug, path: `/agents?drawer.open=${drawer}&drawer.agentId=${agentId}` });
+  return platformUrl({
+    projectSlug,
+    path: `/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`,
+  });
 }
+
 import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
 
@@ -44,27 +56,6 @@ const updateAgentSchema = z.object({
   config: z.record(z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });
-
-/**
- * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
- */
-function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 /**
  * Maps AgentNotFoundError from the service layer to the HTTP NotFoundError.
@@ -105,24 +96,28 @@ secured.access(requires("project:view")).get(
   }),
   zValidator("query", paginationQuerySchema),
   async (c) => {
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
-      const service = c.get("agentService");
+    const project = c.get("project");
+    const { page, limit } = c.req.valid("query");
+    const service = c.get("agentService");
 
-      const result = await service.listAgents({
-        projectId: project.id,
-        page,
-        limit,
-      });
+    const result = await service.listAgents({
+      projectId: project.id,
+      page,
+      limit,
+    });
 
-      return c.json({
-        ...result,
-        data: result.data.map((a: { id: string; type: string }) => ({
-          ...a,
-          platformUrl: agentPlatformUrl({ projectSlug: project.slug, agentId: a.id, agentType: a.type }),
-        })),
-      });
-    },
+    return c.json({
+      ...result,
+      data: result.data.map((a: { id: string; type: string }) => ({
+        ...a,
+        platformUrl: agentPlatformUrl({
+          projectSlug: project.slug,
+          agentId: a.id,
+          agentType: a.type,
+        }),
+      })),
+    });
+  },
 );
 
 // ── Create Agent ─────────────────────────────────────────────
@@ -132,39 +127,43 @@ secured.access(requires("project:update")).post(
   describeRoute({
     description: "Create a new agent",
   }),
-  zValidator("json", createAgentSchema, validationHook),
+  zValidator("json", createAgentSchema),
   async (c) => {
-      const project = c.get("project");
-      const { name, type, config, workflowId } = c.req.valid("json");
-      const service = c.get("agentService");
+    const project = c.get("project");
+    const { name, type, config, workflowId } = c.req.valid("json");
+    const service = c.get("agentService");
 
-      let agent;
-      try {
-        agent = await service.create({
-          id: `agent_${nanoid()}`,
-          projectId: project.id,
-          name,
-          type,
-          config: config as AgentComponentConfig,
-          workflowId,
-        });
-      } catch (error) {
-        return mapConfigValidationError(error);
-      }
+    let agent;
+    try {
+      agent = await service.create({
+        id: `agent_${nanoid()}`,
+        projectId: project.id,
+        name,
+        type,
+        config: config as AgentComponentConfig,
+        workflowId,
+      });
+    } catch (error) {
+      return mapConfigValidationError(error);
+    }
 
-      return c.json(
-        {
-          id: agent.id,
-          name: agent.name,
-          type: agent.type,
-          config: agent.config,
-          createdAt: agent.createdAt,
-          updatedAt: agent.updatedAt,
-          platformUrl: agentPlatformUrl({ projectSlug: project.slug, agentId: agent.id, agentType: agent.type }),
-        },
-        201,
-      );
-    },
+    return c.json(
+      {
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        config: agent.config,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+        platformUrl: agentPlatformUrl({
+          projectSlug: project.slug,
+          agentId: agent.id,
+          agentType: agent.type,
+        }),
+      },
+      201,
+    );
+  },
 );
 
 // ── Get Single Agent ─────────────────────────────────────────
@@ -175,33 +174,34 @@ secured.access(requires("project:view")).get(
     description: "Get an agent by its id",
   }),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("agentService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("agentService");
 
-      let agent;
-      try {
-        agent = await service.getByIdOrThrow({
-          id,
-          projectId: project.id,
-        });
-      } catch (error) {
-        return mapAgentNotFoundError(error);
-      }
-
-      return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/agents`,
-        }),
+    let agent;
+    try {
+      agent = await service.getByIdOrThrow({
+        id,
+        projectId: project.id,
       });
-    },
+    } catch (error) {
+      return mapAgentNotFoundError(error);
+    }
+
+    return c.json({
+      id: agent.id,
+      name: agent.name,
+      type: agent.type,
+      config: agent.config,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      platformUrl: agentPlatformUrl({
+        projectSlug: project.slug,
+        agentId: agent.id,
+        agentType: agent.type,
+      }),
+    });
+  },
 );
 
 // ── Update Agent ─────────────────────────────────────────────
@@ -211,47 +211,48 @@ secured.access(requires("project:update")).patch(
   describeRoute({
     description: "Update an agent by its id",
   }),
-  zValidator("json", updateAgentSchema, validationHook),
+  zValidator("json", updateAgentSchema),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      const service = c.get("agentService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const body = c.req.valid("json");
+    const service = c.get("agentService");
 
-      let agent;
-      try {
-        agent = await service.updateOrThrow({
-          id,
-          projectId: project.id,
-          data: {
-            ...(body.name && { name: body.name }),
-            ...(body.type && { type: body.type }),
-            ...(body.config && { config: body.config as AgentComponentConfig }),
-            ...(body.workflowId !== undefined && {
-              workflowId: body.workflowId,
-            }),
-          },
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "AgentNotFoundError") {
-          throw new NotFoundError("Agent not found");
-        }
-        return mapConfigValidationError(error);
-      }
-
-      return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/agents`,
-        }),
+    let agent;
+    try {
+      agent = await service.updateOrThrow({
+        id,
+        projectId: project.id,
+        data: {
+          ...(body.name && { name: body.name }),
+          ...(body.type && { type: body.type }),
+          ...(body.config && { config: body.config as AgentComponentConfig }),
+          ...(body.workflowId !== undefined && {
+            workflowId: body.workflowId,
+          }),
+        },
       });
-    },
+    } catch (error) {
+      if (error instanceof Error && error.name === "AgentNotFoundError") {
+        throw new NotFoundError("Agent not found");
+      }
+      return mapConfigValidationError(error);
+    }
+
+    return c.json({
+      id: agent.id,
+      name: agent.name,
+      type: agent.type,
+      config: agent.config,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      platformUrl: agentPlatformUrl({
+        projectSlug: project.slug,
+        agentId: agent.id,
+        agentType: agent.type,
+      }),
+    });
+  },
 );
 
 // ── Delete (Archive) Agent ───────────────────────────────────
@@ -262,25 +263,25 @@ secured.access(requires("project:delete")).delete(
     description: "Archive an agent (soft-delete)",
   }),
   async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const service = c.get("agentService");
+    const { id } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("agentService");
 
-      try {
-        const agent = await service.archiveAgent({
-          id,
-          projectId: project.id,
-        });
-        return c.json({
-          id: agent.id,
-          name: agent.name,
-          type: agent.type,
-          archivedAt: agent.archivedAt,
-        });
-      } catch (error) {
-        return mapAgentNotFoundError(error);
-      }
-    },
+    try {
+      const agent = await service.archiveAgent({
+        id,
+        projectId: project.id,
+      });
+      return c.json({
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        archivedAt: agent.archivedAt,
+      });
+    } catch (error) {
+      return mapAgentNotFoundError(error);
+    }
+  },
 );
 
 export const app = secured.hono;

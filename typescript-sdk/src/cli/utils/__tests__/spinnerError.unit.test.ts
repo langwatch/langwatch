@@ -67,14 +67,22 @@ describe("failSpinner", () => {
     });
   });
 
-  describe("when error is an unstructured object", () => {
-    it("routes through formatApiErrorMessage", () => {
+  describe("when error carries the platform's error shape", () => {
+    // `{ error: <code>, message }` is exactly what the shared Hono error handler
+    // puts on the wire for a `HandledError`. It used to be flattened back
+    // into the sentence "NotFoundError: Record missing", which reads as though
+    // the class name were part of the prose. Now the sentence is the sentence and
+    // the code is named as a code — which is the whole point: a caller can act on
+    // `not_found`, and could only ever have read the string.
+    it("leads with the platform's sentence and names the code beneath it", () => {
       const err = { error: "NotFoundError", message: "Record missing" };
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "fetch trace" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to fetch trace: NotFoundError: Record missing",
-      );
+
+      const rendered = stripAnsi(String(calls[0]));
+      expect(rendered.split("\n")[0]).toBe("Failed to fetch trace: Record missing");
+      // The Details block renders key/value pairs without a colon ("code  X").
+      expect(rendered).toMatch(/code\s+NotFoundError/);
     });
   });
 

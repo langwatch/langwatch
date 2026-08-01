@@ -1,13 +1,14 @@
+import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import type {
-  ExecutionState,
-  LlmPromptConfigComponent,
-  Workflow,
+import {
+  type ExecutionState,
+  LATEST_SPEC_VERSION,
+  type LlmPromptConfigComponent,
+  type Workflow,
 } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
-import { createLogger } from "~/utils/logger";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 
 const logger = createLogger("invokeLLM");
@@ -126,15 +127,12 @@ function createWorkflow(
   data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"],
 ): Workflow {
   return {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     workflow_id: workflowId,
     name: "Prompt Execution",
     icon: "",
     description: "",
     version: "1.0",
-    default_llm: {
-      model: "gpt-4o",
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [

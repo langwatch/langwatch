@@ -17,6 +17,7 @@
 		"isolatedModules": true,
 		"jsx": "preserve",
 		"incremental": true,
+		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-app.tsbuildinfo",
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"paths": {
@@ -53,6 +54,13 @@
 		".next-saas",
 		"**/*.snippet.*",
 		"src/**/codegen/snippets/**/*",
-		"packages/insanity-check/**/*"
+		"packages/insanity-check/**/*",
+		"**/*.test.ts",
+		"**/*.test.tsx",
+		"**/*.spec.ts",
+		"**/*.spec.tsx",
+		"**/__tests__/**",
+		"**/__mocks__/**",
+		"e2e/**"
 	]
 }

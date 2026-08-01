@@ -1,9 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
-import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { getApp } from "../app-layer/app";
 import type { UsageService } from "../app-layer/usage/usage.service";
+import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
+import { USAGE_UNKNOWN } from "../traces/usage-count";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import { NotificationRepository } from "./repositories/notification.repository";
 import { NOTIFICATION_TYPES } from "./types";
@@ -158,6 +159,16 @@ export class UsageLimitService {
       organizationId,
       projectIds,
     });
+    // See the ee notifier: an email whose point is "your usage is high" must
+    // not go out with every project showing 0 because the counting store was
+    // unreachable. Skip rather than misinform.
+    if (counts === USAGE_UNKNOWN) {
+      logger.warn(
+        { organizationId },
+        "usage is unknown, skipping usage-limit email rather than reporting zeros",
+      );
+      return;
+    }
     const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
     const projectUsageData = projects.map((p) => ({
       id: p.id,

@@ -2,10 +2,11 @@
  * Public API types for the ExperimentRunService.
  *
  * All types use camelCase naming convention. Backend-specific mappers
- * convert from PascalCase (ClickHouse) or snake_case (Elasticsearch)
+ * convert from PascalCase (ClickHouse) or legacy snake_case
  * into these canonical types.
  */
 
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { ExperimentRunTarget } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/shared";
 
 export type { ExperimentRunTarget };
@@ -69,7 +70,14 @@ export interface ExperimentRunDatasetEntry {
   predicted?: Record<string, unknown>;
   cost?: number | null;
   duration?: number | null;
+  /** The engine's engineer-facing string. Never customer copy — see `domainError`. */
   error?: string | null;
+  /**
+   * The failure's stable code, when the run recorded one. The words a customer
+   * reads come from the presentation registry keyed on it (ADR-045); `error` is
+   * only the fallback for rows written before codes were persisted.
+   */
+  domainError?: SerializedHandledError;
   traceId?: string | null;
 }
 

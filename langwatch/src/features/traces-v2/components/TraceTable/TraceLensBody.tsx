@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import {
   getColumnSizingKey,
@@ -115,6 +116,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sortFromStore],
   );
 
+  // Dropping the keyset cursors is `setSort`'s own job — a cursor is only
+  // valid for the column that minted it, and that invariant has to hold for
+  // every path into a new sort, not just this header click.
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -236,6 +240,26 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isLoading={isLoading}
                 isFirstOfErrorRun={
                   !isLoading && isFirstOfErrorRun[virtualItem.index]
+                }
+                // A trace row IS a trace, so it offers itself to Langy like any
+                // other addressable resource on the page.
+                //
+                // This was null, from when the affordance was held open on
+                // hover and read as noise on a dense table. The arming gate
+                // (`#`, or a held Shift — see useLangyContextArming) settled
+                // that: disarmed, a registered row carries no class, no state
+                // attribute, no handlers and no drag, so the table is exactly
+                // the table. The multi-select route through the selection bar
+                // stays — it is the better way to take twenty — but pointing at
+                // ONE trace should not require checking a box first, and every
+                // other resource on the page already works that way.
+                langyTarget={
+                  isLoading
+                    ? null
+                    : traceContextChip(
+                        row.original.traceId,
+                        row.original.name ?? null,
+                      )
                 }
               />
             );

@@ -1,9 +1,9 @@
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../../../../event-sourcing/queues/groupQueue/groupQueue";
 import type { EventSourcedQueueDefinition } from "../../../../event-sourcing/queues/queue.types";
@@ -80,7 +80,11 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
     return { queue: q, name };
   }
 
-  async function waitForLatencyCount(name: string, target: number, timeoutMs: number) {
+  async function waitForLatencyCount(
+    name: string,
+    target: number,
+    timeoutMs: number,
+  ) {
     const key = `${name}:gq:stats:latencies-ms`;
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -108,11 +112,7 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
 
         await waitForLatencyCount(name, 3, 5000);
 
-        const raw = await redis.lrange(
-          `${name}:gq:stats:latencies-ms`,
-          0,
-          -1,
-        );
+        const raw = await redis.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
         const durations = raw.map((s) => Number(s));
         expect(durations).toHaveLength(3);
         for (const ms of durations) {
@@ -182,8 +182,12 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
           const data = collector.getDashboardData();
           expect(data.latencyP50Ms).toBeGreaterThan(0);
           expect(data.latencyP99Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
-          expect(data.peakLatencyP50Ms).toBeGreaterThanOrEqual(data.latencyP50Ms);
-          expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(data.latencyP99Ms);
+          expect(data.peakLatencyP50Ms).toBeGreaterThanOrEqual(
+            data.latencyP50Ms,
+          );
+          expect(data.peakLatencyP99Ms).toBeGreaterThanOrEqual(
+            data.latencyP99Ms,
+          );
         } finally {
           collector.stop();
         }

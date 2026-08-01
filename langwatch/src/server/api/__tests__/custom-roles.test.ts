@@ -36,9 +36,6 @@ const mockProjectResult = {
   team: {
     id: "team-123",
     organizationId: "org-123",
-    organization: {
-      members: [{ role: OrganizationUserRole.MEMBER }],
-    },
   },
 };
 
@@ -83,13 +80,18 @@ const mockSession = {
 describe("Custom Role Functionality Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default setup for every test: project returns team info, no group memberships
+    // Default setup for every test: project returns team info, the caller is a
+    // current org member (resolveProjectPermission fails closed otherwise), and
+    // there are no group memberships.
     mockPrisma.project.findUnique.mockResolvedValue(mockProjectResult);
+    mockPrisma.organizationUser.findFirst.mockResolvedValue({
+      role: OrganizationUserRole.MEMBER,
+    });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
   });
 
   describe("Custom Role Permission Inheritance", () => {
-    it("should allow custom role with manage permission to access view permission", async () => {
+    it("allows custom role with manage permission to access view permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -107,7 +109,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should allow custom role with manage permission to access create permission", async () => {
+    it("allows custom role with manage permission to access create permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -125,7 +127,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should allow custom role with manage permission to access update permission", async () => {
+    it("allows custom role with manage permission to access update permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -143,7 +145,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should allow custom role with manage permission to access delete permission", async () => {
+    it("allows custom role with manage permission to access delete permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -161,7 +163,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should not allow custom role with only view permission to access manage permission", async () => {
+    it("does not allow custom role with only view permission to access manage permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -181,7 +183,7 @@ describe("Custom Role Functionality Tests", () => {
   });
 
   describe("Complex Custom Role Scenarios", () => {
-    it("should handle custom role with mixed permissions correctly", async () => {
+    it("handles custom role with mixed permissions correctly", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -298,7 +300,7 @@ describe("Custom Role Functionality Tests", () => {
       ).toBe(true);
     });
 
-    it("should handle custom role with no permissions", async () => {
+    it("handles custom role with no permissions", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -317,7 +319,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should handle custom role with invalid permission format", async () => {
+    it("handles custom role with invalid permission format", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
@@ -338,7 +340,7 @@ describe("Custom Role Functionality Tests", () => {
   });
 
   describe("Edge Cases and Error Handling", () => {
-    it("should handle null custom role gracefully", async () => {
+    it("handles null custom role gracefully", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN, customRoleId: null },
       ]);
@@ -353,7 +355,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should handle custom role with null permissions", async () => {
+    it("handles custom role with null permissions", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN, customRoleId: "custom-role-123" },
       ]);
@@ -371,7 +373,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true); // Falls back to built-in role
     });
 
-    it("should handle team with null default custom role", async () => {
+    it("handles team with null default custom role", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.VIEWER, customRoleId: null },
       ]);
@@ -467,8 +469,8 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`should ${
-          expected ? "allow" : "deny"
+        it(`${
+          expected ? "allows" : "denies"
         } ${permission} (${reason})`, () => {
           expect(
             hasPermissionWithHierarchy(customPermissions, permission),
@@ -508,8 +510,8 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`should ${
-          expected ? "allow" : "deny"
+        it(`${
+          expected ? "allows" : "denies"
         } ${permission} (${reason})`, () => {
           expect(
             hasPermissionWithHierarchy(customPermissions, permission),
@@ -565,8 +567,8 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       testCases.forEach(({ permission, expected, reason }) => {
-        it(`should ${
-          expected ? "allow" : "deny"
+        it(`${
+          expected ? "allows" : "denies"
         } ${permission} (${reason})`, () => {
           expect(
             hasPermissionWithHierarchy(customPermissions, permission),
@@ -577,7 +579,7 @@ describe("Custom Role Functionality Tests", () => {
   });
 
   describe("Custom Role Validation", () => {
-    it("should validate permission format in custom roles", () => {
+    it("validates permission format in custom roles", () => {
       const validPermissions = [
         "workflows:view",
         "datasets:manage",
@@ -604,7 +606,7 @@ describe("Custom Role Functionality Tests", () => {
       });
     });
 
-    it("should handle empty permission arrays", () => {
+    it("handles empty permission arrays", () => {
       const emptyPermissions: string[] = [];
 
       expect(
@@ -615,7 +617,7 @@ describe("Custom Role Functionality Tests", () => {
       ).toBe(false);
     });
 
-    it("should handle undefined permission arrays", () => {
+    it("handles undefined permission arrays", () => {
       const undefinedPermissions = undefined as any;
 
       expect(

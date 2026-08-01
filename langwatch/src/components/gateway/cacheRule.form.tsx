@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
 export type CacheRuleFormState = {
   name: string;
@@ -49,21 +49,51 @@ export function emptyFormState(): CacheRuleFormState {
   };
 }
 
-export function validateForm(state: CacheRuleFormState): string | null {
-  if (!state.name.trim()) return "Name is required";
+/**
+ * A rejected submit, and where it belongs on screen.
+ *
+ * `field` is the input the complaint is about, or `null` when it is about the
+ * relationship between several — "at least one matcher", "both a key and a
+ * value". ADR-018 splits the surface on exactly that line: a complaint with
+ * one home is marked there, and only the ones with no single home toast.
+ * Before this the validator returned a bare string, so every complaint took
+ * the toast and the user was left to work out which input it meant.
+ */
+export type CacheRuleFormComplaint = {
+  field: keyof CacheRuleFormState | null;
+  message: string;
+};
+
+export function validateForm(
+  state: CacheRuleFormState,
+): CacheRuleFormComplaint | null {
+  if (!state.name.trim()) {
+    return { field: "name", message: "Name is required" };
+  }
   if (state.priority < 0 || state.priority > 1_000) {
-    return "Priority must be between 0 and 1000";
+    return {
+      field: "priority",
+      message: "Priority must be between 0 and 1000",
+    };
   }
   if (state.actionMode === "force" && state.actionTtlSeconds.trim()) {
     const n = Number(state.actionTtlSeconds);
     if (!Number.isFinite(n) || n < 0 || n > 86_400) {
-      return "TTL must be a number between 0 and 86400 seconds";
+      return {
+        field: "actionTtlSeconds",
+        message: "TTL must be a number between 0 and 86400 seconds",
+      };
     }
   }
   const metaKeyEmpty = !state.matchMetadataKey.trim();
   const metaValEmpty = !state.matchMetadataValue.trim();
   if (metaKeyEmpty !== metaValEmpty) {
-    return "Request metadata needs both a key and a value";
+    return {
+      // One of the pair is filled and the other is not; which one is "wrong"
+      // depends on what the author meant, so this belongs to neither input.
+      field: null,
+      message: "Request metadata needs both a key and a value",
+    };
   }
   if (
     !state.matchVkId &&
@@ -73,7 +103,12 @@ export function validateForm(state: CacheRuleFormState): string | null {
     !state.matchModel &&
     !state.matchMetadataKey
   ) {
-    return "At least one matcher is required (rules matching 'every request' must be explicit — not supported in v1)";
+    return {
+      // About the matcher block as a whole — no one input is at fault.
+      field: null,
+      message:
+        "At least one matcher is required (rules matching 'every request' must be explicit — not supported in v1)",
+    };
   }
   return null;
 }
@@ -84,7 +119,11 @@ export function toWire(state: CacheRuleFormState): {
   priority: number;
   enabled: boolean;
   matchers: Record<string, unknown>;
-  action: { mode: "respect" | "force" | "disable"; ttl?: number; salt?: string };
+  action: {
+    mode: "respect" | "force" | "disable";
+    ttl?: number;
+    salt?: string;
+  };
 } {
   const matchers: Record<string, unknown> = {};
   if (state.matchVkId.trim()) matchers.vk_id = state.matchVkId.trim();
@@ -148,11 +187,12 @@ export function fromWire(rule: {
     matchVkId: typeof m.vk_id === "string" ? m.vk_id : "",
     matchVkPrefix: typeof m.vk_prefix === "string" ? m.vk_prefix : "",
     matchVkTagsCsv: Array.isArray(m.vk_tags) ? m.vk_tags.join(",") : "",
-    matchPrincipalId:
-      typeof m.principal_id === "string" ? m.principal_id : "",
+    matchPrincipalId: typeof m.principal_id === "string" ? m.principal_id : "",
     matchModel: typeof m.model === "string" ? m.model : "",
     matchMetadataKey: firstMetadataKey,
-    matchMetadataValue: firstMetadataKey ? metadataObj[firstMetadataKey] ?? "" : "",
+    matchMetadataValue: firstMetadataKey
+      ? (metadataObj[firstMetadataKey] ?? "")
+      : "",
     actionMode:
       a.mode === "force" || a.mode === "disable" || a.mode === "respect"
         ? a.mode
@@ -165,17 +205,27 @@ export function fromWire(rule: {
 type FormProps = {
   state: CacheRuleFormState;
   onChange: (state: CacheRuleFormState) => void;
+  /**
+   * The rejected submit, when it named one of these inputs. Drawers pass
+   * whatever `validateForm` returned with a non-null `field`; the cross-field
+   * ones stay with the caller, which toasts them.
+   */
+  complaint?: CacheRuleFormComplaint | null;
 };
 
-export function CacheRuleForm({ state, onChange }: FormProps) {
+export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
   const set = <K extends keyof CacheRuleFormState>(
     key: K,
     value: CacheRuleFormState[K],
   ) => onChange({ ...state, [key]: value });
 
+  /** The complaint about this input, if the submit was rejected over it. */
+  const complaintFor = (key: keyof CacheRuleFormState): string | null =>
+    complaint?.field === key ? complaint.message : null;
+
   return (
     <VStack align="stretch" gap={4}>
-      <Field.Root required>
+      <Field.Root required invalid={!!complaintFor("name")}>
         <Field.Label>
           Name
           <FieldInfoTooltip
@@ -189,6 +239,9 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
           placeholder="e.g. force-cache-on-enterprise"
           maxLength={128}
         />
+        {complaintFor("name") && (
+          <Field.ErrorText>{complaintFor("name")}</Field.ErrorText>
+        )}
       </Field.Root>
       <Field.Root>
         <Field.Label>Description</Field.Label>
@@ -200,7 +253,7 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
         />
       </Field.Root>
       <HStack align="start" gap={4}>
-        <Field.Root>
+        <Field.Root invalid={!!complaintFor("priority")}>
           <Field.Label>
             Priority
             <FieldInfoTooltip
@@ -213,13 +266,15 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             min={0}
             max={1000}
             value={state.priority}
-            onChange={(e) =>
-              set("priority", Number(e.target.value) || 0)
-            }
+            onChange={(e) => set("priority", Number(e.target.value) || 0)}
           />
-          <Field.HelperText>
-            Evaluated highest-first. Conflicting rules: higher number wins.
-          </Field.HelperText>
+          {complaintFor("priority") ? (
+            <Field.ErrorText>{complaintFor("priority")}</Field.ErrorText>
+          ) : (
+            <Field.HelperText>
+              Evaluated highest-first. Conflicting rules: higher number wins.
+            </Field.HelperText>
+          )}
         </Field.Root>
         <Field.Root>
           <Field.Label>Enabled</Field.Label>
@@ -293,9 +348,7 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
               onChange={(e) => set("matchVkTagsCsv", e.target.value)}
               placeholder="tier=enterprise, team=ml"
             />
-            <Field.HelperText>
-              VK must carry ALL listed tags.
-            </Field.HelperText>
+            <Field.HelperText>VK must carry ALL listed tags.</Field.HelperText>
           </Field.Root>
           <Field.Root>
             <Field.Label>Principal (user id)</Field.Label>
@@ -374,15 +427,15 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
               </NativeSelect.Field>
             </NativeSelect.Root>
             <Field.HelperText>
-              Force injects cache_control: ephemeral on Anthropic (system[-1]
-              + messages[-1].content[-1], no-double-inject if already present).
+              Force injects cache_control: ephemeral on Anthropic (system[-1] +
+              messages[-1].content[-1], no-double-inject if already present).
               OpenAI/Azure caching is automatic — force is a wire no-op but
-              still attributes + bumps the rule-hit counter. Gemini force
-              WARNs + passes through today (v1.1 will wire /cachedContents).
+              still attributes + bumps the rule-hit counter. Gemini force WARNs
+              + passes through today (v1.1 will wire /cachedContents).
             </Field.HelperText>
           </Field.Root>
           {state.actionMode === "force" && (
-            <Field.Root>
+            <Field.Root invalid={!!complaintFor("actionTtlSeconds")}>
               <Field.Label>
                 TTL (seconds, optional)
                 <FieldInfoTooltip
@@ -398,10 +451,16 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
                 onChange={(e) => set("actionTtlSeconds", e.target.value)}
                 placeholder="300"
               />
-              <Field.HelperText>
-                Clamped to [0, 86400]. Providers without explicit TTL
-                support treat this as a best-effort hint.
-              </Field.HelperText>
+              {complaintFor("actionTtlSeconds") ? (
+                <Field.ErrorText>
+                  {complaintFor("actionTtlSeconds")}
+                </Field.ErrorText>
+              ) : (
+                <Field.HelperText>
+                  Clamped to [0, 86400]. Providers without explicit TTL support
+                  treat this as a best-effort hint.
+                </Field.HelperText>
+              )}
             </Field.Root>
           )}
           <Field.Root>

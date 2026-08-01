@@ -208,6 +208,22 @@ describe("virtualKeys — scope-aware RBAC", () => {
         },
       });
     }
+    // ORG/TEAM-scoped creates need a resolvable trace project
+    // (trace_project_required otherwise); the governance project is that
+    // destination, the same shape provisioned orgs have. RBAC stays the
+    // only thing under test here.
+    await prisma.project.create({
+      data: {
+        id: `proj-gov-${ns}`,
+        name: `gov-${ns}`,
+        slug: `gov-${ns}`,
+        teamId: TEAM_PLATFORM,
+        language: "en",
+        framework: "openai",
+        apiKey: `key-gov-${ns}`,
+        kind: "internal_governance",
+      },
+    });
   }, 60_000);
 
   afterAll(async () => {
@@ -419,7 +435,12 @@ describe("virtualKeys — scope-aware RBAC", () => {
         }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
-        message: expect.stringContaining("scope_org_mismatch"),
+        // On the handled cause, not the message. The refusal used to spell its
+        // discriminant into prose alongside both record ids
+        // (`scope_org_mismatch: team tm_… is not in organization org_…`); it is
+        // a code now, and `meta` carries the KIND of scope rather than the id
+        // of a row in an organization the caller has no part in.
+        cause: { code: "gateway_scope_org_mismatch" },
       });
     });
 
@@ -437,7 +458,12 @@ describe("virtualKeys — scope-aware RBAC", () => {
         }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
-        message: expect.stringContaining("scope_org_mismatch"),
+        // On the handled cause, not the message. The refusal used to spell its
+        // discriminant into prose alongside both record ids
+        // (`scope_org_mismatch: team tm_… is not in organization org_…`); it is
+        // a code now, and `meta` carries the KIND of scope rather than the id
+        // of a row in an organization the caller has no part in.
+        cause: { code: "gateway_scope_org_mismatch" },
       });
     });
   });

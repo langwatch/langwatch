@@ -209,7 +209,9 @@ describe("CodexExtractor.applyLog", () => {
 
       new CodexExtractor().apply(ctx);
 
-      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+      expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe(
+        "true",
+      );
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
     });
 
@@ -259,7 +261,7 @@ describe("CodexExtractor.applyLog", () => {
       const ctx = createExtractorContext(
         {
           model: "gpt-5.5",
-          "turn_id": "abc",
+          turn_id: "abc",
         },
         {
           name: "run_sampling_request",
@@ -313,6 +315,110 @@ describe("CodexExtractor.applyLog", () => {
         "gen_ai.response.model": "gpt-5.5",
       });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/session_task.turn");
+    });
+  });
+
+  describe("when the span identifies the codex account provider", () => {
+    /** @scenario "A gateway codex span is stamped with the non-billable marker" */
+    it("stamps langwatch.cost.non_billable off the gateway's provider name", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.provider.name": "openai_codex",
+          "gen_ai.request.model": "gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": "37749",
+          "gen_ai.usage.output_tokens": "181",
+        },
+        {
+          name: "gen_ai.responses",
+          instrumentationScope: {
+            name: "langwatch-service-aigateway",
+            version: null,
+          },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/bundled-cost");
+    });
+
+    /** @scenario "A span running a codex-prefixed model is stamped with the non-billable marker" */
+    it("stamps langwatch.cost.non_billable off the openai_codex/ model prefix", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.request.model": "openai_codex/gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": "1000",
+          "gen_ai.usage.output_tokens": "50",
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
+      expect(ctx.recordRule).toHaveBeenCalledWith("codex/bundled-cost");
+    });
+
+    it("stamps the marker when only the response model carries the prefix", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.response.model": "openai_codex/gpt-5.6-terra",
+        },
+        {
+          name: "gen_ai.responses",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
+    });
+
+    /** @scenario "An explicit wire-level non-billable marker is left untouched" */
+    it("leaves an explicit wire-level marker untouched", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.provider.name": "openai_codex",
+          "gen_ai.request.model": "gpt-5.6-terra",
+          "langwatch.cost.non_billable": "false",
+        },
+        {
+          name: "gen_ai.responses",
+          instrumentationScope: {
+            name: "langwatch-service-aigateway",
+            version: null,
+          },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalledWith("codex/bundled-cost");
+    });
+
+    it("does not stamp a plain OpenAI span running the same underlying model", () => {
+      const ctx = createExtractorContext(
+        {
+          "gen_ai.provider.name": "openai.responses",
+          "gen_ai.request.model": "gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": "1000",
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      new CodexExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.recordRule).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,12 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-
-import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
 import {
+  guardProjectId,
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
-  guardProjectId,
 } from "../dbMultiTenancyProtection";
+import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
 
 /**
  * Regression tests for the multitenancy guard — specifically its exempt
@@ -20,11 +19,13 @@ import {
  * These tests lock that in.
  */
 
-async function runGuard(params: Partial<Prisma.MiddlewareParams> & {
-  model: string;
-  action: Prisma.MiddlewareParams["action"];
-  args: Prisma.MiddlewareParams["args"];
-}): Promise<unknown> {
+async function runGuard(
+  params: Partial<Prisma.MiddlewareParams> & {
+    model: string;
+    action: Prisma.MiddlewareParams["action"];
+    args: Prisma.MiddlewareParams["args"];
+  },
+): Promise<unknown> {
   const next = vi.fn(async () => "ok");
   return guardProjectId(
     {
@@ -200,6 +201,34 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
               source: "manual",
             },
             update: {},
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
+describe("guardProjectId — WebhookDelivery cleanup", () => {
+  describe("when deleteMany omits projectId", () => {
+    it("rejects the cross-tenant prune", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookDelivery",
+          action: "deleteMany",
+          args: { where: { firedAt: { lt: new Date() } } },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("when deleteMany includes projectId", () => {
+    it("permits the tenant-scoped prune", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookDelivery",
+          action: "deleteMany",
+          args: {
+            where: { projectId: "project-1", firedAt: { lt: new Date() } },
           },
         }),
       ).resolves.toBe("ok");
@@ -499,9 +528,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
                 {
                   scopes: {
                     some: {
-                      OR: [
-                        { scopeType: "TEAM", scopeId: "team_01" },
-                      ],
+                      OR: [{ scopeType: "TEAM", scopeId: "team_01" }],
                     },
                   },
                 },
@@ -626,6 +653,95 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
   });
 });
 
+describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
+  describe("when a raw query carries a tenancy predicate", () => {
+    it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: {
+            query: `SELECT id FROM "Trace" WHERE "projectId" = $1`,
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("does NOT throw — TemplateStringsArray shape (strings) is also recognised", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: {
+            strings: [
+              `UPDATE "Trace" SET "deletedAt" = now() WHERE "tenantId" = `,
+              ``,
+            ],
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a raw query has no tenancy predicate", () => {
+    it("THROWS — a scope-less raw query must not walk every tenant", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: { query: `SELECT id FROM "Trace" WHERE "deletedAt" IS NULL` },
+        }),
+      ).rejects.toThrow(/missing a tenancy predicate/);
+    });
+
+    it("THROWS on executeRaw too — writes are guarded the same way", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: { query: `DELETE FROM "Trace"` },
+        }),
+      ).rejects.toThrow(/missing a tenancy predicate/);
+    });
+  });
+
+  describe("when a raw query opts out via the -- @tenancy: marker", () => {
+    it("does NOT throw — explicit grep-able marker bypasses the predicate check", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: {
+            query: `-- @tenancy: global recovery sweep\nSELECT id FROM "Outbox" WHERE "status" = 'stuck'`,
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the raw SQL cannot be extracted from the args", () => {
+    it("falls through without throwing — unknown args shape is not the guard's job", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "queryRaw",
+          args: { somethingElse: true },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("falls through when args is undefined", async () => {
+      await expect(
+        runGuard({
+          model: undefined as unknown as Prisma.ModelName,
+          action: "executeRaw",
+          args: undefined,
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 /**
  * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
  * WITHOUT a projectId column must be classified into exactly one regime, so a
@@ -711,5 +827,138 @@ describe("project-tenancy regime partition", () => {
       (name) => !modelHasField(name, "projectId"),
     );
     expect(withoutProjectId).toEqual([]);
+  });
+});
+
+/**
+ * ShareLink query shapes (ADR-057). Anonymous share resolution presents only a
+ * secret token — the row is what teaches the caller its projectId — so the
+ * token/id lookups are exempt, and NOTHING else is. Every *write* must still
+ * be project-scoped. `consumeView` (né `incrementViewCount`) originally used
+ * `update({ where: { id } })` and blew up at runtime on the first share
+ * resolve; these lock the real repository's query shapes in.
+ */
+describe("guardProjectId — ShareLink", () => {
+  describe("findUnique by token (the anonymous capability lookup)", () => {
+    it("does NOT throw — projectId cannot be known before the row is read", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { token: "tok_abc" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findUnique by id", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { id: "share_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findFirst by resourceType + resourceId without projectId", () => {
+    it("throws — only the token/id capability lookups are exempt", async () => {
+      // Regression guard: the exemption once covered this shape for a
+      // repository method that no longer exists; nothing may quietly start
+      // enumerating another tenant's share rows by resource id.
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findFirst",
+          args: { where: { resourceType: "TRACE", resourceId: "trace_a" } },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("updateMany scoped by id + projectId + view cap (consumeView)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "updateMany",
+          args: {
+            where: {
+              id: "share_1",
+              projectId: "project_1",
+              viewCount: { lt: 1 },
+            },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("update scoped only by primary key", () => {
+    it("throws — a write must carry projectId", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "update",
+          args: {
+            where: { id: "share_1" },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("create carrying projectId in data", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "create",
+          args: {
+            data: {
+              token: "tok_abc",
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("deleteMany scoped by id + projectId (revokeById)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "deleteMany",
+          args: { where: { id: "share_1", projectId: "project_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("count scoped by projectId (hasActiveShareForResource)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "count",
+          args: {
+            where: {
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
   });
 });

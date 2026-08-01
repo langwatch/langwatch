@@ -17,10 +17,9 @@
  * file is just the admin-side configuration surface that powers the
  * /settings/ingestion-sources UI.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
+  IngestionSourceNotFoundError,
   IngestionSourceService,
   SUPPORTED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ingestionSource.service";
@@ -30,6 +29,8 @@ import {
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -102,7 +103,10 @@ export const ingestionSourcesRouter = createTRPCRouter({
       const service = IngestionSourceService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        // Same named failure the mutations raise, so the detail page reads
+        // one channel: a code the registry has copy for, not a bare 404 the
+        // client has to sniff out of the tRPC envelope.
+        throw new IngestionSourceNotFoundError(input.id);
       }
       return toDto(row);
     }),
@@ -121,10 +125,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
-        pullConfig: z
-          .record(z.string(), z.unknown())
-          .nullable()
-          .optional(),
+        pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
@@ -158,6 +159,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: z.record(z.string(), z.unknown()).optional(),
         status: statusSchema.optional(),
         teamId: z.string().nullable().optional(),
+        pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
     .use(checkOrganizationPermission("ingestionSources:manage"))
@@ -171,6 +173,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: input.parserConfig,
         status: input.status,
         teamId: input.teamId,
+        pullSchedule: input.pullSchedule,
       });
       return toDto(updated);
     }),
@@ -199,10 +202,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
-      const archived = await service.archive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),
 
@@ -236,9 +236,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
    * statement; on parse / type errors, returns per-statement coordinates
    * so the editor can surface line/col error markers.
    *
-   * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway
-   * is up but doesn't yet ship the endpoint, the client returns
-   * `{ ok: true }` so the composer doesn't block on infra.
+   * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway is up
+   * but doesn't yet ship the endpoint, the client returns
+   * `{ status: "deferred" }` — the composer still doesn't block on infra, but
+   * the editor renders neutral dots plus a note rather than claiming a pass
+   * for statements nothing looked at.
    */
   validateOttl: protectedProcedure
     .input(

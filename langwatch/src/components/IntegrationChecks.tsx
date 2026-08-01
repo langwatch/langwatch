@@ -38,7 +38,7 @@ export const useIntegrationChecks = () => {
         project_id: project?.id,
       });
     }
-    if (integrationChecks.data?.evaluations) {
+    if (integrationChecks.data?.onlineEvaluations) {
       trackEventOnce("integration_checks_first_evaluation", {
         project_id: project?.id,
       });
@@ -61,7 +61,7 @@ export const useIntegrationChecks = () => {
   }, [
     integrationChecks.data?.customGraphs,
     integrationChecks.data?.datasets,
-    integrationChecks.data?.evaluations,
+    integrationChecks.data?.onlineEvaluations,
     integrationChecks.data?.firstMessage,
     integrationChecks.data?.integrated,
     integrationChecks.data?.triggers,
@@ -135,14 +135,16 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/evaluations`}>
+          <Link href={`/${project?.slug}/online-evaluations`}>
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.evaluations ? "green.500" : "gray.500"
+                integrationChecks.data?.onlineEvaluations
+                  ? "green.500"
+                  : "gray.500"
               }
             >
-              {integrationChecks.data?.evaluations ? (
+              {integrationChecks.data?.onlineEvaluations ? (
                 <CheckCircle />
               ) : (
                 <Circle />
@@ -155,7 +157,7 @@ export const IntegrationChecks = () => {
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
-              Set up your first evaluation
+              Set up your first online evaluation
             </Text>
           </Link>
         </List.Item>

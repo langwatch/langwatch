@@ -3,7 +3,7 @@
  *
  * Verifies that STALLED status maps to warning-colored visual treatment
  * across the status->visual mapping functions used by ScenarioRunStatusIcon,
- * PreviousRunsList, StatusDisplay, and SimulationStatusOverlay.
+ * StatusDisplay, and SimulationStatusOverlay.
  *
  * These tests verify the exported helper functions that drive component rendering.
  * Component rendering tests are blocked by a missing @testing-library/dom peer
@@ -13,7 +13,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { getStatusBadgeProps } from "../PreviousRunsList";
 import { getOverlayConfig } from "../SimulationStatusOverlay";
 import { STATUS_DISPLAY_TEXT_MAP } from "../simulation-console/constants";
 
@@ -25,41 +24,6 @@ import { STATUS_DISPLAY_TEXT_MAP } from "../simulation-console/constants";
 // The exhaustive switch in that file guarantees compile-time safety.
 // Direct function testing would require exporting a private function.
 // The exhaustive switch pattern IS the compile-time guarantee.
-
-// ============================================================================
-// PreviousRunsList - warning-colored badge
-// @see specs/scenarios/stalled-scenario-runs.feature lines 91-96
-// ============================================================================
-
-describe("getStatusBadgeProps()", () => {
-  describe("given a STALLED status", () => {
-    describe("when resolving badge properties", () => {
-      it("returns a warning-colored palette", () => {
-        const props = getStatusBadgeProps(ScenarioRunStatus.STALLED);
-        expect(props.colorPalette).toBe("yellow");
-      });
-
-      it("labels the badge as stalled", () => {
-        const props = getStatusBadgeProps(ScenarioRunStatus.STALLED);
-        expect(props.label).toBe("stalled");
-      });
-    });
-
-    describe("when compared to ERROR status badge", () => {
-      it("uses a different color palette", () => {
-        const stalledProps = getStatusBadgeProps(ScenarioRunStatus.STALLED);
-        const errorProps = getStatusBadgeProps(ScenarioRunStatus.ERROR);
-        expect(stalledProps.colorPalette).not.toBe(errorProps.colorPalette);
-      });
-
-      it("uses a different label", () => {
-        const stalledProps = getStatusBadgeProps(ScenarioRunStatus.STALLED);
-        const errorProps = getStatusBadgeProps(ScenarioRunStatus.ERROR);
-        expect(stalledProps.label).not.toBe(errorProps.label);
-      });
-    });
-  });
-});
 
 // ============================================================================
 // StatusDisplay - STALLED text with warning color
@@ -99,20 +63,23 @@ describe("getOverlayConfig()", () => {
         expect(config.isComplete).toBe(true);
       });
 
-      it("provides stalled gradient values", () => {
+      it("provides a stalled scrim in the warning hue", () => {
         const config = getOverlayConfig(ScenarioRunStatus.STALLED);
-        expect(config.gradientLight).toContain("radial-gradient");
-        expect(config.gradientDark).toContain("radial-gradient");
+        expect(config.scrim).toContain("yellow");
+      });
+
+      it("provides the established full-card light-mode wash", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.STALLED);
+        expect(config.lightModeGradient).toContain("radial-gradient");
+        expect(config.lightModeGradient).toContain("rgba(214, 158, 46");
       });
     });
 
     describe("when compared to ERROR overlay", () => {
-      it("uses a different gradient", () => {
+      it("uses a different scrim", () => {
         const stalledConfig = getOverlayConfig(ScenarioRunStatus.STALLED);
         const errorConfig = getOverlayConfig(ScenarioRunStatus.ERROR);
-        expect(stalledConfig.gradientLight).not.toBe(
-          errorConfig.gradientLight,
-        );
+        expect(stalledConfig.scrim).not.toBe(errorConfig.scrim);
       });
     });
   });
@@ -131,6 +98,21 @@ describe("getOverlayConfig()", () => {
       it("treats the run as complete", () => {
         const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
         expect(config.isComplete).toBe(true);
+      });
+
+      /** @scenario Light mode restores the full-card completion wash */
+      it("uses the established layered green light-mode gradient", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
+        expect(config.lightModeGradient.match(/radial-gradient/g)).toHaveLength(
+          3,
+        );
+        expect(config.lightModeGradient).toContain("rgba(56, 161, 105");
+      });
+
+      /** @scenario Dark mode keeps the compact status scrim */
+      it("keeps the semantic green scrim for dark mode", () => {
+        const config = getOverlayConfig(ScenarioRunStatus.SUCCESS);
+        expect(config.scrim).toBe("green.solid/20");
       });
     });
   });

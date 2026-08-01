@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
-import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { StudioClientEvent } from "../types/events";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
@@ -86,10 +86,7 @@ export const useWorkflowExecution = () => {
       }
 
       const trace_id = generateOtelTraceId();
-      logger.info(
-        { trace_id, untilNodeId },
-        "workflow execution starting",
-      );
+      logger.info({ trace_id, untilNodeId }, "workflow execution starting");
 
       setWorkflowExecutionState({
         status: "waiting",

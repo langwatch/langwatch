@@ -1,6 +1,8 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type ModelDefaultScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -64,7 +66,7 @@ export class ModelDefaultsApiService {
   private readonly endpoint: string;
 
   constructor(config?: { apiKey?: string; endpoint?: string }) {
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint =
       config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
   }
@@ -93,6 +95,12 @@ export class ModelDefaultsApiService {
       const message = formatApiErrorMessage({
         error: parsed,
         options: { status: response.status },
+      });
+      throwIfHandledError({
+        operation: options?.method ?? "GET",
+        error: parsed,
+        status: response.status,
+        message: `HTTP ${response.status}: ${message}`,
       });
       throw new ModelDefaultsApiError(
         `HTTP ${response.status}: ${message}`,

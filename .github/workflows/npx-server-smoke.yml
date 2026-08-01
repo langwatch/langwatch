@@ -43,7 +43,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -60,13 +63,23 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     env:
-      LANGWATCH_HOME: ${{ github.workspace }}/.langwatch-smoke
       PORT_BASE: ${{ inputs.port_base || '5560' }}
       CI: "true"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Set LANGWATCH_HOME outside the workspace
+        # Outside $GITHUB_WORKSPACE on purpose (see the "Run npx @langwatch/server
+        # in a sandbox" step below): Node walks every ancestor directory looking
+        # for a node_modules, and the checkout's own workspace install would sit
+        # on that ancestor chain if LANGWATCH_HOME or the extracted tarball lived
+        # under the workspace. jobs.<job_id>.env only allows the github, inputs,
+        # matrix, needs, secrets, strategy and vars expression contexts, not
+        # runner, so $RUNNER_TEMP is resolved here as a shell variable instead
+        # and exported to every later step via $GITHUB_ENV.
+        run: echo "LANGWATCH_HOME=$RUNNER_TEMP/.langwatch-smoke" >> "$GITHUB_ENV"
 
       - name: Identify runner
         run: |
@@ -79,7 +92,7 @@ jobs:
           node-version: "24"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           run_install: false
 
@@ -111,6 +124,19 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
+      # Same prebuild as npx-server-publish.yml: every published artifact
+      # ships langwatch/dist + mcp-server/dist (the publish sanity check
+      # asserts both), so the artifact THIS job boots must carry them too —
+      # otherwise the smoke exercises a tree shape no npm user ever receives
+      # and pays a full on-runner vite build for it inside the health budget.
+      - name: Install langwatch app deps
+        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+
+      - name: Build langwatch app (vite + scenario + mcp + generated types)
+        run: pnpm -C langwatch run build
+        env:
+          NODE_ENV: production
+
       - name: Pack the npm tarball
         id: pack
         # Use the same wrapper as npx-server-publish.yml so the smoke tarball
@@ -137,9 +163,29 @@ jobs:
         run: |
           set -e
           mkdir -p "$LANGWATCH_HOME"
-          # `node packages/server/dist/cli.cjs` reproduces what `npx <tarball>` would
-          # do, but doesn't depend on a working npm registry. Faster + more stable.
-          node packages/server/dist/cli.cjs start \
+          # Boot from the EXTRACTED TARBALL, laid out the way npx lays it out
+          # (node_modules/@langwatch/server), so the run exercises the same
+          # relocation + install path npm users get and the app tree is
+          # exactly the published artifact. Booting the checkout instead
+          # masks packaging gaps: 3.6.0 shipped without langwatch/packages/*
+          # (both .npmignore files still excluded the dir after runtime
+          # packages moved in), every install died at first boot with
+          # MODULE_NOT_FOUND, and every checkout-based smoke run passed.
+          #
+          # Extracted under $RUNNER_TEMP, not $GITHUB_WORKSPACE: Node's module
+          # resolution walks every ancestor directory looking for a
+          # node_modules to check, and the "Install pnpm dependencies
+          # (workspace)" step above left $GITHUB_WORKSPACE/node_modules on
+          # disk. An install_dir nested under $GITHUB_WORKSPACE would still
+          # have carried that as an ancestor and could silently satisfy a
+          # module the tarball forgot to ship, masking the exact tsx
+          # alias-skip bug this job exists to catch. $RUNNER_TEMP is a
+          # sibling of the checkout, matching what a real npx cache dir
+          # looks like.
+          install_dir="$RUNNER_TEMP/npx-server-smoke/node_modules/@langwatch/server"
+          mkdir -p "$install_dir"
+          tar -xzf "${{ steps.pack.outputs.tarball }}" -C "$install_dir" --strip-components=1
+          node "$install_dir/packages/server/dist/cli.cjs" start \
             --yes \
             --no-open \
             --port-base "$PORT_BASE" \
@@ -147,37 +193,44 @@ jobs:
           echo "$!" > "$GITHUB_WORKSPACE/_smoke.pid"
           echo "Started CLI in background (pid $(cat $GITHUB_WORKSPACE/_smoke.pid))"
 
-      - name: Wait for /api/health (up to 18 minutes)
+      - name: Wait for /api/health (up to 30 minutes)
         run: |
           set -e
           base=${PORT_BASE}
           # CI runners have nothing cached — predep download (postgres ~80MB,
           # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
-          # for langevals + aigateway/nlpgo monobinary download + pnpm
-          # install + vite build of the langwatch app together can take 8-12
-          # minutes on a cold runner. Be generous so the smoke isn't flaky on
-          # the initial provisioning window. Subsequent runs hit the cached
-          # ~/.langwatch and finish in <1 min.
+          # for langevals + aigateway/nlpgo monobinary download + relocation
+          # of the extracted tarball + pnpm install + vite build of the
+          # langwatch app together can take 15-25 minutes on a cold runner.
+          # Be generous so the smoke isn't flaky on the initial provisioning
+          # window. Subsequent runs hit the cached ~/.langwatch and finish
+          # in <1 min.
           #
-          # Auto-shift is unlikely on a fresh CI runner (5560 should be free)
-          # so the inner timeout is what matters; outer shift is a safety net.
-          for shift in 0 10 20; do
-            url="http://127.0.0.1:$((base + shift))/api/health"
-            echo "==> probing $url for up to 18min"
-            for i in $(seq 1 216); do
-              if curl -fsS "$url" >/dev/null 2>&1; then
-                echo "✓ $url is healthy after $((i*5))s"
+          # Every port slot is probed in the SAME loop: probing one slot per
+          # window meant a boot that outlived the first window was then
+          # sought on ports it never bound, turning a slow build into a
+          # guaranteed 3x-window failure.
+          SECONDS=0
+          i=0
+          while [ "$SECONDS" -lt 1800 ]; do
+            i=$((i + 1))
+            for shift in 0 10 20; do
+              url="http://127.0.0.1:$((base + shift))/api/health"
+              # -m bounds each probe: a half-open listener must not be able
+              # to hang the loop past the advertised budget.
+              if curl -fsS -m 5 "$url" >/dev/null 2>&1; then
+                echo "✓ $url is healthy after ${SECONDS}s"
                 echo "RESOLVED_BASE=$((base + shift))" >> "$GITHUB_ENV"
                 exit 0
               fi
-              if [ $((i % 12)) -eq 0 ]; then
-                echo "  …still waiting at $((i*5))s — last cli.log lines:"
-                tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
-              fi
-              sleep 5
             done
+            if [ $((i % 24)) -eq 0 ]; then
+              echo "  …still waiting at ${SECONDS}s — last cli.log lines:"
+              tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
+            fi
+            sleep 5
           done
-          echo "✗ langwatch never reported healthy on any port-shift"
+          echo "✗ langwatch never reported healthy on any port slot within ${SECONDS}s"
           exit 1
 
       - name: Probe service health endpoints
@@ -218,6 +271,35 @@ jobs:
           probe nlpgo     "http://127.0.0.1:$((base + 1))/healthz" /tmp/health-nlp.json
           probe langevals "http://127.0.0.1:$((base + 2))/"        /tmp/health-langevals.json
           probe gateway   "http://127.0.0.1:$((base + 3))/healthz" /tmp/health-gateway.json
+
+      # The assistant has exactly two legitimate outcomes, and the CLI's own
+      # log says which one happened: `langyagent` reached healthy, or it was
+      # deliberately skipped because the downloaded release binary predates
+      # the langyagent service (the smoke tests an unreleased CLI against the
+      # PREVIOUS release's binary, so the skip is the expected path until the
+      # next release publishes fresh binaries). Anything else — crash-looping,
+      # or a "healthy" verdict without a listener actually answering on the
+      # port — fails the smoke. The port re-probe exists because a stray
+      # listener on the assistant's port once let a dead langyagent pass as
+      # healthy on ubuntu runners.
+      - name: Assert the assistant either booted or declared itself skipped
+        run: |
+          set -eo pipefail
+          base=${RESOLVED_BASE}
+          log="$GITHUB_WORKSPACE/_smoke.log"
+          if grep -q "langy assistant disabled" "$log"; then
+            echo "✓ assistant skipped with the release-binary notice (expected until the next release's binaries exist)"
+            exit 0
+          fi
+          if grep -qE "langyagent +healthy in" "$log"; then
+            curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$((base + 4))/health" > /tmp/health-langy.json
+            echo "✓ assistant healthy and answering on port $((base + 4))"
+            cat /tmp/health-langy.json; echo
+            exit 0
+          fi
+          echo "✗ cli.log shows neither a healthy langyagent nor the deliberate-skip notice"
+          grep -i "langyagent" "$log" | tail -n 5 || true
+          exit 1
 
       # Belt-and-suspenders for the beta.8 → beta.9 regression: the smoke
       # matrix happily passed for weeks while aigateway was being silently
@@ -337,15 +419,10 @@ jobs:
     steps:
       - name: Decide on aggregate status
         run: |
-          # Smoke is informational until it's been running clean for a week —
-          # only fail the aggregator on workflow_dispatch + scheduled runs.
+          # The smoke boots the packed artifact — the thing npm users run —
+          # so a red smoke is a shippability signal on every trigger, not an
+          # informational one. Reporting success over failed or cancelled
+          # matrix jobs is how a broken artifact reads as green.
           status='${{ needs.smoke.result }}'
           echo "smoke status: $status"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$status" != "success" ]; then
-            exit 1
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$status" != "success" ]; then
-            exit 1
-          fi
-          # On push, never fail — let humans decide.
-          exit 0
+          [ "$status" = "success" ] || exit 1

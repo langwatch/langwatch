@@ -21,6 +21,7 @@ import * as os from "os";
 import http from "http";
 import { spawn } from "child_process";
 import type { AddressInfo } from "net";
+import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
@@ -102,11 +103,19 @@ interface CliResult {
 
 function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResult> {
   return new Promise((resolve) => {
+    // This suite asserts on the human (text) rendering. An agent-mode marker
+    // inherited from the runner's environment (CLAUDECODE etc.) would flip
+    // the CLI into agents format and silence the spinner lines the
+    // assertions read, so scrub the CLI's own marker list before spawning.
+    const baseEnv: Record<string, string | undefined> = { ...process.env };
+    for (const marker of AGENT_MODE_ENV_VARS) {
+      delete baseEnv[marker];
+    }
     const child = spawn("node", [CLI_PATH, ...args], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
-        ...process.env,
+        ...baseEnv,
         LANGWATCH_API_KEY: "test",
         LANGWATCH_ENDPOINT: baseUrl,
       },

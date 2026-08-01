@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Tests for URL pattern matching in activity tracker.
@@ -8,7 +8,7 @@ describe("useActivityTracker URL parsing", () => {
   // Helper to simulate parseEntityUrl logic
   function parseEntityUrl(
     path: string,
-    projectSlug: string
+    projectSlug: string,
   ): { type: string; id: string; iconName: string } | null {
     const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
     const prefix = `/${projectSlug}`;
@@ -27,7 +27,7 @@ describe("useActivityTracker URL parsing", () => {
 
     // Span page
     const spanMatch = relativePath.match(
-      /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/
+      /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/,
     );
     if (spanMatch) {
       return { type: "span", id: spanMatch[3]!, iconName: "traces" };
@@ -47,7 +47,7 @@ describe("useActivityTracker URL parsing", () => {
 
     // Simulation run
     const simRunMatch = relativePath.match(
-      /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/
+      /^\/simulations\/([^/]+)\/([^/]+)\/([^/]+)$/,
     );
     if (simRunMatch) {
       return {
@@ -62,7 +62,10 @@ describe("useActivityTracker URL parsing", () => {
 
   describe("trace detection", () => {
     it("detects trace page URL", () => {
-      const result = parseEntityUrl("/my-project/messages/trace_abc123", "my-project");
+      const result = parseEntityUrl(
+        "/my-project/messages/trace_abc123",
+        "my-project",
+      );
       expect(result).toEqual({
         type: "trace",
         id: "trace_abc123",
@@ -73,7 +76,7 @@ describe("useActivityTracker URL parsing", () => {
     it("detects OTEL trace ID format", () => {
       const result = parseEntityUrl(
         "/my-project/messages/0123456789abcdef0123456789abcdef",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "trace",
@@ -87,7 +90,7 @@ describe("useActivityTracker URL parsing", () => {
     it("detects span page URL", () => {
       const result = parseEntityUrl(
         "/my-project/messages/trace_abc/spans/span_xyz",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "span",
@@ -101,7 +104,7 @@ describe("useActivityTracker URL parsing", () => {
     it("detects workflow page URL", () => {
       const result = parseEntityUrl(
         "/my-project/workflows/workflow_abc123",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "entity",
@@ -115,7 +118,7 @@ describe("useActivityTracker URL parsing", () => {
     it("detects dataset page URL", () => {
       const result = parseEntityUrl(
         "/my-project/datasets/dataset_abc123",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "entity",
@@ -129,7 +132,7 @@ describe("useActivityTracker URL parsing", () => {
     it("detects simulation run page URL", () => {
       const result = parseEntityUrl(
         "/my-project/simulations/scenario_set/batch_run/run_abc123",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "simulation-run",
@@ -143,13 +146,15 @@ describe("useActivityTracker URL parsing", () => {
     it("returns null for non-entity pages", () => {
       expect(parseEntityUrl("/my-project/analytics", "my-project")).toBeNull();
       expect(parseEntityUrl("/my-project/settings", "my-project")).toBeNull();
-      expect(parseEntityUrl("/other-project/messages/trace_abc", "my-project")).toBeNull();
+      expect(
+        parseEntityUrl("/other-project/messages/trace_abc", "my-project"),
+      ).toBeNull();
     });
 
     it("handles URLs with query params", () => {
       const result = parseEntityUrl(
         "/my-project/messages/trace_abc?tab=details",
-        "my-project"
+        "my-project",
       );
       expect(result).toEqual({
         type: "trace",

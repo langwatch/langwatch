@@ -1,7 +1,26 @@
-import type { PrismaClient, ApiKey } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
-import { RoleRepository, CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
+import type { Permission } from "~/server/api/rbac";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+  permissionFormatSchema,
+} from "~/server/rbac/custom-role-permissions";
+import {
+  checkRoleBindingPermission,
+  resolveLegacyCeiling,
+} from "~/server/rbac/role-binding-resolver";
+import {
+  CUSTOM_ROLE_KIND,
+  RoleRepository,
+} from "~/server/role/repositories/role.repository";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import {
+  ApiKeyRepository,
+  type ApiKeyWithBindings,
+} from "./api-key.repository";
 import {
   generateApiKeyToken,
   hashSecret,
@@ -13,17 +32,26 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
+  ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
-import type { Permission } from "~/server/api/rbac";
-import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { parseCustomRolePermissions, permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { createLogger } from "~/utils/logger/server";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
+
+/**
+ * Keys the product mints and retires on its own — today the ephemeral
+ * "Langy session" key, one per chat session with a 6h TTL.
+ *
+ * They are already absent from every listing (the repository filters
+ * HIDDEN_SYSTEM_KEY_NAMES), but absence is not immutability: a caller who
+ * learned an id could still rename or revoke one, and revoking it breaks the
+ * Langy turn currently authenticating with it. The by-id mutations refuse them
+ * for the same reason the listings hide them.
+ */
+function isSystemManaged(apiKey: { name: string }): boolean {
+  return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
+}
 
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -33,10 +61,6 @@ type RoleBindingBase = {
 type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
   | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
-
-type ResolvedRoleBinding =
-  | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId: string });
 
 type CreatorScope =
   | { type: "org"; id: string }
@@ -96,6 +120,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    isSystemManaged = false,
   }: {
     name: string;
     description?: string | null;
@@ -109,8 +134,22 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Only the product's own minting paths (e.g. the Langy session key) may
+     * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
+     * unset: a customer-created key with a reserved name would vanish from
+     * every listing and the system-managed guard would refuse to ever rename
+     * or revoke it — a stealth, permanent credential.
+     */
+    isSystemManaged?: boolean;
   }): Promise<{ token: string; apiKey: ApiKey }> {
-    const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
+    if (!isSystemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
+
+    const hasCustomBinding = bindings.some(
+      (b) => b.role === TeamUserRole.CUSTOM,
+    );
     const hasPermissions = !!permissions && permissions.length > 0;
     const isRestricted = permissionMode === "restricted";
 
@@ -153,11 +192,13 @@ export class ApiKeyService {
     // headless automation keys that need full org access.
     let effectiveBindings = bindings;
     if (!userId && effectiveBindings.length === 0) {
-      effectiveBindings = [{
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-      }];
+      effectiveBindings = [
+        {
+          role: "ADMIN",
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      ];
     }
 
     // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
@@ -260,6 +301,15 @@ export class ApiKeyService {
     if (existing.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    // Reported as not-found, like the tenancy mismatch above, so the response
+    // doesn't confirm the id exists.
+    if (isSystemManaged(existing)) throw new ApiKeyNotFoundError(id);
+    // Renaming a customer key TO a reserved name is the same squat as
+    // creating one: the key would drop out of every listing and this very
+    // guard would then refuse to rename or revoke it.
+    if (name !== undefined && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
 
     if (!callerIsAdmin) {
       if (!existing.userId || existing.userId !== callerUserId) {
@@ -269,7 +319,8 @@ export class ApiKeyService {
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    const updateHasCustomBinding = bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
+    const updateHasCustomBinding =
+      bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
     const updateHasPermissions = !!permissions && permissions.length > 0;
     const updateIsRestricted = permissionMode === "restricted";
 
@@ -377,7 +428,10 @@ export class ApiKeyService {
 
         const newCustomRoleIds = new Set(
           effectiveBindings
-            .filter((b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> => b.role === "CUSTOM")
+            .filter(
+              (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
+                b.role === "CUSTOM",
+            )
             .map((b) => b.customRoleId)
             .filter((cid): cid is string => !!cid),
         );
@@ -408,7 +462,10 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const orgUser = await this.repo.findOrgMembership({ userId, organizationId });
+    const orgUser = await this.repo.findOrgMembership({
+      userId,
+      organizationId,
+    });
     if (!orgUser) {
       throw new ApiKeyScopeViolationError("Not a member of this organization", {
         meta: { userId, organizationId },
@@ -458,7 +515,9 @@ export class ApiKeyService {
             customRoleId: binding.customRoleId,
           });
         } else {
-          throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
+          throw new ApiKeyScopeViolationError(
+            "CUSTOM role requires a customRoleId",
+          );
         }
       } else {
         await this.assertBuiltinRoleWithinCeiling({
@@ -534,7 +593,10 @@ export class ApiKeyService {
     scope: CreatorScope;
     customRoleId: string;
   }): Promise<void> {
-    const customRole = await this.roleRepo.findByIdInOrg(customRoleId, organizationId);
+    const customRole = await this.roleRepo.findByIdInOrg(
+      customRoleId,
+      organizationId,
+    );
     if (!customRole) {
       throw new ApiKeyScopeViolationError(
         `Custom role ${customRoleId} not found`,
@@ -548,7 +610,7 @@ export class ApiKeyService {
         permissions: customRole.permissions,
       });
     } catch (err) {
-      if (DomainError.isHandled(err) && err.kind === "malformed_custom_role_permissions") {
+      if (err instanceof MalformedCustomRolePermissionsError) {
         throw new ApiKeyScopeViolationError(
           `Custom role ${customRoleId} has malformed permissions`,
           {
@@ -559,14 +621,26 @@ export class ApiKeyService {
       }
       throw err;
     }
+    // Same legacy fallback as the raw-permission and builtin-role branches.
+    // This one used to call `checkRoleBindingPermission` bare, so a user whose
+    // access comes from legacy membership was refused here even though the
+    // branch beside it would have allowed the identical permission.
+    const legacy = await resolveLegacyCeiling({
+      prisma,
+      userId: ceilingUserId,
+      organizationId,
+      scope,
+    });
+
     for (const perm of perms) {
-      const userHas = await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: perm as Permission,
-      });
+      const userHas =
+        (await checkRoleBindingPermission({
+          prisma,
+          principal: { type: "user", id: ceilingUserId },
+          organizationId,
+          scope,
+          permission: perm as Permission,
+        })) || legacy.grants(perm as Permission);
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
@@ -589,14 +663,28 @@ export class ApiKeyService {
     scope: CreatorScope;
     permissions: string[];
   }): Promise<void> {
+    // Resolved once for the whole request, not per permission. The mint path
+    // that calls this (Langy's per-turn session key) passes ~23 permissions
+    // inside a 5-second interactive transaction, and langyApiKey.ts records
+    // what per-permission queries did to it once already: the fan-out starved
+    // the connection pool and aborted the transaction. Two queries, flat.
+    const legacy = await resolveLegacyCeiling({
+      prisma,
+      userId: ceilingUserId,
+      organizationId,
+      scope,
+    });
+
     for (const perm of permissions) {
-      const userHas = await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: perm as Permission,
-      });
+      const userHas =
+        (await checkRoleBindingPermission({
+          prisma,
+          principal: { type: "user", id: ceilingUserId },
+          organizationId,
+          scope,
+          permission: perm as Permission,
+        })) || legacy.grants(perm as Permission);
+
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
@@ -622,18 +710,34 @@ export class ApiKeyService {
     const isOrgScope = scope.type === "org";
     const representativePermission: Permission =
       role === TeamUserRole.ADMIN
-        ? (isOrgScope ? "organization:manage" : "project:manage")
+        ? isOrgScope
+          ? "organization:manage"
+          : "project:manage"
         : role === TeamUserRole.MEMBER
-          ? (isOrgScope ? "organization:view" : "project:update")
+          ? isOrgScope
+            ? "organization:view"
+            : "project:update"
           : "project:view";
 
-    const userHasPermission = await checkRoleBindingPermission({
-      prisma,
-      principal: { type: "user", id: ceilingUserId },
-      organizationId,
-      scope,
-      permission: representativePermission,
-    });
+    const userHasPermission =
+      (await checkRoleBindingPermission({
+        prisma,
+        principal: { type: "user", id: ceilingUserId },
+        organizationId,
+        scope,
+        permission: representativePermission,
+      })) ||
+      // The builtin-role UI is the ordinary way a person creates a key, so
+      // leaving this branch bare meant the common path still refused a
+      // legacy-membership user while the Langy path had been fixed.
+      (
+        await resolveLegacyCeiling({
+          prisma,
+          userId: ceilingUserId,
+          organizationId,
+          scope,
+        })
+      ).grants(representativePermission);
 
     if (!userHasPermission) {
       throw new ApiKeyScopeViolationError(
@@ -685,12 +789,14 @@ export class ApiKeyService {
     // Auto-upgrade legacy SHA-256 hashes to HMAC-SHA256 (fire-and-forget)
     if (result === "match_legacy") {
       const upgraded = hashSecret(parts.secret);
-      this.repo.upgradeHash({ id: apiKey.id, hashedSecret: upgraded }).catch((err: unknown) => {
-        logger.warn(
-          { err, apiKeyId: apiKey.id },
-          "failed to upgrade legacy hash to HMAC (fire-and-forget)",
-        );
-      });
+      this.repo
+        .upgradeHash({ id: apiKey.id, hashedSecret: upgraded })
+        .catch((err: unknown) => {
+          logger.warn(
+            { err, apiKeyId: apiKey.id },
+            "failed to upgrade legacy hash to HMAC (fire-and-forget)",
+          );
+        });
     }
 
     return apiKey;
@@ -752,6 +858,7 @@ export class ApiKeyService {
     if (apiKey.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
     if (!callerIsAdmin) {
       if (!apiKey.userId || apiKey.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);
@@ -795,7 +902,10 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
-    const binding = await this.repo.findOrgAdminBinding({ userId, organizationId });
+    const binding = await this.repo.findOrgAdminBinding({
+      userId,
+      organizationId,
+    });
     return !!binding;
   }
 
@@ -804,6 +914,26 @@ export class ApiKeyService {
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  /**
+   * Resolve one key id to its display name, within an organization. Returns
+   * null for an id that belongs to another organization or does not exist, so
+   * the two are indistinguishable to the caller.
+   *
+   * A revoked key still resolves: the trace it authorized is still readable,
+   * and naming the key that produced it is the whole point.
+   */
+  async getNameByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ name: string; revoked: boolean } | null> {
+    const row = await this.repo.findNameByIdInOrg({ id, organizationId });
+    if (!row) return null;
+    return { name: row.name, revoked: row.revokedAt !== null };
   }
 
   async getUserBindings({
@@ -873,11 +1003,7 @@ export class ApiKeyService {
     };
   }
 
-  async enrichApiKeyList({
-    apiKeys,
-  }: {
-    apiKeys: ApiKeyWithBindings[];
-  }) {
+  async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKeyWithBindings[] }) {
     const customRoleIds = new Set<string>();
     const userIds = new Set<string>();
     for (const k of apiKeys) {

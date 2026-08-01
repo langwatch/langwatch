@@ -1,6 +1,6 @@
+import { createLogger } from "@langwatch/observability";
 import fs from "fs/promises";
 import path from "path";
-import { createLogger } from "~/utils/logger/server";
 import type { TokenizerClient } from "./tokenizer.client";
 
 const logger = createLogger("langwatch:tiktoken");
@@ -152,17 +152,17 @@ export class TiktokenClient implements TokenizerClient {
     });
 
     try {
-      return await Promise.race([this.doRemoteFetch(url, controller.signal), timeout]);
+      return await Promise.race([
+        this.doRemoteFetch(url, controller.signal),
+        timeout,
+      ]);
     } finally {
       if (timer) clearTimeout(timer);
     }
   }
 
   private resolveFetchTimeoutMs(): number {
-    const parsed = parseInt(
-      process.env.TIKTOKEN_FETCH_TIMEOUT_MS ?? "",
-      10,
-    );
+    const parsed = parseInt(process.env.TIKTOKEN_FETCH_TIMEOUT_MS ?? "", 10);
     return Number.isFinite(parsed) && parsed > 0
       ? parsed
       : DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS;

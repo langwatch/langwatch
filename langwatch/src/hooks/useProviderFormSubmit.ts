@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { describeError, showErrorToast } from "~/features/errors";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
@@ -11,8 +12,13 @@ import { api } from "../utils/api";
 import {
   filterMaskedApiKeys,
   hasUserEnteredNewApiKey,
+  hasUserModifiedAnyCredential,
   hasUserModifiedNonApiKeyFields,
 } from "../utils/modelProviderHelpers";
+import {
+  broadcastModelProvidersUpdated,
+  invalidateModelProviderQueries,
+} from "../utils/modelProviderSync";
 import type { ExtraHeader } from "./useExtraHeaders";
 
 /** Snapshot of all form state needed at submission time. */
@@ -20,7 +26,15 @@ export type FormSnapshot = {
   provider: MaybeStoredModelProvider;
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
+  /**
+   * Tenant anchor for the write. A provider belongs to an organization
+   * and reaches the scopes attached to it, so the organization is always
+   * the answer and the project is the narrower handle when there is one.
+   * An organization on the agent-governance track has none, and the write
+   * path takes either.
+   */
   projectId: string | undefined;
+  organizationId: string | undefined;
   isUsingEnvVars: boolean | undefined;
   customKeys: Record<string, string>;
   initialKeys: Record<string, unknown>;
@@ -107,7 +121,8 @@ export function useProviderFormSubmit({
       try {
         await updateMutation.mutateAsync({
           id: snapshot.provider.id,
-          projectId: snapshot.projectId ?? "",
+          projectId: snapshot.projectId,
+          organizationId: snapshot.organizationId,
           provider: snapshot.provider.provider,
           enabled: newEnabled,
           customKeys: snapshot.provider.customKeys as any,
@@ -115,19 +130,18 @@ export function useProviderFormSubmit({
           customEmbeddingsModels:
             snapshot.provider.customEmbeddingsModels ?? [],
         });
+        await invalidateModelProviderQueries(utils);
+        broadcastModelProvidersUpdated();
         onSuccess?.();
       } catch (err) {
         onError?.(err);
-        toaster.create({
-          title: "Failed to update provider",
-          description: err instanceof Error ? err.message : String(err),
-          type: "error",
-          duration: 4000,
-          meta: { closable: true },
+        showErrorToast({
+          error: err,
+          fallbackTitle: "Couldn't update the provider",
         });
       }
     },
-    [getFormSnapshot, onSuccess, onError, updateMutation],
+    [getFormSnapshot, onSuccess, onError, updateMutation, utils],
   );
 
   const submit = useCallback(async () => {
@@ -138,6 +152,7 @@ export function useProviderFormSubmit({
     const {
       provider,
       projectId,
+      organizationId,
       isUsingEnvVars,
       customKeys,
       initialKeys,
@@ -232,24 +247,20 @@ export function useProviderFormSubmit({
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
         // When editing an existing provider, the stored key is shown masked.
-        // Strip the masked placeholders, then keep the result only if something
-        // actually changed versus the stored values. If nothing changed (the
-        // common case of opening the drawer and saving without re-entering the
-        // key), send `undefined` so the server preserves the stored credentials
-        // instead of validating a partial object (e.g. just an empty base URL)
-        // against the provider's required-key schema and rejecting the save.
-        // A genuine change — a new key, a cleared key, or an edited field —
-        // still goes through.
-        const filtered = filterMaskedApiKeys(customKeys);
-        const hasRealChange = Object.entries(filtered).some(([key, value]) => {
-          const current = (value ?? "").trim();
-          const stored =
-            typeof initialKeys[key] === "string"
-              ? (initialKeys[key] as string).trim()
-              : "";
-          return current !== stored;
+        // Decide whether anything changed by ignoring those placeholders — an
+        // untouched key must not count as an edit — but send the form as the
+        // customer left it, placeholders included: each one tells the server
+        // to keep the credential already on file. Sending the stripped object
+        // instead reads as "this provider has no key", and editing any other
+        // field (a base URL, most often) overwrites the stored key out of
+        // existence. When nothing changed, send `undefined` so the save is a
+        // no-op for credentials rather than a partial object validated
+        // against the provider's schema.
+        const hasRealChange = hasUserModifiedAnyCredential({
+          customKeys,
+          initialKeys,
         });
-        customKeysToSend = hasRealChange ? filtered : undefined;
+        customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey
           ? { ...customKeys }
@@ -303,7 +314,8 @@ export function useProviderFormSubmit({
       }
       await updateMutation.mutateAsync({
         id: provider.id,
-        projectId: projectId ?? "",
+        projectId,
+        organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
         enabled: true,
@@ -402,14 +414,17 @@ export function useProviderFormSubmit({
               x.r.status === "rejected",
           );
         if (failed.length > 0) {
+          // Each rejection keeps its own label, so the user learns WHICH role
+          // failed and why. The reason is a tRPC rejection, so its message is
+          // the code slug — `describeError` turns each one into the copy
+          // written for that code rather than listing slugs.
           const reasons = failed
             .map(
               (f) =>
-                `${f.label}: ${
-                  f.r.reason instanceof Error
-                    ? f.r.reason.message
-                    : String(f.r.reason)
-                }`,
+                `${f.label}: ${describeError({
+                  error: f.r.reason,
+                  fallbackTitle: "Couldn't save this default",
+                })}`,
             )
             .join("; ");
           toaster.create({
@@ -433,13 +448,20 @@ export function useProviderFormSubmit({
       // auto-seed (seedOnboardingDefaultsForProvider) runs regardless of
       // the "use as default provider" checkbox — so the DefaultModelsSection
       // card needs to refetch even when the user didn't opt into the replay.
-      await Promise.all([
-        utils.modelProvider.getAllForProject.invalidate(),
-        utils.modelProvider.getAllForProjectForFrontend.invalidate(),
-        utils.modelProvider.listAllForProjectForFrontend.invalidate(),
-        utils.modelProvider.getResolvedDefault.invalidate(),
-        utils.modelProvider.getDefaultModelsForProject.invalidate(),
-      ]);
+      // listAllForOrganizationForFrontend is here too: the settings table
+      // reads that org-wide list for org:view users, and this invalidation
+      // is awaited before onSuccess closes the drawer — omit it and the
+      // table re-renders with the stale pre-save list (no loading
+      // affordance), which reads as "the save didn't take" and drives
+      // users to re-add the same provider (the other duplicate-row path
+      // in #5380).
+      await invalidateModelProviderQueries(utils);
+      // This save may have happened in a tab opened by
+      // NoModelsConfiguredCallout's "Set up" link — broadcast so the
+      // opener tab's picker (a different QueryClient instance) refreshes
+      // immediately instead of waiting on a window-focus event that,
+      // for a window.open'd tab pair, often never reliably fires (#5827).
+      broadcastModelProvidersUpdated();
 
       toaster.create({
         title: "Model Provider Updated",
@@ -450,12 +472,9 @@ export function useProviderFormSubmit({
       onSuccess?.();
     } catch (err) {
       onError?.(err);
-      toaster.create({
-        title: "Failed to save settings",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 4000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the provider settings",
       });
     } finally {
       setIsSaving(false);

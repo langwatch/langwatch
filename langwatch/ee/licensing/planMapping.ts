@@ -1,5 +1,5 @@
-import type { PlanInfo } from "./planInfo";
 import { resolvePlanDefaults } from "./defaults";
+import type { PlanInfo } from "./planInfo";
 import type { LicenseData } from "./types";
 
 export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {

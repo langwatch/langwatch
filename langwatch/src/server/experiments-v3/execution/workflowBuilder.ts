@@ -2,19 +2,19 @@ import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import type {
   EvaluatorConfig,
-  FieldMapping,
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import type {
-  Code,
-  Entry,
-  Evaluator,
-  Field,
-  HttpComponentConfig,
-  LlmPromptConfigComponent,
-  Signature,
-  Workflow,
+import {
+  type Code,
+  type Entry,
+  type Evaluator,
+  type Field,
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+  type LlmPromptConfigComponent,
+  type Signature,
+  type Workflow,
 } from "~/optimization_studio/types/dsl";
 
 /**
@@ -27,11 +27,12 @@ type HttpNodeData = {
   outputs: Field[];
   parameters: Field[];
 };
+
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ChatMessage } from "~/server/tracer/types";
 import type {
   ExecutionCell,
@@ -103,17 +104,12 @@ export const buildCellWorkflow = (
   );
 
   const workflow: Workflow = {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     workflow_id: workflowId,
     name: `Evaluation V3 - Row ${rowIndex}`,
     icon: "🧪",
     description: `Single cell execution for row ${rowIndex}`,
     version: "1.0",
-    default_llm: {
-      model: "openai/gpt-4o-mini",
-      temperature: 0,
-      max_tokens: 2048,
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, targetNode, ...evaluatorNodes] as Workflow["nodes"],
@@ -207,9 +203,7 @@ const buildTargetNode = (
     if (targetConfig.localPromptConfig) {
       // Get name from loaded prompt if available, fall back to target ID
       const name =
-        loadedData.prompt?.handle ??
-        loadedData.prompt?.name ??
-        targetConfig.id;
+        loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
       return {
         targetNode: buildSignatureNodeFromLocalConfig({
           nodeId: targetNodeId,
@@ -274,7 +268,6 @@ const buildTargetNode = (
             targetNodeId,
           };
         case "code":
-        case "workflow":
           return {
             targetNode: buildCodeNodeFromAgent(
               targetNodeId,
@@ -284,6 +277,16 @@ const buildTargetNode = (
             ),
             targetNodeId,
           };
+        case "workflow":
+          // A workflow-type agent has no code of its own — the orchestrator
+          // must resolve its linked workflow and dispatch it to
+          // executeWorkflowCell before ever reaching buildTargetNode. Reaching
+          // here means that resolution was skipped (e.g. the linked workflow
+          // failed to load), so fail loudly instead of silently building an
+          // empty code node.
+          throw new Error(
+            `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
+          );
         default: {
           const _exhaustive: never = loadedData.agent.type;
           throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -310,7 +313,8 @@ export const buildEvaluatorTargetNode = (
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
     : undefined;
   const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-  const settings = targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+  const settings =
+    targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
   // Build inputs with value mappings applied
   const inputs: Field[] = (targetConfig.inputs ?? []).map((input) => ({
@@ -930,7 +934,8 @@ const buildEvaluatorNodes = (
       ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
       : undefined;
     const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-    const settings = evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+    const settings =
+      evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
     // Get name from loaded evaluator, fall back to evaluator ID
     const evaluatorName = dbEvaluator?.name ?? evaluator.id;

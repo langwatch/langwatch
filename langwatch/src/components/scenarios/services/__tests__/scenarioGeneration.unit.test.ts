@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  generateScenarioWithAI,
   type GeneratedScenario,
+  generateScenarioWithAI,
+  ScenarioGenerationError,
 } from "../scenarioGeneration";
 
 describe("generateScenarioWithAI()", () => {
@@ -32,7 +33,7 @@ describe("generateScenarioWithAI()", () => {
       const result = await generateScenarioWithAI(
         "test prompt",
         "project-123",
-        null
+        null,
       );
 
       expect(result).toEqual(mockScenario);
@@ -72,7 +73,7 @@ describe("generateScenarioWithAI()", () => {
       await generateScenarioWithAI(
         "refine this",
         "project-123",
-        currentScenario
+        currentScenario,
       );
 
       expect(global.fetch).toHaveBeenCalledWith("/api/scenario/generate", {
@@ -87,6 +88,53 @@ describe("generateScenarioWithAI()", () => {
     });
   });
 
+  describe("when the response body is not JSON (HTML error page)", () => {
+    // Regression for langwatch#5758. The generate endpoint answers with JSON on
+    // every outcome, so a NON-JSON body means the response came from a layer in
+    // FRONT of the app — a reverse-proxy / gateway 502·504, an auth-redirect
+    // login page, a timeout error page, or an older self-hosted Next.js build.
+    // Before the fix, `response.json()` threw a raw
+    // `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` that leaked to
+    // the user and masked the real HTTP status. A real Response is used so the
+    // genuine JSON.parse crash is exercised, not a hand-faked reject.
+    const HTML_ERROR_BODY =
+      "<!DOCTYPE html>\n<html><head><title>502 Bad Gateway</title></head>" +
+      "<body><h1>502 Bad Gateway</h1></body></html>";
+
+    beforeEach(() => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+        new Response(HTML_ERROR_BODY, {
+          status: 502,
+          statusText: "Bad Gateway",
+          headers: { "content-type": "text/html" },
+        }),
+      );
+    });
+
+    it("does not leak a raw JSON.parse error to the caller", async () => {
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null,
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toMatch(
+        /Unexpected token|is not valid JSON|DOCTYPE/i,
+      );
+    });
+
+    it("surfaces the HTTP status so the failure is actionable", async () => {
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null,
+      ).catch((e: unknown) => e);
+
+      expect((error as Error).message).toContain("502");
+    });
+  });
+
   describe("when API returns an error response", () => {
     it("throws error with message from API", async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -95,7 +143,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Custom error message");
     });
 
@@ -106,8 +154,37 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Failed to generate scenario");
+    });
+  });
+
+  describe("when API returns a handled domain error", () => {
+    it("throws ScenarioGenerationError carrying the kind and meta", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            error: "bad_request",
+            domainError: {
+              code: "missing_provider",
+              meta: { reason: "missing_provider" },
+              httpStatus: 400,
+            },
+          }),
+      });
+
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null,
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ScenarioGenerationError);
+      expect((error as ScenarioGenerationError).kind).toBe("missing_provider");
+      expect((error as ScenarioGenerationError).meta).toEqual({
+        reason: "missing_provider",
+      });
     });
   });
 
@@ -119,7 +196,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid response: missing scenario data");
     });
 
@@ -139,7 +216,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid scenario data");
     });
 
@@ -155,7 +232,7 @@ describe("generateScenarioWithAI()", () => {
       });
 
       await expect(
-        generateScenarioWithAI("test prompt", "project-123", null)
+        generateScenarioWithAI("test prompt", "project-123", null),
       ).rejects.toThrow("Invalid scenario data");
     });
   });

@@ -10,14 +10,7 @@
  * - Abort handling
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   afterEach,
@@ -49,10 +42,16 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) =>
-    target.id === "target-1" ? "My Prompt" : "Other Prompt",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (target: { id: string }) =>
+    target.id === "target-1" ? "My Prompt" : "Other Prompt";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
@@ -95,6 +94,9 @@ vi.mock("~/hooks/useDrawer", () => ({
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
+    // Batched name lookups (useTargetNames). No target here is a comparison
+    // column, so every caller passes an empty variant list.
+    useQueries: () => [],
     useContext: () => ({
       agents: {
         getById: {
@@ -1500,7 +1502,7 @@ describe("Evaluation Execution", () => {
       });
 
       // Both evaluators should show spinners
-      let spinners = document.querySelectorAll(".chakra-spinner");
+      const spinners = document.querySelectorAll(".chakra-spinner");
       expect(spinners.length).toBe(2);
 
       // Cell A's evaluator completes (but cell B's is still running)

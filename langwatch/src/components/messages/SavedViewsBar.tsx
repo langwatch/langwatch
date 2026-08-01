@@ -14,14 +14,14 @@ import {
   IconButton,
   Input,
   Portal,
-  useBreakpointValue,
   Text,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
-  type DraggableAttributes,
   type DragEndEvent,
+  type DraggableAttributes,
   PointerSensor,
   useSensor,
   useSensors,
@@ -35,7 +35,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, MoreVertical, User, X } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useRef, useState } from "react";
 import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
 import { getOriginColor } from "../../utils/originColors";
@@ -119,92 +120,92 @@ export function SavedViewsBar() {
         paddingY={2}
         data-testid="saved-views-bar"
       >
-      <HStack gap={2} overflowX="auto" width="full">
-        {/* All Traces -- always first, never deletable */}
-        {allTracesView && (
-          <ViewBadge
-            id={allTracesView.id}
-            name={allTracesView.name}
-            colors={{ background: "gray.subtle", color: "gray.emphasized" }}
-            isSelected={selectedViewId === allTracesView.id}
-            isDefault={true}
-            isEditMode={isEditMode}
-            onClick={() => {
-              if (!isEditMode) handleViewClick(allTracesView.id);
-            }}
-          />
-        )}
+        <HStack gap={2} overflowX="auto" width="full">
+          {/* All Traces -- always first, never deletable */}
+          {allTracesView && (
+            <ViewBadge
+              id={allTracesView.id}
+              name={allTracesView.name}
+              colors={{ background: "gray.subtle", color: "gray.emphasized" }}
+              isSelected={selectedViewId === allTracesView.id}
+              isDefault={true}
+              isEditMode={isEditMode}
+              onClick={() => {
+                if (!isEditMode) handleViewClick(allTracesView.id);
+              }}
+            />
+          )}
 
-        {/* Custom views (including seeded origin views) with drag-and-drop */}
-        {customViews.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={customViews.map((v) => v.id)}
-              strategy={horizontalListSortingStrategy}
-              disabled={!isEditMode}
+          {/* Custom views (including seeded origin views) with drag-and-drop */}
+          {customViews.length > 0 && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {customViews.map((view) => (
-                <SortableViewBadge
-                  key={view.id}
-                  view={view}
-                  isSelected={selectedViewId === view.id}
-                  isEditMode={isEditMode}
-                  onClick={() => {
-                    if (!isEditMode) handleViewClick(view.id);
-                  }}
-                  onDelete={() => deleteView(view.id)}
-                  onRename={(newName) => renameView(view.id, newName)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        )}
-
-        {/* Spacer pushes hint and button to the right */}
-        <Box flex={1} />
-
-        {/* Edit mode hint */}
-        {isEditMode && customViews.length > 0 && (
-          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-            Double click to rename
-          </Text>
-        )}
-
-        {/* Edit mode toggle */}
-        {isEditMode ? (
-          <Button
-            size="xs"
-            colorPalette="blue"
-            onClick={() => setIsEditMode(false)}
-            flexShrink={0}
-            data-testid="saved-views-done-button"
-          >
-            Done
-          </Button>
-        ) : (
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <IconButton
-                aria-label="View options"
-                variant="ghost"
-                size="xs"
-                data-testid="saved-views-menu"
+              <SortableContext
+                items={customViews.map((v) => v.id)}
+                strategy={horizontalListSortingStrategy}
+                disabled={!isEditMode}
               >
-                <MoreVertical size={16} />
-              </IconButton>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item value="edit" onClick={() => setIsEditMode(true)}>
-                Edit
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        )}
-      </HStack>
+                {customViews.map((view) => (
+                  <SortableViewBadge
+                    key={view.id}
+                    view={view}
+                    isSelected={selectedViewId === view.id}
+                    isEditMode={isEditMode}
+                    onClick={() => {
+                      if (!isEditMode) handleViewClick(view.id);
+                    }}
+                    onDelete={() => deleteView(view.id)}
+                    onRename={(newName) => renameView(view.id, newName)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+
+          {/* Spacer pushes hint and button to the right */}
+          <Box flex={1} />
+
+          {/* Edit mode hint */}
+          {isEditMode && customViews.length > 0 && (
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+              Double click to rename
+            </Text>
+          )}
+
+          {/* Edit mode toggle */}
+          {isEditMode ? (
+            <Button
+              size="xs"
+              colorPalette="blue"
+              onClick={() => setIsEditMode(false)}
+              flexShrink={0}
+              data-testid="saved-views-done-button"
+            >
+              Done
+            </Button>
+          ) : (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <IconButton
+                  aria-label="View options"
+                  variant="ghost"
+                  size="xs"
+                  data-testid="saved-views-menu"
+                >
+                  <MoreVertical size={16} />
+                </IconButton>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item value="edit" onClick={() => setIsEditMode(true)}>
+                  Edit
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
+          )}
+        </HStack>
       </Box>
     </Portal>
   );

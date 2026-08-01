@@ -7,14 +7,14 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
   console.warn(
-    "Skipping usage reporting integration tests because STRIPE_SECRET_KEY is not set"
+    "Skipping usage reporting integration tests because STRIPE_SECRET_KEY is not set",
   );
 }
 
 if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith("sk_test_")) {
   throw new Error(
     "SAFETY: Stripe integration tests require a TEST key (sk_test_*). " +
-      "A live key was detected — aborting to prevent charges on a real account."
+      "A live key was detected — aborting to prevent charges on a real account.",
   );
 }
 
@@ -125,9 +125,7 @@ describeIfStripeKey("Usage reporting integration", () => {
         ],
       });
 
-      expect(results).toEqual([
-        { identifier, reported: false, valueSent: 0 },
-      ]);
+      expect(results).toEqual([{ identifier, reported: false, valueSent: 0 }]);
     });
 
     it("processes a batch of multiple events sequentially", async () => {
@@ -216,9 +214,7 @@ describeIfStripeKey("Usage reporting integration", () => {
         ],
       });
 
-      expect(results).toEqual([
-        { identifier, reported: false, valueSent: 0 },
-      ]);
+      expect(results).toEqual([{ identifier, reported: false, valueSent: 0 }]);
     });
 
     it("skips when delta is negative (count decreased)", async () => {
@@ -240,9 +236,7 @@ describeIfStripeKey("Usage reporting integration", () => {
         ],
       });
 
-      expect(results).toEqual([
-        { identifier, reported: false, valueSent: 0 },
-      ]);
+      expect(results).toEqual([{ identifier, reported: false, valueSent: 0 }]);
     });
 
     it("sends full value when previouslyReportedValue is zero", async () => {

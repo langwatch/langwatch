@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  evaluatePreconditions,
-  buildPreconditionTraceDataFromTrace,
-  buildPreconditionTraceDataFromCommand,
-  checkEvaluatorRequiredFields,
-  preconditionsNeedEvents,
-  type PreconditionTraceData,
-} from "../preconditions";
-import type { Span, RAGSpan, RAGChunk } from "../../tracer/types";
 import type { ExecuteEvaluationCommandData } from "../../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import type { RAGChunk, RAGSpan, Span } from "../../tracer/types";
+import {
+  buildPreconditionTraceDataFromCommand,
+  buildPreconditionTraceDataFromTrace,
+  checkEvaluatorRequiredFields,
+  evaluatePreconditions,
+  type PreconditionTraceData,
+  preconditionsNeedEvents,
+} from "../preconditions";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,6 +51,19 @@ describe("evaluatePreconditions()", () => {
         value: "application",
       },
     ];
+
+    describe("when a trace arrives with origin = 'application'", () => {
+      /** @scenario "Precondition matcher matches explicit application origin" */
+      it("passes the precondition", () => {
+        const traceData = makeTraceData({ origin: "application" });
+        expect(
+          evaluatePreconditions({
+            traceData,
+            preconditions,
+          }),
+        ).toBe(true);
+      });
+    });
 
     describe("when a trace arrives with no origin attribute", () => {
       /** @scenario Origin "is" application treats missing origin as application (legacy default) */
@@ -148,6 +161,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with input 'hello world'", () => {
+      /** @scenario '"is" rule on text fields does case-insensitive exact match' */
       /** @scenario "is" rule on text fields does case-insensitive exact match */
       it("passes the precondition (case-insensitive)", () => {
         const traceData = makeTraceData({ input: "hello world" });
@@ -184,6 +198,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with labels ['production', 'api']", () => {
+      /** @scenario '"is" rule on array fields matches if value is in array' */
       /** @scenario "is" rule on array fields matches if value is in array */
       it("passes the precondition (value in array)", () => {
         const traceData = makeTraceData({
@@ -263,6 +278,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with spanModels ['gpt-4', 'gpt-3.5']", () => {
+      /** @scenario '"is" on spans.model matches if ANY span has that model' */
       /** @scenario "is" on spans.model matches if ANY span has that model */
       it("passes the precondition", () => {
         const traceData = makeTraceData({
@@ -356,6 +372,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with hasError = true", () => {
+      /** @scenario '"is" on traces.error matches error presence' */
       /** @scenario "is" on traces.error matches error presence */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ hasError: true });
@@ -716,6 +733,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no userId set", () => {
+      /** @scenario 'Missing field values pass "not_contains" checks' */
       /** @scenario Missing field values pass "not_contains" checks */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ userId: undefined });
@@ -750,7 +768,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when traces arrive matching the legacy rules", () => {
-      /** @scenario Existing preconditions with old fields still work */
+      /** @scenario "Existing preconditions with old fields still work" */
       it("evaluates identically to the old behavior", () => {
         const traceData = makeTraceData({
           input: "customer query",
@@ -943,7 +961,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when trace has customMetadata with environment = 'production'", () => {
-      /** @scenario Nested key filter - metadata.value with key */
+      /** @scenario "Nested key filter - metadata.value with key" */
       it("passes the precondition", () => {
         const traceData = makeTraceData({
           customMetadata: { environment: "production" },
@@ -1009,7 +1027,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when trace has topicId 'topic_123'", () => {
-      /** @scenario Topics filter matches topic ID */
+      /** @scenario "Topics filter matches topic ID" */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ topicId: "topic_123" });
         expect(
@@ -1080,7 +1098,6 @@ describe("evaluatePreconditions()", () => {
     });
   });
 
-
   // ── Annotation matching ──
   describe("given a precondition: annotations.hasAnnotation is 'true'", () => {
     const preconditions = [
@@ -1138,8 +1155,16 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             events: [
-              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
-              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+              {
+                event_type: "thumbs_up_down",
+                metrics: [{ key: "vote", value: 1 }],
+                event_details: [],
+              },
+              {
+                event_type: "purchase",
+                metrics: [],
+                event_details: [{ key: "item", value: "shoes" }],
+              },
             ],
           },
           preconditions: [
@@ -1182,11 +1207,20 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             events: [
-              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+              {
+                event_type: "thumbs_up_down",
+                metrics: [{ key: "vote", value: 1 }],
+                event_details: [],
+              },
             ],
           },
           preconditions: [
-            { field: "events.metrics.key", rule: "is", value: "vote", key: "thumbs_up_down" },
+            {
+              field: "events.metrics.key",
+              rule: "is",
+              value: "vote",
+              key: "thumbs_up_down",
+            },
           ],
         }),
       ).toBe(true);
@@ -1197,11 +1231,20 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             events: [
-              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+              {
+                event_type: "thumbs_up_down",
+                metrics: [{ key: "vote", value: 1 }],
+                event_details: [],
+              },
             ],
           },
           preconditions: [
-            { field: "events.metrics.key", rule: "is", value: "score", key: "thumbs_up_down" },
+            {
+              field: "events.metrics.key",
+              rule: "is",
+              value: "score",
+              key: "thumbs_up_down",
+            },
           ],
         }),
       ).toBe(false);
@@ -1214,11 +1257,20 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             events: [
-              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+              {
+                event_type: "purchase",
+                metrics: [],
+                event_details: [{ key: "item", value: "shoes" }],
+              },
             ],
           },
           preconditions: [
-            { field: "events.event_details.key", rule: "is", value: "item", key: "purchase" },
+            {
+              field: "events.event_details.key",
+              rule: "is",
+              value: "item",
+              key: "purchase",
+            },
           ],
         }),
       ).toBe(true);
@@ -1229,11 +1281,20 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             events: [
-              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+              {
+                event_type: "purchase",
+                metrics: [],
+                event_details: [{ key: "item", value: "shoes" }],
+              },
             ],
           },
           preconditions: [
-            { field: "events.event_details.key", rule: "is", value: "color", key: "purchase" },
+            {
+              field: "events.event_details.key",
+              rule: "is",
+              value: "color",
+              key: "purchase",
+            },
           ],
         }),
       ).toBe(false);
@@ -1248,7 +1309,11 @@ describe("evaluatePreconditions()", () => {
             input: "hello",
             origin: "application",
             events: [
-              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+              {
+                event_type: "thumbs_up_down",
+                metrics: [{ key: "vote", value: 1 }],
+                event_details: [],
+              },
             ],
           },
           preconditions: [
@@ -1295,7 +1360,12 @@ describe("preconditionsNeedEvents()", () => {
   it("returns true for events.metrics.key preconditions", () => {
     expect(
       preconditionsNeedEvents([
-        { field: "events.metrics.key", rule: "is", value: "vote", key: "thumbs_up_down" },
+        {
+          field: "events.metrics.key",
+          rule: "is",
+          value: "vote",
+          key: "thumbs_up_down",
+        },
       ]),
     ).toBe(true);
   });
@@ -1373,7 +1443,10 @@ describe("buildPreconditionTraceDataFromTrace()", () => {
         },
         spans: [],
       });
-      expect(result.customMetadata).toEqual({ env: "staging", region: "us-east" });
+      expect(result.customMetadata).toEqual({
+        env: "staging",
+        region: "us-east",
+      });
     });
   });
 
@@ -1554,9 +1627,17 @@ describe("buildPreconditionTraceDataFromCommand()", () => {
     it("includes events in the trace data", () => {
       const data = makeCommandData();
       const events = [
-        { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+        {
+          event_type: "thumbs_up_down",
+          metrics: [{ key: "vote", value: 1 }],
+          event_details: [],
+        },
       ];
-      const result = buildPreconditionTraceDataFromCommand({ data, spans: [], events });
+      const result = buildPreconditionTraceDataFromCommand({
+        data,
+        spans: [],
+        events,
+      });
       expect(result.events).toEqual(events);
     });
   });
@@ -1604,9 +1685,7 @@ describe("checkEvaluatorRequiredFields()", () => {
 
   describe("when evaluator requires contexts and RAG spans with content exist", () => {
     it("returns true", () => {
-      const ragSpan = makeRagSpan([
-        { content: "some context text" },
-      ]);
+      const ragSpan = makeRagSpan([{ content: "some context text" }]);
       const result = checkEvaluatorRequiredFields({
         evaluatorType: "ragas/faithfulness",
         spans: [ragSpan],

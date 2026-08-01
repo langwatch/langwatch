@@ -4,13 +4,14 @@
  * Integration tests for ModelProviderRepository encryption.
  * Tests real database operations with real AES-256-GCM encryption.
  */
+
+import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import main from "../../../tasks/migrateModelProviderKeys";
+import { KSUID_RESOURCES } from "../../../utils/constants";
 import { getTestProject, getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ModelProviderRepository } from "../modelProvider.repository";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "../../../utils/constants";
-import main from "../../../tasks/migrateModelProviderKeys";
 
 let projectId: string;
 let organizationId: string;
@@ -53,11 +54,11 @@ describe("ModelProviderRepository Integration", () => {
       // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
       it.skip("encrypts on save and decrypts on read preserving original values", async () => {
         const created = await repository.create({
-          projectId,
           name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: { OPENAI_API_KEY: "sk-test-key-123" },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         createdProviderIds.push(created.id);
 
@@ -66,7 +67,7 @@ describe("ModelProviderRepository Integration", () => {
 
         expect(found).not.toBeNull();
         expect(
-          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY
+          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY,
         ).toBe("sk-test-key-123");
 
         // Read raw from prisma to verify DB value is encrypted
@@ -110,7 +111,7 @@ describe("ModelProviderRepository Integration", () => {
 
         expect(found).not.toBeNull();
         expect(
-          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY
+          (found!.customKeys as Record<string, unknown>).OPENAI_API_KEY,
         ).toBe("sk-legacy-key");
       });
     });
@@ -120,10 +121,10 @@ describe("ModelProviderRepository Integration", () => {
     describe("when saved and read back", () => {
       it("preserves null customKeys", async () => {
         const created = await repository.create({
-          projectId,
           name: "Gemini",
           provider: "google",
           enabled: true,
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         createdProviderIds.push(created.id);
 
@@ -143,9 +144,7 @@ describe("ModelProviderRepository Integration", () => {
       // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
       it.skip("encrypts only the plaintext rows", async () => {
         // 1. Insert plaintext row directly via prisma
-        const plaintextId = generate(
-          KSUID_RESOURCES.MODEL_PROVIDER
-        ).toString();
+        const plaintextId = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
         migrationIds.push(plaintextId);
         createdProviderIds.push(plaintextId);
 
@@ -184,11 +183,11 @@ describe("ModelProviderRepository Integration", () => {
 
         // 3. Save one through repository (will be encrypted)
         const encryptedRow = await repository.create({
-          projectId,
           name: "Anthropic",
           provider: "anthropic",
           enabled: true,
           customKeys: { ANTHROPIC_API_KEY: "sk-ant-already" },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         migrationIds.push(encryptedRow.id);
         createdProviderIds.push(encryptedRow.id);
@@ -199,18 +198,18 @@ describe("ModelProviderRepository Integration", () => {
         // Read all through repository
         const plaintextProvider = await repository.findById(
           plaintextId,
-          projectId
+          projectId,
         );
         const nullProvider = await repository.findById(nullId, projectId);
         const encryptedProvider = await repository.findById(
           encryptedRow.id,
-          projectId
+          projectId,
         );
 
         // Verify plaintext was migrated correctly
         expect(
           (plaintextProvider!.customKeys as Record<string, unknown>)
-            .COHERE_API_KEY
+            .COHERE_API_KEY,
         ).toBe("sk-plain");
 
         // Verify null stayed null
@@ -219,7 +218,7 @@ describe("ModelProviderRepository Integration", () => {
         // Verify already-encrypted stayed correct
         expect(
           (encryptedProvider!.customKeys as Record<string, unknown>)
-            .ANTHROPIC_API_KEY
+            .ANTHROPIC_API_KEY,
         ).toBe("sk-ant-already");
 
         // Verify raw DB: non-null customKeys are now encrypted strings
@@ -240,7 +239,7 @@ describe("ModelProviderRepository Integration", () => {
     describe("given already-migrated providers", () => {
       describe("when migration runs again", () => {
         // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
-      // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
+        // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
         it.skip("is idempotent -- skips encrypted rows and data remains valid", async () => {
           // Run migration again (same data from previous test)
           await main();

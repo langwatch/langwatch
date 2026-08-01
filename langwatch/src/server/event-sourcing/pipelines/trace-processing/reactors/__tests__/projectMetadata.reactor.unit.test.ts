@@ -1,4 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const logger = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logger,
+}));
+
+const { mockTrackServerEvent } = vi.hoisted(() => ({
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
+}));
+
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
@@ -6,7 +26,6 @@ import {
   createProjectMetadataReactor,
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
-
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -94,6 +113,11 @@ function createMockProjectService() {
     getWithTeam: vi.fn(),
     updateMetadata: vi.fn(),
     isFeatureEnabled: vi.fn(),
+    resolveOrgAdmin: vi.fn().mockResolvedValue({
+      userId: "admin-user-1",
+      organizationId: "org-1",
+      firstMessage: false,
+    }),
     repo: {} as any,
   };
 }
@@ -104,6 +128,9 @@ describe("createProjectMetadataReactor()", () => {
   const tenantId = "project-123";
 
   beforeEach(() => {
+    logger.error.mockClear();
+    logger.warn.mockClear();
+    mockTrackServerEvent.mockClear();
     mockProjects = createMockProjectService();
     deps = {
       projects: mockProjects as any,
@@ -120,6 +147,7 @@ describe("createProjectMetadataReactor()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
+    /** @scenario "Project marks as integrated after first trace ingestion" */
     it("sets firstMessage to true", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);
@@ -144,6 +172,63 @@ describe("createProjectMetadataReactor()", () => {
         id: tenantId,
         data: expect.objectContaining({ integrated: true }),
       });
+    });
+
+    /** @scenario First trace tracks the PostHog integration milestone against the org admin */
+    it("tracks first_trace_integrated against the org admin", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const foldState = createFoldState({
+        attributes: {
+          "sdk.language": "python",
+          "langwatch.sdk.framework": "openai",
+        },
+      });
+
+      await reactor.handle(event, createContext(tenantId, foldState));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "admin-user-1",
+        event: "first_trace_integrated",
+        properties: {
+          sdk_language: "python",
+          sdk_framework: "openai",
+        },
+        projectId: tenantId,
+      });
+    });
+
+    /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
+    it("falls back to unknown sdk properties when attributes are absent", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+
+      await reactor.handle(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: {
+            sdk_language: "unknown",
+            sdk_framework: "unknown",
+          },
+        }),
+      );
+    });
+
+    /** @scenario PostHog integration milestone is skipped when the project has no org admin */
+    it("does not track first_trace_integrated when no admin user is found", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+      });
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+
+      await reactor.handle(event, createContext(tenantId, createFoldState()));
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -246,6 +331,17 @@ describe("createProjectMetadataReactor()", () => {
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
+
+    /** @scenario PostHog integration milestone fires only on the firstMessage transition */
+    it("does not track first_trace_integrated again", async () => {
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const context = createContext(tenantId, createFoldState());
+
+      await reactor.handle(event, context);
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe("when project is not found", () => {
@@ -328,7 +424,212 @@ describe("createProjectMetadataReactor()", () => {
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
 
+    /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
+    it("does not track first_trace_integrated for a failed write", async () => {
+      // The next trace retries the write and fires the event then.
+      const reactor = createProjectMetadataReactor(deps);
+      const event = createEvent(tenantId);
+      const context = createContext(tenantId, createFoldState());
 
+      await reactor.handle(event, context);
+
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a project receiving its first real trace", () => {
+    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: false,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+      deps = {
+        projects: mockProjects as any,
+        bootstrapTopicClustering: bootstrapTopicClustering as any,
+      };
+    });
+
+    describe("when a topic clustering bootstrap is wired", () => {
+      it("bootstraps the project's clustering schedule exactly once", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).toHaveBeenCalledTimes(1);
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+
+      it("bootstraps independently of the metadata write", async () => {
+        // The bootstrap is no longer sequenced behind the metadata write: it
+        // has to run for projects whose metadata needs no update at all. Its
+        // own try/catch, not its position, is what keeps a bootstrap failure
+        // from being reported as a metadata failure.
+        mockProjects.updateMetadata.mockRejectedValue(new Error("pg down"));
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+    });
+
+    describe("when the project is already marked as integrated", () => {
+      it("still re-asserts the clustering schedule", async () => {
+        // The regression that made a deploy-time backfill necessary: an
+        // established project returned early, so a project that lost its
+        // schedule never got it back from ingest. Bootstrap is level-triggered
+        // now, so every real trace re-asserts it.
+        mockProjects.getById.mockResolvedValue({
+          id: tenantId,
+          firstMessage: true,
+          integrated: true,
+        });
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+        // Still no redundant metadata write for an already-marked project.
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the bootstrap throws", () => {
+      beforeEach(() => {
+        bootstrapTopicClustering.mockRejectedValue(
+          new Error("process store unavailable"),
+        );
+      });
+
+      it("swallows the failure (non-fatal)", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await expect(
+          reactor.handle(
+            createEvent(tenantId),
+            createContext(tenantId, createFoldState()),
+          ),
+        ).resolves.toBeUndefined();
+      });
+
+      it("does not report the committed metadata write as failed", async () => {
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        const [, message] = logger.error.mock.calls[0]!;
+        expect(message).toMatch(/bootstrap failed/i);
+        expect(message).not.toMatch(/Failed to update project metadata/i);
+      });
+    });
+
+    describe("when no bootstrap is wired", () => {
+      it("completes the metadata write without error", async () => {
+        const reactor = createProjectMetadataReactor({
+          projects: mockProjects as any,
+        });
+
+        await expect(
+          reactor.handle(
+            createEvent(tenantId),
+            createContext(tenantId, createFoldState()),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a project that already received its first message", () => {
+    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      // Not yet integrated, so the reactor still writes metadata. The
+      // bootstrap is no longer gated on the first-message transition.
+      mockProjects.getById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: false,
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
+      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+      deps = {
+        projects: mockProjects as any,
+        bootstrapTopicClustering: bootstrapTopicClustering as any,
+      };
+    });
+
+    describe("when another trace arrives", () => {
+      it("updates the metadata and re-asserts the clustering schedule", async () => {
+        // Re-asserting is the point: it is idempotent at the process (a
+        // bootstrap-trigger request cannot move the wake or start a run) and
+        // rate-limited at the injected implementation, so the reconciliation
+        // costs at most one commit per project per claim window.
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+      });
+
+      it("does not track first_trace_integrated for the repeat write", async () => {
+        // The event is gated on the firstMessage transition, not on the
+        // metadata write: an integrated-flag repair must not re-fire it.
+        const reactor = createProjectMetadataReactor(deps);
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(mockTrackServerEvent).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the project no longer exists", () => {
+    describe("when a trace arrives", () => {
+      it("does not bootstrap clustering", async () => {
+        const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+        mockProjects.getById.mockResolvedValue(null);
+        const reactor = createProjectMetadataReactor({
+          projects: mockProjects as any,
+          bootstrapTopicClustering: bootstrapTopicClustering as any,
+        });
+
+        await reactor.handle(
+          createEvent(tenantId),
+          createContext(tenantId, createFoldState()),
+        );
+
+        expect(bootstrapTopicClustering).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it("uses dedup makeJobId based on tenantId", () => {

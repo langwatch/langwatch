@@ -15,6 +15,7 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 )
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
+from langwatch.utils.exceptions import extract_api_error_detail
 
 
 def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
@@ -24,7 +25,7 @@ def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
     detail = ""
     try:
         body = response.json()
-        detail = body.get("message") or body.get("error") or ""
+        detail = extract_api_error_detail(body)
     except Exception:
         detail = response.text or ""
     if status == 404:

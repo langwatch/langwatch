@@ -27,6 +27,8 @@
  *   - .monitor-logs/lane-b-jane-storyboard-ui-delta.md §2 (decision rationale)
  */
 
+import type { OrganizationIntent } from "@prisma/client";
+
 export type Persona =
   | "personal_only"
   | "mixed"
@@ -34,6 +36,14 @@ export type Persona =
   | "governance_admin";
 
 export interface PersonaResolverInput {
+  /**
+   * The organization's declared primary intent (ADR-038). When set it ALONE
+   * decides the destination kind — AGENT_GOVERNANCE → /me, LLM_OPS → the
+   * project home — and beats the user pin and persona detection. NULL means
+   * intent unset (legacy orgs): everything below behaves exactly as before.
+   */
+  organizationIntent: OrganizationIntent | null;
+
   /** User pin override — when set, wins over persona detection. */
   userLastHomePath: string | null;
 
@@ -90,6 +100,14 @@ export interface PersonaResolution {
    * overrides to `/me` when that surface is flag-gated off for the org.
    */
   governanceUiEnabled: boolean;
+  /**
+   * True when the org's primaryIntent decided the destination (ADR-038).
+   * The client redirect layer must then keep the destination KIND — it may
+   * substitute which project for a project-kind destination, but never flip
+   * between /me and a project home. Distinct from `isOverride`, which keeps
+   * meaning "user set an explicit pin".
+   */
+  intentPinned: boolean;
 }
 
 export function resolvePersonaHome(
@@ -97,12 +115,41 @@ export function resolvePersonaHome(
 ): PersonaResolution {
   const persona = detectPersona(input);
 
+  // ADR-038: a set org intent decides the landing before everything else,
+  // including the user pin. Persona is still detected (HomePagePicker
+  // consumes it) but never influences the destination here. The
+  // hasGovernanceUi check is the I8 kill-switch guard: a flag-off
+  // AGENT_GOVERNANCE org falls back to the project home, never a 404'd /me.
+  if (input.organizationIntent) {
+    // An intent-set org is onboarded, period: with no shared project it
+    // lands on settings — where the project gets created — never on the
+    // governance-personal /me and never back in /onboarding/welcome
+    // (which would loop: the welcome screen sends onboarded orgs home).
+    // Covers both the LLMOps org that postponed project creation and the
+    // kill-switched governance org that never had one.
+    const projectHome = input.firstProjectSlug
+      ? `/${input.firstProjectSlug}`
+      : "/settings";
+    const destination =
+      input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
+        ? "/me"
+        : projectHome;
+    return {
+      persona,
+      destination,
+      isOverride: false,
+      governanceUiEnabled: input.hasGovernanceUi,
+      intentPinned: true,
+    };
+  }
+
   if (input.userLastHomePath) {
     return {
       persona,
       destination: input.userLastHomePath,
       isOverride: true,
       governanceUiEnabled: input.hasGovernanceUi,
+      intentPinned: false,
     };
   }
 
@@ -111,6 +158,7 @@ export function resolvePersonaHome(
     destination: mapPersonaToDestination(persona, input),
     isOverride: false,
     governanceUiEnabled: input.hasGovernanceUi,
+    intentPinned: false,
   };
 }
 
@@ -124,6 +172,7 @@ export function resolvePersonaHomeSafe(
 ): PersonaResolution {
   try {
     const full: PersonaResolverInput = {
+      organizationIntent: input.organizationIntent ?? null,
       userLastHomePath: input.userLastHomePath ?? null,
       setupState: input.setupState ?? {
         hasPersonalVKs: false,
@@ -146,6 +195,7 @@ export function resolvePersonaHomeSafe(
         : "/me",
       isOverride: false,
       governanceUiEnabled: input.hasGovernanceUi ?? false,
+      intentPinned: false,
     };
   }
 }

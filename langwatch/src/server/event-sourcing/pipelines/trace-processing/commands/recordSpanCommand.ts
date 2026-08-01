@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
@@ -14,7 +15,6 @@ import {
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { featureFlagService } from "~/server/featureFlag";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,
@@ -44,7 +44,7 @@ import { TraceRequestUtils } from "../utils/traceRequest.utils";
  * Same `(tenantId, traceId, spanId)` dispatched within the TTL window is
  * squashed into the existing staged job (`extend + replace`) instead of
  * accumulating new HSET fields in the group `:data` hash. Without this,
- * a re-firing reactor (e.g. `claudeCodeSpanSync`) or a customer retry storm
+ * a customer retry storm or any at-least-once redelivery of the same span
  * grows the hash unboundedly until Redis runs out of memory.
  *
  * Exported so the dedup-coverage integration test can import the exact same
@@ -427,6 +427,7 @@ export class RecordSpanCommand
 
   private static readonly RESERVED_ATTR_PASSTHROUGH = new Set<string>([
     "langwatch.reserved.causality_depth",
+    "langwatch.reserved.skip_token_accumulation",
   ]);
 
   /**
@@ -445,10 +446,17 @@ export class RecordSpanCommand
    *     loops (post-2026-05-11 incident). Stripping it here would
    *     silently disable the loop-prevention guard in production.
    *
+   *   - `langwatch.reserved.skip_token_accumulation`, stamped by the
+   *     Langy telemetry relay on mediated worker model-call spans, whose
+   *     usage the gateway's own gen_ai span in the same trace already
+   *     meters. The trace-summary fold reads it to count that usage once.
+   *     Stripping it would double every Langy turn's token/cost totals.
+   *
    * If a customer SDK does manage to set one of these from outside,
-   * worst case is a one-shot eval-skip on their own trace — bounded
-   * impact, and bypassing requires knowing internal attribute names.
-   * Far preferable to silently breaking loop prevention.
+   * worst case is a one-shot eval-skip or an undercounted total on their
+   * own trace: bounded impact, and bypassing requires knowing internal
+   * attribute names. Far preferable to silently breaking the dependent
+   * behavior.
    */
   private static stripReservedAttributes(
     span: OtlpSpan,

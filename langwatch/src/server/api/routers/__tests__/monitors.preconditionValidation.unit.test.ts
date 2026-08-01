@@ -10,6 +10,7 @@ describe("validatedPreconditionsSchema", () => {
       expect(result.success).toBe(true);
     });
 
+    /** @scenario "Allowed rules derive from field characteristics" */
     it("accepts traces.origin with is rule", () => {
       const result = validatedPreconditionsSchema.safeParse([
         { field: "traces.origin", rule: "is", value: "application" },

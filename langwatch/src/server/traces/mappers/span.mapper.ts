@@ -140,6 +140,9 @@ function getAnnotatedType(
  * After canonicalization, input is at:
  * 1. gen_ai.input.messages (chat messages)
  * 2. langwatch.input (text/json/structured)
+ * 3. gen_ai.tool.call.arguments (tool spans from semconv-native emitters —
+ *    e.g. Copilot CLI — whose ingest path never lifted them into
+ *    langwatch.input)
  */
 function extractInput(
   spanAttributes: NormalizedAttributes,
@@ -192,7 +195,33 @@ function extractInput(
     };
   }
 
+  // Priority 3: gen_ai.tool.call.arguments — the tool-call semconv twin of
+  // the messages keys above.
+  const toolArguments = spanAttributes["gen_ai.tool.call.arguments"];
+  if (toolArguments !== undefined) {
+    return parseJsonOrText(toolArguments);
+  }
+
   return null;
+}
+
+/**
+ * A raw semconv payload: parse JSON strings into a `json` payload, keep
+ * anything else as text (mirrors how the langwatch.* branches infer type).
+ */
+function parseJsonOrText(value: unknown): SpanInputOutput {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (typeof parsed === "object" && parsed !== null) {
+        return { type: "json", value: toJsonSerializable(parsed) };
+      }
+    } catch {
+      // Not JSON — keep as string
+    }
+    return { type: "text", value };
+  }
+  return { type: "json", value: toJsonSerializable(value) };
 }
 
 /**
@@ -200,6 +229,7 @@ function extractInput(
  * After canonicalization, output is at:
  * 1. gen_ai.output.messages (chat messages)
  * 2. langwatch.output (text/json/structured)
+ * 3. gen_ai.tool.call.result (tool spans from semconv-native emitters)
  */
 function extractOutput(
   spanAttributes: NormalizedAttributes,
@@ -256,6 +286,12 @@ function extractOutput(
       type: "json",
       value: toJsonSerializable(lwOutput),
     };
+  }
+
+  // Priority 3: gen_ai.tool.call.result — see extractInput's tool-call twin.
+  const toolResult = spanAttributes["gen_ai.tool.call.result"];
+  if (toolResult !== undefined) {
+    return parseJsonOrText(toolResult);
   }
 
   return null;
@@ -354,7 +390,16 @@ function extractVendor(spanAttributes: NormalizedAttributes): string | null {
 function extractContexts(
   spanAttributes: NormalizedAttributes,
 ): RAGChunk[] | undefined {
-  const contexts = spanAttributes["langwatch.rag.contexts"];
+  let contexts = spanAttributes["langwatch.rag.contexts"];
+
+  // ClickHouse Map(String, String) stores arrays as JSON strings
+  if (typeof contexts === "string") {
+    try {
+      contexts = JSON.parse(contexts);
+    } catch {
+      return undefined;
+    }
+  }
 
   if (!contexts || !Array.isArray(contexts)) {
     return undefined;
@@ -455,7 +500,7 @@ export function unflattenDotNotation(
 
 /**
  * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
- * used by the Elasticsearch-based trace system.
+ * used by the pre-ClickHouse trace system.
  */
 export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
   const timestamps: SpanTimestamps = {

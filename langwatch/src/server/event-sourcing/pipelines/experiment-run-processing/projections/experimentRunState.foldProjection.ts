@@ -4,22 +4,22 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { normalizeDurationMs } from "../utils/duration.utils";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
-  EvaluatorResultEvent,
   TraceMetricsComputedEvent,
-  ExperimentRunCompletedEvent,
 } from "../schemas/events";
 import {
+  evaluatorResultEventSchema,
+  experimentRunCompletedEventSchema,
   experimentRunStartedEventSchema,
   targetResultEventSchema,
-  evaluatorResultEventSchema,
   traceMetricsComputedEventSchema,
-  experimentRunCompletedEventSchema,
 } from "../schemas/events";
+import { normalizeDurationMs } from "../utils/duration.utils";
 
 /**
  * State data for an experiment run.
@@ -63,7 +63,7 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
 }
 
-// Keep in sync with the Painless merge script in elasticsearchBatchEvaluation.repository.ts
+// Keep in sync with the target-merging logic in the ClickHouse experiment_runs projection store.
 function mergeTargetsJson(
   existingJson: string,
   incoming: Array<{ id: string; [k: string]: unknown }>,
@@ -101,12 +101,30 @@ const experimentRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class ExperimentRunStateFoldProjection
-  extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
-  implements FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
+  extends AbstractFoldProjection<
+    ExperimentRunStateData,
+    typeof experimentRunEvents
+  >
+  implements
+    FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
 {
   readonly name = "experimentRunState";
   readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<ExperimentRunStateData>;
+
+  /**
+   * Order-insensitive fold: every handler is a counter (`CompletedCount++`),
+   * a running sum (`TotalCost`/`TotalDurationMs`/`TotalScoreSum` +=), a
+   * `Math.max` (`Total`), or a keyed map that last-write-wins per key
+   * (`TraceMetrics[traceId]` subtract-old/add-new, `Targets` merged by id) —
+   * so the state converges to the same value whichever order events are seen
+   * in. A run's aggregate is dataset-scale (one targetResult per row + one
+   * evaluatorResult per row×evaluator, thousands of events), so re-folding the
+   * whole history on every out-of-order event is the same O(n²) amplification
+   * that hit the trace folds — pure waste here since the result is identical.
+   * See specs/event-sourcing/hot-trace-fold-amplification.feature.
+   */
+  readonly options = { refoldOnOutOfOrder: false } as const;
 
   protected readonly events = experimentRunEvents;
 
@@ -196,7 +214,13 @@ export class ExperimentRunStateFoldProjection
     event: EvaluatorResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {
-    let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, GradedCount: gradedCount, TotalCost: totalCost } = state;
+    let {
+      TotalScoreSum: totalScoreSum,
+      ScoreCount: scoreCount,
+      PassedCount: passedCount,
+      GradedCount: gradedCount,
+      TotalCost: totalCost,
+    } = state;
 
     if (event.data.status === "processed") {
       if (event.data.score != null) {
@@ -213,8 +237,10 @@ export class ExperimentRunStateFoldProjection
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 
-    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
-    const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+    const avgScoreBps =
+      scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
+    const passRateBps =
+      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
       ...state,

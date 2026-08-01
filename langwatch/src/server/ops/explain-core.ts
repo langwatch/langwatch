@@ -6,7 +6,13 @@ import { z } from "zod";
 /// itself lives in src/server/routes/ops.ts (Hono); these functions stay
 /// pure so they can be unit-tested in isolation.
 
-export const ALLOWED_EXPLAIN_TYPES = ["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"] as const;
+export const ALLOWED_EXPLAIN_TYPES = [
+  "PLAN",
+  "SYNTAX",
+  "PIPELINE",
+  "AST",
+  "INDEXES",
+] as const;
 export type ExplainType = (typeof ALLOWED_EXPLAIN_TYPES)[number];
 
 /// `ANALYZE` would execute the inner query — never allow it. The other
@@ -30,8 +36,8 @@ const TABLE_FUNCTION_RE =
 const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 
 /// Per-query ClickHouse-side guardrails. Must stay aligned with the
-/// langwatch_ops profile in
-/// infrastructure/clickhouse-serverless/config/users.xml.template.
+/// langwatch_ops profile, which is provisioned per deployment rather than
+/// from this repo: a readonly=1 profile with no SOURCES grant.
 /// ClickHouseSettings is picky: `readonly` / `max_result_bytes` /
 /// `max_memory_usage` are typed `UInt64 = string`, `max_execution_time`
 /// is `Seconds = number`.
@@ -148,11 +154,18 @@ export function stripCommentsAndStrings(query: string): string {
   return out;
 }
 
-export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): ParseResult {
+export function buildExplainQuery(
+  query: string,
+  type: ExplainType = "PLAN",
+): ParseResult {
   const trimmed = query.trim();
   if (!trimmed) return { ok: false, reason: "query is empty" };
   if (/^\s*EXPLAIN\b/i.test(trimmed)) {
-    return { ok: false, reason: "query already starts with EXPLAIN — pass the inner SELECT only and choose type via the `type` field" };
+    return {
+      ok: false,
+      reason:
+        "query already starts with EXPLAIN — pass the inner SELECT only and choose type via the `type` field",
+    };
   }
   const normalized = stripCommentsAndStrings(trimmed);
   if (normalized.includes(";")) {
@@ -160,7 +173,10 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   }
   const forbidden = FORBIDDEN_KEYWORD_RE.exec(normalized);
   if (forbidden) {
-    return { ok: false, reason: `forbidden keyword in query: ${(forbidden[1] ?? "").toUpperCase()}` };
+    return {
+      ok: false,
+      reason: `forbidden keyword in query: ${(forbidden[1] ?? "").toUpperCase()}`,
+    };
   }
   const tableFn = TABLE_FUNCTION_RE.exec(normalized);
   if (tableFn) {
@@ -170,7 +186,10 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
     };
   }
   if (SYSTEM_SCHEMA_RE.test(normalized)) {
-    return { ok: false, reason: "references to the system.* schema are not allowed" };
+    return {
+      ok: false,
+      reason: "references to the system.* schema are not allowed",
+    };
   }
   // `INDEXES` is not a top-level EXPLAIN type in ClickHouse — it's a
   // modifier on `EXPLAIN PLAN` (`EXPLAIN PLAN indexes = 1 ...`). Sending
@@ -178,11 +197,16 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   // 502s. Expand it to the canonical form so callers can pass `INDEXES`
   // as a logical type without needing to know that wrinkle.
   const prefix =
-    type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
+    type === "INDEXES"
+      ? "EXPLAIN PLAN indexes = 1, actions = 1"
+      : `EXPLAIN ${type}`;
   return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 
-export function redactQueryForAudit(query: string): { shape: string; sha256: string } {
+export function redactQueryForAudit(query: string): {
+  shape: string;
+  sha256: string;
+} {
   const shape = query
     .replace(/'(?:\\.|[^'\\])*'/g, "'?'")
     .replace(/"(?:\\.|[^"\\])*"/g, '"?"')

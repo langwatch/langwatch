@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { responseFormatToOutputs } from "@/cli/utils/responseFormat";
@@ -18,7 +18,7 @@ import type {
 } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import readline from "node:readline";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
@@ -105,7 +105,7 @@ export const pushPrompts = async ({
   );
 
   if (localFileRefs.length > 0) {
-    const pushSpinner = ora(
+    const pushSpinner = createSpinner(
       `Pushing ${localFileRefs.length} local prompts...`
     ).start();
 
@@ -385,7 +385,7 @@ export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?
   const startTime = Date.now();
 
   try {
-    checkApiKey();
+    await resolveCredentials();
 
     const promptsApiService = new PromptsApiService();
 

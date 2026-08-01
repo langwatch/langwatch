@@ -6,6 +6,7 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
+import type { ModelParamsProvider, ModelParamsResult } from "./data-prefetcher";
 import type {
   ExecutionContext,
   LiteLLMParams,
@@ -14,7 +15,7 @@ import type {
   TargetConfig,
   TelemetryConfig,
 } from "./types";
-import type { ModelParamsProvider, ModelParamsResult } from "./data-prefetcher";
+
 export type { ModelParamsProvider, ModelParamsResult };
 
 /** Fetches scenario configuration by ID */
@@ -45,8 +46,7 @@ export interface AdapterFactory {
     modelParams: LiteLLMParams;
     nlpServiceUrl: string;
   }): Promise<
-    | { success: true; adapter: AgentAdapter }
-    | { success: false; error: string }
+    { success: true; adapter: AgentAdapter } | { success: false; error: string }
   >;
 }
 
@@ -57,7 +57,13 @@ export interface TracerHandle {
 
 /** Creates tracers for scenario execution */
 export interface TracerFactory {
-  create(config: TelemetryConfig & { scenarioId: string; batchRunId: string; projectId: string }): TracerHandle;
+  create(
+    config: TelemetryConfig & {
+      scenarioId: string;
+      batchRunId: string;
+      projectId: string;
+    },
+  ): TracerHandle;
 }
 
 /** Executes scenarios using the SDK */

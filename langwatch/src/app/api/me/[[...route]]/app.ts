@@ -1,27 +1,41 @@
+import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import {
   createProjectApp,
   requires,
   type SecuredApp,
 } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
+import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import { baseResponses } from "../../shared/base-responses";
-import { meUsageQuerySchema, meUsageResponseSchema } from "./schemas";
+import {
+  meProjectResponseSchema,
+  meUsageQuerySchema,
+  meUsageResponseSchema,
+} from "./schemas";
 
 patchZodOpenapi();
 
 /**
- * Hono app for /api/me — the personal-developer surface. Today it
- * exposes a single read: GET /api/me/usage, the same spend / usage /
- * model-breakdown payload the /me dashboard renders via the
- * `api.user.personalUsage` tRPC procedure. Both entrypoints call the
- * shared PersonalUsageService so the numbers stay identical across the
- * web dashboard and any external client (desktop widget, CLI, CI).
+ * Hono app for /api/me — the personal-developer surface. Two reads:
+ *
+ *   GET /api/me/usage    — the same spend / usage / model-breakdown payload
+ *                          the /me dashboard renders via the
+ *                          `api.user.personalUsage` tRPC procedure. Both
+ *                          entrypoints call the shared PersonalUsageService
+ *                          so the numbers stay identical across the web
+ *                          dashboard and any external client (desktop
+ *                          widget, CLI, CI).
+ *   GET /api/me/project  — identity of the project the calling key belongs
+ *                          to (any project key, not only personal). The
+ *                          CLI's identity notice names the project behind
+ *                          LANGWATCH_API_KEY with it.
  *
  * Auth: a project API key whose project is the caller's personal
  * project (Project.isPersonal=true). The owner is resolved from
@@ -34,6 +48,13 @@ const secured = createProjectApp({ basePath: "/api/me" });
 registerMeRoutes(secured);
 
 export function registerMeRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  registerUsageRoute(secured);
+  registerProjectRoute(secured);
+}
+
+function registerUsageRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
   secured.access(requires("project:view")).get(
@@ -85,10 +106,29 @@ export function registerMeRoutes(
           ? { start: new Date(windowStartMs), end: new Date(windowEndMs) }
           : undefined;
 
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
+      // the org's hidden Governance Project tenant, not the personal
+      // project. Resolve it read-only (never provision on a GET) so the
+      // usage union is scoped to THIS org's tenant — both to prune
+      // ClickHouse partitions and to avoid summing a multi-org user's
+      // spend across every org. Absent when the org never minted an
+      // ingestion source, in which case there is no ledger traffic.
+      const team = await prisma.team.findUnique({
+        where: { id: project.teamId },
+        select: { organizationId: true },
+      });
+      const governanceProject = team
+        ? await findHiddenGovernanceProject({
+            prisma,
+            organizationId: team.organizationId,
+          })
+        : null;
+
       const usage = new PersonalUsageService();
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,
+        ingestionTenantId: governanceProject?.id,
         window,
       };
 
@@ -100,6 +140,38 @@ export function registerMeRoutes(
       ]);
 
       return c.json({ summary, dailyBuckets, breakdownByModel });
+    },
+  );
+}
+
+function registerProjectRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("project:view")).get(
+    "/project",
+    describeRoute({
+      description:
+        "Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(meProjectResponseSchema),
+            },
+          },
+        },
+      },
+    }),
+    (c) => {
+      const project = c.get("project");
+      return c.json({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        isPersonal: project.isPersonal === true,
+      });
     },
   );
 }

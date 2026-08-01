@@ -1,6 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
-import React from "react";
 
 import { formatBudgetUsd } from "../gateway/formatBudgetUsd";
 import { Link } from "../ui/link";
@@ -113,11 +112,7 @@ export function BudgetExceededBanner({
       _dark={{ borderColor: "red.700", backgroundColor: "red.900" }}
     >
       <HStack gap={3} alignItems="start">
-        <Box
-          color="red.600"
-          paddingTop="2px"
-          _dark={{ color: "red.300" }}
-        >
+        <Box color="red.600" paddingTop="2px" _dark={{ color: "red.300" }}>
           <AlertTriangle size={20} aria-hidden="true" />
         </Box>
         <VStack align="start" gap={2} flex={1}>
@@ -128,15 +123,11 @@ export function BudgetExceededBanner({
           >
             Budget limit reached
           </Text>
-          <Text
-            fontSize="sm"
-            color="red.700"
-            _dark={{ color: "red.200" }}
-          >
+          <Text fontSize="sm" color="red.700" _dark={{ color: "red.200" }}>
             You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
-            <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel} budget.
-            New requests are being blocked until the limit resets or your admin
-            raises it.
+            <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel}{" "}
+            budget. New requests are being blocked until the limit resets or
+            your admin raises it.
           </Text>
           {(requestIncreaseUrl || adminEmail) && (
             <HStack gap={4} fontSize="sm" wrap="wrap">

@@ -1,0 +1,94 @@
+---
+title: Ask Langy
+description: Ask Langy in plain language about your production traces and evals; it reads the data with the langwatch CLI, writes a Scenario test, and can open a pull request.
+sidebarTitle: Ask Langy
+keywords:
+  - ai agent debugging
+  - did my agent get worse
+  - ask ai about traces
+---
+
+Type the question into the Langy panel in plain language; there is no query syntax to learn. The sections below group example questions by what you are trying to find out, from a regression, to a cost spike, to a fix you want turned into a pull request.
+
+<Info>**Also check:** [Scenario tests and evals](/langy/scenario-tests-and-evals) (what Langy produces), [Pull requests](/langy/pull-requests) (how it changes code), [Insights across your traces](/langy/insights) (what it finds when you ask what changed).</Info>
+
+<Frame caption="The Langy panel, ready for a question, with suggested prompts and a 'Choose what Langy can see' context row on the composer.">
+  ![The Langy chat panel ready for a question](/images/langy/overview/chat-panel-empty.png)
+</Frame>
+
+## What you can ask
+
+Group your questions by intent. Each maps to the `langwatch` CLI commands Langy runs behind it.
+
+### Investigate a regression
+
+- "Did my agent get worse this week?"
+- "Find failing traces from the last 24 hours."
+- "Why is p50 latency 12s on the checkout agent?"
+
+Langy runs `langwatch trace search` and `langwatch analytics query` over the relevant origin, compares the window you named, and comes back with the traces and the metric that moved.
+
+### Investigate cost
+
+- "Where is my cost going?"
+- "What changed in my token spend after the last deploy?"
+- "Can I move this feature to a cheaper model without losing quality?"
+
+For a cheaper-model migration, Langy pulls the traces for that feature, then writes an [evaluation or a Scenario test](/langy/scenario-tests-and-evals) that measures the current behavior so the swap is proven, not guessed.
+
+### Set up testing and evals
+
+- "Set up an evaluator for answer correctness on the support agent."
+- "Write a Scenario test that probes this agent like an annoyed user."
+- "Compare two runs and tell me which prompt is better."
+
+Langy writes the test or evaluator with `langwatch scenario create`, `langwatch evaluator create`, or `langwatch experiment run`, and can run it for you. See [Scenario tests and evals](/langy/scenario-tests-and-evals).
+
+### Investigate an issue and open a PR
+
+- "Investigate this failing trace and open a PR with a fix."
+- "This agent ignores the system prompt under pressure; write a failing test and fix it."
+
+Langy reads the trace, writes a failing Scenario test that captures the problem, drafts a fix, and opens a [bot-authored pull request](/langy/pull-requests). A human reviews and merges; Langy never merges.
+
+## What happens when you ask
+
+<Steps>
+  <Step title="Langy reads your data">
+    It shells the `langwatch` CLI (`trace search`, `trace get`, `analytics query`, and more) to read the traces and evals for the question you asked. Traces are scoped by origin, so it excludes its own turns by default.
+  </Step>
+  <Step title="It may write a test or evaluation">
+    When a question needs a check, Langy writes a Scenario simulation test or an evaluation that captures the behavior. See [Scenario tests and evals](/langy/scenario-tests-and-evals).
+  </Step>
+  <Step title="It may open a pull request">
+    For a code change, Langy opens a bot-authored PR on the repo you installed the GitHub App on, and runs the Scenario tests it wrote in your CI. See [Pull requests](/langy/pull-requests).
+  </Step>
+</Steps>
+
+Each tool call streams into the turn as an activity card, so you see the CLI command it ran and its typed result, not a black box.
+
+<Frame caption="The Langy panel mid-turn, running real tool work. Each CLI call appears as an activity in the conversation.">
+  ![Langy running tool work](/images/langy/chat/chat-toolwork.png)
+</Frame>
+
+When Langy runs a Scenario simulation, the result appears as a run card in the chat with its outcome, duration, and cost.
+
+<Frame caption="A live simulation-run card inside chat: outcome SUCCESS with duration and cost, and a link to open the run in Simulations.">
+  ![Simulation run card in chat](/images/langy/chat/simulation-run-card.png)
+</Frame>
+
+## Ask about what you are looking at
+
+The panel stays docked while you move through the app, so you can open a trace and ask Langy about that trace. Paste the trace ID or add it through the context chip, and Langy reads the same spans you see in the waterfall.
+
+<Frame caption="A trace's span waterfall with Langy alongside, walking through what happened in that trace and why an evaluator errored.">
+  ![A trace drawer with its span waterfall and a Langy conversation about that trace](/images/langy/panel/drawer-companion.png)
+</Frame>
+
+## Choose what Langy can see
+
+Context is explicit. The `# Context` chip on the composer lets you choose what Langy can see, and the chips shown are exactly the context the model receives, nothing hidden.
+
+## Stop a turn
+
+You can stop a turn at any point. Stopping ends the turn for real: Langy stops the work in progress and keeps the partial output it already produced. Start a new turn to continue from there.

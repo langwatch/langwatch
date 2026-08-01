@@ -1,14 +1,16 @@
-import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
+import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { annotationContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({
@@ -88,7 +90,9 @@ export default function AnnotationsLayout({
                     : ""}
                 </Text>
               }
-              isSelectedAnnotation={router.pathname === "/[project]/annotations"}
+              isSelectedAnnotation={
+                router.pathname === "/[project]/annotations"
+              }
             >
               Inbox
             </MenuLink>
@@ -132,22 +136,39 @@ export default function AnnotationsLayout({
               )}
             </HStack>
             {queueItemsCounts.data?.map((queue) => (
-              <MenuLink
+              // Armed, the queue can be handed to Langy. Keyed on the SLUG,
+              // because that is what `/annotations/<slug>` puts in the URL and
+              // therefore what the route-derived chip uses.
+              <LangyContextTarget
                 key={queue.id}
-                href={`/${project?.slug}/annotations/${queue.slug}`}
-                isSelectedAnnotation={
-                  router.pathname ===
-                  `/${project?.slug}/annotations/${queue.slug}`
-                }
-                icon={menuItems.queues}
-                menuEnd={
-                  <Text fontSize="xs" fontWeight="500">
-                    {queue.pendingCount > 0 ? queue.pendingCount : ""}
-                  </Text>
-                }
+                target={annotationContextChip({
+                  annotationId: queue.slug,
+                  name: queue.name,
+                  noun: "annotation queue",
+                })}
               >
-                {queue.name}
-              </MenuLink>
+                {/* A Box, not the MenuLink itself: MenuLink takes a fixed prop
+                  set and would drop the target's className / handlers on the
+                  floor. The Box is width-full and carries the link's own
+                  radius, so the outline lands exactly on the row. */}
+                <Box width="full" borderRadius="lg">
+                  <MenuLink
+                    href={`/${project?.slug}/annotations/${queue.slug}`}
+                    isSelectedAnnotation={
+                      router.pathname ===
+                      `/${project?.slug}/annotations/${queue.slug}`
+                    }
+                    icon={menuItems.queues}
+                    menuEnd={
+                      <Text fontSize="xs" fontWeight="500">
+                        {queue.pendingCount > 0 ? queue.pendingCount : ""}
+                      </Text>
+                    }
+                  >
+                    {queue.name}
+                  </MenuLink>
+                </Box>
+              </LangyContextTarget>
             ))}
           </VStack>
         </VStack>

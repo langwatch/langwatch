@@ -1,15 +1,20 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
+import {
+  BookText,
+  ChevronDown,
+  Code,
+  Globe,
+  Play,
+  Plus,
+  Save,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 import type { TargetValue } from "./TargetSelector";
-import {
-  isAgentTarget,
-  useFilteredAgents,
-} from "./useFilteredScenarioTargets";
+import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;
@@ -36,13 +41,16 @@ export function SaveAndRunMenu({
 }: SaveAndRunMenuProps) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
+
+  // Agents are only shown inside the popover, and the trigger is static —
+  // don't fetch them until the menu is opened.
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: open && !!project?.id },
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -162,10 +170,10 @@ export function SaveAndRunMenu({
                     bg={
                       isAgentTarget(selectedTarget) &&
                       selectedTarget.id === agent.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
-                    _hover={{ bg: "gray.100" }}
+                    _hover={{ bg: "bg.muted" }}
                     onClick={() =>
                       handleSelectAndRun({
                         type: agent.type,
@@ -174,9 +182,9 @@ export function SaveAndRunMenu({
                     }
                   >
                     {agent.type === "code" ? (
-                      <Code size={14} color="var(--chakra-colors-gray-500)" />
+                      <Code size={14} color="var(--chakra-colors-fg-muted)" />
                     ) : (
-                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                      <Globe size={14} color="var(--chakra-colors-fg-muted)" />
                     )}
                     <Text fontSize="sm" flex={1}>
                       {agent.name}
@@ -190,7 +198,7 @@ export function SaveAndRunMenu({
                 paddingX={3}
                 paddingY={2}
                 cursor="pointer"
-                _hover={{ bg: "gray.100" }}
+                _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
                 color="blue.500"
@@ -231,15 +239,15 @@ export function SaveAndRunMenu({
                     bg={
                       selectedTarget?.type === "prompt" &&
                       selectedTarget.id === prompt.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
-                    _hover={{ bg: "gray.100" }}
+                    _hover={{ bg: "bg.muted" }}
                     onClick={() =>
                       handleSelectAndRun({ type: "prompt", id: prompt.id })
                     }
                   >
-                    <BookText size={14} color="var(--chakra-colors-gray-500)" />
+                    <BookText size={14} color="var(--chakra-colors-fg-muted)" />
                     <Text fontSize="sm" flex={1}>
                       {prompt.handle ?? prompt.id}
                     </Text>
@@ -252,7 +260,7 @@ export function SaveAndRunMenu({
                 paddingX={3}
                 paddingY={2}
                 cursor="pointer"
-                _hover={{ bg: "gray.100" }}
+                _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
                 color="blue.500"
@@ -270,10 +278,10 @@ export function SaveAndRunMenu({
               paddingX={3}
               paddingY={3}
               cursor="pointer"
-              _hover={{ bg: "gray.50" }}
+              _hover={{ bg: "bg.muted" }}
               onClick={handleSaveWithoutRunning}
             >
-              <Save size={14} color="var(--chakra-colors-gray-500)" />
+              <Save size={14} color="var(--chakra-colors-fg-muted)" />
               <Text fontSize="sm">Save without running</Text>
             </HStack>
           </Box>

@@ -24,14 +24,26 @@
  * Used by the gateway-config materialiser to assemble the flat
  * `providers[]` array the Go dispatcher reads on every request.
  */
-import type {
-  ModelProvider,
-  PrismaClient,
-  Prisma,
-  Team,
-} from "@prisma/client";
+import type { ModelProvider, Prisma, PrismaClient, Team } from "@prisma/client";
 
-import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
+
+/**
+ * The two fields trace-project resolution actually reads. Narrower than
+ * `VirtualKeyWithScopes` so a drawer draft (no key row yet) satisfies it
+ * structurally; if resolution ever needs another field of the key, the
+ * draft call sites stop compiling instead of silently passing undefined.
+ */
+export type TraceProjectInput = {
+  organizationId: string;
+  scopes: ScopeInput[];
+  /**
+   * The explicit destination an org- or team-owned key carries. Stored
+   * apart from the access scopes because scope rows grant visibility and
+   * operate rights, and the trace destination must grant neither.
+   */
+  traceProjectId?: string | null;
+};
 
 export type EligibleModelProvider = ModelProvider;
 
@@ -158,13 +170,32 @@ function parseModelProviderIds(raw: unknown): string[] {
  *     pre-governance) -> null. The materialiser then null-stamps
  *     `project_id` / `project_otlp_token` in the bundle and the gateway
  *     skips span export rather than 500-ing.
+ *
+ * Null is a read-path tolerance for keys that already exist, not a shape
+ * new writes may take: VirtualKeyService refuses create/update when this
+ * resolves null (`trace_project_required`), because dropped traces mean
+ * spend no budget can ever see.
  */
 export async function resolveTraceProject(
   prisma: PrismaClient,
-  vk: VirtualKeyWithScopes,
+  vk: TraceProjectInput,
   tx?: Prisma.TransactionClient,
 ): Promise<{ id: string; teamId: string; apiKey: string } | null> {
   const client = tx ?? prisma;
+  // Resolution order: (1) the explicit trace destination, (2) a unique
+  // PROJECT access scope, (3) the org's governance project. The explicit
+  // column wins because it is the one the key's creator chose; the org
+  // pin on the lookup keeps a stray id from landing traces cross-tenant.
+  if (vk.traceProjectId) {
+    const explicit = await client.project.findFirst({
+      where: {
+        id: vk.traceProjectId,
+        team: { organizationId: vk.organizationId },
+      },
+      select: { id: true, teamId: true, apiKey: true },
+    });
+    if (explicit) return explicit;
+  }
   const projectScopes = vk.scopes.filter((s) => s.scopeType === "PROJECT");
   if (projectScopes.length === 1) {
     const proj = await client.project.findUnique({
@@ -174,21 +205,25 @@ export async function resolveTraceProject(
     if (proj) return proj;
   }
 
-  const governanceProjects: Array<{ id: string; teamId: string; apiKey: string; team: Pick<Team, "organizationId"> }> =
-    await client.project.findMany({
-      where: {
-        kind: "internal_governance",
-        team: { organizationId: vk.organizationId },
-      },
-      select: {
-        id: true,
-        teamId: true,
-        apiKey: true,
-        team: { select: { organizationId: true } },
-      },
-      orderBy: { createdAt: "asc" },
-      take: 1,
-    });
+  const governanceProjects: Array<{
+    id: string;
+    teamId: string;
+    apiKey: string;
+    team: Pick<Team, "organizationId">;
+  }> = await client.project.findMany({
+    where: {
+      kind: "internal_governance",
+      team: { organizationId: vk.organizationId },
+    },
+    select: {
+      id: true,
+      teamId: true,
+      apiKey: true,
+      team: { select: { organizationId: true } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 1,
+  });
   const gov = governanceProjects[0];
   if (!gov) return null;
   return { id: gov.id, teamId: gov.teamId, apiKey: gov.apiKey };

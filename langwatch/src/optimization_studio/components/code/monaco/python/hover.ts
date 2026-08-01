@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable } from "monaco-editor";
+import type { editor, IDisposable, Position } from "monaco-editor";
 import { PYTHON_BUILTIN_BY_NAME } from "../pythonStdlib";
 import { ATTR_ACCESS, type ContractRef, scanImports } from "./shared";
 
@@ -8,7 +8,7 @@ export function registerHover(
   contractRef: ContractRef,
 ): IDisposable {
   return monaco.languages.registerHoverProvider("python", {
-    provideHover: (model, position) => {
+    provideHover: (model: editor.ITextModel, position: Position) => {
       const word = model.getWordAtPosition(position);
       if (!word) return null;
       // Include the *full* hovered word — not just the prefix up to the cursor
@@ -66,7 +66,10 @@ export function registerHover(
         return {
           contents: [
             { value: `**${input.identifier}** *(node input)*` },
-            { value: "```python\n" + `${input.identifier}: ${input.type}\n` + "```" },
+            {
+              value:
+                "```python\n" + `${input.identifier}: ${input.type}\n` + "```",
+            },
             { value: "Wired in the Inputs section of the properties panel." },
           ],
         };
@@ -80,7 +83,9 @@ export function registerHover(
             { value: `**${output.identifier}** *(node output)*` },
             {
               value:
-                "```python\n" + `${output.identifier}: ${output.type}\n` + "```",
+                "```python\n" +
+                `${output.identifier}: ${output.type}\n` +
+                "```",
             },
             {
               value:

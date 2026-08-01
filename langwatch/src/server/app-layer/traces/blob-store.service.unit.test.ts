@@ -6,16 +6,14 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { describe, it, expect, vi } from "vitest";
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import {
-  BlobStore,
-  type S3ClientResolver,
-} from "./blob-store.service";
+import { describe, expect, it, vi } from "vitest";
+import { BlobStore, type S3ClientResolver } from "./blob-store.service";
 
 /**
  * In-memory fake S3 keyed by `${bucket}/${key}`.
@@ -107,7 +105,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
           const store = new BlobStore(resolverFor(fake));
           const originalBody = Buffer.from("exact span body bytes", "utf-8");
 
-          const spoolRef = await store.putSpool({ ...spoolCoords, body: originalBody });
+          const spoolRef = await store.putSpool({
+            ...spoolCoords,
+            body: originalBody,
+          });
           const retrieved = await store.getSpool(spoolRef);
 
           expect(retrieved).toEqual(originalBody);

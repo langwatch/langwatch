@@ -1,4 +1,9 @@
+import { createLogger } from "@langwatch/observability";
+
+import { getLangyRateLimitCounter } from "~/server/metrics";
 import { connection } from "../redis";
+
+const logger = createLogger("langwatch:langy:rate-limit");
 
 export const LANGY_MESSAGES_PER_MINUTE = 30;
 
@@ -36,13 +41,20 @@ export async function checkLangyMessageRateLimit({
         connection as { expire: (k: string, s: number) => Promise<number> }
       ).expire(key, 65);
     }
-  } catch {
+  } catch (error) {
     // Redis hiccup — fail open rather than 500 the chat request, matching the
-    // no-connection branch above.
+    // no-connection branch above. Metered + logged: a sustained fail_open rate
+    // means the limit is effectively off fleet-wide (Redis outage).
+    getLangyRateLimitCounter("fail_open").inc();
+    logger.warn(
+      { error, projectId, userId },
+      "langy rate limit failing open on redis error",
+    );
     return { allowed: true, remaining: limit };
   }
   const remaining = Math.max(0, limit - count);
   if (count > limit) {
+    getLangyRateLimitCounter("rejected").inc();
     const nextBucket = (bucket + 1) * 60_000;
     return {
       allowed: false,

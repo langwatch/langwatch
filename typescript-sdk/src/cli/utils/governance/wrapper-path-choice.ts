@@ -25,8 +25,12 @@
  *   3. exactly one allowed path (policy gate) - used silently.
  *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
  *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - default gateway,
- *      no prompt, no persist.
+ *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
+ *      no prompt, no persist. Nobody is there to consent to the gateway
+ *      billing model usage to the org, so it is never chosen implicitly.
+ *
+ * Cancelling the prompt in case 4 cancels the run rather than picking a
+ * path on the user's behalf.
  *
  * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
  * before they are forwarded to the real tool. Every other arg is
@@ -156,22 +160,60 @@ export interface ResolveWrapperPathResult {
   mode: WrapperMode;
   /** True when this run made a fresh interactive choice (and persisted it). */
   prompted: boolean;
+  /**
+   * True when the user cancelled the path prompt. `mode` is then a
+   * placeholder the caller must not act on; it should stop the run.
+   */
+  isAborted?: boolean;
 }
 
 /**
- * Human-readable copy for the interactive select. Kept as a constant so
- * tests can assert it and the wording stays in one place.
+ * Human-readable copy for the interactive select. Kept as exported
+ * helpers so tests can assert it and the wording stays in one place.
+ *
+ * The OTLP (ingestion) option is listed first and is the default: most
+ * users reaching this prompt already pay for the tool's own subscription
+ * and want LangWatch to observe their usage, not re-bill it. The gateway
+ * (API key) path is the explicit opt-in.
  */
 export function pathChoiceMessage(tool: string): string {
   return `How should \`langwatch ${tool}\` run?`;
 }
 
 export function gatewayChoiceTitle(): string {
-  return "Gateway (virtual key) - route LLM calls through LangWatch (usage billed per token)";
+  return "Using an API key";
 }
 
+export function gatewayChoiceDescription(): string {
+  return "route calls through LangWatch with a virtual key, billed per token";
+}
+
+/**
+ * Per-tool subscription noun for the OTLP (bring-your-own-plan) option:
+ * claude runs on a Claude subscription, codex on a ChatGPT subscription,
+ * gemini on a Gemini subscription, cursor on a Cursor subscription.
+ * Tools without a well-known subscription (opencode is a bring-your-own
+ * client) fall back to a neutral "your own <tool> plan".
+ */
+const OTLP_TITLE_BY_TOOL = {
+  claude: "Using a Claude subscription",
+  codex: "Using a ChatGPT subscription",
+  gemini: "Using a Gemini subscription",
+  cursor: "Using a Cursor subscription",
+} as const satisfies Record<string, string>;
+
 export function otlpChoiceTitle(tool: string): string {
-  return `Direct OTLP - use your own ${tool} plan, send only telemetry to LangWatch`;
+  // Own-property check (not `in`) so inherited names like "toString" take
+  // the fallback path. hasOwnProperty.call keeps the SDK's pre-ES2022 lib
+  // target happy where Object.hasOwn does not typecheck.
+  if (Object.prototype.hasOwnProperty.call(OTLP_TITLE_BY_TOOL, tool)) {
+    return OTLP_TITLE_BY_TOOL[tool as keyof typeof OTLP_TITLE_BY_TOOL];
+  }
+  return `Using your own ${tool} plan`;
+}
+
+export function otlpChoiceDescription(): string {
+  return "keep your own plan, send only telemetry to LangWatch";
 }
 
 /**
@@ -251,22 +293,31 @@ export async function resolveWrapperPath(
   // 4 / 5. Both paths allowed.
   const canPrompt = isTTY && !isForcedAutoLogin(env);
   if (!canPrompt) {
-    // Non-TTY / CI / forced-auto-login - default to the gateway, no prompt.
-    return { mode: "gateway", prompted: false };
+    // Non-TTY / CI / forced-auto-login: nobody is there to answer, and the
+    // gateway bills model usage to the organization. Take the same option
+    // the prompt pre-selects, which costs nothing beyond telemetry. A CI
+    // job that wants the gateway asks for it with --tool-mode=gateway,
+    // LANGWATCH_TOOL_MODE=gateway, or a pinned tool_mode.
+    return { mode: "ingestion", prompted: false };
   }
 
   const res = await promptImpl({
     type: "select",
     name: "path",
     message: pathChoiceMessage(tool),
+    // Subscription (OTLP) first and pre-selected; API key (gateway) is the
+    // explicit opt-in. Values stay "gateway"/"ingestion" - they are the
+    // persisted cfg.tool_mode vocabulary.
     choices: [
       {
-        title: gatewayChoiceTitle(),
-        value: "gateway",
+        title: otlpChoiceTitle(tool),
+        description: otlpChoiceDescription(),
+        value: "ingestion",
       },
       {
-        title: otlpChoiceTitle(tool),
-        value: "ingestion",
+        title: gatewayChoiceTitle(),
+        description: gatewayChoiceDescription(),
+        value: "gateway",
       },
     ],
     initial: 0,
@@ -274,9 +325,10 @@ export async function resolveWrapperPath(
 
   const chosen = tokenToMode(res?.path as string | undefined);
   if (!chosen) {
-    // User aborted the prompt (Ctrl-C / empty). Default to the gateway
-    // for this run without persisting, so the next run asks again.
-    return { mode: "gateway", prompted: false };
+    // User aborted the prompt (Ctrl-C / empty). Cancelling the question
+    // cancels the run: picking a path for them would either start the tool
+    // they just interrupted or bill their organization for it.
+    return { mode: "ingestion", prompted: false, isAborted: true };
   }
 
   // Remember the choice so subsequent runs don't prompt.
@@ -292,9 +344,10 @@ export async function resolveWrapperPath(
     // Best-effort persist - a write failure shouldn't block the run.
   }
 
-  const label = chosen === "gateway" ? "gateway" : "otlp";
+  const label =
+    chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";
   writeImpl(
-    `${lwTag()} saved. \`${tool}\` will use the ${label} path. ` +
+    `${lwTag()} saved. \`${tool}\` will use ${label}. ` +
       `Override with --tool-mode=${chosen === "gateway" ? "otlp" : "gateway"}, ` +
       `or edit ~/.langwatch/config.json (tool_mode.${tool}).\n`,
   );

@@ -11,7 +11,7 @@ vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOr
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("ora", () => ({
@@ -88,21 +88,44 @@ describe("queryAnalyticsCommand()", () => {
         }),
       );
     });
+
+    it("maps the natural-language latency alias to average completion time", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ metric: "latency" });
+
+      expect(mockTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              metric: "performance.completion_time",
+              aggregation: "avg",
+            }),
+          ],
+        }),
+      );
+    });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the timeseries labelled with the resolved series as the payload", async () => {
       const result = {
         currentPeriod: [{ date: 123, val: 1 }],
         previousPeriod: [],
       };
       mockTimeseries.mockResolvedValue(result);
 
-      await queryAnalyticsCommand({ format: "json" });
+      const commandResult = await queryAnalyticsCommand({});
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port. The resolved metric/aggregation ride along so a
+      // consumer can label the result without guessing from numeric keys.
+      expect(commandResult?.data).toEqual({
+        ...result,
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

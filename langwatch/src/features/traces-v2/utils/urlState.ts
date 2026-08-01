@@ -1,5 +1,3 @@
-import type { LensConfig } from "../stores/viewStore";
-
 // Density is intentionally NOT serialised into the URL — it's a personal
 // preference, not a shareable view setting. Lives in `densityStore.ts`.
 //
@@ -16,7 +14,6 @@ export interface BarStateOverrides {
   preset?: string;
   timeFrom?: number;
   timeTo?: number;
-  page?: number;
 }
 
 export interface FragmentState {
@@ -30,11 +27,6 @@ function safeDecode(value: string): string | null {
   } catch {
     return null;
   }
-}
-
-function parseFinitePositiveInt(value: string): number | undefined {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 export function parseFragment(fragment: string): FragmentState | null {
@@ -67,23 +59,15 @@ export function parseFragment(fragment: string): FragmentState | null {
         }
       }
     }
-
-    const page = params.get("page");
-    if (page !== null) {
-      const parsed = parseFinitePositiveInt(page);
-      if (parsed !== undefined) overrides.page = parsed;
-    }
   }
 
   return { lensId, overrides };
 }
 
 interface ComputeOverridesInput {
-  activeLens: LensConfig;
   query: string;
   timeRange: { from: number; to: number; presetId?: string };
   defaultPresetId: string;
-  page: number;
 }
 
 export function computeOverrides(
@@ -99,7 +83,6 @@ export function computeOverrides(
     overrides.timeFrom = input.timeRange.from;
     overrides.timeTo = input.timeRange.to;
   }
-  if (input.page !== 1) overrides.page = input.page;
   return overrides;
 }
 
@@ -118,7 +101,6 @@ export function buildFragment(
     params.set("from", String(overrides.timeFrom));
     params.set("to", String(overrides.timeTo));
   }
-  if (overrides.page !== undefined) params.set("page", String(overrides.page));
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();
   return paramStr ? `${encodedLens}?${paramStr}` : encodedLens;

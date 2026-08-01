@@ -29,6 +29,32 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
+   * The user's personal workspace project on this control plane, delivered
+   * by `POST /api/auth/cli/exchange` at device-login time (or lazily via
+   * `GET /api/auth/cli/personal-project` for sessions minted before the
+   * field existed). Its `api_key` is what API-calling commands authenticate
+   * with when no `LANGWATCH_API_KEY` is set anywhere, so `langwatch trace
+   * search` etc. just work after `langwatch login`.
+   * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+   */
+  personal_project?: {
+    id?: string;
+    slug?: string;
+    name?: string;
+    api_key?: string;
+    /**
+     * Unix epoch (seconds) the device session was last confirmed live for
+     * this cached key. The key is a long-lived Project.apiKey, so using it
+     * unconditionally would outlive a revoked device (a stolen config would
+     * work forever). The resolver only trusts the cache within a short
+     * revalidation window; past it, it re-confirms liveness through the
+     * session-authenticated endpoint and drops the key when the session is
+     * gone. See cli/utils/apiKey.ts resolveSessionProjectKey.
+     */
+    validated_at?: number;
+  };
+
+  /**
    * Personal ingest keys (the project-scoped ingest-only ApiKey
    * `sk-lw-<...>` shape minted by `/api/auth/cli/governance/ingestion-key`),
    * keyed by the tool's source_type slug (`claude_code` / `codex` /
@@ -87,6 +113,17 @@ export interface GovernanceConfig {
    * then falls back to the hardcoded defaults.
    */
   tool_policies?: PlatformToolPolicyMap;
+
+  /**
+   * Persistent opt-out from the background command daemon, written by
+   * `langwatch config set daemon off`. Absent = on. `LANGWATCH_NO_DAEMON`
+   * (per-invocation) takes precedence when both are set.
+   *
+   * Also read DIRECTLY from this file by cli/daemon/eligibility.ts
+   * (`isDaemonDisabledByConfig`), which must stay dependency-free — keep the
+   * field name in sync.
+   */
+  daemon?: "on" | "off";
 
   /**
    * Most-recent signed `request_increase_url` returned by the
@@ -151,7 +188,14 @@ export function configPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
 }
 
-/** Read the config from disk, merging in defaults for missing keys. */
+/**
+ * Read the config from disk, merging in defaults for missing keys.
+ *
+ * Deliberately re-read on EVERY call, with no in-process cache: the daemon's
+ * logged-in single-identity boundary depends on it (see "THE LOGGED-IN
+ * SINGLE-IDENTITY BOUNDARY" in cli/daemon/identity.ts). A cached credential
+ * here would outlive a logout inside a long-lived daemon.
+ */
 export function loadConfig(): GovernanceConfig {
   const p = configPath();
   if (!fs.existsSync(p)) return defaults();

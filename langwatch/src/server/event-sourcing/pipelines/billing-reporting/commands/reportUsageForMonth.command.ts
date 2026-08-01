@@ -1,20 +1,20 @@
-import type { Command, CommandHandler } from "../../../";
-import { defineCommandSchema } from "../../../";
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { TtlCache } from "~/server/utils/ttlCache";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
-import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
-import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
-import { TtlCache } from "~/server/utils/ttlCache";
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
+import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
+import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
+import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
+import type { Command, CommandHandler } from "../../../";
+import { defineCommandSchema } from "../../../";
+import type { Event } from "../../../domain/types";
 import type { ReportUsageForMonthCommandData } from "../schemas/commands";
 import { reportUsageForMonthCommandDataSchema } from "../schemas/commands";
 import { BILLING_REPORT_COMMAND_TYPES } from "../schemas/constants";
-import type { Event } from "../../../domain/types";
 
 const logger = createLogger(
   "langwatch:billing-reporting:report-usage-for-month",
@@ -34,8 +34,10 @@ type CachedOrgData = {
   subscriptions: { id: string }[];
 };
 
-const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS, "ttlcache:billing:orgData:");
-
+const orgCache = new TtlCache<CachedOrgData>(
+  ONE_MINUTE_MS,
+  "ttlcache:billing:orgData:",
+);
 
 export interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
@@ -89,9 +91,7 @@ export class ReportUsageForMonthCommand
 
   constructor(private readonly deps: ReportUsageForMonthCommandDeps) {}
 
-  static getAggregateId(
-    payload: ReportUsageForMonthCommandData,
-  ): string {
+  static getAggregateId(payload: ReportUsageForMonthCommandData): string {
     return payload.organizationId;
   }
 
@@ -114,7 +114,10 @@ export class ReportUsageForMonthCommand
       // 1. Skip conditions
       let org = (await orgCache.get(organizationId)) ?? null;
       if (!org) {
-        org = await this.deps.organizations.getOrganizationForBilling(organizationId);
+        org =
+          await this.deps.organizations.getOrganizationForBilling(
+            organizationId,
+          );
         if (org) {
           await orgCache.set(organizationId, org);
         }
@@ -288,23 +291,22 @@ export class ReportUsageForMonthCommand
     }
 
     try {
-      const results = await usageReportingService
-        .reportUsageDelta({
-          stripeCustomerId,
-          organizationId,
-          events: [
-            {
-              eventName: BILLABLE_EVENTS_EVENT_NAME,
-              identifier,
-              timestamp: Math.floor(Date.now() / 1000),
-              value: delta,
-            },
-          ],
-        });
+      const results = await usageReportingService.reportUsageDelta({
+        stripeCustomerId,
+        organizationId,
+        events: [
+          {
+            eventName: BILLABLE_EVENTS_EVENT_NAME,
+            identifier,
+            timestamp: Math.floor(Date.now() / 1000),
+            value: delta,
+          },
+        ],
+      });
 
       const result = results[0];
 
-      if (!result || !result.reported) {
+      if (!result?.reported) {
         // Permanent Stripe rejection: do NOT update checkpoint.
         logger.error(
           {

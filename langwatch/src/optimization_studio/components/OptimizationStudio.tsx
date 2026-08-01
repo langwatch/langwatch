@@ -45,6 +45,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { assertCrispChatHidden } from "../../utils/crispBubblePolicy";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
@@ -152,16 +153,36 @@ export default function OptimizationStudio() {
     }
   };
 
+  // The effect below clears the request it just handled, so its own dependency
+  // flips mid-flight and an effect-scoped cleanup would cut the expand
+  // animation short. The frame is tracked on a ref instead, cancelled on
+  // unmount and whenever a fresh request arrives.
+  const expandFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
+    // A new request supersedes whatever the last one was still animating
+    // towards. Without this an in-flight expand keeps resizing the panel back
+    // up while a "closed" request is collapsing it. The cleared request that
+    // this effect writes at the end is not a new one, so it must not cancel.
+    if (
+      openResultsPanelRequest !== undefined &&
+      expandFrameRef.current !== null
+    ) {
+      window.cancelAnimationFrame(expandFrameRef.current);
+      expandFrameRef.current = null;
+    }
+
     if (openResultsPanelRequest === "evaluations") {
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
 
       const step = () => {
-        const size = panelRef.current?.getSize() ?? 0;
+        const panel = panelRef.current;
+        if (!panel) return;
+        const size = panel.getSize();
         if (size < 70) {
-          panelRef.current?.resize(size + 10);
-          window.requestAnimationFrame(step);
+          panel.resize(size + 10);
+          expandFrameRef.current = window.requestAnimationFrame(step);
         }
       };
       step();
@@ -173,18 +194,20 @@ export default function OptimizationStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResultsPanelRequest]);
 
+  useEffect(
+    () => () => {
+      if (expandFrameRef.current !== null) {
+        window.cancelAnimationFrame(expandFrameRef.current);
+      }
+    },
+    [],
+  );
+
+  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // deliberately opened; re-assert on entering the studio so it can never
+  // cover the canvas controls even if Crisp booted mid-navigation.
   useEffect(() => {
-    if (typeof window === "undefined" || !("$crisp" in window)) {
-      return;
-    }
-
-    // @ts-ignore
-    window.$crisp.push(["do", "chat:hide"]);
-
-    return () => {
-      // @ts-ignore
-      window.$crisp.push(["do", "chat:show"]);
-    };
+    assertCrispChatHidden();
   }, []);
 
   useAskBeforeLeaving();
@@ -483,6 +506,9 @@ export function OptimizationStudioCanvas({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       colorMode={colorMode}
+      // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
+      // so a selected node or connection is removable with either key.
+      deleteKeyCode={["Backspace", "Delete"]}
       defaultViewport={{
         zoom: defaultZoom,
         x: 100,

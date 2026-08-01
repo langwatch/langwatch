@@ -6,10 +6,10 @@
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SimulationSuite } from "@prisma/client";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "@prisma/client";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 
 // VoiceAgentsCallout inside SuiteSidebar pulls project context via
@@ -25,17 +25,15 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-import { SuiteSidebar } from "../SuiteSidebar";
 import { NowProvider } from "../NowProvider";
-import { ALL_RUNS_ID, toExternalSetSelection } from "../useSuiteRouting";
+import { SuiteSidebar } from "../SuiteSidebar";
+import { toExternalSetSelection } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuite(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "project_1",
@@ -87,15 +85,13 @@ describe("<SuiteSidebar/> External Sets", () => {
   describe("given no external sets exist", () => {
     /** @scenario "External Sets section is hidden when no external sets exist" */
     it("does not display the External Sets section header", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          suites={[makeSuite()]}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} suites={[makeSuite()]} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("external-sets-header"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -112,13 +108,9 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External sets section appears with SDK-submitted scenario runs" */
     it("displays the External Sets section header", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={externalSets}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("external-sets-header")).toHaveTextContent(
         "EXTERNAL SETS",
@@ -128,13 +120,9 @@ describe("<SuiteSidebar/> External Sets", () => {
     /** @scenario "External set batch entry displays the set name" */
     /** @scenario "External set uses scenarioSetId as its display name" */
     it("displays external set names", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={externalSets}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("nightly-regression")).toBeInTheDocument();
       expect(screen.getByText("ci-smoke-tests")).toBeInTheDocument();
@@ -142,25 +130,17 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External set entry shows pass rate and recency" */
     it("displays pass/fail summary for external sets", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={externalSets}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={externalSets}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+        wrapper: Wrapper,
+      });
 
       const externalItems = screen.getAllByTestId("external-set-list-item");
       for (const item of externalItems) {
@@ -182,9 +162,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
-        expect(
-          within(items[0]!).getByText("100%"),
-        ).toBeInTheDocument();
+        expect(within(items[0]!).getByText("100%")).toBeInTheDocument();
       });
     });
 
@@ -193,17 +171,13 @@ describe("<SuiteSidebar/> External Sets", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
-            externalSets={[
-              makeExternalSet({ passedCount: 7, totalCount: 10 }),
-            ]}
+            externalSets={[makeExternalSet({ passedCount: 7, totalCount: 10 })]}
           />,
           { wrapper: Wrapper },
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
-        expect(
-          within(items[0]!).getByText("70%"),
-        ).toBeInTheDocument();
+        expect(within(items[0]!).getByText("70%")).toBeInTheDocument();
       });
     });
 
@@ -269,11 +243,13 @@ describe("<SuiteSidebar/> External Sets", () => {
 
   describe("search filtering across suites and external sets", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Billing Tests", slug: "billing-tests" }),
+      makeSuite({
+        id: "suite_1",
+        name: "Billing Tests",
+        slug: "billing-tests",
+      }),
     ];
-    const externalSets = [
-      makeExternalSet({ scenarioSetId: "billing-ci" }),
-    ];
+    const externalSets = [makeExternalSet({ scenarioSetId: "billing-ci" })];
 
     describe("when typing 'billing' in the search box", () => {
       it("shows matching suites", async () => {
@@ -405,9 +381,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       render(
         <SuiteSidebar
           {...defaultProps}
-          externalSets={[
-            makeExternalSet({ scenarioSetId: "ci-smoke-tests" }),
-          ]}
+          externalSets={[makeExternalSet({ scenarioSetId: "ci-smoke-tests" })]}
         />,
         { wrapper: Wrapper },
       );
@@ -433,13 +407,9 @@ describe("<SuiteSidebar/> External Sets", () => {
         }),
       ];
 
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={externalSets}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+        wrapper: Wrapper,
+      });
 
       const items = screen.getAllByTestId("external-set-list-item");
       expect(items[0]!.textContent).toContain("recent-set");

@@ -9,14 +9,16 @@
  *   - 404s from Azure surface as ObjectNotFoundError on GET
  */
 import crypto from "node:crypto";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { ObjectNotFoundError } from "../errors";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.
-const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString("base64");
+const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString(
+  "base64",
+);
 const CONTAINER = "stored-objects";
 const BLOB_PATH = "proj-1/abc123";
 const URI = `azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`;
@@ -44,13 +46,22 @@ function newDriver() {
 }
 
 describe("AzureBlobDriver", () => {
+  // Restored in a hook, never inline: a rejected assertion between
+  // useFakeTimers() and an inline restore would leave every subsequent test
+  // in this file on a frozen clock, failing somewhere unrelated.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("when registered alongside the existing drivers", () => {
-    /** @scenario "Stored-objects writes do not mint azure-blob URIs in this PR" */
+    /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
     it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
       // Import lazily to keep the registry construction local to this test.
       const { StorageRegistry } = await import("../storage-registry");
       const { getUriScheme, mintAzureBlobUri } = await import("../uri");
-      const { LocalFilesystemDriver } = await import("../local-filesystem-driver");
+      const { LocalFilesystemDriver } = await import(
+        "../local-filesystem-driver"
+      );
       const { S3Driver } = await import("../s3-driver");
 
       // Scheme is in the supported set and is NOT s3/file.
@@ -114,9 +125,7 @@ describe("AzureBlobDriver", () => {
     it("hits the public-cloud endpoint with a SharedKey Authorization header and returns the bytes as a stream", async () => {
       const driver = newDriver();
       const body = Buffer.from("hello azure", "utf8");
-      fetchSpy.mockResolvedValueOnce(
-        new Response(body, { status: 200 }),
-      );
+      fetchSpy.mockResolvedValueOnce(new Response(body, { status: 200 }));
 
       const stream = await driver.get(URI);
 
@@ -159,7 +168,9 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("oops", { status: 503 }));
 
       await expect(driver.get(URI)).rejects.toThrow(/503/);
-      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(ObjectNotFoundError);
+      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(
+        ObjectNotFoundError,
+      );
     });
   });
 
@@ -179,7 +190,11 @@ describe("AzureBlobDriver", () => {
       const headers = init.headers as Record<string, string>;
       expect(headers["x-ms-blob-type"]).toBe("BlockBlob");
       expect(headers["Content-Type"]).toBe("image/png");
-      expect(headers["Content-Length"]).toBe(String(bytes.length));
+      // Content-Length must NOT be set manually: undici computes it from the
+      // body and rejects a user-supplied duplicate (InvalidArgumentError).
+      // The SharedKey signature still covers the byte length, which matches
+      // what undici puts on the wire.
+      expect(headers["Content-Length"]).toBeUndefined();
       expect(headers.Authorization).toMatch(
         new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
       );
@@ -190,7 +205,10 @@ describe("AzureBlobDriver", () => {
     it("throws a descriptive error when Azure rejects the PUT", async () => {
       const driver = newDriver();
       fetchSpy.mockResolvedValueOnce(
-        new Response("AuthenticationFailed", { status: 403, statusText: "Forbidden" }),
+        new Response("AuthenticationFailed", {
+          status: 403,
+          statusText: "Forbidden",
+        }),
       );
 
       await expect(
@@ -239,6 +257,42 @@ describe("AzureBlobDriver", () => {
       const driver = newDriver();
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 503 }));
       await expect(driver.exists(URI)).rejects.toThrow(/503/);
+    });
+  });
+
+  describe("ensureContainer() — integration-test setup helper, not part of StorageDriver", () => {
+    it("PUTs ?restype=container with the query param folded into the signed resource", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      await driver.ensureContainer(CONTAINER);
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(url).toBe(
+        `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}?restype=container`,
+      );
+      expect(init.method).toBe("PUT");
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toMatch(
+        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
+      );
+    });
+
+    it("treats 409 (already exists) as success — idempotent", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(
+        new Response("ContainerAlreadyExists", { status: 409 }),
+      );
+
+      await expect(driver.ensureContainer(CONTAINER)).resolves.toBeUndefined();
+    });
+
+    it("throws on a non-409 error", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(new Response("oops", { status: 500 }));
+
+      await expect(driver.ensureContainer(CONTAINER)).rejects.toThrow(/500/);
     });
   });
 
@@ -308,8 +362,6 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await driver.put(KAT_URI, KAT_BODY, "application/octet-stream");
 
-      vi.useRealTimers();
-
       const [, init] = fetchSpy.mock.calls[0]!;
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(KAT_EXPECTED_AUTH);
@@ -345,7 +397,9 @@ describe("AzureBlobDriver", () => {
         .update(stringToSign, "utf8")
         .digest("base64");
 
-      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(KAT_EXPECTED_AUTH);
+      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(
+        KAT_EXPECTED_AUTH,
+      );
     });
   });
 
@@ -363,6 +417,121 @@ describe("AzureBlobDriver", () => {
       const [url] = fetchSpy.mock.calls[0]!;
       expect(url).toBe(
         `http://127.0.0.1:10000/devstoreaccount1/${CONTAINER}/${BLOB_PATH}`,
+      );
+    });
+  });
+
+  describe("when Azurite path-style addressing puts the account in the endpoint path", () => {
+    /**
+     * Regression for the Azurite-signing gap (AC37 / issue #4133): when
+     * `endpointBaseUrl` addresses the account via a path segment (Azurite's
+     * only mode — it has no per-account subdomain like production Azure),
+     * the shared-key canonicalised resource must include the account name
+     * TWICE (`/{account}/{account}/{container}/{blob}`), not once. Getting
+     * this wrong produces a well-formed-looking `SharedKey` header that
+     * Azurite rejects with 403 AuthenticationFailed — a bug a prefix-only
+     * regex assertion on the header would never catch, so this test
+     * recomputes the exact expected signature (KAT-style) rather than just
+     * checking the `SharedKey {account}:` prefix.
+     */
+    const PATH_STYLE_ACCOUNT = "devstoreaccount1";
+    const PATH_STYLE_ENDPOINT = "http://127.0.0.1:10000/devstoreaccount1";
+    const PATH_STYLE_TIMESTAMP = "Wed, 23 Oct 2013 09:49:06 GMT";
+    const PATH_STYLE_BODY = Buffer.from("hello world"); // 11 bytes
+
+    it("signs with the account name doubled in the canonicalised resource", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
+
+      const driver = new AzureBlobDriver({
+        accountName: PATH_STYLE_ACCOUNT,
+        accountKey: ACCOUNT_KEY,
+        endpointBaseUrl: PATH_STYLE_ENDPOINT,
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
+      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+
+      const stringToSign = [
+        "PUT",
+        "",
+        "",
+        String(PATH_STYLE_BODY.length),
+        "",
+        "application/octet-stream",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [
+          `x-ms-blob-type:BlockBlob`,
+          `x-ms-date:${PATH_STYLE_TIMESTAMP}`,
+          `x-ms-version:2021-12-02`,
+        ].join("\n"),
+        // The account name appears twice: once for "the path-style host",
+        // once for "the actual account" — this is the assertion under test.
+        `/${PATH_STYLE_ACCOUNT}/${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`,
+      ].join("\n");
+      const keyBytes = Buffer.from(ACCOUNT_KEY, "base64");
+      const expectedSignature = crypto
+        .createHmac("sha256", keyBytes)
+        .update(stringToSign, "utf8")
+        .digest("base64");
+
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe(
+        `SharedKey ${PATH_STYLE_ACCOUNT}:${expectedSignature}`,
+      );
+    });
+
+    it("does NOT use the single-account-segment signature production Azure would produce", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
+
+      const driver = new AzureBlobDriver({
+        accountName: PATH_STYLE_ACCOUNT,
+        accountKey: ACCOUNT_KEY,
+        endpointBaseUrl: PATH_STYLE_ENDPOINT,
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
+      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+
+      const wrongStringToSign = [
+        "PUT",
+        "",
+        "",
+        String(PATH_STYLE_BODY.length),
+        "",
+        "application/octet-stream",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [
+          `x-ms-blob-type:BlockBlob`,
+          `x-ms-date:${PATH_STYLE_TIMESTAMP}`,
+          `x-ms-version:2021-12-02`,
+        ].join("\n"),
+        `/${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`,
+      ].join("\n");
+      const keyBytes = Buffer.from(ACCOUNT_KEY, "base64");
+      const wrongSignature = crypto
+        .createHmac("sha256", keyBytes)
+        .update(wrongStringToSign, "utf8")
+        .digest("base64");
+
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).not.toBe(
+        `SharedKey ${PATH_STYLE_ACCOUNT}:${wrongSignature}`,
       );
     });
   });

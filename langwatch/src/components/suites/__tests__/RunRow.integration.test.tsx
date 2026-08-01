@@ -12,8 +12,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { cssRulesForElement } from "~/utils/emotionTestCss";
 import { RunRow } from "../RunRow";
-import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -75,12 +80,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText(/Angry refund request/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/Policy violation/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Angry refund request/)).toBeInTheDocument();
+      expect(screen.getByText(/Policy violation/)).toBeInTheDocument();
     });
 
     it("displays target name in scenario x target format in list view", () => {
@@ -173,7 +174,11 @@ describe("<RunRow/>", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 2, failedCount: 1, passRate: 67 })}
+          summary={makeSummary({
+            passedCount: 2,
+            failedCount: 1,
+            passRate: 67,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -268,7 +273,11 @@ describe("<RunRow/>", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 8,
+            failedCount: 2,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -285,7 +294,11 @@ describe("<RunRow/>", () => {
       const { container } = render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          summary={makeSummary({
+            passedCount: 8,
+            failedCount: 2,
+            passRate: 80,
+          })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -296,7 +309,9 @@ describe("<RunRow/>", () => {
 
       const header = container.querySelector('[data-testid="run-row-header"]');
       expect(header).toBeInTheDocument();
-      const metrics = header?.querySelector('[data-testid="run-metrics-summary"]');
+      const metrics = header?.querySelector(
+        '[data-testid="run-metrics-summary"]',
+      );
       expect(metrics).toBeInTheDocument();
     });
   });
@@ -360,7 +375,40 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("Checkout Flow, Login Flow")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Checkout Flow, Login Flow"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when rendering the sticky header's backdrop blur", () => {
+    /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
+    it("references the shared --lw-backdrop-blur and --lw-panel-alpha CSS variables instead of hardcoded values", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Scope the assertion to the sticky header's OWN generated class, not
+      // every injected <style> — otherwise an unrelated rule referencing the
+      // same variable would keep this green after the header regresses to a
+      // hard-coded blur.
+      const header = screen.getAllByTestId("run-row-header")[0]!;
+      const headerCss = cssRulesForElement(header);
+      expect(headerCss).toContain("--lw-backdrop-blur");
+      // The header's background is semi-transparent specifically because
+      // the blur diffuses whatever shows through it — removing just the
+      // blur while leaving that transparency would turn a frosted header
+      // into a literal see-through window onto the scrolling list behind
+      // it, so --lw-panel-alpha must go with it.
+      expect(headerCss).toContain("--lw-panel-alpha");
     });
   });
 });

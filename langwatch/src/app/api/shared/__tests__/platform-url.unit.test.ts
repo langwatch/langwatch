@@ -1,21 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { platformUrl } from "../platform-url";
 
-describe("platformUrl", () => {
-  const originalEnv = process.env.BASE_HOST;
+// vi.mock factories are hoisted above top-level declarations, so the
+// mutable env object must be created via vi.hoisted to be available
+// when the mock factory runs.
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: { BASE_HOST: "https://app.langwatch.ai" as string | undefined },
+}));
 
-  afterEach(() => {
-    process.env.BASE_HOST = originalEnv;
+vi.mock("~/env.mjs", () => ({ env: mockEnv }));
+
+describe("platformUrl", () => {
+  beforeEach(() => {
+    mockEnv.BASE_HOST = "https://app.langwatch.ai";
   });
 
   describe("when BASE_HOST is set", () => {
-    beforeEach(() => {
-      process.env.BASE_HOST = "https://app.langwatch.ai";
-    });
-
     it("builds a direct page URL", () => {
       expect(
-        platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" })
+        platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" }),
       ).toBe("https://app.langwatch.ai/my-project/datasets/ds_123");
     });
 
@@ -23,52 +26,51 @@ describe("platformUrl", () => {
       expect(
         platformUrl({
           projectSlug: "my-project",
-          path: "/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
-        })
+          path: "/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
+        }),
       ).toBe(
-        "https://app.langwatch.ai/my-project/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123"
+        "https://app.langwatch.ai/my-project/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_123",
       );
     });
 
     it("strips trailing slash from BASE_HOST", () => {
-      process.env.BASE_HOST = "https://app.langwatch.ai/";
-      expect(
-        platformUrl({ projectSlug: "test", path: "/datasets/ds_1" })
-      ).toBe("https://app.langwatch.ai/test/datasets/ds_1");
+      mockEnv.BASE_HOST = "https://app.langwatch.ai/";
+      expect(platformUrl({ projectSlug: "test", path: "/datasets/ds_1" })).toBe(
+        "https://app.langwatch.ai/test/datasets/ds_1",
+      );
     });
   });
 
   describe("when BASE_HOST is not set", () => {
     beforeEach(() => {
-      delete process.env.BASE_HOST;
+      mockEnv.BASE_HOST = undefined;
     });
 
-    it("falls back to localhost:5560", () => {
-      expect(
-        platformUrl({ projectSlug: "demo", path: "/agents" })
-      ).toBe("http://localhost:5560/demo/agents");
+    it("returns a URL with empty base", () => {
+      expect(platformUrl({ projectSlug: "demo", path: "/agents" })).toBe(
+        "/demo/agents",
+      );
     });
   });
 
   describe("resource URL patterns", () => {
-    beforeEach(() => {
-      process.env.BASE_HOST = "https://app.langwatch.ai";
-    });
-
     it("generates correct dataset page URL", () => {
       const url = platformUrl({ projectSlug: "p", path: "/datasets/ds_abc" });
       expect(url).toContain("/p/datasets/ds_abc");
     });
 
     it("generates correct trace page URL", () => {
-      const url = platformUrl({ projectSlug: "p", path: "/messages/trace_abc" });
+      const url = platformUrl({
+        projectSlug: "p",
+        path: "/messages/trace_abc",
+      });
       expect(url).toContain("/p/messages/trace_abc");
     });
 
     it("generates correct monitor drawer URL", () => {
       const url = platformUrl({
         projectSlug: "p",
-        path: "/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_1",
+        path: "/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=mon_1",
       });
       expect(url).toContain("drawer.open=onlineEvaluation");
       expect(url).toContain("drawer.monitorId=mon_1");
@@ -119,7 +121,10 @@ describe("platformUrl", () => {
     });
 
     it("generates correct dashboard page URL", () => {
-      const url = platformUrl({ projectSlug: "p", path: "/analytics/custom/dash_1" });
+      const url = platformUrl({
+        projectSlug: "p",
+        path: "/analytics/custom/dash_1",
+      });
       expect(url).toContain("/p/analytics/custom/dash_1");
     });
 

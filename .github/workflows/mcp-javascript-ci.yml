@@ -15,7 +15,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -23,16 +26,21 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the
+          # integration step spends real LLM money (Anthropic), so it must
+          # not run on pushes or release PRs that touched nothing under
+          # mcp-server/. A release PR still matches via
+          # mcp-server/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'mcp-server/**'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
-              - '.github/.release-please-manifest.json'
 
   typecheck:
     needs: changes
@@ -43,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -65,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -79,7 +87,14 @@ jobs:
         run: pnpm run build
 
       - name: Run tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         working-directory: mcp-server
         env:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}

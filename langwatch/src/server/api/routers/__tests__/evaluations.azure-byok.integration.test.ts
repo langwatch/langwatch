@@ -25,20 +25,24 @@ vi.mock("~/server/api/routers/modelProviders.utils", async (importOriginal) => {
   };
 });
 
-// evaluationsRouter pulls in runEvaluationForTrace from the legacy worker,
-// which in turn imports the BullMQ/Redis stack. Stub it to keep the router
-// import light in unit-style integration tests.
-vi.mock("~/server/background/workers/evaluationsWorker", () => ({
+// evaluationsRouter pulls in runEvaluationForTrace, which in turn imports
+// heavy deps. Stub it to keep the router import light in unit-style
+// integration tests.
+vi.mock("~/server/evaluations/runEvaluation", () => ({
   runEvaluationForTrace: vi.fn(),
-  runEvaluationJob: vi.fn(),
-  startEvaluationsWorker: vi.fn(),
 }));
 
 // Bypass the RBAC middleware — we're testing the handler logic, not auth.
 vi.mock("../../rbac", () => ({
   checkProjectPermission:
     () =>
-    ({ next, ctx }: { next: () => unknown; ctx: { permissionChecked?: boolean } }) => {
+    ({
+      next,
+      ctx,
+    }: {
+      next: () => unknown;
+      ctx: { permissionChecked?: boolean };
+    }) => {
       ctx.permissionChecked = true;
       return next();
     },

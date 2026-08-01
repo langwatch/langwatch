@@ -7,7 +7,7 @@ import {
   type UnaryOperatorToken,
 } from "liqe";
 import { FilterFieldUnknownError, FilterParseError } from "../errors";
-import { FIELD_HANDLERS, KNOWN_FIELDS } from "./build-handlers";
+import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -23,7 +23,7 @@ import {
   wrap,
 } from "./value-helpers";
 
-const MAX_NODE_COUNT = 20;
+export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -31,7 +31,7 @@ const MAX_PARAM_COUNT = 50;
  * `]`/`)` before a boolean) which its own parser then rejects. Normalise the
  * incoming query so older saved URLs and external callers don't 422.
  */
-function normalizeQuery(s: string): string {
+export function normalizeQuery(s: string): string {
   return s
     .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
     .replace(/[ \t]{2,}/g, " ")
@@ -167,13 +167,16 @@ function translateTag(
     return translateEventAttribute(key, tag, negated, ctx);
   }
 
-  const handler = FIELD_HANDLERS[fieldName];
+  // `.get()` — own keys only. A plain-object index would resolve a field named
+  // `constructor` / `toString` / `__proto__` off `Object.prototype`, sail past
+  // this guard, and persist a filter no reader can evaluate.
+  const def = FIELD_DEF_BY_NAME.get(fieldName);
 
-  if (!handler) {
+  if (!def) {
     throw new FilterFieldUnknownError(fieldName, KNOWN_FIELDS);
   }
 
-  return handler(tag, negated, ctx);
+  return def.toClickHouse(tag, negated, ctx);
 }
 
 function translateTraceAttribute(
@@ -278,7 +281,25 @@ function translateFreeText(
   validateValueLength(value);
   const paramName = nextParam(ctx, "freeText");
   ctx.params[paramName] = `%${value}%`;
+  const p = `{${paramName}:String}`;
 
-  const clause = `(ComputedInput ILIKE {${paramName}:String} OR ComputedOutput ILIKE {${paramName}:String})`;
+  // Span names are part of free text, not just the captured I/O: the name is
+  // often the only place a tool or agent identifier appears, so a query like
+  // `codex` has to reach it. `TraceName` covers the root span's name straight
+  // off `trace_summaries`; the subquery covers every other span via
+  // `stored_spans.SpanName` (backed by `idx_span_name`).
+  //
+  // `TraceName` is `String DEFAULT ''`, so the `ifNull` wrapper is belt-and-
+  // braces rather than load-bearing; it matches how `meta-handlers.ts` already
+  // reads the column. What matters is that both name branches evaluate to a
+  // definite true/false, never a NULL, so the clause's three-valued logic when a
+  // computed I/O column is NULL stays exactly as it was. The parity suite pins
+  // that. The span subquery is tenant-scoped and time-bounded by
+  // `boundedSubquery`.
+  const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
+    "stored_spans",
+    "StartTime",
+    `SpanName ILIKE ${p}`,
+  )})`;
   return negated ? `NOT ${clause}` : clause;
 }

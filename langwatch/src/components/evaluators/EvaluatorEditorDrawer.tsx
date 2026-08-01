@@ -5,8 +5,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 
 import {
-  type EvaluatorEditorDrawerProps,
   EvaluatorEditorBody,
+  type EvaluatorEditorDrawerProps,
   EvaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
@@ -27,7 +27,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && controller.handleClose()}
       size="lg"
-      closeOnInteractOutside={false}
+      // Clicking outside (e.g. back on the workbench) closes the drawer.
+      // controller.handleClose() still runs — the unsaved-changes prompt
+      // fires from there, so no work is lost silently.
+      closeOnInteractOutside={true}
       modal={false}
     >
       <Drawer.Content bg="bg">

@@ -30,9 +30,7 @@ describe("<SearchInput/>", () => {
     /** @scenario Scenario picker search field displays a search icon */
     /** @scenario Target picker search field displays a search icon */
     it("renders a search icon inside the input", () => {
-      expect(
-        screen.getByRole("img", { name: "Search" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Search" })).toBeInTheDocument();
     });
 
     it("displays the placeholder text", () => {

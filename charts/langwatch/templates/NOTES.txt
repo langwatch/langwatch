@@ -76,6 +76,57 @@ dev's Personal Workspace at https://<your-host>/me .
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- end }}
+{{- if (index .Values "langyagent").chartManaged }}
+  • Langy, the in-product assistant:
+      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
+{{- $langyRtc := (index .Values "langyagent").runtimeClassName }}
+{{- if $langyRtc }}
+    Isolation: sandboxed. The pod is pinned to the "{{ $langyRtc }}" RuntimeClass.
+    If the command above lists NOTHING, your cluster does not define that class:
+    the pod is rejected at admission, so none is ever created and the reason
+    sits on the Deployment instead:
+      kubectl -n {{ .Release.Namespace }} get deploy {{ .Release.Name }}-langyagent \
+        -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+    Everything else in the install keeps running either way.
+{{- else }}
+    Isolation: each conversation's worker runs under its own UID with its own
+    credentials, workers cannot read each other's, and the NetworkPolicy denies
+    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
+    normal runtime, so a worker that escapes its container faces the node
+    kernel. Hardening that last step is a sandboxed RuntimeClass:
+      https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
+       that this install is not using. `lookup` is empty during `helm template`
+       and GitOps renders, so this stays silent there rather than guessing. */}}
+{{- $sandboxed := list }}
+{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
+{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
+{{- $sandboxed = append $sandboxed .metadata.name }}
+{{- end }}
+{{- end }}
+{{- if $sandboxed }}
+    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
+      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
+{{- end }}
+{{- end }}
+{{- if (index .Values "langyagent").enableForAllUsers }}
+    It is available to everyone in this install. Give it a model to talk to
+    by wiring a Model Provider (step 2 above), then open the assistant from
+    any project.
+{{- else }}
+    langyagent.enableForAllUsers=false, so it stays dark until you open it
+    to the projects or organizations you choose from /ops/feature-flags.
+{{- end }}
+{{- if not (index .Values "langyagent").mirror.existingSecretName }}
+    To watch Langy work with LangWatch itself, mirror its turns into one of
+    your projects: create an API key there, then (the read keeps the key out
+    of your shell history and out of the process list)
+      read -rsp "Mirror project API key: " KEY
+      kubectl -n {{ .Release.Namespace }} create secret generic langwatch-langyagent-mirror \
+        --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+    and set langyagent.mirror.existingSecretName to it on your next upgrade.
+{{- end }}
+{{- end }}
   • Self-host docs:
       https://docs.langwatch.ai/self-hosting/
   • Personal-keys onboarding walkthrough:
@@ -95,7 +146,65 @@ docs/ai-gateway/self-hosting/helm.
 {{- end }}
 
 ──────────────────────────────────────────────────────────────────────
-6. Required Secrets — check before upgrading
+6. Dataset object storage
+──────────────────────────────────────────────────────────────────────
+Datasets store their content as chunked JSONL in object storage, and a
+WRITABLE backend is REQUIRED: every dataset create writes to it, with no
+database fallback (ADR-032 "born-on-storage"). The chart configures a
+backend for you:
+
+  • Default (no S3): a local-filesystem PVC is provisioned
+    ({{ .Values.app.storedObjects.localFilesystem.path }},
+    {{ .Values.app.storedObjects.localFilesystem.size | default "10Gi" }})
+    and mounted into the app, the worker (which runs dataset
+    normalization), and the dataset-migration Job — they all read and write
+    the SAME chunks (LANGWATCH_LOCAL_STORAGE_PATH), so a fresh install works
+    without S3. Because these separate pods share one ReadWriteOnce volume,
+    every dataset pod must run on a SINGLE NODE: the chart refuses
+    replicaCount > 1 and co-locates the worker / migration Job with the app
+    pod via a default podAffinity. Fine for a hobby / single-node install;
+    bytes survive pod restarts. For anything bigger, enable
+    app.dataplane (S3).
+
+    Operational notes for this mode:
+      • The PVC uses the cluster's DEFAULT StorageClass (or
+        app.storedObjects.localFilesystem.storageClassName). On bare-metal
+        clusters with no default StorageClass the PVC — and every pod
+        mounting it — stays Pending: install a provisioner (e.g.
+        local-path-provisioner) or set storageClassName explicitly.
+      • App and worker Deployments default to a kill-then-start rollout
+        (RollingUpdate with maxSurge=0/maxUnavailable=1) so upgrades
+        release the shared volume before new pods schedule (a surged pod
+        wedges Pending on an RWO multi-attach error on multi-node
+        clusters). Expect a brief downtime per upgrade; set app/workers
+        deployment.strategy explicitly to override. Zero-downtime
+        upgrades require S3-backed stored objects instead of local-FS.
+      • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
+        PostSync hook, which already waits for the rollout to be healthy;
+        plain Helm should upgrade with --wait when crossing the ADR-032
+        boundary (see the migration Job template header).
+
+  • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
+    Then configure these on the bucket and deployment, or uploads and
+    large datasets will not work:
+
+      • Bucket CORS: allow PUT from the app origin. The browser uploads
+        files straight to the bucket via a presigned PUT, so a missing
+        CORS rule fails the direct upload (small files fall back to a
+        backend upload; large files cannot).
+
+      • Lifecycle TTL on the staging/ prefix: expire un-finalized uploads
+        (e.g. 1-7 days) so abandoned uploads are reaped automatically.
+
+      • Worker + Redis (event sourcing): dataset normalization runs
+        off-request on the worker via the Redis-backed queue. Without a
+        worker and Redis, normalization falls back to running in the
+        request — fine for a single small pod, but a multi-pod S3
+        deployment must run the worker so uploads are processed
+        off-request.
+
+──────────────────────────────────────────────────────────────────────
+7. Required Secrets — check before upgrading
 ──────────────────────────────────────────────────────────────────────
 Each chart bump may introduce new required keys on the umbrella's app
 Secret. When upgrading, verify these are present in the Secret the app
@@ -111,6 +220,20 @@ message.
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+{{- end }}
+{{- $langy := (index .Values "langyagent") }}
+{{- $langySecrets := $langy.secrets | default dict }}
+{{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+{{- $langySecretName := $langySecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+{{- $langyOwnSecret := ne $langySecretName (include "langwatch.appSecretName" .) }}
+{{- if and $langy.chartManaged (not $langyOwnSecret) }}
+    - {{ $langyKey }}   (langyagent.chartManaged=true)
+{{- end }}
+{{- if and $langy.chartManaged $langyOwnSecret }}
+
+  {{ $langySecretName }} keys (langyagent.chartManaged=true, read by the
+  app, the workers, and the agent pod):
+    - {{ $langyKey }}
 {{- end }}
 
   When autogen.enabled=true the chart materialises this Secret on
@@ -133,5 +256,16 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+{{- end }}
+{{- if and $langy.chartManaged (not $langyOwnSecret) }}
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if and $langy.chartManaged $langyOwnSecret }}
+
+  Langy reads its shared value from a Secret of your own
+  ({{ $langySecretName }}), so create that one too:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
 {{- end }}

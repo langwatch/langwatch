@@ -2,16 +2,31 @@
  * @vitest-environment node
  *
  * Integration tests for annotation CRUD via the tRPC router with a real database.
- * ES writes are globally disabled (esSync is always null), so these tests
- * verify that annotations are persisted in Postgres without any ES interaction.
+ * Annotations persist in Postgres via the service/repository; the router also
+ * performs a best-effort ClickHouse sync (stubbed here) that must never block
+ * the mutation.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-describe("Annotation CRUD (ES sync disabled)", () => {
+const { mockAddAnnotation, mockRemoveAnnotation } = vi.hoisted(() => ({
+  mockAddAnnotation: vi.fn().mockResolvedValue(undefined),
+  mockRemoveAnnotation: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    traces: {
+      addAnnotation: mockAddAnnotation,
+      removeAnnotation: mockRemoveAnnotation,
+    },
+  }),
+}));
+
+describe("Annotation CRUD", () => {
   const projectId = "test-project-id";
   const traceId = "test-trace-annotation-integration";
   let caller: ReturnType<typeof appRouter.createCaller>;
@@ -27,10 +42,6 @@ describe("Annotation CRUD (ES sync disabled)", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
   });
 
   afterAll(async () => {
@@ -96,6 +107,57 @@ describe("Annotation CRUD (ES sync disabled)", () => {
         comment: "to be deleted",
         scoreOptions: {},
       });
+
+      const deleted = await caller.annotation.deleteById({
+        annotationId: created.id,
+        projectId,
+      });
+
+      expect(deleted.id).toBe(created.id);
+
+      const persisted = await prisma.annotation.findFirst({
+        where: { id: created.id, projectId },
+      });
+      expect(persisted).toBeNull();
+    });
+  });
+
+  describe("when the ClickHouse sync fails on create", () => {
+    it("still returns and persists the annotation", async () => {
+      mockAddAnnotation.mockRejectedValueOnce(
+        new Error("ClickHouse unavailable"),
+      );
+
+      const result = await caller.annotation.create({
+        projectId,
+        traceId,
+        comment: "survives sync failure",
+        isThumbsUp: true,
+        scoreOptions: {},
+      });
+
+      expect(result.id).toBeDefined();
+      expect(result.comment).toBe("survives sync failure");
+
+      const persisted = await prisma.annotation.findFirst({
+        where: { id: result.id, projectId },
+      });
+      expect(persisted).not.toBeNull();
+    });
+  });
+
+  describe("when the ClickHouse sync fails on delete", () => {
+    it("still returns the annotation and removes it from Postgres", async () => {
+      const created = await caller.annotation.create({
+        projectId,
+        traceId,
+        comment: "delete despite sync failure",
+        scoreOptions: {},
+      });
+
+      mockRemoveAnnotation.mockRejectedValueOnce(
+        new Error("ClickHouse unavailable"),
+      );
 
       const deleted = await caller.annotation.deleteById({
         annotationId: created.id,

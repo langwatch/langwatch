@@ -1,5 +1,6 @@
-import { Button, Center, EmptyState } from "@chakra-ui/react";
+import { Button, Center, EmptyState, HStack } from "@chakra-ui/react";
 import { LuSparkles } from "react-icons/lu";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { useCreateDraftPrompt } from "../../../hooks/useCreateDraftPrompt";
 
 /**
@@ -21,13 +22,16 @@ export function NoPromptsOnboardingState() {
             Get started on the prompt playground to design, test, and optimize
             your AI prompts in one place.
           </EmptyState.Description>
-          <Button
-            colorPalette="orange"
-            variant="solid"
-            onClick={() => void createDraftPrompt()}
-          >
-            Create First Prompt
-          </Button>
+          <HStack gap={2}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void createDraftPrompt()}
+            >
+              Create First Prompt
+            </Button>
+            <SetupWithAgentButton surface="prompts" />
+          </HStack>
         </EmptyState.Content>
       </EmptyState.Root>
     </Center>

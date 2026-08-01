@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -7,7 +8,6 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -68,7 +68,15 @@ interface ClickHouseSimulationRunRecord {
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "CancellationRequestedAt" | "LastSnapshotOccurredAt" | "LastEventOccurredAt"
+  | "StartedAt"
+  | "QueuedAt"
+  | "CreatedAt"
+  | "UpdatedAt"
+  | "FinishedAt"
+  | "ArchivedAt"
+  | "CancellationRequestedAt"
+  | "LastSnapshotOccurredAt"
+  | "LastEventOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -107,14 +115,23 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
       RoleLatencies: record.RoleLatencies ?? {},
-      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
+      TraceMetrics: record.TraceMetricsJson
+        ? JSON.parse(record.TraceMetricsJson)
+        : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
-      QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
+      QueuedAt:
+        record.QueuedAt === null || record.QueuedAt === undefined
+          ? null
+          : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
-      CancellationRequestedAt: record.CancellationRequestedAt === null || record.CancellationRequestedAt === undefined ? null : Number(record.CancellationRequestedAt),
+      CancellationRequestedAt:
+        record.CancellationRequestedAt === null ||
+        record.CancellationRequestedAt === undefined
+          ? null
+          : Number(record.CancellationRequestedAt),
       LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
@@ -155,16 +172,25 @@ export class SimulationRunStateRepositoryClickHouse<
       RoleCosts: data.RoleCosts,
       RoleLatencies: data.RoleLatencies,
       TraceMetricsJson:
-        Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
+        Object.keys(data.TraceMetrics).length > 0
+          ? JSON.stringify(data.TraceMetrics)
+          : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
-      CancellationRequestedAt: data.CancellationRequestedAt != null ? new Date(data.CancellationRequestedAt) : null,
-      LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
-      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      CancellationRequestedAt:
+        data.CancellationRequestedAt != null
+          ? new Date(data.CancellationRequestedAt)
+          : null,
+      LastSnapshotOccurredAt: data.LastSnapshotOccurredAt
+        ? new Date(data.LastSnapshotOccurredAt)
+        : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt
+        ? new Date(data.LastEventOccurredAt)
+        : new Date(0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -265,8 +291,10 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({ scenarioRunId, tenantId: context.tenantId, error: errorMessage },
-        "Failed to get projection from ClickHouse");
+      logger.error(
+        { scenarioRunId, tenantId: context.tenantId, error: errorMessage },
+        "Failed to get projection from ClickHouse",
+      );
       throw new StoreError(
         "getProjection",
         "SimulationRunStateRepositoryClickHouse",
@@ -314,7 +342,9 @@ export class SimulationRunStateRepositoryClickHouse<
         scenarioRunId,
       );
 
-      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { scenarios?: number | null }
+        | undefined;
       projectionRecord._retention_days =
         retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 
@@ -328,22 +358,27 @@ export class SimulationRunStateRepositoryClickHouse<
           wait_for_async_insert: 0,
         },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        scenarioRunId: String(projection.aggregateId),
-        projectionId: projection.id,
-        error: errorMessage,
-      }, "Failed to store projection in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          scenarioRunId: String(projection.aggregateId),
+          projectionId: projection.id,
+          error: errorMessage,
+        },
+        "Failed to store projection in ClickHouse",
+      );
       throw new StoreError(
         "storeProjection",
         "SimulationRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for scenario run ${projection.aggregateId}: ${errorMessage}`,
         classifyClickHouseError(error),
-        { projectionId: projection.id, scenarioRunId: String(projection.aggregateId) },
+        {
+          projectionId: projection.id,
+          scenarioRunId: String(projection.aggregateId),
+        },
         error,
       );
     }
@@ -372,7 +407,9 @@ export class SimulationRunStateRepositoryClickHouse<
     }
 
     try {
-      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { scenarios?: number | null }
+        | undefined;
       const retentionDays =
         retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
@@ -398,11 +435,14 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        count: projections.length,
-        error: errorMessage,
-      }, "Failed to batch store simulation projections in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          count: projections.length,
+          error: errorMessage,
+        },
+        "Failed to batch store simulation projections in ClickHouse",
+      );
       throw new StoreError(
         "storeProjectionBatch",
         "SimulationRunStateRepositoryClickHouse",

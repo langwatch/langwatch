@@ -48,11 +48,7 @@ describe("<IconCheckboxCardGroup/>", () => {
 
     it("renders all items as unchecked checkboxes", () => {
       render(
-        <IconCheckboxCardGroup
-          items={items}
-          value={[]}
-          onChange={() => {}}
-        />,
+        <IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />,
         { wrapper: Wrapper },
       );
 
@@ -65,11 +61,7 @@ describe("<IconCheckboxCardGroup/>", () => {
 
     it("displays all item titles", () => {
       render(
-        <IconCheckboxCardGroup
-          items={items}
-          value={[]}
-          onChange={() => {}}
-        />,
+        <IconCheckboxCardGroup items={items} value={[]} onChange={() => {}} />,
         { wrapper: Wrapper },
       );
 

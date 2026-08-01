@@ -3,7 +3,6 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { LiteLLMParams, TargetAdapterData } from "../types";
 import {
   createAdapter,
   SERIALIZED_ADAPTER_FACTORIES,
@@ -12,7 +11,8 @@ import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
-} from "../serialized.adapters";
+} from "../serialized-adapters";
+import type { LiteLLMParams, TargetAdapterData } from "../types";
 
 describe("createAdapter", () => {
   const defaultModelParams: LiteLLMParams = {
@@ -99,15 +99,15 @@ describe("createAdapter", () => {
 
   describe("SERIALIZED_ADAPTER_FACTORIES registry", () => {
     it("has factory for prompt type", () => {
-      expect(SERIALIZED_ADAPTER_FACTORIES["prompt"]).toBeDefined();
+      expect(SERIALIZED_ADAPTER_FACTORIES.prompt).toBeDefined();
     });
 
     it("has factory for http type", () => {
-      expect(SERIALIZED_ADAPTER_FACTORIES["http"]).toBeDefined();
+      expect(SERIALIZED_ADAPTER_FACTORIES.http).toBeDefined();
     });
 
     it("has factory for code type", () => {
-      expect(SERIALIZED_ADAPTER_FACTORIES["code"]).toBeDefined();
+      expect(SERIALIZED_ADAPTER_FACTORIES.code).toBeDefined();
     });
   });
 });

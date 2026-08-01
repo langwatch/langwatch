@@ -16,6 +16,8 @@ import "@testing-library/jest-dom/vitest";
 
 let mockPageTourActive = false;
 let mockSeenDrawerSpotlights: Record<string, boolean> = {};
+let isMockTourDismissed = false;
+const mockPersistDismissal = vi.fn();
 
 const mockMarkDrawerSpotlightSeen = vi.fn((id: string) => {
   mockSeenDrawerSpotlights = { ...mockSeenDrawerSpotlights, [id]: true };
@@ -30,6 +32,14 @@ vi.mock("../../store/onboardingStore", () => ({
     }),
 }));
 
+vi.mock("../../hooks/useTraceExplorerTourPreference", () => ({
+  useTraceExplorerTourPreference: () => ({
+    dismiss: mockPersistDismissal,
+    isDismissed: isMockTourDismissed,
+    isResolved: true,
+  }),
+}));
+
 // Make requestAnimationFrame execute synchronously in jsdom so queue
 // computation and anchor measurement fire within render/waitFor.
 vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -38,7 +48,6 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 });
 vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
-import React from "react";
 import { DrawerSpotlights } from "../DrawerSpotlights";
 
 function addAnchor(anchor: string): HTMLElement {
@@ -65,6 +74,7 @@ afterEach(() => {
 beforeEach(() => {
   mockPageTourActive = false;
   mockSeenDrawerSpotlights = {};
+  isMockTourDismissed = false;
 });
 
 describe("<DrawerSpotlights />", () => {
@@ -109,6 +119,22 @@ describe("<DrawerSpotlights />", () => {
           "drawer-events",
         );
       });
+
+      it("persists dismissal when the user finishes the final step", async () => {
+        renderDrawerSpotlights();
+        fireEvent.click(
+          await waitFor(() =>
+            screen.getByRole("button", { name: /next spotlight/i }),
+          ),
+        );
+        fireEvent.click(
+          await waitFor(() =>
+            screen.getByRole("button", { name: /finish tour/i }),
+          ),
+        );
+
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
+      });
     });
 
     describe("when user dismisses via the ✕ button", () => {
@@ -126,6 +152,7 @@ describe("<DrawerSpotlights />", () => {
         expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith(
           "drawer-events",
         );
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
 
@@ -141,6 +168,7 @@ describe("<DrawerSpotlights />", () => {
             screen.queryByTestId("spotlight-popover"),
           ).not.toBeInTheDocument(),
         );
+        expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
     });
   });
@@ -174,6 +202,24 @@ describe("<DrawerSpotlights />", () => {
       it("renders nothing", async () => {
         renderDrawerSpotlights();
         await new Promise((r) => setTimeout(r, 25));
+        expect(
+          screen.queryByTestId("spotlight-popover"),
+        ).not.toBeInTheDocument();
+        expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the user dismissed Traces Explorer tours", () => {
+    beforeEach(() => {
+      isMockTourDismissed = true;
+      addAnchor("drawer-io");
+    });
+
+    describe("when the drawer mounts", () => {
+      it("renders no automatic drawer spotlight", async () => {
+        renderDrawerSpotlights();
+        await new Promise((resolve) => setTimeout(resolve, 25));
         expect(
           screen.queryByTestId("spotlight-popover"),
         ).not.toBeInTheDocument();

@@ -11,15 +11,13 @@
  * - Agent list drawer has edit/delete menu
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import { api } from "~/utils/api";
-
 // Import components
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import type { TargetConfig } from "../types";
 
@@ -75,6 +73,7 @@ vi.mock("../hooks/useEvaluationsV3Store", () => ({
       evaluators: [],
       activeDatasetId: "test-dataset-id",
       datasets: [],
+      ui: { highlightedVariantTargetId: undefined },
     };
     return selector(mockState);
   }),
@@ -111,7 +110,13 @@ const mockCodeAgent: TypedAgent = {
   name: "My Code Agent",
   type: "code",
   config: {
-    parameters: [{ identifier: "code", type: "code", value: "def execute(input): return input" }],
+    parameters: [
+      {
+        identifier: "code",
+        type: "code",
+        value: "def execute(input): return input",
+      },
+    ],
   },
   workflowId: null,
   copiedFromAgentId: null,
@@ -214,6 +219,7 @@ vi.mock("~/utils/api", () => ({
         getById: { invalidate: vi.fn() },
       },
     })),
+    useQueries: () => [],
   },
 }));
 
@@ -283,12 +289,20 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     // Mock agents.getById to return agent names based on ID
     vi.mocked(api.agents.getById.useQuery).mockImplementation((args) => {
       if (args.id === "http-agent-1") {
-        return { data: { name: "My HTTP Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+        return {
+          data: { name: "My HTTP Agent" },
+          isLoading: false,
+        } as ReturnType<typeof api.agents.getById.useQuery>;
       }
       if (args.id === "code-agent-1") {
-        return { data: { name: "My Code Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+        return {
+          data: { name: "My Code Agent" },
+          isLoading: false,
+        } as ReturnType<typeof api.agents.getById.useQuery>;
       }
-      return { data: undefined, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+      return { data: undefined, isLoading: false } as ReturnType<
+        typeof api.agents.getById.useQuery
+      >;
     });
 
     // Create an HTTP agent target config with dbAgentId to enable name lookup
@@ -325,7 +339,7 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
         onDuplicate={vi.fn()}
         onRemove={vi.fn()}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -345,7 +359,7 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
           onDuplicate={vi.fn()}
           onRemove={vi.fn()}
         />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -374,7 +388,7 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
         onDuplicate={vi.fn()}
         onRemove={vi.fn()}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -416,13 +430,6 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
     },
   ];
 
-  const mockInputMappings = {
-    input: {
-      sourceId: "dataset-1",
-      sourceField: "question",
-    },
-  };
-
   it("HTTP agent editor drawer shows Variables tab when availableSources provided", async () => {
     render(
       <AgentHttpEditorDrawer
@@ -431,7 +438,7 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
         availableSources={mockAvailableSources}
         inputMappings={{}}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -441,10 +448,9 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
   });
 
   it("HTTP agent editor drawer hides Variables tab when no availableSources", async () => {
-    render(
-      <AgentHttpEditorDrawer open={true} onClose={vi.fn()} />,
-      { wrapper: Wrapper }
-    );
+    render(<AgentHttpEditorDrawer open={true} onClose={vi.fn()} />, {
+      wrapper: Wrapper,
+    });
 
     await waitFor(() => {
       // The Body tab should be visible
@@ -464,7 +470,7 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
         availableSources={mockAvailableSources}
         inputMappings={{}}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -502,7 +508,7 @@ describe("Bug 5: Agent list drawer menu", () => {
         onSelect={vi.fn()}
         onCreateNew={vi.fn()}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
   };
 

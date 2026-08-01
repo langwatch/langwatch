@@ -20,7 +20,6 @@ Feature: Retention stamping at ingestion time
     And the trace_summaries record has _retention_days = 49
     And the event_log record has _retention_days = 49
     And the evaluation_runs record has _retention_days = 49
-    And the stored_log_records record has _retention_days = 49
     And the stored_metric_records record has _retention_days = 49
     And the dspy_steps record has _retention_days = 49
 

@@ -2,27 +2,27 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
-import type { CellPosition } from "~/components/datasets/editor/DatasetTableContext";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import {
   createInitialResults,
   createInitialState,
   type DatasetColumn,
-  type DatasetReference,
-  type EvaluationsV3Actions,
   type EvaluationsV3State,
   type EvaluationsV3Store,
   type EvaluatorConfig,
   type FieldMapping,
-  type OverlayType,
+  isComparisonEvaluator,
   type TargetConfig,
 } from "../types";
 import {
-  derivePairwiseTargetMappings,
+  deriveComparisonTargetMappings,
   inferAllEvaluatorMappings,
   inferAllTargetMappings,
   propagateMappingsToNewDataset,
 } from "../utils/mappingInference";
+import {
+  normalizeEvaluators,
+  normalizeTargets,
+} from "../utils/normalizeComparison";
 
 // ============================================================================
 // Helper Functions
@@ -258,7 +258,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   addColumn: (datasetId, column) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -289,7 +289,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeColumn: (datasetId, columnId) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -318,7 +318,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   renameColumn: (datasetId, columnId, newName) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -345,7 +345,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateColumnType: (datasetId, columnId, type) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -419,7 +419,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateSavedRecordValue: (datasetId, rowIndex, columnId, value) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "saved" || !dataset.datasetId) {
+      if (dataset?.type !== "saved" || !dataset.datasetId) {
         return state;
       }
 
@@ -516,8 +516,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
     if (
-      !dataset ||
-      dataset.type !== "saved" ||
+      dataset?.type !== "saved" ||
       !dataset.savedRecords ||
       !dataset.datasetId
     ) {
@@ -576,26 +575,6 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           Object.assign(mergedMappings[datasetId]!, targetMappings);
         }
 
-        // Auto-wire pairwise variants when going from 1 → 2 targets.
-        // Guard: only fires at exactly 2 targets (3+ is ambiguous).
-        if (
-          evaluator.evaluatorType === "langevals/pairwise_compare" &&
-          evaluator.pairwise &&
-          newTargets.length === 2 &&
-          !evaluator.pairwise.variantA &&
-          !evaluator.pairwise.variantB
-        ) {
-          return {
-            ...evaluator,
-            mappings: mergedMappings,
-            pairwise: {
-              ...evaluator.pairwise,
-              variantA: state.targets[0]!.id,
-              variantB: targetWithMappings.id,
-            },
-          };
-        }
-
         return { ...evaluator, mappings: mergedMappings };
       });
 
@@ -650,6 +629,27 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   removeTarget: (targetId) => {
     set((state) => {
+      // Removing this target must also drop it from any comparison that
+      // references it as a variant — otherwise the comparison keeps a
+      // phantom entry (ComparisonConfigForm renders nothing for an
+      // unresolvable id, so there's no way to remove it from the UI either)
+      // and the orchestrator's resolveVariants silently produces zero cells
+      // forever, with no error surfaced anywhere.
+      const dropVariant = <T extends { comparison?: { variants: string[] } }>(
+        carrier: T,
+      ): T =>
+        carrier.comparison
+          ? {
+              ...carrier,
+              comparison: {
+                ...carrier.comparison,
+                variants: carrier.comparison.variants.filter(
+                  (v) => v !== targetId,
+                ),
+              },
+            }
+          : carrier;
+
       // Also remove this target's mappings from all evaluators
       // With per-dataset structure: mappings[datasetId][targetId][inputField]
       const evaluators = state.evaluators.map((e) => {
@@ -659,7 +659,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           delete newTargetMappings[targetId];
           newMappings[datasetId] = newTargetMappings;
         }
-        return { ...e, mappings: newMappings };
+        return dropVariant({ ...e, mappings: newMappings });
       });
 
       // Also remove mappings that reference this target from other targets
@@ -684,31 +684,33 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
             }
             newMappings[datasetId] = newFieldMappings;
           }
-          return { ...target, mappings: newMappings };
+          return dropVariant({ ...target, mappings: newMappings });
         });
 
       return { targets, evaluators };
     });
   },
 
-  updateTargetPairwise: (targetId, pairwise) => {
+  updateTargetComparison: (targetId, comparison) => {
     set((state) => {
       const existingTarget = state.targets.find((r) => r.id === targetId);
-      // Strictly additive: silently skip for non-pairwise targets so we never
-      // perturb the prompt / agent / non-pairwise-evaluator code paths.
-      if (!existingTarget || existingTarget.pairwise === undefined) {
+      // Silently skip non-comparison targets so we never perturb the prompt /
+      // agent / plain-evaluator code paths.
+      if (!existingTarget || !isComparisonEvaluator(existingTarget)) {
         return state;
       }
 
       // Derive the per-row field mappings the orchestrator expects from the
-      // high-level pairwise picks — this is what lets the PairwiseConfigForm
-      // be a clean 3-field UI while keeping the orchestrator unchanged.
-      // Keys we own — must be stripped from prior mappings BEFORE spreading
-      // derived on top. Otherwise clearing a variant (or goldenField) just
-      // leaves the previously-derived candidate_*_id / golden mapping in
-      // place, and the orchestrator dispatches against a dead variant id
-      // or stale golden column.
-      const PAIRWISE_DERIVED_KEYS = [
+      // high-level picks — this is what lets ComparisonConfigForm be a clean
+      // variants + golden UI while keeping the orchestrator unchanged.
+      //
+      // Keys we own must be stripped from prior mappings BEFORE spreading the
+      // derived ones on top. Otherwise clearing the golden field just leaves
+      // the previously-derived mapping in place and the orchestrator
+      // dispatches against a stale column. `candidate_*` are legacy pairwise
+      // keys: a target being edited may still carry them from before the
+      // merge, and they must not survive into the comparison payload.
+      const DERIVED_KEYS = [
         "candidate_a_id",
         "candidate_a_output",
         "candidate_b_id",
@@ -721,9 +723,9 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         Record<string, FieldMapping>
       > = {};
       for (const dataset of state.datasets) {
-        const derived = derivePairwiseTargetMappings(pairwise, dataset);
+        const derived = deriveComparisonTargetMappings(comparison, dataset);
         const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
-        for (const key of PAIRWISE_DERIVED_KEYS) delete existing[key];
+        for (const key of DERIVED_KEYS) delete existing[key];
         newDatasetMappings[dataset.id] = {
           ...existing,
           ...derived,
@@ -733,7 +735,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       return {
         targets: state.targets.map((t) =>
           t.id === targetId
-            ? { ...t, pairwise, mappings: newDatasetMappings }
+            ? // Drop the legacy shape as we write the canonical one.
+              {
+                ...t,
+                pairwise: undefined,
+                comparison,
+                mappings: newDatasetMappings,
+              }
             : t,
         ),
       };
@@ -788,32 +796,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         state.datasets,
         state.targets,
       );
-      let evaluatorWithMappings = {
+      const evaluatorWithMappings = {
         ...evaluator,
         mappings: {
           ...evaluator.mappings,
           ...autoMappings,
         },
       };
-
-      // Auto-wire pairwise variants when exactly 2 targets already exist.
-      // Guard: only fires at exactly 2 targets (3+ is ambiguous, user configures manually).
-      if (
-        evaluatorWithMappings.evaluatorType === "langevals/pairwise_compare" &&
-        evaluatorWithMappings.pairwise &&
-        state.targets.length === 2 &&
-        !evaluatorWithMappings.pairwise.variantA &&
-        !evaluatorWithMappings.pairwise.variantB
-      ) {
-        evaluatorWithMappings = {
-          ...evaluatorWithMappings,
-          pairwise: {
-            ...evaluatorWithMappings.pairwise,
-            variantA: state.targets[0]!.id,
-            variantB: state.targets[1]!.id,
-          },
-        };
-      }
 
       return {
         evaluators: [...state.evaluators, evaluatorWithMappings],
@@ -957,6 +946,16 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
+  setHighlightedVariantTargetId: (targetId, outcome) => {
+    set({
+      ui: {
+        ...get().ui,
+        highlightedVariantTargetId: targetId,
+        highlightedVariantOutcome: targetId ? outcome : undefined,
+      },
+    });
+  },
+
   toggleRowSelection: (row) => {
     set((state) => {
       const newSelected = new Set(state.ui.selectedRows);
@@ -1010,11 +1009,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          !currentDataset ||
-          currentDataset.type !== "inline" ||
-          !currentDataset.inline
-        ) {
+        if (currentDataset?.type !== "inline" || !currentDataset.inline) {
           return currentState;
         }
 
@@ -1065,11 +1060,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const currentDataset = currentState.datasets.find(
           (d) => d.id === datasetId,
         );
-        if (
-          !currentDataset ||
-          currentDataset.type !== "saved" ||
-          !currentDataset.savedRecords
-        ) {
+        if (currentDataset?.type !== "saved" || !currentDataset.savedRecords) {
           return currentState;
         }
 
@@ -1296,13 +1287,19 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           (state.datasets as typeof current.datasets) ?? current.datasets,
         activeDatasetId:
           (state.activeDatasetId as string) ?? current.activeDatasetId,
-        evaluators:
+        // Experiments saved before pairwise and N-way were merged carry a
+        // two-slot `pairwise` config. This is the load boundary where it is
+        // folded into the canonical `comparison` shape — everything
+        // downstream, including what gets saved back, sees only `comparison`.
+        evaluators: normalizeEvaluators(
           (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+        ),
         // Support loading old state format (agents) and new format (targets)
-        targets:
+        targets: normalizeTargets(
           (state.targets as typeof current.targets) ??
-          (state.agents as typeof current.targets) ??
-          current.targets,
+            (state.agents as typeof current.targets) ??
+            current.targets,
+        ),
         // Load persisted results if available
         results: loadedResults ?? current.results,
         // Load UI settings

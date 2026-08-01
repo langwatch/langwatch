@@ -1,6 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import cloneDeep from "lodash.clonedeep";
-import debounce from "lodash.debounce";
+import { cloneDeep, debounce } from "lodash-es";
 import {
   createContext,
   useCallback,
@@ -148,7 +147,13 @@ function PromptBrowserWindowInner(props: {
         }),
       });
     });
-    return () => sub.unsubscribe();
+    return () => {
+      sub.unsubscribe();
+      // Flush any pending debounced write before this tab unmounts (e.g. the
+      // user edited a field then immediately switched prompt tabs). Without
+      // this, switching back would restore stale tab.data.
+      updateTabDataDebounced.flush();
+    };
   }, [form.methods, props.tabId, updateTabDataDebounced]);
 
   // Refs for measuring content and direct DOM manipulation during drag

@@ -27,7 +27,7 @@ describe("escapeCssAttributeValue", () => {
   });
 
   describe("given a literal double-quote", () => {
-    it("escapes it as `\\\"` so it cannot close the attribute string", () => {
+    it('escapes it as `\\"` so it cannot close the attribute string', () => {
       // A bare `"` inside `[data-x="…"]` would terminate the string
       // early. The escape produces `\"` which CSS reads as a literal.
       expect(escape('"')).toBe('\\"');
@@ -91,7 +91,7 @@ describe("escapeCssAttributeValue", () => {
     });
   });
 
-  describe("given a literal `\\\"` in the input", () => {
+  describe('given a literal `\\"` in the input', () => {
     it("treats both characters as text", () => {
       // Input is backslash + double-quote. Both get escaped: `\\` then
       // `\"`. The CSS parser reads the output as `\\` (literal
@@ -111,7 +111,7 @@ describe("escapeCssAttributeValue", () => {
     });
   });
 
-  describe("given `\"></style>`", () => {
+  describe('given `"></style>`', () => {
     it("escapes the leading double-quote so the selector cannot be broken", () => {
       // The hostile case: the `"` is what would close the attribute
       // string and let the rest reach the parser as raw CSS. The

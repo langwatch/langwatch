@@ -11,6 +11,7 @@ import type {
   Prisma,
   PrismaClient,
   VirtualKey,
+  VirtualKeyRoutingMode,
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@prisma/client";
@@ -50,7 +51,14 @@ export type CreateVirtualKeyData = {
    * least one entry is required.
    */
   scopes: ScopeInput[];
+  /** Explicit trace destination; grants no access (not a scope row). */
+  traceProjectId?: string | null;
   routingPolicyId?: string | null;
+  /**
+   * Routing behaviour. Defaults to the column default (NONE: no
+   * failover) when the caller does not state one.
+   */
+  routingMode?: VirtualKeyRoutingMode;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
    * auto-provisioned by `langyVirtualKey.provisionLangyVirtualKey` for the
@@ -123,13 +131,22 @@ export class VirtualKeyRepository {
     });
   }
 
+  /**
+   * The customer-facing organization listing. Product-managed keys
+   * (`purpose != USER` — today the Langy VK) are excluded: the customer
+   * neither created them nor may mutate them, so surfacing them only invites
+   * a rotate that silently breaks the feature holding the secret. Internal
+   * lookups that legitimately need them go through `findById` /
+   * `findByHashedSecret`, which stay unfiltered. Same posture as
+   * HIDDEN_SYSTEM_KEY_NAMES on the API-key listings.
+   */
   async findAllInOrganization(
     organizationId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<VirtualKeyWithScopes[]> {
     const client = tx ?? this.prisma;
     return client.virtualKey.findMany({
-      where: { organizationId },
+      where: { organizationId, purpose: "USER" },
       include: {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
@@ -142,9 +159,10 @@ export class VirtualKeyRepository {
   }
 
   /**
-   * Every VK reachable from a given scope entry. Used for the
+   * Every customer-owned VK reachable from a given scope entry. Used for the
    * project / team / org settings pages — each page lists VKs that
-   * declare at least one matching scope row.
+   * declare at least one matching scope row. Product-managed keys are
+   * excluded for the same reason as `findAllInOrganization`.
    */
   async findAllForScope(
     scope: ScopeInput,
@@ -153,6 +171,7 @@ export class VirtualKeyRepository {
     const client = tx ?? this.prisma;
     return client.virtualKey.findMany({
       where: {
+        purpose: "USER",
         scopes: {
           some: { scopeType: scope.scopeType, scopeId: scope.scopeId },
         },
@@ -182,9 +201,11 @@ export class VirtualKeyRepository {
         hashedSecret: data.hashedSecret,
         displayPrefix: data.displayPrefix,
         principalUserId: data.principalUserId ?? null,
+        traceProjectId: data.traceProjectId ?? null,
         config: data.config,
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,
+        ...(data.routingMode ? { routingMode: data.routingMode } : {}),
         purpose: data.purpose ?? "USER",
         revision: 1n,
         scopes: {

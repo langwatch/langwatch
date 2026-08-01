@@ -102,9 +102,25 @@ const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
 ```
 
 This means:
-- **No ties possible** — every fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`
-- **`max(UpdatedAt)` always identifies exactly one row** per dedup key
-- The IN-tuple pattern is safe without additional tie-breaking
+- **Within one state chain, no ties** — each fold bumps `UpdatedAt` to at least `prevUpdatedAt + 1`, so successive versions written by one writer strictly increase
+
+**It does NOT mean `max(UpdatedAt)` identifies exactly one row.** The bump is
+relative to the `prevUpdatedAt` the writer *loaded*, so two writers that both
+resume from the same committed version compute their next stamp from the same
+predecessor and can land on the same millisecond. Both then satisfy the
+IN-tuple, and a bare `LIMIT 1` picks between them arbitrarily — returning a
+stale version that the fold resumes from and rewrites, silently dropping the
+other version's contributions.
+
+So the IN-tuple narrows the candidates but does not order them. Give the outer
+scope a deterministic `ORDER BY … LIMIT 1` whenever a tie is reachable, ranked
+by whatever monotonically records how far each version's fold actually got
+(a progress watermark, a count that only increments), never by a value that can
+move in both directions. See `trace-analytics.clickhouse.repository.ts` and
+`evaluation-analytics.clickhouse.repository.ts` for worked examples, and note
+that the sort is cheap there precisely because the IN-tuple has already reduced
+the outer scope to one or two rows — it is not the "sort the whole table"
+anti-pattern below.
 
 ## Pagination with Dedup
 
@@ -153,6 +169,40 @@ Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for t
 
 Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}`. No other ID (ScenarioRunId, BatchRunId, TraceId, etc.) is unique across tenants.
 
+### Carve-out: boot-time system sweeps
+
+A query may omit the `TenantId` filter **only** when every one of these holds:
+
+1. It runs from a system/background entrypoint (worker boot, cron, metering sweep) where there is genuinely **no tenant in context** — not a request path, not a tRPC/Hono handler.
+2. It runs on the **shared** ClickHouse client, and the code says so. Tenants on private instances (`CLICKHOUSE_URL__*`) are therefore out of its reach — state that limitation where the sweep is defined.
+3. It **SELECTs** `TenantId` rather than filtering on it, and every downstream write is re-scoped per row to that row's own `TenantId`. A sweep that reads cross-tenant and writes with a single tenant id is a data-corruption bug.
+4. The omission carries an inline comment explaining which of these applies, so a future "you forgot the tenant filter" fix does not silently narrow the sweep to one tenant.
+5. A test pins the cross-tenant behaviour — otherwise item 4's regression passes CI. Single-tenant fixtures cannot catch it.
+
+Current sweeps under this carve-out, both on worker boot:
+
+- `scenarios/scenario-orphan-reconciler.ts` — reconciles `QUEUED` orphans (#3365).
+- `scenarios/orphaned-run-reconciliation.clickhouse.ts` — reconciles `IN_PROGRESS` orphans (#3195).
+
+Anything else that wants to skip the filter should be a repository method taking a `tenantId`, not a sweep.
+
+### Carve-out: organization-scoped billing ledgers
+
+A table whose whole purpose is to total usage *across* an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. One table qualifies today:
+
+- `metric_usage_estimates` (`queryMetricUsageEstimates`, `metric-data-point.usage.ts`) — ORDER BY `(OrganizationId, TenantId, PointId)`.
+
+It is allowed to lead with `OrganizationId` **only** because all of these hold:
+
+1. The `OrganizationId = {organizationId:String}` predicate **is** the isolation boundary here, exactly as `TenantId` is elsewhere. Do not mistake client selection for that boundary: `getClickHouseClientForOrganization` returns a private instance only when a `CLICKHOUSE_URL__<org>` entry exists and otherwise falls back to the **shared** client, which is the common case — so on a shared instance every organization's rows live in one `metric_usage_estimates` table and the predicate is the only thing separating them. Never relax it, and never widen it to a table holding customer data on the theory that instances are per-organization. The repository still takes the organization resolver as a **required** constructor argument, so which client is used stays an explicit decision rather than a default inherited from the project resolver.
+2. `OrganizationId` leads the table's sort key, so the predicate order matches the index. A `TenantId`-first predicate would be both wrong for the aggregate and worse for the scan.
+3. `TenantId` is still ANDed in whenever the caller supplies one, and remains a selected grouping dimension.
+4. The table holds identifiers and byte counts only — never attributes, values, buckets or payloads — so a scoping mistake cannot leak customer data.
+5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId`.
+6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `queryMetricUsageEstimates` has no callers yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
+
+A new table wanting this carve-out needs all six, plus a line here. Anything that merely *finds it convenient* to skip `TenantId` does not qualify.
+
 ## Code Review Checklist
 
 When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:
@@ -162,5 +212,6 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 - **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
+- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
 
 These checks belong in code review because they're query-shape problems, not type problems — typecheck and unit tests will not catch them. CI integration tests will pass while production grinds to a halt under merge backlog.

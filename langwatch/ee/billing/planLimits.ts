@@ -1,6 +1,6 @@
 import { FREE_VISIBILITY_DAYS } from "../licensing/constants";
 import type { PlanInfo } from "../licensing/planInfo";
-import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
+import { type PlanTypes as PlanType, PlanTypes } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 
 /**

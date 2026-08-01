@@ -29,12 +29,16 @@ import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
-  CodeComponentConfig,
   HttpAuth,
   HttpComponentConfig,
   HttpHeader,
   HttpMethod,
 } from "~/optimization_studio/types/dsl";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "~/optimization_studio/utils/codeAgentConfig";
 import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -93,39 +97,6 @@ function buildHttpConfig(
     outputPath,
     headers: headers.length > 0 ? headers : undefined,
     auth: auth?.type === "none" ? undefined : auth,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Code Config helpers
-// ---------------------------------------------------------------------------
-
-const DEFAULT_CODE = `class Code:
-    def __call__(self, input: str):
-        # Your code goes here
-
-        return {"output": input.upper()}
-`;
-
-function getCodeFromConfig(config: AgentComponentConfig): string {
-  const codeConfig = config as CodeComponentConfig;
-  const codeParam = codeConfig.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code",
-  );
-  return (codeParam?.value as string) ?? DEFAULT_CODE;
-}
-
-function buildCodeConfig(
-  code: string,
-  inputs: DslField[],
-  outputs: DslField[],
-): CodeComponentConfig {
-  return {
-    name: "Code",
-    description: "Python code block",
-    parameters: [{ identifier: "code", type: "code", value: code }],
-    inputs: inputs as CodeComponentConfig["inputs"],
-    outputs: outputs as CodeComponentConfig["outputs"],
   };
 }
 
@@ -523,17 +494,17 @@ function DbAgentPanel({
         auth,
       );
     } else if (agentType === "code") {
-      config = buildCodeConfig(
+      config = buildCodeConfig({
         code,
-        (node.data.inputs ?? []).map((i) => ({
+        inputs: (node.data.inputs ?? []).map((i) => ({
           identifier: i.identifier,
           type: i.type,
         })),
-        (node.data.outputs ?? []).map((o) => ({
+        outputs: (node.data.outputs ?? []).map((o) => ({
           identifier: o.identifier,
           type: o.type,
         })),
-      );
+      });
     }
 
     updateMutation.mutate(

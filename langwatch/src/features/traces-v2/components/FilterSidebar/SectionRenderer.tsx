@@ -233,6 +233,10 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
         renderActiveRowExtras={renderActiveRowExtras}
         renderInactiveRowExtras={renderInactiveRowExtras}
         synthetic={section.synthetic}
+        // Categorical facets get server-side value search; the discrete-range
+        // branch below omits it (the discriminator is the render BRANCH, not
+        // the `field`). See useFacetSearch — server search is categorical-only.
+        serverValueSearch
       />
     );
 

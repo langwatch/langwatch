@@ -132,7 +132,7 @@ describe("exchange", () => {
   });
 
   it("attaches client_info (hostname, uname, platform) to the exchange POST body", async () => {
-    // Drives the /me/sessions device-label fix (Ariana QA): without
+    // Drives the /me/devices device-label fix (Ariana QA): without
     // client_info on /exchange, every CLI session falls back to
     // "Unknown device" in the inventory, blocking selective revoke
     // for multi-device users.

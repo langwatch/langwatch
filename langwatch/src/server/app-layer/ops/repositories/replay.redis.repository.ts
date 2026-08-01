@@ -2,9 +2,9 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import {
   IDLE_STATUS,
+  type ReplayHistoryEntry,
   type ReplayRepository,
   type ReplayStatus,
-  type ReplayHistoryEntry,
 } from "./replay.repository";
 
 const REPLAY_LOCK_KEY = "ops:replay:lock";
@@ -54,11 +54,39 @@ export class ReplayRedisRepository implements ReplayRepository {
     return result !== null;
   }
 
+  async refreshLock(params: {
+    runId: string;
+    ttlSeconds: number;
+  }): Promise<boolean> {
+    // Atomic check-and-extend: only the current holder may push the TTL out.
+    const result = await this.redis.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('expire', KEYS[1], ARGV[2])
+      else
+        return 0
+      end`,
+      1,
+      REPLAY_LOCK_KEY,
+      params.runId,
+      String(params.ttlSeconds),
+    );
+    return result === 1;
+  }
+
   async releaseLock(params: { runId: string }): Promise<void> {
-    const holder = await this.redis.get(REPLAY_LOCK_KEY);
-    if (holder === params.runId) {
-      await this.redis.del(REPLAY_LOCK_KEY);
-    }
+    // Atomic compare-and-delete: only the current holder may release. A
+    // GET-then-DEL would race — the lock could expire and be re-acquired by a
+    // successor run between the two calls, and we'd delete the successor's lock.
+    await this.redis.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1] then
+        return redis.call('del', KEYS[1])
+      else
+        return 0
+      end`,
+      1,
+      REPLAY_LOCK_KEY,
+      params.runId,
+    );
   }
 
   async getLockHolder(): Promise<string | null> {
@@ -78,18 +106,17 @@ export class ReplayRedisRepository implements ReplayRepository {
     await this.redis.del(REPLAY_CANCEL_KEY);
   }
 
-  async pushToHistory(params: {
-    entry: ReplayHistoryEntry;
-  }): Promise<void> {
-    await this.redis.lpush(
-      REPLAY_HISTORY_KEY,
-      JSON.stringify(params.entry),
-    );
+  async pushToHistory(params: { entry: ReplayHistoryEntry }): Promise<void> {
+    await this.redis.lpush(REPLAY_HISTORY_KEY, JSON.stringify(params.entry));
     await this.redis.ltrim(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
   }
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
-    const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
+    const raw = await this.redis.lrange(
+      REPLAY_HISTORY_KEY,
+      0,
+      REPLAY_HISTORY_MAX - 1,
+    );
     const entries: ReplayHistoryEntry[] = [];
     for (const item of raw) {
       try {

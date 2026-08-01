@@ -6,15 +6,43 @@
 import {
   createSystem,
   defaultConfig,
+  defineConfig,
   defineRecipe,
   defineSlotRecipe,
+  mergeConfigs,
 } from "@chakra-ui/react";
 import { colorSystem } from "../components/ui/color-mode";
+import { langyThemeConfig } from "../features/langy/langyTheme";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
 const interFontFamily = "'Inter', sans-serif";
 
-export const system = createSystem(defaultConfig, {
+/**
+ * A restrained hairline in the status colour, mixed into the neutral border
+ * rather than drawn on top of it — the same formula as the Langy card's
+ * `accentBorder` (`features/asaplangy/tokens.ts`), which exists so a card can
+ * carry a tone without wearing a coloured ring.
+ */
+const statusHairline = (color: string) =>
+  `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
+
+/**
+ * The neutral card material every toast wears, whatever its status — the same
+ * panel + hairline pair as `INSET` in `features/asaplangy/tokens.ts`. It is
+ * repeated per `&[data-type=…]` because that is the shape (and specificity) of
+ * Chakra's own filled defaults, which set `bg: red.solid` / `color:
+ * red.contrast` and would otherwise survive the deep merge.
+ */
+const toastPanel = {
+  bg: "bg.panel",
+  color: "fg",
+  // Those same filled defaults hand the action trigger a white border and a
+  // white hover wash, both of which disappear on a light panel.
+  "--toast-trigger-bg": "colors.bg.muted",
+  "--toast-border-color": "colors.border.muted",
+} as const;
+
+const appConfig = defineConfig({
   globalCss: {
     body: {
       background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
@@ -37,7 +65,24 @@ export const system = createSystem(defaultConfig, {
     },
     "[data-line][data-highlight]::after, [data-line][data-diff]::after": {
       borderInlineStartColor: "#ED8926 !important",
-      background: 'color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important',
+      background:
+        "color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important",
+    },
+    // GraphicsQualityProvider sets this attribute when a background FPS
+    // probe finds the device can't sustain a smooth frame rate. Recipes
+    // below reference `var(--lw-backdrop-blur, blur(Npx))` instead of a
+    // literal blur value, so this one variable turns off decorative blur
+    // everywhere at once — including static recipes, which can't read
+    // React state directly.
+    //
+    // --lw-panel-alpha goes with it: these surfaces are semi-transparent
+    // specifically because the blur diffuses whatever shows through. Turn
+    // off the blur alone and the same transparency reads as a plain
+    // see-through tint instead of frosted glass — so reduced-graphics mode
+    // also pushes every paired background to fully opaque.
+    'html[data-reduced-graphics="true"]': {
+      "--lw-backdrop-blur": "none",
+      "--lw-panel-alpha": "100%",
     },
   },
   theme: {
@@ -658,8 +703,8 @@ export const system = createSystem(defaultConfig, {
         slots: ["content", "arrow", "arrowTip"],
         base: {
           content: {
-            bg: "bg.panel/85",
-            backdropFilter: "blur(8px)",
+            bg: "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 85%), transparent)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             color: "fg",
             border: "1px solid",
             borderColor: "border",
@@ -996,8 +1041,9 @@ export const system = createSystem(defaultConfig, {
             fontWeight: "500",
           },
           content: {
-            background: "bg.surface/60",
-            backdropFilter: "blur(12px)",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 60%), transparent)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1030,8 +1076,9 @@ export const system = createSystem(defaultConfig, {
             background: "bg.surface/65",
           },
           content: {
-            background: "bg.panel/75",
-            backdropFilter: "blur(8px)",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 75%), transparent)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1108,8 +1155,9 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             maxWidth: "70%",
-            background: "bg.surface/80",
-            backdropFilter: "blur(25px)",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1131,71 +1179,67 @@ export const system = createSystem(defaultConfig, {
           size: "xl",
         },
       }),
+      /**
+       * Toasts are surface cards, not coloured slabs.
+       *
+       * They used to be a translucent wash of the status colour with white
+       * text — the message set on the paint, which is both loud and harder to
+       * read than the colour behind it. This follows the language Langy
+       * already established (`features/asaplangy/tokens.ts`,
+       * `features/langy/components/LangyError.tsx`): panel material, ONE
+       * hairline carrying the tone, the status colour spent on a small icon,
+       * and the accent reserved for the way forward — never on the trouble.
+       *
+       * It has to live here rather than as props on `<Toast.Root>`: Chakra's
+       * defaults are attribute selectors (`&[data-type=error]`), which a style
+       * prop cannot outrank — so both the neutral material and the per-status
+       * hairline are declared here. `components/ui/toaster.tsx` renders the
+       * status icon.
+       */
       toast: defineSlotRecipe({
-        slots: ["root"],
+        slots: ["root", "title", "description"],
         base: {
           root: {
             borderRadius: "xl",
-            backdropFilter: "blur(12px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
+            borderColor: "border.muted",
             boxShadow: "lg",
+            // The same neutral material for every status; ONE hairline carries
+            // the tone.
             "&[data-type=info]": {
-              bg: {
-                _light: "blue.solid/85",
-                _dark: "rgba(37, 99, 235, 0.8)",
-              },
-              borderColor: {
-                _light: "blue.solid/30",
-                _dark: "rgba(96, 165, 250, 0.25)",
-              },
-              color: "white",
-              "--toast-trigger-bg": "{white/10}",
-              "--toast-border-color": "{white/40}",
-            },
-            "&[data-type=success]": {
-              bg: {
-                _light: "green.solid/85",
-                _dark: "rgba(22, 163, 74, 0.8)",
-              },
-              borderColor: {
-                _light: "green.solid/30",
-                _dark: "rgba(74, 222, 128, 0.25)",
-              },
-              color: "white",
-            },
-            "&[data-type=error]": {
-              bg: {
-                _light: "red.solid/88",
-                _dark: "rgba(220, 38, 38, 0.8)",
-              },
-              borderColor: {
-                _light: "red.solid/30",
-                _dark: "rgba(248, 113, 113, 0.25)",
-              },
-              color: "white",
-            },
-            "&[data-type=warning]": {
-              bg: {
-                _light: "yellow.solid/88",
-                _dark: "rgba(217, 119, 6, 0.8)",
-              },
-              borderColor: {
-                _light: "yellow.solid/30",
-                _dark: "rgba(251, 191, 36, 0.25)",
-              },
-              color: "white",
+              ...toastPanel,
+              borderColor: "border.muted",
             },
             "&[data-type=loading]": {
-              bg: {
-                _light: "white/80",
-                _dark: "rgba(30, 30, 36, 0.8)",
-              },
-              borderColor: {
-                _light: "black/8",
-                _dark: "rgba(255, 255, 255, 0.1)",
-              },
-              color: { _light: "gray.800", _dark: "gray.100" },
+              ...toastPanel,
+              borderColor: "border.muted",
             },
+            "&[data-type=error]": {
+              ...toastPanel,
+              borderColor: statusHairline("red-solid"),
+            },
+            "&[data-type=warning]": {
+              ...toastPanel,
+              borderColor: statusHairline("yellow-solid"),
+            },
+            "&[data-type=success]": {
+              ...toastPanel,
+              borderColor: statusHairline("green-solid"),
+            },
+          },
+          title: {
+            fontSize: "13.5px",
+            fontWeight: "640",
+            lineHeight: "1.35",
+            letterSpacing: "-0.005em",
+            marginEnd: "0",
+          },
+          description: {
+            fontSize: "13px",
+            lineHeight: "1.5",
+            color: "fg.muted",
+            opacity: "1",
           },
         },
       }),
@@ -1230,6 +1274,26 @@ export const system = createSystem(defaultConfig, {
     },
   },
 });
+
+/**
+ * The app's system, plus Langy's.
+ *
+ * Langy is a distinct surface inside LangWatch (warm paper, ink, the brand's own
+ * ramp) and it carries its own palette — but as a THEME, not a stylesheet of
+ * `--chakra-colors-*` overrides. It declares two custom conditions
+ * (`_langy` / `_langyDark`, scoped to `.langy-root`) and hangs its values off
+ * the SAME semantic tokens the rest of the app uses.
+ *
+ * `mergeConfigs` is what makes that safe: it deep-merges Langy's condition keys
+ * INTO the app's existing token definitions rather than replacing them, so
+ * `bg.surface` keeps its `_light` / `_dark` values everywhere and simply gains a
+ * `_langy` / `_langyDark` pair that only applies inside the panel. Nothing
+ * outside `.langy-root` changes.
+ */
+export const system = createSystem(
+  defaultConfig,
+  mergeConfigs(appConfig, langyThemeConfig),
+);
 
 // The LangWatch app shell (providers, routing, NProgress) has moved to:
 // - src/AppProviders.tsx (provider hierarchy)

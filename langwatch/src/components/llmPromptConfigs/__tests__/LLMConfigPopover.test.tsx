@@ -148,11 +148,7 @@ vi.mock("../../ModelSelector", () => ({
 }));
 
 import { Popover } from "../../ui/popover";
-import {
-  LLMConfigPopover,
-  type LLMConfigValues,
-  type Output,
-} from "../LLMConfigPopover";
+import { LLMConfigPopover, type Output } from "../LLMConfigPopover";
 
 const renderComponent = (
   props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {},

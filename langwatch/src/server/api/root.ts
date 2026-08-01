@@ -16,6 +16,8 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
+import { bugReportsRouter } from "./routers/bugReports";
+import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -23,6 +25,7 @@ import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
+import { emailSuppressionRouter } from "./routers/emailSuppression";
 import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
@@ -37,6 +40,8 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { langyRouter } from "./routers/langy";
+import { langyEgressRouter } from "./routers/langyEgress";
 import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
@@ -63,9 +68,9 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
-import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
+import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
@@ -88,6 +93,7 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  codingAgents: codingAgentsRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
@@ -111,11 +117,14 @@ const coreRouters = {
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
+  bugReports: bugReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
+  emailSuppression: emailSuppressionRouter,
   dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   workflow: workflowRouter,
@@ -128,7 +137,6 @@ const coreRouters = {
   prompts: promptsRouter,
   promptTags: promptTagsRouter,
   savedViews: savedViewsRouter,
-  sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
@@ -157,6 +165,8 @@ const coreRouters = {
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
   langyGithub: langyGithubRouter,
+  langyEgress: langyEgressRouter,
+  langy: langyRouter,
 };
 
 const eeRouters = {

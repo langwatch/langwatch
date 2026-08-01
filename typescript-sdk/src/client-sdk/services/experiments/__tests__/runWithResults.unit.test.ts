@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ExperimentsFacade } from "../experiments.facade";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
+import {
+  ExperimentNotFoundError,
+  ExperimentsApiError,
+} from "../platformErrors";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -299,5 +303,31 @@ describe("ExperimentsFacade.runWithResults", () => {
         expect(mockFetch).toHaveBeenCalledTimes(3);
       });
     });
+  });
+});
+
+describe("ExperimentsFacade.run error compatibility", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("keeps the public not-found error when the transport recognizes a domain error", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ error: "Experiment not found" }, { status: 404 }),
+    );
+
+    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(
+      ExperimentNotFoundError,
+    );
+  });
+
+  it("keeps the public API error for invalid credentials", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ error: "Invalid credentials" }, { status: 401 }),
+    );
+
+    await expect(makeFacade().run("my-experiment")).rejects.toThrow(
+      ExperimentsApiError,
+    );
   });
 });

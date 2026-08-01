@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import type {
   Group,
   GroupMembership,
@@ -5,9 +6,8 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
-import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { slugify } from "~/utils/slugify";
 import type {
   GroupRepository,
   GroupWithDetails,
@@ -76,6 +76,16 @@ export class GroupRestService {
     }>;
     memberIds?: string[];
   }): Promise<Group> {
+    const uniqueMemberIds = [...new Set(memberIds ?? [])];
+    const allMembersInOrganization = await this.repo.areUsersInOrganization({
+      organizationId,
+      userIds: uniqueMemberIds,
+    });
+    if (!allMembersInOrganization) {
+      throw new UserNotInOrganizationError(
+        "All users must belong to the organization before joining a group",
+      );
+    }
     const baseSlug = slugify(name, { lower: true, strict: true });
     const slug = await this.repo.findUniqueSlug({
       organizationId,
@@ -90,9 +100,7 @@ export class GroupRestService {
       groupId,
       role: b.role,
       customRoleId:
-        b.role === ("CUSTOM" as TeamUserRole)
-          ? (b.customRoleId ?? null)
-          : null,
+        b.role === ("CUSTOM" as TeamUserRole) ? (b.customRoleId ?? null) : null,
       scopeType: b.scopeType,
       scopeId: b.scopeId,
     }));
@@ -116,9 +124,7 @@ export class GroupRestService {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError("Group not found");
     if (group.scimSource) {
-      throw new ScimManagedGroupError(
-        "Cannot rename a SCIM-managed group",
-      );
+      throw new ScimManagedGroupError("Cannot rename a SCIM-managed group");
     }
 
     const baseSlug = slugify(name, { lower: true, strict: true });
@@ -190,7 +196,9 @@ export class GroupRestService {
         "code" in error &&
         (error as { code: string }).code === "P2002"
       ) {
-        throw new DuplicateMemberError("User is already a member of this group");
+        throw new DuplicateMemberError(
+          "User is already a member of this group",
+        );
       }
       throw error;
     }
@@ -261,9 +269,7 @@ export class GroupRestService {
       groupId,
       role,
       customRoleId:
-        role === ("CUSTOM" as TeamUserRole)
-          ? (customRoleId ?? null)
-          : null,
+        role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
       scopeType,
       scopeId,
     });

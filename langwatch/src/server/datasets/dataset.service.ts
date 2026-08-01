@@ -1,5 +1,6 @@
 import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type {
   Dataset,
   DatasetRecord,
@@ -9,7 +10,6 @@ import type {
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import {
   adaptS3JsonlRecord,

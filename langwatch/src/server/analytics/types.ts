@@ -1,5 +1,5 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import { type FilterField, filterFieldsEnum } from "../filters/types";
@@ -17,18 +17,6 @@ export type AnalyticsMetric = {
     filter: FilterField;
   };
   allowedAggregations: AggregationTypes[];
-  aggregation: (
-    index: number,
-    aggregation: AggregationTypes,
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => Record<string, AggregationsAggregationContainer>;
-  extractionPath: (
-    index: number,
-    aggregations: AggregationTypes,
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => string;
 };
 
 export type AnalyticsGroup = {
@@ -37,11 +25,6 @@ export type AnalyticsGroup = {
     filter: FilterField;
     optional?: boolean;
   };
-  aggregation: (
-    aggToGroup: Record<string, AggregationsAggregationContainer>,
-    key?: string,
-  ) => Record<string, AggregationsAggregationContainer>;
-  extractionPath: () => string;
 };
 
 export const aggregationTypesEnum = z.enum([
@@ -189,10 +172,15 @@ export interface FeedbacksResult {
 }
 
 /**
- * Analytics backend interface for dependency injection
+ * Analytics backend interface for dependency injection. Covers the legacy
+ * non-timeseries reads (filter options, feedbacks, top documents).
+ * Timeseries reads are owned end-to-end by the app-layer service
+ * (`~/server/app-layer/analytics`) — routing, query building, and the
+ * shared row parser — so this interface deliberately has no
+ * `getTimeseries`: a second implementation would be a place for bucket
+ * semantics to drift.
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: import("./registry").TimeseriesInputType): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,

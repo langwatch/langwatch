@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  ErrorCategory,
-  SecurityError,
-  ValidationError,
+  ClickHouseUnavailableError,
+  QueryMemoryExceededError,
+} from "~/server/app-layer/traces/errors";
+import {
   ConfigurationError,
-  StoreError,
-  QueueError,
-  HandlerError,
-  ProjectionError,
-  handleError,
   categorizeError,
   classifyClickHouseError,
+  ErrorCategory,
+  HandlerError,
+  handleError,
+  ProjectionError,
+  QueueError,
+  SecurityError,
+  StoreError,
+  ValidationError,
 } from "../errorHandling";
 
 const createMockLogger = () => ({
@@ -348,7 +352,9 @@ describe("categorizeError", () => {
 describe("classifyClickHouseError", () => {
   describe("when error has a transient ClickHouse error code", () => {
     it("returns RECOVERABLE for code 202 (TOO_MANY_SIMULTANEOUS_QUERIES)", () => {
-      const err = Object.assign(new Error("Too many simultaneous queries"), { code: "202" });
+      const err = Object.assign(new Error("Too many simultaneous queries"), {
+        code: "202",
+      });
       expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
     });
 
@@ -390,21 +396,33 @@ describe("classifyClickHouseError", () => {
 
   describe("when error message matches transient patterns", () => {
     it("returns RECOVERABLE for 'Too many simultaneous queries' message", () => {
-      expect(classifyClickHouseError(new Error("Too many simultaneous queries. Maximum: 100. "))).toBe(ErrorCategory.RECOVERABLE);
+      expect(
+        classifyClickHouseError(
+          new Error("Too many simultaneous queries. Maximum: 100. "),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("returns RECOVERABLE for connection refused", () => {
-      expect(classifyClickHouseError(new Error("connect ECONNREFUSED 127.0.0.1:8123"))).toBe(ErrorCategory.RECOVERABLE);
+      expect(
+        classifyClickHouseError(
+          new Error("connect ECONNREFUSED 127.0.0.1:8123"),
+        ),
+      ).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("returns RECOVERABLE for connection timeout", () => {
-      expect(classifyClickHouseError(new Error("connect ETIMEDOUT"))).toBe(ErrorCategory.RECOVERABLE);
+      expect(classifyClickHouseError(new Error("connect ETIMEDOUT"))).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
     });
 
     it("returns RECOVERABLE for MEMORY_LIMIT_EXCEEDED message-only (no `code` field)", () => {
       expect(
         classifyClickHouseError(
-          new Error("Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB. (MEMORY_LIMIT_EXCEEDED)"),
+          new Error(
+            "Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB. (MEMORY_LIMIT_EXCEEDED)",
+          ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -412,7 +430,9 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for 'Query was cancelled' message (CH replica graceful shutdown)", () => {
       expect(
         classifyClickHouseError(
-          new Error("Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)"),
+          new Error(
+            "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
+          ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -420,7 +440,9 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for 'Table is in readonly mode' message (ZK session lost)", () => {
       expect(
         classifyClickHouseError(
-          new Error("Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)"),
+          new Error(
+            "Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)",
+          ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -428,7 +450,9 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for Coordination::Exception (KEEPER_EXCEPTION)", () => {
       expect(
         classifyClickHouseError(
-          new Error("Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)"),
+          new Error(
+            "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
+          ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -436,7 +460,9 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for 'Connection loss' message (Keeper coordinator dropped)", () => {
       expect(
         classifyClickHouseError(
-          new Error("Code: 999. Coordination::Exception: Coordination error: Connection loss."),
+          new Error(
+            "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
+          ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -444,12 +470,41 @@ describe("classifyClickHouseError", () => {
 
   describe("when error is not transient", () => {
     it("returns CRITICAL for unknown ClickHouse errors", () => {
-      expect(classifyClickHouseError(new Error("Syntax error in SQL"))).toBe(ErrorCategory.CRITICAL);
+      expect(classifyClickHouseError(new Error("Syntax error in SQL"))).toBe(
+        ErrorCategory.CRITICAL,
+      );
     });
 
     it("returns CRITICAL for null/undefined", () => {
       expect(classifyClickHouseError(null)).toBe(ErrorCategory.CRITICAL);
       expect(classifyClickHouseError(undefined)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+
+  describe("when the resilient client's translation wrapped the raw error", () => {
+    it("returns RECOVERABLE for a handled query_memory_exceeded wrapping code 241", () => {
+      const raw = Object.assign(new Error("memory"), { code: "241" });
+      const translated = new QueryMemoryExceededError({ reasons: [raw] });
+      expect(classifyClickHouseError(translated)).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
+    });
+
+    it("returns RECOVERABLE for a handled clickhouse_unavailable wrapping ECONNREFUSED", () => {
+      const raw = Object.assign(new Error("connect ECONNREFUSED"), {
+        code: "ECONNREFUSED",
+      });
+      const translated = new ClickHouseUnavailableError({ reasons: [raw] });
+      expect(classifyClickHouseError(translated)).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
+    });
+
+    it("returns CRITICAL for a handled error wrapping a non-transient cause", () => {
+      const translated = new QueryMemoryExceededError({
+        reasons: [new Error("Syntax error in SQL")],
+      });
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.CRITICAL);
     });
   });
 });

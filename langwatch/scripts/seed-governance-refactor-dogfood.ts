@@ -121,13 +121,21 @@ async function ensureUserOrgTeamsProjects(): Promise<
 
   const platformTeam = await prisma.team.upsert({
     where: { slug: "platform" },
-    create: { slug: "platform", name: "Platform", organizationId: organization.id },
+    create: {
+      slug: "platform",
+      name: "Platform",
+      organizationId: organization.id,
+    },
     update: { name: "Platform" },
   });
 
   const dataSciTeam = await prisma.team.upsert({
     where: { slug: "data-sci" },
-    create: { slug: "data-sci", name: "Data Science", organizationId: organization.id },
+    create: {
+      slug: "data-sci",
+      name: "Data Science",
+      organizationId: organization.id,
+    },
     update: { name: "Data Science" },
   });
 
@@ -276,7 +284,10 @@ async function upsertModelProviderByName(input: {
   customKeys: string | Record<string, unknown> | null;
   rateLimitRpm: number;
   fallbackPriorityGlobal: number;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  scopes: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
 }): Promise<{ id: string }> {
   // Idempotency: ANY MP with this `name` reachable from one of the
   // input scopes counts as the same row. Matching only ORGANIZATION
@@ -371,9 +382,7 @@ async function ensureRoutingPolicy(
     data: {
       organizationId: base.organizationId,
       scopes: {
-        create: [
-          { scopeType: "ORGANIZATION", scopeId: base.organizationId },
-        ],
+        create: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
       },
       name: "developer-default",
       description: "Try OpenAI first, fall back to other configured providers",
@@ -410,7 +419,10 @@ async function mintVk(input: {
   routingPolicyId: string | null;
   principalUserId: string | null;
   createdById: string;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  scopes: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
 }): Promise<MintedVk> {
   // Always mint a fresh secret on first run; on re-run, idempotency falls
   // back to the existing row (we detect by organizationId+name).
@@ -477,7 +489,8 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
     await mintVk({
       organizationId: handles.organizationId,
       name: "vk_project_demo",
-      description: "PROJECT-scope VK — inherits OpenAI + Anthropic via team cascade",
+      description:
+        "PROJECT-scope VK — inherits OpenAI + Anthropic via team cascade",
       routingPolicyId: null,
       principalUserId: null,
       createdById: handles.userId,
@@ -488,7 +501,8 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
     await mintVk({
       organizationId: handles.organizationId,
       name: "vk_personal",
-      description: "Personal VK at ORG scope (lazy-mint device-flow path shape)",
+      description:
+        "Personal VK at ORG scope (lazy-mint device-flow path shape)",
       routingPolicyId: null,
       principalUserId: handles.userId,
       createdById: handles.userId,
@@ -510,9 +524,10 @@ async function ensurePrincipalBudget(handles: SeedHandles): Promise<void> {
     create: {
       id: `dogfood-principal-budget-${handles.userId}`,
       organizationId: handles.organizationId,
+      // Post-ADR-021 the (scopeType, scopeId) pair is the only stored
+      // representation of the target; the typed FK columns are gone.
       scopeType: "PRINCIPAL",
       scopeId: handles.userId,
-      principalUserId: handles.userId,
       name: "Personal monthly cap",
       description: "Dogfood seed: $50/month spend cap on personal VK usage",
       window,
@@ -531,10 +546,14 @@ async function main(): Promise<void> {
   console.log("[seed-governance-refactor-dogfood] starting");
 
   const base = await ensureUserOrgTeamsProjects();
-  console.log(`  ✓ user + org + 2 teams + 3 projects (org=${base.organizationId})`);
+  console.log(
+    `  ✓ user + org + 2 teams + 3 projects (org=${base.organizationId})`,
+  );
 
   const mps = await ensureModelProviders(base);
-  console.log(`  ✓ ModelProviders: openai(org), anthropic(team:platform), gemini(org if GEMINI_API_KEY set), bedrock(org if AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY set)`);
+  console.log(
+    `  ✓ ModelProviders: openai(org), anthropic(team:platform), gemini(org if GEMINI_API_KEY set), bedrock(org if AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY set)`,
+  );
 
   const routingPolicyId = await ensureRoutingPolicy(base, mps);
   console.log(`  ✓ RoutingPolicy: developer-default at ORG scope`);
@@ -542,14 +561,20 @@ async function main(): Promise<void> {
   const handles: SeedHandles = { ...base, ...mps, routingPolicyId };
 
   const vks = await ensureVirtualKeys(handles);
-  console.log(`  ✓ ${vks.length} VirtualKeys minted (org/team/project/personal)`);
+  console.log(
+    `  ✓ ${vks.length} VirtualKeys minted (org/team/project/personal)`,
+  );
 
   await ensurePrincipalBudget(handles);
   console.log(`  ✓ PRINCIPAL-scope GatewayBudget for dogfood user ($50/mo)`);
 
-  console.log("\n[seed-governance-refactor-dogfood] done. Minted VKs (capture these):");
+  console.log(
+    "\n[seed-governance-refactor-dogfood] done. Minted VKs (capture these):",
+  );
   for (const vk of vks) {
-    console.log(`  ${vk.name.padEnd(20)} scopes=[${vk.scopes.join(", ")}]  secret=${vk.secret}`);
+    console.log(
+      `  ${vk.name.padEnd(20)} scopes=[${vk.scopes.join(", ")}]  secret=${vk.secret}`,
+    );
   }
   console.log(
     "\nNext: run the F full-matrix dogfood against these VKs (assets/dogfood/pr-3524/MATRIX.md).",

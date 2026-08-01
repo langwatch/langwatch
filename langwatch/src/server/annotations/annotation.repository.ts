@@ -82,4 +82,72 @@ export class AnnotationRepository {
       },
     });
   }
+
+  /**
+   * Resolves the organization that owns a project, or null when the project
+   * does not exist.
+   */
+  async findProjectOrganizationId({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+
+    return project?.team.organizationId ?? null;
+  }
+
+  /**
+   * Counts how many of the given users belong to the organization.
+   */
+  async countOrganizationUsers({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<number> {
+    if (userIds.length === 0) return 0;
+
+    return await this.prisma.organizationUser.count({
+      where: { organizationId, userId: { in: userIds } },
+    });
+  }
+
+  /**
+   * Counts how many of the given annotation scores belong to the project.
+   */
+  async countAnnotationScores({
+    projectId,
+    scoreTypeIds,
+  }: {
+    projectId: string;
+    scoreTypeIds: string[];
+  }): Promise<number> {
+    if (scoreTypeIds.length === 0) return 0;
+
+    return await this.prisma.annotationScore.count({
+      where: { projectId, id: { in: scoreTypeIds } },
+    });
+  }
+
+  /**
+   * Counts how many of the given annotation queues belong to the project.
+   */
+  async countAnnotationQueues({
+    projectId,
+    queueIds,
+  }: {
+    projectId: string;
+    queueIds: string[];
+  }): Promise<number> {
+    if (queueIds.length === 0) return 0;
+
+    return await this.prisma.annotationQueue.count({
+      where: { id: { in: queueIds }, projectId },
+    });
+  }
 }

@@ -213,6 +213,117 @@ describe("parseEvaluationResult", () => {
         score: 0.5,
       });
     });
+
+    describe("given a domainError payload", () => {
+      it("parses a full current-shape payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: {
+            code: "evaluator_execution_error",
+            httpStatus: 401,
+            meta: { httpStatus: 401 },
+            traceId: "trace-1",
+            spanId: "span-1",
+            traceUrl: "https://grafana.example.com/trace-1",
+            reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+          },
+        });
+
+        expect(result.domainError).toEqual({
+          code: "evaluator_execution_error",
+          kind: "evaluator_execution_error",
+          httpStatus: 401,
+          fault: "customer",
+          meta: { httpStatus: 401 },
+          traceId: "trace-1",
+          spanId: "span-1",
+          traceUrl: "https://grafana.example.com/trace-1",
+          reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+        });
+      });
+
+      it("derives code from a legacy kind-only payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { kind: "evaluator_execution_error", httpStatus: 401 },
+        });
+
+        expect(result.domainError).toEqual({
+          code: "evaluator_execution_error",
+          kind: "evaluator_execution_error",
+          httpStatus: 401,
+          fault: "customer",
+          meta: {},
+          traceId: undefined,
+          spanId: undefined,
+          traceUrl: undefined,
+          reasons: [],
+        });
+      });
+
+      it("derives kind from a code-only payload", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { code: "evaluator_execution_error", httpStatus: 401 },
+        });
+
+        expect(result.domainError?.kind).toBe("evaluator_execution_error");
+      });
+
+      it("preserves fault, tips and docsUrl through the parse", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: {
+            code: "evaluator_execution_error",
+            httpStatus: 502,
+            fault: "provider",
+            tips: ["Check the evaluator logs"],
+            docsUrl: "https://docs.langwatch.ai/evaluations",
+            reasons: [
+              {
+                code: "rate_limited",
+                kind: "rate_limited",
+                tips: ["Back off"],
+              },
+            ],
+          },
+        });
+
+        expect(result.domainError).toMatchObject({
+          fault: "provider",
+          tips: ["Check the evaluator logs"],
+          docsUrl: "https://docs.langwatch.ai/evaluations",
+          reasons: [{ code: "rate_limited", tips: ["Back off"] }],
+        });
+      });
+
+      it("drops the domainError when httpStatus is missing", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { code: "evaluator_execution_error" },
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+
+      it("drops the domainError when neither code nor kind is present", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: { httpStatus: 401 },
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+
+      it("drops a non-object domainError", () => {
+        const result = parseEvaluationResult({
+          status: "error",
+          domainError: "not an object",
+        });
+
+        expect(result.domainError).toBeUndefined();
+      });
+    });
   });
 
   describe("skipped status", () => {
@@ -389,15 +500,11 @@ describe("getEvalChipDisplay", () => {
     });
 
     it("normalizes the v1 'pass' / 'fail' tokens", () => {
-      
-        
       expect(getEvalChipDisplay({ status: "pass" }).status).toBe("passed");
       expect(getEvalChipDisplay({ status: "fail" }).status).toBe("failed");
     });
 
     it("normalizes the trace-list 'in_progress' / 'scheduled' tokens", () => {
-      
-        
       expect(getEvalChipDisplay({ status: "in_progress" }).status).toBe(
         "running",
       );
@@ -407,40 +514,30 @@ describe("getEvalChipDisplay", () => {
     });
 
     it("maps the legacy 'warning' status to failed so the chip turns red", () => {
-      
-        
       expect(getEvalChipDisplay({ status: "warning" }).status).toBe("failed");
     });
   });
 
   describe("when rendering trailing verdict slot", () => {
     it("yields numeric scoreText for numeric verdicts (<= 1)", () => {
-      
-        
-      expect(getEvalChipDisplay({ status: "processed", score: 0.75 }).scoreText).toBe(
-        "0.75",
-      );
+      expect(
+        getEvalChipDisplay({ status: "processed", score: 0.75 }).scoreText,
+      ).toBe("0.75");
     });
 
     it("yields one-decimal scoreText for verdicts > 1", () => {
-      
-        
-      expect(getEvalChipDisplay({ status: "processed", score: 5 }).scoreText).toBe(
-        "5.0",
-      );
+      expect(
+        getEvalChipDisplay({ status: "processed", score: 5 }).scoreText,
+      ).toBe("5.0");
     });
 
     it("suppresses the boolean Pass/Fail label when a numeric score exists", () => {
-      
-        
       const d = getEvalChipDisplay({ status: "passed", score: 0.9 });
       expect(d.scoreText).toBe("0.90");
       expect(d.passLabel).toBeNull();
     });
 
     it("marks skipped + error as no-verdict so the dot is dropped", () => {
-      
-        
       expect(getEvalChipDisplay({ status: "skipped" }).noVerdict).toBe(true);
       expect(getEvalChipDisplay({ status: "error" }).noVerdict).toBe(true);
     });
@@ -448,8 +545,6 @@ describe("getEvalChipDisplay", () => {
 
   describe("when picking a display name", () => {
     it("prefers explicit name over evaluatorId", () => {
-      
-        
       expect(
         getEvalChipDisplay({ name: "Safety", evaluatorId: "azure_safety" })
           .displayName,
@@ -457,11 +552,9 @@ describe("getEvalChipDisplay", () => {
     });
 
     it("falls back to evaluatorId when name missing", () => {
-
-
-      expect(getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName).toBe(
-        "azure_safety",
-      );
+      expect(
+        getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName,
+      ).toBe("azure_safety");
     });
 
     it("accepts the trace-list shape (evaluatorName) as an alias for name", () => {
@@ -493,8 +586,6 @@ describe("getEvalChipDisplay", () => {
   });
 
   it("color tokens stay in lockstep with EVALUATION_STATUS_COLORS for every status", () => {
-    
-      
     for (const [status, color] of Object.entries(EVALUATION_STATUS_COLORS)) {
       const d = getEvalChipDisplay({ status });
       expect(d.color).toBe(color);
