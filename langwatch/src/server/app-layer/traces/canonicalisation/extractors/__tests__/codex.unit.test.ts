@@ -444,6 +444,7 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
     ).toBeUndefined();
   });
 
+  /** @scenario "Codex reasoning effort is canonicalised from the response span when no turn rollup exists" */
   it("lifts reasoning effort, reasoning tokens, and cache writes from the response span", () => {
     const ctx = createExtractorContext(
       {
@@ -488,6 +489,7 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
 });
 
 describe("CodexExtractor turn-span cache writes", () => {
+  /** @scenario "Codex cache write tokens are canonicalised from the turn span" */
   it("lifts cache_write_input_tokens onto the canonical cache creation key", () => {
     const ctx = createExtractorContext(
       {

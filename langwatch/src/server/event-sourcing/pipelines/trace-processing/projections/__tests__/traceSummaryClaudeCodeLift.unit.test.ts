@@ -455,6 +455,7 @@ describe("TraceSummaryFoldProjection cache TTL split sums", () => {
     );
 
   describe("when two model calls each report 1h cache creation", () => {
+    /** @scenario "Cache TTL split sums accumulate across a session's model calls" */
     it("sums the per-call values under the reserved attributes instead of overwriting", () => {
       const projection = makeProjection();
       let state = createInitState();

@@ -695,6 +695,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
     );
 
   describe("given tool_result log events carrying arguments and output", () => {
+    /** @scenario "A codex session shows its prompt and its tool calls with real input and output" */
     it("renders each tool call with its name, input, and output", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [],
@@ -750,6 +751,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
   });
 
   describe("given a tool span and a tool_result log for the same call id", () => {
+    /** @scenario "Codex tool calls are not doubled when both a span and a log record the same call" */
     it("renders the call once, on the span, filled with the log's content", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
@@ -786,6 +788,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
   });
 
   describe("given usage-bearing response spans and no turn rollup (the exec wire)", () => {
+    /** @scenario "Codex model calls appear once per response span when no turn rollup exists" */
     it("derives one model call per response span with its token counts", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
@@ -865,6 +868,7 @@ describe("buildCodingAgentTranscript session system context", () => {
   ]);
 
   describe("given a claude session whose first model call input carries a system message", () => {
+    /** @scenario "The session's system context is shown once at the top" */
     it("pins one collapsed system context entry above the first prompt", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [

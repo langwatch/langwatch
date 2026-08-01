@@ -566,18 +566,10 @@ export function buildInputMessagesFromRequestBody(
 function toolDefinitionsMessage(
   tools: unknown,
 ): { role: string; content: string } | null {
-  if (!Array.isArray(tools) || tools.length === 0) return null;
-  const lines: string[] = [];
-  for (const tool of tools) {
-    if (!tool || typeof tool !== "object") continue;
-    const t = tool as { name?: unknown; description?: unknown };
-    if (typeof t.name !== "string" || t.name.length === 0) continue;
-    const description =
-      typeof t.description === "string"
-        ? (t.description.split("\n", 1)[0] ?? "").trim()
-        : "";
-    lines.push(description ? `${t.name}: ${description}` : t.name);
-  }
+  if (!Array.isArray(tools)) return null;
+  const lines = tools
+    .map(toolDefinitionLine)
+    .filter((line): line is string => line !== null);
   if (lines.length === 0) return null;
   return {
     role: "system",
@@ -587,6 +579,21 @@ function toolDefinitionsMessage(
       "tool_definitions",
     ),
   };
+}
+
+/** One tool as `name: first description line`, or null if it has no name. */
+function toolDefinitionLine(tool: unknown): string | null {
+  if (!tool || typeof tool !== "object") return null;
+  const { name, description } = tool as {
+    name?: unknown;
+    description?: unknown;
+  };
+  if (typeof name !== "string" || name.length === 0) return null;
+  const summary =
+    typeof description === "string"
+      ? (description.split("\n", 1)[0] ?? "").trim()
+      : "";
+  return summary ? `${name}: ${summary}` : name;
 }
 
 /** claude appends this marker where it cut an oversized inline body. */
@@ -606,53 +613,19 @@ export function salvageTruncatedRequestBody(
   raw: string,
 ): Array<{ role: string; content: string }> | null {
   const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
-  const out: Array<{ role: string; content: string }> = [];
 
   const system = salvageTopLevelValue(trimmed, "system");
-  if (system !== null) {
-    const systemText = system.complete
-      ? contentToText(safeParse(system.slice) ?? system.slice)
-      : salvagePartialText(system.slice);
-    if (systemText && systemText.length > 0) {
-      out.push({
-        role: "system",
-        content: system.complete
-          ? systemText
-          : `${systemText}\n\n[system prompt truncated by claude's 60KB telemetry cap]`,
-      });
-    }
-  }
-
   const tools = salvageTopLevelValue(trimmed, "tools");
-  if (tools !== null) {
-    const parsedTools = tools.complete
-      ? safeParse(tools.slice)
-      : salvageCompleteArrayElements(tools.slice);
-    const toolsMessage = toolDefinitionsMessage(parsedTools);
-    if (toolsMessage !== null) out.push(toolsMessage);
-  }
-
   const messages = salvageTopLevelValue(trimmed, "messages");
-  let truncatedMidMessages = false;
-  if (messages !== null) {
-    const parsedMessages = messages.complete
-      ? safeParse(messages.slice)
-      : salvageCompleteArrayElements(messages.slice);
-    truncatedMidMessages = !messages.complete;
-    if (Array.isArray(parsedMessages)) {
-      for (const m of parsedMessages) {
-        if (!m || typeof m !== "object") continue;
-        const message = m as { role?: unknown; content?: unknown };
-        const role = typeof message.role === "string" ? message.role : "user";
-        const content = contentToText(message.content);
-        if (content.length === 0) continue;
-        out.push({ role, content });
-      }
-    }
-  }
+
+  const out = [
+    salvagedSystemMessage(system),
+    toolDefinitionsMessage(salvagedArray(tools)),
+    ...salvagedHistoryMessages(messages),
+  ].filter((m): m is { role: string; content: string } => m !== null);
 
   if (out.length === 0) return null;
-  if (truncatedMidMessages || system === null || !system.complete) {
+  if (messages?.complete !== true || system === null || !system.complete) {
     out.push({
       role: "system",
       content:
@@ -660,6 +633,48 @@ export function salvageTruncatedRequestBody(
     });
   }
   return out;
+}
+
+/** The `system` value, marked when the cut landed inside it. */
+function salvagedSystemMessage(
+  system: SalvagedValue | null,
+): { role: string; content: string } | null {
+  if (system === null) return null;
+  const text = system.complete
+    ? contentToText(safeParse(system.slice) ?? system.slice)
+    : salvagePartialText(system.slice);
+  if (!text || text.length === 0) return null;
+  return {
+    role: "system",
+    content: system.complete
+      ? text
+      : `${text}\n\n[system prompt truncated by claude's 60KB telemetry cap]`,
+  };
+}
+
+/** Every message that closed before the cut, in order. */
+function salvagedHistoryMessages(
+  messages: SalvagedValue | null,
+): Array<{ role: string; content: string }> {
+  const parsed = salvagedArray(messages);
+  if (!Array.isArray(parsed)) return [];
+  const out: Array<{ role: string; content: string }> = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") continue;
+    const { role, content } = entry as { role?: unknown; content?: unknown };
+    const text = contentToText(content);
+    if (text.length === 0) continue;
+    out.push({ role: typeof role === "string" ? role : "user", content: text });
+  }
+  return out;
+}
+
+/** A salvaged array value, parsed whole when it closed and element-wise when not. */
+function salvagedArray(value: SalvagedValue | null): unknown {
+  if (value === null) return null;
+  return value.complete
+    ? safeParse(value.slice)
+    : salvageCompleteArrayElements(value.slice);
 }
 
 function safeParse(slice: string): unknown {
@@ -678,73 +693,92 @@ interface SalvagedValue {
 }
 
 /**
- * Single-pass scan for a top-level key's value span in (possibly cut) JSON.
- * Tracks string/escape state and bracket depth; never allocates a parse tree,
- * so a 60KB body costs one linear pass per key.
+ * What one character meant to a JSON scan. The walkers below each care about a
+ * different subset, but all of them need string and escape state tracked
+ * exactly right, which is the part that is easy to get subtly wrong, so it
+ * lives in {@link JsonScan} once rather than three times.
  */
-function salvageTopLevelValue(raw: string, key: string): SalvagedValue | null {
-  const needle = `"${key}":`;
-  let inString = false;
-  let escaped = false;
-  let depth = 0;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
+type JsonScanEvent =
+  | "string-content"
+  | "string-open"
+  | "string-close"
+  | "depth-in"
+  | "depth-out"
+  | "literal";
+
+/**
+ * A character cursor over (possibly cut) JSON that never allocates a parse
+ * tree, so a 60KB body costs one linear pass. `depth` counts brackets and is
+ * updated before the event is returned; a quote leaves it untouched, so a
+ * caller reading `depth` on a string event sees the depth the string sits at.
+ */
+class JsonScan {
+  depth = 0;
+  private inString = false;
+  private escaped = false;
+
+  step(ch: string | undefined): JsonScanEvent {
+    if (this.inString) return this.stepInsideString(ch);
+    if (ch === '"') {
+      this.inString = true;
+      return "string-open";
+    }
+    if (ch === "{" || ch === "[") {
+      this.depth++;
+      return "depth-in";
+    }
+    if (ch === "}" || ch === "]") {
+      this.depth--;
+      return "depth-out";
+    }
+    return "literal";
+  }
+
+  private stepInsideString(ch: string | undefined): JsonScanEvent {
+    if (this.escaped) {
+      this.escaped = false;
+      return "string-content";
+    }
+    if (ch === "\\") {
+      this.escaped = true;
+      return "string-content";
     }
     if (ch === '"') {
-      // Only a depth-1 position can start a top-level key.
-      if (depth === 1 && raw.startsWith(needle, i)) {
-        const valueStart = i + needle.length;
-        return scanValueSpan(raw, valueStart);
-      }
-      inString = true;
-      continue;
+      this.inString = false;
+      return "string-close";
     }
-    if (ch === "{" || ch === "[") depth++;
-    else if (ch === "}" || ch === "]") depth--;
+    return "string-content";
+  }
+}
+
+/** Single-pass scan for a top-level key's value span in (possibly cut) JSON. */
+function salvageTopLevelValue(raw: string, key: string): SalvagedValue | null {
+  const needle = `"${key}":`;
+  const scan = new JsonScan();
+  for (let i = 0; i < raw.length; i++) {
+    // Only a depth-1 quote can open a top-level key, and the check has to
+    // happen before the step consumes the quote into string state.
+    const atTopLevelKey = scan.depth === 1 && raw.startsWith(needle, i);
+    if (scan.step(raw[i]) === "string-open" && atTopLevelKey) {
+      return scanValueSpan(raw, i + needle.length);
+    }
   }
   return null;
 }
 
-/** The span of one JSON value starting at `start`, or its cut prefix. */
+/**
+ * The span of one JSON value starting at `start`, or its cut prefix. The value
+ * is expected to be a string, object or array, which is what the three keys
+ * salvage asks for always are; a bare scalar owns no delimiter to close on and
+ * so reads as running to the end of the input.
+ */
 function scanValueSpan(raw: string, start: number): SalvagedValue {
-  let inString = false;
-  let escaped = false;
-  let depth = 0;
-  let began = false;
+  const scan = new JsonScan();
   for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === '"') {
-        inString = false;
-        if (depth === 0) {
-          return { slice: raw.slice(start, i + 1), complete: true };
-        }
-      }
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-      began = true;
-      continue;
-    }
-    if (ch === "{" || ch === "[") {
-      depth++;
-      began = true;
-    } else if (ch === "}" || ch === "]") {
-      depth--;
-      if (depth === 0) {
-        return { slice: raw.slice(start, i + 1), complete: true };
-      }
-    } else if (depth === 0 && began && (ch === "," || ch === "}")) {
-      // A bare scalar (number/true/false/null) ended.
-      return { slice: raw.slice(start, i), complete: true };
+    const event = scan.step(raw[i]);
+    const closed = event === "string-close" || event === "depth-out";
+    if (closed && scan.depth === 0) {
+      return { slice: raw.slice(start, i + 1), complete: true };
     }
   }
   return { slice: raw.slice(start), complete: false };
@@ -757,32 +791,16 @@ function scanValueSpan(raw: string, start: number): SalvagedValue {
  */
 function salvageCompleteArrayElements(slice: string): unknown[] {
   const elements: unknown[] = [];
-  let inString = false;
-  let escaped = false;
-  let depth = 0;
+  const scan = new JsonScan();
   let elementStart = -1;
   for (let i = 0; i < slice.length; i++) {
-    const ch = slice[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-    if (ch === "{" || ch === "[") {
-      depth++;
-      if (depth === 2 && elementStart === -1) elementStart = i;
-    } else if (ch === "}" || ch === "]") {
-      depth--;
-      if (depth === 1 && elementStart !== -1) {
-        const parsed = safeParse(slice.slice(elementStart, i + 1));
-        if (parsed !== null) elements.push(parsed);
-        elementStart = -1;
-      }
+    const event = scan.step(slice[i]);
+    if (event === "depth-in" && scan.depth === 2 && elementStart === -1) {
+      elementStart = i;
+    } else if (event === "depth-out" && scan.depth === 1 && elementStart >= 0) {
+      const parsed = safeParse(slice.slice(elementStart, i + 1));
+      if (parsed !== null) elements.push(parsed);
+      elementStart = -1;
     }
   }
   return elements;
@@ -800,24 +818,23 @@ function salvagePartialText(slice: string): string | null {
     return decodePartialJsonString(fragment.slice(1));
   }
   if (fragment.startsWith("[")) {
-    const complete = salvageCompleteArrayElements(fragment);
-    const parts: string[] = [];
-    const completeText = contentToText(complete);
-    if (completeText.length > 0) parts.push(completeText);
-    // The cut element's partial text, when the cut landed inside its "text".
-    const lastTextKey = fragment.lastIndexOf('"text":');
-    if (lastTextKey !== -1) {
-      const afterKey = fragment
-        .slice(lastTextKey + '"text":'.length)
-        .trimStart();
-      if (afterKey.startsWith('"') && !isClosedString(afterKey)) {
-        const partial = decodePartialJsonString(afterKey.slice(1));
-        if (partial && partial.length > 0) parts.push(partial);
-      }
-    }
+    const parts = [
+      contentToText(salvageCompleteArrayElements(fragment)),
+      cutBlockText(fragment) ?? "",
+    ].filter((part) => part.length > 0);
     return parts.length > 0 ? parts.join("\n\n") : null;
   }
   return null;
+}
+
+/** The last block's partial `"text"` value, when the cut landed inside it. */
+function cutBlockText(fragment: string): string | null {
+  const key = '"text":';
+  const lastTextKey = fragment.lastIndexOf(key);
+  if (lastTextKey === -1) return null;
+  const afterKey = fragment.slice(lastTextKey + key.length).trimStart();
+  if (!afterKey.startsWith('"') || isClosedString(afterKey)) return null;
+  return decodePartialJsonString(afterKey.slice(1));
 }
 
 /** Whether a fragment starting at a quote closes its string. */

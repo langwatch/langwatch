@@ -325,25 +325,60 @@ function dedupeRepeatedSystemMessages({
   let callNumber = 0;
   for (const span of spans) {
     const input = bySpanId.get(span.spanId);
-    if (input === undefined || input.type !== "chat_messages") continue;
-    if (!Array.isArray(input.value)) continue;
+    if (input?.type !== "chat_messages" || !Array.isArray(input.value)) {
+      continue;
+    }
     callNumber++;
-    const value = input.value as ChatMessage[];
-    for (let i = 0; i < value.length; i++) {
-      const message = value[i]!;
-      if (message.role !== "system") continue;
-      if (typeof message.content !== "string") continue;
-      const firstCall = firstCallByContent.get(message.content);
-      if (firstCall === undefined) {
-        firstCallByContent.set(message.content, callNumber);
-        continue;
-      }
-      value[i] = {
-        role: "system",
-        content: `[system context unchanged since call #${firstCall} of this trace, ${message.content.length.toLocaleString("en-US")} chars not repeated]`,
-      };
+    const messages = input.value as ChatMessage[];
+    for (const [i, message] of messages.entries()) {
+      const seenAtCall = firstSystemCall({
+        message,
+        callNumber,
+        firstCallByContent,
+      });
+      if (seenAtCall === null) continue;
+      messages[i] = repeatedSystemPlaceholder(
+        message.content as string,
+        seenAtCall,
+      );
     }
   }
+}
+
+/**
+ * The earlier call number that already carried this exact system message, or
+ * null when the message is not a system string or is being seen for the first
+ * time (in which case this call is recorded as its origin).
+ */
+function firstSystemCall({
+  message,
+  callNumber,
+  firstCallByContent,
+}: {
+  message: ChatMessage;
+  callNumber: number;
+  firstCallByContent: Map<string, number>;
+}): number | null {
+  if (message.role !== "system" || typeof message.content !== "string") {
+    return null;
+  }
+  const firstCall = firstCallByContent.get(message.content);
+  if (firstCall === undefined) {
+    firstCallByContent.set(message.content, callNumber);
+    return null;
+  }
+  return firstCall;
+}
+
+function repeatedSystemPlaceholder(
+  content: string,
+  firstCall: number,
+): ChatMessage {
+  const chars = content.length.toLocaleString("en-US");
+  return {
+    role: "system",
+    content: `[system context unchanged since call #${firstCall} of this trace, ${chars} chars not repeated]`,
+  };
 }
 
 /**

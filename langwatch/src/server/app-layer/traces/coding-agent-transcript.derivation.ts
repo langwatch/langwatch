@@ -283,21 +283,28 @@ function parseMaybeJson(raw: string | null): unknown {
   }
 }
 
-function collectSpanEntries(
-  spans: SpanDetail[],
-  codexToolLogs: Map<string, CodexToolLogContent>,
-): {
+interface SpanEntryAccumulator {
   entries: TranscriptEntry[];
   spanReplies: SpanReply[];
   totals: CodingAgentTranscript["totals"];
   subAgentToolCounts: Map<string, number>;
   claimedToolCallIds: Set<string>;
-} {
-  const entries: TranscriptEntry[] = [];
-  const spanReplies: SpanReply[] = [];
-  const subAgentToolCounts = new Map<string, number>();
-  const claimedToolCallIds = new Set<string>();
-  const totals = { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 };
+  /** The session's system context is emitted once, off the first call carrying one. */
+  systemPromptEmitted: boolean;
+}
+
+function collectSpanEntries(
+  spans: SpanDetail[],
+  codexToolLogs: Map<string, CodexToolLogContent>,
+): SpanEntryAccumulator {
+  const acc: SpanEntryAccumulator = {
+    entries: [],
+    spanReplies: [],
+    totals: { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 },
+    subAgentToolCounts: new Map(),
+    claimedToolCallIds: new Set(),
+    systemPromptEmitted: false,
+  };
 
   // codex 0.146's exec wire has no `session_task.turn` rollup, its
   // usage-bearing `handle_responses` spans are the model calls. When the
@@ -306,7 +313,6 @@ function collectSpanEntries(
   const hasCodexTurnRollup = spans.some(
     (span) => span.name === "session_task.turn",
   );
-  let systemPromptEmitted = false;
 
   for (const span of spans) {
     const isCodexResponseCall =
@@ -314,109 +320,121 @@ function collectSpanEntries(
       span.name === "handle_responses" &&
       readNumber(span.params, "gen_ai.usage.input_tokens") !== null;
     if (isModelCallSpan(span.name) || isCodexResponseCall) {
-      const call = modelCallEntry(span);
-      totals.modelCalls += 1;
-      totals.tokens += call.tokens;
-      totals.costUsd += call.costUsd;
-      entries.push(call);
-
-      // The session's system context, once, off the first model call that
-      // carries one. Only claude's enriched llm_request inputs have it -
-      // codex/opencode/gemini model spans carry no system message.
-      if (!systemPromptEmitted) {
-        const systemText = extractedSystemText(span.input);
-        if (systemText !== null) {
-          systemPromptEmitted = true;
-          entries.push({
-            kind: "system_prompt",
-            atMs: span.startTimeMs,
-            text: systemText,
-            chars: systemText.length,
-          });
-        }
-      }
-      // Agents whose reply rides the SPAN (opencode via the Vercel AI SDK,
-      // copilot with content capture, gemini's llm_call) get their assistant
-      // message from the span's extracted output. Claude never lands here:
-      // its spans carry no content, the reply comes off the log events.
-      const spanReplyText =
-        extractedOutputText(span.output) ??
-        outputMessagesText(readString(span.params, "gen_ai.output.messages"));
-      if (spanReplyText !== null) {
-        spanReplies.push({
-          entry: {
-            kind: "assistant_message",
-            atMs: span.endTimeMs ?? span.startTimeMs,
-            text: spanReplyText,
-            model: modelOf(span),
-          },
-          windowStartMs: span.startTimeMs,
-          windowEndMs: span.endTimeMs ?? span.startTimeMs,
-        });
-      }
-      continue;
+      collectModelCallSpan(span, acc);
+    } else {
+      collectToolSpan(span, acc, codexToolLogs);
     }
+  }
 
-    // A span is a tool run when it DECLARES a tool: either by attribute
-    // (`tool_name` / `tool.name` — claude, codex) or by the opencode span-name
-    // encoding. No name allowlist on top: the declaration is the evidence, and
-    // an allowlist here silently dropped attribute-backed tools under span
-    // names it had never seen.
-    const toolName = resolveToolName({
-      spanName: span.name,
-      attrs: (span.params ?? {}) as Record<string, unknown>,
-    });
-    if (toolName === null) continue;
+  return acc;
+}
 
-    totals.toolCalls += 1;
+function collectModelCallSpan(
+  span: SpanDetail,
+  acc: SpanEntryAccumulator,
+): void {
+  const call = modelCallEntry(span);
+  acc.totals.modelCalls += 1;
+  acc.totals.tokens += call.tokens;
+  acc.totals.costUsd += call.costUsd;
+  acc.entries.push(call);
 
-    // A sub-agent's tools are kept IN the sequence but marked, rather than
-    // hoisted out of it. Dropping them lost the work entirely; flattening them
-    // into the main thread pretended the main thread did it.
-    const agentId = readString(span.params, "agent_id");
-    if (agentId !== null) {
-      subAgentToolCounts.set(
-        agentId,
-        (subAgentToolCounts.get(agentId) ?? 0) + 1,
-      );
-    }
-
-    // A codex tool span records the run but not its content, that rides the
-    // tool_result log sharing the span's call_id. Claim the call_id either
-    // way so the log pass never renders the same call twice.
-    const callId = readString(span.params, "call_id");
-    const logContent = callId !== null ? codexToolLogs.get(callId) : undefined;
-    if (callId !== null) claimedToolCallIds.add(callId);
-
-    entries.push({
-      kind: "tool",
+  // Only claude's enriched llm_request inputs carry a system message;
+  // codex/opencode/gemini model spans have none.
+  const systemText = acc.systemPromptEmitted
+    ? null
+    : extractedSystemText(span.input);
+  if (systemText !== null) {
+    acc.systemPromptEmitted = true;
+    acc.entries.push({
+      kind: "system_prompt",
       atMs: span.startTimeMs,
-      name: toolName,
-      mcpServer: parseMcpToolName(toolName)?.server ?? null,
-      input: span.input ?? logContent?.input ?? null,
-      output: span.output ?? logContent?.output ?? null,
-      durationMs:
-        span.endTimeMs && span.startTimeMs
-          ? span.endTimeMs - span.startTimeMs
-          : null,
-      // Both signals, because they are set independently: a span can carry an
-      // error payload, or simply an error STATUS with no payload at all.
-      failed:
-        span.status === "error" ||
-        span.error != null ||
-        (logContent?.failed ?? false),
-      agentId,
-      spanId: span.spanId,
+      text: systemText,
+      chars: systemText.length,
     });
   }
 
-  return {
-    entries,
-    spanReplies,
-    totals,
-    subAgentToolCounts,
-    claimedToolCallIds,
-  };
+  // Agents whose reply rides the SPAN (opencode via the Vercel AI SDK,
+  // copilot with content capture, gemini's llm_call) get their assistant
+  // message from the span's extracted output. Claude never lands here:
+  // its spans carry no content, the reply comes off the log events.
+  const spanReplyText =
+    extractedOutputText(span.output) ??
+    outputMessagesText(readString(span.params, "gen_ai.output.messages"));
+  if (spanReplyText === null) return;
+  acc.spanReplies.push({
+    entry: {
+      kind: "assistant_message",
+      atMs: span.endTimeMs ?? span.startTimeMs,
+      text: spanReplyText,
+      model: modelOf(span),
+    },
+    windowStartMs: span.startTimeMs,
+    windowEndMs: span.endTimeMs ?? span.startTimeMs,
+  });
+}
+
+function collectToolSpan(
+  span: SpanDetail,
+  acc: SpanEntryAccumulator,
+  codexToolLogs: Map<string, CodexToolLogContent>,
+): void {
+  // A span is a tool run when it DECLARES a tool: either by attribute
+  // (`tool_name` / `tool.name`, for claude and codex) or by the opencode span-name
+  // encoding. No name allowlist on top: the declaration is the evidence, and
+  // an allowlist here silently dropped attribute-backed tools under span
+  // names it had never seen.
+  const toolName = resolveToolName({
+    spanName: span.name,
+    attrs: (span.params ?? {}) as Record<string, unknown>,
+  });
+  if (toolName === null) return;
+
+  acc.totals.toolCalls += 1;
+
+  // A sub-agent's tools are kept IN the sequence but marked, rather than
+  // hoisted out of it. Dropping them lost the work entirely; flattening them
+  // into the main thread pretended the main thread did it.
+  const agentId = readString(span.params, "agent_id");
+  if (agentId !== null) {
+    acc.subAgentToolCounts.set(
+      agentId,
+      (acc.subAgentToolCounts.get(agentId) ?? 0) + 1,
+    );
+  }
+
+  // A codex tool span records the run but not its content, that rides the
+  // tool_result log sharing the span's call_id. Claim the call_id either
+  // way so the log pass never renders the same call twice.
+  const callId = readString(span.params, "call_id");
+  const logContent = callId !== null ? codexToolLogs.get(callId) : undefined;
+  if (callId !== null) acc.claimedToolCallIds.add(callId);
+
+  acc.entries.push({
+    kind: "tool",
+    atMs: span.startTimeMs,
+    name: toolName,
+    mcpServer: parseMcpToolName(toolName)?.server ?? null,
+    input: span.input ?? logContent?.input ?? null,
+    output: span.output ?? logContent?.output ?? null,
+    durationMs: spanDurationMs(span),
+    // Both signals, because they are set independently: a span can carry an
+    // error payload, or simply an error STATUS with no payload at all.
+    failed:
+      span.status === "error" || span.error != null || isFailed(logContent),
+    agentId,
+    spanId: span.spanId,
+  });
+}
+
+function spanDurationMs(span: SpanDetail): number | null {
+  return span.endTimeMs && span.startTimeMs
+    ? span.endTimeMs - span.startTimeMs
+    : null;
+}
+
+function isFailed(logContent: CodexToolLogContent | undefined): boolean {
+  return logContent?.failed ?? false;
 }
 
 function modelCallEntry(span: SpanDetail): TranscriptEntry & {
@@ -836,42 +854,48 @@ function extractedOutputText(output: string | null | undefined): string | null {
  * serializes after the message history) still shows what filled the window.
  */
 function extractedSystemText(input: string | null | undefined): string | null {
+  const messages = parsedChatMessages(input);
+  if (messages === null) return null;
+
+  const parts: string[] = [];
+  let firstUserReminders: string | null = null;
+  for (const message of messages) {
+    const m = message as { role?: unknown; content?: unknown } | null;
+    if (typeof m?.content !== "string" || m.content.length === 0) continue;
+    if (m.role === "system") parts.push(m.content);
+    else if (m.role === "user" && firstUserReminders === null) {
+      firstUserReminders = systemReminderText(m.content);
+    }
+  }
+  if (firstUserReminders !== null) parts.push(firstUserReminders);
+  return parts.length > 0 ? parts.join("\n\n") : null;
+}
+
+/**
+ * The message list out of a serialized chat input. The read path serializes it
+ * as the bare message ARRAY (`buildDisplayInput` -> `JSON.stringify(io.value)`)
+ * while the `{type, value}` wrapper is the in-process shape; both are accepted
+ * so a caller reads the same input whichever side hands it over.
+ */
+function parsedChatMessages(
+  input: string | null | undefined,
+): unknown[] | null {
   if (typeof input !== "string") return null;
   const raw = input.trim();
   if (!raw.startsWith("[") && !raw.startsWith("{")) return null;
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    // The read path serializes a chat input as the bare message ARRAY
-    // (`buildDisplayInput` -> `JSON.stringify(io.value)`); the `{type, value}`
-    // wrapper is the in-process shape. Accept both, like the reply extractor
-    // above, so this reads the same input whichever side hands it over.
-    const messages = Array.isArray(parsed)
-      ? parsed
-      : parsed &&
-          typeof parsed === "object" &&
-          (parsed as { type?: unknown }).type === "chat_messages" &&
-          Array.isArray((parsed as { value?: unknown }).value)
-        ? (parsed as { value: unknown[] }).value
-        : null;
-    if (messages === null) return null;
-    const parts: string[] = [];
-    let firstUserReminders: string | null = null;
-    for (const message of messages) {
-      const m = message as { role?: unknown; content?: unknown } | null;
-      if (typeof m?.content !== "string" || m.content.length === 0) continue;
-      if (m.role === "system") {
-        parts.push(m.content);
-        continue;
-      }
-      if (m.role === "user" && firstUserReminders === null) {
-        firstUserReminders = systemReminderText(m.content);
-      }
-    }
-    if (firstUserReminders !== null) parts.push(firstUserReminders);
-    return parts.length > 0 ? parts.join("\n\n") : null;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object") return null;
+  const wrapper = parsed as { type?: unknown; value?: unknown };
+  if (wrapper.type !== "chat_messages" || !Array.isArray(wrapper.value)) {
+    return null;
+  }
+  return wrapper.value;
 }
 
 /**

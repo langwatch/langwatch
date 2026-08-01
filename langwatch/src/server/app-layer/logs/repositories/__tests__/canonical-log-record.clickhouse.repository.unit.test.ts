@@ -151,4 +151,58 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
     expect(request.query).toContain("LIMIT {limit:UInt64}");
     expect(request.query_params).toMatchObject({ limit: 101 });
   });
+
+  describe("when a stored row carries its event name on the EventName column", () => {
+    function readOneRow(row: Record<string, unknown>) {
+      const query = vi.fn(async () => ({ json: async () => [row] }));
+      const repository = new CanonicalLogRecordClickHouseRepository(
+        async () => ({ query }) as never,
+      );
+      return repository.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "b".repeat(32),
+        occurredAtMs: 1_700_000_000_000,
+        limit: 10,
+      });
+    }
+
+    const storedRow = (over: Record<string, unknown>) => ({
+      TraceId: "b".repeat(32),
+      SpanId: "c".repeat(16),
+      TimeUnixMs: 1_700_000_000_000,
+      BodyText: null,
+      AttributesFlatJson: "{}",
+      ResourceAttributesFlatJson: "{}",
+      ScopeName: "codex_exec",
+      ScopeVersion: "0.146.0",
+      EventName: "",
+      ...over,
+    });
+
+    /** @scenario "A log record whose event name arrived on the OTLP eventName field still renders" */
+    it("backfills event.name so attribute-keyed readers can recognise the record", async () => {
+      const [log] = await readOneRow(
+        storedRow({ EventName: "codex.tool_result" }),
+      );
+
+      expect(log?.attributes["event.name"]).toBe("codex.tool_result");
+    });
+
+    it("leaves an event.name already in the attributes alone", async () => {
+      const [log] = await readOneRow(
+        storedRow({
+          EventName: "codex.tool_result",
+          AttributesFlatJson: '{"event.name":"api_request"}',
+        }),
+      );
+
+      expect(log?.attributes["event.name"]).toBe("api_request");
+    });
+
+    it("adds no event.name when the column is empty, so a nameless record stays nameless", async () => {
+      const [log] = await readOneRow(storedRow({}));
+
+      expect(log?.attributes["event.name"]).toBeUndefined();
+    });
+  });
 });

@@ -345,6 +345,7 @@ describe("extractAssistantOutputFromResponseBody", () => {
 });
 
 describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
+  /** @scenario "Claude Code reasoning effort is lifted from the model call log event" */
   it("lifts the effort setting onto the canonical reasoning-effort key for a conversational turn", () => {
     const ctx = createLogExtractorContext(SCOPE, {
       "event.name": "api_request",
@@ -399,6 +400,7 @@ describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
 });
 
 describe("ClaudeCodeExtractor.applyLog api_response_body cache TTL split", () => {
+  /** @scenario "Claude Code cache TTL split is lifted from the response body log event" */
   it("lifts the per-TTL cache creation counts from the response body usage", () => {
     const body = JSON.stringify({
       content: [{ type: "text", text: "ok" }],
@@ -472,6 +474,7 @@ describe("isConversationalQuerySource sdk turns", () => {
 });
 
 describe("buildInputMessagesFromRequestBody tool definitions", () => {
+  /** @scenario "Tool definitions are surfaced from the request body" */
   it("surfaces the tools array as a compact system-side message", () => {
     const body = JSON.stringify({
       system: "You are a coding assistant.",
@@ -496,6 +499,7 @@ describe("buildInputMessagesFromRequestBody tool definitions", () => {
 });
 
 describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
+  /** @scenario "A truncated request body still yields its leading messages" */
   it("recovers every complete leading message when the cut lands mid-history", () => {
     const intact = JSON.stringify({
       model: "claude-opus-5",
@@ -517,6 +521,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     expect(note.content).toContain("truncated");
   });
 
+  /** @scenario "A truncated request body still yields the system prompt when the cut lands inside it" */
   it("recovers the partial system prompt when the cut lands inside it", () => {
     const raw =
       '{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],' +

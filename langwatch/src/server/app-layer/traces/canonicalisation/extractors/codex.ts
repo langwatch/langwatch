@@ -99,6 +99,30 @@ const asNumber = (raw: unknown): number | null => {
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
+const positiveOrNull = (n: number | null): number | null =>
+  n !== null && n > 0 ? n : null;
+
+/** A canonical key and the codex-spelled value to lift onto it, if reported. */
+type CanonicalLift = readonly [string, string | number | null];
+
+/**
+ * Write every reported lift onto its canonical key, leaving an already-present
+ * key alone. Returns whether anything was written, which is what decides if the
+ * span records the rule.
+ */
+function applyCanonicalLifts(
+  ctx: ExtractorContext,
+  lifts: readonly CanonicalLift[],
+): boolean {
+  let fired = false;
+  for (const [key, value] of lifts) {
+    if (value === null) continue;
+    ctx.setAttrIfAbsent(key, value);
+    fired = true;
+  }
+  return fired;
+}
+
 export class CodexExtractor implements CanonicalAttributesExtractor {
   readonly id = "codex";
 
@@ -149,73 +173,41 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
-    const inputTokens = asNumber(
-      attrs.take("codex.turn.token_usage.input_tokens"),
-    );
-    const outputTokens = asNumber(
-      attrs.take("codex.turn.token_usage.output_tokens"),
-    );
-    const cacheReadTokens = asNumber(
-      attrs.take("codex.turn.token_usage.cached_input_tokens"),
-    );
-    const cacheWriteTokens = asNumber(
-      attrs.take("codex.turn.token_usage.cache_write_input_tokens"),
-    );
-    const reasoningTokens = asNumber(
-      attrs.take("codex.turn.token_usage.reasoning_output_tokens"),
-    );
-    const reasoningEffort = asString(attrs.take("codex.turn.reasoning_effort"));
-    const turnId = asString(attrs.take("turn.id"));
-
-    let fired = false;
-    if (model !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model);
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model);
-      fired = true;
-    }
-    if (inputTokens !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, inputTokens);
-      fired = true;
-    }
-    if (outputTokens !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outputTokens);
-      fired = true;
-    }
-    if (cacheReadTokens !== null) {
-      ctx.setAttrIfAbsent(
+    // codex spells cache creation "cache_write"; the canonical keys follow the
+    // Anthropic-derived semconv names.
+    const lifts: CanonicalLift[] = [
+      [ATTR_KEYS.GEN_AI_REQUEST_MODEL, model],
+      [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+        asNumber(attrs.take("codex.turn.token_usage.input_tokens")),
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+        asNumber(attrs.take("codex.turn.token_usage.output_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        cacheReadTokens,
-      );
-      fired = true;
-    }
-    if (cacheWriteTokens !== null) {
-      // codex spells cache creation "cache_write"; our canonical key follows
-      // the Anthropic-derived semconv name.
-      ctx.setAttrIfAbsent(
+        asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        cacheWriteTokens,
-      );
-      fired = true;
-    }
-    if (reasoningTokens !== null) {
-      ctx.setAttrIfAbsent(
+        asNumber(attrs.take("codex.turn.token_usage.cache_write_input_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        reasoningTokens,
-      );
-      fired = true;
-    }
-    if (reasoningEffort !== null) {
-      ctx.setAttrIfAbsent(
+        asNumber(attrs.take("codex.turn.token_usage.reasoning_output_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-        reasoningEffort,
-      );
-      fired = true;
+        asString(attrs.take("codex.turn.reasoning_effort")),
+      ],
+      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, asString(attrs.take("turn.id"))],
+    ];
+
+    if (applyCanonicalLifts(ctx, lifts)) {
+      ctx.recordRule("codex/session_task.turn");
     }
-    if (turnId !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, turnId);
-      fired = true;
-    }
-    if (fired) ctx.recordRule("codex/session_task.turn");
   }
 
   /**
@@ -230,42 +222,30 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
    */
   private liftResponseSpan(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-    let fired = false;
-
-    const reasoningEffort = asString(
-      attrs.take("codex.request.reasoning_effort"),
-    );
-    if (reasoningEffort !== null) {
-      ctx.setAttrIfAbsent(
+    // A zero token count here means "not reported", not "measured as zero", so
+    // it is dropped rather than lifted as a real reading.
+    const lifts: CanonicalLift[] = [
+      [
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-        reasoningEffort,
-      );
-      fired = true;
-    }
-
-    const reasoningTokens = asNumber(
-      attrs.take("codex.usage.reasoning_output_tokens"),
-    );
-    if (reasoningTokens !== null && reasoningTokens > 0) {
-      ctx.setAttrIfAbsent(
+        asString(attrs.take("codex.request.reasoning_effort")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        reasoningTokens,
-      );
-      fired = true;
-    }
-
-    const cacheWriteTokens = asNumber(
-      attrs.get("gen_ai.usage.cache_write.input_tokens"),
-    );
-    if (cacheWriteTokens !== null && cacheWriteTokens > 0) {
-      ctx.setAttrIfAbsent(
+        positiveOrNull(
+          asNumber(attrs.take("codex.usage.reasoning_output_tokens")),
+        ),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        cacheWriteTokens,
-      );
-      fired = true;
-    }
+        positiveOrNull(
+          asNumber(attrs.get("gen_ai.usage.cache_write.input_tokens")),
+        ),
+      ],
+    ];
 
-    if (fired) ctx.recordRule("codex/handle_responses");
+    if (applyCanonicalLifts(ctx, lifts)) {
+      ctx.recordRule("codex/handle_responses");
+    }
   }
 
   /**
