@@ -59,8 +59,12 @@ function buildSpan(
     endTimeUnixNano: (startTimeUnixNano + 100_000_000n).toString(),
     attributes: [
       {
-        key: "ai.response.text",
+        key: "ai.response.object",
         value: { stringValue: response },
+      },
+      {
+        key: "ai.response.text",
+        value: { stringValue: "" },
       },
       {
         key: "ai.prompt",
@@ -109,7 +113,7 @@ describe.skipIf(!hasTestcontainers)(
       await cleanupTestDataForTenant(tenantIdString);
     });
 
-    it("persists structured output on the LLM span and trace summary", async () => {
+    it("persists flat structured output when text is empty", async () => {
       const currentTenantIdString = tenantIdString;
       if (!currentTenantIdString) {
         throw new Error("Test tenant was not initialized.");
