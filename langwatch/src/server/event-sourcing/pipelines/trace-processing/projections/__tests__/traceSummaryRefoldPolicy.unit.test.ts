@@ -9,7 +9,10 @@ import {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import { createInitState } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createSpanReceivedEvent,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Regression guard for the 2026-07-09 re-fold storm. Sharding recordSpan across
@@ -50,6 +53,40 @@ function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
 }
 
 describe("TraceSummaryFoldProjection re-fold policy", () => {
+  it("rebuilds a missing persisted summary instead of silently losing prior totals", async () => {
+    const store: FoldProjectionStore<TraceSummaryData> = {
+      get: vi.fn().mockResolvedValue(null),
+      store: vi.fn().mockResolvedValue(undefined),
+    };
+    const projection = new TraceSummaryFoldProjection({ store });
+    const first = createSpanReceivedEvent({
+      eventId: "first",
+      tenantId: TENANT_ID,
+      traceId: TRACE_ID,
+      spanId: "0000000000000001",
+      occurredAt: 1_000,
+    });
+    const delivered = createSpanReceivedEvent({
+      eventId: "delivered",
+      tenantId: TENANT_ID,
+      traceId: TRACE_ID,
+      spanId: "0000000000000002",
+      occurredAt: 2_000,
+    });
+    const eventLoaderUpTo = vi.fn().mockResolvedValue([first, delivered]);
+    projection.eventLoaderUpTo = eventLoaderUpTo;
+
+    const result = await new FoldProjectionExecutor().execute(
+      projection,
+      delivered,
+      { aggregateId: TRACE_ID, tenantId: TENANT_ID },
+    );
+
+    expect(eventLoaderUpTo).toHaveBeenCalledTimes(1);
+    expect(result.spanCount).toBe(2);
+    expect(store.store).toHaveBeenCalledTimes(1);
+  });
+
   /** @scenario "The trace summary folds an earlier span without reading the event log" */
   it("folds a span that occurred before the checkpoint without reading the event log", async () => {
     const store: FoldProjectionStore<TraceSummaryData> = {

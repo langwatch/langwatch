@@ -178,12 +178,21 @@ export const TRACE_NAME_MAX_LENGTH = 200;
 export type TraceProcessingCommandType =
   (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
 
-export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-05-07" as const;
+/** The trace-summary stamp immediately before the storage-anchor split. */
+export const TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR =
+  "2026-05-07" as const;
+
+/**
+ * 2026-08-02: `trace_summaries.OccurredAt` became a frozen storage/TTL anchor;
+ * the span timing baseline moved to `EarliestSpanStartMs` (migration 00067).
+ */
+export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-08-02" as const;
 
 /** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
   "2026-04-23",
+  TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 ] as const;

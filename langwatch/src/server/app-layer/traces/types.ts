@@ -140,6 +140,11 @@ export const traceSummaryDataSchema = z.object({
    * over.
    */
   rootMetadataFromFallback: z.boolean().optional(),
+  /**
+   * Frozen storage/partition/TTL anchor for `trace_summaries.OccurredAt`.
+   * Kept separate from `occurredAt`, which remains the span timing baseline.
+   */
+  storageAnchorMs: z.number().optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

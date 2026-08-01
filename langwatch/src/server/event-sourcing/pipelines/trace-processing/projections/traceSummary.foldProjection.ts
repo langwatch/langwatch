@@ -56,6 +56,7 @@ import {
   TraceOriginService,
   TracePromptAccumulationService,
 } from "./services";
+import { isValidTimestamp } from "./services/span-timing.service";
 
 export type { TraceSummaryData };
 
@@ -417,6 +418,39 @@ const traceSummaryEvents = [
   traceNameChangedEventSchema,
 ] as const;
 
+const MAX_STORAGE_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+
+function isUsableStorageAnchorMs(
+  value: number | undefined,
+  now: number,
+): value is number {
+  return (
+    isValidTimestamp(value) && value <= now + MAX_STORAGE_ANCHOR_FUTURE_SKEW_MS
+  );
+}
+
+/**
+ * Freeze the first usable business time as the trace-summary storage anchor.
+ * A span handler runs first, so a span-led trace prefers its own start time;
+ * non-span contributions fall back to the event envelope's business time.
+ */
+export function anchorTraceSummaryStorageTime({
+  state,
+  eventOccurredAtMs,
+  now = Date.now(),
+}: {
+  state: TraceSummaryData;
+  eventOccurredAtMs: number | undefined;
+  now?: number;
+}): TraceSummaryData {
+  if (isUsableStorageAnchorMs(state.storageAnchorMs, now)) return state;
+  const candidate = isUsableStorageAnchorMs(state.occurredAt, now)
+    ? state.occurredAt
+    : eventOccurredAtMs;
+  if (!isUsableStorageAnchorMs(candidate, now)) return state;
+  return { ...state, storageAnchorMs: candidate };
+}
+
 /**
  * Type-safe fold projection for trace summary state.
  *
@@ -483,21 +517,19 @@ export class TraceSummaryFoldProjection
    * zero: the 7-day-windowed folds' fallback `recovered` count over the same
    * 30 days is 0 across 230k+ misses.
    *
-   * `trustAbsentMiss: true` — an absent windowed read is final; no unwindowed
-   * retry. This fold's stake in that retry is narrower than the read-back
-   * folds': it declares no `refoldOnStoreMiss`, so an absent miss always
-   * folded from `init()` — the retry only decided whether a row EXISTED
-   * outside the window. At ±7 days that is measured-never (above), and the
-   * one state the retry could not have found anyway is one the store's own
-   * persistability gate never wrote — a dimension-only summary, which lives
-   * in the Redis tier alone today, trusted or not. So the retry was proving
-   * non-existence at ~100 unpruned scans/min; the flag stops paying for the
-   * proof. Watch `es_fold_read_window_fallback_total{outcome="recovered"}`
-   * on the OTHER folds for the width contract, as ever.
+   * `refoldOnStoreMiss: true` is the correctness net for summaries whose old
+   * epoch-anchored row was reaped by TTL. Without it a miss restarts at init()
+   * and silently replaces the trace's accumulated cost, tokens and span count
+   * with only the newly delivered event. This fold cannot declare
+   * `trustAbsentMiss`: its persistability gate deliberately declines
+   * dimension-only rows, so absence does not prove that no state ever existed.
+   * The re-fold net can be retired only after the store represents every
+   * committed state with a readable row (for example, an always-written row
+   * with a separately filtered signal verdict).
    */
   readonly options = {
+    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
-    trustAbsentMiss: true,
     readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
   } as const;
 
@@ -555,6 +587,9 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
+      // Frozen by apply() on the first contribution carrying usable business
+      // time. This is persisted as trace_summaries.OccurredAt.
+      storageAnchorMs: 0,
       // events, scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
       // accumulated in the fold state: they scaled O(span-count) and made each
       // fold step O(n) (copy + re-serialize the whole growing blob), so a
@@ -568,6 +603,25 @@ export class TraceSummaryFoldProjection
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.
       occurredAt: 0,
     };
+  }
+
+  /**
+   * Dispatch first, then freeze the storage anchor. This keeps the rule at one
+   * seam for every contribution type and lets a span's normalized start time
+   * win over the envelope's ingest timestamp.
+   */
+  override apply(
+    state: TraceSummaryData,
+    event: { type: string },
+  ): TraceSummaryData {
+    const folded = super.apply(state, event);
+    if (folded === state) return state;
+    const eventOccurredAt = (event as { occurredAt?: unknown }).occurredAt;
+    return anchorTraceSummaryStorageTime({
+      state: folded,
+      eventOccurredAtMs:
+        typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
+    });
   }
 
   handleTraceSpanReceived(
