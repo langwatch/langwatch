@@ -50,6 +50,12 @@ Feature: Settings Plans Comparison Page
     Then no plan column is shown as current
 
   @integration
+  Scenario: Plan usage lines link to the list of billable events
+    Given I am on /settings/plans
+    Then I see a link asking what counts as an event
+    And the link opens the billable events documentation in a new tab
+
+  @integration
   Scenario: TIERED organizations see a discontinued plan migration notice
     Given my organization is on a legacy pricing plan that has been discontinued
     When I view /settings/plans
