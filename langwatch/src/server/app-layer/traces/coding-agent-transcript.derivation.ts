@@ -290,7 +290,7 @@ interface SpanEntryAccumulator {
   subAgentToolCounts: Map<string, number>;
   claimedToolCallIds: Set<string>;
   /** The session's system context is emitted once, off the first call carrying one. */
-  systemPromptEmitted: boolean;
+  hasEmittedSystemPrompt: boolean;
 }
 
 function collectSpanEntries(
@@ -303,7 +303,7 @@ function collectSpanEntries(
     totals: { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 },
     subAgentToolCounts: new Map(),
     claimedToolCallIds: new Set(),
-    systemPromptEmitted: false,
+    hasEmittedSystemPrompt: false,
   };
 
   // codex 0.146's exec wire has no `session_task.turn` rollup, its
@@ -341,11 +341,11 @@ function collectModelCallSpan(
 
   // Only claude's enriched llm_request inputs carry a system message;
   // codex/opencode/gemini model spans have none.
-  const systemText = acc.systemPromptEmitted
+  const systemText = acc.hasEmittedSystemPrompt
     ? null
     : extractedSystemText(span.input);
   if (systemText !== null) {
-    acc.systemPromptEmitted = true;
+    acc.hasEmittedSystemPrompt = true;
     acc.entries.push({
       kind: "system_prompt",
       atMs: span.startTimeMs,
