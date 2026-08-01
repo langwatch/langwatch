@@ -1,0 +1,48 @@
+---
+title: "Demo: a rebilling agent platform"
+description: The open-source agent-billing-demo repo, a tiny agent SaaS that meters and rebills its customers entirely through LangWatch, in TypeScript and Python.
+sidebarTitle: "Demo: Rebilling Platform"
+keywords: demo, agent billing, rebilling example, webhook receiver example, reference implementation
+---
+
+[`langwatch/agent-billing-demo`](https://github.com/langwatch/agent-billing-demo) is a deliberately small agent-platform SaaS: customers sign up, create agents, and chat with them. The platform meters every LLM call and rebills its customers, with **zero metering code of its own**. It exists so you can see the whole [metering and rebilling pattern](/ai-gateway/cookbooks/metering-and-rebilling) running, then copy it.
+
+<Tip>
+Point your coding agent at the repo as the canonical integration example for gateway provisioning, webhook ingestion, and budgets. Every file is written to be copied from, and the README carries the same contracts these docs document.
+</Tip>
+
+## What it demonstrates
+
+- **Provisioning**: customer signup mints one virtual key (the tenant boundary), a `BLOCK` cap, a `WARN` cap, and an attributed-user template, four REST calls.
+- **The request path**: the chat calls the gateway on the OpenAI wire with the `user` field set. That one field is all the attribution the billing pipeline needs.
+- **Billing**: a local ledger fed exclusively by LangWatch's signed webhooks, with signature verification, dedup by envelope id, and settled-row supersession (replace, never sum). If the numbers on screen are right, the pipeline works end to end.
+- **Reconciliation**: checksum comparison against `spend-summaries`, cursor diff against `spend-events` on divergence.
+- **Breach UX**: the `402` meta's `budget_scope` drives two different messages, "your allowance ran out" versus "your organization's cap ran out".
+- **Period close**: a reset button drives `POST /budgets/:id/reset` on the `MANUAL` windows; recorded spend never changes.
+- **Kill switch**: reversible disable and enable on the tenant key.
+
+## The integration surfaces, twice
+
+The app shell is one stack, but every surface you would copy exists in both languages, self-contained:
+
+| Surface | TypeScript | Python |
+|---|---|---|
+| Signature verification | `ts/src/verify-signature.ts` | `python/verify_signature.py` |
+| Webhook receiver | `ts/src/receiver.ts` | `python/receiver.py` |
+| Billing ledger | `ts/src/ledger.ts` | `python/ledger.py` |
+| Reconciliation | `ts/src/reconcile.ts` | `python/reconcile.py` |
+| Provisioning | `ts/src/provision.ts` | `python/provision.py` |
+
+Both receivers run side by side against the same LangWatch instance; every request lands in both ledgers, signed and deduped, which doubles as a demonstration that delivery is consumer-agnostic.
+
+## Running it
+
+You need a LangWatch instance (local dev, self-hosted, or cloud) with an enterprise license for the webhook surface, and an API key carrying the gateway and webhook permissions. Then, per the repo README: register the receivers as webhook endpoints (once each, storing the returned secrets), seed the fictional tenants, and start the app plus the two receivers. Chat as a tenant and watch both receiver terminals ingest the same signed events.
+
+The full walkthrough, environment variables, and sequence diagrams live in the [repo README](https://github.com/langwatch/agent-billing-demo).
+
+## See also
+
+- [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling): the cookbook this demo implements.
+- [Billing & spend events](/ai-gateway/billing-events): the payload and money contract.
+- [Webhooks](/features/webhooks): endpoints, signatures, retries, health.

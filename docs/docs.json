@@ -566,12 +566,22 @@
             ]
           },
           {
+            "group": "Billing & Metering",
+            "pages": [
+              "ai-gateway/billing-events",
+              "features/webhooks",
+              "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/demo-agent-platform"
+            ]
+          },
+          {
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies"
+              "ai-gateway/governance/routing-policies",
+              "ai-gateway/governance/retention"
             ]
           },
           {
@@ -813,7 +823,8 @@
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
               "self-hosting/configuration/observability",
-              "self-hosting/configuration/third-party-integrations"
+              "self-hosting/configuration/third-party-integrations",
+              "self-hosting/webhooks"
             ]
           },
           {

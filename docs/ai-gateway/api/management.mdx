@@ -164,13 +164,22 @@ Response `200`:
 
 The previous secret keeps authenticating for a 24 h grace window so in-flight clients can roll over.
 
+### Disable / Enable
+
+```
+POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
+POST /virtual-keys/:id/enable
+```
+
+The reversible stop (`virtualKeys:update`): a disabled key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact; enable restores the key exactly as it was. Both are idempotent, audit-logged, and propagate to the gateway in seconds. Each transition emits a `gateway.virtual_key.disabled` / `gateway.virtual_key.enabled` [webhook event](/features/webhooks#family-gateway). See [Virtual Keys → Disable and enable](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
+
 ### Revoke
 
 ```
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets.
+Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets and discards any rotation grace. One-way; for a reversible stop use disable.
 
 ## Budgets
 
@@ -181,7 +190,7 @@ GET /budgets
 GET /budgets?scope_type=VIRTUAL_KEY,PRINCIPAL
 ```
 
-Returns every non-archived budget in your organization across all six scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+Returns every non-archived budget in your organization across all seven scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`, `ATTRIBUTED_USER`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
 
 Response:
 
@@ -227,14 +236,16 @@ Body:
 ```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP
+    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP, ATTRIBUTED_USER
     "project_id": "proj_..."   // the id field depends on scope.kind:
                                // organization_id | team_id | project_id |
-                               // virtual_key_id | principal_user_id | group_id
+                               // virtual_key_id | principal_user_id | group_id;
+                               // ATTRIBUTED_USER takes exactly one of
+                               // anchor_virtual_key_id | anchor_project_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
-  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
+  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL | MANUAL
   "limit_usd": 5000,           // or "5000.00"
   "on_breach": "BLOCK",        // or WARN
   "timezone": "Europe/Amsterdam",
@@ -242,7 +253,7 @@ Body:
 }
 ```
 
-`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`.
+`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `ATTRIBUTED_USER` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `MANUAL` windows accrue until an explicit [reset](#reset-period). See [Budgets](/ai-gateway/budgets) for semantics.
 
 ### Update
 
@@ -251,6 +262,19 @@ PATCH /budgets/:id
 ```
 
 Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope and window are immutable after create.
+
+### Reset period
+
+```
+POST /budgets/:id/reset
+POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
+```
+
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `MANUAL` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+
+### End-user spend
+
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 
@@ -365,6 +389,13 @@ DELETE /cache-rules/:id
 ```
 
 Requires `gatewayCacheRules:delete`. Soft archive: sets `archivedAt`. The rule stops matching new requests. Returns the archived row (200, not 204) so scripts can confirm the `archivedAt` timestamp.
+
+## Webhooks and billing surfaces
+
+Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
+
+- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
+- `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
 
 ## Errors
 
