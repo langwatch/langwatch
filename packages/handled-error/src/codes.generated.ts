@@ -127,7 +127,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  end_user_required: { service: "aigateway" },
+  end_user_required: { service: "aigateway", httpStatus: 400 },
   /**
    * ErrGatewayUnavailable — signals the AI Gateway returned an error or is
    * unreachable.
