@@ -7,6 +7,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
+import type { TraceSummaryData } from "../types";
 import {
   MAX_NODE_COUNT,
   normalizeQuery,
@@ -46,6 +47,20 @@ export function evaluateQueryInMemory(
   queryText: string,
   trace: InMemoryTrace,
 ): boolean {
+  return evaluateQueryInMemoryDetailed(queryText, trace, true).matches;
+}
+
+interface QueryEvaluationDiagnostic {
+  matches: boolean;
+  invalid: boolean;
+  unsupportedFields: string[];
+}
+
+function evaluateQueryInMemoryDetailed(
+  queryText: string,
+  trace: InMemoryTrace,
+  logUnsupported: boolean,
+): QueryEvaluationDiagnostic {
   // Reuse the compiler as the validation gate — it enforces the exact
   // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
   // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
@@ -56,16 +71,18 @@ export function evaluateQueryInMemory(
       to: 0,
     });
   } catch {
-    return false;
+    return { matches: false, invalid: true, unsupportedFields: [] };
   }
   // `null` means no filter (empty / whitespace) — every trace matches.
-  if (compiled === null) return true;
+  if (compiled === null) {
+    return { matches: true, invalid: false, unsupportedFields: [] };
+  }
 
   let ast: LiqeQuery;
   try {
     ast = parse(normalizeQuery(queryText));
   } catch {
-    return false;
+    return { matches: false, invalid: true, unsupportedFields: [] };
   }
 
   const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
@@ -77,19 +94,63 @@ export function evaluateQueryInMemory(
   // trace, forever, and the automation silently never fires. Whether that
   // should be rejected at save time or made evaluable is a product call; until
   // then, at least make the silence audible.
-  if (state.unsupportedFields.length > 0) {
+  const unsupportedFields = [...new Set(state.unsupportedFields)];
+  if (logUnsupported && unsupportedFields.length > 0) {
     logger.warn(
       {
         traceId: trace.summary.traceId,
         // Field names only — filter *values* can carry customer content.
-        unsupportedFields: [...new Set(state.unsupportedFields)],
+        unsupportedFields,
       },
       "Filter query fails closed: field(s) cannot be evaluated at dispatch, so this query never matches any trace",
     );
   }
 
   // UNSUPPORTED anywhere ⇒ the query can't be positively evaluated ⇒ false.
-  return result === true;
+  return {
+    matches: result === true,
+    invalid: false,
+    unsupportedFields,
+  };
+}
+
+/**
+ * Diagnose whether a stored query can ever be evaluated positively by the
+ * dispatch path. This runs the real in-memory evaluator against an empty but
+ * fully-loaded trace shape: evaluation/event collections requested by
+ * `queryNeeds` are present, while spans stay absent exactly as they do in
+ * `confirmSettledMatch`. Only field names leave this function; filter values
+ * are never returned or logged.
+ */
+export function diagnoseFilterQueryReachability(queryText: string): {
+  invalid: boolean;
+  unsupportedFields: string[];
+} {
+  const needs = queryNeeds(queryText);
+  const summary = {
+    traceId: "__reachability__",
+    attributes: {},
+    models: [],
+    annotationIds: [],
+    spanCount: 0,
+    traceName: "",
+    containsErrorStatus: false,
+  } as unknown as TraceSummaryData;
+  const result = evaluateQueryInMemoryDetailed(
+    queryText,
+    {
+      summary,
+      evaluations: needs.has("evaluations") ? [] : null,
+      events: needs.has("events") ? [] : null,
+      // Production dispatch deliberately does not derive span rows yet.
+      spans: null,
+    },
+    false,
+  );
+  return {
+    invalid: result.invalid,
+    unsupportedFields: result.unsupportedFields,
+  };
 }
 
 interface WalkState {
@@ -125,9 +186,8 @@ function evaluateNode(
       // Negation threads down unchanged and the operator stays as-is — the
       // exact shape `translateNode` compiles, so both sides always agree.
       const left = evaluateNode(logExpr.left, negated, trace, state);
-      if (left === UNSUPPORTED) return UNSUPPORTED;
       const right = evaluateNode(logExpr.right, negated, trace, state);
-      if (right === UNSUPPORTED) return UNSUPPORTED;
+      if (left === UNSUPPORTED || right === UNSUPPORTED) return UNSUPPORTED;
       return logExpr.operator.operator === "OR" ? left || right : left && right;
     }
 

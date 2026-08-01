@@ -790,6 +790,39 @@ describe("automationRouter", () => {
   });
 
   describe("getTriggers", () => {
+    describe("when a trace automation has conditions that fail closed", () => {
+      it("returns a field-only unreachable diagnostic", async () => {
+        mockTriggerFindMany.mockResolvedValueOnce([
+          {
+            id: "trigger_unreachable",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            triggerKind: "AUTOMATION",
+            customGraphId: null,
+            filterQuery: null,
+            filters: JSON.stringify({
+              "evaluations.state": { evaluator_1: ["finished"] },
+            }),
+          },
+        ]);
+        mockMonitorFindMany.mockResolvedValueOnce([]);
+
+        const result = await caller.getTriggers({ projectId: "proj_123" });
+
+        expect(result[0]?.reachability).toEqual({
+          status: "unreachable",
+          reasons: [
+            {
+              code: "invalid_evaluation_state",
+              fields: ["evaluations.state"],
+            },
+          ],
+        });
+        expect(JSON.stringify(result[0]?.reachability)).not.toContain(
+          "finished",
+        );
+      });
+    });
+
     describe("when some triggers point at custom graphs", () => {
       it("enriches only the graph-alert row with its customGraph", async () => {
         mockTriggerFindMany.mockResolvedValueOnce([

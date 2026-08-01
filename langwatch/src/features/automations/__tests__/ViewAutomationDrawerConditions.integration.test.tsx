@@ -157,4 +157,33 @@ describe("ViewAutomationDrawer conditions section", () => {
       });
     });
   });
+
+  describe("given an automation whose conditions cannot match", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        ...baseTrigger,
+        filterQuery: null,
+        filters: JSON.stringify({
+          "evaluations.state": { evaluator_1: ["finished"] },
+        }),
+        reachability: {
+          status: "unreachable",
+          reasons: [
+            {
+              code: "invalid_evaluation_state",
+              fields: ["evaluations.state"],
+            },
+          ],
+        },
+      };
+    });
+
+    it("shows an explicit warning next to the displayed conditions", () => {
+      renderDrawer();
+
+      expect(screen.getByText("Conditions cannot match")).toBeDefined();
+      expect(screen.getByText(/evaluations\.state/)).toBeDefined();
+      expect(screen.getByRole("alert").textContent).not.toContain("finished");
+    });
+  });
 });
