@@ -44,7 +44,7 @@ export const LICENSE_ERRORS = {
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 
-/** Free tier resource limits - designed for individual evaluation/POC use */
+/** Cloud free tier resource limits - designed for individual evaluation/POC use */
 const FREE_TIER_LIMITS = {
   /** Single operator model */
   MEMBERS: 1,
@@ -55,8 +55,11 @@ const FREE_TIER_LIMITS = {
 } as const;
 
 /**
- * UNLIMITED_PLAN: Default plan for self-hosted deployments without a license.
- * Maintains backward compatibility with current OSS behavior.
+ * UNLIMITED_PLAN: the plan a self-hosted deployment runs on without a license.
+ *
+ * A license sells the Enterprise surface (SSO, SCIM, audit logs) and support,
+ * not permission to run the software, so nothing the deployment stores on its
+ * own infrastructure is capped here.
  *
  * Uses Number.MAX_SAFE_INTEGER instead of Infinity because:
  * - JSON.stringify(Infinity) returns null, causing silent failures in tRPC
@@ -81,15 +84,16 @@ export const UNLIMITED_PLAN: PlanInfo = {
 };
 
 /**
- * FREE_PLAN: Fallback plan for expired or invalid licenses.
- * Provides minimal access to encourage license renewal.
+ * FREE_PLAN: the Cloud free tier.
+ *
+ * Self-hosted deployments never land here. With no license, or an expired or
+ * unreadable one, they resolve to UNLIMITED_PLAN.
  */
 export const FREE_PLAN: PlanInfo = {
   planSource: "free",
   type: "FREE",
   name: "Free",
   free: true,
-  // Self-hosted unlicensed gets the Free visibility experience.
   visibilityDays: FREE_VISIBILITY_DAYS,
   overrideAddingLimitations: false,
 

@@ -7,7 +7,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { PlanInfo } from "./planInfo";
@@ -42,9 +42,9 @@ interface LicenseHandlerConfig {
  * Manages license validation and storage for self-hosted deployments.
  *
  * Key behaviors:
- * - No license stored = FREE_PLAN (restricted access)
+ * - No license stored = UNLIMITED_PLAN (the OSS baseline)
  * - Valid license = license-based limits
- * - Invalid/expired license = FREE_PLAN (restricted fallback)
+ * - Invalid/expired license = UNLIMITED_PLAN (the OSS baseline)
  *
  * ## Design Note (SRP)
  *
@@ -74,9 +74,25 @@ export class LicenseHandler {
    * Gets the active plan for an organization based on its stored license.
    *
    * Returns:
-   * - FREE_PLAN if no license is stored
+   * - UNLIMITED_PLAN if no license is stored
    * - License-based PlanInfo if valid license exists
-   * - FREE_PLAN if license is invalid or expired
+   * - UNLIMITED_PLAN if license is invalid or expired
+   *
+   * A license buys the Enterprise surface (SSO, SCIM, audit logs) and the
+   * support relationship, not permission to run the software. Everything a
+   * self-hosted deployment stores on its own infrastructure is uncapped without
+   * one: seats, projects, teams, experimentation resources, and its own trace
+   * history. That is what `UNLIMITED_PLAN` encodes.
+   *
+   * An unreadable or expired license resolves to the same baseline rather than
+   * to something more restrictive than never having had a license at all: a
+   * customer in renewal limbo must not wake up locked out of their own
+   * deployment. Enterprise features are gated on their own terms (see
+   * `platformSSOAllowed`), so this is not a way to keep them for free.
+   *
+   * On SaaS this method is only the license *override* leg of the composite
+   * provider; `UNLIMITED_PLAN.free` is true, so an org without a license still
+   * falls through to its Stripe subscription and is unaffected.
    */
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
     const organization = await this.prisma.organization.findUnique({
@@ -84,9 +100,8 @@ export class LicenseHandler {
       select: { license: true },
     });
 
-    // No license stored = FREE_PLAN (enforcement enabled requires valid license)
     if (!organization?.license) {
-      return FREE_PLAN;
+      return UNLIMITED_PLAN;
     }
 
     // Validate the stored license
@@ -99,8 +114,7 @@ export class LicenseHandler {
       return result.planInfo;
     }
 
-    // Invalid or expired license = restricted FREE_PLAN
-    return FREE_PLAN;
+    return UNLIMITED_PLAN;
   }
 
   /**
@@ -294,15 +308,12 @@ export class LicenseHandler {
           )
       : Promise.resolve(0);
 
-    const [
-      currentMembers,
-      currentMembersLite,
-      currentMessagesPerMonth,
-    ] = await Promise.all([
-      this.repository.getMemberCount(organizationId),
-      this.repository.getMembersLiteCount(organizationId),
-      messagesCountPromise,
-    ]);
+    const [currentMembers, currentMembersLite, currentMessagesPerMonth] =
+      await Promise.all([
+        this.repository.getMemberCount(organizationId),
+        this.repository.getMembersLiteCount(organizationId),
+        messagesCountPromise,
+      ]);
 
     return {
       currentMembers,
@@ -317,9 +328,8 @@ export class LicenseHandler {
   /**
    * Removes the license from an organization (idempotent).
    *
-   * This clears all license-related fields, returning the organization
-   * to unlimited mode (when enforcement is disabled) or FREE_PLAN
-   * (when enforcement is enabled).
+   * This clears all license-related fields, returning the organization to the
+   * OSS baseline (`UNLIMITED_PLAN`) and withdrawing the Enterprise surface.
    *
    * @returns { removed: true } when complete
    * @throws OrganizationNotFoundError if organization does not exist

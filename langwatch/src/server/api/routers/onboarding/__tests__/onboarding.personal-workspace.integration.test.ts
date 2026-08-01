@@ -27,7 +27,6 @@ import { OrganizationService } from "~/server/app-layer/organizations/organizati
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
@@ -165,22 +164,16 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(sharedProjects).toHaveLength(0);
     });
 
-    /** @scenario The personal workspace does not spend the plan's allowance */
-    it("spends none of the plan's project allowance", async () => {
-      const repository = new LicenseEnforcementRepository(prisma);
-
-      expect(await repository.getProjectCount(organizationId)).toBe(0);
-    });
-
-    /** @scenario The personal workspace does not spend the plan's allowance */
-    it("spends only the shared team out of the team allowance", async () => {
-      const repository = new LicenseEnforcementRepository(prisma);
+    /** @scenario The personal workspace stays separate from the shared workspace */
+    it("keeps the personal team distinct from the organization's shared team", async () => {
       const allTeams = await prisma.team.count({ where: { organizationId } });
+      const personalTeams = await prisma.team.count({
+        where: { organizationId, isPersonal: true },
+      });
 
-      // Two teams exist, the organization's own and the personal one; only
-      // the first is charged.
+      // Two teams exist, the organization's own and the personal one.
       expect(allTeams).toBe(2);
-      expect(await repository.getTeamCount(organizationId)).toBe(1);
+      expect(personalTeams).toBe(1);
     });
 
     /** @scenario A fresh organization gets the full standard catalog with no admin action */
@@ -196,7 +189,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
 
-    /** @scenario The personal workspace does not spend the plan's allowance */
+    /** @scenario The personal workspace stays separate from the shared workspace */
     it("is idempotent, so a later CLI login adds no second workspace", async () => {
       const { PersonalWorkspaceService } = await import(
         "@ee/governance/services/personalWorkspace.service"

@@ -349,6 +349,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.getByText("Feature Not Available")).toBeDefined();
     });
 
+    /** @scenario Restriction modal uses role-based messaging */
     it("renders role-based messaging without billing references", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,
@@ -366,6 +367,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.queryByText(/upgrade/i)).toBeNull();
     });
 
+    /** @scenario Restriction modal offers "Contact Admin" not "Upgrade your plan" */
     it("does not render an 'Upgrade' button", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,

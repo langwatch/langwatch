@@ -1,15 +1,14 @@
 @unit
 Feature: Subscription Limit Overrides
 
-  # The "Only non-null overrides replace plan defaults" scenario is
-  # bound below. The remaining @unimplemented scenarios (per-field
-  # project/message overrides, multiple-overrides-applied-together,
-  # cancellation clears overrides) are exercised at the unit level by
-  # the it.each block in
+  # Overrides only exist for the limits a plan still enforces: member seats,
+  # lite-member seats, and monthly message volume. Everything a customer creates
+  # is uncapped on every plan, so there is nothing else to override.
+  #
+  # The per-field cases are also exercised by the it.each block in
   # ee/billing/__tests__/planProvider.unit.test.ts (NUMERIC_OVERRIDE_FIELDS
   # parameterization), but parameterized it.each tests cannot bind via
-  # @scenario JSDoc. Aspirational pending dedicated prose tests OR a
-  # parity-script enhancement that traverses it.each parameter sets.
+  # @scenario JSDoc, so the prose cases below carry the binding.
 
   As a LangWatch Cloud operator
   I want per-subscription overrides to take precedence over plan defaults
@@ -22,14 +21,15 @@ Feature: Subscription Limit Overrides
   # Existing Overrides Still Work
   # ============================================================================
 
+  Scenario: Subscription with a lite-member override uses that value
+    Given the subscription overrides lite-member capacity to 50
+    When the plan is resolved for the organization
+    Then the plan allows 50 lite members
+
   Scenario: Subscription with a monthly message override uses that value
     Given the subscription overrides monthly message capacity to 500000
     When the plan is resolved for the organization
     Then the plan allows 500000 messages per month
-
-  # ============================================================================
-  # Bug Fix: maxWorkflows Override Is Applied
-  # ============================================================================
 
   # ============================================================================
   # New Numeric Overrides Are Applied
@@ -56,13 +56,11 @@ Feature: Subscription Limit Overrides
 
   Scenario: Several overrides are applied together
     Given the subscription overrides member capacity to 20
-    And the subscription overrides workflow capacity to 50
-    And the subscription overrides prompt capacity to 30
+    And the subscription overrides lite-member capacity to 30
     And the subscription overrides monthly message capacity to 200000
     When the plan is resolved for the organization
     Then the plan allows 20 members
-    And the plan allows 50 workflows
-    And the plan allows 30 prompts
+    And the plan allows 30 lite members
     And the plan allows 200000 messages per month
     And all non-overridden limits match the base plan defaults
 

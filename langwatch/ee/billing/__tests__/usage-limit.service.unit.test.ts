@@ -467,7 +467,7 @@ describe("UsageLimitService", () => {
         // Second call with different type is NOT suppressed
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "agents",
+          limitType: "membersLite",
           current: 3,
           max: 3,
         });
@@ -501,7 +501,7 @@ describe("UsageLimitService", () => {
           adminName: "Jane Admin",
           adminEmail: "jane@example.com",
           planName: "Launch",
-          limitType: "Workflows",
+          limitType: "Team Members",
           current: 5,
           max: 5,
         });
