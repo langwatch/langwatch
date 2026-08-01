@@ -37,6 +37,18 @@ function traceIdFor(i: number): string {
   return `tr-${String(i).padStart(4, "0")}`;
 }
 
+/** system.query_log only exists on a server started with log_queries enabled. */
+async function hasQueryLog(client: ClickHouseClient): Promise<boolean> {
+  const rows = (await (
+    await client.query({
+      query: `SELECT count() AS n FROM system.tables
+              WHERE database = 'system' AND name = 'query_log'`,
+      format: "JSONEachRow",
+    })
+  ).json()) as Array<{ n: string }>;
+  return Number(rows[0]?.n ?? 0) > 0;
+}
+
 function makeTraceSummaryRow(
   i: number,
   overrides: Record<string, unknown> = {},
@@ -210,7 +222,19 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       expect(page2.rows.map((r) => r.traceId)).toEqual(expected);
     });
 
-    it("reads heavy columns for fewer traces than the naive single-scan form", async () => {
+    it("reads heavy columns for fewer traces than the naive single-scan form", async ({
+      skip,
+    }) => {
+      // The assertion compares per-query peak memory, which only
+      // system.query_log records. A server started with log_queries=0 never
+      // creates that table, so say why the check cannot run rather than
+      // failing on an UNKNOWN_TABLE that reads like a broken query.
+      if (!(await hasQueryLog(ch))) {
+        skip(
+          "ClickHouse runs with log_queries=0, so system.query_log is absent",
+        );
+      }
+
       const dedup = `(TenantId, TraceId, UpdatedAt) IN (
         SELECT TenantId, TraceId, max(UpdatedAt)
         FROM trace_summaries
@@ -294,7 +318,8 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
   });
 
   describe("when a trace carries fold-summed cache + reasoning token attributes", () => {
-    it("surfaces the reserved cache/reasoning keys so the drawer header can show them", async () => {
+    /** @scenario "Context size is shown in the trace list next to tokens" */
+    it("surfaces the reserved cache/reasoning/context keys so the list and drawer header can show them", async () => {
       const cacheTenant = `test-cache-attrs-${nanoid()}`;
       await ch.insert({
         table: "trace_summaries",
@@ -307,6 +332,7 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
               "langwatch.reserved.cache_read_tokens": "31680",
               "langwatch.reserved.cache_creation_tokens": "6",
               "langwatch.reserved.reasoning_tokens": "100",
+              "langwatch.reserved.context_size_tokens": "52878",
             },
           }),
         ],
@@ -330,6 +356,9 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       );
       expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
         "100",
+      );
+      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe(
+        "52878",
       );
       // The pre-existing allow-listed keys still flow through.
       expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
