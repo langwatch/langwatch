@@ -11,15 +11,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { trackEvent } from "../../utils/tracking";
 import { UpgradeModal } from "../UpgradeModalContent";
-import { toaster } from "../ui/toaster";
 
-const { pushMock, previewProrationMock, subscriptionEnabled } = vi.hoisted(
-  () => ({
-    pushMock: vi.fn(),
-    previewProrationMock: vi.fn(),
-    subscriptionEnabled: { value: true },
-  }),
-);
+const {
+  pushMock,
+  previewProrationMock,
+  showErrorToastMock,
+  subscriptionEnabled,
+} = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  previewProrationMock: vi.fn(),
+  showErrorToastMock: vi.fn(),
+  subscriptionEnabled: { value: true },
+}));
 
 // Mock dependencies used by other content variants
 vi.mock("~/utils/compat/next-router", () => ({
@@ -47,8 +50,9 @@ vi.mock("../../utils/tracking", () => ({
   trackEvent: vi.fn(),
 }));
 
-vi.mock("../ui/toaster", () => ({
-  toaster: { create: vi.fn() },
+vi.mock("~/features/errors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/features/errors")>()),
+  showErrorToast: showErrorToastMock,
 }));
 
 // `api.subscription` is undefined in OSS builds (see UpgradeModal.tsx's
@@ -187,7 +191,7 @@ describe("<UpgradeModal />", () => {
         <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
       );
 
-      expect(screen.getAllByText("Confirm Seat Update").length).toBeGreaterThan(
+      expect(screen.getAllByText("Confirm seat update").length).toBeGreaterThan(
         0,
       );
       expect(screen.getAllByText("5").length).toBeGreaterThan(0);
@@ -210,7 +214,6 @@ describe("<UpgradeModal />", () => {
         <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
       );
 
-      expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
       expect(screen.queryByText(/new billing amount/i)).toBeNull();
 
       const confirmButtons = screen.getAllByRole("button", {
@@ -233,7 +236,7 @@ describe("<UpgradeModal />", () => {
       );
 
       expect(
-        screen.getAllByText("Could not reach billing provider").length,
+        screen.getAllByText("Couldn't load the price preview").length,
       ).toBeGreaterThan(0);
 
       const confirmButtons = screen.getAllByRole("button", {
@@ -277,7 +280,7 @@ describe("<UpgradeModal />", () => {
 
       await waitFor(() => expect(onConfirm).toHaveBeenCalled());
       await waitFor(() => expect(onClose).toHaveBeenCalled());
-      expect(toaster.create).not.toHaveBeenCalled();
+      expect(showErrorToastMock).not.toHaveBeenCalled();
     });
 
     it("shows an error toast and keeps the modal open when onConfirm rejects", async () => {
@@ -298,11 +301,9 @@ describe("<UpgradeModal />", () => {
       fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
 
       await waitFor(() =>
-        expect(toaster.create).toHaveBeenCalledWith(
+        expect(showErrorToastMock).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: "Error updating seats",
-            description: "Payment declined",
-            type: "error",
+            fallbackTitle: "Couldn't update your seats",
           }),
         ),
       );

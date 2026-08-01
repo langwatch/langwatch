@@ -154,7 +154,7 @@ describe("presentLangyToolError", () => {
 
     it("names a limit type the label table has never heard of in plain words", () => {
       const scenarioSets = failureDocument({
-        code: "scenario_set_limit_exceeded",
+        code: "resource_limit_exceeded",
         message: "You have reached the maximum number of scenario sets",
         httpStatus: 403,
         meta: { limitType: "scenarioSets", current: 2, max: 2 },
