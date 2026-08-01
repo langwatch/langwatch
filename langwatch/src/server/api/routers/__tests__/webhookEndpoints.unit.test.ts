@@ -12,6 +12,13 @@ import { webhookEndpointsRouter } from "../webhookEndpoints";
 
 const ORG_ID = "org_1";
 
+// protectedProcedure audits every mutation and every handled error through
+// the module-level Prisma client, which no injected ctx.prisma can stand in
+// for. Stubbed so the router's own behaviour is what these assertions see.
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 // Every checkOrganizationPermission call records its permission string and
 // denies the ones a test put into `denied`, so each procedure's scope
 // mapping is asserted against the real wiring, not a copy of it.
