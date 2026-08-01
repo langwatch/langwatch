@@ -579,7 +579,6 @@ describe("Feature: Dataset File Upload REST API", () => {
       });
     });
 
-
     describe("when slug conflicts with existing dataset", () => {
       beforeEach(async () => {
         await createDataset({ name: "Duplicate", slug: "duplicate" });

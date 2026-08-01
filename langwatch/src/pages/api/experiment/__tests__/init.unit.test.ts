@@ -140,6 +140,5 @@ describe("POST /api/experiment/init", () => {
         });
       });
     });
-
   });
 });

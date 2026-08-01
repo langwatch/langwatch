@@ -232,13 +232,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         createMutation.mutate(payload);
       }
     },
-    [
-      project,
-      isEditMode,
-      suite,
-      createMutation,
-      updateMutation,
-    ],
+    [project, isEditMode, suite, createMutation, updateMutation],
   );
 
   const submitAndRun = useCallback(

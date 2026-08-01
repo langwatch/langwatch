@@ -113,7 +113,6 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
@@ -317,7 +316,6 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-
       const hasSourcePermission = await hasProjectPermission(
         ctx,
         input.sourceProjectId,

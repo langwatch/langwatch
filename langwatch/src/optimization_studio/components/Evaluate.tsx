@@ -314,9 +314,7 @@ export function EvaluateModalContent({
         workflow_version_id: versionId,
         evaluate_on: evaluateOn.value,
         dataset_entry:
-          evaluateOn.value === "specific"
-            ? evaluateOn.datasetEntry
-            : undefined,
+          evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
       });
       setHasStarted(true);
     },

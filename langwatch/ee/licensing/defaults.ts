@@ -30,7 +30,9 @@ export type ResolvedPlanLimits = {
  * @param plan - License plan limits (the signed payload)
  * @returns The enforced limits with all fields guaranteed to have values
  */
-export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits {
+export function resolvePlanDefaults(
+  plan: LicensePlanLimits,
+): ResolvedPlanLimits {
   return {
     type: plan.type,
     name: plan.name,
