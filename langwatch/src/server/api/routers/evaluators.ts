@@ -100,7 +100,6 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-
       if (input.type === "code") {
         const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
         if (!parsed.success) {

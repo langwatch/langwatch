@@ -161,6 +161,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Help
 
 - [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works — events, data retention, and answers to common questions.
+- [What counts as a billable event](https://langwatch.ai/docs/pricing/billable-events.md): The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works
 - [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
 - [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
 
@@ -556,6 +557,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one
 - [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 

@@ -52589,7 +52589,13 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+
+<Warning>
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out.
+
+The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+</Warning>
 
 ## Supported Providers
 
@@ -52622,7 +52628,9 @@ The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users r
 
 Reset links are sent through the same transactional email provider as the rest of LangWatch. Configure SendGrid or AWS SES as described in [Third-party integrations](/self-hosting/configuration/third-party-integrations) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled.
+When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+
+Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
 
 ### Auth0
 
@@ -55154,6 +55162,122 @@ else in your install changes.
 
 ---
 
+# FILE: ./self-hosting/licensing.mdx
+
+---
+title: Editions and licensing
+description: "What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one"
+sidebarTitle: Editions & licensing
+keywords: license, licensing, self-hosted, enterprise, SSO, RBAC, SCIM, audit logs, seats, open source
+---
+
+Self-hosted LangWatch runs the same image that powers LangWatch Cloud. There is no separate "community" build to outgrow and no feature you have to re-deploy to obtain: a license unlocks the Enterprise surface in the software you are already running.
+
+## What you get without a license
+
+Everything the platform stores on your own infrastructure is uncapped. Running unlicensed, you get:
+
+<CardGroup cols={2}>
+<Card title="Unlimited people" icon="users">
+Members, lite members, teams, and projects. Invite your whole organization.
+</Card>
+
+<Card title="Unlimited work" icon="infinity">
+Traces, spans, prompts, evaluations, scenarios and simulations, agents, experiments, datasets, dashboards, custom graphs, and automations.
+</Card>
+
+<Card title="Your full history" icon="clock-rotate-left">
+No visibility window on the data in your own ClickHouse. Retention is yours to configure.
+</Card>
+
+<Card title="The whole product surface" icon="grid-2">
+Observability, evaluations, prompt management, agent simulations, the Optimization Studio, and the AI Gateway.
+</Card>
+</CardGroup>
+
+A license is not permission to run the software. It buys the Enterprise security surface and the support relationship.
+
+<Note>
+Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+</Note>
+
+## What an Enterprise license unlocks
+
+| Capability | Why it is licensed |
+|---|---|
+| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab, Cognito) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso). |
+| **RBAC** with custom roles | Fine-grained permissions beyond the built-in roles. |
+| **SCIM** user provisioning | Directory-driven joiner/mover/leaver flows. |
+| **Audit logs** | Tamper-evident record of who did what, exportable to your SIEM. |
+| **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
+| **Extended retention** | Multi-class retention policies configured per category. |
+| **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository. See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+
+## SSO requires a license
+
+Setting the SSO environment variables is not sufficient on its own. A deployment with an identity provider configured but no license runs in **email mode**: the sign-in page offers the email and password form, the identity-provider button is not shown, and SSO sign-in routes are refused.
+
+This is deliberate rather than a failure state, so an unlicensed deployment always has a working door:
+
+- Email sign-up and sign-in stay available.
+- **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox.
+
+Once a license is present, the deployment flips to SSO and the email routes close again, so no password account can be minted on a licensed install.
+
+## Activating a license
+
+<Steps>
+<Step title="Get a license">
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+</Step>
+
+<Step title="Activate it">
+In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+
+Prefer configuration over a UI step? Set the key as an environment variable instead:
+
+```bash
+LANGWATCH_LICENSE_KEY=<your signed license key>
+```
+
+This is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+</Step>
+
+<Step title="Restart the deployment">
+The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+</Step>
+</Steps>
+
+## Expiry
+
+An expired license keeps SSO working. Losing company-wide login the morning a renewal slips is a worse outcome than serving an ex-customer for a few days, so the SSO gate accepts any genuinely issued license regardless of its expiry date, and logs a renewal reminder instead.
+
+Plan entitlements do follow expiry. An expired or unreadable license drops the deployment back to the uncapped open-source baseline, never to something more restrictive than never having held a license at all.
+
+## Frequently asked
+
+<AccordionGroup>
+<Accordion title="Is there a user limit without a license?">
+No. Members, lite members, teams, and projects are all uncapped on a self-hosted deployment without a license.
+</Accordion>
+
+<Accordion title="Do I need a license for commercial use?">
+No. The Apache 2.0 floor covers commercial use. A license is for the Enterprise capabilities listed above and for a support relationship.
+</Accordion>
+
+<Accordion title="One organization has a license. What about the others?">
+The SSO gate is deployment-wide: one genuinely licensed organization enables SSO for the whole deployment. Plan entitlements stay per organization.
+</Accordion>
+
+<Accordion title="Does self-hosted send usage data to LangWatch?">
+No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+</Accordion>
+</AccordionGroup>
+
+---
+
 # FILE: ./self-hosting/ops/dashboard.mdx
 
 ---
@@ -55790,6 +55914,8 @@ description: "Deploy LangWatch on your own infrastructure for full data control"
 ---
 
 LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
+
+Without a license, self-hosted LangWatch is uncapped: unlimited members, teams, projects, and everything you create on your own infrastructure. An Enterprise license unlocks SSO, RBAC, SCIM, audit logs and support in the same deployment. See [Editions and licensing](/self-hosting/licensing).
 
 <Tip>
 **Get the entire LangWatch platform running with a single Helm install:**
@@ -60402,6 +60528,8 @@ A **billable event** is either:
 
 Both contribute to your event count for the billing period. There are no separate charges per feature on top of this — evaluations, monitoring, and simulations all run against the same event stream.
 
+For the complete list, including exactly how many events an experiment sweep or a scenario run produces and what is never billed, see [What counts as a billable event](/pricing/billable-events).
+
 ### What's included
 
 Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more — a longer retention window or higher volume — you can [extend retention](#extending-retention) with an Enterprise plan or a self-hosted license.
@@ -60445,7 +60573,7 @@ This keeps the model predictable: your base plan covers normal usage at its defa
   </Accordion>
 
   <Accordion title="What counts as a billable event?">
-    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period.
+    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including what is never billed and how retries are deduplicated.
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
@@ -60453,7 +60581,7 @@ This keeps the model predictable: your base plan covers normal usage at its defa
   </Accordion>
 
   <Accordion title="Can I self-host or run a hybrid setup?">
-    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free. If you require enterprise features such as SSO, RBAC, SCIM, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai).
+    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free, with unlimited users, projects, and events on your own hardware. If you require enterprise features such as SSO, RBAC, SCIM, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai). See [Editions and licensing](/self-hosting/licensing) for what a license unlocks.
   </Accordion>
 
   <Accordion title="Where is my data stored?">

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "../constants";
 import { generateLicenseKey } from "../licenseGenerationService";
+import { GROWTH_TEMPLATE } from "../planTemplates";
 import { validateLicense } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import { GROWTH_TEMPLATE } from "../planTemplates";
 
 const baseParams = {
   organizationName: "Acme Corp",
@@ -39,7 +39,9 @@ describe("generateLicenseKey", () => {
 
       expect(plan.maxMembersLite).toBe(GROWTH_TEMPLATE.maxMembersLite);
       expect(plan.maxMembersLite).toBe(DEFAULT_LIMIT);
-      expect(plan.maxMessagesPerMonth).toBe(GROWTH_TEMPLATE.maxMessagesPerMonth);
+      expect(plan.maxMessagesPerMonth).toBe(
+        GROWTH_TEMPLATE.maxMessagesPerMonth,
+      );
       expect(plan.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
     });
 

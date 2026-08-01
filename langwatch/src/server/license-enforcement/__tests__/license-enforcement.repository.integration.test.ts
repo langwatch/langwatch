@@ -1,6 +1,6 @@
 import {
-  OrganizationUserRole,
   type Organization,
+  OrganizationUserRole,
   type Project,
   type Team,
   type User,
@@ -130,7 +130,10 @@ describe("LicenseEnforcementRepository Integration", () => {
         role,
       },
     });
-    createdOrgUserIds.push({ organizationId: organization.id, userId: user.id });
+    createdOrgUserIds.push({
+      organizationId: organization.id,
+      userId: user.id,
+    });
 
     return user;
   }
@@ -157,8 +160,9 @@ describe("LicenseEnforcementRepository Integration", () => {
 
     it("returns zero when no Lite Member users exist", async () => {
       // Count before creating any more users
-      const externalCountBefore =
-        await repository.getMembersLiteCount(organization.id);
+      const externalCountBefore = await repository.getMembersLiteCount(
+        organization.id,
+      );
 
       // Given: only ADMIN and MEMBER users (no additional Lite Member)
       await createOrgUser(OrganizationUserRole.ADMIN);

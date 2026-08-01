@@ -16,11 +16,7 @@ const PAID_FEATURES = {
 
 type PlanOverrides = Pick<
   PlanInfo,
-  | "type"
-  | "name"
-  | "maxMembers"
-  | "maxMessagesPerMonth"
-  | "prices"
+  "type" | "name" | "maxMembers" | "maxMessagesPerMonth" | "prices"
 > &
   Partial<Omit<PlanInfo, "free">>;
 

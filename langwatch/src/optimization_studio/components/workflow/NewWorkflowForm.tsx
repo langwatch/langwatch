@@ -215,9 +215,7 @@ export const NewWorkflowForm = ({
           );
         },
         onError: (error) => {
-          if (
-            applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
-          )
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
             return;
           showErrorToast({
             error,

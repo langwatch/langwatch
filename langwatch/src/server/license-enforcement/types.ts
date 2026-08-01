@@ -12,10 +12,7 @@ import { z } from "zod";
  * have no creation cap on any plan — cloud monetizes via traces/messages
  * volume and seats, not by counting workspaces or experimentation artifacts.
  */
-export const limitTypes = [
-  "members",
-  "membersLite",
-] as const;
+export const limitTypes = ["members", "membersLite"] as const;
 
 export type LimitType = (typeof limitTypes)[number];
 
