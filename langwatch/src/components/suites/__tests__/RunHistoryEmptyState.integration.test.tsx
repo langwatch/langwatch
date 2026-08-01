@@ -46,6 +46,9 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
+    export: {
+      onScenarioRunExportProgress: { useSubscription: vi.fn() },
+    },
   },
 }));
 
@@ -122,6 +125,48 @@ describe("<RunHistoryPanel/>", () => {
       expect(
         screen.getByText("Run this suite to see results here."),
       ).toBeInTheDocument();
+    });
+
+    /**
+     * Exporting here would write a header and no rows, which reads as a broken
+     * export rather than an empty one. Asserted against the panel rather than
+     * the filter bar on its own, because the panel is what decides — the bar
+     * only renders the flag it is handed.
+     */
+    /** @scenario Export is unavailable when no runs match */
+    it("disables Export CSV rather than offering a header-only file", () => {
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByRole("button", { name: /export csv/i }),
+      ).toBeDisabled();
+    });
+  });
+
+  describe("given no runs on the loaded pages but more still to fetch", () => {
+    /**
+     * The loaded pages are not the whole history. Filter to a scenario whose
+     * runs sit further back and the fetched pages hold none of them, while the
+     * server-side sweep would return every one — so a zero count here means
+     * "not yet" rather than "none", and disabling the export would refuse a
+     * request that would have produced a file.
+     */
+    it("keeps Export CSV enabled, because the sweep may still match", () => {
+      mockGetSuiteRunData.mockReturnValue({
+        data: { runs: [], scenarioSetIds: {}, hasMore: true, changed: true },
+        isLoading: false,
+        error: null,
+      });
+
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeEnabled();
     });
   });
 

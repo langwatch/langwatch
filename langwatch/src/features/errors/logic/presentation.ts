@@ -607,6 +607,15 @@ const presentations = {
     describe: () =>
       "Browser monitoring is sending faster than we accept. It will resume on its own.",
   },
+  scenario_run_export_unauthenticated: {
+    title: "Log in to export simulation runs",
+    describe: () =>
+      "Your session has expired. Log in and try the export again.",
+  },
+  scenario_run_export_forbidden: {
+    title: "You can't export this project's simulation runs",
+    describe: () => "Ask an admin for access to simulations on this project.",
+  },
   scenario_set_limit_exceeded: {
     title: "You've hit the simulation set limit",
     describe: () => "Delete an existing set, or upgrade your plan.",

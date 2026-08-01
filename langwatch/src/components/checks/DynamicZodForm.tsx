@@ -101,6 +101,15 @@ const FIELD_HELPER_OVERRIDES: Record<
     tooltip:
       "Studies show that swapping can reduce position bias from 68% to 51% (PandaLM paper).",
   },
+  // The Comparison evaluator's field. Only its legacy predecessor
+  // (`swap_and_confirm`, above) was listed, so this one rendered its whole
+  // schema description — citation included — as the line under the toggle.
+  swap_and_reconcile: {
+    helper:
+      "Check each row again with the candidates in the opposite order. Doubles judge cost.",
+    tooltip:
+      "Judges tend to favour whichever answer they read first, and reversing the order is the most reliable way to catch it — swapping alone flips 10-30% of verdicts on close rows. When the two checks disagree, the row is left without a result rather than called a tie: a tie would say the candidates are equally good, which is not what was found.",
+  },
 };
 
 type MetricMeta = { label: string; tooltip: string };

@@ -339,7 +339,107 @@ describe("resultMapper", () => {
           details: undefined,
           cost: { currency: "USD", amount: 0.0001 },
         },
+        duration: 500,
       });
+    });
+
+    it("includes duration when timestamps are present", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+        timestamps: { started_at: 1000, finished_at: 2500 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBe(1500);
+      }
+    });
+
+    it("omits duration when timestamps are missing", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBeUndefined();
+      }
+    });
+
+    it("includes the evaluator's request inputs when provided", () => {
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        {
+          status: "success",
+          outputs: { label: "target-a" },
+        },
+        { inputs: { candidates } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({ candidates });
+      }
+    });
+
+    it("keeps only the candidate ids, not the whole request payload", () => {
+      // Everything but the ids duplicates what the run already stores per
+      // target, and this column reaches ClickHouse twice, the browser via a
+      // `SELECT *`, and the storage meter — at rows x targets x evaluators.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { label: "target-a" } },
+        {
+          inputs: {
+            candidates: [
+              { id: "target-a", output: "a long answer", cost: 0.01 },
+              { id: "target-b", output: "another long answer", cost: 0.02 },
+            ],
+            golden: "the reference answer",
+            input: "the task",
+          },
+        },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({
+          candidates: [{ id: "target-a" }, { id: "target-b" }],
+        });
+      }
+    });
+
+    it("omits inputs for an evaluator that has no candidate list", () => {
+      // A non-Comparison evaluator persists nothing here rather than an
+      // empty object.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { passed: true, score: 1.0 } },
+        { inputs: { input: "the task", output: "the answer" } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
+    });
+
+    it("omits inputs when none are provided", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
     });
 
     it("maps successful evaluator result with passed=false", () => {
@@ -729,7 +829,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -755,11 +859,39 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).evaluatorId).toBe("eval-1");
       expect((result as any).result.passed).toBe(true);
+    });
+
+    it("threads the evaluator's request inputs through to the mapped event", () => {
+      const event: StudioServerEvent = {
+        type: "component_state_change",
+        payload: {
+          component_id: "target-1.eval-1",
+          execution_state: {
+            status: "success",
+            outputs: { label: "target-a" },
+          },
+        },
+      };
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        evaluatorInputs: { candidates },
+      });
+
+      expect(result?.type).toBe("evaluator_result");
+      expect((result as any).inputs).toEqual({ candidates });
     });
 
     it("ignores running state events", () => {
@@ -774,7 +906,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -790,7 +926,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -800,7 +940,11 @@ describe("resultMapper", () => {
         payload: { message: "starting execution" },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -809,7 +953,11 @@ describe("resultMapper", () => {
         type: "done",
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -825,7 +973,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -851,7 +1003,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).result.status).toBe("error");
@@ -870,8 +1026,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes, {
-        stripScoreEvaluatorIds: new Set(["eval-strip"]),
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        config: { stripScoreEvaluatorIds: new Set(["eval-strip"]) },
       });
 
       expect(result?.type).toBe("evaluator_result");
@@ -896,8 +1055,12 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes, {
-        stripScoreEvaluatorIds: new Set(["eval-strip"]), // Only eval-strip should be stripped
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        // Only eval-strip should be stripped.
+        config: { stripScoreEvaluatorIds: new Set(["eval-strip"]) },
       });
 
       expect(result?.type).toBe("evaluator_result");
@@ -922,7 +1085,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       if (result?.type === "evaluator_result") {

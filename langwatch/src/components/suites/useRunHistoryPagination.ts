@@ -26,6 +26,20 @@ interface UseRunHistoryPaginationOptions {
   sseConnected?: boolean;
 }
 
+/**
+ * Deliberately sends no upper bound.
+ *
+ * `usePeriodSelector` builds a relative preset as `endDate: now` and its
+ * useMemo excludes `now` from its deps, so `period.endDate` is pinned at mount.
+ * Sending it here would filter the list on `StartedAt <= <page load>`, and a
+ * run started after the page opened would never appear — on the one surface
+ * whose job is watching runs happen. Omitting it lets the router's
+ * `resolveDateRange` default the bound to `Date.now()` per request, which is
+ * live.
+ *
+ * The export is a different case and does send both bounds: it is a snapshot
+ * the user asked for, not a live view.
+ */
 export function useRunHistoryPagination({
   scenarioSetId,
   startDateMs,

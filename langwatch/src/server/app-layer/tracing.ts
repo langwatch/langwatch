@@ -1,3 +1,4 @@
+import { SpanStatusCode } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 /**
@@ -40,6 +41,39 @@ export function traced<T extends object>(instance: T, className: string): T {
 
       const spanName = `${className}.${String(prop)}`;
 
+      // Async generators cannot go through withActiveSpan. Calling one returns
+      // an AsyncGenerator, not a promise, so `withActiveSpan(name, async () =>
+      // fn())` resolves to a Promise<AsyncGenerator> — and `for await` on a
+      // promise throws "not async iterable". The failure is silent at wrap
+      // time and only surfaces when the method is iterated.
+      //
+      // So the span is managed by hand instead. withActiveSpan owns the whole
+      // call and would close the span at the first yield; a generator's work
+      // happens across every later next(), so what is worth measuring is the
+      // iteration. `finally` covers all three ways a generator ends — drained,
+      // thrown, or abandoned when a `for await` breaks and calls return().
+      if (isAsyncGeneratorFunction(value)) {
+        const generatorWrapper = async function* (
+          this: unknown,
+          ...args: unknown[]
+        ) {
+          const span = tracer.startSpan(spanName);
+          try {
+            yield* (
+              value as (...a: unknown[]) => AsyncGenerator<unknown>
+            ).apply(this ?? target, args);
+          } catch (error) {
+            span.recordException(error as Error);
+            span.setStatus({ code: SpanStatusCode.ERROR });
+            throw error;
+          } finally {
+            span.end();
+          }
+        };
+        wrapperCache.set(prop, generatorWrapper);
+        return generatorWrapper;
+      }
+
       const wrapper = function (this: unknown, ...args: unknown[]) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return tracer.withActiveSpan(spanName, async () =>
@@ -51,4 +85,17 @@ export function traced<T extends object>(instance: T, className: string): T {
       return wrapper;
     },
   });
+}
+
+/**
+ * True for `async function*` declarations.
+ *
+ * Checked by constructor name rather than `instanceof` because the
+ * AsyncGeneratorFunction constructor is not a global binding.
+ */
+function isAsyncGeneratorFunction(value: unknown): boolean {
+  return (
+    typeof value === "function" &&
+    value.constructor?.name === "AsyncGeneratorFunction"
+  );
 }

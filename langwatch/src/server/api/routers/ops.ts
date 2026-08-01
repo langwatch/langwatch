@@ -475,6 +475,7 @@ export const opsRouter = createTRPCRouter({
         since: z.string(),
         tenantIds: z.array(z.string()).optional(),
         aggregateIds: z.array(z.string()).optional(),
+        fullRebuild: z.boolean().optional(),
         description: z.string(),
       }),
     )
@@ -490,6 +491,7 @@ export const opsRouter = createTRPCRouter({
           since: input.since,
           tenantIds: input.tenantIds ?? [],
           aggregateIds: input.aggregateIds,
+          fullRebuild: input.fullRebuild,
           description: input.description,
           userName,
         });

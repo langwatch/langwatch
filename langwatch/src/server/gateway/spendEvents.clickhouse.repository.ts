@@ -12,7 +12,7 @@
  * `costUsd` string is derived at the read boundary for response-shape
  * stability; sums downstream should prefer the integer.
  *
- * See: migration 00064_create_gateway_spend.sql
+ * See: migration 00067_create_gateway_spend.sql
  */
 
 import { createLogger } from "@langwatch/observability";

@@ -998,12 +998,12 @@ function diffGuardrailAttachments(
   const flatten = (attachments: GuardrailAttachment[]): Set<string> => {
     const set = new Set<string>();
     for (const a of attachments) {
-      for (const id of a.guardrailIds) set.add(`${a.direction} ${id}`);
+      for (const id of a.guardrailIds) set.add(`${a.direction}\u0000${id}`);
     }
     return set;
   };
   const toPair = (key: string): GuardrailPair => {
-    const [direction, guardrailId] = key.split(" ");
+    const [direction, guardrailId] = key.split("\u0000");
     return {
       direction: direction as GuardrailDirection,
       guardrailId: guardrailId!,

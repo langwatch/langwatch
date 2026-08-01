@@ -127,6 +127,52 @@ describe("StaticPipelineBuilder validations", () => {
       );
     });
 
+    it("threads a custom groupKeyFn through to the raw subscriber definition", () => {
+      // Without the pass-through, a subscriber spec's groupKeyFn silently
+      // vanished and the queue fell back to per-aggregate groups — the gap
+      // behind the 2026-07-31 parallel sweep storm (dedup bounded staging,
+      // nothing bounded concurrency).
+      const laneFn = (e: Event) => `lane:${e.tenantId}`;
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withSubscriber("settle", {
+          events: ["trace_received"],
+          groupKeyFn: laneFn,
+          handler: vi.fn(),
+        })
+        .build();
+
+      const options = pipeline.eventSubscribers.get("settle")?.options;
+      expect(options?.groupKeyFn).toBe(laneFn);
+      expect(options?.groupKeyFn?.(event)).toBe("lane:project-1");
+    });
+
+    it("adapts a custom groupKeyFn onto a fold subscriber's reactor payload", () => {
+      // Fold/map subscribers dispatch with a { event, foldState } payload;
+      // the spec's event-shaped key must be adapted, not silently dropped —
+      // dropping it recreates the raw-subscriber gap on the reactor path.
+      const laneFn = (e: Event) => `lane:${e.tenantId}`;
+      const fold = createMockFoldProjectionDefinition<Event>("summary");
+      const pipeline = definePipeline<Event>()
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withFoldProjection("summary", fold)
+        .withSubscriber("settle", {
+          fold: "summary",
+          events: ["trace_received"],
+          groupKeyFn: laneFn,
+          handler: vi.fn(),
+        })
+        .build();
+
+      const reactorGroupKeyFn =
+        pipeline.foldReactors?.get("settle")?.definition.options?.groupKeyFn;
+      expect(reactorGroupKeyFn?.({ event, foldState: {} })).toBe(
+        "lane:project-1",
+      );
+    });
+
     it("preserves the full deduplication contract on a raw subscriber", () => {
       const pipeline = definePipeline<Event>()
         .withName("test-pipeline")

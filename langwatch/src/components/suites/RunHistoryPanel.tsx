@@ -49,8 +49,10 @@ import {
   groupRunsByTarget,
   resolveOriginLabel,
 } from "./run-history-transforms";
+import { ScenarioRunExportDialog } from "./ScenarioRunExportDialog";
 import { useAutoExpansion } from "./useAutoExpansion";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
+import { useExportScenarioRuns } from "./useExportScenarioRuns";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
@@ -133,6 +135,7 @@ export function RunHistoryPanel({
 
   // Pagination
   const startDateMs = period.startDate.getTime();
+  const endDateMs = period.endDate.getTime();
   const {
     allRuns,
     allScenarioSetIds,
@@ -142,6 +145,26 @@ export function RunHistoryPanel({
     error,
     refetch,
   } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
+
+  // CSV export, scoped to whatever this panel is currently showing.
+  const {
+    isDialogOpen: isExportDialogOpen,
+    openExportDialog,
+    closeExportDialog,
+    startExport,
+    isExporting,
+    progress: exportProgress,
+    cancelExport,
+  } = useExportScenarioRuns({
+    projectId: project?.id,
+    scenarioSetId,
+    scenarioId: filters.scenarioId || undefined,
+    passFailStatus: filters.passFailStatus
+      ? (filters.passFailStatus as "pass" | "fail" | "stalled")
+      : undefined,
+    startDate: startDateMs,
+    endDate: endDateMs,
+  });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -423,6 +446,19 @@ export function RunHistoryPanel({
           onGroupByChange={setGroupBy}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onExport={openExportDialog}
+          // totals.runCount counts the pages fetched so far, not what the
+          // server would export, so it is never compared against a total —
+          // that would block a valid export of a longer history.
+          //
+          // Zero only means "nothing matched" once there is nothing left to
+          // fetch. Filter to a scenario whose runs sit on a later page and the
+          // loaded pages hold none of them, while the server-side sweep would
+          // return every one — so `hasMore` is what makes the zero definitive.
+          isExportDisabled={isLoading || (totals.runCount === 0 && !hasMore)}
+          isExporting={isExporting}
+          exportProgress={exportProgress}
+          onCancelExport={cancelExport}
         />
       </Box>
 
@@ -551,6 +587,14 @@ export function RunHistoryPanel({
           )}
         </VStack>
       )}
+
+      <ScenarioRunExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={closeExportDialog}
+        onExport={startExport}
+        runCount={totals.runCount}
+        hasFiltersApplied={hasFiltersApplied}
+      />
     </VStack>
   );
 }
