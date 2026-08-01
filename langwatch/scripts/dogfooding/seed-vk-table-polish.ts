@@ -25,6 +25,7 @@ import { dirname, resolve } from "node:path";
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import { nextResetAt } from "~/server/gateway/budgetWindow";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
 const TAG = "vkpolish";
@@ -52,8 +53,16 @@ async function resolveTarget(wanted?: string): Promise<SeedTarget> {
   if (!org) throw new Error("no organization in this database");
   const project = org.teams[0]?.projects[0];
   if (!project) throw new Error("no team/project in this database");
-  const user = await prisma.user.findFirst();
-  if (!user) throw new Error("no user in this database");
+  // A member of THIS organization: the id becomes `actorUserId` on the keys
+  // and `createdById` on the budgets, so an unrelated user would stamp rows
+  // with an actor who cannot see them.
+  const membership = await prisma.organizationUser.findFirst({
+    where: { organizationId: org.id },
+    select: { userId: true },
+  });
+  if (!membership) {
+    throw new Error(`organization ${org.name} has no members to act as`);
+  }
 
   const [policy, group] = await Promise.all([
     prisma.routingPolicy.findFirst({ where: { organizationId: org.id } }),
@@ -63,7 +72,7 @@ async function resolveTarget(wanted?: string): Promise<SeedTarget> {
   return {
     organizationId: org.id,
     projectId: project.id,
-    userId: user.id,
+    userId: membership.userId,
     routingPolicyId: policy?.id ?? null,
     groupId: group?.id ?? null,
   };
@@ -74,34 +83,48 @@ async function resolveTarget(wanted?: string): Promise<SeedTarget> {
  * the last run's traffic produced. The rollup is a materialized-view
  * target, so deleting the source events does not cascade; both need the
  * sweep or the next run's bar reads the last run's money.
+ *
+ * ClickHouse goes first, and a failure there aborts before Postgres is
+ * touched: the key ids are the only handle on those rows, so deleting the
+ * keys first and then failing would strand the spend permanently. The
+ * deletes are synchronous for the same reason: an accepted-but-unfinished
+ * mutation is indistinguishable from a completed one, and the next run
+ * would read the old money.
  */
 async function purgePrevious(target: SeedTarget) {
   const previous = await prisma.virtualKey.findMany({
     where: { organizationId: target.organizationId, name: { startsWith: TAG } },
     select: { id: true },
   });
+
+  if (previous.length > 0) {
+    const client = await getClickHouseClientForProject(target.projectId);
+    if (!client) {
+      throw new Error(
+        `refusing to delete ${previous.length} previous fixture key(s): no ClickHouse client for ${target.projectId}, so their ledger and rollup rows would be stranded`,
+      );
+    }
+    for (const table of [
+      "gateway_budget_ledger_events",
+      "gateway_budget_scope_totals",
+    ]) {
+      await client.command({
+        query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String} AND ScopeId IN ({ids:Array(String)})`,
+        query_params: {
+          tenantId: target.projectId,
+          ids: previous.map((k) => k.id),
+        },
+        clickhouse_settings: { mutations_sync: "2" },
+      });
+    }
+  }
+
   await prisma.gatewayBudget.deleteMany({
     where: { organizationId: target.organizationId, name: { startsWith: TAG } },
   });
   await prisma.virtualKey.deleteMany({
     where: { organizationId: target.organizationId, name: { startsWith: TAG } },
   });
-  if (previous.length === 0) return;
-
-  const client = await getClickHouseClientForProject(target.projectId);
-  if (!client) return;
-  for (const table of [
-    "gateway_budget_ledger_events",
-    "gateway_budget_scope_totals",
-  ]) {
-    await client.command({
-      query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String} AND ScopeId IN ({ids:Array(String)})`,
-      query_params: {
-        tenantId: target.projectId,
-        ids: previous.map((k) => k.id),
-      },
-    });
-  }
 }
 
 async function createKeys(target: SeedTarget): Promise<Map<string, string>> {
@@ -145,7 +168,9 @@ async function createInheritedBudgets(target: SeedTarget) {
   const common = {
     organizationId: target.organizationId,
     createdById: target.userId,
-    resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    // The same computation the service uses, so a monthly budget shows a
+    // month boundary rather than "resets in about 24 hours".
+    resetsAt: nextResetAt("MONTH"),
   };
   await prisma.gatewayBudget.create({
     data: {

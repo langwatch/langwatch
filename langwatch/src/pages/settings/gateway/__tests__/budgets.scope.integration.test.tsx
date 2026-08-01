@@ -94,10 +94,10 @@ const BUDGETS = [
       memberCount: 4,
     },
   }),
-  // The remaining kinds the Scope column can be asked to render. Without
-  // them a mislabelled chip would pass unnoticed: unmapped kinds fall back
-  // to the PROJECT style, so PRINCIPAL and TEAM would silently render as
-  // a project folder.
+  // The remaining kinds the Scope column can be asked to render, so every
+  // kind in the enum is exercised through the page. Which chip STYLE each
+  // one gets is asserted where it is observable without a portal, in
+  // budgets.scopeChipDetail.unit.test.ts.
   budget({
     id: "bdg-team",
     name: "team cap",
@@ -168,7 +168,7 @@ describe("budgets list scope column", () => {
     const row = rowFor("org cap");
     expect(within(row).getByText("ACME")).toBeInTheDocument();
     // The identifier moved into the tooltip, so it must not appear on the
-    // visible line in ANY form — matching the bare id, not the old
+    // visible line in ANY form. Matching the bare id, not the old
     // parenthesized rendering, is what makes this assertion able to fail.
     expect(within(row).queryByText(/acme-HXECRq/)).not.toBeInTheDocument();
     expect(within(row).queryByText("organization")).not.toBeInTheDocument();

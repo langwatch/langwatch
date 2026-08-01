@@ -117,8 +117,9 @@ export function SectionNavigationFrame({
             >
               {navigationItems.map((item) => (
                 // Each link keeps its intrinsic width in the horizontal
-                // strip; without this they share the row equally and every
-                // label truncates.
+                // strip. Without it the links shrink to fit the viewport
+                // instead of overflowing, so the strip never scrolls and the
+                // labels are squeezed.
                 <Box key={`${item.href}:${item.label}`} flexShrink={0}>
                   <MenuLink
                     href={item.href}

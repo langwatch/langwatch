@@ -54,16 +54,18 @@ function fillColorFor(ratio: number): string {
 /**
  * Current-period spend against the budget a key carries on itself, in
  * the trace table's meter style. Only keys with a budget of their own
- * render one — an empty track under every other key would read as a
- * limit that is not there.
+ * render one, because an empty track under every other key would read as
+ * a limit that is not there.
  */
 export function VirtualKeyBudgetBar({
   value,
   virtualKeyId,
 }: {
-  value: VirtualKeyBudgetBarValue;
+  value: VirtualKeyBudgetBarValue | undefined;
   virtualKeyId: string;
 }) {
+  if (!value) return null;
+
   const limit = Number.parseFloat(value.limitUsd);
   const spent =
     value.periodSpentUsd === null

@@ -45,6 +45,10 @@ export function MeterBar({
         <Box
           height="full"
           width={`${Math.min(fillRatio, 1) * 100}%`}
+          // The clamped ratio, readable without resolving styling. The width
+          // above is the same number, but reading it back means depending on
+          // whether the styling layer inlines the value or emits a class.
+          data-fill-ratio={Math.min(fillRatio, 1)}
           bg={fillColor}
           borderRadius="full"
         />

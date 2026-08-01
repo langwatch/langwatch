@@ -4,7 +4,7 @@
  * The behaviour is entirely a media query: the rail is a fixed 220px
  * column from `md` up and a full-width strip below it. jsdom evaluates no
  * media queries, so a jsdom assertion on the responsive values can only
- * ever restate the props — it passes whether or not the breakpoint works.
+ * ever restate the props: it passes whether or not the breakpoint works.
  * This drives a real browser at two widths and measures the boxes.
  *
  * @see specs/navigation/shared-section-navigation-layout.feature

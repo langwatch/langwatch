@@ -36,7 +36,7 @@ describe("<MeterBar />", () => {
   describe("given no reading to show", () => {
     it("renders the bare track for null", () => {
       // Null is "we could not total this", which must not look like zero
-      // spend rendered at zero width — it looks like an empty track either
+      // spend rendered at zero width. It looks like an empty track either
       // way, but nothing is drawn on top of it.
       expect(renderBar(null).fill).toBeNull();
     });
@@ -50,13 +50,13 @@ describe("<MeterBar />", () => {
 
   describe("given a reading inside the track", () => {
     it("fills that proportion of the width", () => {
-      expect(renderBar(0.5).fill).toHaveStyle({ width: "50%" });
+      expect(renderBar(0.5).fill).toHaveAttribute("data-fill-ratio", "0.5");
     });
   });
 
   describe("given a reading past the end of the track", () => {
     it("clamps the fill to a full track", () => {
-      expect(renderBar(1.5).fill).toHaveStyle({ width: "100%" });
+      expect(renderBar(1.5).fill).toHaveAttribute("data-fill-ratio", "1");
     });
   });
 });

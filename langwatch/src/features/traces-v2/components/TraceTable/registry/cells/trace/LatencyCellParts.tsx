@@ -28,7 +28,7 @@ function LatencyBar({
 }: LatencyBarProps) {
   const ratio = hasStats && valueMs > 0 ? valueMs / p95Ms : null;
   return (
-    // Right-anchored fill — latency columns are right-aligned, so the bar
+    // Right-anchored fill, because latency columns are right-aligned so the bar
     // visually connects to the value above it rather than floating off to
     // the left side of the cell.
     <MeterBar

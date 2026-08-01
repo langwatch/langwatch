@@ -177,9 +177,18 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
     /** @scenario "A key with no budget still reports what it spent" */
     it("never reports spend on its own budget", async () => {
       const budgets = await load();
-      for (const keyId of NEVER_USED_KEY_IDS) {
+      const rows = NEVER_USED_KEY_IDS.flatMap((keyId) => {
         const row = budgets.get(keyId);
-        if (!row) continue; // no direct budget: no bar to be wrong about
+        return row ? [{ keyId, row }] : [];
+      });
+
+      // Without this the loop below is vacuous: a regression that dropped
+      // every direct budget would leave nothing to assert and pass. The
+      // unused neighbour carries its own VIRTUAL_KEY budget, so at least
+      // one row has to be here.
+      expect(rows.length).toBeGreaterThan(0);
+
+      for (const { keyId, row } of rows) {
         expect(
           Number(row.periodSpentUsd),
           `key ${keyId} has never been used but its budget bar reads ${row.periodSpentUsd}`,

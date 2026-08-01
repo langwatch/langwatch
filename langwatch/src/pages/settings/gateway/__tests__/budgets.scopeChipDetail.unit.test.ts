@@ -61,6 +61,36 @@ describe("scopeChipDetail", () => {
     });
   });
 
+  describe("given each scope kind the Budgets page can render", () => {
+    /**
+     * `ProviderScopeChips` falls back to the PROJECT style for any kind it
+     * does not map, and the fallback still prints the name, so a chip that
+     * lost its own icon and colour looks right on the page. The kind named
+     * in the tooltip is the one place the mapping is observable.
+     *
+     * @scenario "Budget list Scope column renders the shared scope chip on one line"
+     */
+    it("names its own kind rather than falling back to Project", () => {
+      const cases: Array<[Parameters<typeof scopeChipTooltip>[0], string]> = [
+        [{ scopeType: "ORGANIZATION", name: "ACME" }, "Organization: ACME"],
+        [{ scopeType: "TEAM", name: "Platform" }, "Team: Platform"],
+        [{ scopeType: "PROJECT", name: "Web App" }, "Project: Web App"],
+        [{ scopeType: "GROUP", name: "Engineering" }, "Group: Engineering"],
+        [
+          { scopeType: "PRINCIPAL", name: "Ada Lovelace" },
+          "Person: Ada Lovelace",
+        ],
+        [
+          { scopeType: "VIRTUAL_KEY", name: "Scenario CI" },
+          "Virtual key: Scenario CI",
+        ],
+      ];
+      for (const [entry, expected] of cases) {
+        expect(scopeChipTooltip(entry)).toBe(expected);
+      }
+    });
+  });
+
   describe("given a target with nothing to add", () => {
     it("leaves the tooltip at kind and name", () => {
       const detail = scopeChipDetail({
