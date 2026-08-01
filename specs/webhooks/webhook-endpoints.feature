@@ -304,6 +304,13 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then a load-more control passes that cursor back for the next page
 
     @integration
+    Scenario: Load more appends the next page below the loaded rows
+      Given a loaded first page and a second page behind its cursor
+      When the load-more control is used
+      Then both pages' rows are visible together
+      And rows the reader already scanned keep their position
+
+    @integration
     Scenario: No Load more when the page is the last
       Given a deliveries page with no next cursor
       Then no load-more control is shown
