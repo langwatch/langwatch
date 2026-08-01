@@ -21,6 +21,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import {
   GatewaySpendEventsRepository,
   type SpendEventRow,
@@ -289,6 +290,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
     await prisma.team.deleteMany({
       where: { organizationId: { in: organizationIds } },
+    });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: organization.id },
     });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.organization.deleteMany({
@@ -609,13 +613,78 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         cost: { total_usd: string };
         request_count: number;
         usage: { input_tokens: number };
-        cap: null;
+        caps: unknown[];
       };
     };
     expect(Number(body.data.cost.total_usd)).toBeCloseTo(0.05, 6);
     expect(body.data.request_count).toBe(2);
     expect(body.data.usage.input_tokens).toBe(200);
-    expect(body.data.cap).toBeNull();
+    // No attributed-user template in this org: the caps list is empty,
+    // never null, so consumers can iterate without a shape branch.
+    expect(body.data.caps).toEqual([]);
+  });
+
+  /** @scenario The end-user spend endpoint returns spend and the applicable cap together */
+  it("returns the applicable template caps beside the usage rollup", async () => {
+    const templateAnchor = `vk-caps-${ns}`;
+    const template = await prisma.gatewayBudget.create({
+      data: {
+        organizationId: organization.id,
+        scopeType: "ATTRIBUTED_USER",
+        scopeId: templateAnchor,
+        name: `per-user-${ns}`,
+        window: "MONTH",
+        limitUsd: "100",
+        onBreach: "BLOCK",
+        resetsAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+        currentPeriodStartedAt: new Date(Date.now() - 60_000),
+        createdById: userId,
+      },
+    });
+    const budgetCH = new GatewayBudgetClickHouseRepository(
+      async () => chClient,
+    );
+    await budgetCH.insertDebitsForBudgets([
+      {
+        tenantId: project.id,
+        budgetId: template.id,
+        scope: "ATTRIBUTED_USER",
+        scopeId: `${templateAnchor}:${ns}-user-caps`,
+        window: "MONTH",
+        virtualKeyId: templateAnchor,
+        providerKey: null,
+        gatewayRequestId: `${ns}-caps-req`,
+        amountUsd: "12.500000",
+        tokensInput: 10,
+        tokensOutput: 5,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        model: "gpt-x",
+        durationMs: 10,
+        status: "SUCCESS",
+        occurredAt: new Date(),
+      },
+    ]);
+    const res = await app.request(
+      `/api/gateway/v1/end-users/${ns}-user-caps/spend?from=${baseTime}&to=${baseTime + 60_000}`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        caps: Array<{
+          budget_id: string;
+          anchor_id: string;
+          limit_usd: string;
+          spent_usd: string;
+        }>;
+      };
+    };
+    const cap = body.data.caps.find((c) => c.budget_id === template.id);
+    expect(cap).toBeDefined();
+    expect(cap!.anchor_id).toBe(templateAnchor);
+    expect(Number.parseFloat(cap!.limit_usd)).toBe(100);
+    expect(Number.parseFloat(cap!.spent_usd)).toBeCloseTo(12.5, 3);
   });
 
   /** @scenario A virtual key filter narrows the rollup */

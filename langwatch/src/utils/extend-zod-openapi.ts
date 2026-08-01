@@ -2,6 +2,7 @@ import {
   ZodArray,
   ZodBoolean,
   ZodEnum,
+  ZodLazy,
   ZodNumber,
   ZodObject,
   ZodRecord,
@@ -42,6 +43,10 @@ export const patchZodOpenapi = () => {
     };
 
     ZodUnion.prototype.openapi = function () {
+      return this;
+    };
+
+    ZodLazy.prototype.openapi = function () {
       return this;
     };
   }

@@ -1160,63 +1160,6 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
   // ── Per-key spend ─────────────────────────────────────────────────────
 
-  describe("end-user spend read", () => {
-    /** @scenario The end-user spend endpoint returns spend and the applicable cap together */
-    it("returns the bucket's spend with the template's limit", async () => {
-      const vk = await createVk({ name: `attr-anchor-${suffix}` });
-      const anchorId = vk.body.virtual_key.id as string;
-      const templateRes = await post(
-        "/api/gateway/v1/budgets",
-        {
-          scope: { kind: "ATTRIBUTED_USER", anchor_virtual_key_id: anchorId },
-          name: `per-user-${suffix}`,
-          window: "MONTH",
-          limit_usd: 100,
-        },
-        legacyAuth(),
-      );
-      expect(templateRes.status).toBe(201);
-      const template = (await templateRes.json()).budget;
-
-      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
-      await chRepo.insertDebitsForBudgets([
-        {
-          tenantId: PROJECT_ID,
-          budgetId: template.id,
-          scope: "ATTRIBUTED_USER",
-          scopeId: `${anchorId}:enduser-rest-${suffix}`,
-          window: "MONTH",
-          virtualKeyId: anchorId,
-          providerKey: null,
-          gatewayRequestId: `req-attr-rest-${suffix}`,
-          amountUsd: "12.500000",
-          tokensInput: 100,
-          tokensOutput: 50,
-          tokensCacheRead: 0,
-          tokensCacheWrite: 0,
-          model: "gpt-x",
-          durationMs: 50,
-          status: "SUCCESS",
-          occurredAt: new Date(),
-        },
-      ]);
-
-      const res = await app.request(
-        `/api/gateway/v1/end-users/enduser-rest-${suffix}/spend`,
-        { headers: legacyAuth() },
-      );
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      const row = body.data.find(
-        (r: { budget_id: string }) => r.budget_id === template.id,
-      );
-      expect(row).toBeDefined();
-      expect(row.anchor_id).toBe(anchorId);
-      expect(Number.parseFloat(row.limit_usd)).toBe(100);
-      expect(Number.parseFloat(row.spent_usd)).toBeCloseTo(12.5, 3);
-    });
-  });
-
   describe("virtual key spend read", () => {
     /** @scenario A fresh key reports zero spend for the current month */
     it("returns an honest zero with the window echoed", async () => {

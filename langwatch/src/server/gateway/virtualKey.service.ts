@@ -525,6 +525,7 @@ export class VirtualKeyService {
       return vk;
     });
 
+    await emitVkLifecycle(this.prisma, { vk: rotated, action: "rotated" });
     return { virtualKey: rotated, secret: newSecret };
   }
 

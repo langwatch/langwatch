@@ -31,15 +31,10 @@ import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
-import { budgetPeriodFloorMs } from "~/server/gateway/budget.clickhouse.repository";
 import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
-import {
-  attributedUserBucketScopeId,
-  bucketScopeIdFor,
-} from "~/server/gateway/budgetResolution.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   chRepoOrUndefined,
@@ -1458,157 +1453,6 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
     }
   },
 );
-
-secured.access(apiKeyPermission("gatewayBudgets:view")).get(
-  "/end-users/:end_user_id/spend",
-  describeRoute({
-    summary: "End-user spend",
-    description:
-      "Current spend and the applicable per-end-user cap for one external end-user id, resolved against the attributed-user templates the caller's organization runs. The pair a rebilling platform polls at period close or renders in its own UI. `anchor_virtual_key_id` narrows to one template when several anchors carry one.",
-    tags: ["Budgets"],
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Spend and cap",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                data: z.array(
-                  z.object({
-                    budget_id: z.string(),
-                    anchor_id: z.string(),
-                    window: z.string(),
-                    on_breach: z.enum(["BLOCK", "WARN"]),
-                    limit_usd: z.string(),
-                    spent_usd: z.string(),
-                    period_started_at: z.string(),
-                  }),
-                ),
-              }),
-            ),
-          },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const project = c.get("project");
-    const endUserId = c.req.param("end_user_id");
-    const anchorFilter = c.req.query("anchor_virtual_key_id") ?? null;
-    const organizationId = await orgIdForProject(project.id);
-    const chRepo = chRepoOrUndefined();
-    const templates = await prisma.gatewayBudget.findMany({
-      where: {
-        organizationId,
-        scopeType: "ATTRIBUTED_USER",
-        archivedAt: null,
-        ...(anchorFilter ? { scopeId: anchorFilter } : {}),
-      },
-    });
-    if (templates.length === 0 || !chRepo) {
-      return c.json({ data: [] });
-    }
-    const projects = await prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
-    });
-    const boundaries = await prisma.gatewayBudgetBucketBoundary.findMany({
-      where: {
-        organizationId,
-        budgetId: { in: templates.map((t) => t.id) },
-      },
-    });
-    const boundaryByKey = new Map(
-      boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),
-    );
-    try {
-      const spends = await chRepo.getSpendForTargetsAcrossTenants(
-        projects.map((p) => p.id),
-        attributedUserSpendTargets({ templates, endUserId, boundaryByKey }),
-      );
-      return c.json({
-        data: attributedUserBucketRows({
-          templates,
-          endUserId,
-          boundaryByKey,
-          spentByBudget: new Map(
-            spends.map((sp) => [sp.budgetId, sp.spentUsd]),
-          ),
-        }),
-      });
-    } catch (error) {
-      return trpcErrorResponse(c, error);
-    }
-  },
-);
-
-/** The bucket one attributed-user template resolves to for a given end
- *  user. */
-function attributedUserBucketKey(
-  template: GatewayBudget,
-  endUserId: string,
-): string {
-  return bucketScopeIdFor(
-    template,
-    attributedUserBucketScopeId(template.scopeId, endUserId),
-  );
-}
-
-/** One spend-read target per template, floored at the later of the
- *  template's own period floor and the bucket boundary's period start. */
-function attributedUserSpendTargets(params: {
-  templates: GatewayBudget[];
-  endUserId: string;
-  boundaryByKey: Map<string, { periodStartedAt: Date }>;
-}) {
-  return params.templates.map((template) => {
-    const bucketScopeId = attributedUserBucketKey(template, params.endUserId);
-    const floors = [
-      budgetPeriodFloorMs(template),
-      params.boundaryByKey
-        .get(`${template.id}:${bucketScopeId}`)
-        ?.periodStartedAt.getTime(),
-    ].filter((n): n is number => typeof n === "number");
-    return {
-      budgetId: template.id,
-      scope: template.scopeType,
-      scopeId: bucketScopeId,
-      window: template.window,
-      match: "exact" as const,
-      periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
-    };
-  });
-}
-
-/** One response row per template: the bucket's window and limit, the spend
- *  read for it, and the period the bucket is currently in. */
-function attributedUserBucketRows(params: {
-  templates: GatewayBudget[];
-  endUserId: string;
-  boundaryByKey: Map<string, { periodStartedAt: Date }>;
-  spentByBudget: Map<string, string>;
-}) {
-  return params.templates.map((template) => {
-    const bucketScopeId = attributedUserBucketKey(template, params.endUserId);
-    const boundary = params.boundaryByKey.get(
-      `${template.id}:${bucketScopeId}`,
-    );
-    const periodStart =
-      boundary?.periodStartedAt ?? template.currentPeriodStartedAt;
-    return {
-      budget_id: template.id,
-      anchor_id: template.scopeId,
-      window: template.window,
-      on_breach: template.onBreach,
-      limit_usd: template.limitUsd.toString(),
-      spent_usd: params.spentByBudget.get(template.id) ?? "0",
-      period_started_at: periodStart.toISOString(),
-    };
-  });
-}
-
-// ── Provider credentials — update + disable ────────────────────────────
 
 secured.access(apiKeyPermission("gatewayProviders:update")).patch(
   "/providers/:id",

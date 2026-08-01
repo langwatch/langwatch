@@ -57,7 +57,14 @@ export type CreateGatewayBudgetScope =
   | { kind: "PROJECT"; project_id: string }
   | { kind: "VIRTUAL_KEY"; virtual_key_id: string }
   | { kind: "PRINCIPAL"; principal_user_id: string }
-  | { kind: "GROUP"; group_id: string };
+  | { kind: "GROUP"; group_id: string }
+  // Template: each distinct external end user on the anchor gets the
+  // budget's limit per window. Exactly one anchor id.
+  | {
+      kind: "ATTRIBUTED_USER";
+      anchor_virtual_key_id?: string;
+      anchor_project_id?: string;
+    };
 
 export interface CreateGatewayBudgetInput {
   scope: CreateGatewayBudgetScope;
@@ -93,16 +100,21 @@ export class GatewayBudgetsApiError extends Error {
 export class GatewayBudgetsApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  private readonly projectId: string | undefined;
 
-  constructor(config?: { endpoint?: string; apiKey?: string }) {
+  constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
     this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
+      // Org-anchored API keys carry no project of their own; the surface
+      // scopes on this header. Absent for project keys, which self-scope.
+      ...(this.projectId ? { "X-Project-Id": this.projectId } : {}),
     };
   }
 

@@ -1189,6 +1189,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	// Fail-closed attribution: the request is missing a required field
+	// (the end-user id) while a per-end-user template is active. A
+	// request-shape error like the two around it, so 400 per the house
+	// table; unregistered it fell to 500 and read as a platform bug.
+	herr.RegisterStatus(domain.ErrEndUserRequired, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)

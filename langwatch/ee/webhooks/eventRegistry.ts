@@ -68,6 +68,14 @@ export const WEBHOOK_EVENT_TYPES = [
     description: "A virtual key was created.",
   },
   {
+    type: "gateway.virtual_key.rotated",
+    family: "gateway",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "A virtual key's secret was rotated; the previous secret stays valid for its grace window.",
+  },
+  {
     type: "gateway.virtual_key.disabled",
     family: "gateway",
     schemaVersion: "1",
