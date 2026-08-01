@@ -491,7 +491,6 @@ function VirtualKeysPage() {
                                   value={budgetByKeyId.get(vk.id)}
                                   virtualKeyId={vk.id}
                                 />
-
                               </VStack>
                             </Table.Cell>
                             <Table.Cell>
