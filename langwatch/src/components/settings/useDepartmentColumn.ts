@@ -48,7 +48,6 @@ export function useDepartmentColumn(organizationId: string) {
     byUser,
     byTeam,
     byProject,
-    refetch: () =>
-      utils.departments.assignments.invalidate({ organizationId }),
+    refetch: () => utils.departments.assignments.invalidate({ organizationId }),
   };
 }

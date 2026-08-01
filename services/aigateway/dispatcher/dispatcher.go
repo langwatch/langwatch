@@ -46,6 +46,13 @@ type Dispatcher struct {
 type Options struct {
 	// Logger receives provider-routing telemetry. Optional; defaults to noop.
 	Logger *zap.Logger
+	// BlockLocalHTTPCalls applies the shared customer-egress SSRF policy.
+	BlockLocalHTTPCalls bool
+	// RequireHTTPSCustomerEndpoints is a hosted-cloud transport policy. It is
+	// intentionally independent of private-address blocking.
+	RequireHTTPSCustomerEndpoints bool
+	// AllowedEndpointHosts bypasses private-network blocking for exact hosts.
+	AllowedEndpointHosts []string
 }
 
 // New constructs a Dispatcher backed by Bifrost. Returns an error if
@@ -55,7 +62,10 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 		opts.Logger = zap.NewNop()
 	}
 	router, err := providers.NewBifrostRouter(ctx, providers.BifrostOptions{
-		Logger: opts.Logger,
+		Logger:                        opts.Logger,
+		BlockLocalHTTPCalls:           opts.BlockLocalHTTPCalls,
+		RequireHTTPSCustomerEndpoints: opts.RequireHTTPSCustomerEndpoints,
+		AllowedEndpointHosts:          opts.AllowedEndpointHosts,
 	})
 	if err != nil {
 		return nil, err

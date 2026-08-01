@@ -6,7 +6,7 @@
  * Verifies that clicking a run row opens the drawer instead of navigating.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExternalSetDetailPanel } from "../ExternalSetDetailPanel";
 
@@ -39,6 +39,23 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(() => ({
+    connectionState: "disconnected",
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  })),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
@@ -48,9 +65,19 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
+      },
+      getSuiteRunFreshness: {
+        useQuery: vi.fn(() => ({ data: undefined })),
       },
       getAll: {
         useQuery: () => ({ data: undefined, isLoading: false, error: null }),
@@ -89,7 +116,16 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, { wrapper: Wrapper });
+      render(
+        <ExternalSetDetailPanel
+          scenarioSetId="ext-set-1"
+          period={{
+            startDate: new Date("2025-01-01"),
+            endDate: new Date("2025-01-31"),
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
 
       // Row is auto-expanded, so click the scenario run card directly
       const scenarioCard = screen.getByLabelText(/View details for/);
@@ -103,18 +139,27 @@ describe("<ExternalSetDetailPanel/>", () => {
   });
 
   describe("given loading state", () => {
-    it("displays loading spinner", () => {
+    it("displays skeleton placeholders", () => {
       mockRunDataQuery.mockReturnValue({
         data: undefined,
         isLoading: true,
         error: null,
       });
 
-      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ExternalSetDetailPanel
+          scenarioSetId="ext-set-1"
+          period={{
+            startDate: new Date("2025-01-01"),
+            endDate: new Date("2025-01-31"),
+          }}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
-      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+      expect(screen.getByTestId("run-history-skeleton")).toBeInTheDocument();
     });
   });
 });

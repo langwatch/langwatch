@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
-import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import {
   getCustomLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
+import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import { extractModelName } from "./utils/spanModel";
@@ -105,5 +105,4 @@ export class OtlpSpanCostEnrichmentService {
       });
     }
   }
-
 }

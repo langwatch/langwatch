@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
-import { generateLicenseKey } from "../../licensing/licenseGenerationService";
-import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
 import { getApp } from "../../../src/server/app-layer/app";
-import { createLogger } from "../../../src/utils/logger";
+import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
+import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
 

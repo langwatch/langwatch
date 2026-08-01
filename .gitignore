@@ -51,16 +51,18 @@ prompts/**
 # Chainlit
 .chainlit
 
-# Claude Code personal settings
-**/.claude/settings.local.json
+# Claude Code personal settings (the wildcard also catches editor/tool backup
+# copies like settings.local.json.bak-*, which carry the same secrets)
+**/.claude/settings.local.json*
 **/.claude/agent-memory/
 **/.claude/projects/
 .claude/scheduled_tasks.lock
 .claude/skills/local-*/
-# Per-iter QA / dogfood notes are workspace-local. Durable proof
-# belongs in docs/ or specs/; transient transcripts and screenshots
-# stay untracked.
-.claude/qa-*/
+# Per-iter QA / dogfood notes, probes, and seed scripts are
+# workspace-local, in any package's .claude/ directory. Durable proof
+# belongs in docs/ or specs/; transient transcripts, screenshots, and
+# scripts stay untracked.
+**/.claude/qa-*
 
 # PR body draft checkpoints — coordinated through the agent channel
 # before any `gh pr edit`. Live PR body is the source of truth.
@@ -86,10 +88,14 @@ browser-tests/
 # README.md is the exception — it documents the .claude/ layout itself.
 .claude/*.md
 !.claude/README.md
-# PR description documents are the canonical reviewer artifact for the
-# branch they describe — graduated from local notes to tracked content
-# per @rchaves directive 2026-04-27.
-!.claude/PR-*.md
+# No un-ignore for PR-*.md here. Git matches ignore patterns
+# case-insensitively when core.ignorecase is on, which is the default on
+# macOS, so that glob also un-ignored scratch files named pr-*.md and
+# committed them: .claude/pr-body-current.md and .claude/pr-body-new.md
+# reached main that way. It protected nothing, since no .claude/PR-*.md is
+# tracked and the rules further down re-ignore the canonical names anyway.
+# To track a specific PR document, add a negation for its exact name below
+# those rules, or `git add -f` it.
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
@@ -125,7 +131,11 @@ uuid
 
 # PR-body screenshots live in the github.com/langwatch/pr-screenshots repo,
 # referenced by raw URL from the PR body — never committed to the product tree.
-langwatch/pr-screenshots/
+# Match any depth and both the plain and dot-prefixed spellings: the earlier
+# path-anchored rule missed `langwatch/.pr-screenshots/`, which is how 30+ PNGs
+# reached main.
+**/pr-screenshots/
+**/.pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
 langwatch/e2e/langy/scenario-logs/
@@ -136,3 +146,15 @@ langwatch/e2e/langy/scenario-logs/
 
 # Dev server logs
 server.log
+
+# thuishaven (portless local dev)
+.langwatch-slug
+.haven.json
+/bin/haven
+langwatch/dev.log
+.claude/tmp/
+
+# Biome gate artifacts (.github/workflows/langwatch-app-ci.yml lint job)
+/biome.raw.json
+/biome.rdjson
+/biome.posted.json

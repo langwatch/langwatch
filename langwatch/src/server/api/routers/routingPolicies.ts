@@ -9,15 +9,15 @@
  * (members can list). Mirrors the existing gatewayProviders router
  * pattern.
  */
-import { RoutingPolicyScopeType } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
 } from "@ee/governance/services/routingPolicy.service";
+import { RoutingPolicyScopeType } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -96,7 +96,10 @@ export const routingPoliciesRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         modelProviderIds: z
           .array(z.string())
-          .min(1, "Routing policy must reference at least one provider credential"),
+          .min(
+            1,
+            "Routing policy must reference at least one provider credential",
+          ),
         modelAllowlist: z.array(z.string()).nullable().optional(),
         strategy: strategySchema.default("priority"),
         isDefault: z.boolean().default(false),
@@ -135,7 +138,10 @@ export const routingPoliciesRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         modelProviderIds: z
           .array(z.string())
-          .min(1, "Routing policy must reference at least one provider credential")
+          .min(
+            1,
+            "Routing policy must reference at least one provider credential",
+          )
           .optional(),
         modelAllowlist: z.array(z.string()).nullable().optional(),
         strategy: strategySchema.optional(),
@@ -181,7 +187,10 @@ export const routingPoliciesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("routingPolicies:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
-      await service.delete({ id: input.id, organizationId: input.organizationId });
+      await service.delete({
+        id: input.id,
+        organizationId: input.organizationId,
+      });
       return { ok: true };
     }),
 });

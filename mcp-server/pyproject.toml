@@ -16,5 +16,13 @@ dependencies = [
 [tool.uv]
 exclude-newer = "7 days"
 
+# Transitive-dependency security pins. Keep these even when the importing
+# package isn't a direct dependency, so a future re-resolution can't silently
+# pull a vulnerable version back in.
+constraint-dependencies = [
+    "python-dotenv>=1.2.2",  # security: python-dotenv advisory (#934)
+    "python-liquid>=2.2.1",  # security: python-liquid advisory (#1528)
+]
+
 [tool.uv.sources]
 langwatch = { path = "../python-sdk", editable = true }

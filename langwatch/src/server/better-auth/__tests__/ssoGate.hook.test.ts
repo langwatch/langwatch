@@ -29,7 +29,7 @@ const { loggerMock } = vi.hoisted(() => ({
     debug: vi.fn(),
   },
 }));
-vi.mock("../../../utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 

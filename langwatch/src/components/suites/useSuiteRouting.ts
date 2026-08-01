@@ -33,11 +33,82 @@ export function toExternalSetSelection(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
 }
 
+/**
+ * The URL a simulations path should be sent to instead of rendered, or null to
+ * render it as it stands.
+ *
+ * Everything under /simulations that is not a known shape is read as an
+ * external SET slug, so a near-miss URL does not fail — it quietly renders the
+ * run history for a set that does not exist, which reads as "your thing isn't
+ * here". `/simulations/scenarios/<id>` is the near-miss that matters: the
+ * scenario library is a real page one segment away, and a link built by hand
+ * (or by an agent) lands on it constantly. Send those to the library with the
+ * scenario open rather than to an empty set.
+ *
+ * Pure and exported so the redirect rules are testable without a router.
+ */
+export function resolveSimulationsRedirect({
+  projectSlug,
+  segments,
+  query,
+}: {
+  projectSlug: string;
+  segments: string[];
+  query: Record<string, unknown>;
+}): string | null {
+  const base = `/${projectSlug}/simulations`;
+  const [first, second, third] = segments;
+
+  // The scenario LIBRARY, not a simulation set. `/simulations/scenarios` itself
+  // is a route of its own, so only the near-misses reach here.
+  if (first === "scenarios" || first === "scenario") {
+    return second
+      ? `${base}/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(second)}`
+      : `${base}/scenarios`;
+  }
+
+  if (first === "suites") {
+    const suite = query.suite;
+    const externalSet = query.externalSet;
+    if (typeof suite === "string" && suite) return `${base}/run-plans/${suite}`;
+    if (typeof externalSet === "string" && externalSet) {
+      return `${base}/${externalSet}`;
+    }
+    return base;
+  }
+
+  // /setId/batchId/scenarioRunId → the set + batch, with the run's drawer open.
+  if (segments.length === 3 && first !== "run-plans") {
+    return `${base}/${first}/${second}?openRun=${third}`;
+  }
+
+  return null;
+}
+
 type SuiteRouting = {
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
   highlightBatchId: string | null;
 };
+
+/**
+ * Route params, rebuilt from the target selection rather than carried over.
+ */
+const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
+
+/**
+ * Whether a query param carries over when the sidebar selection changes.
+ *
+ * The date window (`period`, or `startDate` plus `endDate`) and the
+ * run-history view state (`groupBy`, `scenarioId`, `passFailStatus`) describe
+ * what the user is looking at rather than which set they picked, so they
+ * follow the selection. Dropping `period` snapped a widened window back to
+ * the 30-day default and hid the older run the user had widened the window to
+ * reach. An open drawer is the exception: it holds a run from the set being
+ * navigated away from.
+ */
+const survivesSelectionChange = (key: string): boolean =>
+  !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");
 
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
@@ -56,10 +127,11 @@ export function useSuiteRouting(): SuiteRouting {
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
 
-      // Preserve date params so period survives navigation
-      const dateParams: Record<string, string> = {};
-      if (typeof router.query.startDate === "string") dateParams.startDate = router.query.startDate;
-      if (typeof router.query.endDate === "string") dateParams.endDate = router.query.endDate;
+      const carriedParams: Record<string, string | string[]> = {};
+      for (const [key, value] of Object.entries(router.query)) {
+        if (value === undefined || !survivesSelectionChange(key)) continue;
+        carriedParams[key] = value;
+      }
 
       let pathSegments: string[];
       if (slug === ALL_RUNS_ID) {
@@ -70,14 +142,23 @@ export function useSuiteRouting(): SuiteRouting {
         pathSegments = ["run-plans", slug];
       }
 
-      const displayPath = pathSegments.length > 0
-        ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
-        : `/${projectSlug}/simulations`;
+      const displayPath =
+        pathSegments.length > 0
+          ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
+          : `/${projectSlug}/simulations`;
 
-      const dateQueryString = Object.entries(dateParams)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join("&");
-      const asUrl = dateQueryString ? `${displayPath}?${dateQueryString}` : displayPath;
+      const search = new URLSearchParams();
+      for (const [key, value] of Object.entries(carriedParams)) {
+        if (Array.isArray(value)) {
+          for (const item of value) search.append(key, item);
+        } else {
+          search.set(key, value);
+        }
+      }
+      const carriedQueryString = search.toString();
+      const asUrl = carriedQueryString
+        ? `${displayPath}?${carriedQueryString}`
+        : displayPath;
 
       // All routes are handled by the same [[...path]] page, so shallow works
       void router.push(
@@ -86,7 +167,7 @@ export function useSuiteRouting(): SuiteRouting {
           query: {
             project: projectSlug,
             ...(pathSegments.length > 0 ? { path: pathSegments } : {}),
-            ...dateParams,
+            ...carriedParams,
           },
         },
         asUrl,
@@ -106,13 +187,18 @@ export function deriveFromPath({
 }: {
   isReady: boolean;
   path: string | string[] | undefined;
-}): { selectedSuiteSlug: string | typeof ALL_RUNS_ID | null; highlightBatchId: string | null } {
+}): {
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  highlightBatchId: string | null;
+} {
   if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
 
   const rawSegments = Array.isArray(path) ? path : path ? [path] : [];
   // Drop segments that are actually query strings leaking in from the URL
   // (e.g. when a redirect fires before the catch-all has stripped "?foo=bar").
-  const segments = rawSegments.filter((s) => s && !s.startsWith("?") && !s.includes("="));
+  const segments = rawSegments.filter(
+    (s) => s && !s.startsWith("?") && !s.includes("="),
+  );
 
   // [] → All Runs
   if (segments.length === 0) {

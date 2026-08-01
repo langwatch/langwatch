@@ -47,8 +47,12 @@ const AddOrEditDatasetDrawer = lazyDefault({
   key: "AddOrEditDatasetDrawer",
 });
 const AutomationDrawer = lazyDefault({
-  factory: () => import("./AddAutomationDrawer"),
+  factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
+});
+const ViewAutomationDrawer = lazyDefault({
+  factory: () => import("~/features/automations/ViewAutomationDrawer"),
+  key: "ViewAutomationDrawer",
 });
 const AgentHistoryDrawer = lazyDefault({
   factory: () => import("./agents/AgentHistoryDrawer"),
@@ -66,6 +70,10 @@ const AgentWorkflowEditorDrawer = lazyDefault({
   factory: () => import("./agents/AgentWorkflowEditorDrawer"),
   key: "AgentWorkflowEditorDrawer",
 });
+const AgentWorkflowTargetEditorDrawer = lazyDefault({
+  factory: () => import("./agents/AgentWorkflowTargetEditorDrawer"),
+  key: "AgentWorkflowTargetEditorDrawer",
+});
 const AgentCodeEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentCodeEditorDrawerFromUrl",
@@ -77,10 +85,6 @@ const AgentHttpEditorDrawerFromUrl = lazyDefault({
 const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "WorkflowSelectorDrawerFromUrl",
-});
-const AlertDrawer = lazyDefault({
-  factory: () => import("./analytics/AlertDrawer"),
-  key: "AlertDrawer",
 });
 const DashboardNameDrawer = lazyDefault({
   factory: () => import("./analytics/DashboardNameDrawer"),
@@ -97,10 +101,6 @@ const UploadCSVDrawer = lazyDefault({
 const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
-});
-const SdkRadarDrawer = lazyDefault({
-  factory: () => import("./drawers/SdkRadarDrawer"),
-  key: "SdkRadarDrawer",
 });
 const EditAutomationFilterDrawer = lazyDefault({
   factory: () => import("./EditAutomationFilterDrawer"),
@@ -133,6 +133,10 @@ const EvaluatorEditorDrawer = lazyDefault({
 const EvaluatorHistoryDrawer = lazyDefault({
   factory: () => import("./evaluators/EvaluatorHistoryDrawer"),
   key: "EvaluatorHistoryDrawer",
+});
+const ComparisonLeaderboardDrawer = lazyDefault({
+  factory: () => import("./ComparisonLeaderboardDrawer"),
+  key: "ComparisonLeaderboardDrawer",
 });
 const EvaluatorListDrawer = lazyDefault({
   factory: () => import("./evaluators/EvaluatorListDrawer"),
@@ -177,6 +181,10 @@ const SeriesFiltersDrawer = lazyDefault({
 const CreateTeamDrawer = lazyDefault({
   factory: () => import("./settings/CreateTeamDrawer"),
   key: "CreateTeamDrawer",
+});
+const InviteMemberDrawer = lazyDefault({
+  factory: () => import("./settings/InviteMemberDrawer"),
+  key: "InviteMemberDrawer",
 });
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
@@ -226,6 +234,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
+  viewAutomation: ViewAutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
@@ -237,7 +246,6 @@ export const drawers = {
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
-  customGraphAlert: AlertDrawer,
   dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
@@ -249,8 +257,10 @@ export const drawers = {
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
+  agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
+  comparisonLeaderboard: ComparisonLeaderboardDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
@@ -269,11 +279,10 @@ export const drawers = {
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
+  inviteMember: InviteMemberDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
-  // SDK Radar
-  sdkRadar: SdkRadarDrawer,
   // Dev tools
   featureFlags: FeatureFlagsDrawer,
   // Ops

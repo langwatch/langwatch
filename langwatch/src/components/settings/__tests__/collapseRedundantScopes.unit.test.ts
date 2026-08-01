@@ -5,14 +5,32 @@ import {
   type ScopeChipPickerEntry,
 } from "../ScopeChipPicker";
 
-const ORG: ScopeChipPickerEntry = { scopeType: "ORGANIZATION", scopeId: "org-1" };
+const ORG: ScopeChipPickerEntry = {
+  scopeType: "ORGANIZATION",
+  scopeId: "org-1",
+};
 const TEAM_A: ScopeChipPickerEntry = { scopeType: "TEAM", scopeId: "team-a" };
 const TEAM_B: ScopeChipPickerEntry = { scopeType: "TEAM", scopeId: "team-b" };
-const PROJ_A1: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-a1" };
-const PROJ_A2: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-a2" };
-const PROJ_B1: ScopeChipPickerEntry = { scopeType: "PROJECT", scopeId: "proj-b1" };
-const DEPT_X: ScopeChipPickerEntry = { scopeType: "DEPARTMENT", scopeId: "dept-x" };
-const DEPT_Y: ScopeChipPickerEntry = { scopeType: "DEPARTMENT", scopeId: "dept-y" };
+const PROJ_A1: ScopeChipPickerEntry = {
+  scopeType: "PROJECT",
+  scopeId: "proj-a1",
+};
+const PROJ_A2: ScopeChipPickerEntry = {
+  scopeType: "PROJECT",
+  scopeId: "proj-a2",
+};
+const PROJ_B1: ScopeChipPickerEntry = {
+  scopeType: "PROJECT",
+  scopeId: "proj-b1",
+};
+const DEPT_X: ScopeChipPickerEntry = {
+  scopeType: "DEPARTMENT",
+  scopeId: "dept-x",
+};
+const DEPT_Y: ScopeChipPickerEntry = {
+  scopeType: "DEPARTMENT",
+  scopeId: "dept-y",
+};
 
 const ctx = {
   organizationId: "org-1",
@@ -98,7 +116,10 @@ describe("given the user is editing a multi-scope selection", () => {
     it("leaves sibling departments alone (a tile can target several)", () => {
       const prev = [DEPT_Y];
       const next = [DEPT_Y, DEPT_X];
-      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([DEPT_Y, DEPT_X]);
+      expect(collapseRedundantScopes(next, prev, ctx)).toEqual([
+        DEPT_Y,
+        DEPT_X,
+      ]);
     });
   });
 

@@ -1,4 +1,4 @@
-import { Box, HStack, Popover as ChakraPopover } from "@chakra-ui/react";
+import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -8,10 +8,10 @@ import {
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import type { ModelOption } from "~/server/topicClustering/types";
+import type { ModelOption } from "~/server/app-layer/topic-clustering/clustering.types";
+import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
 import { Popover } from "../ui/popover";
 import { LLMModelDisplay } from "./LLMModelDisplay";
-import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;

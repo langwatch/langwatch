@@ -1,18 +1,28 @@
-import type { Context, Next } from "hono";
-import {
-  createContextFromHono,
-  runWithContext,
-} from "../../../server/context/asyncContext";
+import { createLogger } from "@langwatch/observability";
 import {
   getStatusCodeFromError,
   logHttpRequest,
-} from "../../../server/middleware/requestLogging";
-import { createLogger } from "../../../utils/logger/server";
+} from "@langwatch/observability/request";
+import type { Context, Next } from "hono";
+import {
+  createContextFromHono,
+  getCurrentContext,
+  runWithContext,
+} from "../../../server/context/asyncContext";
 
 const logger = createLogger("langwatch:api:hono");
 
 export const loggerMiddleware = () => {
   return async (c: Context, next: Next): Promise<any> => {
+    // The async request context doubles as the "this request is already being
+    // handled" signal: the outermost logger establishes it below, so if it
+    // already exists this invocation is one of the duplicate middleware
+    // entries the SecuredApp families sharing basePath "/api" all register —
+    // every family's middleware matches every /api request. Also covers
+    // internal re-dispatches (legacy OAuth rewrite), which log once as the
+    // original request instead of twice.
+    if (getCurrentContext()) return next();
+
     // Create context from Hono context and run within it
     const ctx = createContextFromHono(c);
 

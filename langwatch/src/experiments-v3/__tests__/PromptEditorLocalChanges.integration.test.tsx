@@ -20,9 +20,15 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { LocalPromptConfig } from "../types";
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: () => "Test Prompt",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (_target: { id: string }) => "Test Prompt";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
@@ -368,7 +374,9 @@ describe("Prompt Editor Local Changes", () => {
         () => {
           const callWithMessages = mockOnLocalConfigChange.mock.calls.find(
             (call: unknown[]) =>
-              call[0] != null && typeof call[0] === "object" && "messages" in call[0],
+              call[0] != null &&
+              typeof call[0] === "object" &&
+              "messages" in call[0],
           );
           expect(callWithMessages).toBeDefined();
         },

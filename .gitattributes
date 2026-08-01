@@ -4,3 +4,4 @@
 python-sdk/src/langwatch/generated/**/* linguist-generated=true
 langwatch/src/app/api/openapiLangWatch.json linguist-generated=true
 typescript-sdk/src/internal/generated/openapi/api-client.ts linguist-generated=true merge=ours
+packages/handled-error/src/codes.generated.ts linguist-generated=true merge=ours

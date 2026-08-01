@@ -14,6 +14,7 @@
  *     resolves org/team-scoped rules through the scope cascade)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ValidationError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
@@ -21,7 +22,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { ValidationError } from "../../domain-error";
 import {
   deriveUnmappedCostSuggestion,
   previewCostRuleMatchingSpans,

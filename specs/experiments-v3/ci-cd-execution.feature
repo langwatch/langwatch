@@ -190,9 +190,9 @@ Feature: CI/CD Execution of Platform Evaluations
   # ==========================================================================
 
   @unimplemented
-  Scenario: Results are saved to Elasticsearch
+  Scenario: Results are saved to ClickHouse
     When execution completes
-    Then results are stored in Elasticsearch with:
+    Then results are stored in ClickHouse with:
       | field        | value                    |
       | project_id   | project's ID             |
       | experiment_id| evaluation's experiment ID|

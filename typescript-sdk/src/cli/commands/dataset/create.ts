@@ -1,7 +1,8 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -29,9 +30,9 @@ export const parseColumns = (columnsStr: string): DatasetColumnType[] => {
  */
 export const createCommand = async (
   name: string,
-  options: { columns?: string; format?: string },
-): Promise<void> => {
-  checkApiKey();
+  options: { columns?: string },
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   let columnTypes: DatasetColumnType[] = [];
   if (options.columns) {
@@ -46,31 +47,31 @@ export const createCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = ora(`Creating dataset "${name}"...`).start();
+  const spinner = createSpinner(`Creating dataset "${name}"...`).start();
 
   try {
     const dataset = await service.createDataset({ name, columnTypes });
 
     spinner.succeed(`Dataset created: ${chalk.cyan(dataset.slug)}`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(dataset, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.bold("ID:")}    ${dataset.id}`);
-    console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
-    if (dataset.columnTypes.length > 0) {
-      const colStr = dataset.columnTypes
-        .map((c) => `${c.name}:${c.type}`)
-        .join(", ");
-      console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
-    }
-    const viewUrl = dataset.platformUrl;
-    if (viewUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(viewUrl)}`);
-    }
+    return {
+      data: dataset,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.bold("ID:")}    ${dataset.id}`);
+        console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
+        if (dataset.columnTypes.length > 0) {
+          const colStr = dataset.columnTypes
+            .map((c) => `${c.name}:${c.type}`)
+            .join(", ");
+          console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
+        }
+        const viewUrl = dataset.platformUrl;
+        if (viewUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(viewUrl)}`);
+        }
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "create dataset" });
   }

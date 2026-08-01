@@ -19,19 +19,24 @@
  * `_rotation` slot — the receiver layer accepts either during the
  * window.
  */
-import { createHash, randomBytes } from "crypto";
 
-import { Prisma } from "@prisma/client";
-import type { IngestionSource, PrismaClient } from "@prisma/client";
-
-import { TRPCError } from "@trpc/server";
-
-import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
-import { isEnterpriseTier } from "~/server/api/enterprise";
+import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import {
+  HandledError,
+  NotFoundError,
+  ValidationError,
+} from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
+import { createHash, randomBytes } from "crypto";
+import { env } from "~/env.mjs";
+import { isEnterpriseTier } from "~/server/api/enterprise";
+import { getApp } from "~/server/app-layer/app";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
+import { unsupportedValue } from "./unsupportedValue";
 
 export type SourceType =
   | "otel_generic"
@@ -71,7 +76,7 @@ export interface CreateIngestionSourceInput {
    * the adapter id + credentials reference.
    */
   pullConfig?: Record<string, unknown> | null;
-  /** Cron schedule for the BullMQ puller worker. Null = use adapter default. */
+  /** Five-field UTC cron schedule for the durable pull process. */
   pullSchedule?: string | null;
   actorUserId: string;
 }
@@ -84,6 +89,7 @@ export interface UpdateIngestionSourceInput {
   parserConfig?: Record<string, unknown>;
   status?: "active" | "disabled" | "awaiting_first_event";
   teamId?: string | null;
+  pullSchedule?: string | null;
 }
 
 export interface CreatedIngestionSource {
@@ -93,6 +99,95 @@ export interface CreatedIngestionSource {
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+const logger = createLogger("langwatch:governance:ingestion-source");
+
+/**
+ * Thrown when a mutation names a source this org doesn't have.
+ *
+ * The everyday cause is two tabs: one archives a source, the other still
+ * shows it and clicks Archive. That is a known cause with an obvious action
+ * — reload — so it is handled, not a 500. `meta.id` carries the source id;
+ * the org id belongs in the log, not in copy a customer reads.
+ */
+export class IngestionSourceNotFoundError extends NotFoundError {
+  constructor(sourceId: string) {
+    super("ingestion_source_not_found", "Ingestion source", sourceId);
+    this.name = "IngestionSourceNotFoundError";
+  }
+}
+
+/**
+ * Thrown when a non-enterprise org already holds its full allowance of active
+ * ingestion sources.
+ *
+ * Handled, and raised from the service rather than the router, because that is
+ * the whole point of the guard: workers and webhook adapters reach it too, and
+ * a `TRPCError` means nothing to them. A plan cap is exactly-known and
+ * exactly-actionable — archive one or upgrade — so it gets a code, and
+ * `meta.max` lets the UI say the number without the message having to.
+ */
+export class IngestionSourceCapReachedError extends HandledError {
+  declare readonly code: "ingestion_source_cap_reached";
+
+  constructor(max: number) {
+    super(
+      "ingestion_source_cap_reached",
+      `Non-enterprise plans are limited to ${max} ingestion sources.`,
+      { httpStatus: 403, meta: { max } },
+    );
+    this.name = "IngestionSourceCapReachedError";
+  }
+}
+
+/**
+ * The cron field, validated where the rejection can still say something
+ * useful about it.
+ *
+ * The previous guard threw the zod issues away and rethrew a plain `Error`,
+ * so a typo in a free-text box became an INTERNAL_SERVER_ERROR: the admin
+ * read "Something went wrong — we've been notified" about their own mistake,
+ * and a real 5xx incident was booked for it.
+ *
+ * The complaint rides in `meta.formErrors`, which the `validation_error`
+ * registry entry renders verbatim. There is deliberately no `fieldErrors`
+ * half: the source composer (`dashboard/pages/ingestion-sources.tsx`) holds
+ * its state in `useState`, not `react-hook-form`, so nothing calls
+ * `applyHandledErrorToForm` and a `fieldErrors.pullSchedule` key would have
+ * no reader. Wiring the composer to `react-hook-form` — so the rejection
+ * lands on the input instead of in a toast — is the better end state and is
+ * where that half comes back.
+ */
+function assertPullSchedule(pullSchedule: string): void {
+  const parsed = pullScheduleSchema.safeParse(pullSchedule);
+  if (parsed.success) return;
+
+  const complaints = parsed.error.issues.map((issue) => issue.message);
+  throw new ValidationError(
+    complaints.join(" ") || "Pull schedule is not a valid cron expression",
+    { meta: { formErrors: complaints } },
+  );
+}
+
+async function syncPullProcessBestEffort({
+  prisma,
+  source,
+}: {
+  prisma: PrismaClient;
+  source: IngestionSource;
+}): Promise<void> {
+  try {
+    await syncIngestionPullSource({
+      prisma,
+      commands: getApp().commands.ingestionPull,
+      source,
+    });
+  } catch (error) {
+    logger.error(
+      { sourceId: source.id, error },
+      "Failed to sync ingestion pull process; boot reconciliation will retry",
+    );
+  }
+}
 
 export class IngestionSourceService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -122,6 +217,27 @@ export class IngestionSourceService {
   }
 
   /**
+   * `findById`, for the mutations that cannot proceed without the row.
+   *
+   * Which org asked is a debugging detail — it goes to the log, not into an
+   * error a customer reads (see {@link IngestionSourceNotFoundError}).
+   */
+  private async requireById(
+    id: string,
+    organizationId: string,
+  ): Promise<IngestionSource> {
+    const existing = await this.findById(id, organizationId);
+    if (!existing) {
+      logger.warn(
+        { sourceId: id, organizationId },
+        "IngestionSource not found for organization",
+      );
+      throw new IngestionSourceNotFoundError(id);
+    }
+    return existing;
+  }
+
+  /**
    * Resolve a raw ingestSecret to its IngestionSource row. Used by the
    * push-mode receivers (/api/ingest/otel, /api/ingest/webhook) at the
    * top of every request. Returns null on miss — receivers should
@@ -131,9 +247,7 @@ export class IngestionSourceService {
    * carries the prior hash with `expiresAt > now`, both hashes match
    * the same source.
    */
-  async findByIngestSecret(
-    rawSecret: string,
-  ): Promise<IngestionSource | null> {
+  async findByIngestSecret(rawSecret: string): Promise<IngestionSource | null> {
     const candidateHash = hashIngestSecret(rawSecret);
     const direct = await this.prisma.ingestionSource.findFirst({
       where: { ingestSecretHash: candidateHash, archivedAt: null },
@@ -148,7 +262,10 @@ export class IngestionSourceService {
     const candidates = await this.prisma.ingestionSource.findMany({
       where: {
         archivedAt: null,
-        parserConfig: { path: ["_rotation", "priorHash"], equals: candidateHash },
+        parserConfig: {
+          path: ["_rotation", "priorHash"],
+          equals: candidateHash,
+        },
       },
     });
     const now = Date.now();
@@ -175,6 +292,9 @@ export class IngestionSourceService {
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
+    if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
+      assertPullSchedule(input.pullSchedule);
+    }
     // Defense-in-depth plan gate. Non-enterprise orgs can create up to
     // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
     // separately restricts source TYPE to otel_generic for them). This
@@ -189,15 +309,22 @@ export class IngestionSourceService {
         where: { organizationId: input.organizationId, archivedAt: null },
       });
       if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Non-enterprise plans are limited to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} ingestion sources. Upgrade to Enterprise for unlimited.`,
-        });
+        throw new IngestionSourceCapReachedError(
+          NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+        );
       }
     }
 
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
-      throw new Error(`Unsupported sourceType: ${input.sourceType}`);
+      // The router's zod enum catches this before the service sees it; a
+      // worker or webhook adapter's does not, and that is the caller this
+      // guard exists for. Naming the allowed values is the entire remedy, so
+      // it must not arrive as "Something went wrong — we've been notified".
+      throw unsupportedValue({
+        field: "sourceType",
+        value: input.sourceType,
+        allowed: SUPPORTED_SOURCE_TYPES,
+      });
     }
 
     // Lazy-ensure the hidden Governance Project on first source mint —
@@ -238,17 +365,18 @@ export class IngestionSourceService {
         createdById: input.actorUserId,
       },
     });
+    if (source.pullSchedule) {
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
+    }
     return { source, ingestSecret };
   }
 
   async updateSource(
     input: UpdateIngestionSourceInput,
   ): Promise<IngestionSource> {
-    const existing = await this.findById(input.id, input.organizationId);
-    if (!existing) {
-      throw new Error(
-        `IngestionSource ${input.id} not found in org ${input.organizationId}`,
-      );
+    const existing = await this.requireById(input.id, input.organizationId);
+    if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
+      assertPullSchedule(input.pullSchedule);
     }
     const data: Prisma.IngestionSourceUpdateInput = {};
     if (input.name !== undefined) data.name = input.name;
@@ -259,15 +387,21 @@ export class IngestionSourceService {
       ) as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
+    if (input.pullSchedule !== undefined)
+      data.pullSchedule = input.pullSchedule;
     if (input.teamId !== undefined) {
       data.team = input.teamId
         ? { connect: { id: input.teamId } }
         : { disconnect: true };
     }
-    return this.prisma.ingestionSource.update({
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data,
     });
+    if (existing.pullSchedule !== null || source.pullSchedule !== null) {
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
+    }
+    return source;
   }
 
   /**
@@ -279,13 +413,11 @@ export class IngestionSourceService {
     id: string,
     organizationId: string,
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
-    const existing = await this.findById(id, organizationId);
-    if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
-    }
+    const existing = await this.requireById(id, organizationId);
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
-    const priorParser = (existing.parserConfig as Record<string, unknown>) ?? {};
+    const priorParser =
+      (existing.parserConfig as Record<string, unknown>) ?? {};
     const merged = encryptParserConfigCredentials({
       ...priorParser,
       _rotation: {
@@ -304,14 +436,15 @@ export class IngestionSourceService {
   }
 
   async archive(id: string, organizationId: string): Promise<IngestionSource> {
-    const existing = await this.findById(id, organizationId);
-    if (!existing) {
-      throw new Error(`IngestionSource ${id} not found in org ${organizationId}`);
-    }
-    return this.prisma.ingestionSource.update({
+    const existing = await this.requireById(id, organizationId);
+    const source = await this.prisma.ingestionSource.update({
       where: { id: existing.id },
       data: { archivedAt: new Date(), status: "disabled" },
     });
+    if (source.pullSchedule) {
+      await syncPullProcessBestEffort({ prisma: this.prisma, source });
+    }
+    return source;
   }
 
   /**

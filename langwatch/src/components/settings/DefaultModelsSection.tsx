@@ -31,11 +31,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-// Wrapped Menu uses a Portal under the hood so Menu.Content overlays
-// the page instead of rendering inline inside the <td>, which would
-// push the row's other cells to a wrapped line on open (caught on
-// 2026-05-18 dogfood, Image #118).
-import { Menu } from "../ui/menu";
 import {
   Building2,
   Edit,
@@ -47,32 +42,39 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
-
+import type React from "react";
+import { useMemo, useState } from "react";
+import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import {
-  ScopeFilter as ScopeFilterComponent,
-  type ScopeFilter,
-} from "./ScopeFilter";
-import { ModelChip } from "./ModelChip";
-import { toaster } from "~/components/ui/toaster";
 import {
   isScopeInFilter,
   resolveScopeFilter,
   type ScopeHierarchy,
 } from "~/utils/filterProvidersByScope";
+// Wrapped Menu uses a Portal under the hood so Menu.Content overlays
+// the page instead of rendering inline inside the <td>, which would
+// push the row's other cells to a wrapped line on open (caught on
+// 2026-05-18 dogfood, Image #118).
+import { Menu } from "../ui/menu";
+import { ModelChip } from "./ModelChip";
+import {
+  type ScopeFilter,
+  ScopeFilter as ScopeFilterComponent,
+} from "./ScopeFilter";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
-type ModelRoleKey = "DEFAULT" | "FAST" | "EMBEDDINGS";
+type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 
-const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "EMBEDDINGS"];
+const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
+  LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
 };
 
@@ -98,6 +100,11 @@ interface DefaultModelsSectionProps {
    *  children of the picked scope). When omitted, falls back to the
    *  org returned from the tRPC payload — fine for standalone mounts. */
   hierarchy?: ScopeHierarchy;
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`,
+   *  forwarded to each row's `ModelChip`. The section doesn't fetch
+   *  provider data itself; the page passes this down from the same
+   *  provider list it uses for `enabledProviderKeys`. */
+  displayNames?: Record<string, string>;
 }
 
 export function DefaultModelsSection({
@@ -106,8 +113,9 @@ export function DefaultModelsSection({
   enabledProviderKeys,
   noProvidersConfigured = false,
   hierarchy,
+  displayNames,
 }: DefaultModelsSectionProps = {}) {
-  const { project, team, organization } = useOrganizationTeamProject();
+  const { project, team } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
   const dataQuery = api.modelProvider.getDefaultModelsForProject.useQuery(
@@ -137,12 +145,9 @@ export function DefaultModelsSection({
         meta: { closable: true },
       });
     } catch (err) {
-      toaster.create({
-        title: "Failed to delete",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't remove the default model",
       });
     }
   };
@@ -178,7 +183,13 @@ export function DefaultModelsSection({
         ),
       ),
     );
-  }, [dataQuery.data?.configs, filter, team?.id, project?.id, effectiveHierarchy]);
+  }, [
+    dataQuery.data?.configs,
+    filter,
+    team?.id,
+    project?.id,
+    effectiveHierarchy,
+  ]);
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
@@ -193,7 +204,8 @@ export function DefaultModelsSection({
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            AI features across the platform: prompt creation, evaluations, traces search, topic clustering and more
+            AI features across the platform: prompt creation, evaluations,
+            traces search, topic clustering and more
           </Text>
         </VStack>
         <DefaultModelsTableSkeleton />
@@ -235,7 +247,8 @@ export function DefaultModelsSection({
             Default Models
           </Heading>
           <Text fontSize="sm" color="fg.muted">
-            AI features across the platform: prompt creation, evaluations, traces search, topic clustering and more
+            AI features across the platform: prompt creation, evaluations,
+            traces search, topic clustering and more
           </Text>
         </VStack>
         <HStack gap={2}>
@@ -276,10 +289,10 @@ export function DefaultModelsSection({
             onDelete={handleDelete}
             onAdd={openAdd}
             enabledProviderKeys={enabledProviderKeys ?? null}
+            displayNames={displayNames}
           />
         </Card.Body>
       </Card.Root>
-
     </VStack>
   );
 }
@@ -294,6 +307,7 @@ function AllConfigsView({
   onDelete,
   onAdd,
   enabledProviderKeys,
+  displayNames,
 }: {
   configs: ConfigRow[];
   /** Full cascade input. `configs` is filter-narrowed for display, but
@@ -306,6 +320,7 @@ function AllConfigsView({
   onDelete: (c: ConfigRow) => void;
   onAdd: () => void;
   enabledProviderKeys: Set<string> | null;
+  displayNames?: Record<string, string>;
 }) {
   if (configs.length === 0) {
     return (
@@ -317,7 +332,8 @@ function AllConfigsView({
           <VStack textAlign="center" gap={2}>
             <EmptyState.Title>No default models configured</EmptyState.Title>
             <EmptyState.Description>
-              Define a default model for prompt creation, evaluations, traces search, topic clustering and more.
+              Define a default model for prompt creation, evaluations, traces
+              search, topic clustering and more.
             </EmptyState.Description>
             <Button
               size="sm"
@@ -337,9 +353,11 @@ function AllConfigsView({
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-          <Table.ColumnHeader>Default</Table.ColumnHeader>
-          <Table.ColumnHeader>Fast</Table.ColumnHeader>
-          <Table.ColumnHeader>Embeddings</Table.ColumnHeader>
+          {ROLES.map((role) => (
+            <Table.ColumnHeader key={role}>
+              {ROLE_LABEL[role]}
+            </Table.ColumnHeader>
+          ))}
           <Table.ColumnHeader textAlign="right" />
         </Table.Row>
       </Table.Header>
@@ -349,7 +367,11 @@ function AllConfigsView({
             <Table.Cell>
               <HStack gap={2} flexWrap="wrap">
                 {c.scopes.map((s) => (
-                  <ScopeChip key={`${s.type}:${s.id}`} type={s.type} name={s.name} />
+                  <ScopeChip
+                    key={`${s.type}:${s.id}`}
+                    type={s.type}
+                    name={s.name}
+                  />
                 ))}
               </HStack>
             </Table.Cell>
@@ -366,6 +388,7 @@ function AllConfigsView({
                   anchorScope={mostSpecificScope(c.scopes)}
                   onEdit={() => onEdit(c)}
                   enabledProviderKeys={enabledProviderKeys}
+                  displayNames={displayNames}
                 />
               </Table.Cell>
             ))}
@@ -430,6 +453,7 @@ function ConfigCell({
   anchorScope,
   onEdit,
   enabledProviderKeys,
+  displayNames,
 }: {
   role: ModelRoleKey;
   config: Record<string, string>;
@@ -442,6 +466,7 @@ function ConfigCell({
    *  menu. Edits the whole policy, not just the cell. */
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
+  displayNames?: Record<string, string>;
 }) {
   const isInvalid = (model: string) =>
     !!enabledProviderKeys &&
@@ -476,6 +501,7 @@ function ConfigCell({
             model={resolvedRoleModel}
             size="sm"
             invalid={isInvalid(resolvedRoleModel)}
+            displayNames={displayNames}
           />
         ) : (
           <Badge colorPalette="orange" variant="subtle">
@@ -492,6 +518,7 @@ function ConfigCell({
             model={config[f.key]!}
             size="sm"
             invalid={isInvalid(config[f.key]!)}
+            displayNames={displayNames}
           />
         </ChipWithEdit>
       ))}
@@ -585,9 +612,7 @@ function resolveAtScope(
     const matching = configs
       .filter((c) =>
         c.scopes.some((s) =>
-          t === scopeType
-            ? s.type === t && s.id === scopeId
-            : s.type === t,
+          t === scopeType ? s.type === t && s.id === scopeId : s.type === t,
         ),
       )
       .filter((c) => (c.config as Record<string, string>)[key])
@@ -615,7 +640,8 @@ function ScopeChip({
 }) {
   const palette =
     type === "ORGANIZATION" ? "blue" : type === "TEAM" ? "purple" : "gray";
-  const Icon = type === "ORGANIZATION" ? Building2 : type === "TEAM" ? Users : Folder;
+  const Icon =
+    type === "ORGANIZATION" ? Building2 : type === "TEAM" ? Users : Folder;
   return (
     <Badge colorPalette={palette} variant="subtle">
       <HStack gap={1}>
@@ -638,9 +664,11 @@ function DefaultModelsTableSkeleton() {
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-              <Table.ColumnHeader>Default</Table.ColumnHeader>
-              <Table.ColumnHeader>Fast</Table.ColumnHeader>
-              <Table.ColumnHeader>Embeddings</Table.ColumnHeader>
+              {ROLES.map((role) => (
+                <Table.ColumnHeader key={role}>
+                  {ROLE_LABEL[role]}
+                </Table.ColumnHeader>
+              ))}
               <Table.ColumnHeader textAlign="right" />
             </Table.Row>
           </Table.Header>
@@ -650,17 +678,18 @@ function DefaultModelsTableSkeleton() {
                 <Table.Cell>
                   <Skeleton width="100px" height="20px" borderRadius="full" />
                 </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
+                {ROLES.map((role) => (
+                  <Table.Cell key={role}>
+                    <Skeleton width="160px" height="16px" />
+                  </Table.Cell>
+                ))}
                 <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+                  <Skeleton
+                    width="24px"
+                    height="24px"
+                    borderRadius="md"
+                    marginLeft="auto"
+                  />
                 </Table.Cell>
               </Table.Row>
             ))}

@@ -1,17 +1,19 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
+  cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
-  act,
   within,
-  fireEvent,
-  cleanup,
 } from "@testing-library/react";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ScenarioGenerationError } from "../../scenarios/services/scenarioGeneration";
 import { AICreateModal } from "../AICreateModal";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -70,11 +72,13 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Create new scenario"),
+      ).toBeInTheDocument();
     });
 
     it("displays custom title", () => {
@@ -87,7 +91,7 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -105,12 +109,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByPlaceholderText("Describe your custom scenario...")
+        within(dialog).getByPlaceholderText("Describe your custom scenario..."),
       ).toBeInTheDocument();
     });
 
@@ -124,13 +128,15 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
-      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Tool-calling Agent"),
+      ).toBeInTheDocument();
     });
 
     it("displays Generate with AI button", () => {
@@ -143,12 +149,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       ).toBeInTheDocument();
     });
 
@@ -162,12 +168,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i })
+        within(dialog).getByRole("button", { name: /i'll write it myself/i }),
       ).toBeInTheDocument();
     });
 
@@ -181,12 +187,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /close/i })
+        within(dialog).getByRole("button", { name: /close/i }),
       ).toBeInTheDocument();
     });
   });
@@ -202,7 +208,7 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -225,7 +231,7 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -233,7 +239,7 @@ describe("<AICreateModal/>", () => {
 
       const textarea = within(dialog).getByRole("textbox");
       expect(textarea).toHaveValue(
-        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
+        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund.",
       );
     });
   });
@@ -251,11 +257,13 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={onSkip}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /i'll write it myself/i }),
+      );
 
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
@@ -274,14 +282,14 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
@@ -290,7 +298,9 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays generating state with spinner", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi
+        .fn()
+        .mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -301,14 +311,14 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
@@ -317,7 +327,9 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays custom generating text", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi
+        .fn()
+        .mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -329,23 +341,27 @@ describe("<AICreateModal/>", () => {
           onSkip={vi.fn()}
           generatingText="Generating prompt..."
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
-        expect(within(dialog).getByText("Generating prompt...")).toBeInTheDocument();
+        expect(
+          within(dialog).getByText("Generating prompt..."),
+        ).toBeInTheDocument();
       });
     });
 
     it("hides close button during generation", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi
+        .fn()
+        .mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -356,27 +372,29 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
         expect(
-          within(dialog).queryByRole("button", { name: /close/i })
+          within(dialog).queryByRole("button", { name: /close/i }),
         ).not.toBeInTheDocument();
       });
     });
   });
 
   describe("when generation fails", () => {
-    it("displays error title and message", async () => {
-      const onGenerate = vi.fn().mockRejectedValue(new Error("API connection failed"));
+    it("displays the registry's copy, never the failure's own message", async () => {
+      const onGenerate = vi
+        .fn()
+        .mockRejectedValue(new Error("API connection failed"));
 
       render(
         <AICreateModal
@@ -387,20 +405,27 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
-        expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
+        expect(
+          within(dialog).getByText("Something went wrong"),
+        ).toBeInTheDocument();
       });
-      expect(within(dialog).getByText("API connection failed")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("We've been notified. Try again in a moment."),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText("API connection failed"),
+      ).not.toBeInTheDocument();
     });
 
     it("displays Try again button", async () => {
@@ -415,19 +440,19 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
         expect(
-          within(dialog).getByRole("button", { name: /try again/i })
+          within(dialog).getByRole("button", { name: /try again/i }),
         ).toBeInTheDocument();
       });
     });
@@ -444,19 +469,19 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
         expect(
-          within(dialog).getByRole("button", { name: /i'll write it myself/i })
+          within(dialog).getByRole("button", { name: /i'll write it myself/i }),
         ).toBeInTheDocument();
       });
     });
@@ -474,19 +499,19 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
         expect(
-          within(dialog).getByRole("button", { name: /close/i })
+          within(dialog).getByRole("button", { name: /close/i }),
         ).toBeInTheDocument();
       });
     });
@@ -508,26 +533,26 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await waitFor(() => {
         expect(
           within(dialog).getByRole("button", {
             name: /try again/i,
-          })
+          }),
         ).toBeInTheDocument();
       });
 
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /try again/i })
+        within(dialog).getByRole("button", { name: /try again/i }),
       );
 
       await waitFor(() => {
@@ -547,7 +572,9 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays timeout error after 60 seconds", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi
+        .fn()
+        .mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -558,14 +585,14 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       );
 
       await act(async () => {
@@ -573,8 +600,12 @@ describe("<AICreateModal/>", () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
-      expect(within(dialog).getByText(/timed out/i)).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Something went wrong"),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("We've been notified. Try again in a moment."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -589,12 +620,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialogs = container.querySelectorAll('[role="dialog"]');
       const openDialogs = Array.from(dialogs).filter(
-        (d) => d.getAttribute("data-state") === "open"
+        (d) => d.getAttribute("data-state") === "open",
       );
 
       expect(openDialogs.length).toBe(0);
@@ -612,7 +643,7 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const openDialog = getDialogByState("open");
@@ -624,12 +655,14 @@ describe("<AICreateModal/>", () => {
   // Error classifier integration
   // ─────────────────────────────────────────────────────────────────────────
 
-  describe("given an auth-shape error", () => {
+  describe("given a handled auth failure", () => {
     describe("when ErrorState renders", () => {
       it("shows the Configure model provider button", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Invalid API key provided by the provider"));
+          .mockRejectedValue(
+            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
+          );
 
         render(
           <AICreateModal
@@ -640,27 +673,29 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper }
+          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i })
+          within(dialog).getByRole("button", { name: /generate with ai/i }),
         );
 
         await waitFor(() => {
           expect(
-            within(dialog).getByTestId("error-configure-model-provider-button")
+            within(dialog).getByTestId("error-configure-model-provider-button"),
           ).toBeInTheDocument();
         });
       });
 
-      it("shows tailored copy about API key", async () => {
+      it("shows the registry's copy about the API key", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Invalid API key provided"));
+          .mockRejectedValue(
+            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
+          );
 
         render(
           <AICreateModal
@@ -671,18 +706,20 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper }
+          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i })
+          within(dialog).getByRole("button", { name: /generate with ai/i }),
         );
 
         await waitFor(() => {
-          expect(within(dialog).getByText(/api key/i)).toBeInTheDocument();
+          expect(
+            within(dialog).getByText("That API key isn't valid"),
+          ).toBeInTheDocument();
         });
       });
     });
@@ -690,10 +727,15 @@ describe("<AICreateModal/>", () => {
 
   describe("given an unknown error", () => {
     describe("when ErrorState renders", () => {
-      it("shows the raw error message verbatim", async () => {
+      // The raw message used to be printed in a <Code> block. For a handled
+      // failure that is the code slug, and for an unhandled one it can carry
+      // internals — neither is a customer's to read (#5984, ADR-045).
+      it("never shows the raw error message", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
+          .mockRejectedValue(
+            new Error("Completely unexpected server meltdown 42"),
+          );
 
         render(
           <AICreateModal
@@ -704,27 +746,34 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper }
+          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i })
+          within(dialog).getByRole("button", { name: /generate with ai/i }),
         );
 
         await waitFor(() => {
           expect(
-            within(dialog).getByText("Completely unexpected server meltdown 42")
+            within(dialog).getByText("Something went wrong"),
           ).toBeInTheDocument();
         });
+        expect(
+          within(dialog).queryByText(
+            "Completely unexpected server meltdown 42",
+          ),
+        ).not.toBeInTheDocument();
       });
 
       it("does not show Configure model provider button", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
+          .mockRejectedValue(
+            new Error("Completely unexpected server meltdown 42"),
+          );
 
         render(
           <AICreateModal
@@ -735,31 +784,38 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper }
+          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i })
+          within(dialog).getByRole("button", { name: /generate with ai/i }),
         );
 
         await waitFor(() => {
           expect(
-            within(dialog).queryByTestId("error-configure-model-provider-button")
+            within(dialog).queryByTestId(
+              "error-configure-model-provider-button",
+            ),
           ).not.toBeInTheDocument();
         });
       });
     });
   });
 
-  describe("given a config-shape error", () => {
+  describe("given a handled configuration failure", () => {
     describe("when Configure is clicked", () => {
       it("links to settings/model-providers in a new tab", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("No default model configured for this project"));
+          .mockRejectedValue(
+            new ScenarioGenerationError(
+              "no_provider_configured",
+              "no_provider_configured",
+            ),
+          );
 
         render(
           <AICreateModal
@@ -770,21 +826,24 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper }
+          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i })
+          within(dialog).getByRole("button", { name: /generate with ai/i }),
         );
 
         await waitFor(() => {
           const configureBtn = within(dialog).getByTestId(
-            "error-configure-model-provider-button"
+            "error-configure-model-provider-button",
           );
-          expect(configureBtn).toHaveAttribute("href", "/settings/model-providers");
+          expect(configureBtn).toHaveAttribute(
+            "href",
+            "/settings/model-providers",
+          );
           expect(configureBtn).toHaveAttribute("target", "_blank");
         });
       });
@@ -808,11 +867,11 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(
-        screen.queryAllByRole("dialog", { hidden: true }).length
+        screen.queryAllByRole("dialog", { hidden: true }).length,
       ).toBeGreaterThan(0);
     });
 
@@ -833,7 +892,7 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -850,12 +909,12 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /generate with ai/i })
+        within(dialog).getByRole("button", { name: /generate with ai/i }),
       ).toBeInTheDocument();
     });
 
@@ -869,13 +928,15 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
-      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Tool-calling Agent"),
+      ).toBeInTheDocument();
     });
   });
 });

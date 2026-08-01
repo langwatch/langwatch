@@ -1,18 +1,28 @@
+import { createLogger } from "@langwatch/observability";
 import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+} from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
-import type {
-  LogRecordStorageRepository,
-  StoredLogRecordRow,
+import {
+  type LogRecordStorageRepository,
+  type StoredLogRecordRow,
+  TRACE_LOG_READ_CAP,
 } from "./log-record-storage.repository";
 
 const TABLE_NAME = "stored_log_records" as const;
+
+/**
+ * Fallback lookback (no `occurredAtMs` hint): scan `now − 90d … now + 2d`.
+ * `stored_log_records` is `PARTITION BY toYearWeek(TimeUnixMs)` and tiered to
+ * S3 after the hot window, so a read with no time predicate walks every weekly
+ * partition (incl. cold S3). 90d covers the "open a recent trace's raw logs"
+ * use case while keeping the scan on hot partitions; the +2d upper bound
+ * (the {@link DEFAULT_PARTITION_WINDOW_MS} half-width) mirrors the hint path's
+ * clock-skew headroom.
+ */
+const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
 const logger = createLogger(
   "langwatch:app-layer:traces:log-record-storage-repository",
@@ -23,128 +33,66 @@ export class LogRecordStorageClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertLogRecord(
-    record: NormalizedLogRecord,
-    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId: record.tenantId },
-      "LogRecordStorageClickHouseRepository.insertLogRecord",
-    );
-
-    try {
-      const client = await this.resolveClient(record.tenantId);
-      const now = new Date();
-      // Raw claude_code logs the span fold consumes turn into pure duplication
-      // once the claudeCodeSpanSync reactor folds them into stored_spans, so GC
-      // them far sooner than the platform default (the spans inherit the real
-      // retention). The existing `_retention_days` DELETE TTL does the eviction;
-      // we just stamp the shorter floor on these rows here. Stamped, not min'd
-      // against the caller's value, so an indefinite (0) project retention can't
-      // make a fold-intermediate log live forever.
-      const effectiveRetentionDays = record.attributes[CLAUDE_CODE_KIND_ATTR]
-        ? CLAUDE_CODE_LOG_RETENTION_DAYS
-        : retentionDays;
-      await client.insert({
-        table: TABLE_NAME,
-        values: [
-          {
-            ProjectionId: record.id,
-            TenantId: record.tenantId,
-            TraceId: record.traceId,
-            SpanId: record.spanId,
-            TimeUnixMs: new Date(record.timeUnixMs),
-            SeverityNumber: record.severityNumber,
-            SeverityText: record.severityText,
-            Body: record.body,
-            Attributes: record.attributes,
-            ResourceAttributes: record.resourceAttributes,
-            ScopeName: record.scopeName,
-            ScopeVersion: record.scopeVersion,
-            CreatedAt: now,
-            UpdatedAt: now,
-            _retention_days: effectiveRetentionDays,
-          },
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          tenantId: record.tenantId,
-          traceId: record.traceId,
-          spanId: record.spanId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to insert log record into ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  async getMarkedClaudeCodeLogsByTrace(
+  async getLogsByTraceId(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
+    limit: number = TRACE_LOG_READ_CAP,
   ): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
-      "LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace",
+      "LogRecordStorageClickHouseRepository.getLogsByTraceId",
     );
 
     const client = await this.resolveClient(tenantId);
 
-    // `stored_log_records` is `PARTITION BY toYearWeek(TimeUnixMs)` and tiered to
-    // S3 after the hot window. Filtering only on TenantId + TraceId can't prune
-    // partitions, so without a time predicate the read walks every weekly
-    // partition (incl. cold S3) — a burst of S3 GETs on every claude-code log
-    // re-fold. Two windows:
-    //   * with a turn-time hint → ±2d around it (generous headroom for clock
-    //     skew / long-running turns)
-    //   * without a hint → `now − 7×CC_RETENTION` ... `now + 2d`. The upper
-    //     bound mirrors the hint path's clock-skew headroom so a fast client
-    //     clock that writes a slightly-future TimeUnixMs (it's client-supplied)
-    //     doesn't silently drop the row. Lower bound is safe because CC logs
-    //     older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been deleted
-    //     by TTL anyway.
-    const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
-    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const fallbackLookbackMs = ccRetentionMs * 7;
-    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
-    const now = Date.now();
-    const fromMs = hasWindow
-      ? occurredAtMs - partitionWindowMs
-      : now - fallbackLookbackMs;
-    const toMs = hasWindow
-      ? occurredAtMs + partitionWindowMs
-      : now + partitionWindowMs;
-    // Qualify the bound with the table name: the outer SELECT aliases
-    // `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`, and ClickHouse would
-    // otherwise resolve a bare `TimeUnixMs` in WHERE to that ms-integer alias
-    // instead of the DateTime64 column, making the partition bound nonsensical.
-    const timeFilter =
-      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
-      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
-
-    // Dedup to the latest version of each distinct stored log (the table is a
-    // ReplacingMergeTree(UpdatedAt) keyed on TenantId,TraceId,SpanId,ProjectionId);
-    // the IN-tuple over max(UpdatedAt) returns one row per record. TenantId is
-    // the first predicate (no other id is unique across tenants).
+    // Bound the read on the TimeUnixMs partition key so it prunes weekly
+    // partitions instead of cold-scanning every one (incl. tiered S3). With a
+    // turn-time hint → ±2d around it; without → now − 90d … now + 2d.
     //
-    // The `Attributes[kindKey] != ''` filter LIVES IN THE OUTER scope only —
-    // including it inside the dedup GROUP BY forces ClickHouse to read the
-    // heavy `Attributes` Map column for every unmerged version of every row
-    // in the trace, which is what the inner subquery is supposed to avoid.
-    // Moving it out makes the inner read lightweight key columns only; the
-    // outer SELECT then applies the filter to one row per (TenantId, TraceId,
-    // SpanId, ProjectionId), which is the right scale to read the map at.
-    const result = await client.query({
-      query: `
+    // Routed through the shared `queryWindowed` adopter for the
+    // clickhouse_windowed_read_total metric, but the read stays SINGLE-SHOT and
+    // byte-identical to the previous inline window:
+    //   * hint present → `fallback: "none"`, so an empty hinted window is
+    //     authoritative and never re-widens (the pre-adopter behaviour).
+    //   * no hint → the `{ lookbackMs }` fallback runs the fixed
+    //     `now − 90d … now + 2d` frame directly (the +2d upper bound is the
+    //     DEFAULT_PARTITION_WINDOW_MS clock-skew headroom).
+    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
+
+    return queryWindowed<StoredLogRecordRow[]>({
+      table: TABLE_NAME,
+      hintMs: hasWindow ? occurredAtMs : null,
+      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      fallback: hasWindow ? "none" : { lookbackMs: FALLBACK_LOOKBACK_MS },
+      isEmpty: (rows) => rows.length === 0,
+      run: async (window) => {
+        // Qualify the bound with the table name: the outer SELECT aliases
+        // `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`, and ClickHouse
+        // would otherwise resolve a bare `TimeUnixMs` in WHERE to that
+        // ms-integer alias instead of the DateTime64 column, making the
+        // partition bound nonsensical. `window` is always present here (both
+        // the hinted "none" and the no-hint lookback yield a fragment); the
+        // guard keeps the unbounded shape safe regardless.
+        const timeFilter = window
+          ? window.sqlFor(`${TABLE_NAME}.TimeUnixMs`)
+          : "";
+
+        // Dedup to the latest version of each distinct stored log (the table is
+        // a ReplacingMergeTree(UpdatedAt) keyed on
+        // TenantId,TraceId,SpanId,ProjectionId); the IN-tuple over max(UpdatedAt)
+        // returns one row per record. TenantId is the first predicate (no other
+        // id is unique across tenants). The inner subquery reads only the light
+        // key columns; the heavy Body / Attributes / ResourceAttributes maps are
+        // materialised by the outer SELECT for one row per (TenantId, TraceId,
+        // SpanId, ProjectionId) only.
+        const result = await client.query({
+          query: `
         SELECT
           TraceId,
           SpanId,
           toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+          Body,
           Attributes,
           ResourceAttributes,
           ScopeName,
@@ -161,37 +109,49 @@ export class LogRecordStorageClickHouseRepository
               ${timeFilter}
             GROUP BY TenantId, TraceId, SpanId, ProjectionId
           )
-          AND Attributes[{kindKey:String}] != ''
         ORDER BY TimeUnixMs ASC
+        LIMIT {limitPlusOne:UInt32}
       `,
-      query_params: {
-        tenantId,
-        traceId,
-        kindKey: CLAUDE_CODE_KIND_ATTR,
-        fromMs,
-        toMs,
+          query_params: {
+            tenantId,
+            traceId,
+            // One row past the cap so truncation is detectable without a count.
+            limitPlusOne: limit + 1,
+            ...(window?.params ?? {}),
+          },
+          format: "JSONEachRow",
+        });
+
+        const rows = (await result.json()) as Array<{
+          TraceId: string;
+          SpanId: string;
+          TimeUnixMs: number;
+          Body: string | null;
+          Attributes: Record<string, string>;
+          ResourceAttributes: Record<string, string>;
+          ScopeName: string | null;
+          ScopeVersion: string | null;
+        }>;
+
+        if (rows.length > limit) {
+          rows.length = limit;
+          logger.warn(
+            { tenantId, traceId, limit },
+            "Trace log read truncated at the row cap; the oldest rows are returned and later ones dropped",
+          );
+        }
+
+        return rows.map((row) => ({
+          traceId: row.TraceId,
+          spanId: row.SpanId,
+          timeUnixMs: row.TimeUnixMs,
+          body: row.Body ?? "",
+          attributes: row.Attributes ?? {},
+          resourceAttributes: row.ResourceAttributes ?? {},
+          scopeName: row.ScopeName ?? "",
+          scopeVersion: row.ScopeVersion ?? null,
+        }));
       },
-      format: "JSONEachRow",
     });
-
-    const rows = (await result.json()) as Array<{
-      TraceId: string;
-      SpanId: string;
-      TimeUnixMs: number;
-      Attributes: Record<string, string>;
-      ResourceAttributes: Record<string, string>;
-      ScopeName: string | null;
-      ScopeVersion: string | null;
-    }>;
-
-    return rows.map((row) => ({
-      traceId: row.TraceId,
-      spanId: row.SpanId,
-      timeUnixMs: row.TimeUnixMs,
-      attributes: row.Attributes ?? {},
-      resourceAttributes: row.ResourceAttributes ?? {},
-      scopeName: row.ScopeName ?? "",
-      scopeVersion: row.ScopeVersion ?? null,
-    }));
   }
 }

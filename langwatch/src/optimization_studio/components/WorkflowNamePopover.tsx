@@ -9,12 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Popover } from "../../components/ui/popover";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { WorkflowIcon } from "./ColorfulBlockIcons";
 import { EmojiPickerModal } from "./properties/modals/EmojiPickerModal";
-import { useShallow } from "zustand/react/shallow";
 
 export function WorkflowNamePopover() {
   const { name, icon, description, setWorkflow } = useWorkflowStore(
@@ -70,7 +70,12 @@ export function WorkflowNamePopover() {
       >
         <Popover.Trigger asChild>
           <HStack cursor="pointer" _hover={{ opacity: 0.8 }} gap={1.5}>
-            <WorkflowIcon icon={icon} size="md" background="none" border="none" />
+            <WorkflowIcon
+              icon={icon}
+              size="md"
+              background="none"
+              border="none"
+            />
             <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
               {name}
             </Text>

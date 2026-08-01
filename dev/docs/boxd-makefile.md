@@ -54,7 +54,7 @@ Collision: `boxd-fork-branch BRANCH=issue42/foo` produces `langwatch-issue42-foo
 4. Inside the VM: `git fetch origin && git checkout <branch>` (or detached head for cross-fork PRs).
 5. Upload Claude credentials (default `~/.claude/.credentials.json`; override via `CLAUDE_CREDS=`).
 6. Discover all `.env` files in the monorepo and upload each, with stale-localhost values rewritten to point at the VM's proxy URL.
-7. Map ports: default proxy → `:5560`, plus subdomains for aigw (5563), bullboard (6380), ai-server (3456), next (3000).
+7. Map ports: default proxy → `:5560`, plus subdomains for aigw (5563), ai-server (3456), next (3000).
 8. **For `fork-issue` only:** start a tmux session inside the VM running `claude --dangerously-skip-permissions`.
 
 ## Connecting

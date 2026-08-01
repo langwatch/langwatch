@@ -7,9 +7,14 @@ const newPassword = "RogerTest123!";
 const hash = await bcrypt.hash(newPassword, 10);
 
 const user = await prisma.user.findFirst({ where: { email } });
-if (!user) { console.error("not found"); process.exit(1); }
+if (!user) {
+  console.error("not found");
+  process.exit(1);
+}
 
-let acc = await prisma.account.findFirst({ where: { userId: user.id, type: "credential" } });
+let acc = await prisma.account.findFirst({
+  where: { userId: user.id, type: "credential" },
+});
 if (acc) {
   await prisma.account.update({
     where: { id: acc.id },

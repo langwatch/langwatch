@@ -48,11 +48,7 @@ export function useCursorBroadcast({
     const flush = () => {
       rafHandle = null;
       if (!pending) return;
-      if (
-        lastSent &&
-        lastSent.x === pending.x &&
-        lastSent.y === pending.y
-      ) {
+      if (lastSent && lastSent.x === pending.x && lastSent.y === pending.y) {
         pending = null;
         return;
       }

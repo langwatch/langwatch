@@ -9,10 +9,10 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
+import { CopyableInputWithPrefix } from "../../features/onboarding/components/sections/observability/CopyableInputWithPrefix";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { trackEvent } from "../../utils/tracking";
-import { CopyableInputWithPrefix } from "../../features/onboarding/components/sections/observability/CopyableInputWithPrefix";
 import { useIntegrationChecks } from "../IntegrationChecks";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";

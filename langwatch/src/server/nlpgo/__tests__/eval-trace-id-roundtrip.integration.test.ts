@@ -36,8 +36,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   collectSSE,
   hasGo,
-  startNlpgoSubprocess,
   type NlpgoSubprocess,
+  startNlpgoSubprocess,
 } from "./_nlpgoSubprocess";
 
 // Unique port alongside the other nlpgo subprocess integration tests
@@ -107,57 +107,52 @@ describe.skipIf(!hasGo())(
       };
     }
 
-    it(
-      "every component_state_change frame echoes the inbound trace_id inside execution_state",
-      async () => {
-        const body = makeExecuteComponentBody(KNOWN_TRACE_ID);
-        const resp = await fetch(`${nlpgo.baseUrl}/go/studio/execute`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "text/event-stream",
-            "X-LangWatch-Origin": "evaluation",
-          },
-          body: JSON.stringify(body),
-        });
+    it("every component_state_change frame echoes the inbound trace_id inside execution_state", async () => {
+      const body = makeExecuteComponentBody(KNOWN_TRACE_ID);
+      const resp = await fetch(`${nlpgo.baseUrl}/go/studio/execute`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          "X-LangWatch-Origin": "evaluation",
+        },
+        body: JSON.stringify(body),
+      });
+      expect(resp.ok, `nlpgo /go/studio/execute responded ${resp.status}`).toBe(
+        true,
+      );
+
+      const frames = await collectSSE(resp.body, { timeoutMs: 30_000 });
+      const componentEvents = frames.filter(
+        (f) => f.type === "component_state_change",
+      );
+
+      // The execute_component path must emit per-node state events —
+      // without them the eval-v3 result cell has nothing to populate.
+      expect(
+        componentEvents.length,
+        "nlpgo emitted no component_state_change frames for the " +
+          "execute_component request",
+      ).toBeGreaterThan(0);
+
+      // CORE ASSERTION — the field eval-v3's TargetCell reads
+      // (execution_state.trace_id, resultMapper.ts:306) is present
+      // and equals the trace_id the orchestrator sent in. Pre-fix it
+      // was absent (carried only on the unused outer envelope), so
+      // the cell's trace link never rendered.
+      for (const ev of componentEvents) {
+        const es = ev?.payload?.execution_state;
         expect(
-          resp.ok,
-          `nlpgo /go/studio/execute responded ${resp.status}`,
-        ).toBe(true);
-
-        const frames = await collectSSE(resp.body, { timeoutMs: 30_000 });
-        const componentEvents = frames.filter(
-          (f) => f.type === "component_state_change",
-        );
-
-        // The execute_component path must emit per-node state events —
-        // without them the eval-v3 result cell has nothing to populate.
+          es,
+          `component_state_change missing execution_state: ${JSON.stringify(ev)}`,
+        ).toBeTruthy();
         expect(
-          componentEvents.length,
-          "nlpgo emitted no component_state_change frames for the " +
-            "execute_component request",
-        ).toBeGreaterThan(0);
-
-        // CORE ASSERTION — the field eval-v3's TargetCell reads
-        // (execution_state.trace_id, resultMapper.ts:306) is present
-        // and equals the trace_id the orchestrator sent in. Pre-fix it
-        // was absent (carried only on the unused outer envelope), so
-        // the cell's trace link never rendered.
-        for (const ev of componentEvents) {
-          const es = ev?.payload?.execution_state;
-          expect(
-            es,
-            `component_state_change missing execution_state: ${JSON.stringify(ev)}`,
-          ).toBeTruthy();
-          expect(
-            es.trace_id,
-            `component_state_change.execution_state.trace_id missing/blank ` +
-              `(status=${es?.status}) — eval-v3 TargetCell would render no ` +
-              `"View trace" link. Frame: ${JSON.stringify(ev)}`,
-          ).toBe(KNOWN_TRACE_ID);
-        }
-      },
-      60_000,
-    );
+          es.trace_id,
+          `component_state_change.execution_state.trace_id missing/blank ` +
+            `(status=${es?.status}) — eval-v3 TargetCell would render no ` +
+            `"View trace" link. Frame: ${JSON.stringify(ev)}`,
+        ).toBe(KNOWN_TRACE_ID);
+      }
+    }, 60_000);
   },
 );

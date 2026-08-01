@@ -1,7 +1,4 @@
-import { Container } from "@react-email/container";
-import { Heading } from "@react-email/heading";
-import { Html } from "@react-email/html";
-import { Img } from "@react-email/img";
+import { Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
 
@@ -94,13 +91,12 @@ export const sendLicenseEmail = async ({
           How to activate
         </Heading>
         <p>
-          A <code>.langwatch-license</code> file is attached to this email.
-          To activate your license:
+          A <code>.langwatch-license</code> file is attached to this email. To
+          activate your license:
         </p>
         <ol>
           <li>
-            Go to <strong>Settings → License</strong> in your LangWatch
-            instance
+            Go to <strong>Settings → License</strong> in your LangWatch instance
           </li>
           <li>Upload the attached file or paste the license key below</li>
         </ol>

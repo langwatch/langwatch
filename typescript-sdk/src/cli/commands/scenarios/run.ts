@@ -1,11 +1,13 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import {
   SuitesApiService,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
@@ -28,7 +30,7 @@ export const runScenarioCommand = async (
   id: string,
   options: { target: string; wait?: boolean; format?: string },
 ): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.target) {
     console.error(chalk.red("Error: --target is required. Specify what to run the scenario against."));
@@ -41,7 +43,7 @@ export const runScenarioCommand = async (
   const suitesService = new SuitesApiService();
 
   // Create a temporary suite to execute this scenario
-  const spinner = ora(`Preparing scenario run for "${id}"...`).start();
+  const spinner = createSpinner(`Preparing scenario run for "${id}"...`).start();
 
   try {
     // Create an ephemeral suite for this single scenario run
@@ -86,21 +88,31 @@ export const runScenarioCommand = async (
 
     // Poll for completion
     console.log();
-    const pollSpinner = ora("Waiting for scenario run to complete...").start();
+    const pollSpinner = createSpinner("Waiting for scenario run to complete...").start();
 
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
     let completed = false;
     const startTime = Date.now();
     const TIMEOUT_MS = 10 * 60 * 1000;
+    const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+    let consecutivePollFailures = 0;
 
     while (!completed) {
       if (Date.now() - startTime > TIMEOUT_MS) {
-        pollSpinner.fail("Scenario run timed out after 10 minutes");
-        console.log(
-          chalk.yellow(`Check results in the dashboard. Batch ID: ${result.batchRunId}`),
-        );
+        failSpinner({
+          spinner: pollSpinner,
+          error: new Error("Scenario run timed out after 10 minutes"),
+          action: "run scenario",
+        });
+        // Follow-up prose is human-only — in a machine format the structured
+        // document above must keep stdout to itself.
+        if (resolveOutputFormat() === "text") {
+          console.log(
+            chalk.yellow(`Check results in the dashboard. Batch ID: ${result.batchRunId}`),
+          );
+        }
         await suitesService.delete(suite.id).catch(() => undefined);
         process.exit(1);
       }
@@ -137,16 +149,33 @@ export const runScenarioCommand = async (
               pollSpinner.warn(
                 `Scenario run completed: ${passed}/${total} passed, ${chalk.red(`${failed} failed`)}`,
               );
+              // `--wait` exists to report the verdict. Exiting 0 on a failed
+              // run hides it from every machine caller — see suites/run.ts.
+              process.exitCode = 1;
             } else {
               pollSpinner.succeed(
                 `Scenario run completed: ${chalk.green(`${passed}/${total} passed`)}`,
               );
             }
           }
+        } else {
+          throw new Error(`status endpoint answered ${statusResponse.status}`);
         }
       } catch {
-        // Polling error — continue waiting
+        // Polling error — continue waiting, but bounded: a status endpoint that
+        // is down should not burn the whole timeout before saying so.
+        consecutivePollFailures++;
+        if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+          pollSpinner.warn(
+            `Stopped waiting: the run status endpoint failed ${consecutivePollFailures} times in a row. ` +
+              `The scenario is still running — check batch ${result.batchRunId}.`,
+          );
+          process.exitCode = 1;
+          break;
+        }
+        continue;
       }
+      consecutivePollFailures = 0;
     }
 
     console.log();

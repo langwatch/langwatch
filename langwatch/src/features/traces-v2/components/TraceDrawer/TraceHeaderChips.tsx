@@ -1,4 +1,4 @@
-import { Avatar, Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,
@@ -12,10 +12,11 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { getEvalChipDisplay } from "~/utils/evaluationResults";
+import { UserAvatar } from "~/components/UserAvatar";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
+import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
@@ -142,9 +143,13 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
         <VStack align="stretch" gap={3} maxHeight="280px" overflowY="auto">
           {items.map((a) => (
             <HStack key={a.id} gap={2.5} align="start">
-              <Avatar.Root size="xs" background="gray.solid" color="white">
-                <Avatar.Fallback name={a.user?.name ?? a.email ?? "?"} />
-              </Avatar.Root>
+              <UserAvatar
+                size="xs"
+                background="gray.solid"
+                color="white"
+                name={a.user?.name ?? a.email ?? "?"}
+                image={a.user?.image}
+              />
               <VStack align="start" gap={0.5} flex={1} minWidth={0}>
                 <HStack gap={1.5} width="full">
                   <Text textStyle="2xs" fontWeight="600">

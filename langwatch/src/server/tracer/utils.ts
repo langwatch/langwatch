@@ -3,8 +3,8 @@ import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
-} from "../background/workers/collector/common";
-import { extractRAGTextualContext } from "../background/workers/collector/rag";
+} from "./collector/common";
+import { extractRAGTextualContext } from "./collector/rag";
 import type {
   ElasticSearchEvaluation,
   ElasticSearchEvent,

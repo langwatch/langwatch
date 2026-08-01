@@ -168,6 +168,30 @@ describe("handleSearchTraces()", () => {
     expect(result).toContain("timeout");
   });
 
+  describe("when a trace has evaluation results", () => {
+    it("shows pass/fail status per evaluation without requiring get_trace", async () => {
+      mockSearchTraces.mockResolvedValue({
+        traces: [
+          {
+            trace_id: "trace-eval",
+            input: { value: "" },
+            output: { value: "" },
+            evaluations: [
+              { name: "faithfulness", passed: true, score: 0.92 },
+              { evaluator_id: "toxicity-check", passed: false, label: "flagged" },
+            ],
+          },
+        ],
+        pagination: { totalHits: 1 },
+      });
+
+      const result = await handleSearchTraces({});
+
+      expect(result).toContain("**faithfulness**: PASSED (score: 0.92)");
+      expect(result).toContain("**toxicity-check**: FAILED [flagged]");
+    });
+  });
+
   describe("when no traces are found", () => {
     it("returns a no-results message", async () => {
       mockSearchTraces.mockResolvedValue({ traces: [] });

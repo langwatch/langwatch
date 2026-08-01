@@ -50,10 +50,9 @@ async function main() {
     await pwFields[0]!.fill(PASSWORD);
     await pwFields[1]!.fill(PASSWORD);
     await page.click('button:has-text("Sign up")');
-    await page.waitForURL(
-      (url) => !url.toString().includes("/auth/signup"),
-      { timeout: 15000 },
-    );
+    await page.waitForURL((url) => !url.toString().includes("/auth/signup"), {
+      timeout: 15000,
+    });
 
     const user = await prisma.user.findUnique({ where: { email: EMAIL } });
     if (!user) throw new Error("user row missing after signup");
@@ -91,13 +90,10 @@ async function main() {
     // delete. The transaction-wrapped fix should serialize them, so
     // exactly one succeeds and the other fails.
     const callUnlink = (id: string) =>
-      page.request.post(
-        `${BASE_URL}/api/trpc/user.unlinkAccount?batch=1`,
-        {
-          headers: { "Content-Type": "application/json", Origin: BASE_URL },
-          data: { "0": { json: { accountId: id } } },
-        },
-      );
+      page.request.post(`${BASE_URL}/api/trpc/user.unlinkAccount?batch=1`, {
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        data: { "0": { json: { accountId: id } } },
+      });
     const [r1, r2] = await Promise.all([
       callUnlink(acct1.id),
       callUnlink(acct2.id),

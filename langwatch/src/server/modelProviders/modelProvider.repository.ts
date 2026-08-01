@@ -1,8 +1,12 @@
-import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type {
+  ModelProvider,
+  ModelProviderScope,
+  PrismaClient,
+} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { encrypt, decrypt } from "../../utils/encryption";
+import { decrypt, encrypt } from "../../utils/encryption";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
@@ -127,7 +131,11 @@ export class ModelProviderRepository {
     const client = tx ?? this.prisma;
     const project = await client.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+      select: {
+        id: true,
+        teamId: true,
+        team: { select: { organizationId: true } },
+      },
     });
     if (!project) return [];
     const results = await client.modelProvider.findMany({
@@ -177,7 +185,12 @@ export class ModelProviderRepository {
                 ? [{ scopeType: "TEAM" as const, scopeId: { in: teamIds } }]
                 : []),
               ...(projectIds.length > 0
-                ? [{ scopeType: "PROJECT" as const, scopeId: { in: projectIds } }]
+                ? [
+                    {
+                      scopeType: "PROJECT" as const,
+                      scopeId: { in: projectIds },
+                    },
+                  ]
                 : []),
             ],
           },
@@ -190,7 +203,6 @@ export class ModelProviderRepository {
 
   async create(
     data: {
-      projectId: string;
       name: string;
       provider: string;
       enabled: boolean;
@@ -199,12 +211,13 @@ export class ModelProviderRepository {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders?: { key: string; value: string }[];
       /**
-       * Scope grants for this credential. Required — every row must be
-       * accessible to at least one (scopeType, scopeId) pair. When the
-       * caller omits scopes, defaults to a single PROJECT entry pointing
-       * at `projectId`, matching the legacy iter-107 behavior.
+       * Scope grants for this credential. Every row must be accessible to
+       * at least one (scopeType, scopeId) pair, and they are what the
+       * organization anchor below is resolved from, so the caller decides
+       * them. The service defaults the legacy single-scope path to the
+       * project it wrote through.
        */
-      scopes?: ScopeInput[];
+      scopes: ScopeInput[];
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
@@ -215,10 +228,10 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes> {
     const client = tx ?? this.prisma;
     const encryptedKeys = this.encryptCustomKeys(data.customKeys ?? undefined);
-    const scopes =
-      data.scopes && data.scopes.length > 0
-        ? data.scopes
-        : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
+    const { scopes } = data;
+    if (scopes.length === 0) {
+      throw new Error("Cannot create model provider: no scopes given");
+    }
 
     // Single-organization anchor (ADR-021): every scope this provider attaches
     // to must resolve to the same org. Resolve them all and reject a mixed or
@@ -280,7 +293,6 @@ export class ModelProviderRepository {
 
   async update(
     id: string,
-    projectId: string,
     data: {
       name?: string;
       enabled?: boolean;
@@ -367,7 +379,6 @@ export class ModelProviderRepository {
 
   async delete(
     id: string,
-    _projectId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProvider> {
     const client = tx ?? this.prisma;
@@ -393,6 +404,40 @@ export class ModelProviderRepository {
   // ─────────────────────────────────────────────────────────────────
   // Private encryption helpers
   // ─────────────────────────────────────────────────────────────────
+
+  /**
+   * One provider row by id with decrypted customKeys, or null. Serves the
+   * internal token-refresh path, which addresses the row directly (the
+   * gateway hands back the row id it was configured with) — tenant scoping
+   * happened when the row id entered the gateway config.
+   */
+  async findByIdWithDecryptedKeys(
+    id: string,
+  ): Promise<ModelProviderWithScopes | null> {
+    const provider = await this.prisma.modelProvider.findUnique({
+      where: { id },
+      include: { scopes: true },
+    });
+    return provider ? this.withDecryptedKeys(provider) : null;
+  }
+
+  /**
+   * Replace a provider row's credential keys (encrypted at rest). Used by
+   * the token-refresh path only — user-driven edits go through update().
+   */
+  async replaceCustomKeys(args: {
+    id: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<void> {
+    // A required object always encrypts to a string; `?? undefined` only
+    // narrows the helper's wider nullable signature for Prisma's Json input.
+    await this.prisma.modelProvider.update({
+      where: { id: args.id },
+      data: {
+        customKeys: this.encryptCustomKeys(args.customKeys) ?? undefined,
+      },
+    });
+  }
 
   /**
    * Encrypts customKeys before storing in the database.
@@ -456,9 +501,9 @@ export class ModelProviderRepository {
   ): ModelProviderWithScopes {
     return {
       ...provider,
-      customKeys: this.decryptCustomKeys(provider.customKeys) as
-        | Prisma.JsonValue
-        | null,
+      customKeys: this.decryptCustomKeys(
+        provider.customKeys,
+      ) as Prisma.JsonValue | null,
     };
   }
 }

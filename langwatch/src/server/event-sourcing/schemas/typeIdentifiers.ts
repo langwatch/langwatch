@@ -5,6 +5,24 @@
  */
 
 import {
+  ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
+  ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
+  ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
+} from "@ee/event-sourcing/typeIdentifiers";
+import {
+  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+} from "@langwatch/langy";
+import {
+  AUTOMATIONS_COMMAND_TYPES,
+  AUTOMATIONS_EVENT_TYPES,
+} from "../pipelines/automations/schemas/constants";
+import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
+import {
+  CODING_AGENT_PROCESSING_COMMAND_TYPES,
+  CODING_AGENT_PROCESSING_EVENT_TYPES,
+} from "../pipelines/coding-agent-processing/schemas/constants";
+import {
   EVALUATION_PROCESSING_COMMAND_TYPES,
   EVALUATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/evaluation-processing/schemas/constants";
@@ -13,36 +31,58 @@ import {
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
 import {
-  BILLING_REPORTING_COMMAND_TYPES,
-} from "../pipelines/billing-reporting/schemas/constants";
+  LOG_PROCESSING_COMMAND_TYPES,
+  LOG_PROCESSING_EVENT_TYPES,
+} from "../pipelines/log-processing/schemas/constants";
 import {
-  SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
+  METRIC_PROCESSING_COMMAND_TYPES,
+  METRIC_PROCESSING_EVENT_TYPES,
+} from "../pipelines/metric-processing/schemas/constants";
+import {
   SIMULATION_PROCESSING_EVENT_TYPES,
+  SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
 } from "../pipelines/simulation-processing/schemas/constants";
 import {
   SUITE_RUN_PROCESSING_COMMAND_TYPES,
   SUITE_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/suite-run-processing/schemas/constants";
 import {
+  TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
+  TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+} from "../pipelines/topic-clustering-processing/schemas/constants";
+import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
+  TRACE_PROCESSING_STAGING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
 
 /**
- * Test event type identifiers for integration tests.
- * These are minimal identifiers without full schemas - used only for validation.
+ * Test-only event type identifiers. Minimal brands without full schemas, used
+ * only to validate the pipeline in tests: `test.integration.event` for
+ * integration coverage, and `test.referenced` for the enqueue-staging seam's
+ * claim-check unit (a synthetic reference a `stage` hook returns).
  */
-const TEST_EVENT_TYPES = ["test.integration.event"] as const;
+const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
 
 /**
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
+  ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
+  // Staging-only brands (ADR-069): valid Event types that a `stage` hook may
+  // return but that are never appended to the event log.
+  ...TRACE_PROCESSING_STAGING_EVENT_TYPES,
+  ...METRIC_PROCESSING_EVENT_TYPES,
+  ...LOG_PROCESSING_EVENT_TYPES,
+  ...CODING_AGENT_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
+  ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+  ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
+  ...ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -50,11 +90,18 @@ export const EVENT_TYPE_IDENTIFIERS = [
  * All command type identifiers defined in schemas.
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
+  ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
+  ...METRIC_PROCESSING_COMMAND_TYPES,
+  ...LOG_PROCESSING_COMMAND_TYPES,
+  ...CODING_AGENT_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
+  ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
+  ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -70,12 +117,19 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
+  "trigger",
   "trace",
+  "metric",
+  "log",
+  "coding_agent_session",
   "evaluation",
   "experiment_run",
   "simulation_run",
   "simulation_set",
   "suite_run",
+  "langy_conversation",
+  "topic_clustering",
+  ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,

@@ -5,7 +5,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -13,7 +12,10 @@ import {
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
-import { persistedMessagesKey } from "../PromptPlaygroundChat";
+import {
+  PromptPlaygroundChat,
+  persistedMessagesKey,
+} from "../PromptPlaygroundChat";
 import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
 import { SyncedChatInput } from "../SyncedChatInput";
 
@@ -47,11 +49,32 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Captures the render props PromptPlaygroundChat passes to CopilotChat so
+// tests can drive the AssistantMessage render prop directly.
+const captured = vi.hoisted(() => ({
+  chatProps: null as Record<string, any> | null,
+}));
+
 // Mock CopilotKit components since they require complex setup
 vi.mock("@copilotkit/react-ui", () => ({
-  CopilotChat: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="copilot-chat">{children}</div>
+  CopilotChat: (props: Record<string, any>) => {
+    captured.chatProps = props;
+    return <div data-testid="copilot-chat" />;
+  },
+  AssistantMessage: (props: Record<string, any>) => (
+    <div data-testid="assistant-message">
+      {props.rawData?.content?.toString() ?? ""}
+    </div>
   ),
+  UserMessage: () => <div data-testid="user-message" />,
+}));
+
+vi.mock("@copilotkit/react-core", () => ({
+  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useCopilotChat: () => ({
+    setMessages: vi.fn(),
+    visibleMessages: [],
+  }),
 }));
 
 vi.mock("@copilotkit/runtime-client-gql", () => ({
@@ -59,6 +82,18 @@ vi.mock("@copilotkit/runtime-client-gql", () => ({
     setMessages: vi.fn(),
     messages: [],
   }),
+}));
+
+// TraceMessage pulls in tRPC + trace drawer hooks; stub it so tests can
+// assert on its presence/absence only.
+vi.mock("~/components/copilot-kit/TraceMessage", () => ({
+  TraceMessage: ({ traceId }: { traceId: string }) => (
+    <div data-testid="trace-message" data-trace-id={traceId} />
+  ),
+}));
+
+vi.mock("~/components/simulations/utils/convert-scenario-messages", () => ({
+  convertScenarioMessagesToCopilotKit: vi.fn(() => []),
 }));
 
 /**
@@ -169,6 +204,99 @@ describe("PromptPlaygroundChat ref methods", () => {
         { id: "u-2", role: "user", content: "ok" },
       ]);
       expect(before).not.toBe(after);
+    });
+  });
+
+  describe("given a rendered assistant message", () => {
+    const renderAssistantMessage = ({
+      content,
+      isLoading = false,
+      isGenerating = false,
+    }: {
+      content: string;
+      isLoading?: boolean;
+      isGenerating?: boolean;
+    }) => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      captured.chatProps = null;
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TabIdProvider tabId={tabId!}>
+            <PromptPlaygroundChat formValues={{} as never} />
+          </TabIdProvider>
+        </ChakraProvider>,
+      );
+
+      // Re-widen: the `= null` above narrows the property to `null`, and the
+      // render that repopulates it is opaque to control-flow analysis.
+      const chatProps = captured.chatProps as Record<string, any> | null;
+      const AssistantMessageProp =
+        chatProps?.AssistantMessage as unknown as React.ComponentType<
+          Record<string, unknown>
+        >;
+      expect(AssistantMessageProp).toBeDefined();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AssistantMessageProp
+            isLoading={isLoading}
+            isGenerating={isGenerating}
+            rawData={{ id: "msg-1", content }}
+          />
+        </ChakraProvider>,
+      );
+    };
+
+    describe("when the message content starts with [ERROR]", () => {
+      it("renders the error alert without reciting the provider's message", () => {
+        // `api_error` is the PROVIDER's discriminant, not one of ours, and
+        // "boom" is its own sentence. This asserted that "boom" rendered,
+        // which is how a provider's prose — and anything it quotes, including
+        // the API key it just rejected — reached the playground. The type is
+        // narrowed to `unknown` at the parse boundary now and the customer
+        // reads the registry's copy.
+        renderAssistantMessage({
+          content: '[ERROR]{"type":"api_error","message":"boom"}',
+        });
+
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+        expect(screen.getByText(/We've been notified/i)).toBeInTheDocument();
+        expect(screen.queryByTestId("trace-message")).not.toBeInTheDocument();
+      });
+
+      it("renders our own copy for a failure class it recognises", () => {
+        renderAssistantMessage({
+          content:
+            '[ERROR]{"type":"auth","message":"Incorrect API key provided: sk-proj-NOT-A-REAL-KEY"}',
+        });
+
+        expect(
+          screen.getByText(/rejected our credentials/i),
+        ).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain("sk-proj-");
+      });
+    });
+
+    describe("when the message is a finished non-error reply", () => {
+      it("renders the trace link for the message", () => {
+        renderAssistantMessage({ content: "The answer is 42." });
+
+        expect(screen.getByTestId("trace-message")).toHaveAttribute(
+          "data-trace-id",
+          "msg-1",
+        );
+      });
+    });
+
+    describe("when the message is still streaming", () => {
+      it("does not render the trace link yet", () => {
+        renderAssistantMessage({ content: "The answer", isGenerating: true });
+
+        expect(screen.queryByTestId("trace-message")).not.toBeInTheDocument();
+      });
     });
   });
 

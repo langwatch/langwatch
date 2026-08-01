@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"slices"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -144,7 +147,7 @@ func buildChatRequest(
 		return &bfschemas.BifrostChatRequest{
 				Provider:       provider,
 				Model:          model,
-				RawRequestBody: req.Body,
+				RawRequestBody: stripDropTuningParams(req.Body),
 				Input:          []bfschemas.ChatMessage{},
 			},
 			rawForwardCtx(ctx),
@@ -159,11 +162,14 @@ func buildChatRequest(
 	// preserves byte-for-byte identity and keeps cache hits working.
 	// Translation earns its keep only when the target wire format
 	// differs from the inbound (Anthropic / Gemini / Bedrock / Vertex).
+	// The parameter policy never applies here: whatever the provider
+	// accepts, the client gets, and the body stays byte-identical except
+	// for stripping the gateway-only drop_tuning_params field when present.
 	if isOpenAICompatibleProvider(provider) {
 		return &bfschemas.BifrostChatRequest{
 				Provider:       provider,
 				Model:          model,
-				RawRequestBody: req.Body,
+				RawRequestBody: stripDropTuningParams(req.Body),
 				Input:          []bfschemas.ChatMessage{},
 			},
 			rawForwardCtx(ctx),
@@ -174,6 +180,20 @@ func buildChatRequest(
 	if err != nil {
 		return nil, ctx, err
 	}
+	policy, err := applyParamPolicy(policyTarget{provider: provider, model: model}, req.Body, params)
+	if err != nil {
+		return nil, ctx, err
+	}
+	if len(policy.dropped) > 0 {
+		// The response-header seam for both sync and stream lanes is the
+		// dispatch meta accumulator (setMetaHeaders writes it before the
+		// first byte on either lane).
+		if meta := pipeline.MetaFromContext(ctx); meta != nil {
+			droppedCopy := slices.Clone(policy.dropped)
+			meta.Update(func(m *pipeline.Meta) { m.ParamsDropped = droppedCopy })
+		}
+		ctx = withParamsDropped(ctx, policy.dropped)
+	}
 	return &bfschemas.BifrostChatRequest{
 		Provider: provider,
 		Model:    model,
@@ -182,14 +202,38 @@ func buildChatRequest(
 	}, ctx, nil
 }
 
+// stripDropTuningParams removes the gateway-only drop_tuning_params field before a
+// body is forwarded to a provider. Only mutates when the field is present
+// so raw-forward bodies stay byte-identical for the overwhelmingly common
+// case (OpenAI's prompt-prefix auto-cache depends on that identity).
+func stripDropTuningParams(body []byte) []byte {
+	if !gjson.GetBytes(body, "drop_tuning_params").Exists() {
+		return body
+	}
+	out, err := sjson.DeleteBytes(body, "drop_tuning_params")
+	if err != nil {
+		return body
+	}
+	return out
+}
+
 // isOpenAICompatibleProvider reports whether the destination provider
 // natively speaks OpenAI chat-completions wire format. When true, the
 // gateway raw-forwards the inbound body rather than parse+re-marshal,
 // preserving byte-for-byte identity so OpenAI prompt-prefix auto-cache
 // continues to hit between repeated calls.
+//
+// VLLM is included: it is Bifrost's generic OpenAI-compatible adapter,
+// the destination for customer-hosted endpoints (self-hosted vLLM,
+// LiteLLM proxies) mapped from provider "custom" and from "openai" with
+// a base-URL override. Raw-forwarding them preserves the provider-specific
+// sampling params the structured parse would otherwise drop (top_k,
+// repetition_penalty, chat_template_kwargs, guided_json, ...) and lets
+// DispatchStream inject stream_options.include_usage so streamed token
+// usage still reaches billing/traces.
 func isOpenAICompatibleProvider(p bfschemas.ModelProvider) bool {
 	switch p {
-	case bfschemas.OpenAI, bfschemas.Azure:
+	case bfschemas.OpenAI, bfschemas.Azure, bfschemas.VLLM:
 		return true
 	default:
 		return false
@@ -221,6 +265,7 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 	if len(body) == 0 {
 		return nil, nil, nil
 	}
+	body = normalizeStopString(body)
 
 	var messagesWrap struct {
 		Messages []bfschemas.ChatMessage `json:"messages"`
@@ -234,9 +279,67 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 		return nil, nil, fmt.Errorf("parse params: %w", err)
 	}
 
+	if err := liftMaxTokensAlias(body, &params); err != nil {
+		return nil, nil, err
+	}
 	liftExtensionParams(body, &params)
 
 	return messagesWrap.Messages, &params, nil
+}
+
+// normalizeStopString accepts OpenAI's bare-string form of `stop`
+// ("stop": "END") by rewriting it to the one-element list form before the
+// structured parse. ChatParameters types Stop as []string, so without
+// this a valid OpenAI body that works on every raw-forward lane would
+// 400 on the translated lanes.
+func normalizeStopString(body []byte) []byte {
+	v := gjson.GetBytes(body, "stop")
+	if v.Type != gjson.String {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "stop", []string{v.String()})
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// liftMaxTokensAlias maps the legacy OpenAI output cap `max_tokens` onto
+// ChatParameters.MaxCompletionTokens for the translated lanes.
+//
+// ChatParameters has no top-level `max_tokens` field, so on the lanes that
+// parse the body (Anthropic, Bedrock, Gemini, Vertex: everything
+// isOpenAICompatibleProvider does not raw-forward) a client's `max_tokens`
+// used to unmarshal into nothing. The per-provider translators read only
+// MaxCompletionTokens and, finding nil, fall back to the model's own
+// maximum (Anthropic's Messages API requires max_tokens so Bifrost injects
+// a default; Bedrock and Gemini omit the cap field entirely): the client's
+// cap was silently ignored, and a request sent with max_tokens: 5 came
+// back with dozens of completion tokens and finish_reason "stop" instead
+// of "length".
+//
+// An explicit max_completion_tokens wins over the alias; OpenAI documents
+// max_tokens as the deprecated name for the same cap. Raw-forward lanes
+// (OpenAI, Azure, vLLM) are deliberately untouched: their bodies reach the
+// provider byte-for-byte and the provider applies its own alias rules
+// (gpt-5* rejects max_tokens with a 400 the gateway passes through
+// verbatim, per specs/ai-gateway/openai-param-compat.feature).
+func liftMaxTokensAlias(body []byte, params *bfschemas.ChatParameters) error {
+	v := gjson.GetBytes(body, "max_tokens")
+	if !v.Exists() || v.Type == gjson.Null {
+		return nil
+	}
+	// Mirror the strictness of max_completion_tokens (*int): a malformed
+	// cap must fail the request, not silently un-cap it.
+	if v.Type != gjson.Number || v.Num != math.Trunc(v.Num) {
+		return fmt.Errorf("max_tokens must be an integer")
+	}
+	if params.MaxCompletionTokens != nil {
+		return nil
+	}
+	n := int(v.Int())
+	params.MaxCompletionTokens = &n
+	return nil
 }
 
 // chatExtensionKeys enumerates the provider-extension fields the gateway
@@ -271,9 +374,10 @@ var chatExtensionKeys = []string{
 //   - the body has no "stream":true (non-stream dispatch),
 //   - the body already carries stream_options.include_usage (caller decided).
 //
-// Only call on raw-forward paths for OpenAI / Azure. Anthropic / Gemini /
-// Vertex / Bedrock emit usage natively in their stream deltas and this flag
-// is meaningless on their wire formats.
+// Only call on raw-forward paths for OpenAI / Azure / VLLM (self-hosted
+// OpenAI-compatible). Anthropic / Gemini / Vertex / Bedrock emit usage
+// natively in their stream deltas and this flag is meaningless on their
+// wire formats.
 func ensureStreamIncludeUsage(body []byte) []byte {
 	if len(body) == 0 {
 		return body

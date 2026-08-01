@@ -38,6 +38,9 @@ export function SelectionActionBar({
       borderWidth="1px"
       borderColor="border.muted"
       boxShadow="lg"
+      // Anyone else who floats at the bottom-center (Langy's armed-mode hint)
+      // reads this to stack above the bar instead of landing on top of it.
+      data-bottom-floating-bar=""
       data-testid={testId}
     >
       <HStack gap={2} align="center" whiteSpace="nowrap">

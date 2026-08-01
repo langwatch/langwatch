@@ -11,49 +11,64 @@
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { getApp } from "~/server/app-layer/app";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
-import { prisma } from "~/server/db";
-import { generateAsciiTree } from "~/server/traces/trace-formatting";
-import {
-  toLLMModeTrace,
-  formatTraceSummaryDigest,
-} from "~/server/traces/trace-formatting";
-import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import type { Span, Trace } from "~/server/tracer/types";
 import type { Permission } from "~/server/api/rbac";
+import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getProtectionsForProject } from "~/server/api/utils";
 import {
+  apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
-  apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import type { Span, Trace } from "~/server/tracer/types";
+import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  formatTraceSummaryDigest,
+  generateAsciiTree,
+  toLLMModeTrace,
+} from "~/server/traces/trace-formatting";
 
 const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
+
+// Split by grain: the reads and the share/unshare pair are different powers,
+// and `traces:share` creates PUBLIC links — exactly the sort of thing that must
+// be legible in the registry rather than buried in a handler.
+const tracesViewAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:view"],
+  credential: "apiKey",
+});
+const tracesShareAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:share"],
+  credential: "apiKey",
+});
 
 const secured = createServiceApp({ basePath: "/api" });
 
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either `{ project, markUsed }` or
- * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
- * keys — callers invoke it after a successful response.
+ * `{ error, status, body }`, where `body` is what the route answers with —
+ * a bare sentence for an unauthenticated call, and the full handled payload
+ * (code, permission, tips) for a permission denial. `markUsed` is
+ * fire-and-forget and a no-op for legacy keys — callers invoke it after a
+ * successful response.
  */
 async function authenticateRequest(c: Context, permission: Permission) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   const resolved = await tokenResolver.resolve({
@@ -61,14 +76,19 @@ async function authenticateRequest(c: Context, permission: Permission) {
     projectId: credentials.projectId,
   });
   if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   try {
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   const markUsed = () => {
@@ -81,10 +101,10 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 // ---------- GET /api/trace/:id ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
+secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -92,8 +112,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
     const traceId = c.req.param("id");
     const formatParam = c.req.query("format");
     const llmMode =
-      c.req.query("llmMode") === "true" ||
-      c.req.query("llmMode") === "1";
+      c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
     const format = formatParam ?? (llmMode ? "digest" : "json");
 
     c.header("Deprecation", "true");
@@ -156,10 +175,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
 });
 
 // ---------- POST /api/trace/:id/share ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (c) => {
+secured.access(tracesShareAuth).post("/trace/:id/share", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -176,10 +195,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (
 });
 
 // ---------- POST /api/trace/:id/unshare ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/unshare", async (c) => {
+secured.access(tracesShareAuth).post("/trace/:id/unshare", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -220,10 +239,10 @@ const paramsSchema = getAllForProjectInput
     llmMode: z.boolean().optional().default(false),
   });
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/search", async (c) => {
+secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -312,10 +331,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/search", async (c) 
 });
 
 // ---------- GET /api/thread/:id ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => {
+secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -323,11 +342,16 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => 
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  const traceService = TraceService.create(prisma);
+  // Thread-detail read consumes conversation content — resolve full IO (#4991).
+  const traceService = TraceService.create(
+    prisma,
+    buildTraceBlobResolutionDeps(),
+  );
   const traces = await traceService.getTracesByThreadId(
     project.id,
     threadId,
     protections,
+    { full: true },
   );
 
   markUsed();

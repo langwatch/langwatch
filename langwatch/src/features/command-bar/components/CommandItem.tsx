@@ -43,16 +43,16 @@ export function CommandItem({
   return (
     <HStack
       data-index={index}
-      px={2}
-      py={1.5}
+      px={3}
+      py={2}
       cursor="pointer"
-      borderRadius="md"
-      marginX={2}
-      bg={isSelected ? "bg.emphasized" : "transparent"}
-      _hover={{ bg: "bg.muted" }}
+      borderRadius="lg"
+      marginX={{ base: 2, md: 2.5 }}
+      bg={isSelected ? "bg.emphasized/60" : "transparent"}
+      _hover={{ bg: "bg.emphasized/80" }}
       onClick={() => onSelect(item)}
       onMouseEnter={() => onMouseEnter(index)}
-      gap={3}
+      gap={3.5}
     >
       <Box color={color} flexShrink={0}>
         <Icon size={18} />

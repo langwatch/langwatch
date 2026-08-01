@@ -7,13 +7,19 @@
  * background, and hands back the run id plus a shareable results URL the
  * caller can poll or open in the browser.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { type OrchestratorInput, runOrchestrator } from "./orchestrator";
+import { mapThrownErrorEvent } from "./resultMapper";
 import { runStateManager } from "./runStateManager";
 import { getRunUrl } from "./runUrl";
-import type { EvaluationV3Event, ExecutionScope } from "./types";
+import {
+  type EvaluationV3Event,
+  type ExecutionScope,
+  UNNAMED_FAILURE,
+} from "./types";
 
 const logger = createLogger("langwatch:experiments-v3:runner");
 
@@ -81,10 +87,21 @@ export const startPollingRun = async (
         }
       }
     } catch (error) {
+      // Through the same mapper the streaming path uses, so a polled run and a
+      // streamed one report a failure identically: a handled error keeps its
+      // code and travels as `domainError`; anything else is the unnamed-failure
+      // marker plus the trace id.
+      const failure = mapThrownErrorEvent({ error });
+      const code = failure.type === "error" ? failure.message : UNNAMED_FAILURE;
+      const traceId = failure.type === "error" ? failure.traceId : undefined;
+
+      // The raw message stops here. This log line is where it belongs — with
+      // the trace id that ties it to the run row the customer can see.
       logger.error(
         {
           error,
           runId,
+          traceId,
           experimentSlug,
           projectId: orchestratorInput.projectId,
         },
@@ -97,10 +114,11 @@ export const startPollingRun = async (
           projectId: orchestratorInput.projectId,
         },
       });
-      await runStateManager.failRun(
-        runId,
-        error instanceof Error ? error.message : String(error),
-      );
+      await runStateManager.failRun(runId, {
+        code,
+        domainError: failure.type === "error" ? failure.domainError : undefined,
+        traceId,
+      });
     }
   };
 

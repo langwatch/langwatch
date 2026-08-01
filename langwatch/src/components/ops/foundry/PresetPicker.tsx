@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Box, Button, Flex, Text, Badge } from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, Text } from "@chakra-ui/react";
 import { ChevronDown, Shuffle } from "lucide-react";
-import { useTraceStore } from "./traceStore";
-import { usePresetStore } from "./presetStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import { shortId } from "./types";
-import type { SpanConfig, TraceConfig } from "./types";
+import { useState } from "react";
 import { api } from "~/utils/api";
+import { useFoundryProjectStore } from "./foundryProjectStore";
+import { usePresetStore } from "./presetStore";
+import { useTraceStore } from "./traceStore";
+import type { SpanConfig, TraceConfig } from "./types";
+import { shortId } from "./types";
 
 function countSpans(spans: SpanConfig[]): number {
   return spans.reduce((acc, s) => acc + 1 + countSpans(s.children), 0);
@@ -28,7 +28,12 @@ function reassignIds(span: SpanConfig) {
 
 function injectRealPrompts(
   config: TraceConfig,
-  prompts: Array<{ id: string; handle: string | null; versionId: string; version: number }>
+  prompts: Array<{
+    id: string;
+    handle: string | null;
+    versionId: string;
+    version: number;
+  }>,
 ) {
   const promptSpans: SpanConfig[] = [];
   function collect(spans: SpanConfig[]) {
@@ -64,7 +69,7 @@ export function PresetPicker() {
   const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
   const prompts = api.prompts.getAllPromptsForProject.useQuery(
     { projectId: selectedProjectId! },
-    { enabled: !!selectedProjectId }
+    { enabled: !!selectedProjectId },
   );
 
   function loadPreset(id: string) {
@@ -93,10 +98,7 @@ export function PresetPicker() {
       [allSpans[i], allSpans[j]] = [allSpans[j]!, allSpans[i]!];
     }
 
-    const count = Math.min(
-      allSpans.length,
-      8 + Math.floor(Math.random() * 8)
-    );
+    const count = Math.min(allSpans.length, 8 + Math.floor(Math.random() * 8));
     const picked = allSpans.slice(0, count);
 
     // Reassign IDs and lay out sequentially
@@ -125,7 +127,12 @@ export function PresetPicker() {
       </Button>
       {isOpen && (
         <>
-          <Box position="fixed" inset={0} zIndex={40} onClick={() => setIsOpen(false)} />
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={40}
+            onClick={() => setIsOpen(false)}
+          />
           <Box
             position="absolute"
             right={0}
@@ -153,7 +160,13 @@ export function PresetPicker() {
                 Mashup (random spans from all presets)
               </Button>
             </Flex>
-            <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1}>
+            <Text
+              fontSize="xs"
+              fontWeight="medium"
+              color="fg.muted"
+              px={2}
+              py={1}
+            >
               Built-in Presets
             </Text>
             {builtIn.map((preset) => (
@@ -186,7 +199,14 @@ export function PresetPicker() {
             ))}
             {userPresets.length > 0 && (
               <>
-                <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1} mt={1}>
+                <Text
+                  fontSize="xs"
+                  fontWeight="medium"
+                  color="fg.muted"
+                  px={2}
+                  py={1}
+                  mt={1}
+                >
                   Your Presets
                 </Text>
                 {userPresets.map((preset) => (
@@ -205,10 +225,16 @@ export function PresetPicker() {
                     onClick={() => loadPreset(preset.id)}
                   >
                     <Flex w="full" justify="space-between" align="center">
-                      <Text fontSize="sm" fontWeight="medium" color="fg.default">
+                      <Text
+                        fontSize="sm"
+                        fontWeight="medium"
+                        color="fg.default"
+                      >
                         {preset.name}
                       </Text>
-                      <Badge colorPalette="purple" size="sm">Custom</Badge>
+                      <Badge colorPalette="purple" size="sm">
+                        Custom
+                      </Badge>
                     </Flex>
                     <Text fontSize="xs" color="fg.muted" lineClamp={1}>
                       {preset.description}

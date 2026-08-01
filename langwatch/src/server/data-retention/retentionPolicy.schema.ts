@@ -76,7 +76,86 @@ export const DEFAULT_RETENTION_DAYS = MIN_RETENTION_DAYS;
  * grandfathers data that predates the column. Must stay a whole number of weeks
  * (weekly partition key).
  */
-export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+const PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+
+/**
+ * Resolve the platform retention default, honouring a local-dev override.
+ *
+ * `LANGWATCH_DEFAULT_RETENTION_DAYS` lets a local stack (haven pins it to 7) run
+ * with a tiny default so ClickHouse stays small. It is a DEV-ONLY affordance:
+ * shrinking the platform default in production would silently expire customer
+ * data, so the override is honoured ONLY under an environment we positively
+ * recognise as non-production, and fails loud anywhere else.
+ *
+ * The check is deliberately fail-CLOSED. `NODE_ENV` reaches a deployment from
+ * operator-supplied Helm values, so an environment spelled `prod`, `staging`,
+ * `Production` — or left unset entirely — must not be able to shrink the
+ * platform default by omission. Only the two values a dev/test process actually
+ * sets open the gate.
+ *
+ * The value must be a positive whole number of weeks (the weekly partition key)
+ * within the column's bounds, enforced the same way `retentionDaysSchema` does.
+ *
+ * Takes its environment as an argument (defaulting to `process.env`) so the
+ * branches are unit-testable without reloading the module.
+ */
+const NON_PRODUCTION_NODE_ENVS = ["development", "test"] as const;
+
+export function resolvePlatformDefaultRetentionDays(
+  env: {
+    LANGWATCH_DEFAULT_RETENTION_DAYS?: string;
+    NODE_ENV?: string;
+  } = process.env,
+): number {
+  const raw = env.LANGWATCH_DEFAULT_RETENTION_DAYS;
+  if (raw == null || raw === "") {
+    return PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS;
+  }
+  const nodeEnv = env.NODE_ENV;
+  const isKnownNonProduction = NON_PRODUCTION_NODE_ENVS.some(
+    (candidate) => candidate === nodeEnv,
+  );
+  if (!isKnownNonProduction) {
+    throw new Error(
+      `LANGWATCH_DEFAULT_RETENTION_DAYS must not be set when NODE_ENV=${nodeEnv ?? "(unset)"}: ` +
+        `the platform retention default is fixed at ${PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS} days ` +
+        "outside development and test, and lowering it would silently expire customer data. " +
+        "Configure per-tenant retention through RetentionPolicy overrides instead.",
+    );
+  }
+  const days = Number(raw);
+  if (
+    !Number.isInteger(days) ||
+    days <= 0 ||
+    days > MAX_RETENTION_DAYS ||
+    days % RETENTION_WEEK_DAYS !== 0
+  ) {
+    throw new Error(
+      `LANGWATCH_DEFAULT_RETENTION_DAYS=${raw} is invalid: it must be a positive whole number of weeks ` +
+        `(a multiple of ${RETENTION_WEEK_DAYS}, at most ${MAX_RETENTION_DAYS}) so it aligns with the weekly partition key.`,
+    );
+  }
+  return days;
+}
+
+/**
+ * The platform retention default, fixed at 49 days in production and overridable
+ * only by a local-dev stack via `LANGWATCH_DEFAULT_RETENTION_DAYS` (see
+ * `resolvePlatformDefaultRetentionDays`). Read once at module load.
+ *
+ * This module is also imported by client components (the data-retention settings
+ * page and its cards import `RETENTION_CATEGORIES` and friends from here), and
+ * the browser bundle has no `process`: vite's `define` substitutes only the
+ * specific `process.env.<KEY>` reads it enumerates, never a bare `process.env`.
+ * Evaluating the resolver unguarded therefore threw `ReferenceError: process is
+ * not defined` at module load and took the settings page down with it. In the
+ * browser there is no override to honour anyway — the dev-only var is
+ * server-side — so fall back to the production constant there.
+ */
+export const PLATFORM_DEFAULT_RETENTION_DAYS =
+  typeof process === "undefined"
+    ? PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS
+    : resolvePlatformDefaultRetentionDays();
 
 /**
  * The ClickHouse `_retention_days` column DEFAULT (migration 00032): the value
@@ -172,9 +251,24 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   event_log: "traces",
   stored_spans: "traces",
   stored_log_records: "traces",
-  stored_metric_records: "traces",
+  log_records: "traces",
+  metric_data_points: "traces",
+  metric_series: "traces",
+  metric_time_rollups: "traces",
   trace_summaries: "traces",
+  // ADR-034: both analytics projections derive from trace events and age with
+  // the same per-project retention policy as trace_summaries.
+  trace_analytics: "traces",
+  trace_analytics_rollup: "traces",
   evaluation_runs: "traces",
+  // ADR-034 Phase 6: eval analytics tables age with the same per-project
+  // retention policy as evaluation_runs (and trace_summaries — both currently
+  // categorised "traces" until eval split-out lands).
+  evaluation_analytics: "traces",
+  evaluation_analytics_rollup: "traces",
+  // Content-free Langy event analytics derives from the canonical event log
+  // and ages/meters with the same project trace-retention policy.
+  langy_analytics_events: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",
   suite_runs: "scenarios",
@@ -187,3 +281,35 @@ export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
 export const RETENTION_MANAGED_TABLES = Object.keys(
   RETENTION_TABLE_CATEGORY_MAP,
 ) as RetentionManagedTable[];
+
+/**
+ * Tables included in the customer-visible production storage meter. Canonical
+ * metrics follow trace retention, but remain shadow-only for pricing: their
+ * raw source bytes and derived rows must not affect billed storage totals.
+ *
+ * `log_records` is deliberately NOT shadowed, and that asymmetry is the point:
+ * logs were already billed here via `stored_log_records`, which canonical logs
+ * replace, so shadowing them would stop billing log storage entirely once the
+ * legacy table drains. Metrics are a new data type that was never billed, so
+ * they stay shadowed until priced.
+ *
+ * This does not make the cutover a price rise. Both tables meter the record's
+ * *content*, not its physical row: `stored_log_records._size_bytes` is
+ * `MATERIALIZED byteSize(Body, Attributes, ResourceAttributes, …)` (00032),
+ * while `log_records._size_bytes` is app-supplied `canonicalSizeBytes` — the
+ * byte length of the canonical payload alone. The canonical row denormalises
+ * that content into BodyJson/BodyText, Attributes{,Flat}Json and a ZSTD(6)
+ * CanonicalPayload, and none of that duplication is billed; the delta is JSON
+ * serialisation overhead, not a multiple. Supplying `_size_bytes` from the app
+ * is a deliberate exception to 00032's "never pass _size_bytes in INSERTs" —
+ * possible only because these columns are DEFAULT 0 rather than MATERIALIZED.
+ */
+const SHADOW_METRIC_STORAGE_TABLES = new Set<RetentionManagedTable>([
+  "metric_data_points",
+  "metric_series",
+  "metric_time_rollups",
+]);
+
+export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
+  (table) => !SHADOW_METRIC_STORAGE_TABLES.has(table),
+);

@@ -23,6 +23,13 @@ export type LLMModelPricing = {
   audioCostPerToken?: number;
   internalReasoningCostPerToken?: number;
   webSearchCostPerQuery?: number;
+  // Audio pricing: TTS models bill per input character synthesized,
+  // STT models per second of audio transcribed. Matched against the
+  // gen_ai.usage.input_chars / gen_ai.usage.audio_seconds span attrs
+  // the gateway emits. Hand-curated in llmModels.overlay.json — the
+  // OpenRouter sync has no per-character/per-second price data.
+  inputCostPerCharacter?: number;
+  inputCostPerSecond?: number;
 };
 
 // ============================================================================
@@ -78,8 +85,8 @@ export type LLMModelEntry = {
   defaultParameters: Record<string, unknown> | null;
   /** Raw modality string, e.g. "text->text" */
   modality: string;
-  /** Derived mode: "chat" or "embedding" */
-  mode: "chat" | "embedding";
+  /** Derived mode: "chat", "embedding", or "audio" (TTS/STT) */
+  mode: "chat" | "embedding" | "audio";
   /** Model description (optional) */
   description?: string;
   // Multimodal support flags

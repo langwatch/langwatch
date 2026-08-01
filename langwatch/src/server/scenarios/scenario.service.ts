@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import { ScenarioNotFoundError } from "./errors";
 import {
-  ScenarioRepository,
   type CreateScenarioInput,
+  ScenarioRepository,
   type UpdateScenarioInput,
 } from "./scenario.repository";
 
@@ -134,10 +134,7 @@ export class ScenarioService {
    * Soft-archive a single scenario.
    * Throws if the scenario is not found in the given project.
    */
-  async archive(params: {
-    id: string;
-    projectId: string;
-  }): Promise<Scenario> {
+  async archive(params: { id: string; projectId: string }): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioService.archive",
       {
@@ -165,10 +162,7 @@ export class ScenarioService {
    * Soft-archive multiple scenarios.
    * Returns archived IDs and structured failure details.
    */
-  async batchArchive(params: {
-    ids: string[];
-    projectId: string;
-  }): Promise<{
+  async batchArchive(params: { ids: string[]; projectId: string }): Promise<{
     archived: string[];
     failed: { id: string; error: string }[];
   }> {

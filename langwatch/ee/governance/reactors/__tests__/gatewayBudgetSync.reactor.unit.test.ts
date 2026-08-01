@@ -1,14 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatewayBudget } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "../gatewayBudgetSync.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -90,14 +90,26 @@ const event: TraceProcessingEvent = {
   metadata: { spanId: "span-1", traceId: "trace-1" },
 } as unknown as TraceProcessingEvent;
 
+type ResolvedBudgetStub = {
+  budget: GatewayBudget;
+  bucketScopeId: string;
+  principalUserId: string | null;
+  groupId: string | null;
+};
+
 function mockDeps(
-  vk:
-    | { id: string; organizationId: string; principalUserId: string | null }
-    | null,
-  project:
-    | { id: string; teamId: string; team: { organizationId: string } }
-    | null,
+  vk: {
+    id: string;
+    organizationId: string;
+    principalUserId: string | null;
+  } | null,
+  project: {
+    id: string;
+    teamId: string;
+    team: { organizationId: string };
+  } | null,
   budgets: GatewayBudget[] = [],
+  resolved?: ResolvedBudgetStub[],
 ): {
   deps: GatewayBudgetSyncReactorDeps;
   insertDebit: ReturnType<typeof vi.fn>;
@@ -114,7 +126,17 @@ function mockDeps(
         },
       } as any,
       budgetRepository: {
-        applicableForRequest: vi.fn().mockResolvedValue(budgets),
+        // The reactor resolves buckets, not bare rows: a group budget
+        // debits one member's bucket, not the whole group's.
+        resolveForRequest: vi.fn().mockResolvedValue(
+          resolved ??
+            budgets.map((budget) => ({
+              budget,
+              bucketScopeId: budget.scopeId,
+              principalUserId: null,
+              groupId: null,
+            })),
+        ),
       } as any,
       budgetCHRepository: {
         insertDebit,
@@ -265,6 +287,63 @@ describe("gatewayBudgetSync reactor", () => {
         tokensOutput: 42,
         model: "gpt-5-mini",
         status: "SUCCESS",
+      });
+    });
+  });
+
+  describe("when the VK has a per-member group budget", () => {
+    it("debits the member's bucket, provider suffix included, not the group row", async () => {
+      const budget = {
+        id: "budget-grp",
+        scopeType: "GROUP",
+        scopeId: "grp-1",
+        providerKey: "mp-openai",
+        window: "MONTH",
+      } as GatewayBudget;
+
+      const { deps, insertDebit } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: "user-1" },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [budget],
+        [
+          {
+            budget,
+            // The bucket resolution service computes this shape; the
+            // reactor must carry it into the row verbatim, because the
+            // gateway and the spend readers match on exactly this id.
+            bucketScopeId: "grp-1:user-1|provider:mp-openai",
+            principalUserId: "user-1",
+            groupId: "grp-1",
+          },
+        ],
+      );
+      const reactor = createGatewayBudgetSyncReactor(deps);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState({
+            "langwatch.virtual_key_id": "vk-1",
+            "langwatch.gateway_request_id": "req-grp-1",
+            // The provider-filtered budget only accrues when the span
+            // names the dispatched provider it filters on.
+            "langwatch.model_provider_id": "mp-openai",
+          }),
+        ),
+      );
+
+      expect(insertDebit).toHaveBeenCalledTimes(1);
+      const rows = insertDebit.mock.calls[0]![0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        budgetId: "budget-grp",
+        scope: "GROUP",
+        scopeId: "grp-1:user-1|provider:mp-openai",
+        window: "MONTH",
       });
     });
   });

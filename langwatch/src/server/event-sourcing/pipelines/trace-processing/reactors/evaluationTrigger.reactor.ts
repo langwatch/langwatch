@@ -1,21 +1,24 @@
 import { generate } from "@langwatch/ksuid";
-import { evaluatorLoopBlockedCounter } from "../../../../metrics";
+import { createLogger } from "@langwatch/observability";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
+import { KSUID_RESOURCES } from "../../../../../utils/constants";
+import { featureFlagService } from "../../../../featureFlag";
+import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
+import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
-import { KSUID_RESOURCES } from "../../../../../utils/constants";
-import { createLogger } from "../../../../../utils/logger/server";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import {
   MAX_PROCESSED_SPANS,
   type TraceSummaryData,
 } from "../projections/traceSummary.foldProjection";
-import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
+import {
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
-import { featureFlagService } from "../../../../featureFlag";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
   "ops_es_causality_loop_guard_disabled";
@@ -26,7 +29,32 @@ const logger = createLogger(
 
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
-  evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
+  evaluation: (
+    data: ExecuteEvaluationCommandData,
+    options?: QueueSendOptions<ExecuteEvaluationCommandData>,
+  ) => Promise<void>;
+}
+
+/**
+ * Pure relevance guard, evaluated pre-enqueue via `shouldReact` (and again in
+ * `handle`, the fail-open path). Reads only the payload the handler receives, so
+ * hoisting it out of `handle` changes nothing but where the work is skipped —
+ * before the queue serializes, gzips and blobs a payload it would immediately
+ * dedup away, rather than after.
+ *
+ * Side-effect free, per the `ExtraGuard` contract: `shouldReact` is evaluated
+ * once per event of a coalesced batch, so anything logged here is multiplied by
+ * the batch size. The oversized-trace guard lives in `handle` for exactly that
+ * reason — see below.
+ */
+function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
+  // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
+  // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
+  // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
+  // future synthetic name updates both sites at once.
+  return !(
+    isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)
+  );
 }
 
 /**
@@ -43,14 +71,8 @@ export function createEvaluationTriggerReactor(
   return defineOriginGuardedTraceReactor({
     name: "evaluationTrigger",
     jobIdPrefix: "eval-trigger",
+    isRelevant: isDispatchableEvaluationEvent,
     async handle(event, context) {
-      // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
-      // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
-      // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
-      // future synthetic name updates both sites at once.
-      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)) {
-        return;
-      }
       const { tenantId, aggregateId: traceId, foldState } = context;
 
       // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
@@ -60,10 +82,16 @@ export function createEvaluationTriggerReactor(
       // on a 26k-span trace is pure amplification for no added signal. Skip the
       // eval dispatch (lighter processing). The span itself is still stored and
       // the trace stays fully queryable: we drop the WORK, never the DATA.
+      //
+      // This stays in `handle`, not in the pre-enqueue `shouldReact`, so the
+      // once-per-crossing warn below fires once: `shouldReact` runs per event of
+      // a coalesced batch, and would multiply the log by the batch size. The
+      // enqueue it no longer skips is already collapsed to one job per batch by
+      // the router's dedup-id collapse, so there is nothing left to save.
       if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
-        // Log once, on the first crossing only. This is a per-span hot path: a
-        // runaway trace would otherwise emit thousands of identical warns, the
-        // very per-span amplification we are skipping the eval to avoid.
+        // Log once, on the first crossing only. A runaway trace would otherwise
+        // emit thousands of identical warns — the very per-span amplification we
+        // are skipping the eval to avoid.
         if (foldState.spanCount === MAX_PROCESSED_SPANS) {
           logger.warn(
             {
@@ -259,29 +287,37 @@ async function dispatchEvaluations({
       };
 
       const isThreadLevel =
-        monitor.threadIdleTimeout &&
-        monitor.threadIdleTimeout > 0 &&
-        threadId;
+        monitor.threadIdleTimeout && monitor.threadIdleTimeout > 0 && threadId;
 
-      const sendOptions: QueueSendOptions<ExecuteEvaluationCommandData> | undefined =
-        isThreadLevel
-          ? {
-              delay: monitor.threadIdleTimeout! * 1000,
-              deduplication: {
-                makeId: ExecuteEvaluationCommand.makeJobId,
-                ttlMs: monitor.threadIdleTimeout! * 1000,
-              },
-            }
-          : {
-              deduplication: {
-                makeId: ExecuteEvaluationCommand.makeJobId,
-                // 6 min — outlasts the 5-min deferred origin resolution window
-                // so that if the reactor fires twice (once from a late span,
-                // once from the deferred OriginResolvedEvent), the second
-                // dispatch is squashed by the dedup key.
-                ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
-              },
-            };
+      const sendOptions:
+        | QueueSendOptions<ExecuteEvaluationCommandData>
+        | undefined = isThreadLevel
+        ? {
+            delay: monitor.threadIdleTimeout! * 1000,
+            deduplication: {
+              makeId: ExecuteEvaluationCommand.makeJobId,
+              ttlMs: monitor.threadIdleTimeout! * 1000,
+              // Defensive on this branch: the thread dedup TTL roughly equals the
+              // dispatch delay (both = threadIdleTimeout), so the post-dispatch
+              // squash window is ~0. The load-bearing fix is the trace-level
+              // deferred branch below (6-min TTL >> dispatch latency) (#3912).
+              shouldSurviveDispatch: true,
+            },
+          }
+        : {
+            deduplication: {
+              makeId: ExecuteEvaluationCommand.makeJobId,
+              // 6 min — outlasts the 5-min deferred origin resolution window
+              // so that if the reactor fires twice (once from a late span,
+              // once from the deferred OriginResolvedEvent), the second
+              // dispatch is squashed by the dedup key.
+              ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+              // Honor the still-alive dedup key even after the first command was
+              // dispatched, so the second trigger is squashed rather than
+              // DEL+restaged into a duplicate evaluation run (#3912).
+              shouldSurviveDispatch: true,
+            },
+          };
 
       await deps.evaluation(payload, sendOptions);
     } catch (error) {

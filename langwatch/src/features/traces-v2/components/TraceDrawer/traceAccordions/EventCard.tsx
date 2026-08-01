@@ -16,6 +16,13 @@ interface EventCardProps {
   spanId?: string | null;
   /** Selection callback for the "Open span" affordance. */
   onSelectSpan?: (spanId: string) => void;
+  /**
+   * Outcome colour for events whose structure we know (a denied tool call, a
+   * failed result) — the same tone vocabulary SessionView's Signals use, so a
+   * bad outcome reads at a glance instead of requiring a read through the
+   * attribute table underneath. Omitted (or "neutral") renders the plain card.
+   */
+  tone?: "danger" | "warning" | "neutral";
 }
 
 /**
@@ -33,80 +40,103 @@ export const EventCard: React.FC<EventCardProps> = ({
   attributes,
   spanId,
   onSelectSpan,
+  tone = "neutral",
 }) => {
   const offsetMs = Math.max(0, Math.round(timestampMs - anchorMs));
   const attributeEntries = attributes ? Object.entries(attributes) : [];
   const hasAttributes = attributeEntries.length > 0;
 
   return (
-    <Box
+    <HStack
+      align="stretch"
+      gap={0}
       borderWidth="1px"
-      borderColor="border.subtle"
+      borderColor={
+        tone === "danger"
+          ? "red.solid/30"
+          : tone === "warning"
+            ? "yellow.solid/30"
+            : "border.subtle"
+      }
       borderRadius="md"
-      bg="bg.subtle"
-      paddingX={3}
-      paddingY={2}
+      bg={
+        tone === "danger"
+          ? "red.solid/8"
+          : tone === "warning"
+            ? "yellow.solid/8"
+            : "bg.subtle"
+      }
+      overflow="hidden"
     >
-      <HStack gap={3} align="center">
-        <Text textStyle="sm" fontWeight="medium" color="fg" truncate>
-          {name}
-        </Text>
-        <HStack gap={1} color="fg.subtle" flexShrink={0}>
-          <LuCalendar size={12} />
-          <Text textStyle="2xs" fontFamily="mono">
-            +{offsetMs}ms
-          </Text>
-        </HStack>
-        {spanId && onSelectSpan && (
-          <Button
-            size="2xs"
-            variant="ghost"
-            marginLeft="auto"
-            color="fg.muted"
-            gap={1}
-            onClick={() => onSelectSpan(spanId)}
-            aria-label={`Open span that emitted ${name}`}
-          >
-            Open span
-            <LuArrowUpRight size={11} />
-          </Button>
-        )}
-      </HStack>
-      {hasAttributes && (
-        <VStack
-          align="stretch"
-          gap={0.5}
-          marginTop={1.5}
-          paddingTop={1.5}
-          borderTopWidth="1px"
-          borderTopColor="border.subtle"
-        >
-          {attributeEntries.map(([key, value]) => (
-            <HStack key={key} gap={2} align="center" minWidth={0}>
-              <Text
-                textStyle="2xs"
-                color="fg.muted"
-                fontFamily="mono"
-                minWidth="120px"
-                maxWidth="160px"
-                flexShrink={0}
-                truncate
-              >
-                {key}
-              </Text>
-              {/* Delegate to the shared AttributeValue renderer: JSON
-                  / chat payloads get format detection + a click-to-open
-                  popover with the prettified body; leaves stay inline.
-                  Same affordance the span attributes table uses, so
-                  large event payloads like `langwatch.evaluation.custom`
-                  are no longer dumped as a flat 200-char string. */}
-              <Box flex={1} minWidth={0}>
-                <AttributeValue attrKey={key} value={value} />
-              </Box>
-            </HStack>
-          ))}
-        </VStack>
+      {tone !== "neutral" && (
+        <Box
+          width="3px"
+          flexShrink={0}
+          bg={tone === "danger" ? "red.solid" : "yellow.solid"}
+        />
       )}
-    </Box>
+      <Box flex={1} minWidth={0} paddingX={3} paddingY={2}>
+        <HStack gap={3} align="center">
+          <Text textStyle="sm" fontWeight="medium" color="fg" truncate>
+            {name}
+          </Text>
+          <HStack gap={1} color="fg.subtle" flexShrink={0}>
+            <LuCalendar size={12} />
+            <Text textStyle="2xs" fontFamily="mono">
+              +{offsetMs}ms
+            </Text>
+          </HStack>
+          {spanId && onSelectSpan && (
+            <Button
+              size="2xs"
+              variant="ghost"
+              marginLeft="auto"
+              color="fg.muted"
+              gap={1}
+              onClick={() => onSelectSpan(spanId)}
+              aria-label={`Open span that emitted ${name}`}
+            >
+              Open span
+              <LuArrowUpRight size={11} />
+            </Button>
+          )}
+        </HStack>
+        {hasAttributes && (
+          <VStack
+            align="stretch"
+            gap={0.5}
+            marginTop={1.5}
+            paddingTop={1.5}
+            borderTopWidth="1px"
+            borderTopColor="border.subtle"
+          >
+            {attributeEntries.map(([key, value]) => (
+              <HStack key={key} gap={2} align="center" minWidth={0}>
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  fontFamily="mono"
+                  minWidth="120px"
+                  maxWidth="160px"
+                  flexShrink={0}
+                  truncate
+                >
+                  {key}
+                </Text>
+                {/* Delegate to the shared AttributeValue renderer: JSON
+                    / chat payloads get format detection + a click-to-open
+                    popover with the prettified body; leaves stay inline.
+                    Same affordance the span attributes table uses, so
+                    large event payloads like `langwatch.evaluation.custom`
+                    are no longer dumped as a flat 200-char string. */}
+                <Box flex={1} minWidth={0}>
+                  <AttributeValue attrKey={key} value={value} />
+                </Box>
+              </HStack>
+            ))}
+          </VStack>
+        )}
+      </Box>
+    </HStack>
   );
 };

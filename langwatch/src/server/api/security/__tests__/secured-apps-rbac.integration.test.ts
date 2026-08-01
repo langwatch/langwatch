@@ -12,31 +12,31 @@
  *   - a key for one organization cannot resolve another organization's project
  *     (cross-tenant isolation at the token layer).
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
-  type Project,
-  type Team,
-} from "@prisma/client";
+
 import { generate } from "@langwatch/ksuid";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  RoleBindingScopeType,
+  type Team,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { prisma } from "~/server/db";
-import { KSUID_RESOURCES } from "~/utils/constants";
-
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
 import { app as copilotkitApp } from "~/app/api/copilotkit/[[...route]]/app";
 import { app as experimentsApp } from "~/app/api/experiments/[[...route]]/app";
 import { app as modelDefaultsApp } from "~/app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "~/app/api/model-providers/[[...route]]/app";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const ns = `secured-rbac-${nanoid(8)}`;
 
 let orgA: Organization;
+let teamA: Team;
 let projectA1: Project;
 let orgB: Organization;
 let projectB1: Project;
@@ -100,6 +100,7 @@ async function makeAdminUser(organization: Organization, team: Team) {
 beforeAll(async () => {
   const a = await makeOrgWithProject("A");
   orgA = a.organization;
+  teamA = a.team;
   projectA1 = a.project;
   const b = await makeOrgWithProject("B");
   orgB = b.organization;
@@ -130,7 +131,11 @@ beforeAll(async () => {
     permissionMode: "restricted",
     permissions: ["traces:view"], // deliberately lacks project/analytics/evaluations/prompts view
     bindings: [
-      { role: TeamUserRole.CUSTOM, scopeType: "PROJECT", scopeId: projectA1.id },
+      {
+        role: TeamUserRole.CUSTOM,
+        scopeType: "PROJECT",
+        scopeId: projectA1.id,
+      },
     ],
   });
   readOnlyTokenA = readOnly.token;
@@ -143,7 +148,11 @@ beforeAll(async () => {
     permissionMode: "restricted",
     permissions: ["workflows:view"], // workflows only — no experiments access anymore
     bindings: [
-      { role: TeamUserRole.CUSTOM, scopeType: "PROJECT", scopeId: projectA1.id },
+      {
+        role: TeamUserRole.CUSTOM,
+        scopeType: "PROJECT",
+        scopeId: projectA1.id,
+      },
     ],
   });
   workflowsViewerTokenA = workflowsViewer.token;
@@ -156,7 +165,11 @@ beforeAll(async () => {
     permissionMode: "restricted",
     permissions: ["experiments:view"], // experiments only — no workflows access
     bindings: [
-      { role: TeamUserRole.CUSTOM, scopeType: "PROJECT", scopeId: projectA1.id },
+      {
+        role: TeamUserRole.CUSTOM,
+        scopeType: "PROJECT",
+        scopeId: projectA1.id,
+      },
     ],
   });
   experimentsViewerTokenA = experimentsViewer.token;
@@ -242,6 +255,51 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
         headers: headers(readOnlyTokenA, projectA1.id),
       });
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("when the key's owning user is demoted after the key was minted", () => {
+    /**
+     * The ceiling's promise, end to end: an admin key keeps its own bindings
+     * but stops working the moment its owner can no longer do the thing —
+     * without anyone revoking or re-issuing the key.
+     *
+     * Uses its own user so the demotion cannot disturb the other cases.
+     */
+    it("stops honouring the key on a write route the owner can no longer reach", async () => {
+      const owner = await makeAdminUser(orgA, teamA);
+      const { token } = await ApiKeyService.create(prisma).create({
+        name: `degrading-${nanoid(6)}`,
+        userId: owner.id,
+        createdByUserId: owner.id,
+        organizationId: orgA.id,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeId: projectA1.id,
+          },
+        ],
+      });
+
+      const writeRequest = () =>
+        modelProvidersApp.request("/api/model-providers/openai", {
+          method: "PUT",
+          headers: headers(token, projectA1.id),
+          body: JSON.stringify({ enabled: true }),
+        });
+
+      // 200, not merely 'not 403': a 4xx/5xx here would satisfy the
+      // before/after contrast without the write ever having worked.
+      expect((await writeRequest()).status).toBe(200);
+
+      await prisma.roleBinding.updateMany({
+        where: { organizationId: orgA.id, userId: owner.id },
+        data: { role: TeamUserRole.VIEWER },
+      });
+
+      expect((await writeRequest()).status).toBe(403);
     });
   });
 

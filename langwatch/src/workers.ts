@@ -1,10 +1,35 @@
 import "dotenv/config";
+// Portless (haven) overlay, loaded last with override exactly like
+// server.mts: a standalone workers lane must resolve the same hostnames,
+// ports and connection URLs as the app it serves, or the two halves of one
+// stack quietly talk to different infrastructure.
+import dotenv from "dotenv";
+import { existsSync } from "fs";
+
+dotenv.config({
+  path: ".env.portless",
+  override: true,
+  quiet: process.env.NODE_ENV !== "development" || !existsSync(".env.portless"),
+});
+
+// OTel instrumentation MUST load before any module that creates spans —
+// without it the worker process has no registered tracer provider and every
+// BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.
+// dotenv stays first so instrumentation.node sees .env-provided config
+// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT). Kept as the first import
+// so its side effects run before the worker modules below evaluate.
+import "./instrumentation.node";
+// Registers the Grafana trace-link builder with @langwatch/handled-error.
+import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
-import { WorkersRestart } from "./server/background/errors";
-import { verifyRedisReady } from "./server/redis";
-import { createLogger } from "./utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
+
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
+// initializeWorkerApp loads the full app graph, which reads process.env at
+// module load — it must run AFTER setEnvironment() above. A static import
+// would hoist above that call and break env loading, so it's required here.
 const { initializeWorkerApp } = require("./server/app-layer/presets") as {
   initializeWorkerApp: () => void;
 };
@@ -14,48 +39,43 @@ const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
 
-// Self-restart cadence: by default the worker exits cleanly every 15 min
-// (memory-leak safety pattern) and an external supervisor (helm/docker)
-// brings it back up immediately. In environments without that supervisor
-// (e.g. `npx @langwatch/server`, where supervise() in spawn.ts doesn't
-// restart-on-exit), set `LANGWATCH_WORKERS_MAX_RUNTIME_MS=0` to disable
-// the timer and run forever. A non-numeric / unset value keeps the legacy
-// 15-min default so helm/docker behavior is unchanged.
-const maxRuntimeMsRaw = process.env.LANGWATCH_WORKERS_MAX_RUNTIME_MS;
-const maxRuntimeMs =
-  maxRuntimeMsRaw !== undefined && maxRuntimeMsRaw !== ""
-    ? Number(maxRuntimeMsRaw)
-    : 15 * 60 * 1000;
+let isShuttingDown = false;
+let workerHandle: WorkerHandle | undefined;
 
-// Fail fast if Redis isn't reachable — BullMQ would otherwise reconnect
-// forever and jobs silently pile up in queues we can't even read.
-void verifyRedisReady().then(() => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("./server/background/worker")
-    .start(void 0, maxRuntimeMs)
-    .catch((error: Error) => {
-      if (error instanceof WorkersRestart) {
-        logger.info({ error }, "worker restart");
-        process.exit(0);
-      }
+async function gracefulShutdown(): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  try {
+    await workerHandle?.shutdown();
+  } catch (error) {
+    logger.error({ error }, "error shutting down workers");
+  }
+  // Close the App (ClickHouse / Redis / Prisma) last, after the workers above
+  // have stopped accepting and draining jobs.
+  try {
+    const { getApp } = await import("./server/app-layer/app");
+    await getApp().close();
+  } catch (error) {
+    logger.error({ error }, "error closing app during shutdown");
+  }
+  process.exit(0);
+}
 
-      logger.error({ error }, "error running worker");
-      process.exit(1);
-    });
-});
+process.on("SIGINT", () => void gracefulShutdown());
+process.on("SIGTERM", () => void gracefulShutdown());
 
-// Global error handlers for uncaught exceptions and unhandled promise rejections
+void startWorkers({ shouldStartMetricsServer: true })
+  .then((handle) => {
+    workerHandle = handle;
+  })
+  .catch((error) => {
+    logger.error({ error }, "failed to start background workers");
+    process.exit(1);
+  });
+
 process.on("uncaughtException", (err) => {
   logger.fatal({ error: err }, "uncaught exception detected");
-
-  // Attempt graceful shutdown, abort if it takes too long
-  const { gracefulShutdown } = require("./server/background/worker");
-  Promise.race([
-    gracefulShutdown(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 3000)),
-  ])
-    .catch(() => process.abort())
-    .finally(() => process.exit(1));
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason, promise) => {

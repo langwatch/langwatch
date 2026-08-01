@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
+import { LicensePlanLimitsSchema } from "../types";
 import {
   isExpired,
   parseLicenseKey,
   validateLicense,
   verifySignature,
 } from "../validation";
-import { LicensePlanLimitsSchema } from "../types";
+import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
 import {
   BASE_LICENSE,
-  VALID_LICENSE_KEY,
+  EMPTY_SIGNATURE_KEY,
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_LICENSE_KEY,
-  TAMPERED_LICENSE_KEY,
-  EMPTY_SIGNATURE_KEY,
-  MALFORMED_BASE64,
-  INVALID_JSON_BASE64,
   GARBAGE_DATA,
+  INVALID_JSON_BASE64,
+  MALFORMED_BASE64,
+  TAMPERED_LICENSE_KEY,
+  VALID_LICENSE_KEY,
 } from "./fixtures/testLicenses";
-import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
 
 describe("LicensePlanLimitsSchema", () => {
   /** @scenario License schema accepts maxMembersLite as optional field */
@@ -81,7 +81,7 @@ describe("parseLicenseKey", () => {
 
   it("returns null for valid JSON but missing required fields", () => {
     const invalidStructure = Buffer.from(
-      JSON.stringify({ foo: "bar" })
+      JSON.stringify({ foo: "bar" }),
     ).toString("base64");
 
     const result = parseLicenseKey(invalidStructure);
@@ -180,7 +180,10 @@ describe("isExpired", () => {
 describe("validateLicense", () => {
   /** @scenario Validates complete license successfully */
   it("validates complete license successfully", () => {
-    const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+    const result = validateLicense({
+      licenseKey: VALID_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
 
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -226,7 +229,10 @@ describe("validateLicense", () => {
 
   describe("extracts license fields correctly", () => {
     it("extracts licenseId", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -235,16 +241,24 @@ describe("validateLicense", () => {
     });
 
     it("extracts organizationName", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.organizationName).toBe(BASE_LICENSE.organizationName);
+        expect(result.licenseData.organizationName).toBe(
+          BASE_LICENSE.organizationName,
+        );
       }
     });
 
     it("extracts email", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -253,7 +267,10 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.type", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -262,29 +279,44 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.maxMembers", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
+        expect(result.licenseData.plan.maxMembers).toBe(
+          BASE_LICENSE.plan.maxMembers,
+        );
       }
     });
 
     it("extracts plan.maxProjects", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxProjects).toBe(BASE_LICENSE.plan.maxProjects);
+        expect(result.licenseData.plan.maxProjects).toBe(
+          BASE_LICENSE.plan.maxProjects,
+        );
       }
     });
 
     it("extracts plan.maxMessagesPerMonth", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxMessagesPerMonth).toBe(BASE_LICENSE.plan.maxMessagesPerMonth);
+        expect(result.licenseData.plan.maxMessagesPerMonth).toBe(
+          BASE_LICENSE.plan.maxMessagesPerMonth,
+        );
       }
     });
 
@@ -292,30 +324,45 @@ describe("validateLicense", () => {
       // VALID_LICENSE_KEY contains evaluationsCredit in the signed payload.
       // After making the field optional, old licenses must still parse and
       // pass signature verification without error.
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
         // The field is declared as optional on the schema, so Zod preserves its value on parse.
-        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
+        expect(result.licenseData.plan.evaluationsCredit).toBe(
+          BASE_LICENSE.plan.evaluationsCredit,
+        );
       }
     });
 
     it("extracts plan.maxWorkflows", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.maxWorkflows).toBe(BASE_LICENSE.plan.maxWorkflows);
+        expect(result.licenseData.plan.maxWorkflows).toBe(
+          BASE_LICENSE.plan.maxWorkflows,
+        );
       }
     });
 
     it("extracts plan.canPublish", () => {
-      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+      const result = validateLicense({
+        licenseKey: VALID_LICENSE_KEY,
+        publicKey: TEST_PUBLIC_KEY,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
+        expect(result.licenseData.plan.canPublish).toBe(
+          BASE_LICENSE.plan.canPublish,
+        );
       }
     });
   });
@@ -327,14 +374,17 @@ describe("backward compatibility: licenses issued before experimentation limits 
     // ENTERPRISE_LICENSE_KEY was signed (with TEST_PRIVATE_KEY) with a payload
     // that still carries maxPrompts/maxWorkflows/maxScenarios/maxAgents/... —
     // exactly what a self-hosted customer's already-issued license contains.
-    // It MUST keep validating after the experimentation-limit removal:
-    // LicensePlanLimitsSchema intentionally retains those fields so that
-    // verifySignature re-serializes byte-identical JSON and the signature still
-    // verifies (no re-issuance). The caps are then dropped from the active plan
-    // rather than enforced. If a future change strips those schema fields, Zod
-    // would discard them on parse, the re-serialized JSON would differ, and this
-    // test would fail — guarding every already-issued customer license.
-    const result = validateLicense({ licenseKey: ENTERPRISE_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+    // It MUST keep validating: LicensePlanLimitsSchema intentionally retains
+    // those fields so that verifySignature re-serializes byte-identical JSON
+    // and the signature still verifies (no re-issuance). The caps are then
+    // dropped from the active plan rather than enforced. If a future change
+    // strips those schema fields, Zod would discard them on parse, the
+    // re-serialized JSON would differ, and this test would fail — guarding
+    // every already-issued customer license.
+    const result = validateLicense({
+      licenseKey: ENTERPRISE_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
 
     expect(result.valid).toBe(true);
     if (!result.valid) return;
@@ -354,4 +404,3 @@ describe("backward compatibility: licenses issued before experimentation limits 
     expect("maxTeams" in result.planInfo).toBe(false);
   });
 });
-

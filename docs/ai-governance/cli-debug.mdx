@@ -4,7 +4,7 @@ description: Inspect IngestionSources, tail recent OCSF events, and read the org
 sidebarTitle: CLI debug
 ---
 
-<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance, `login`/`logout-device` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
+<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
 
 A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
 
@@ -24,7 +24,7 @@ These commands are **not** for end-user developers, they don't proxy completions
 langwatch login --device
 ```
 
-The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout-device` server-revokes both.
+The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout` server-revokes both.
 
 The `ingest` and `governance` subcommands are always registered — `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
 

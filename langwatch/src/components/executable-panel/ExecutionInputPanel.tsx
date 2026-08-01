@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
-import { type FieldError, type FieldErrors, useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 
 // Create a simplified field type that matches what we need

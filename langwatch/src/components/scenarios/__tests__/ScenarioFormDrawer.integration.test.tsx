@@ -11,10 +11,11 @@
  *
  * @see specs/scenarios/scenario-deferred-persistence.feature
  */
-import * as React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock heavy sub-components that pull in generated types
@@ -22,8 +23,20 @@ vi.mock("../../prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
 }));
 vi.mock("../../agents/AgentTypeSelectorDrawer", () => ({
-  AgentTypeSelectorDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
-    open ? <div data-testid="agent-type-selector-drawer"><button data-testid="close-agent-selector" onClick={onClose}>Close</button></div> : null,
+  AgentTypeSelectorDrawer: ({
+    open,
+    onClose,
+  }: {
+    open?: boolean;
+    onClose?: () => void;
+  }) =>
+    open ? (
+      <div data-testid="agent-type-selector-drawer">
+        <button data-testid="close-agent-selector" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    ) : null,
 }));
 vi.mock("../SaveAndRunMenu", () => ({
   SaveAndRunMenu: ({
@@ -88,16 +101,29 @@ const mocks = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
   mockCloseDrawer: vi.fn(),
   mockSetFlowCallbacks: vi.fn(),
+  mockClearFlowCallbacks: vi.fn(),
   mockRunScenario: vi.fn(),
   mockRouterPush: vi.fn(),
-  mockGetByIdData: null as { id: string; name: string; situation: string; criteria: string[]; labels: string[] } | null,
+  mockGetByIdData: null as {
+    id: string;
+    name: string;
+    situation: string;
+    criteria: string[];
+    labels: string[];
+  } | null,
 }));
 
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
       create: {
-        useMutation: ({ onSuccess, onError }: { onSuccess?: (data: unknown) => void; onError?: (error: Error) => void }) => ({
+        useMutation: ({
+          onSuccess,
+          onError,
+        }: {
+          onSuccess?: (data: unknown) => void;
+          onError?: (error: Error) => void;
+        }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
             try {
               const result = await mocks.mockCreateMutateAsync(input);
@@ -112,7 +138,13 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       update: {
-        useMutation: ({ onSuccess, onError }: { onSuccess?: (data: unknown) => void; onError?: (error: Error) => void }) => ({
+        useMutation: ({
+          onSuccess,
+          onError,
+        }: {
+          onSuccess?: (data: unknown) => void;
+          onError?: (error: Error) => void;
+        }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
             try {
               const result = await mocks.mockUpdateMutateAsync(input);
@@ -174,6 +206,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawerParams: () => mocks.mockDrawerParams,
   getComplexProps: () => mocks.mockComplexProps,
   setFlowCallbacks: mocks.mockSetFlowCallbacks,
+  clearFlowCallbacks: mocks.mockClearFlowCallbacks,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -214,7 +247,9 @@ vi.mock("~/hooks/useScenarioTarget", () => ({
 vi.mock("~/stores/upgradeModalStore", () => ({
   useUpgradeModalStore: (selector: unknown) => {
     if (typeof selector === "function") {
-      return (selector as (state: { open: () => void }) => unknown)({ open: vi.fn() });
+      return (selector as (state: { open: () => void }) => unknown)({
+        open: vi.fn(),
+      });
     }
     return { open: vi.fn() };
   },
@@ -278,8 +313,12 @@ describe("<ScenarioFormDrawer/>", () => {
       it("pre-populates the form with initial data", () => {
         render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 
-        expect(screen.getByDisplayValue("Generated Scenario")).toBeInTheDocument();
-        expect(screen.getByDisplayValue("A generated situation")).toBeInTheDocument();
+        expect(
+          screen.getByDisplayValue("Generated Scenario"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByDisplayValue("A generated situation"),
+        ).toBeInTheDocument();
       });
 
       it("does not create a DB record", () => {
@@ -305,7 +344,9 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+          wrapper: Wrapper,
+        });
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -322,7 +363,9 @@ describe("<ScenarioFormDrawer/>", () => {
       it("does not transition to edit mode when save-without-running", async () => {
         const user = userEvent.setup();
 
-        render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
+          wrapper: Wrapper,
+        });
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -379,7 +422,9 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+          wrapper: Wrapper,
+        });
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -405,16 +450,16 @@ describe("<ScenarioFormDrawer/>", () => {
         criteria: ["Existing criterion"],
         labels: ["billing"],
       };
-      mocks.mockUpdateMutateAsync.mockRejectedValue(
-        new Error("Network error")
-      );
+      mocks.mockUpdateMutateAsync.mockRejectedValue(new Error("Network error"));
     });
 
     it("keeps the drawer open", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+      render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
@@ -430,17 +475,22 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays an error message", async () => {
       const user = userEvent.setup();
 
-      render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, { wrapper: Wrapper });
+      render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
 
+      // The failure here is a bare Error, so there is no handled payload and
+      // no registry copy — the caller's fallback names what was being done.
+      // A recognised code would show its own title instead.
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({
-            title: "Failed to update scenario",
+            title: "Couldn't save scenario",
             type: "error",
-          })
+          }),
         );
       });
     });
@@ -472,7 +522,9 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+          wrapper: Wrapper,
+        });
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -493,7 +545,9 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+          wrapper: Wrapper,
+        });
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -509,7 +563,9 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
+          wrapper: Wrapper,
+        });
 
         await user.click(screen.getByTestId("save-and-run-button"));
 
@@ -595,15 +651,23 @@ describe("<ScenarioFormDrawer/>", () => {
     it("opens the agent type selector drawer via local state", async () => {
       await clickCreateAgentButton();
 
-      expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("agent-type-selector-drawer"),
+      ).toBeInTheDocument();
       // Should NOT use URL-based openDrawer for the type selector (regression #1903)
-      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith("agentTypeSelector");
+      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentTypeSelector",
+      );
     });
 
     it("registers onSave flow callbacks for all agent editor types", async () => {
       await clickCreateAgentButton();
 
-      for (const drawerName of ["agentHttpEditor", "agentCodeEditor", "workflowSelector"]) {
+      for (const drawerName of [
+        "agentHttpEditor",
+        "agentCodeEditor",
+        "workflowSelector",
+      ]) {
         expect(mocks.mockSetFlowCallbacks).toHaveBeenCalledWith(
           drawerName,
           expect.objectContaining({ onSave: expect.any(Function) }),
@@ -631,6 +695,24 @@ describe("<ScenarioFormDrawer/>", () => {
           type: "success",
         }),
       );
+    });
+
+    describe("when agent type selector is closed without completing the flow", () => {
+      it("clears flow callbacks to prevent stale callbacks in other contexts", async () => {
+        const user = userEvent.setup();
+        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+
+        // Open agent type selector
+        await user.click(screen.getByTestId("create-agent-button"));
+        expect(
+          screen.getByTestId("agent-type-selector-drawer"),
+        ).toBeInTheDocument();
+
+        // Close without completing (cancellation path)
+        await user.click(screen.getByTestId("close-agent-selector"));
+
+        expect(mocks.mockClearFlowCallbacks).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

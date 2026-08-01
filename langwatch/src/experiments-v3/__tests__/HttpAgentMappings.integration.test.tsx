@@ -23,9 +23,15 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: () => "HTTP Agent",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (_target: { id: string }) => "HTTP Agent";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
@@ -36,11 +42,11 @@ import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetReference, TargetConfig } from "../types";
 import { DEFAULT_TEST_DATA_ID } from "../types";
+import { extractVariablesFromBodyTemplate } from "../utils/httpAgentUtils";
 import {
   getTargetMissingMappings,
   targetHasMissingMappings,
 } from "../utils/mappingValidation";
-import { extractVariablesFromBodyTemplate } from "../utils/httpAgentUtils";
 
 const createTestDataset = (
   id: string = DEFAULT_TEST_DATA_ID,
@@ -273,7 +279,9 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
           { id: "thread_id", name: "thread_id", type: "string" },
         ],
       });
-      useEvaluationsV3Store.getState().setActiveDataset("dataset-with-thread-id");
+      useEvaluationsV3Store
+        .getState()
+        .setActiveDataset("dataset-with-thread-id");
     });
 
     // Add HTTP agent target - addTarget should auto-infer mappings
@@ -304,7 +312,8 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
       .targets.find((t) => t.id === targetId)!;
 
     // thread_id should be auto-mapped to thread_id column (exact match)
-    const threadIdMapping = target.mappings["dataset-with-thread-id"]?.thread_id;
+    const threadIdMapping =
+      target.mappings["dataset-with-thread-id"]?.thread_id;
     expect(threadIdMapping).toBeDefined();
     expect(threadIdMapping?.type).toBe("source");
     if (threadIdMapping?.type === "source") {
@@ -342,9 +351,7 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
         id: targetId,
         type: "agent",
         agentType: "http",
-        inputs: [
-          { identifier: "custom_field", type: "str" },
-        ],
+        inputs: [{ identifier: "custom_field", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
         httpConfig: {
@@ -362,7 +369,8 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
       .targets.find((t) => t.id === targetId)!;
 
     // custom_field should NOT be mapped (no matching column)
-    const customFieldMapping = target.mappings["dataset-no-match"]?.custom_field;
+    const customFieldMapping =
+      target.mappings["dataset-no-match"]?.custom_field;
     expect(customFieldMapping).toBeUndefined();
 
     // Validation should detect missing mapping
@@ -424,7 +432,9 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
     );
 
     // Alert icon should NOT be present
-    expect(screen.queryByTestId("missing-mapping-alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("missing-mapping-alert"),
+    ).not.toBeInTheDocument();
   });
 
   it("calls onEdit when play button is clicked with missing mappings", () => {
@@ -506,8 +516,14 @@ describe("HTTP agent has different validation than code agent", () => {
       },
     };
 
-    const httpResult = getTargetMissingMappings(httpTarget, DEFAULT_TEST_DATA_ID);
-    const codeResult = getTargetMissingMappings(codeTarget, DEFAULT_TEST_DATA_ID);
+    const httpResult = getTargetMissingMappings(
+      httpTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
+    const codeResult = getTargetMissingMappings(
+      codeTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
 
     // HTTP agent is valid (at least one mapping)
     expect(httpResult.isValid).toBe(true);
@@ -533,8 +549,14 @@ describe("HTTP agent has different validation than code agent", () => {
       mappings: {},
     };
 
-    const httpResult = getTargetMissingMappings(httpTarget, DEFAULT_TEST_DATA_ID);
-    const codeResult = getTargetMissingMappings(codeTarget, DEFAULT_TEST_DATA_ID);
+    const httpResult = getTargetMissingMappings(
+      httpTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
+    const codeResult = getTargetMissingMappings(
+      codeTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
 
     // Both invalid with no mappings
     expect(httpResult.isValid).toBe(false);

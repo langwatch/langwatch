@@ -1,12 +1,20 @@
 import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType } from "@prisma/client";
 
+import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
+
 export class SecretsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findAllByProject({ projectId }: { projectId: string }) {
+    // Product-owned rows (RESERVED_PROJECT_SECRET_NAMES) are excluded, same
+    // as the tRPC listing: the customer did not create them and cannot safely
+    // change them.
     return this.prisma.projectSecret.findMany({
-      where: { projectId },
+      where: {
+        projectId,
+        name: { notIn: RESERVED_PROJECT_SECRET_NAMES },
+      },
       select: {
         id: true,
         projectId: true,

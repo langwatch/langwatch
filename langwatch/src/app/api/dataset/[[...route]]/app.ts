@@ -1,13 +1,13 @@
 import { Readable } from "node:stream";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
   createProjectApp,
   handlerManagedAuth,
   requires,
 } from "~/server/api/security";
-import { createLogger } from "~/utils/logger/server";
+import { validator as zValidator } from "~/server/api/validation";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
@@ -40,8 +40,6 @@ import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
-
-const logger = createLogger("langwatch:api:dataset");
 
 // -- Validation schemas for new endpoints --
 
@@ -82,31 +80,6 @@ const batchCreateRecordsSchema = z.object({
     .min(1, "entries is required")
     .max(1000, "Maximum batch size is 1000 entries"),
 });
-
-/**
- * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
- * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
- */
-function validationHook(
-  result: {
-    success: boolean;
-    error?: { issues: Array<{ message?: string; path?: (string | number)[] }> };
-  },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 /**
  * Maps DatasetNotFoundError from the service layer to the HTTP NotFoundError.
@@ -159,9 +132,14 @@ secured.hono.onError(handleDatasetError);
 // The browser→S3 direct-upload routes authenticate the in-app upload UI by
 // NextAuth session cookie (or API key), resolved in-handler — the rest of the
 // surface is API-key-only `requires(...)`, which would 401 a cookie request.
-const directUploadSessionAuth = handlerManagedAuth(
-  "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
-);
+const directUploadSessionAuth = handlerManagedAuth({
+  reason:
+    "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
+  // authorizeDirectUpload resolves the caller and the target dataset; it does
+  // not gate on a standalone RBAC permission.
+  permissions: [],
+  credential: "both",
+});
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and
 // sets `project`), so it is applied per-route rather than app-wide.
@@ -199,13 +177,18 @@ secured.access(requires("datasets:view")).get(
 );
 
 // ── Create Dataset ─────────────────────────────────────────────
-secured.access(requires("datasets:manage")).post(
+// Creating asks for `datasets:create`, not `datasets:manage`. `:manage` still
+// implies `:create` through the RBAC hierarchy, so every role and key that
+// could create a dataset yesterday still can — what changes is that a
+// credential the product issues at the CREATE grain is honoured instead of
+// refused. A viewer holds only `datasets:view` and is declined as before.
+secured.access(requires("datasets:create")).post(
   "/",
   datasetServiceMiddleware,
   describeRoute({
     description: "Create a new dataset",
   }),
-  zValidator("json", createDatasetSchema, validationHook),
+  zValidator("json", createDatasetSchema),
   async (c) => {
     const project = c.get("project");
     const { name, columnTypes } = c.req.valid("json");
@@ -251,7 +234,8 @@ secured.access(requires("datasets:manage")).post(
 // ── Create + Upload Dataset from File ─────────────────────────
 // IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
 // so Hono doesn't match "upload" as a slugOrId parameter.
-secured.access(requires("datasets:manage")).post(
+// Also a create: the file becomes a brand-new dataset.
+secured.access(requires("datasets:create")).post(
   "/upload",
   datasetServiceMiddleware,
   describeRoute({
@@ -343,7 +327,10 @@ secured.access(directUploadSessionAuth).post(
     // `authMiddleware` to set `c.get("project")` for this route.
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
 
     const name = body.name;
@@ -442,7 +429,10 @@ secured.access(directUploadSessionAuth).put(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const body = c.req.raw.body;
     if (!body) {
@@ -481,7 +471,10 @@ secured.access(directUploadSessionAuth).post(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 
@@ -512,7 +505,10 @@ secured.access(directUploadSessionAuth).post(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 
@@ -543,7 +539,10 @@ secured.access(directUploadSessionAuth).delete(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 
@@ -557,7 +556,9 @@ secured.access(directUploadSessionAuth).delete(
 );
 
 // ── Upload File to Existing Dataset ─────────────────────────────
-secured.access(requires("datasets:manage")).post(
+// Appending rows to a dataset that already exists changes that dataset, so it
+// is an `:update`, not a create of anything the caller can name.
+secured.access(requires("datasets:update")).post(
   "/:slugOrId/upload",
   datasetServiceMiddleware,
   describeRoute({
@@ -620,13 +621,14 @@ secured.access(requires("datasets:manage")).post(
 );
 
 // ── Batch Create Records ──────────────────────────────────────
-secured.access(requires("datasets:manage")).post(
+// Rows live inside a dataset; adding them mutates that dataset — `:update`.
+secured.access(requires("datasets:update")).post(
   "/:slugOrId/records",
   datasetServiceMiddleware,
   describeRoute({
     description: "Create records in a dataset in batch",
   }),
-  zValidator("json", batchCreateRecordsSchema, validationHook),
+  zValidator("json", batchCreateRecordsSchema),
   async (c) => {
     const { slugOrId } = c.req.param();
     const project = c.get("project");
@@ -657,7 +659,8 @@ secured.access(requires("datasets:manage")).post(
 );
 
 // ── Legacy: Add Entries ────────────────────────────────────────
-secured.access(requires("datasets:manage")).post(
+// The legacy spelling of the batch-records route above; same grain.
+secured.access(requires("datasets:update")).post(
   "/:slug/entries",
   datasetServiceMiddleware,
   describeRoute({
@@ -779,6 +782,13 @@ secured.access(requires("datasets:view")).get(
 );
 
 // ── Update Dataset ─────────────────────────────────────────────
+// `:manage`, not `:update`. A change to the column KEY SET makes this a
+// migration rather than an edit: `upsertDataset` rewrites every record onto the
+// new set (`migrateS3JsonlColumns` / `migrateDatasetRecordColumns`), so the
+// shape of the whole dataset follows the payload. That is administering a
+// dataset, which is what `:manage` names. The tRPC `dataset.upsert` procedure
+// calls the same service method and asks for the same grain; the two surfaces
+// describing one operation differently is what this sweep set out to remove.
 secured.access(requires("datasets:manage")).patch(
   "/:slugOrId",
   datasetServiceMiddleware,
@@ -843,6 +853,8 @@ secured.access(requires("datasets:manage")).patch(
 );
 
 // ── Delete (Archive) Dataset ───────────────────────────────────
+// Destruction deliberately stays at `:manage` — it is the only grain that
+// carries it, and a read-and-write credential must not inherit it.
 secured.access(requires("datasets:manage")).delete(
   "/:slugOrId",
   datasetServiceMiddleware,
@@ -897,7 +909,7 @@ secured.access(requires("datasets:view")).get(
 );
 
 // ── Update / Upsert Record ─────────────────────────────────────
-secured.access(requires("datasets:manage")).patch(
+secured.access(requires("datasets:update")).patch(
   "/:slugOrId/records/:recordId",
   datasetServiceMiddleware,
   describeRoute({
@@ -929,13 +941,14 @@ secured.access(requires("datasets:manage")).patch(
 );
 
 // ── Batch Delete Records ───────────────────────────────────────
+// Destructive — stays at `:manage`, like the dataset archive above.
 secured.access(requires("datasets:manage")).delete(
   "/:slugOrId/records",
   datasetServiceMiddleware,
   describeRoute({
     description: "Delete records from a dataset by IDs",
   }),
-  zValidator("json", deleteRecordsSchema, validationHook),
+  zValidator("json", deleteRecordsSchema),
   async (c) => {
     const { slugOrId } = c.req.param();
     const project = c.get("project");

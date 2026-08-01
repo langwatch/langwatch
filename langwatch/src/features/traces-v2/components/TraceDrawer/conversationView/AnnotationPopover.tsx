@@ -13,6 +13,7 @@ import { diffWordsWithSpace } from "diff";
 import { Check, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Popover } from "~/components/ui/popover";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -31,12 +32,7 @@ interface AnnotationPopoverProps {
   annotationId?: string;
   /** The button that opens the popover. */
   trigger: React.ReactNode;
-  /**
-   * Hover hint for the trigger. Wired here (not in the trigger itself) so
-   * the Tooltip can wrap `Popover.Trigger` directly — nesting `<Tooltip>`
-   * inside the trigger meant two `asChild` layers tried to forward refs to
-   * the same Button, and Zag fell back to (0,0) for the tooltip anchor.
-   */
+  /** Hover hint for the trigger. */
   triggerTooltip?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -88,7 +84,9 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
           content={props.triggerTooltip}
           positioning={{ placement: "top" }}
         >
-          <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
+          <TriggerAnchor>
+            <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
+          </TriggerAnchor>
         </Tooltip>
       ) : (
         <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>

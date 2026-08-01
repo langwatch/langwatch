@@ -5,8 +5,9 @@
  * Verifies that onOpenChange calls goBack() to handle both nested
  * and root drawer scenarios correctly (Issue #2278).
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+
 import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock useDrawer hook
 const mockGoBack = vi.fn();
@@ -42,22 +43,18 @@ vi.mock("~/components/traces/TraceDetails", () => ({
   TraceDetails: () => <div data-testid="trace-details">TraceDetails</div>,
 }));
 
-// NewTracesPromo pulls in tRPC (publicEnv → useOrganizationTeamProject) which
-// requires withTRPC context this test does not provide. Also exports the
-// `isDrawerSwapInProgress` flag-getter that TraceDetailsDrawer reads on
-// every onOpenChange — stub it as always-false so the close flow runs.
-vi.mock("~/components/messages/NewTracesPromo", () => ({
-  NewTracesPromo: () => null,
-  isDrawerSwapInProgress: () => false,
+// LegacyTracesDeprecationBanner pulls in tRPC (publicEnv →
+// useOrganizationTeamProject) which requires withTRPC context this test
+// does not provide.
+vi.mock("~/components/messages/LegacyTracesDeprecationBanner", () => ({
+  LegacyTracesDeprecationBanner: () => null,
 }));
 
 // Capture the onOpenChange handler from Drawer.Root. The real
 // handler destructures `{ open }` from its single argument (Chakra
 // passes a details object on close), so type the captured signature
 // accordingly.
-let capturedOnOpenChange:
-  | ((details: { open: boolean }) => void)
-  | undefined;
+let capturedOnOpenChange: ((details: { open: boolean }) => void) | undefined;
 vi.mock("~/components/ui/drawer", () => ({
   Drawer: {
     Root: ({

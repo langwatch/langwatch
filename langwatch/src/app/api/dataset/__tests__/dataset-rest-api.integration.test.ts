@@ -5,10 +5,11 @@ import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -105,15 +106,10 @@ describe("Feature: Dataset REST API", () => {
   });
 
   afterEach(async () => {
-    // Guard: skip cleanup if beforeEach failed before creating test data
-    if (!testProjectId) return;
-
-    await prisma.datasetRecord.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.dataset.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [
+      ["datasetRecord", { projectId: testProjectId }],
+      ["dataset", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });
@@ -767,15 +763,12 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Batch create records via POST /:slugOrId/records */
       it("creates records with unique IDs and returns them", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          {
-            entries: [
-              { input: "hello", output: "world" },
-              { input: "hello-2", output: "world-2" },
-            ],
-          },
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {
+          entries: [
+            { input: "hello", output: "world" },
+            { input: "hello-2", output: "world-2" },
+          ],
+        });
 
         expect(res.status).toBe(201);
         const body = await res.json();
@@ -801,10 +794,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Batch create records accepts dataset ID as well as slug */
       it("creates records for the matching dataset", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/dataset_xyz/records",
-          { entries: [{ input: "test" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/dataset_xyz/records", {
+          entries: [{ input: "test" }],
+        });
 
         expect(res.status).toBe(201);
         const body = await res.json();
@@ -822,10 +814,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Batch create records validates column names against dataset schema */
       it("returns 400 Bad Request identifying the invalid column and listing the valid ones", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          { entries: [{ input: "hi", foo: "bar" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {
+          entries: [{ input: "hi", foo: "bar" }],
+        });
 
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -845,10 +836,9 @@ describe("Feature: Dataset REST API", () => {
 
       /** @scenario Batch create records allows entries with subset of columns */
       it("creates records with missing columns defaulting to null", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          { entries: [{ input: "hi" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {
+          entries: [{ input: "hi" }],
+        });
 
         expect(res.status).toBe(201);
         const body = await res.json();
@@ -861,10 +851,9 @@ describe("Feature: Dataset REST API", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario Batch create records returns 404 for non-existent dataset */
       it("returns 404 Not Found", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/ghost/records",
-          { entries: [{ input: "hello" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/ghost/records", {
+          entries: [{ input: "hello" }],
+        });
 
         expect(res.status).toBe(404);
       });
@@ -900,10 +889,9 @@ describe("Feature: Dataset REST API", () => {
         const tooMany = Array.from({ length: 1001 }, (_, i) => ({
           input: `value-${i}`,
         }));
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          { entries: tooMany },
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {
+          entries: tooMany,
+        });
 
         expect(res.status).toBe(422);
         const body = await res.json();
@@ -951,10 +939,9 @@ describe("Feature: Dataset REST API", () => {
       });
 
       it("returns 500 with a descriptive error instead of crashing", async () => {
-        const res = await helpers.api.post(
-          "/api/dataset/bad-items/records",
-          { entries: [{ input: "hello" }] },
-        );
+        const res = await helpers.api.post("/api/dataset/bad-items/records", {
+          entries: [{ input: "hello" }],
+        });
 
         expect(res.status).toBe(500);
         const body = await res.json();
@@ -974,14 +961,17 @@ describe("Feature: Dataset REST API", () => {
           input: `item-${i}`,
         }));
 
-        const res = await helpers.api.post(
-          "/api/dataset/my-dataset/records",
-          { entries },
-        );
+        const res = await helpers.api.post("/api/dataset/my-dataset/records", {
+          entries,
+        });
 
         expect(res.status).toBe(422);
         const body = await res.json();
-        expect(body.message).toMatch(/batch size|1000/i);
+        // The constraint is named in the reason, not concatenated into the
+        // sentence — see specs/features/domain-error-contract.feature.
+        expect(body.error).toBe("validation_error");
+        expect(body.reasons[0].meta.field).toBe("entries");
+        expect(body.reasons[0].meta.message).toMatch(/batch size|1000/i);
       });
     });
   });
@@ -990,15 +980,12 @@ describe("Feature: Dataset REST API", () => {
 
   describe("Slug or ID resolution", () => {
     describe("when a dataset has both slug and id", () => {
-      let datasetId: string;
-
       beforeEach(async () => {
-        const dataset = await createDataset({
+        await createDataset({
           name: "My Data",
           slug: "my-data",
           id: "dataset_xyz",
         });
-        datasetId = dataset.id;
       });
 
       it("returns the same dataset for both slug and id", async () => {

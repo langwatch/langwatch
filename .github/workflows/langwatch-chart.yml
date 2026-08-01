@@ -6,6 +6,7 @@ on:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
       - "charts/gateway/**"
+      - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
   push:
@@ -14,6 +15,7 @@ on:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
       - "charts/gateway/**"
+      - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
 
@@ -39,6 +41,10 @@ jobs:
             flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml"
           - name: ha+ingress+replicated
             flags: "--set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml"
+          - name: langy-gvisor
+            flags: "--set autogen.enabled=true -f examples/overlays/langy-gvisor.yaml"
+          - name: langy-disabled
+            flags: "--set autogen.enabled=true -f examples/overlays/langy-disabled.yaml"
           - name: prod+external-ch
             flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml"
           - name: prod+ext-pg+ext-redis
@@ -51,8 +57,8 @@ jobs:
           - name: scalable-prod
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -81,15 +87,21 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
         run: docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+      - name: Resolve app image
+        if: matrix.build_app
+        run: |
+          APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
+          APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
+          echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t langwatch/langwatch:2.6.0 ../..
+        run: docker build -t "$APP_IMAGE" ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
@@ -103,7 +115,7 @@ jobs:
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
           kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
           if [ "${{ matrix.build_app }}" = "true" ]; then
-            kind load docker-image langwatch/langwatch:2.6.0 --name ${{ matrix.cluster }}
+            kind load docker-image "$APP_IMAGE" --name ${{ matrix.cluster }}
           fi
       - run: ${{ matrix.script }}
         env:
@@ -116,3 +128,8 @@ jobs:
           [ -z "$NS" ] && exit 0
           kubectl -n "$NS" get pods -o wide 2>/dev/null || true
           kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+          kubectl -n "$NS" describe pods 2>/dev/null || true
+          for POD in $(kubectl -n "$NS" get pods -o name 2>/dev/null); do
+            kubectl -n "$NS" logs "$POD" --all-containers --prefix --tail=-1 2>/dev/null || true
+            kubectl -n "$NS" logs "$POD" --all-containers --prefix --previous --tail=-1 2>/dev/null || true
+          done

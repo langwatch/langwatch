@@ -8,10 +8,11 @@
 # .github/workflows/npx-server-publish.yml so end users skip the runtime
 # `vite build` step.
 
-# Internal dev tooling — used only during langwatch development, never at
-# runtime by `npx @langwatch/server`. Keeping these out cuts the tarball
-# in half (deja-view alone is ~1MB).
-langwatch/packages/
+# langwatch/packages/ is intentionally INCLUDED. Its members are runtime
+# workspace dependencies of the app (@langwatch/observability, automations,
+# react-rum, redaction, ssrf, api) — excluding them ships an app whose
+# `workspace:*` links dangle and whose first import dies with
+# MODULE_NOT_FOUND. All members together are under 1MB of source.
 
 # Jupyter notebooks — exploration artifacts, not runtime code.
 langwatch_nlp/notebooks/

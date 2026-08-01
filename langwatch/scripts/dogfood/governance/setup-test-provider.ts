@@ -32,7 +32,9 @@ async function main(): Promise<void> {
   let providerId: string;
   if (existingScope) {
     providerId = existingScope.modelProviderId;
-    console.log(`[setup] ModelProvider exists: ${existingScope.modelProvider.provider} (id=${providerId})`);
+    console.log(
+      `[setup] ModelProvider exists: ${existingScope.modelProvider.provider} (id=${providerId})`,
+    );
   } else {
     const created = await prisma.modelProvider.create({
       data: {
@@ -45,7 +47,9 @@ async function main(): Promise<void> {
       },
     });
     providerId = created.id;
-    console.log(`[setup] created ModelProvider id=${providerId} provider=openai org-scoped`);
+    console.log(
+      `[setup] created ModelProvider id=${providerId} provider=openai org-scoped`,
+    );
   }
 
   // 2. Default RoutingPolicy — idempotent.
@@ -53,7 +57,9 @@ async function main(): Promise<void> {
     where: { organizationId: org.id, isDefault: true },
   });
   if (existingPolicy) {
-    console.log(`[setup] default RoutingPolicy exists: ${existingPolicy.name} (id=${existingPolicy.id})`);
+    console.log(
+      `[setup] default RoutingPolicy exists: ${existingPolicy.name} (id=${existingPolicy.id})`,
+    );
   } else {
     const policy = await prisma.routingPolicy.create({
       data: {
@@ -68,7 +74,9 @@ async function main(): Promise<void> {
         modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
       },
     });
-    console.log(`[setup] created default RoutingPolicy id=${policy.id} → providers=[${providerId}]`);
+    console.log(
+      `[setup] created default RoutingPolicy id=${policy.id} → providers=[${providerId}]`,
+    );
   }
 
   await prisma.$disconnect();

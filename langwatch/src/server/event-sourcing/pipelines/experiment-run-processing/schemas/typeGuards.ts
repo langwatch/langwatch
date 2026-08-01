@@ -1,9 +1,9 @@
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
 import type {
+  EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
   ExperimentRunProcessingEvent,
   ExperimentRunStartedEvent,
-  EvaluatorResultEvent,
   TargetResultEvent,
   TraceMetricsComputedEvent,
 } from "./events";

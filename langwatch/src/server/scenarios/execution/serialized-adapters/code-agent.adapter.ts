@@ -14,6 +14,7 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
+import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
@@ -36,7 +37,10 @@ export class SerializedCodeAgentAdapterError extends Error {
     message: string,
     options: { kind: AdapterErrorKind; httpStatus?: number; cause?: unknown },
   ) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    super(
+      message,
+      options.cause === undefined ? undefined : { cause: options.cause },
+    );
     this.name = "SerializedCodeAgentAdapterError";
     this.kind = options.kind;
     this.httpStatus = options.httpStatus;
@@ -89,7 +93,13 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             type: inp.type,
             value: resolvedValues[inp.identifier] ?? "",
           }))
-        : [{ identifier: "input", type: "str", value: resolvedValues["input"] ?? "" }];
+        : [
+            {
+              identifier: "input",
+              type: "str",
+              value: resolvedValues.input ?? "",
+            },
+          ];
 
     const outputs =
       this.config.outputs.length > 0
@@ -99,13 +109,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     return {
       api_key: this.apiKey,
       workflow_id: `scenario-code-${this.config.agentId}`,
-      spec_version: "1.4",
+      spec_version: LATEST_SPEC_VERSION,
       name: "Scenario Code Execution",
       icon: "🔧",
       description: "Minimal workflow for scenario code agent execution",
       version: "1.0",
       template_adapter: "default" as const,
-      default_llm: null,
       secrets: this.config.secrets,
       nodes: [
         this.buildEntryNode(inputs),
@@ -265,16 +274,20 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             });
           } catch (fetchError) {
             if (timedOut) {
-              span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
+              span.setAttribute(
+                "error.kind",
+                "timeout" satisfies AdapterErrorKind,
+              );
               throw new SerializedCodeAgentAdapterError(
                 `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
                 { kind: "timeout", cause: fetchError },
               );
             }
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            const cause = fetchError instanceof Error && "cause" in fetchError
-              ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-              : "";
+            const cause =
+              fetchError instanceof Error && "cause" in fetchError
+                ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
+                : "";
             throw new SerializedCodeAgentAdapterError(
               `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
               { kind: "fetch", cause: fetchError },
@@ -346,7 +359,9 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     }
 
     // Legacy behavior: first input = last user message, rest = ""
-    const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
+    const lastUserMessage = agentInput.messages.findLast(
+      (m) => m.role === "user",
+    );
     const inputValue =
       typeof lastUserMessage?.content === "string"
         ? lastUserMessage.content

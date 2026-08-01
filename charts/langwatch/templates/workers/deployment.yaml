@@ -20,6 +20,32 @@ spec:
   {{- if .Values.workers.deployment.strategy }}
   strategy:
     {{- toYaml .Values.workers.deployment.strategy | nindent 8 }}
+  {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+  {{/* Default kill-then-start under local-FS, same rationale as the app
+       Deployment: workers mount the app's RWO stored-objects PVC, and the k8s default RollingUpdate (25% surge) starts
+       the new pod BEFORE the old one releases the volume — on a multi-node
+       cluster the new pod can land on another node and wedge Pending on a
+       multi-attach error (the scheduler does not avoid RWO conflicts for CSI
+       volumes). maxSurge=0/maxUnavailable=1 at replicas=1 behaves exactly like
+       Recreate (old pod terminates and releases the volume before the new one
+       schedules), at the cost of a brief downtime — honest for the
+       single-replica local-FS tier.
+
+       Deliberately NOT `type: Recreate`: switching a live Deployment from the
+       k8s-defaulted RollingUpdate to Recreate requires DELETING the live
+       `rollingUpdate` struct, and Helm's 3-way merge cannot emit that deletion
+       when the previous release's manifest never had a `strategy` key (the
+       pre-#5083 chart) — the API then rejects the patch with
+       "spec.strategy.rollingUpdate: Forbidden: may not be specified when
+       strategy `type` is 'Recreate'", failing every upgrade across this
+       boundary. Setting maxSurge/maxUnavailable only UPDATES existing fields,
+       which the merge applies cleanly. An explicit workers.deployment.strategy
+       overrides this. */}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   {{- if hasKey (default (dict) .Values.workers.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.workers.deployment.revisionHistoryLimit }}
@@ -44,10 +70,8 @@ spec:
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 
       {{- with (coalesce .Values.workers.nodeSelector .Values.global.scheduling.nodeSelector)}}
       nodeSelector:
@@ -59,9 +83,16 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      {{- with (coalesce .Values.workers.affinity .Values.global.scheduling.affinity)}}
+      {{- $affinity := coalesce .Values.workers.affinity .Values.global.scheduling.affinity }}
+      {{- if $affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $affinity | nindent 8 }}
+      {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+      {{/* Default co-location with the app pod: workers mount the app's RWO
+           stored-objects PVC below, so off-node scheduling means a multi-attach
+           Pending wedge. See langwatch.storedObjects.colocationAffinity. */}}
+      affinity:
+        {{- include "langwatch.storedObjects.colocationAffinity" . | nindent 8 }}
       {{- end }}
 
       {{- with (coalesce .Values.workers.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
@@ -69,17 +100,22 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.workers.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      {{- with .Values.workers.extraInitContainers}}
       initContainers:
-        {{- with .Values.workers.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
       containers:
         {{- with .Values.workers.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: {{ .Release.Name }}-workers
           securityContext:
-            {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           workingDir: /app/langwatch
@@ -88,21 +124,70 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # See the app deployment — named per role so worker telemetry is
+            # separable from the app's.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
+
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
+            {{- /* Langy turns are dispatched from HERE, not from the app: the
+                   process outbox in the event-sourcing runtime POSTs the turn to
+                   the Go manager and the liveness subscriber re-drives a stalled
+                   one (see startWorkers.ts, "Langy turns self-drive"). Both run
+                   in the worker stack, so a workers pod without this pair builds
+                   its Langy port with an empty URL and every turn dies where no
+                   one is looking — the app pod, which HAS the pair, never makes
+                   that call. Same Secret and same Service as the app block. */}}
+            {{- if (index .Values "langyagent").chartManaged }}
+            - name: OPENCODE_AGENT_URL
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
+            {{- /* Re-dispatching a stalled turn re-resolves the worker's
+                   credentials, which needs the gateway the same way the app does. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
+            {{- end }}
 
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
+          {{- with .Values.workers.extraEnvFrom}}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # Probe the worker's HTTP listener (the metrics server port, 2999)
+          # rather than just PID 1 liveness — an answered request proves the
+          # event loop is turning, which `kill -0 1` cannot tell us.
+          #
+          # The probe targets /healthz, NOT /metrics. /metrics is fail-closed in
+          # production: with no METRICS_API_KEY (the default —
+          # app.telemetry.metrics.enabled is false, so the env var is never
+          # emitted) it answers 500 to every caller, which would crash-loop the
+          # workers on a stock install. And an httpGet probe cannot read a
+          # Secret, so a key delivered via secretKeyRef could never be put in a
+          # rendered Authorization header anyway — that install would 401.
+          # /healthz is unauthenticated by design and carries no telemetry, so
+          # no bearer token is copied into this podspec.
+          # See specs/server/worker-liveness-probe.feature.
           startupProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /healthz
+              port: 2999
             failureThreshold: 12
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["sh", "-c", "kill -0 1"]
+            httpGet:
+              path: /healthz
+              port: 2999
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
@@ -114,11 +199,31 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
+            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+            # Stored-objects local-FS mount. The off-request normalize job runs
+            # HERE (on the worker), so it must read the app's staged upload and
+            # write dataset chunks to the SAME PVC the app mounts — not the
+            # worker's own ephemeral FS (where `LANGWATCH_LOCAL_STORAGE_PATH`
+            # from sharedEnv would otherwise point, and normalize would fail to
+            # find the staged file / lose its chunk writes). Renders only when
+            # local-FS is the active backend; app + workers share this one RWO
+            # PVC, which requires them co-located on a single node — the
+            # documented single-replica/hobby topology. Use app.dataplane (S3)
+            # for any multi-node deployment.
+            - name: stored-objects-data
+              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+            {{- end }}
 
       volumes:
         {{- with .Values.workers.extraVolumes}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.workers.scratchSizeLimit }}
+        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+        - name: stored-objects-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-stored-objects
+        {{- end }}
 {{- end }}

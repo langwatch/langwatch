@@ -8,6 +8,7 @@
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "../dataPrivacy.types";
@@ -50,20 +51,20 @@ describe("DataPrivacyPolicyService integration", () => {
   });
 
   beforeEach(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
-    await prisma.dataPrivacyPolicy.deleteMany({
-      where: { organizationId: otherOrganizationId },
-    });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+      ["dataPrivacyPolicy", { organizationId: otherOrganizationId }],
+    ]);
     // Fresh cache per test so a previous test's resolved entries never leak in.
     cache = new DataPrivacyPolicyCache(repository);
     service = new DataPrivacyPolicyService(repository, cache);
   });
 
   afterAll(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
-    await prisma.dataPrivacyPolicy.deleteMany({
-      where: { organizationId: otherOrganizationId },
-    });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+      ["dataPrivacyPolicy", { organizationId: otherOrganizationId }],
+    ]);
   });
 
   describe("given a project in an organization", () => {
@@ -267,6 +268,85 @@ describe("DataPrivacyPolicyService integration", () => {
             },
           }),
         ).rejects.toThrow(/not a valid regular expression/);
+      });
+    });
+
+    describe("when a PII exception pattern is unsafe", () => {
+      /** @scenario An unsafe exception pattern is rejected when saving the rule */
+      it("rejects a pattern that can backtrack catastrophically", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              pii: { level: "essential", exceptPatterns: ["(a+)+$"] },
+            },
+          }),
+        ).rejects.toThrow(InvalidDataPrivacyConfigError);
+      });
+
+      it("rejects a pattern that does not compile", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              pii: { level: "essential", exceptPatterns: ["[unclosed"] },
+            },
+          }),
+        ).rejects.toThrow(/not a valid regular expression/);
+      });
+
+      it("stores a safe exception pattern and resolves it", async () => {
+        await service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+          },
+        });
+
+        const resolved = await service.getResolvedForProject({
+          projectId: project.id,
+        });
+        expect(resolved.pii.exceptPatterns).toEqual(["00\\d{12}"]);
+      });
+    });
+
+    describe("when a PII exception pattern is over-broad", () => {
+      // An exception REMOVES redaction, so a catch-all fails open: anchored to
+      // the whole detected span, it matches every finding and turns the PII
+      // pass off while the level still reads as active in the UI.
+      const catchAlls = [".*", ".+", "\\d+", "\\w+", "[\\s\\S]*", "\\S+"];
+
+      for (const pattern of catchAlls) {
+        /** @scenario An over-broad exception pattern is rejected when saving the rule */
+        it(`rejects ${pattern}, which would keep every detected value`, async () => {
+          await expect(
+            service.setForScope({
+              scope: { scopeType: "PROJECT", scopeId: project.id },
+              personalOnly: false,
+              config: {
+                pii: { level: "essential", exceptPatterns: [pattern] },
+              },
+            }),
+          ).rejects.toThrow(/too broad/);
+        });
+      }
+
+      it("still accepts a specific business identifier of the same shape", async () => {
+        await service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            pii: { level: "essential", exceptPatterns: ["\\d{14}"] },
+          },
+        });
+
+        const resolved = await service.getResolvedForProject({
+          projectId: project.id,
+        });
+        expect(resolved.pii.exceptPatterns).toEqual(["\\d{14}"]);
       });
     });
 

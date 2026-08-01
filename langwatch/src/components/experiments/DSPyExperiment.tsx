@@ -20,7 +20,6 @@ import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
@@ -35,7 +34,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartTooltip } from "../analytics/ChartTooltip";
+import { useRouter } from "~/utils/compat/next-router";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
@@ -50,8 +49,9 @@ import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
-import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { titleCase } from "../../utils/stringCasing";
+import { ChartTooltip } from "../analytics/ChartTooltip";
+import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { FeedbackLink } from "../FeedbackLink";
 import { LLMIcon } from "../icons/LLMIcon";
 import { MetadataTag } from "../MetadataTag";
@@ -639,6 +639,11 @@ export const RunDetails = React.memo(
           flexDirection="column"
           minWidth="0"
           colorPalette="blue"
+          // Every panel here (Predictors, Evaluations, LLM Calls) is a
+          // read-only render of the same dspyStep query with no
+          // user-entered state, so fully unmounting inactive tabs is safe.
+          lazyMount
+          unmountOnExit
         >
           <Tabs.List
             position="relative"
@@ -665,7 +670,9 @@ export const RunDetails = React.memo(
                   <Field.Root>
                     <Switch
                       checked={displayRawParams}
-                      onChange={() => setDisplayRawParams(!displayRawParams)}
+                      onCheckedChange={() =>
+                        setDisplayRawParams(!displayRawParams)
+                      }
                     />
                   </Field.Root>
                 </HStack>

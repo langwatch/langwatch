@@ -10,8 +10,14 @@ import { generate } from "@langwatch/ksuid";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import {
+  clearFlowCallbacks,
   getComplexProps,
   setFlowCallbacks,
   useDrawer,
@@ -24,7 +30,6 @@ import type { CustomComponentConfig } from "../../optimization_studio/types/dsl"
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
@@ -47,6 +52,16 @@ export type ScenarioFormDrawerProps = {
   onSuccess?: (scenario: Scenario) => void;
   scenarioId?: string;
 } & Partial<ScenarioInitialData>;
+
+/**
+ * Model overrides chosen in the run dialog. Omitted on a plain save so the
+ * scenario's existing models are left untouched (undefined = no-op in the
+ * Prisma update).
+ */
+type ModelOverrides = {
+  simulatorModel: string | null;
+  judgeModel: string | null;
+};
 
 /**
  * URL-based wrapper for ScenarioFormDrawer.
@@ -157,14 +172,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to create scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
@@ -177,14 +194,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to update scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
     },
   });
 
@@ -206,43 +225,53 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [openDrawer],
   );
 
-  const handleSave = useCallback(
+  // Edit mode: the scenario already exists, so the save is a plain update.
+  // Mutation errors are caught here so a save failure never surfaces as
+  // "Failed to run scenario" in the save-and-run path — updateMutation's own
+  // onError toast is what the user sees.
+  const updateExisting = useCallback(
     async ({
+      projectId,
+      scenarioId,
       data,
-      skipTransition = false,
       models,
     }: {
+      projectId: string;
+      scenarioId: string;
       data: ScenarioFormData;
-      skipTransition?: boolean;
-      /** Model overrides chosen in the run dialog. Omitted on a plain save
-       *  so existing scenario models are left untouched (undefined = no-op
-       *  in the Prisma update). */
-      models?: { simulatorModel: string | null; judgeModel: string | null };
+      models?: ModelOverrides;
     }): Promise<Scenario | null> => {
-      if (!project?.id) return null;
-
-      // Edit mode: scenarioId is in URL and scenario data is loaded.
-      // Catch mutation errors here so save failures never surface as "Failed to run scenario"
-      // in the save-and-run path — the mutation's own onError toast handles user feedback.
-      if (scenario) {
-        try {
-          return await updateMutation.mutateAsync({
-            projectId: project.id,
-            id: scenario.id,
-            ...data,
-            ...(models ?? {}),
-          });
-        } catch {
-          // Error toast already surfaced by updateMutation.onError; return null
-          // so the save-and-run caller doesn't re-report it as a run failure.
-          return null;
-        }
+      try {
+        return await updateMutation.mutateAsync({
+          projectId,
+          id: scenarioId,
+          ...data,
+          ...(models ?? {}),
+        });
+      } catch {
+        // Error toast already surfaced by updateMutation.onError; return null
+        // so the save-and-run caller doesn't re-report it as a run failure.
+        return null;
       }
+    },
+    [updateMutation],
+  );
 
-      // Create mode: no scenarioId in URL yet
+  const createScenario = useCallback(
+    async ({
+      projectId,
+      data,
+      skipTransition,
+      models,
+    }: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
       try {
         const result = await createMutation.mutateAsync({
-          projectId: project.id,
+          projectId,
           ...data,
           ...(models ?? {}),
         });
@@ -253,17 +282,36 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }
         return result;
       } catch {
-        // Error already handled by global mutation cache
+        // Error already handled by global mutation cache if license error
         return null;
       }
     },
-    [
-      project?.id,
-      scenario,
-      createMutation,
-      updateMutation,
-      transitionToEditMode,
-    ],
+    [createMutation, transitionToEditMode],
+  );
+
+  const handleSave = useCallback(
+    async ({
+      data,
+      skipTransition = false,
+      models,
+    }: {
+      data: ScenarioFormData;
+      skipTransition?: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      const projectId = project?.id;
+      if (!projectId) return null;
+
+      return scenario
+        ? await updateExisting({
+            projectId,
+            scenarioId: scenario.id,
+            data,
+            models,
+          })
+        : await createScenario({ projectId, data, skipTransition, models });
+    },
+    [project?.id, scenario, updateExisting, createScenario],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -290,9 +338,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           if (agent) {
             const config = agent.config as CustomComponentConfig;
             const mappings = config.scenarioMappings ?? {};
-            // We don't have workflow outputs here — server-side pre-run check
-            // covers output validation. Share the input half of the rule with
-            // the editor drawer via hasScenarioInputMapping.
+            // Run gate is input-only by design (#3412): a scenario needs only one
+            // input ("input" or "messages") mapped to be runnable; output mapping
+            // is optional (auto-populates to first output, or graceful stringify
+            // fallback). Uses shared hasScenarioInputMapping SSOT so the run gate
+            // and editor Save gate agree on the same input rule.
             if (!hasScenarioInputMapping(mappings)) {
               // Fallback affordance (#3411): even if the auto-open below races,
               // is dismissed, or fails, the toast itself links back to the editor.
@@ -380,13 +430,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         );
       })();
     } catch (error) {
-      toaster.create({
-        title: "Failed to run scenario",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
-        type: "error",
-        meta: { closable: true },
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
   }, [
     formInstance,
@@ -455,6 +499,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
+              {formInstance && <FormServerError form={formInstance} />}
               <ScenarioForm
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
@@ -502,7 +547,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       {/* Agent Type Selector Drawer */}
       <AgentTypeSelectorDrawer
         open={agentTypeSelectorOpen}
-        onClose={() => setAgentTypeSelectorOpen(false)}
+        onClose={() => {
+          setAgentTypeSelectorOpen(false);
+          clearFlowCallbacks();
+        }}
       />
 
       {/* Prompt Creation Drawer */}

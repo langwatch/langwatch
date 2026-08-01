@@ -8,88 +8,86 @@
  * - src/pages/api/experiment/init.ts
  * - src/pages/api/mcp/authorize.ts
  * - src/pages/api/optimization/[...params].ts
- * - src/pages/api/rerun_checks.ts
- * - src/pages/api/start_workers.ts
  * - src/pages/api/track_event.ts
  * - src/pages/api/track_usage.ts
  * - src/pages/api/trigger/slack.ts
  * - src/pages/api/webhooks/stripe.ts
  */
-import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
-import type { Project } from "@prisma/client";
-import { OpenAI } from "openai";
-import { nanoid } from "nanoid";
+
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
+import type { Project } from "@prisma/client";
+import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { nanoid } from "nanoid";
+import { OpenAI } from "openai";
+import type Stripe from "stripe";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
-import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
-import { getAnalyticsService } from "~/server/analytics/analytics.service";
+import { getOAuthClient } from "~/mcp/oauthClientRegistry";
+import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { start } from "~/server/background/worker";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
-import { prisma } from "~/server/db";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import {
-  dSPyStepRESTParamsSchema,
-  type DSPyLLMCall,
-  type DSPyStepRESTParams,
-} from "~/server/experiments/types";
-import { filterFieldsEnum } from "~/server/filters/types";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
-import {
-  getLLMModelCosts,
-  type MaybeStoredLLMModelCost,
-} from "~/server/modelProviders/llmModelCost";
-import { getPayloadSizeHistogram } from "~/server/metrics";
-import { getPostHogInstance } from "~/server/posthog";
-import { getServerAuthSession } from "~/server/auth";
-import { connection as redis } from "~/server/redis";
-import {
-  generateTrackedEventId,
-  predefinedEventTypes,
-  predefinedEventsSchemas,
-  recordTrackedEventSpan,
-} from "~/server/app-layer/events/track-event.service";
-import {
-  trackEventRESTParamsValidatorSchema,
-  type TrackEventRESTParamsValidator,
-} from "~/server/tracer/types";
-import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
-import type Stripe from "stripe";
-import { encrypt } from "~/utils/encryption";
-import { slugify } from "~/utils/slugify";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { createLogger } from "~/utils/logger/server";
-import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import {
-  createUnifiedAuthMiddleware,
-  requireApiKeyPermission,
-  type UnifiedAuthVariables,
-} from "~/server/api-key/auth-middleware";
 import {
   createServiceApp,
   handlerManagedAuth,
   internalSecret,
   publicEndpoint,
 } from "~/server/api/security";
+import {
+  createUnifiedAuthMiddleware,
+  requireApiKeyPermission,
+  type UnifiedAuthVariables,
+} from "~/server/api-key/auth-middleware";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { getApp } from "~/server/app-layer/app";
+import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
+import {
+  generateTrackedEventId,
+  predefinedEventsSchemas,
+  predefinedEventTypes,
+  recordTrackedEventSpan,
+} from "~/server/app-layer/events/track-event.service";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
+import {
+  type DSPyLLMCall,
+  type DSPyStepRESTParams,
+  dSPyStepRESTParamsSchema,
+} from "~/server/experiments/types";
+import { filterFieldsEnum } from "~/server/filters/types";
+import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
+import { getPayloadSizeHistogram } from "~/server/metrics";
+import {
+  getLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "~/server/modelProviders/llmModelCost";
+import { getPostHogInstance } from "~/server/posthog";
+import { rateLimit } from "~/server/rateLimit";
+import { connection as redis } from "~/server/redis";
+import {
+  estimateCost,
+  matchModelCostWithFallbacks,
+} from "~/server/tracer/collector/cost";
+import {
+  type TrackEventRESTParamsValidator,
+  trackEventRESTParamsValidatorSchema,
+} from "~/server/tracer/types";
+import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
+import { encrypt } from "~/utils/encryption";
+import { getClientIpFromHonoContext } from "~/utils/getClientIp";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -127,57 +125,83 @@ const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
 // Most endpoints here authenticate a project key plus a permission ceiling via
 // in-route middleware (authMiddleware + requireApiKeyPermission); the rest are
 // documented at their route.
-const inRouteAuth = handlerManagedAuth(
-  "project auth + permission ceiling enforced by in-route middleware",
-);
-const internalAuth = internalSecret(
-  "internal shared secret validated in-handler via validateInternalSecret",
-);
-
-// =============================================
-// POST /api/analytics
-// =============================================
-secured.access(inRouteAuth).post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
-  const project = c.get("project");
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  const input = body;
-  input.projectId = project.id;
-
-  let params: TimeseriesInputType;
-  try {
-    params = sharedFiltersInputSchema
-      .extend(timeseriesSeriesInput.shape)
-      .parse(input);
-  } catch (error) {
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  try {
-    const analyticsService = getAnalyticsService();
-    const timeseriesResult = await analyticsService.getTimeseries(params);
-    return c.json(timeseriesResult);
-  } catch (e) {
-    if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
-      return c.json({ code: e.code, message: e.message }, 400);
-    } else {
-      throw e;
-    }
-  }
+// One policy per grain, mirroring the `requireApiKeyPermission` middleware each
+// route applies. A single shared `inRouteAuth` reported nothing at all, so the
+// registry could not tell an analytics read from a trigger management call.
+const IN_ROUTE_REASON =
+  "project auth + permission ceiling enforced by in-route middleware";
+const analyticsViewAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["analytics:view"],
+  credential: "apiKey",
 });
+const experimentsManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["experiments:manage"],
+  credential: "apiKey",
+});
+const workflowsManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["workflows:manage"],
+  credential: "apiKey",
+});
+const tracesCreateAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["traces:create"],
+  credential: "apiKey",
+});
+const triggersManageAuth = handlerManagedAuth({
+  reason: IN_ROUTE_REASON,
+  permissions: ["triggers:manage"],
+  credential: "apiKey",
+});
+
+secured
+  .access(analyticsViewAuth)
+  .post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
+    const project = c.get("project");
+
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    const input = body;
+    input.projectId = project.id;
+
+    let params: TimeseriesInputType;
+    try {
+      params = sharedFiltersInputSchema
+        .extend(timeseriesSeriesInput.shape)
+        .parse(input);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
+    }
+
+    try {
+      const analyticsService = getAnalyticsService();
+      const timeseriesResult = await analyticsService.getTimeseries(params);
+      return c.json(timeseriesResult);
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
+        return c.json({ code: e.code, message: e.message }, 400);
+      } else {
+        throw e;
+      }
+    }
+  });
 
 // =============================================
 // POST /api/demo/hotel_bot
 // =============================================
 const hotelBotOpenai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY ?? "bogus",
+  // `||` and not `??`: a present-but-empty OPENAI_API_KEY (a scaffolded .env
+  // with the key left blank) must also fall back, or the SDK throws at
+  // module load and takes the whole server down with it.
+  apiKey: env.OPENAI_API_KEY || "bogus",
 });
 
 const guestQueries = [
@@ -203,177 +227,195 @@ const RAG_SYSTEM_PROMPT =
 // which performs full API-key/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
-secured.access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler")).post("/demo/hotel_bot", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
-
-  const randomNumberTry = Math.floor(Math.random() * 10);
-  if (randomNumberTry % 2 === 0) {
-    return c.json({ message: "Not this time" }, 401);
-  }
-
-  const randomNumber = Math.floor(Math.random() * 10);
-
-  if (randomNumber % 2 === 0) {
-    try {
-      const ragResponse = await ragMessage(authToken as string);
-      return c.json({ message: "Sent to LangWatch", ragResponse });
-    } catch (error: any) {
-      return c.json({ message: "Error", error }, 500);
+secured
+  .access(
+    handlerManagedAuth({
+      reason: "demo endpoint validates X-Auth-Token in-handler",
+      permissions: [],
+      credential: "apiKey",
+    }),
+  )
+  .post("/demo/hotel_bot", async (c) => {
+    const authToken = c.req.header("x-auth-token");
+    if (!authToken) {
+      return c.json({ message: "X-Auth-Token header is required." }, 401);
     }
-  } else {
-    try {
-      const threadId = `thread_${nanoid()}`;
-      const userId = `user_${nanoid()}`;
-      const userInput = (await getInitialMessage()) ?? "";
 
-      const assistantResponse = await firstChatMessage(
-        userInput,
-        threadId,
-        userId,
-        authToken as string,
-      );
-      const expectedUserResponse = await userResponse(
-        userInput,
-        assistantResponse ?? "",
-      );
-      await secondChatMessage(
-        userInput,
-        assistantResponse ?? "",
-        expectedUserResponse ?? "",
-        threadId,
-        userId,
-        authToken as string,
-      );
-
-      return c.json({ message: "Sent to LangWatch" });
-    } catch (error: any) {
-      return c.json({ message: "Error", error }, 500);
+    const randomNumberTry = Math.floor(Math.random() * 10);
+    if (randomNumberTry % 2 === 0) {
+      return c.json({ message: "Not this time" }, 401);
     }
-  }
-});
+
+    const randomNumber = Math.floor(Math.random() * 10);
+
+    if (randomNumber % 2 === 0) {
+      try {
+        const ragResponse = await ragMessage(authToken as string);
+        return c.json({ message: "Sent to LangWatch", ragResponse });
+      } catch (error: any) {
+        return c.json({ message: "Error", error }, 500);
+      }
+    } else {
+      try {
+        const threadId = `thread_${nanoid()}`;
+        const userId = `user_${nanoid()}`;
+        const userInput = (await getInitialMessage()) ?? "";
+
+        const assistantResponse = await firstChatMessage(
+          userInput,
+          threadId,
+          userId,
+          authToken as string,
+        );
+        const expectedUserResponse = await userResponse(
+          userInput,
+          assistantResponse ?? "",
+        );
+        await secondChatMessage(
+          userInput,
+          assistantResponse ?? "",
+          expectedUserResponse ?? "",
+          threadId,
+          userId,
+          authToken as string,
+        );
+
+        return c.json({ message: "Sent to LangWatch" });
+      } catch (error: any) {
+        return c.json({ message: "Error", error }, 500);
+      }
+    }
+  });
 
 // =============================================
 // POST /api/dspy/log_steps
 // =============================================
-secured.access(inRouteAuth).post(
-  "/dspy/log_steps",
-  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
-  authMiddleware,
-  requireExperimentsManage,
-  async (c) => {
-    const project = c.get("project");
+secured
+  .access(experimentsManageAuth)
+  .post(
+    "/dspy/log_steps",
+    bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+    authMiddleware,
+    requireExperimentsManage,
+    async (c) => {
+      const project = c.get("project");
 
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+      let body: unknown;
+      let payloadSize: number;
+      try {
+        // Take the size from the wire bytes rather than re-serialising the
+        // parsed body: bodies here run to 20MB, and the old
+        // `JSON.stringify(body).length` both cost a full second pass and
+        // reported UTF-16 code units instead of transferred bytes.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
+      } catch {
+        return c.json({ message: "Bad request" }, 400);
+      }
 
-    const payloadSize = JSON.stringify(body).length;
-    const payloadSizeMB = payloadSize / (1024 * 1024);
-    getPayloadSizeHistogram("log_steps").observe(payloadSize);
+      const payloadSizeMB = payloadSize / (1024 * 1024);
+      getPayloadSizeHistogram("log_steps").observe(payloadSize);
 
-    logger.info(
-      {
-        payloadSize,
-        payloadSizeMB: payloadSizeMB.toFixed(2),
-        projectId: project.id,
-      },
-      "DSPy log_steps request received",
-    );
-
-    let params: DSPyStepRESTParams[];
-    try {
-      params = z.array(dSPyStepRESTParamsSchema).parse(body);
-    } catch (error) {
-      logger.error(
+      logger.info(
         {
-          error,
           payloadSize,
           payloadSizeMB: payloadSizeMB.toFixed(2),
           projectId: project.id,
         },
-        "invalid log_steps data received",
+        "DSPy log_steps request received",
       );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
 
-    for (const param of params) {
-      if (
-        param.timestamps.created_at &&
-        param.timestamps.created_at.toString().length === 10
-      ) {
-        logger.error(
-          { param, projectId: project.id },
-          "timestamps not in milliseconds for step",
-        );
-        return c.json(
-          {
-            error:
-              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-          },
-          400,
-        );
-      }
-    }
-
-    logger.info(
-      { stepCount: params.length, projectId: project.id },
-      "Processing DSPy steps",
-    );
-
-    for (const param of params) {
+      let params: DSPyStepRESTParams[];
       try {
-        await processDSPyStep(project, param);
+        params = z.array(dSPyStepRESTParamsSchema).parse(body);
       } catch (error) {
-        if (error instanceof z.ZodError) {
+        logger.error(
+          {
+            error,
+            payloadSize,
+            payloadSizeMB: payloadSizeMB.toFixed(2),
+            projectId: project.id,
+          },
+          "invalid log_steps data received",
+        );
+        captureException(toError(error), { extra: { projectId: project.id } });
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+
+      for (const param of params) {
+        if (
+          param.timestamps.created_at &&
+          param.timestamps.created_at.toString().length === 10
+        ) {
           logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "failed to validate data for DSPy step",
+            { param, projectId: project.id },
+            "timestamps not in milliseconds for step",
           );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
-          const validationError = fromZodError(error);
-          return c.json({ error: validationError.message }, 400);
-        } else {
-          logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "internal server error processing DSPy step",
-          );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
           return c.json(
             {
               error:
-                error instanceof Error ? error.message : "Internal server error",
+                "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
             },
-            500,
+            400,
           );
         }
       }
-    }
 
-    return c.json({ message: "ok" });
-  },
-);
+      logger.info(
+        { stepCount: params.length, projectId: project.id },
+        "Processing DSPy steps",
+      );
+
+      for (const param of params) {
+        try {
+          await processDSPyStep(project, param);
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            logger.error(
+              {
+                error,
+                stepId: param.index,
+                runId: param.run_id,
+                projectId: project.id,
+              },
+              "failed to validate data for DSPy step",
+            );
+            captureException(toError(error), {
+              extra: { projectId: project.id, param },
+            });
+            const validationError = fromZodError(error);
+            return c.json({ error: validationError.message }, 400);
+          } else {
+            logger.error(
+              {
+                error,
+                stepId: param.index,
+                runId: param.run_id,
+                projectId: project.id,
+              },
+              "internal server error processing DSPy step",
+            );
+            captureException(toError(error), {
+              extra: { projectId: project.id, param },
+            });
+            return c.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Internal server error",
+              },
+              500,
+            );
+          }
+        }
+      }
+
+      return c.json({ message: "ok" });
+    },
+  );
 
 // =============================================
 // POST /api/experiment/init
@@ -395,82 +437,82 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-secured.access(inRouteAuth).post(
-  "/experiment/init",
-  authMiddleware,
-  requireExperimentsManage,
-  async (c) => {
-  const project = c.get("project");
+secured
+  .access(experimentsManageAuth)
+  .post(
+    "/experiment/init",
+    authMiddleware,
+    requireExperimentsManage,
+    async (c) => {
+      const project = c.get("project");
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  let params: z.infer<typeof dspyInitParamsSchema>;
-  try {
-    params = dspyInitParamsSchema.parse(body);
-  } catch (error) {
-    logger.error(
-      { error, body, projectId: project.id },
-      "invalid init data received",
-    );
-    captureException(toError(error), { extra: { projectId: project.id } });
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  let experiment;
-  try {
-    experiment = await findOrCreateExperiment({
-      project,
-      experiment_slug: params.experiment_slug,
-      experiment_type: params.experiment_type as ExperimentType,
-      experiment_name: params.experiment_name,
-      workflowId: params.workflowId,
-    });
-  } catch (error) {
-    if (error instanceof LimitExceededError) {
-      let message = error.message;
+      let body: Record<string, any>;
       try {
-        const organizationId = await resolveOrganizationId(
-          project.teamId,
-        );
-        if (organizationId) {
-          message = await buildResourceLimitMessage({
-            organizationId,
-            limitType: error.limitType,
-            max: error.max,
-          });
-        }
+        body = await c.req.json();
       } catch {
-        logger.warn(
-          { projectId: project.id },
-          "Failed to build resource limit message",
-        );
+        return c.json({ message: "Bad request" }, 400);
       }
-      return c.json(
-        {
-          error: error.kind,
-          message,
-          limitType: error.limitType,
-          current: error.current,
-          max: error.max,
-        },
-        403,
-      );
-    }
-    throw error;
-  }
 
-  return c.json({
-    path: `/${project.slug}/experiments/${experiment.slug}`,
-    slug: experiment.slug,
-  });
-  },
-);
+      let params: z.infer<typeof dspyInitParamsSchema>;
+      try {
+        params = dspyInitParamsSchema.parse(body);
+      } catch (error) {
+        logger.error(
+          { error, body, projectId: project.id },
+          "invalid init data received",
+        );
+        captureException(toError(error), { extra: { projectId: project.id } });
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+
+      let experiment;
+      try {
+        experiment = await findOrCreateExperiment({
+          project,
+          experiment_slug: params.experiment_slug,
+          experiment_type: params.experiment_type as ExperimentType,
+          experiment_name: params.experiment_name,
+          workflowId: params.workflowId,
+        });
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          let message = error.message;
+          try {
+            const organizationId = await resolveOrganizationId(project.teamId);
+            if (organizationId) {
+              message = await buildResourceLimitMessage({
+                organizationId,
+                limitType: error.limitType,
+                max: error.max,
+              });
+            }
+          } catch {
+            logger.warn(
+              { projectId: project.id },
+              "Failed to build resource limit message",
+            );
+          }
+          return c.json(
+            {
+              error: error.code,
+              message,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            },
+            403,
+          );
+        }
+        throw error;
+      }
+
+      return c.json({
+        path: `/${project.slug}/experiments/${experiment.slug}`,
+        slug: experiment.slug,
+      });
+    },
+  );
 
 // =============================================
 // POST /api/mcp/authorize
@@ -478,258 +520,211 @@ secured.access(inRouteAuth).post(
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
 
-secured.access(handlerManagedAuth("user session validated in-handler via getServerAuthSession")).post("/mcp/authorize", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
-  if (!session?.user?.id) {
-    return c.json({ error: "Not authenticated" }, 401);
-  }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid body" }, 400);
-  }
-
-  const {
-    projectId,
-    redirect_uri,
-    state,
-    code_challenge,
-    code_challenge_method,
-    client_id,
-  } = body;
-
-  if (!projectId || !redirect_uri) {
-    return c.json(
-      { error: "projectId and redirect_uri are required" },
-      400,
-    );
-  }
-
-  try {
-    const redirectUrl = new URL(redirect_uri);
-    if (
-      redirectUrl.protocol === "javascript:" ||
-      redirectUrl.protocol === "data:" ||
-      redirectUrl.protocol === "vbscript:"
-    ) {
-      return c.json(
-        { error: "redirect_uri uses a disallowed scheme" },
-        400,
-      );
+secured
+  .access(
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      // OAuth authorize step; no RBAC permission gates it.
+      permissions: [],
+      credential: "session",
+    }),
+  )
+  .post("/mcp/authorize", async (c) => {
+    const session = await getServerAuthSession({ req: c.req.raw as any });
+    if (!session?.user?.id) {
+      return c.json({ error: "Not authenticated" }, 401);
     }
-  } catch {
-    return c.json({ error: "Invalid redirect_uri" }, 400);
-  }
-
-  if (!code_challenge) {
-    return c.json(
-      { error: "code_challenge is required (PKCE S256)" },
-      400,
-    );
-  }
-
-  // The demo project is a globally-readable showcase: isDemoProject grants
-  // `project:view` to ANY caller, so it must never reach the RoleBinding check
-  // below — otherwise any authenticated user could mint an MCP auth code
-  // embedding the demo project's API key. (The old `team.members.some` check
-  // happened to block this; the RoleBinding-aware check does not.)
-  if (isDemoProject(projectId, "project:view")) {
-    return c.json(
-      { error: "Project not found or you don't have access" },
-      403,
-    );
-  }
-
-  // Authorize against RoleBindings (the authoritative source since migration
-  // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
-  // TeamUser relation. A user added to the team after that migration has no
-  // TeamUser row, so the old `team.members.some` check rejected them with a
-  // false 403. `project:view` is the baseline grant every team role (incl.
-  // VIEWER) has, and hasProjectPermission also honors org-level access.
-  // ProjectService is constructed directly (not via getApp()) so this handler
-  // stays unit-testable without booting the app container — the same pattern
-  // used in presets.ts and the project-service middleware.
-  const projectService = new ProjectService(new PrismaProjectRepository(prisma));
-  const project = await projectService.getById(projectId);
-
-  if (
-    !project ||
-    project.archivedAt !== null ||
-    !(await hasProjectPermission({ prisma, session }, projectId, "project:view"))
-  ) {
-    // Single 403 whether the project is missing, archived, or simply
-    // inaccessible — never disclose existence of a project the caller can't reach.
-    return c.json(
-      { error: "Project not found or you don't have access" },
-      403,
-    );
-  }
-
-  const code = randomUUID();
-
-  if (!redis) {
-    return c.json({ error: "Redis is not available" }, 500);
-  }
-
-  const authCodeEntry = JSON.stringify({
-    projectId: project.id,
-    encryptedApiKey: encrypt(project.apiKey),
-    // Captured here so MCP tools that need a caller identity (e.g.,
-    // governance install/uninstall/rotate) can attribute audit rows to
-    // the actual OAuth-flowing user instead of falling back to a project-
-    // wide identity. Read in handler.ts at the token-exchange step.
-    userId: session.user.id,
-    codeChallenge: code_challenge,
-    codeChallengeMethod: code_challenge_method ?? "S256",
-    clientId: client_id ?? "",
-    expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
-  });
-
-  await redis.set(
-    `${REDIS_AUTH_CODE_PREFIX}${code}`,
-    authCodeEntry,
-    "EX",
-    AUTH_CODE_TTL_SECONDS,
-  );
-
-  const redirectUrl = new URL(redirect_uri);
-  redirectUrl.searchParams.set("code", code);
-  if (state) {
-    redirectUrl.searchParams.set("state", state);
-  }
-
-  return c.json({ redirect: redirectUrl.toString() });
-});
-
-// =============================================
-// POST /api/optimization/:workflowId/:versionId  (deprecated)
-// =============================================
-secured.access(inRouteAuth).post(
-  "/optimization/:workflowId/:versionId",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    const workflowId = c.req.param("workflowId");
-    const versionId = c.req.param("versionId");
-
-    const contentType = c.req.header("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      return c.json({ message: "Invalid body, expecting json" }, 400);
-    }
-
-    const project = c.get("project");
 
     let body: Record<string, any>;
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ message: "Invalid body" }, 400);
+      return c.json({ error: "Invalid body" }, 400);
+    }
+
+    const {
+      projectId,
+      redirect_uri,
+      state,
+      code_challenge,
+      code_challenge_method,
+      client_id,
+    } = body;
+
+    if (!projectId || !redirect_uri || !client_id) {
+      return c.json(
+        { error: "projectId, redirect_uri and client_id are required" },
+        400,
+      );
     }
 
     try {
-      const result = await runWorkflowFn(
-        workflowId,
-        project.id,
-        body,
-        versionId,
-      );
-      return c.json(result);
-    } catch (error) {
-      return c.json({ message: (error as Error).message }, 500);
+      const redirectUrl = new URL(redirect_uri);
+      if (
+        redirectUrl.protocol === "javascript:" ||
+        redirectUrl.protocol === "data:" ||
+        redirectUrl.protocol === "vbscript:"
+      ) {
+        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
+      }
+    } catch {
+      return c.json({ error: "Invalid redirect_uri" }, 400);
     }
-  },
-);
 
-// =============================================
-// GET /api/rerun_checks
-// =============================================
-const rerunChecksHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const checkId = c.req.query("checkId") as string;
-    const projectId = c.req.query("projectId") as string;
+    // RFC 6749 §10.6: an authorization server must only ever issue a code to
+    // a redirect_uri that was registered for this client_id — otherwise
+    // whoever crafts the authorization request (which can be an attacker,
+    // not the approving user) can point it at a URI they control and the
+    // approved code is exfiltrated there. PKCE does not defend against this:
+    // it proves the token-exchanger holds the verifier for the challenge in
+    // the code, and an attacker who authored the request holds both. Exact
+    // string match against the client's /oauth/register'd redirect_uris —
+    // no scheme/host-only comparison, which a subdomain or path trick could
+    // slip past.
+    const registeredClient = await getOAuthClient(client_id);
+    if (!registeredClient) {
+      return c.json({ error: "Unknown or unregistered client_id" }, 400);
+    }
+    if (!registeredClient.redirectUris.includes(redirect_uri)) {
+      return c.json(
+        {
+          error:
+            "redirect_uri does not match any redirect URI registered for this client_id",
+        },
+        400,
+      );
+    }
 
-    const { default: rerunChecks } = await import("~/tasks/rerunChecks");
-    await rerunChecks(checkId, projectId);
+    if (!code_challenge) {
+      return c.json({ error: "code_challenge is required (PKCE S256)" }, 400);
+    }
 
-    return c.json({ message: "Checks rescheduled" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
+    // The demo project is a globally-readable showcase: isDemoProject grants
+    // `project:view` to ANY caller, so it must never reach the RoleBinding check
+    // below — otherwise any authenticated user could mint an MCP auth code
+    // embedding the demo project's API key. (The old `team.members.some` check
+    // happened to block this; the RoleBinding-aware check does not.)
+    if (isDemoProject(projectId, "project:view")) {
+      return c.json(
+        { error: "Project not found or you don't have access" },
+        403,
+      );
+    }
+
+    // Authorize against RoleBindings (the authoritative source since migration
+    // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
+    // TeamUser relation. A user added to the team after that migration has no
+    // TeamUser row, so the old `team.members.some` check rejected them with a
+    // false 403. `project:view` is the baseline grant every team role (incl.
+    // VIEWER) has, and hasProjectPermission also honors org-level access.
+    // ProjectService is constructed directly (not via getApp()) so this handler
+    // stays unit-testable without booting the app container — the same pattern
+    // used in presets.ts and the project-service middleware.
+    const projectService = new ProjectService(
+      new PrismaProjectRepository(prisma),
     );
-  }
-};
-secured.access(internalAuth).get("/rerun_checks", rerunChecksHandler);
-secured.access(internalAuth).post("/rerun_checks", rerunChecksHandler);
+    const project = await projectService.getById(projectId);
 
-// =============================================
-// GET /api/start_workers
-// =============================================
-const MAX_WORKER_DURATION = 300;
+    if (
+      !project ||
+      project.archivedAt !== null ||
+      !(await hasProjectPermission(
+        { prisma, session },
+        projectId,
+        "project:view",
+      ))
+    ) {
+      // Single 403 whether the project is missing, archived, or simply
+      // inaccessible — never disclose existence of a project the caller can't reach.
+      return c.json(
+        { error: "Project not found or you don't have access" },
+        403,
+      );
+    }
 
-const startWorkersHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const maxRuntimeMs = (MAX_WORKER_DURATION - 60) * 1000;
-    await start(undefined, maxRuntimeMs);
-    return c.json({ message: "Worker done" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
+    const code = randomUUID();
+
+    if (!redis) {
+      return c.json({ error: "Redis is not available" }, 500);
+    }
+
+    const authCodeEntry = JSON.stringify({
+      projectId: project.id,
+      encryptedApiKey: encrypt(project.apiKey),
+      // Captured here so MCP tools that need a caller identity (e.g.,
+      // governance install/uninstall/rotate) can attribute audit rows to
+      // the actual OAuth-flowing user instead of falling back to a project-
+      // wide identity. Read in handler.ts at the token-exchange step.
+      userId: session.user.id,
+      codeChallenge: code_challenge,
+      codeChallengeMethod: code_challenge_method ?? "S256",
+      // Bound here so /oauth/token can require the exchange to present the
+      // exact same client_id + redirect_uri this authorization was validated
+      // and approved against (RFC 6749 §4.1.3 / §3.2.1) — a code minted for
+      // one client's registered URI must never be redeemable against another.
+      clientId: client_id,
+      redirectUri: redirect_uri,
+      expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
+    });
+
+    await redis.set(
+      `${REDIS_AUTH_CODE_PREFIX}${code}`,
+      authCodeEntry,
+      "EX",
+      AUTH_CODE_TTL_SECONDS,
     );
-  }
-};
-secured.access(internalAuth).get("/start_workers", startWorkersHandler);
-secured.access(internalAuth).post("/start_workers", startWorkersHandler);
+
+    const redirectUrl = new URL(redirect_uri);
+    redirectUrl.searchParams.set("code", code);
+    if (state) {
+      redirectUrl.searchParams.set("state", state);
+    }
+
+    return c.json({ redirect: redirectUrl.toString() });
+  });
+
+// =============================================
+// POST /api/optimization/:workflowId/:versionId  (deprecated)
+// =============================================
+secured
+  .access(workflowsManageAuth)
+  .post(
+    "/optimization/:workflowId/:versionId",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      // Delegates to the same handler as POST /workflows/:workflowId/:versionId/run
+      // (below) — this route used to duplicate that logic with its own
+      // catch-and-flatten-to-500, which had drifted to disagree with the
+      // canonical route on the status code for identical failures.
+      return handleWorkflowRun(
+        c,
+        c.req.param("workflowId"),
+        c.req.param("versionId"),
+      );
+    },
+  );
 
 // =============================================
 // POST /api/track_event
 // =============================================
-//
-// Legacy URL kept for backwards compatibility. The canonical endpoint is
-// `POST /api/events/track` (src/app/api/events/[[...route]]/app.ts). Both
-// routes share `recordTrackedEventSpan` so behaviour stays identical.
+// Both this legacy URL and the canonical POST /api/events/track route
+// through track-event.service so behaviour stays identical between them.
+secured
+  .access(tracesCreateAuth)
+  .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
+    const project = c.get("project");
 
-secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
-  const project = c.get("project");
-
-  let rawBody: Record<string, any>;
-  try {
-    rawBody = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  let body: TrackEventRESTParamsValidator;
-  try {
-    body = trackEventRESTParamsValidatorSchema.parse(rawBody);
-  } catch (error) {
-    logger.error(
-      { error, body: rawBody, projectId: project.id },
-      "invalid event received",
-    );
-    captureException(toError(error));
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  if (predefinedEventTypes.includes(rawBody.event_type)) {
+    let rawBody: Record<string, any>;
     try {
-      predefinedEventsSchemas.parse(rawBody);
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    let body: TrackEventRESTParamsValidator;
+    try {
+      body = trackEventRESTParamsValidatorSchema.parse(rawBody);
     } catch (error) {
       logger.error(
         { error, body: rawBody, projectId: project.id },
@@ -739,47 +734,188 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
-  }
 
-  const eventId = body.event_id ?? generateTrackedEventId();
+    if (predefinedEventTypes.includes(rawBody.event_type)) {
+      try {
+        predefinedEventsSchemas.parse(rawBody);
+      } catch (error) {
+        logger.error(
+          { error, body: rawBody, projectId: project.id },
+          "invalid event received",
+        );
+        captureException(toError(error));
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+    }
 
-  try {
-    await recordTrackedEventSpan({ project, body, eventId });
-  } catch (error) {
-    logger.error({ error }, "unable to dispatch tracked event span");
-  }
+    const eventId = body.event_id ?? generateTrackedEventId();
 
-  return c.json({ message: "Event tracked" });
-});
+    try {
+      await recordTrackedEventSpan({ project, body, eventId });
+    } catch (error) {
+      logger.error({ error }, "unable to dispatch tracked event span");
+    }
+
+    return c.json({ message: "Event tracked" });
+  });
 
 // =============================================
 // POST /api/track_usage
 // =============================================
-secured.access(publicEndpoint("anonymous product telemetry, no credential")).post("/track_usage", async (c) => {
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+// Self-hosted instances report anonymous daily usage counts here with no
+// credential to present (see usageStatsWorker.ts), so the route stays public.
+// What it accepts is bounded instead:
+//   - `.strict()` schema matching exactly the one report `collectUsageStats`
+//     produces, so a spoofed event can't also smuggle arbitrary properties
+//     into PostHog even once it gets the event name right
+//   - a capped payload size
+//   - a global rate limit — the actual bound. `ip` and `instance_id` are both
+//     values the caller supplies, so an abuser rotates either one and lands
+//     in a fresh bucket every request (mirrors the reasoning in
+//     rum-ingest.service.ts). Checked first, on a fixed key, so a flood the
+//     global bucket is already refusing doesn't also mint a fresh per-caller
+//     Redis key on every request.
+//   - per-IP and per-instance limits on top, for fairness once under the cap
+const TRACK_USAGE_EVENT = "daily_usage_stats";
+// Every stat field is `.optional()`, not required: this receiver is a stable
+// contract that self-hosted instances at ANY historical version hit (see
+// usageStatsWorker.ts's docstring), so an older sender predating a field
+// collectUsageStats.ts later added (or a newer one with a field this receiver
+// doesn't know about yet) must still be accepted rather than 400'd — a
+// self-hosted operator gets zero feedback on a rejected send (the worker logs
+// success unconditionally once `fetch` resolves, without checking `.ok`), so
+// a strict shape mismatch here would silently and permanently drop that
+// instance's telemetry. `.strict()` still closes the actual security gap by
+// rejecting keys outside this known set — the two constraints don't conflict.
+const trackUsageBodySchema = z
+  .object({
+    event: z.literal(TRACK_USAGE_EVENT),
+    instance_id: z.string().min(1).max(200),
+    install_method: z.string().max(100).optional(),
+    hostname: z.string().max(255).optional(),
+    environment: z.string().max(50).optional(),
+    totalTraces: z.number().optional(),
+    totalScenarioEvents: z.number().optional(),
+    annotations: z.number().optional(),
+    annotationQueues: z.number().optional(),
+    annotationQueueItems: z.number().optional(),
+    annotationScores: z.number().optional(),
+    batchEvaluations: z.number().optional(),
+    customGraphs: z.number().optional(),
+    datasets: z.number().optional(),
+    datasetRecords: z.number().optional(),
+    experiments: z.number().optional(),
+    triggers: z.number().optional(),
+    workflows: z.number().optional(),
+    timestamp: z.string().optional(),
+  })
+  .strict();
 
-  const { event, instance_id, ...properties } = body;
+// A self-hosted instance sends this once per organization per day
+// (usageStatsWorker.ts), so these ceilings stay generous for legitimate
+// traffic while bounding abuse.
+const TRACK_USAGE_GLOBAL_PER_MINUTE = 500;
+const TRACK_USAGE_PER_IP_PER_MINUTE = 10;
+const TRACK_USAGE_PER_INSTANCE_PER_HOUR = 5;
 
-  const posthog = getPostHogInstance();
-  if (posthog) {
-    try {
-      posthog.capture({
-        distinctId: instance_id,
-        event,
-        properties,
-      });
-    } catch (error) {
-      captureException(toError(error));
+interface TrackUsageRateLimitVerdict {
+  allowed: boolean;
+  retryAfterSeconds: number;
+}
+
+function toVerdict(result: {
+  allowed: boolean;
+  resetAt: number;
+}): TrackUsageRateLimitVerdict {
+  return {
+    allowed: result.allowed,
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((result.resetAt - Date.now()) / 1000),
+    ),
+  };
+}
+
+/**
+ * Checked before the body is even parsed, on keys no request-body field can
+ * influence, so a flood of malformed JSON is capped exactly like valid
+ * traffic — an attacker can't dodge the limiter just by sending garbage.
+ */
+async function enforceGlobalAndIpRateLimit(
+  ip: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const global = await rateLimit({
+    key: "track_usage:global",
+    windowSeconds: 60,
+    max: TRACK_USAGE_GLOBAL_PER_MINUTE,
+  });
+  if (!global.allowed) return toVerdict(global);
+
+  const perIp = await rateLimit({
+    key: `track_usage:ip:${ip}`,
+    windowSeconds: 60,
+    max: TRACK_USAGE_PER_IP_PER_MINUTE,
+  });
+  return toVerdict(perIp);
+}
+
+async function enforceInstanceRateLimit(
+  instanceId: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const perInstance = await rateLimit({
+    key: `track_usage:instance:${instanceId}`,
+    windowSeconds: 3600,
+    max: TRACK_USAGE_PER_INSTANCE_PER_HOUR,
+  });
+  return toVerdict(perInstance);
+}
+
+secured
+  .access(publicEndpoint("anonymous product telemetry, no credential"))
+  .post("/track_usage", bodyLimit({ maxSize: 10 * 1024 }), async (c) => {
+    const ip = getClientIpFromHonoContext(c) ?? "unknown";
+
+    const ipLimit = await enforceGlobalAndIpRateLimit(ip);
+    if (!ipLimit.allowed) {
+      c.header("Retry-After", String(ipLimit.retryAfterSeconds));
+      return c.json({ message: "Too many requests" }, 429);
     }
-  }
 
-  return c.json({ message: "Event captured" });
-});
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
+
+    const parsed = trackUsageBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ message: "Bad request" }, 400);
+    }
+    const { event, instance_id, ...properties } = parsed.data;
+
+    const instanceLimit = await enforceInstanceRateLimit(instance_id);
+    if (!instanceLimit.allowed) {
+      c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
+      return c.json({ message: "Too many requests" }, 429);
+    }
+
+    const posthog = getPostHogInstance();
+    if (posthog) {
+      try {
+        posthog.capture({
+          distinctId: instance_id,
+          event,
+          properties,
+        });
+      } catch (error) {
+        captureException(toError(error));
+      }
+    }
+
+    return c.json({ message: "Event captured" });
+  });
 
 // =============================================
 // POST /api/trigger/slack
@@ -795,11 +931,9 @@ const filterSchema = z
   )
   .default({});
 
-secured.access(inRouteAuth).post(
-  "/trigger/slack",
-  authMiddleware,
-  requireTriggersManage,
-  async (c) => {
+secured
+  .access(triggersManageAuth)
+  .post("/trigger/slack", authMiddleware, requireTriggersManage, async (c) => {
     const project = c.get("project");
 
     let body: Record<string, any>;
@@ -844,34 +978,37 @@ secured.access(inRouteAuth).post(
       logger.error({ error }, "Error creating trigger");
       return c.json({ message: "Error creating trigger" }, 500);
     }
-  },
-);
+  });
 
 // =============================================
 // POST /api/workflows/:workflowId/run
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
-secured.access(inRouteAuth).post(
-  "/workflows/:workflowId/run",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
-  },
-);
+secured
+  .access(workflowsManageAuth)
+  .post(
+    "/workflows/:workflowId/run",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
+    },
+  );
 
-secured.access(inRouteAuth).post(
-  "/workflows/:workflowId/:versionId/run",
-  authMiddleware,
-  requireWorkflowsManage,
-  async (c) => {
-    return handleWorkflowRun(
-      c,
-      c.req.param("workflowId"),
-      c.req.param("versionId"),
-    );
-  },
-);
+secured
+  .access(workflowsManageAuth)
+  .post(
+    "/workflows/:workflowId/:versionId/run",
+    authMiddleware,
+    requireWorkflowsManage,
+    async (c) => {
+      return handleWorkflowRun(
+        c,
+        c.req.param("workflowId"),
+        c.req.param("versionId"),
+      );
+    },
+  );
 
 async function handleWorkflowRun(
   c: any,
@@ -879,7 +1016,7 @@ async function handleWorkflowRun(
   versionId: string | undefined,
 ) {
   const contentType = c.req.header("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
+  if (!contentType?.includes("application/json")) {
     return c.json({ message: "Invalid body, expecting json" }, 400);
   }
 
@@ -892,64 +1029,59 @@ async function handleWorkflowRun(
     return c.json({ message: "Invalid body" }, 400);
   }
 
-  try {
-    const result = await runWorkflowFn(
-      workflowId,
-      project.id,
-      body,
-      versionId,
-    );
-    return c.json(result);
-  } catch (error) {
-    return c.json({ message: (error as Error).message }, 500);
-  }
+  // Let errors propagate to the app's onError(handleError) middleware — it
+  // already knows how to map HandledError subclasses (e.g. runWorkflow's
+  // NotFoundError/ValidationError) to the right status code. Catching here
+  // and hard-coding 500 was masking those as raw 500s regardless of type.
+  const result = await runWorkflowFn(workflowId, project.id, body, versionId);
+  return c.json(result);
 }
 
 // =============================================
 // POST /api/webhooks/stripe
 // =============================================
-secured.access(internalSecret("Stripe webhook signature verified in-handler")).post("/webhooks/stripe", async (c) => {
-  const { webhookService, stripeClient } = getApp();
-  if (!env.IS_SAAS || !webhookService || !stripeClient) {
-    return c.json({ error: "Not Found" }, 404);
-  }
+secured
+  .access(internalSecret("Stripe webhook signature verified in-handler"))
+  .post("/webhooks/stripe", async (c) => {
+    const { webhookService, stripeClient } = getApp();
+    if (!env.IS_SAAS || !webhookService || !stripeClient) {
+      return c.json({ error: "Not Found" }, 404);
+    }
 
-  const sig = c.req.header("stripe-signature");
-  const secret = env.STRIPE_WEBHOOK_SECRET;
-  if (!sig || !secret) {
-    logger.error(
-      { sig: !!sig, secret: !!secret },
-      "[stripeWebhook] Missing signature or secret",
-    );
-    return c.text("Webhook Error: Missing signature or secret", 400);
-  }
+    const sig = c.req.header("stripe-signature");
+    const secret = env.STRIPE_WEBHOOK_SECRET;
+    if (!sig || !secret) {
+      logger.error(
+        { sig: !!sig, secret: !!secret },
+        "[stripeWebhook] Missing signature or secret",
+      );
+      return c.text("Webhook Error: Missing signature or secret", 400);
+    }
 
-  let event: Stripe.Event;
-  try {
-    const rawBody = Buffer.from(await c.req.arrayBuffer());
-    event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
-  } catch (error) {
-    logger.error(
-      { error: (error as Error).message },
-      "[stripeWebhook] Failed to construct event",
-    );
-    return c.text("Webhook Error: Invalid payload or signature", 400);
-  }
+    let event: Stripe.Event;
+    try {
+      const rawBody = Buffer.from(await c.req.arrayBuffer());
+      event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
+    } catch (error) {
+      logger.error(
+        { error: (error as Error).message },
+        "[stripeWebhook] Failed to construct event",
+      );
+      return c.text("Webhook Error: Invalid payload or signature", 400);
+    }
 
-  const result = await webhookService.handleEvent(event);
-  if (result.status === "error") {
-    return c.text(result.message, result.httpStatus);
-  }
-  return c.json({ received: true });
-});
+    const result = await webhookService.handleEvent(event);
+    if (result.status === "error") {
+      return c.text(result.message, result.httpStatus);
+    }
+    return c.json({ received: true });
+  });
 
 // =============================================
 // Helpers
 // =============================================
 
-async function resolveOrganizationId(
-  teamId: string,
-): Promise<string | null> {
+async function resolveOrganizationId(teamId: string): Promise<string | null> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: { organizationId: true },
@@ -992,10 +1124,7 @@ const extractLLMCallInfo =
     return call;
   };
 
-const processDSPyStep = async (
-  project: Project,
-  param: DSPyStepRESTParams,
-) => {
+const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, index, experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
@@ -1155,10 +1284,7 @@ const langwatchAPI = async (
   }
 };
 
-const userResponse = async (
-  userInput: string,
-  chatResponse: string,
-) => {
+const userResponse = async (userInput: string, chatResponse: string) => {
   const completion = await hotelBotOpenai.chat.completions.create({
     messages: [
       { role: "system", content: HOTEL_SYSTEM_PROMPT },
@@ -1205,19 +1331,17 @@ const ragMessage = async (authToken: string) => {
 
   const completions = (
     await Promise.all(
-      Array.from(
-        { length: 2 + Math.floor(Math.random() * 5) },
-        () =>
-          hotelBotOpenai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Invent a restaurant name and a short google maps review of it",
-              },
-            ],
-          }),
+      Array.from({ length: 2 + Math.floor(Math.random() * 5) }, () =>
+        hotelBotOpenai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Invent a restaurant name and a short google maps review of it",
+            },
+          ],
+        }),
       ),
     )
   ).map((c) => c.choices[0]!.message.content ?? "");
@@ -1247,13 +1371,7 @@ const firstChatMessage = async (
     ],
     model: "gpt-3.5-turbo",
   });
-  await langwatchAPI(
-    completion,
-    userInput ?? "",
-    authToken,
-    threadId,
-    userId,
-  );
+  await langwatchAPI(completion, userInput ?? "", authToken, threadId, userId);
   return completion.choices[0]!.message.content;
 };
 
@@ -1287,38 +1405,39 @@ const secondChatMessage = async (
 // =============================================
 // GET /image-proxy — SSRF-safe image proxy
 // =============================================
-secured.access(publicEndpoint("SSRF-guarded image proxy, no credential")).get("/image-proxy", async (c) => {
-  const url = c.req.query("url");
-  if (!url) {
-    return c.json({ error: "Missing url" }, 400);
-  }
-
-  try {
-    const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
-    const response = await ssrfSafeFetch(url);
-
-    if (!response.ok) {
-      return c.json(
-        { error: `Failed to fetch image: ${response.statusText}` },
-        response.status as any
-      );
+secured
+  .access(publicEndpoint("SSRF-guarded image proxy, no credential"))
+  .get("/image-proxy", async (c) => {
+    const url = c.req.query("url");
+    if (!url) {
+      return c.json({ error: "Missing url" }, 400);
     }
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.startsWith("image/")) {
-      return c.json({ error: "URL does not point to an image" }, 400);
-    }
+    try {
+      const response = await ssrfSafeFetch(url);
 
-    const imageBuffer = await response.arrayBuffer();
-    return new Response(imageBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=31536000",
-      },
-    });
-  } catch {
-    return c.json({ error: "Failed to fetch image" }, 500);
-  }
-});
+      if (!response.ok) {
+        return c.json(
+          { error: `Failed to fetch image: ${response.statusText}` },
+          response.status as any,
+        );
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType?.startsWith("image/")) {
+        return c.json({ error: "URL does not point to an image" }, 400);
+      }
+
+      const imageBuffer = await response.arrayBuffer();
+      return new Response(imageBuffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=31536000",
+        },
+      });
+    } catch {
+      return c.json({ error: "Failed to fetch image" }, 500);
+    }
+  });
 
 export const app = secured.hono;

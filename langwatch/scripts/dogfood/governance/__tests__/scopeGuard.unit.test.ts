@@ -25,9 +25,7 @@ describe("parseDemoOrgIdsEnv", () => {
     });
 
     it("throws DemoScopeMisconfigured when only commas + whitespace", () => {
-      expect(() => parseDemoOrgIdsEnv(", , ,")).toThrow(
-        DemoScopeMisconfigured,
-      );
+      expect(() => parseDemoOrgIdsEnv(", , ,")).toThrow(DemoScopeMisconfigured);
     });
   });
 
@@ -37,18 +35,15 @@ describe("parseDemoOrgIdsEnv", () => {
     });
 
     it("parses comma-separated ids and trims whitespace", () => {
-      expect(parseDemoOrgIdsEnv("org_acme123, org_beta456 ,org_gamma789")).toEqual([
-        "org_acme123",
-        "org_beta456",
-        "org_gamma789",
-      ]);
+      expect(
+        parseDemoOrgIdsEnv("org_acme123, org_beta456 ,org_gamma789"),
+      ).toEqual(["org_acme123", "org_beta456", "org_gamma789"]);
     });
 
     it("dedupes repeated ids", () => {
-      expect(parseDemoOrgIdsEnv("org_acme123,org_acme123,org_beta456")).toEqual([
-        "org_acme123",
-        "org_beta456",
-      ]);
+      expect(parseDemoOrgIdsEnv("org_acme123,org_acme123,org_beta456")).toEqual(
+        ["org_acme123", "org_beta456"],
+      );
     });
   });
 
@@ -97,9 +92,9 @@ describe("assertDemoOrgAllowed", () => {
   });
 
   it("is case-sensitive", () => {
-    expect(() =>
-      assertDemoOrgAllowed("ORG_ACME123", ["org_acme123"]),
-    ).toThrow(DemoScopeViolation);
+    expect(() => assertDemoOrgAllowed("ORG_ACME123", ["org_acme123"])).toThrow(
+      DemoScopeViolation,
+    );
   });
 });
 

@@ -17,15 +17,13 @@
  * Spec: specs/ai-gateway/governance/c3-alert-dispatch.feature
  */
 import { createHmac } from "node:crypto";
-
+import { createLogger } from "@langwatch/observability";
 import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
-
-import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import {
-  safeParseDestinationConfig,
   type Destination,
+  safeParseDestinationConfig,
   type WebhookDestination,
 } from "./destinationConfig.schema";
 
@@ -37,12 +35,22 @@ const RETRY_BACKOFF_MS = 250;
 
 export type FetchLike = (
   input: string,
-  init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal },
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+    signal: AbortSignal;
+  },
 ) => Promise<{ status: number; ok: boolean; statusText: string }>;
 
 export type DispatchOutcome =
   | { destinationIndex: number; type: "webhook"; status: "succeeded" }
-  | { destinationIndex: number; type: "webhook"; status: "failed"; reason: string };
+  | {
+      destinationIndex: number;
+      type: "webhook";
+      status: "failed";
+      reason: string;
+    };
 
 export type DispatchResult = {
   /** Tag written to AnomalyAlert.detail.dispatch for audit/UX. */
@@ -124,7 +132,12 @@ export class AnomalyAlertDispatcherService {
         reason: `Unsupported destination type`,
       };
     }
-    return this.dispatchWebhook({ destination, body, destinationIndex, ruleId });
+    return this.dispatchWebhook({
+      destination,
+      body,
+      destinationIndex,
+      ruleId,
+    });
   }
 
   private async dispatchWebhook({

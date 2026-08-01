@@ -5,12 +5,21 @@
  * Computes pass rates and calculates totals.
  */
 
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "~/components/shared/MetricStatsTooltip";
+import {
+  isOnPlatformSet,
+  ON_PLATFORM_DISPLAY_NAME,
+} from "~/server/scenarios/internal-set-id";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
-import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
+import type {
+  ScenarioRunData,
+  SuiteRunSummary,
+} from "~/server/scenarios/scenario-event.types";
+import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
-
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -93,29 +102,6 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   if (summary.failedCount > 0) return ScenarioRunStatus.FAILED;
   if (summary.cancelledCount > 0) return ScenarioRunStatus.CANCELLED;
   return ScenarioRunStatus.SUCCESS;
-}
-
-
-type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress" | "queued";
-
-function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
-  switch (status) {
-    case ScenarioRunStatus.SUCCESS:
-      return "success";
-    case ScenarioRunStatus.ERROR:
-    case ScenarioRunStatus.FAILED:
-      return "failure";
-    case ScenarioRunStatus.STALLED:
-      return "stalled";
-    case ScenarioRunStatus.CANCELLED:
-      return "cancelled";
-    case ScenarioRunStatus.IN_PROGRESS:
-    case ScenarioRunStatus.PENDING:
-    case ScenarioRunStatus.RUNNING:
-      return "in_progress";
-    case ScenarioRunStatus.QUEUED:
-      return "queued";
-  }
 }
 
 const UNKNOWN_GROUP_KEY = "__unknown__";
@@ -264,7 +250,7 @@ export function groupRunsByTarget({
     const label =
       targetId === UNKNOWN_GROUP_KEY
         ? "Unknown"
-        : targetNameMap.get(targetId) ?? targetId;
+        : (targetNameMap.get(targetId) ?? targetId);
     groups.push({
       groupKey: targetId,
       groupLabel: label,
@@ -338,11 +324,15 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
-  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
+  const settledCount =
+    passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
-  const passRate = settledCount > 0
-    ? (passedCount / settledCount) * 100
-    : (totalCount > 0 ? null : 0);
+  const passRate =
+    settledCount > 0
+      ? (passedCount / settledCount) * 100
+      : totalCount > 0
+        ? null
+        : 0;
 
   let totalCost = 0;
   let totalDurationMs = 0;
@@ -351,11 +341,11 @@ export function computeGroupSummary({
   for (const run of group.scenarioRuns) {
     if (run.totalCost != null) totalCost += run.totalCost;
     if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
-    const agentLatencies = run.roleLatencies?.["Agent"];
+    const agentLatencies = run.roleLatencies?.Agent;
     if (agentLatencies) {
       allAgentLatencies.push(...agentLatencies);
     }
-    const agentCosts = run.roleCosts?.["Agent"];
+    const agentCosts = run.roleCosts?.Agent;
     if (agentCosts) {
       allAgentCosts.push(...agentCosts);
     }
@@ -514,8 +504,14 @@ export function computeRunHistoryTotals({
   for (const run of runs) {
     const category = categorizeRunStatus(run.status);
     if (category === "success") passedCount++;
-    else if (category === "failure" || category === "stalled" || category === "cancelled") failedCount++;
-    else if (category === "queued" || category === "in_progress") pendingCount++;
+    else if (
+      category === "failure" ||
+      category === "stalled" ||
+      category === "cancelled"
+    )
+      failedCount++;
+    else if (category === "queued" || category === "in_progress")
+      pendingCount++;
   }
 
   return {

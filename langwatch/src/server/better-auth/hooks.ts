@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import {
-  type Organization,
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
@@ -9,9 +9,9 @@ import {
 import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";
 import { InviteService } from "~/server/invites/invite.service";
+import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
-import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { platformSSOAllowed } from "../sso/sso-gate";
 import { extractEmailDomain, isSsoProviderMatch } from "./sso";
@@ -85,8 +85,10 @@ export const beforeUserCreate = async ({
 };
 
 /**
- * Called after a new user is created. If the user's email domain matches an
- * organization with ssoDomain, auto-onboard the user:
+ * Called after a new user is created. Fires the `signed_up` analytics event
+ * for every new user (fire-and-forget, no-op without POSTHOG_KEY), then, if
+ * the user's email domain matches an organization with ssoDomain,
+ * auto-onboard the user:
  *
  *   - If a PENDING invite exists for (org, email), apply it — the invite's
  *     role and team assignments take precedence, and the invite is marked
@@ -125,6 +127,10 @@ export const afterUserCreate = async ({
   prisma: PrismaClient;
   user: { id: string; email: string; name: string };
 }): Promise<void> => {
+  // Same distinct_id posthog-js identifies with client-side (the user id),
+  // so this server event joins the browser person.
+  trackServerEvent({ userId: user.id, event: "signed_up" });
+
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 

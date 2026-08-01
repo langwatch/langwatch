@@ -1,0 +1,218 @@
+name: pr-impact-map
+
+# Posts a single sticky comment summarising which areas of the monorepo a PR
+# touches, and rewrites that same comment on every subsequent push.
+#
+# `synchronize` IS "a new commit was pushed to this PR", so one `pull_request`
+# trigger covers both "on open" and "on every push". There is deliberately no
+# `push:` trigger and no `actions/checkout` — the changed-file list comes from
+# the pulls/files API, which keeps the whole job to a single ~5s step.
+#
+# Deliberately non-blocking: this workflow only ever describes the diff, it
+# never judges it. Nothing here should gate a merge, so it is not a candidate
+# for branch protection.
+#
+# No path filter, so it always produces a result and needs no "-unmodified"
+# stub under the complementary-pair system (see specs/ci/path-filters.feature).
+#
+# Spec: specs/ci/pr-impact-map.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Two pushes in quick succession would otherwise race: both runs read "no
+# existing comment" and both POST, leaving duplicates on the thread.
+concurrency:
+  group: pr-impact-map-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST would 403.
+    # Skip quietly rather than paint a red X on a contributor's first PR.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and upsert impact map comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const MARKER = "<!-- pr-impact-map -->";
+
+            // First match wins, so order is load-bearing: `langwatch/**` would
+            // otherwise swallow migrations, specs and tests. Lockfiles are
+            // pulled out above the language buckets so a dependency bump does
+            // not masquerade as a large Go or app change — but `go.mod` and
+            // `package.json` stay with their language, because those express
+            // intent rather than churn.
+            const CATEGORIES = [
+              ["Migrations",     p => /^langwatch\/(prisma|scripts|elastic)\/migrations\//.test(p)],
+              ["Specs",          p => p.startsWith("specs/")],
+              ["Tests",          p => /(^|\/)__tests__\//.test(p)
+                                   || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)
+                                   || /_test\.go$/.test(p)
+                                   || /(^|\/)test_[^/]+\.py$/.test(p)
+                                   || p.startsWith("agentic-e2e-tests/")],
+              ["CI/CD",          p => p.startsWith(".github/")],
+              ["Deploy",         p => p.startsWith("charts/")
+                                   || /^Dockerfile/.test(p)
+                                   || /^compose[.\w-]*\.ya?ml$/.test(p)],
+              ["Docs",           p => p.startsWith("docs/")
+                                   || p.startsWith("dev/docs/")
+                                   || p.startsWith("skills/")
+                                   || p.endsWith(".md")],
+              ["Deps",           p => /(^|\/)(pnpm-lock\.yaml|go\.sum|uv\.lock|poetry\.lock)$/.test(p)
+                                   || p.endsWith(".lock")],
+              ["SDKs",           p => /^(python-sdk|typescript-sdk|sdk-go|mcp-server|packages)\//.test(p)],
+              ["Go services",    p => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
+              ["Python",         p => /^(langwatch_nlp|langevals|langwatch_server)\//.test(p)],
+              ["App · Server",   p => p.startsWith("langwatch/src/server/")
+                                   || p.endsWith("schema.prisma")
+                                   || /^langwatch\/src\/(mcp|tasks|workers)/.test(p)],
+              ["App · Frontend", p => /^langwatch\/src\/(components|pages|app|hooks|stores|styles|features|optimization_studio)\//.test(p)
+                                   || p.endsWith(".tsx")],
+              ["Other",          () => true],
+            ];
+
+            const classify = (path) => CATEGORIES.find(([, test]) => test(path))[0];
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const shortSha = pr.head.sha.slice(0, 7);
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            // The pulls/files API caps out at 3000 files. `changed_files` on the
+            // PR payload is authoritative, so a shortfall means we were truncated
+            // and the per-category counts below are a floor, not a total.
+            const truncated = files.length < pr.changed_files;
+
+            const buckets = new Map();
+            for (const file of files) {
+              const name = classify(file.filename);
+              const bucket = buckets.get(name) ?? { files: 0, additions: 0, deletions: 0 };
+              bucket.files += 1;
+              bucket.additions += file.additions;
+              bucket.deletions += file.deletions;
+              buckets.set(name, bucket);
+            }
+
+            const num = (n) => n.toLocaleString("en-US");
+            const rows = [...buckets.entries()].sort((a, b) => b[1].files - a[1].files);
+
+            let body;
+            if (files.length === 0) {
+              body = [
+                MARKER,
+                "### PR Impact Map",
+                "",
+                "No files changed.",
+              ].join("\n");
+            } else {
+              // Share is by file count, not lines: lockfiles and generated code
+              // dominate line counts and would make every dep bump look like a
+              // rewrite.
+              const BAR_WIDTH = 15;
+              const bar = (share) => {
+                const filled = Math.round(share * BAR_WIDTH);
+                return "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+              };
+
+              const table = rows.map(([name, b]) => {
+                const share = b.files / files.length;
+                const pct = Math.round(share * 100);
+                return [
+                  "  ",
+                  name.padEnd(16),
+                  String(b.files).padStart(5),
+                  ("+" + num(b.additions)).padStart(11),
+                  ("-" + num(b.deletions)).padStart(10),
+                  "   ",
+                  bar(share),
+                  " ",
+                  (pct + "%").padStart(4),
+                ].join("");
+              });
+
+              const header =
+                "  " + "Category".padEnd(16) + "Files".padStart(5) +
+                "Added".padStart(11) + "Removed".padStart(10) + "   Share";
+              const rule = "  " + "-".repeat(62);
+
+              // Every figure on the totals row comes from the PR payload, never
+              // from the (possibly truncated) file list, so the row stays
+              // internally consistent even when the category rows are a floor.
+              const totals =
+                "  " + "Total".padEnd(16) + String(pr.changed_files).padStart(5) +
+                ("+" + num(pr.additions)).padStart(11) +
+                ("-" + num(pr.deletions)).padStart(10);
+
+              const fileWord = pr.changed_files === 1 ? "file" : "files";
+              const title =
+                `PR Impact Map · ${num(pr.changed_files)} ${fileWord} · ` +
+                `+${num(pr.additions)} / -${num(pr.deletions)} · ${shortSha}`;
+
+              body = [
+                MARKER,
+                "### PR Impact Map",
+                "",
+                "```",
+                title,
+                "-".repeat(title.length),
+                "",
+                header,
+                rule,
+                ...table,
+                rule,
+                totals,
+                "```",
+                ...(truncated
+                  ? [
+                      "",
+                      `> **File list truncated.** GitHub returned ${num(files.length)} of ` +
+                        `${num(pr.changed_files)} changed files, so the per-category counts ` +
+                        `above are a lower bound. The totals row is complete.`,
+                    ]
+                  : []),
+                "",
+                `<sub>Updated for \`${shortSha}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC</sub>`,
+              ].join("\n");
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated impact map comment ${existing.id} on PR #${pr.number}.`);
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body,
+              });
+              core.info(`Created impact map comment on PR #${pr.number}.`);
+            }

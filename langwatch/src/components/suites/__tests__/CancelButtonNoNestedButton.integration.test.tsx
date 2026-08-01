@@ -17,9 +17,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { ScenarioGridCard } from "../ScenarioGridCard";
 import { RunRow } from "../RunRow";
-import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
+import { ScenarioGridCard } from "../ScenarioGridCard";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -92,7 +96,12 @@ describe("<RunRow/> per-row Cancel wiring in grid view (regression #3192)", () =
       render(
         <RunRow
           batchRun={makeBatchRun({ scenarioRuns: [scenarioRun] })}
-          summary={makeSummary({ inProgressCount: 1, totalCount: 1, passedCount: 0, passRate: 0 })}
+          summary={makeSummary({
+            inProgressCount: 1,
+            totalCount: 1,
+            passedCount: 0,
+            passRate: 0,
+          })}
           isExpanded={true}
           onToggle={vi.fn()}
           resolveTargetName={() => "Agent"}

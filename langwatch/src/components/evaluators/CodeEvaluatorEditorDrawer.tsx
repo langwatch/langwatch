@@ -20,6 +20,7 @@ import {
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -35,8 +36,8 @@ import {
   DEFAULT_CODE_EVALUATOR_CONFIG,
 } from "~/server/evaluators/codeEvaluator";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
+import { codeEvaluatorDisabledReason } from "./codeEvaluatorValidation";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 
 const FIELD_TYPES = ["str", "float", "bool", "list[str]", "dict"] as const;
@@ -175,28 +176,17 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
 
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: finishSave,
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating code evaluator",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't create code evaluator",
+      }),
   });
 
   const updateMutation = api.evaluators.update.useMutation({
     onSuccess: finishSave,
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error saving code evaluator",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });
 
   const handleSave = () => {
@@ -233,6 +223,19 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     !isPending &&
     !isLoadingEvaluator;
 
+  // Why the button is disabled, so it explains itself instead of being a
+  // silent dead button. Suppressed while saving/loading (those are transient
+  // and the button shows its own loading state).
+  const disabledReason =
+    isPending || isLoadingEvaluator
+      ? null
+      : codeEvaluatorDisabledReason({
+          hasName: !!name.trim(),
+          hasCode: code.trim() !== "",
+          hasInput: validFields(inputs).length > 0,
+          isEditing,
+        });
+
   return {
     name,
     setName,
@@ -249,6 +252,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     isLoadingEvaluator,
     handleSave,
     canSave,
+    disabledReason,
     isPending,
   };
 }
@@ -298,15 +302,28 @@ export function CodeEvaluatorEditorDrawer(
           )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <Button
-            colorPalette="blue"
-            onClick={form.handleSave}
-            disabled={!form.canSave}
-            loading={form.isPending}
-            data-testid="save-code-evaluator"
-          >
-            {form.isEditing ? "Save changes" : "Create evaluator"}
-          </Button>
+          <HStack width="full" justify="space-between" gap={3}>
+            {form.disabledReason ? (
+              <Text
+                fontSize="sm"
+                color="fg.muted"
+                data-testid="code-evaluator-disabled-reason"
+              >
+                {form.disabledReason}
+              </Text>
+            ) : (
+              <Box />
+            )}
+            <Button
+              colorPalette="blue"
+              onClick={form.handleSave}
+              disabled={!form.canSave}
+              loading={form.isPending}
+              data-testid="save-code-evaluator"
+            >
+              {form.isEditing ? "Save changes" : "Create evaluator"}
+            </Button>
+          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>

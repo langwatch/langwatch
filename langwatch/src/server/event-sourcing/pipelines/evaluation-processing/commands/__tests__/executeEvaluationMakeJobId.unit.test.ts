@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
+import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 
 function makePayload(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

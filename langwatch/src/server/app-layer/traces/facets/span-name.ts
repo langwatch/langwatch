@@ -4,7 +4,7 @@ import type { ExpressionCategoricalDef } from "../facet-registry";
  * Span Name facet: every distinct `SpanName` seen on `stored_spans`.
  *
  * Surfaced as "this trace contains a span named X" — the registry's
- * cross-table categorical translator (`crossTableStringEquality`) handles
+ * cross-table categorical field def (`crossTableCategorical`) handles
  * the join back to `trace_summaries`, so adding the def is enough; no
  * custom filter handler is required.
  *

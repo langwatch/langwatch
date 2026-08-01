@@ -6,7 +6,7 @@
  * Tests validation logic, toggle actions, filtering, and form data shape.
  */
 
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useSuiteForm } from "../useSuiteForm";
 
@@ -550,7 +550,11 @@ describe("useSuiteForm()", () => {
         );
 
         expect(result.current.archivedTargets).toEqual([
-          { type: "prompt", referenceId: "prompt_deleted", name: "prompt_deleted" },
+          {
+            type: "prompt",
+            referenceId: "prompt_deleted",
+            name: "prompt_deleted",
+          },
         ]);
       });
     });
@@ -735,7 +739,9 @@ describe("useSuiteForm()", () => {
           result.current.removeArchivedScenario("scen_archived");
         });
 
-        expect(result.current.selectedScenarioIds).not.toContain("scen_archived");
+        expect(result.current.selectedScenarioIds).not.toContain(
+          "scen_archived",
+        );
         expect(result.current.selectedScenarioIds).toContain("scen_1");
       });
     });
@@ -796,9 +802,7 @@ describe("useSuiteForm()", () => {
               slug: "test",
               description: null,
               scenarioIds: ["scen_1"],
-              targets: [
-                { type: "http", referenceId: "shared_id" },
-              ],
+              targets: [{ type: "http", referenceId: "shared_id" }],
               repeatCount: 1,
               labels: [],
               simulatorModel: null,

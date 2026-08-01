@@ -2,12 +2,12 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronsUpDown, Lock } from "lucide-react";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
+import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 import {
-  PERMISSION_CATEGORIES,
   type AccessLevel,
+  PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "../../../server/api-key/permission-categories";
-import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 
 export type PermissionSelection = "none" | AccessLevel;
 
@@ -81,7 +81,9 @@ function PermissionRow({
           <Text fontSize="sm" color="fg.muted">
             {category.label}
           </Text>
-          <Tooltip content={`Your role does not include access to ${category.label.toLowerCase()}`}>
+          <Tooltip
+            content={`Your role does not include access to ${category.label.toLowerCase()}`}
+          >
             <Box color="fg.subtle" cursor="help">
               <Lock size={12} />
             </Box>

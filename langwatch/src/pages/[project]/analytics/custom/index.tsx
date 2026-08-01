@@ -8,7 +8,6 @@ import {
   createListCollection,
   Field,
   Grid,
-  Heading,
   HStack,
   Input,
   NativeSelect,
@@ -36,7 +35,6 @@ import {
   BarChart2,
   Bell,
   Check,
-  CheckSquare,
   ChevronDown,
   GitBranch,
   Info,
@@ -63,7 +61,6 @@ import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
-import { Popover } from "~/components/ui/popover";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -75,6 +72,7 @@ import {
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
+import { deriveSeriesIdentifier } from "../../../../components/analytics/seriesIdentifier";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterIconWithBadge } from "../../../../components/filters/FilterIconWithBadge";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
@@ -386,40 +384,63 @@ function AnalyticsCustomGraphContent({
                     fontSize="16px"
                   />
                   <HStack gap={2}>
-                    {form.watch("alert.enabled") ? (
-                      <Tooltip
-                        content="Alert configured"
-                        positioning={{ placement: "top" }}
-                      >
-                        <Box
-                          padding={1}
-                          cursor="pointer"
+                    {/*
+                     * ADR-034 Phase 8: both the bell-icon (edit) and the
+                     * "Add alert" (create) paths open the automations
+                     * drawer pre-filled with this graph + its first series,
+                     * mirroring the dashboard chart card flow from Phase
+                     * 5.2. `deriveSeriesIdentifier` emits the canonical
+                     * "{index}/{key|metric}/{aggregation}" form the
+                     * automations secondary drawer matches against
+                     * (Series.name is a free-form label and would not
+                     * pre-select). Alerts only exist for saved graphs —
+                     * `customId` is unset until the first save, so the
+                     * entry point hides rather than opening a drawer that
+                     * can't reference the graph.
+                     */}
+                    {customId ? (
+                      form.watch("alert.enabled") ? (
+                        <Tooltip
+                          content="Alert configured"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Box
+                            padding={1}
+                            cursor="pointer"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                automationId: form.getValues("alert.triggerId"),
+                                prefilledGraphId: customId,
+                                prefilledSeriesName: deriveSeriesIdentifier(
+                                  graph,
+                                  0,
+                                ),
+                              })
+                            }
+                          >
+                            <Bell width={16} />
+                          </Box>
+                        </Tooltip>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          colorPalette="gray"
+                          size="sm"
                           onClick={() =>
-                            openDrawer("customGraphAlert", {
-                              form,
-                              graphId: customId,
+                            openDrawer("automation", {
+                              prefilledGraphId: customId,
+                              prefilledSeriesName: deriveSeriesIdentifier(
+                                graph,
+                                0,
+                              ),
                             })
                           }
                         >
                           <Bell width={16} />
-                        </Box>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        colorPalette="gray"
-                        size="sm"
-                        onClick={() =>
-                          openDrawer("customGraphAlert", {
-                            form,
-                            graphId: customId,
-                          })
-                        }
-                      >
-                        <Bell width={16} />
-                        Add alert
-                      </Button>
-                    )}
+                          Add alert
+                        </Button>
+                      )
+                    ) : null}
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <Button variant="ghost" paddingX={0}>
@@ -674,10 +695,9 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
-
   // Get dashboardId from URL query param
   const dashboardId = router.query.dashboard as string | undefined;
 
@@ -688,16 +708,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    const formData = form.getValues();
-
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
+    // the chart-card `Add alert` bell opens `automation` drawer with
+    // `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {
@@ -705,9 +718,7 @@ function CustomGraphForm({
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
         dashboardId: dashboardId,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -725,16 +736,10 @@ function CustomGraphForm({
   const updateGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    const formData = form.getValues();
 
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2).
+    // This graph mutation is graph-shape only; edits to the alert go
+    // through the bell icon → automation drawer edit path.
 
     updateGraphById.mutate(
       {
@@ -743,8 +748,6 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -806,7 +809,10 @@ function CustomGraphForm({
             name="connected"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value}>
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+              >
                 Connect dots
               </Switch>
             )}
@@ -931,7 +937,11 @@ function CustomGraphForm({
             name="includePrevious"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value} colorPalette="orange">
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+                colorPalette="orange"
+              >
                 Include previous period
               </Switch>
             )}
@@ -1438,7 +1448,7 @@ function SeriesField({
                     {...field}
                     checked={!!field.value}
                     value="on"
-                    onChange={(e) => field.onChange(e.target.checked)}
+                    onCheckedChange={({ checked }) => field.onChange(checked)}
                   />
                   <Field.Label flexShrink={0}>
                     Show in percentage (%)

@@ -1,4 +1,6 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export interface RoleBinding {
@@ -58,7 +60,7 @@ export class ApiKeysApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private headers(): Record<string, string> {
@@ -84,6 +86,12 @@ export class ApiKeysApiService {
         operation,
         error: parsedBody,
         options: { status: response.status },
+      });
+      throwIfHandledError({
+        operation,
+        error: parsedBody,
+        status: response.status,
+        message,
       });
       throw new ApiKeysApiError(message, operation, parsedBody);
     }

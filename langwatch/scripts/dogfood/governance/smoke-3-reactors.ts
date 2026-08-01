@@ -32,19 +32,22 @@
  *   0 — all 3 reactors landed at least one row tied to the synthetic trace
  *   1 — any reactor missing evidence after timeout
  */
-import { randomBytes } from "crypto";
+
 import { createClient } from "@clickhouse/client";
 import { TeamUserRole } from "@prisma/client";
+import { randomBytes } from "crypto";
 
 import { prisma } from "../../../src/server/db";
+import { defaultVirtualKeyConfig } from "../../../src/server/gateway/virtualKey.config";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../../../src/server/gateway/virtualKey.crypto";
-import { defaultVirtualKeyConfig } from "../../../src/server/gateway/virtualKey.config";
 
 const APP_BASE_URL = process.env.LANGWATCH_BASE_URL ?? "http://localhost:5560";
-const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
+const CLICKHOUSE_URL =
+  process.env.CLICKHOUSE_URL ??
+  "http://default:langwatch@localhost:8123/langwatch";
 const POLL_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 3_000;
 
@@ -304,7 +307,9 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
   return out;
 }
 
-async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<string> {
+async function postSyntheticIngestionSourceTrace(
+  seeded: SeededState,
+): Promise<string> {
   // Build an OTLP/JSON payload for an ingestion-source-shaped trace.
   // governanceKpisSync + governanceOcsfEventsSync gate on
   // langwatch.origin.kind=ingestion_source + langwatch.ingestion_source.id.
@@ -393,7 +398,9 @@ async function main() {
   console.log(
     `[smoke] seeded: org=${seeded.org.id} project=${seeded.project.id} vk=${seeded.vk.id}`,
   );
-  console.log(`[smoke] posting synthetic OTLP gateway trace to /api/otel/v1/traces…`);
+  console.log(
+    `[smoke] posting synthetic OTLP gateway trace to /api/otel/v1/traces…`,
+  );
   const traceId = await postSyntheticOtlpTrace(seeded);
   console.log(`[smoke] posting synthetic OTLP ingestion-source trace…`);
   const ingestionTraceId = await postSyntheticIngestionSourceTrace(seeded);

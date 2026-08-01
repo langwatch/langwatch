@@ -1,4 +1,5 @@
-import type { createLogger } from "~/utils/logger/server";
+import { HandledError } from "@langwatch/handled-error";
+import type { createLogger } from "@langwatch/observability";
 
 /**
  * Error categories for standardized error handling.
@@ -427,7 +428,19 @@ export function categorizeError(error: unknown): ErrorCategory {
  * - 999: KEEPER_EXCEPTION (ZooKeeper / ClickHouse Keeper coordination error)
  */
 const CLICKHOUSE_TRANSIENT_CODES = new Set([
-  "33", "159", "160", "202", "203", "209", "210", "236", "241", "242", "252", "394", "999",
+  "33",
+  "159",
+  "160",
+  "202",
+  "203",
+  "209",
+  "210",
+  "236",
+  "241",
+  "242",
+  "252",
+  "394",
+  "999",
 ]);
 
 /**
@@ -464,21 +477,39 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
  * errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
+  // The resilient client's query translation wraps the raw driver error in a
+  // HandledError's `reasons` — classify the wrapped causes, not the handled
+  // shell. Single shallow pass: the translation wraps the driver error
+  // directly, no deep recursion needed.
+  const candidates =
+    HandledError.isHandled(error) && (error.reasons ?? []).length > 0
+      ? error.reasons
+      : [error];
+
+  for (const candidate of candidates) {
+    if (isTransientClickHouseError(candidate)) {
+      return ErrorCategory.RECOVERABLE;
+    }
+  }
+  return ErrorCategory.CRITICAL;
+}
+
+function isTransientClickHouseError(error: unknown): boolean {
   if (
     error != null &&
     typeof error === "object" &&
     "code" in error &&
     CLICKHOUSE_TRANSIENT_CODES.has(String((error as { code: unknown }).code))
   ) {
-    return ErrorCategory.RECOVERABLE;
+    return true;
   }
 
   const message = error instanceof Error ? error.message : String(error);
   for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
     if (message.includes(fragment)) {
-      return ErrorCategory.RECOVERABLE;
+      return true;
     }
   }
 
-  return ErrorCategory.CRITICAL;
+  return false;
 }

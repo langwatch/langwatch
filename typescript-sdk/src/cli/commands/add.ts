@@ -1,12 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { FileManager } from "../utils/fileManager";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { failSpinner } from "../utils/spinnerError";
 
@@ -87,13 +87,13 @@ export const addCommand = async (
     }
 
     // Check API key before doing anything else
-    checkApiKey();
+    await resolveCredentials();
 
     const promptsApiService = new PromptsApiService();
     const version = options.version ?? "latest";
 
     // Fetch and materialize the prompt (like sync does for individual prompts)
-    const spinner = ora(
+    const spinner = createSpinner(
       `Adding ${chalk.cyan(`${name}@${version}`)}...`,
     ).start();
 
@@ -102,7 +102,11 @@ export const addCommand = async (
       const prompt = await promptsApiService.get(name, { version });
 
       if (!prompt) {
-        spinner.fail(chalk.red(`Prompt "${name}" not found`));
+        failSpinner({
+          spinner,
+          error: new Error(`Prompt "${name}" not found`),
+          action: "add prompt",
+        });
         process.exit(1);
       }
 

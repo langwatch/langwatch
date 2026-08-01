@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  generateApiKeyToken,
-  splitApiKeyToken,
-  hashSecret,
-  verifySecret,
-  getTokenType,
   API_KEY_PREFIX,
+  generateApiKeyToken,
+  getTokenType,
+  hashSecret,
   INGEST_KEY_PREFIX,
+  splitApiKeyToken,
+  verifySecret,
 } from "../api-key-token.utils";
 
 describe("generateApiKeyToken", () => {
@@ -54,7 +54,9 @@ describe("splitApiKeyToken", () => {
   describe("when given an old pat-lw- token", () => {
     /** @scenario "Old pat-lw- tokens still authenticate" */
     it("extracts lookupId and secret (backward compat)", () => {
-      const result = splitApiKeyToken("pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr");
+      const result = splitApiKeyToken(
+        "pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr",
+      );
       expect(result).not.toBeNull();
       expect(result!.lookupId).toBe("abcdefghijklmnop");
     });
@@ -152,9 +154,9 @@ describe("getTokenType", () => {
     it("returns legacyProjectKey", () => {
       // Legacy keys are random strings from alphabets that include `_` and
       // `-` — an underscore must not flip them to the API key lookup path
-      expect(
-        getTokenType("sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM"),
-      ).toBe("legacyProjectKey");
+      expect(getTokenType("sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM")).toBe(
+        "legacyProjectKey",
+      );
     });
   });
 

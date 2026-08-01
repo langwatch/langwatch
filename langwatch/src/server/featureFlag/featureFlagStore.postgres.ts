@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { prisma } from "../db";
-import { createLogger } from "~/utils/logger/server";
-import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";
 import { TtlCache } from "../utils/ttlCache";
+import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";
 import {
   evaluateRules,
-  parseRules,
   type FeatureFlagRules,
+  parseRules,
   type RuleEvaluationContext,
 } from "./rules";
 

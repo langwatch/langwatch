@@ -7,6 +7,7 @@
  * - src/pages/api/auth/logout.ts    (explicit cookie-clearing logout)
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
@@ -18,6 +19,8 @@ import { connection as redisConnection } from "~/server/redis";
 import { resolveAuthProvider } from "~/server/sso/sso-gate";
 
 const secured = createServiceApp({ basePath: "/api" });
+
+const logger = createLogger("langwatch:auth");
 
 const authPolicy = () =>
   publicEndpoint(
@@ -166,6 +169,20 @@ const betterAuthCatchAll = async (c: Context) => {
       baseUrl: env.NEXTAUTH_URL,
     })
   ) {
+    // The 403 body carries no detail on purpose. Without this line the reason
+    // is nowhere: the access log records the status and nothing else, so a
+    // misconfigured NEXTAUTH_URL is indistinguishable from a real cross-site
+    // POST, which is what makes it expensive to diagnose.
+    logger.warn(
+      {
+        path: c.req.path,
+        method: c.req.method,
+        expectedOrigin: env.NEXTAUTH_URL,
+        receivedOrigin: c.req.header("origin") ?? null,
+        receivedReferer: c.req.header("referer") ?? null,
+      },
+      "rejected auth request: origin does not match NEXTAUTH_URL",
+    );
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 

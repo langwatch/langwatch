@@ -72,14 +72,14 @@ export function PeerCursorOverlay({
       {children}
       {effectivelyEnabled && anchor && projectId
         ? cursors.map((cursor) => (
-            <PeerCursor key={cursor.sessionId} cursor={cursor} />
+            <PeerCursorMarker key={cursor.sessionId} cursor={cursor} />
           ))
         : null}
     </Box>
   );
 }
 
-const PeerCursor = memo(function PeerCursor({
+const PeerCursorMarker = memo(function PeerCursorMarker({
   cursor,
 }: {
   cursor: PeerCursor;

@@ -1,26 +1,33 @@
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
-import type { GroupInfo, QueueInfo, ErrorCluster } from "../types";
-import type {
-  QueueRepository,
-  BlockedSummary,
-  DlqGroupInfo,
-  DrainPreview,
-  JobEntry,
-  ReconcileResult,
-} from "./queue.repository";
-import { normalizeErrorMessage } from "../normalize-error-message";
-import { createLogger } from "~/utils/logger/server";
+import type { ChainableCommander, Cluster } from "ioredis";
 import {
-  GROUP_QUEUE_REGISTRY_KEY,
-  TTL_HELPER_LUA,
-  PARK_HELPER_LUA,
-} from "~/server/event-sourcing/queues/groupQueue/scripts";
+  CachedLuaScript,
+  isNoScriptResult,
+} from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
 import {
   decodeJobEnvelope,
   readJobRoutingMeta,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
+import {
+  GROUP_QUEUE_REGISTRY_KEY,
+  PARK_HELPER_LUA,
+  TTL_HELPER_LUA,
+} from "~/server/event-sourcing/queues/groupQueue/scripts";
+import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
+import { normalizeErrorMessage } from "../normalize-error-message";
+import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type {
+  BlockedSummary,
+  DlqGroupInfo,
+  DrainPreview,
+  JobEntry,
+  QueueRepository,
+  ReconcileResult,
+} from "./queue.repository";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
@@ -36,6 +43,9 @@ local jobsKey    = KEYS[3]
 local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
 local errorKey   = KEYS[6]
+local strikesKey = KEYS[7]
+local attemptKey = KEYS[8]
+local failStreakKey = KEYS[9]
 local groupId    = ARGV[1]
 local nowMs      = tonumber(ARGV[2])
 
@@ -44,6 +54,17 @@ local wasBlocked = redis.call("SREM", blockedKey, groupId)
 if wasBlocked > 0 then
   redis.call("DEL", activeKey)
   redis.call("DEL", errorKey)
+  -- Unblocking is an operator's "try again", so EVERY counter that decides
+  -- whether trying is allowed has to be reset — not just the claim strikes
+  -- (ADR-080). A group blocked by retry exhaustion came back with its retry
+  -- chain still reading "budget spent" and its failure streak still at the
+  -- quarantine threshold, so the very first failure re-blocked it, and whether
+  -- it did depended on how long the operator took to press the button (the
+  -- chain expires on its own after GROUP_ATTEMPT_TTL_SECONDS).
+  redis.call("DEL", strikesKey)
+  -- specs/event-sourcing/poison-group-park-guard.feature
+  redis.call("DEL", attemptKey)
+  redis.call("DEL", failStreakKey)
 
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
@@ -78,6 +99,9 @@ local blockedKey      = KEYS[5]
 local signalKey       = KEYS[6]
 local errorKey        = KEYS[7]
 local totalPendingKey = KEYS[8]
+local strikesKey      = KEYS[9]
+local attemptKey      = KEYS[10]
+local failStreakKey   = KEYS[11]
 local groupId         = ARGV[1]
 
 -- Total dropped = staged jobs (ZCARD) only. Previously this also counted
@@ -93,6 +117,15 @@ redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)
 redis.call("DEL", activeKey)
 redis.call("DEL", errorKey)
+-- Draining empties the group for a fresh start, so EVERY counter that decides
+-- whether a later job is allowed to run goes with it. Leaving any behind means
+-- a re-created group with the same id inherits it: claim strikes park it on its
+-- first claim, a spent retry chain exhausts it on its first failure, and a
+-- carried failure streak re-quarantines it (ADR-080,
+-- specs/event-sourcing/poison-group-park-guard.feature).
+redis.call("DEL", strikesKey)
+redis.call("DEL", attemptKey)
+redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)
 redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
@@ -117,6 +150,9 @@ local dstJobsKey   = KEYS[8]
 local dstDataKey   = KEYS[9]
 local dstErrorKey  = KEYS[10]
 local dlqIndexKey  = KEYS[11]
+local strikesKey   = KEYS[12]
+local attemptKey   = KEYS[13]
+local failStreakKey = KEYS[14]
 local groupId      = ARGV[1]
 local ttl          = tonumber(ARGV[2])
 
@@ -150,6 +186,13 @@ redis.call("DEL", srcJobsKey)
 redis.call("DEL", srcDataKey)
 redis.call("DEL", activeKey)
 redis.call("DEL", srcErrorKey)
+-- Moving to the DLQ empties the live group just like a drain, so it clears the
+-- same counters for the same reason: a re-created group with the same id must
+-- get a fresh run, not inherit strikes, a spent retry chain, or a failure
+-- streak from the jobs that were carried off (ADR-080).
+redis.call("DEL", strikesKey)
+redis.call("DEL", attemptKey)
+redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)
 redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
@@ -206,6 +249,20 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
+// ── Cached scripts ───────────────────────────────────────────────────
+//
+// EVALSHA, not EVAL: plain EVAL re-transfers and re-hashes the full source on
+// every call, which was measured at ~33% of the prod Redis engine CPU for the
+// queue's own scripts (see `cachedLuaScript.ts`). These ops scripts are larger
+// than they look — each one carries the shared TTL/park helpers — and the bulk
+// paths below run one per group across a whole page, so the same argument
+// applies. A NOSCRIPT miss falls back to EVAL once and warms the node's cache.
+
+const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
+const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
+const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
+const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+
 // ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
@@ -214,6 +271,37 @@ const SSCAN_BATCH = 500;
 const PENDING_RECONCILE_SCAN_COUNT = 1000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Run a pipeline of cached scripts, re-running any entry the node had no cached
+ * copy of.
+ *
+ * `queue()` sends EVALSHA with no fallback of its own — a queued command cannot
+ * retry itself — so a node whose script cache is cold (restart, SCRIPT FLUSH,
+ * or the first call against a fresh cluster node) fails EVERY entry in the
+ * batch with NOSCRIPT. These are the bulk operator paths, so without this a
+ * "drain everything" would report zero drained and quietly do nothing. Re-running
+ * through `run()` both completes the work and loads the source for later calls.
+ *
+ * Returns the same `[err, value]` tuples `pipeline.exec()` does, so callers read
+ * the results exactly as before.
+ */
+export async function execWithNoScriptRecovery(
+  pipeline: ChainableCommander,
+  rerun: (index: number) => Promise<unknown>,
+): Promise<Array<[Error | null, unknown]>> {
+  const results = (await pipeline.exec()) ?? [];
+  return await Promise.all(
+    results.map(async (result, index): Promise<[Error | null, unknown]> => {
+      if (!isNoScriptResult(result)) return result;
+      try {
+        return [null, await rerun(index)];
+      } catch (err) {
+        return [err instanceof Error ? err : new Error(String(err)), null];
+      }
+    }),
+  );
+}
 
 function stripHashTag(name: string): string {
   if (name.startsWith("{") && name.endsWith("}")) {
@@ -412,7 +500,7 @@ export class QueueRedisRepository implements QueueRepository {
     >();
     for (let i = 0; i < allGroupIds.length; i++) {
       const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
-      if (errorHash && errorHash.message) {
+      if (errorHash?.message) {
         groupErrors.set(allGroupIds[i]!, {
           message: errorHash.message,
           stack: errorHash.stack ?? "",
@@ -551,12 +639,34 @@ export class QueueRedisRepository implements QueueRepository {
         redis: this.redis,
         queueName: params.queueName,
       });
+      // Wire the GQ2 tiered store too so an offloaded envelope renders its
+      // body in the ops dashboard once the write flag flips in prod. Without
+      // it, decode throws "no tiered store provided" and the catch below hides
+      // the payload from any operator trying to diagnose a stuck GQ2 job
+      // (2026-07-03 audit follow-up).
+      const tieredBlobs = new TieredBlobStore({
+        redisBlobs: blobs,
+        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+        resolveDestination: resolveProjectStorageDestination,
+        queueName: params.queueName,
+        logger,
+      });
       await Promise.all(
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
           if (raw) {
             try {
-              jobs[i]!.data = await decodeJobEnvelope({ value: raw, blobs });
+              // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
+              // (2026-06-24 review). A repeatedly-viewed blocked group would
+              // otherwise keep its orphan blobs alive indefinitely. readMode
+              // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
+              // to their peek variants.
+              jobs[i]!.data = await decodeJobEnvelope({
+                value: raw,
+                blobs,
+                tieredBlobs,
+                readMode: "peek",
+              });
             } catch {
               // ignore undecodable values
             }
@@ -674,15 +784,18 @@ export class QueueRedisRepository implements QueueRepository {
     groupId: string;
   }): Promise<{ wasBlocked: boolean }> {
     const prefix = `${params.queueName}:gq:`;
-    const result = await this.redis.eval(
-      UNBLOCK_LUA,
-      6,
+    const result = await unblockScript.run(
+      this.redis,
+      9,
       `${prefix}blocked`,
       `${prefix}group:${params.groupId}:active`,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}ready`,
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
+      `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:attempt`,
+      `${prefix}group:${params.groupId}:failstreak`,
       params.groupId,
       String(Date.now()),
     );
@@ -709,21 +822,25 @@ export class QueueRedisRepository implements QueueRepository {
       if (members.length === 0) continue;
 
       const pipeline = this.redis.pipeline();
-      for (const groupId of members) {
-        pipeline.eval(
-          UNBLOCK_LUA,
-          6,
-          `${prefix}blocked`,
-          `${prefix}group:${groupId}:active`,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}ready`,
-          `${prefix}signal`,
-          `${prefix}group:${groupId}:error`,
-          groupId,
-          String(Date.now()),
-        );
+      const argsByIndex = members.map((groupId) => [
+        `${prefix}blocked`,
+        `${prefix}group:${groupId}:active`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
+        `${prefix}group:${groupId}:strikes`,
+        `${prefix}group:${groupId}:attempt`,
+        `${prefix}group:${groupId}:failstreak`,
+        groupId,
+        String(Date.now()),
+      ]);
+      for (const args of argsByIndex) {
+        unblockScript.queue(pipeline, 9, ...args);
       }
-      const results = await pipeline.exec();
+      const results = await execWithNoScriptRecovery(pipeline, (index) =>
+        unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
+      );
       if (results) {
         for (const [err, result] of results) {
           if (!err && result === 1) unblockedCount++;
@@ -739,9 +856,9 @@ export class QueueRedisRepository implements QueueRepository {
     groupId: string;
   }): Promise<{ jobsRemoved: number }> {
     const prefix = `${params.queueName}:gq:`;
-    const result = await this.redis.eval(
-      DRAIN_GROUP_LUA,
-      8,
+    const result = await drainGroupScript.run(
+      this.redis,
+      11,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -750,6 +867,9 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
       `${prefix}stats:total-pending`,
+      `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:attempt`,
+      `${prefix}group:${params.groupId}:failstreak`,
       params.groupId,
     );
     return { jobsRemoved: Number(result) };
@@ -786,7 +906,7 @@ export class QueueRedisRepository implements QueueRepository {
   }
 
   // Tenant pause: encoded as a special "tenant:<id>" entry in the same
-  // paused-jobs SET that DISPATCH_LUA already consults. The Lua dispatcher
+  // paused-jobs SET that DISPATCH_BATCH_LUA already consults. The Lua dispatcher
   // extracts the tenantId from each groupId (everything before the first
   // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
   // incident so an operator can halt ALL processing for a runaway tenant
@@ -832,7 +952,7 @@ export class QueueRedisRepository implements QueueRepository {
   // `groupIdContains`: optional plain-text fragment that the groupId
   // must contain in addition to starting with `<tenantId>/`. Use this to
   // scope a drain to part of a tenant's groups — for example:
-  //   - "/fold/projectDailySdkUsage/" → drop only that fold's groups
+  //   - "/fold/traceSummary/" → drop only that fold's groups
   //   - "/reactor/customEvaluationSync/" → drop only this reactor's groups
   //   - "/map/spanStorage/" → drop only the span-storage map groups
   // Honest substring semantics (matches the operator's mental model of
@@ -884,26 +1004,30 @@ export class QueueRedisRepository implements QueueRepository {
       }
       if (matched.length === 0) continue;
 
-      // Pipeline all DRAIN_GROUP_LUA evals for this page into a single
-      // network round-trip. Each EVAL is independent; ioredis batches
-      // them and returns results in the same order.
+      // Pipeline all the drains for this page into a single network round-trip.
+      // Each call is independent; ioredis batches them and returns results in
+      // the same order.
       const pipeline = this.redis.pipeline();
-      for (const groupId of matched) {
-        pipeline.eval(
-          DRAIN_GROUP_LUA,
-          8,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}group:${groupId}:data`,
-          `${prefix}group:${groupId}:active`,
-          readyKey,
-          `${prefix}blocked`,
-          `${prefix}signal`,
-          `${prefix}group:${groupId}:error`,
-          totalPendingKey,
-          groupId,
-        );
+      const argsByIndex = matched.map((groupId) => [
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}group:${groupId}:active`,
+        readyKey,
+        `${prefix}blocked`,
+        `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
+        totalPendingKey,
+        `${prefix}group:${groupId}:strikes`,
+        `${prefix}group:${groupId}:attempt`,
+        `${prefix}group:${groupId}:failstreak`,
+        groupId,
+      ]);
+      for (const args of argsByIndex) {
+        drainGroupScript.queue(pipeline, 11, ...args);
       }
-      const results = await pipeline.exec();
+      const results = await execWithNoScriptRecovery(pipeline, (index) =>
+        drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
+      );
       if (!results) continue;
       for (const [err, value] of results) {
         if (err) continue;
@@ -922,9 +1046,9 @@ export class QueueRedisRepository implements QueueRepository {
     groupId: string;
   }): Promise<{ jobsMoved: number }> {
     const prefix = `${params.queueName}:gq:`;
-    const result = await this.redis.eval(
-      MOVE_TO_DLQ_LUA,
-      11,
+    const result = await moveToDlqScript.run(
+      this.redis,
+      14,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -936,6 +1060,9 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}dlq:${params.groupId}:data`,
       `${prefix}dlq:${params.groupId}:error`,
       `${prefix}dlq`,
+      `${prefix}group:${params.groupId}:strikes`,
+      `${prefix}group:${params.groupId}:attempt`,
+      `${prefix}group:${params.groupId}:failstreak`,
       params.groupId,
       String(DLQ_TTL_SECONDS),
     );
@@ -977,26 +1104,30 @@ export class QueueRedisRepository implements QueueRepository {
       if (groupsToMove.length === 0) continue;
 
       const pipeline = this.redis.pipeline();
-      for (const groupId of groupsToMove) {
-        pipeline.eval(
-          MOVE_TO_DLQ_LUA,
-          11,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}group:${groupId}:data`,
-          `${prefix}group:${groupId}:active`,
-          `${prefix}ready`,
-          `${prefix}blocked`,
-          `${prefix}signal`,
-          `${prefix}group:${groupId}:error`,
-          `${prefix}dlq:${groupId}:jobs`,
-          `${prefix}dlq:${groupId}:data`,
-          `${prefix}dlq:${groupId}:error`,
-          `${prefix}dlq`,
-          groupId,
-          String(DLQ_TTL_SECONDS),
-        );
+      const argsByIndex = groupsToMove.map((groupId) => [
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}group:${groupId}:active`,
+        `${prefix}ready`,
+        `${prefix}blocked`,
+        `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
+        `${prefix}dlq:${groupId}:jobs`,
+        `${prefix}dlq:${groupId}:data`,
+        `${prefix}dlq:${groupId}:error`,
+        `${prefix}dlq`,
+        `${prefix}group:${groupId}:strikes`,
+        `${prefix}group:${groupId}:attempt`,
+        `${prefix}group:${groupId}:failstreak`,
+        groupId,
+        String(DLQ_TTL_SECONDS),
+      ]);
+      for (const args of argsByIndex) {
+        moveToDlqScript.queue(pipeline, 14, ...args);
       }
-      const results = await pipeline.exec();
+      const results = await execWithNoScriptRecovery(pipeline, (index) =>
+        moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
+      );
       if (results) {
         for (const [err, result] of results) {
           if (!err) {
@@ -1018,8 +1149,8 @@ export class QueueRedisRepository implements QueueRepository {
     groupId: string;
   }): Promise<{ jobsReplayed: number }> {
     const prefix = `${params.queueName}:gq:`;
-    const result = await this.redis.eval(
-      REPLAY_FROM_DLQ_LUA,
+    const result = await replayFromDlqScript.run(
+      this.redis,
       8,
       `${prefix}dlq:${params.groupId}:jobs`,
       `${prefix}dlq:${params.groupId}:data`,
@@ -1070,23 +1201,24 @@ export class QueueRedisRepository implements QueueRepository {
       if (groupsToReplay.length === 0) continue;
 
       const pipeline = this.redis.pipeline();
-      for (const groupId of groupsToReplay) {
-        pipeline.eval(
-          REPLAY_FROM_DLQ_LUA,
-          8,
-          `${prefix}dlq:${groupId}:jobs`,
-          `${prefix}dlq:${groupId}:data`,
-          `${prefix}dlq:${groupId}:error`,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}group:${groupId}:data`,
-          `${prefix}ready`,
-          `${prefix}signal`,
-          `${prefix}dlq`,
-          groupId,
-          String(Date.now()),
-        );
+      const argsByIndex = groupsToReplay.map((groupId) => [
+        `${prefix}dlq:${groupId}:jobs`,
+        `${prefix}dlq:${groupId}:data`,
+        `${prefix}dlq:${groupId}:error`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        `${prefix}dlq`,
+        groupId,
+        String(Date.now()),
+      ]);
+      for (const args of argsByIndex) {
+        replayFromDlqScript.queue(pipeline, 8, ...args);
       }
-      const results = await pipeline.exec();
+      const results = await execWithNoScriptRecovery(pipeline, (index) =>
+        replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+      );
       if (results) {
         for (const [err, result] of results) {
           if (!err) {
@@ -1139,23 +1271,24 @@ export class QueueRedisRepository implements QueueRepository {
     if (groupsToRedrive.length === 0) return { redrivenCount: 0, groupIds: [] };
 
     const pipeline = this.redis.pipeline();
-    for (const groupId of groupsToRedrive) {
-      pipeline.eval(
-        REPLAY_FROM_DLQ_LUA,
-        8,
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}dlq`,
-        groupId,
-        String(Date.now()),
-      );
+    const argsByIndex = groupsToRedrive.map((groupId) => [
+      `${prefix}dlq:${groupId}:jobs`,
+      `${prefix}dlq:${groupId}:data`,
+      `${prefix}dlq:${groupId}:error`,
+      `${prefix}group:${groupId}:jobs`,
+      `${prefix}group:${groupId}:data`,
+      `${prefix}ready`,
+      `${prefix}signal`,
+      `${prefix}dlq`,
+      groupId,
+      String(Date.now()),
+    ]);
+    for (const args of argsByIndex) {
+      replayFromDlqScript.queue(pipeline, 8, ...args);
     }
-    const results = await pipeline.exec();
+    const results = await execWithNoScriptRecovery(pipeline, (index) =>
+      replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+    );
 
     let redrivenCount = 0;
     const redrivenIds: string[] = [];
@@ -1201,21 +1334,25 @@ export class QueueRedisRepository implements QueueRepository {
       return { unblockedCount: 0, groupIds: [] };
 
     const unblockPipeline = this.redis.pipeline();
-    for (const groupId of groupsToUnblock) {
-      unblockPipeline.eval(
-        UNBLOCK_LUA,
-        6,
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-        String(Date.now()),
-      );
+    const argsByIndex = groupsToUnblock.map((groupId) => [
+      `${prefix}blocked`,
+      `${prefix}group:${groupId}:active`,
+      `${prefix}group:${groupId}:jobs`,
+      `${prefix}ready`,
+      `${prefix}signal`,
+      `${prefix}group:${groupId}:error`,
+      `${prefix}group:${groupId}:strikes`,
+      `${prefix}group:${groupId}:attempt`,
+      `${prefix}group:${groupId}:failstreak`,
+      groupId,
+      String(Date.now()),
+    ]);
+    for (const args of argsByIndex) {
+      unblockScript.queue(unblockPipeline, 9, ...args);
     }
-    const results = await unblockPipeline.exec();
+    const results = await execWithNoScriptRecovery(unblockPipeline, (index) =>
+      unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
+    );
 
     let unblockedCount = 0;
     const unblockedIds: string[] = [];

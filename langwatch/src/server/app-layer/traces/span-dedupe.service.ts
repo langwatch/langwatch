@@ -1,6 +1,8 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
 import { traced } from "../tracing";
 
 const logger = createLogger("langwatch:trace-processing:span-dedup");

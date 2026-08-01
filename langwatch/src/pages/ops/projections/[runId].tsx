@@ -1,8 +1,8 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ReplayProgressContent } from "~/components/ops/replay-progress";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useRouter } from "~/utils/compat/next-router";
 
 export default function ReplayProgressPage() {
   const router = useRouter();

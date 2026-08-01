@@ -1,5 +1,14 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { SCOPE_TIERS, scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import {
+  SCOPE_TIERS,
+  type ScopeAssignment,
+  scopeAssignmentSchema,
+} from "~/server/scopes/scope.types";
+import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { auditLog } from "../../auditLog";
+import { CodexAccountService } from "../../modelProviders/codexAccount.service";
+import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -19,36 +28,64 @@ import {
   setRoleAtScope,
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
+import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
+  type Permission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  getProjectModelProviders,
+  getProjectModelProvidersForFrontend,
+  listOrgModelProvidersForFrontend,
+  listProjectModelProvidersForFrontend,
+} from "./modelProviders.utils";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "./providerValidation";
-import {
-  getProjectModelProviders,
-  getProjectModelProvidersForFrontend,
-  listProjectModelProvidersForFrontend,
-  listOrgModelProvidersForFrontend,
-} from "./modelProviders.utils";
-import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
-  getProjectModelProviders,
   getModelMetadataForFrontend,
-  mergeCustomModelMetadata,
+  getProjectModelProviders,
   getProjectModelProvidersForFrontend,
+  mergeCustomModelMetadata,
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
 
+/**
+ * Shared input shape for the provider write paths: name the tenant with
+ * either handle, and refuse a request that names neither. A create with
+ * no project also has to say where the credential lands, since there is
+ * no project to default the scope set from.
+ */
+const tenantAnchorSchema = {
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+};
+
+function requireTenantAnchor(
+  input: { projectId?: string; organizationId?: string },
+  ctx: z.RefinementCtx,
+) {
+  if (!input.projectId && !input.organizationId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either projectId or organizationId is required.",
+      path: ["projectId"],
+    });
+  }
+}
+
 export const modelProviderRouter = createTRPCRouter({
+  // tRPC responses land in the browser, so every query here must go
+  // through the masking service method — decrypted customKeys are only
+  // for server-internal callers of `getProjectModelProviders`.
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
@@ -61,7 +98,11 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await getProjectModelProviders(projectId, hasSetupPermission);
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.getProjectModelProvidersForFrontend(
+        projectId,
+        hasSetupPermission,
+      );
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -107,54 +148,59 @@ export const modelProviderRouter = createTRPCRouter({
     }),
   update: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        projectId: z.string(),
-        provider: z.string(),
-        // Human-readable label shown in the settings list and the model
-        // selector group headers. Defaults to the humanized provider name
-        // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
-        // column; now exposing it on the write path so operators can
-        // distinguish multiple same-provider instances at different
-        // scopes.
-        name: z.string().trim().min(1).max(128).optional(),
-        enabled: z.boolean(),
-        customKeys: z.object({}).passthrough().optional().nullable(),
-        customModels: customModelUpdateInputSchema.optional().nullable(),
-        customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
-        extraHeaders: z
-          .array(z.object({ key: z.string(), value: z.string() }))
-          .optional()
-          .nullable(),
-        defaultModel: z.string().optional(),
-        // Multi-scope writes (iter 109). `scopes` is the canonical shape;
-        // `scopeType`/`scopeId` remain for the transition period so older
-        // callers still compile. When both arrive, `scopes` wins. The
-        // service runs the fail-closed authz check on every entry before
-        // persisting — any non-manageable scope aborts the whole write.
-        scopes: z
-          .array(scopeAssignmentSchema)
-          .min(1, "At least one scope must be selected.")
-          .optional(),
-        scopeType: z.enum(SCOPE_TIERS).optional(),
-        scopeId: z.string().optional(),
-        // Advanced (Gateway) fields live on the same ModelProvider row.
-        // Accepted on the unified write path so the drawer ships one Save
-        // button across basic + advanced settings.
-        rateLimitRpm: z.number().int().min(0).nullable().optional(),
-        rateLimitTpm: z.number().int().min(0).nullable().optional(),
-        rateLimitRpd: z.number().int().min(0).nullable().optional(),
-        fallbackPriorityGlobal: z.number().int().nullable().optional(),
-        providerConfig: z.object({}).passthrough().nullable().optional(),
-      }),
+      z
+        .object({
+          id: z.string().optional(),
+          ...tenantAnchorSchema,
+          provider: z.string(),
+          // Human-readable label shown in the settings list and the model
+          // selector group headers. Defaults to the humanized provider name
+          // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
+          // column; now exposing it on the write path so operators can
+          // distinguish multiple same-provider instances at different
+          // scopes.
+          name: z.string().trim().min(1).max(128).optional(),
+          enabled: z.boolean(),
+          customKeys: z.object({}).passthrough().optional().nullable(),
+          customModels: customModelUpdateInputSchema.optional().nullable(),
+          customEmbeddingsModels: customModelUpdateInputSchema
+            .optional()
+            .nullable(),
+          extraHeaders: z
+            .array(z.object({ key: z.string(), value: z.string() }))
+            .optional()
+            .nullable(),
+          defaultModel: z.string().optional(),
+          // Multi-scope writes (iter 109). `scopes` is the canonical shape;
+          // `scopeType`/`scopeId` remain for the transition period so older
+          // callers still compile. When both arrive, `scopes` wins. The
+          // service runs the fail-closed authz check on every entry before
+          // persisting — any non-manageable scope aborts the whole write.
+          scopes: z
+            .array(scopeAssignmentSchema)
+            .min(1, "At least one scope must be selected.")
+            .optional(),
+          scopeType: z.enum(SCOPE_TIERS).optional(),
+          scopeId: z.string().optional(),
+          // Advanced (Gateway) fields live on the same ModelProvider row.
+          // Accepted on the unified write path so the drawer ships one Save
+          // button across basic + advanced settings.
+          rateLimitRpm: z.number().int().min(0).nullable().optional(),
+          rateLimitTpm: z.number().int().min(0).nullable().optional(),
+          rateLimitRpd: z.number().int().min(0).nullable().optional(),
+          fallbackPriorityGlobal: z.number().int().nullable().optional(),
+          providerConfig: z.object({}).passthrough().nullable().optional(),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
+          organizationId: input.organizationId,
           provider: input.provider,
           name: input.name,
           enabled: input.enabled,
@@ -186,13 +232,15 @@ export const modelProviderRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        projectId: z.string(),
-        provider: z.string(),
-      }),
+      z
+        .object({
+          id: z.string().optional(),
+          ...tenantAnchorSchema,
+          provider: z.string(),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:delete"))
+    .use(checkProjectOrOrganizationPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       return await service.deleteModelProvider(input, {
@@ -203,20 +251,212 @@ export const modelProviderRouter = createTRPCRouter({
 
   /**
    * Validates an API key for a given model provider.
-   * This is a read-only query that tests if the provided API key works
+   *
+   * A mutation despite changing nothing, because tRPC sends queries as GET
+   * with their input encoded into the URL — and the input here is the
+   * customer's API key. A secret in a URL is written to access logs, proxy
+   * logs and browser history, and proxies that strip credential-shaped query
+   * parameters leave the server parsing an absent input, which surfaces to
+   * the customer as a validation error against a key that is perfectly good.
+   * POSTing the key in a body avoids all of it.
    */
   validateApiKey: protectedProcedure
     .input(
+      z
+        .object({
+          ...tenantAnchorSchema,
+          provider: z.string(),
+          customKeys: z.record(z.string()),
+          // The scopes the credential is being set up for. Required on the
+          // no-project path, where they are what the probe is authorized
+          // against — see checkProviderValidationPermission.
+          scopes: z.array(scopeAssignmentSchema).min(1).optional(),
+        })
+        .superRefine(requireTenantAnchor),
+    )
+    .use(checkProviderValidationPermission())
+    .mutation(async ({ input }) => {
+      const { provider, customKeys } = input;
+      return validateProviderApiKey(provider, customKeys);
+    }),
+
+  /**
+   * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored —
+   * the pending sign-in's identifiers travel to the client and come back on
+   * every poll, so polling works across server instances.
+   * Spec: specs/model-providers/codex-account-provider.feature
+   */
+  codexSignInStart: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:update"))
+    .mutation(async () => {
+      const codex = new CodexAccountService();
+      return await codex.startDeviceSignIn();
+    }),
+
+  /**
+   * Codex sign-in, step 2..n: one poll of the pending device authorization.
+   * While the user hasn't approved yet this returns `{ status: "pending" }`.
+   * On approval it exchanges the code, saves the provider row with the
+   * encrypted token set at the requested scopes (service authz fails closed
+   * on any non-manageable scope), and — when the caller asks — writes the
+   * coding-assistant defaults so Langy and the tiny assists start using the
+   * account immediately.
+   */
+  codexSignInPoll: protectedProcedure
+    .input(
       z.object({
         projectId: z.string(),
-        provider: z.string(),
-        customKeys: z.record(z.string()),
+        deviceAuthId: z.string(),
+        userCode: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+        /** Langy setup + onboarding pass true: also point the allowed
+         *  feature slots at the codex model. Settings passes false. */
+        setAsCodingDefaults: z.boolean().default(false),
       }),
     )
     .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      const codex = new CodexAccountService();
+      const poll = await codex.pollDeviceSignIn({
+        deviceAuthId: input.deviceAuthId,
+        userCode: input.userCode,
+      });
+      if (poll.status === "pending") {
+        return { status: "pending" as const };
+      }
+
+      const service = ModelProviderService.create(ctx.prisma);
+      const saved = await service.updateModelProvider(
+        {
+          projectId: input.projectId,
+          provider: "openai_codex",
+          enabled: true,
+          customKeys: poll.keys,
+          scopes: input.scopes,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
+
+      if (input.setAsCodingDefaults) {
+        for (const scope of input.scopes) {
+          await assertCanWriteScope(
+            { prisma: ctx.prisma, session: ctx.session },
+            scope.scopeType,
+            scope.scopeId,
+          );
+        }
+        // The widest selected scope carries the defaults; role values
+        // cascade down from it. One scope is the norm (the sign-in surfaces
+        // pick the widest manageable), so this is scopes[0] in practice.
+        // ROLE-level writes, not per-feature: Langy's own role plus the
+        // Fast tier — the two roles whose whole feature set is
+        // codex-licensed. The Default role (playground, evaluators,
+        // workflows) is deliberately untouched.
+        const scope = input.scopes[0]!;
+        for (const role of ["LANGY", "FAST"] as const) {
+          await setRoleAtScope(
+            { prisma: ctx.prisma },
+            {
+              scopeType: scope.scopeType,
+              scopeId: scope.scopeId,
+              role,
+              model: CODEX_DEFAULT_MODEL,
+              authorId: ctx.session?.user?.id ?? null,
+            },
+          );
+        }
+      }
+
+      // The response hands the connector their own account email (PII), so
+      // the connect event is audit-logged: who, where, and which scopes. The
+      // email itself deliberately stays out of the log row.
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexConnect",
+        targetKind: "modelProvider",
+        targetId: saved?.id,
+        args: {
+          scopes: input.scopes,
+          setAsCodingDefaults: input.setAsCodingDefaults,
+          plan: poll.keys.CODEX_PLAN,
+        },
+      });
+
+      return {
+        status: "complete" as const,
+        providerId: saved?.id,
+        email: poll.keys.CODEX_EMAIL,
+        plan: poll.keys.CODEX_PLAN,
+      };
+    }),
+
+  /**
+   * Point the coding-assistant roles (LANGY + FAST) at the codex model,
+   * after the fact. The settings-page connect flow doesn't write defaults
+   * during sign-in; it asks with a dialog once connected and calls this on
+   * "yes" — the same role writes the Langy/onboarding flows perform inline.
+   */
+  codexApplyCodingDefaults: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      for (const scope of input.scopes) {
+        await assertCanWriteScope(
+          { prisma: ctx.prisma, session: ctx.session },
+          scope.scopeType,
+          scope.scopeId,
+        );
+      }
+      const scope = input.scopes[0]!;
+      for (const role of ["LANGY", "FAST"] as const) {
+        await setRoleAtScope(
+          { prisma: ctx.prisma },
+          {
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+            role,
+            model: CODEX_DEFAULT_MODEL,
+            authorId: ctx.session?.user?.id ?? null,
+          },
+        );
+      }
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexApplyCodingDefaults",
+        args: { scopes: input.scopes },
+      });
+      return { applied: true as const };
+    }),
+
+  /**
+   * The connected Codex account for a project, for the setup surfaces'
+   * connected state. Never returns tokens, and deliberately NOT the account
+   * email: this is a project:view query, so a plain member must not read the
+   * (often personal) OpenAI address the connecting admin signed in with. The
+   * plan tier is non-identifying. The connector still sees their own email at
+   * connect time from the sign-in mutation's result.
+   */
+  codexStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
-      const { provider, customKeys } = input;
-      return validateProviderApiKey(provider, customKeys);
+      const providers = await getProjectModelProviders(input.projectId);
+      const row = providers.openai_codex;
+      if (!row?.enabled) return { connected: false as const };
+      const keys = (row.customKeys ?? {}) as Partial<Record<string, string>>;
+      return {
+        connected: true as const,
+        providerId: row.id,
+        plan: keys.CODEX_PLAN ?? "",
+      };
     }),
 
   isManagedProvider: protectedProcedure
@@ -228,7 +468,9 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
-      return { managed: isManagedProvider(input.organizationId, input.provider) };
+      return {
+        managed: isManagedProvider(input.organizationId, input.provider),
+      };
     }),
 
   /**
@@ -481,6 +723,100 @@ export const modelProviderRouter = createTRPCRouter({
 });
 
 /**
+ * Tenant gate for a provider write that may arrive with either handle. A
+ * provider belongs to an organization and reaches the scopes attached to
+ * it, so a project is one valid way to name the tenant and the
+ * organization is the other — an organization on the agent-governance
+ * track has no project until it needs one, and organization scope is the
+ * default for a new credential.
+ *
+ * With a project, this is the unchanged project permission check. Without
+ * one, it falls back to organization membership, which establishes the
+ * caller belongs to the tenant they named and nothing more. What the
+ * caller may actually write is decided per scope by
+ * `assertCanManageAllScopes` in the service, which is where organization
+ * scope demands `organization:manage`, team demands `team:manage`, and
+ * project demands `project:manage`. Same division of labour as
+ * `scopeAwarePermissionMiddleware` below.
+ */
+function checkProjectOrOrganizationPermission(projectPermission: Permission) {
+  const projectCheck = checkProjectPermission(projectPermission);
+  const organizationCheck = checkOrganizationPermission("organization:view");
+  return async (params: {
+    ctx: any;
+    input: { projectId?: string; organizationId?: string };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    if (!params.input.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Either a project or an organization is required.",
+      });
+    }
+    return organizationCheck({
+      ...params,
+      input: { ...params.input, organizationId: params.input.organizationId },
+    });
+  };
+}
+
+/**
+ * Tenant gate for the credential probe.
+ *
+ * Nothing downstream re-authorizes this one. The handler goes straight out
+ * to the provider with caller-supplied keys and, for the `custom` provider,
+ * a caller-supplied base URL, so whatever gate sits here IS the
+ * authorization rather than a coarse pre-filter. Organization membership
+ * would not do: `organization:view` is held by MEMBER and EXTERNAL, which
+ * would turn a read-only seat into an arbitrary outbound request from our
+ * servers.
+ *
+ * With a project this stays the pre-existing `project:update` check.
+ * Without one it runs the same per-scope check the provider writes use, so
+ * "may I probe a credential for this scope" is the same question, answered
+ * by the same code, as "may I store a credential at this scope".
+ */
+function checkProviderValidationPermission() {
+  const projectCheck = checkProjectPermission("project:update");
+  return async (params: {
+    ctx: any;
+    input: {
+      projectId?: string;
+      organizationId?: string;
+      scopes?: ScopeAssignment[];
+    };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    const scopes = params.input.scopes;
+    if (!scopes || scopes.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Validating a credential without a project needs the scopes it is being set up for.",
+      });
+    }
+    await assertCanManageAllScopes(
+      { prisma: params.ctx.prisma, session: params.ctx.session },
+      scopes,
+    );
+    params.ctx.permissionChecked = true;
+    return params.next();
+  };
+}
+
+/**
  * Permission middleware for the role/feature default writers. Each scope
  * demands its matching permission so a project admin can't silently push
  * a role default up to the organization scope. Matches the per-scope
@@ -563,4 +899,3 @@ async function deleteConfigPermissionMiddleware({
   ctx.permissionChecked = true;
   return next();
 }
-

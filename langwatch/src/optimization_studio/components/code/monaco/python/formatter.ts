@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable } from "monaco-editor";
+import type { editor, IDisposable } from "monaco-editor";
 
 /**
  * Heuristic Python formatter — re-indents to multiples of 4 spaces, trims
@@ -9,7 +9,7 @@ import type { IDisposable } from "monaco-editor";
  */
 export function registerFormatter(monaco: Monaco): IDisposable {
   return monaco.languages.registerDocumentFormattingEditProvider("python", {
-    provideDocumentFormattingEdits: (model) => {
+    provideDocumentFormattingEdits: (model: editor.ITextModel) => {
       const source = model.getValue();
       const lines = source.split("\n");
 

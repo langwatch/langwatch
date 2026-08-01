@@ -20,9 +20,7 @@ export function getGetPromptSnippets(params?: {
   } = params ?? {};
 
   // Shorthand syntax: "my-prompt:production" instead of query params
-  const shorthand = label
-    ? `${promptHandle}:${label}`
-    : promptHandle;
+  const shorthand = label ? `${promptHandle}:${label}` : promptHandle;
 
   return [
     {

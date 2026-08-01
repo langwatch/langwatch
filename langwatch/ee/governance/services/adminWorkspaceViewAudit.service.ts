@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 /**
  * AdminWorkspaceViewAuditService — records audit-log + OCSF rows
  * when an org admin drills into another user's Personal Workspace
@@ -22,22 +23,18 @@
  *         §"Admins read user-scoped traces ONLY via audit-logged drill-in"
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
-
 import {
-  GovernanceOcsfEventsClickHouseRepository,
+  type GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "./governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger(
-  "langwatch:governance:admin-workspace-view-audit",
-);
+const logger = createLogger("langwatch:governance:admin-workspace-view-audit");
 
 /** Action name pinned by the spec — DO NOT rename without amending the spec. */
-export const ADMIN_WORKSPACE_VIEW_ACTION = "governance.viewWorkspaceAs" as const;
+export const ADMIN_WORKSPACE_VIEW_ACTION =
+  "governance.viewWorkspaceAs" as const;
 
 /**
  * Dedup window. Within this many milliseconds, repeat detections
@@ -125,8 +122,7 @@ export class AdminWorkspaceViewAuditService {
       return { recorded: false, auditLogId: null };
     }
 
-    const isOwner =
-      team.isPersonal && team.ownerUserId === input.actorUserId;
+    const isOwner = team.isPersonal && team.ownerUserId === input.actorUserId;
     const isMember = team.members.length > 0;
     if (isOwner || isMember) {
       // Self-view (own personal workspace) or team-member view
@@ -186,7 +182,8 @@ export class AdminWorkspaceViewAuditService {
           eventId: row.id,
           traceId: "",
           sourceId: input.targetTeamId,
-          sourceType: input.kind === "personal" ? "personal_workspace" : "team_workspace",
+          sourceType:
+            input.kind === "personal" ? "personal_workspace" : "team_workspace",
           activityId: OCSF_ACTIVITY.READ,
           severityId: OCSF_SEVERITY.INFO,
           eventTime: row.createdAt,

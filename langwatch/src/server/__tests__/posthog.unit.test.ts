@@ -8,7 +8,7 @@
  * - Includes projectId in properties when provided
  * - Silently no-ops when POSTHOG_KEY is not set
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockCapture } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("posthog-node", () => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

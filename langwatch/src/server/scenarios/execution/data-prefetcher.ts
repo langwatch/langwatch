@@ -10,27 +10,34 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
+
+import { decrypt } from "~/utils/encryption";
+import {
+  AgentRepository,
+  type TypedAgent,
+} from "../../agents/agent.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import { prisma } from "../../db";
-import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
+import {
+  PromptService,
+  type VersionedPrompt,
+} from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
-import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
@@ -91,7 +98,10 @@ export interface PromptFetcher {
 
 /** Minimal interface for agent lookup - uses only what prefetcher needs */
 export interface AgentFetcher {
-  findById(params: { projectId: string; id: string }): Promise<TypedAgent | null>;
+  findById(params: {
+    projectId: string;
+    id: string;
+  }): Promise<TypedAgent | null>;
 }
 
 /**
@@ -195,7 +205,12 @@ export async function prefetchScenarioData(
   deps: DataPrefetcherDependencies,
 ): Promise<PrefetchResult> {
   logger.debug(
-    { projectId: context.projectId, scenarioId: context.scenarioId, batchRunId: context.batchRunId, targetType: target.type },
+    {
+      projectId: context.projectId,
+      scenarioId: context.scenarioId,
+      batchRunId: context.batchRunId,
+      targetType: target.type,
+    },
     "Prefetching scenario data",
   );
 
@@ -205,23 +220,43 @@ export async function prefetchScenarioData(
     deps.scenarioFetcher,
   );
   if (!scenarioResult) {
-    logger.warn({ projectId: context.projectId, scenarioId: context.scenarioId }, "Scenario not found");
-    return { success: false, error: `Scenario ${context.scenarioId} not found` };
+    logger.warn(
+      { projectId: context.projectId, scenarioId: context.scenarioId },
+      "Scenario not found",
+    );
+    return {
+      success: false,
+      error: `Scenario ${context.scenarioId} not found`,
+    };
   }
   const scenario = scenarioResult.config;
 
-  const projectResult = await fetchProject(context.projectId, deps.projectFetcher);
+  const projectResult = await fetchProject(
+    context.projectId,
+    deps.projectFetcher,
+  );
   if (!projectResult.success) {
-    logger.warn({ projectId: context.projectId, error: projectResult.error }, "Project fetch failed");
+    logger.warn(
+      { projectId: context.projectId, error: projectResult.error },
+      "Project fetch failed",
+    );
     return { success: false, error: projectResult.error };
   }
   const project = projectResult.data;
 
   const adapterResult = await fetchAgentData(context.projectId, target, deps);
-  if (adapterResult !== null && "success" in adapterResult && !adapterResult.success) {
+  if (
+    adapterResult !== null &&
+    "success" in adapterResult &&
+    !adapterResult.success
+  ) {
     // Hydration failure from workflow DSL — surface structured error
     logger.warn(
-      { projectId: context.projectId, targetType: target.type, reason: adapterResult.reason },
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        reason: adapterResult.reason,
+      },
       `Workflow LLM hydration failed: ${adapterResult.message}`,
     );
     return {
@@ -233,7 +268,11 @@ export async function prefetchScenarioData(
   const adapterData = adapterResult as TargetAdapterData | null;
   if (!adapterData) {
     logger.warn(
-      { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        targetReferenceId: target.referenceId,
+      },
       "Target adapter not found",
     );
     const targetLabel =
@@ -301,12 +340,21 @@ export async function prefetchScenarioData(
     ]);
   for (const { label, model, result } of [
     { label: "adapter", model: modelForParams, result: modelParamsResult },
-    { label: "user-simulator", model: simulatorModel, result: simulatorParamsResult },
+    {
+      label: "user-simulator",
+      model: simulatorModel,
+      result: simulatorParamsResult,
+    },
     { label: "judge", model: judgeModel, result: judgeParamsResult },
   ]) {
     if (!result.success) {
       logger.warn(
-        { projectId: context.projectId, role: label, model, reason: result.reason },
+        {
+          projectId: context.projectId,
+          role: label,
+          model,
+          reason: result.reason,
+        },
         `Failed to prepare model params: ${result.message}`,
       );
       return { success: false, error: result.message, reason: result.reason };
@@ -322,7 +370,11 @@ export async function prefetchScenarioData(
   }
 
   logger.debug(
-    { projectId: context.projectId, scenarioId: context.scenarioId, targetType: target.type },
+    {
+      projectId: context.projectId,
+      scenarioId: context.scenarioId,
+      targetType: target.type,
+    },
     "Prefetch complete",
   );
 
@@ -335,11 +387,11 @@ export async function prefetchScenarioData(
       modelParams: modelParamsResult.params,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
-      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
     },
     telemetry: {
-      endpoint: process.env.LANGWATCH_ENDPOINT!,
+      endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
   };
@@ -392,7 +444,11 @@ async function fetchProject(
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
-type HydrationFailure = { success: false; reason: ModelParamsFailureReason; message: string };
+type HydrationFailure = {
+  success: false;
+  reason: ModelParamsFailureReason;
+  message: string;
+};
 
 async function fetchAgentData(
   projectId: string,
@@ -400,7 +456,11 @@ async function fetchAgentData(
   deps: DataPrefetcherDependencies,
 ): Promise<TargetAdapterData | HydrationFailure | null> {
   if (target.type === "prompt") {
-    return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
+    return fetchPromptConfigData(
+      projectId,
+      target.referenceId,
+      deps.promptFetcher,
+    );
   }
   if (target.type === "code") {
     return fetchCodeAgentData(
@@ -468,7 +528,7 @@ async function fetchHttpAgentData(
   fetcher: AgentFetcher,
 ): Promise<HttpAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "http") return null;
+  if (agent?.type !== "http") return null;
 
   const parseResult = HttpAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) {
@@ -494,19 +554,29 @@ async function fetchHttpAgentData(
  * Code agents have a parameters array with a "code" entry, plus inputs/outputs.
  */
 const RawCodeAgentConfigSchema = z.object({
-  parameters: z.array(z.object({
-    identifier: z.string(),
-    type: z.string(),
-    value: z.string().optional(),
-  })),
-  inputs: z.array(z.object({
-    identifier: z.string(),
-    type: z.string(),
-  })).optional(),
-  outputs: z.array(z.object({
-    identifier: z.string(),
-    type: z.string(),
-  })).optional(),
+  parameters: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+      value: z.string().optional(),
+    }),
+  ),
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .optional(),
+  outputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
 });
@@ -518,7 +588,7 @@ async function fetchCodeAgentData(
   projectSecretsFetcher: ProjectSecretsFetcher,
 ): Promise<CodeAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "code") return null;
+  if (agent?.type !== "code") return null;
 
   const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) {
@@ -580,7 +650,7 @@ async function fetchWorkflowAgentData({
   projectSecretsFetcher: ProjectSecretsFetcher;
 }): Promise<WorkflowAgentData | HydrationFailure | null> {
   const agent = await agentFetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "workflow") return null;
+  if (agent?.type !== "workflow") return null;
 
   const parseResult = RawWorkflowAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) return null;
@@ -607,7 +677,11 @@ async function fetchWorkflowAgentData({
   });
 
   if (!hydrateResult.success) {
-    return { success: false, reason: hydrateResult.reason, message: hydrateResult.message };
+    return {
+      success: false,
+      reason: hydrateResult.reason,
+      message: hydrateResult.message,
+    };
   }
 
   const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
@@ -659,15 +733,32 @@ async function hydrateLlmParameters({
   const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
   if (nodes.length === 0) return { success: true, dsl };
 
-  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  // Legacy fallback. `default_llm` only exists on raw persisted DSLs from
+  // spec_version <= 1.4 (nodes own their config since 1.5); this reader
+  // keeps tolerating it because scenario agents can reference old workflow
+  // versions that were never re-saved. On 1.5+ DSLs a modelless llm
+  // parameter is stale state and must NOT be silently substituted — leave
+  // it unhydrated so the engine raises its typed llm_model_not_set error.
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
   const defaultLlm =
-    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+    legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
       ? (dsl.default_llm as Record<string, unknown>)
       : null;
-  const defaultModel =
-    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+  const defaultModel = legacyDsl
+    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
       ? defaultLlm.model
-      : DEFAULT_MODEL;
+      : DEFAULT_MODEL
+    : undefined;
 
   // Collect unique models needed before hitting the provider
   const modelsNeeded = new Set<string>();
@@ -679,19 +770,22 @@ async function hydrateLlmParameters({
         ? (n.data as Record<string, unknown>)
         : null;
     const rawParameters = nodeData?.parameters;
-    const parameters = Array.isArray(rawParameters) ? (rawParameters as unknown[]) : [];
+    const parameters = Array.isArray(rawParameters)
+      ? (rawParameters as unknown[])
+      : [];
     for (const param of parameters) {
       if (typeof param !== "object" || param === null) continue;
       const p = param as Record<string, unknown>;
       if (p.type !== "llm") continue;
-      const value = typeof p.value === "object" && p.value !== null
-        ? (p.value as Record<string, unknown>)
-        : null;
+      const value =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
       const model =
         typeof value?.model === "string" && value.model.length > 0
           ? value.model
           : defaultModel;
-      modelsNeeded.add(model);
+      if (model) modelsNeeded.add(model);
     }
   }
 
@@ -743,19 +837,18 @@ async function hydrateLlmParameters({
           ? (p.value as Record<string, unknown>)
           : null;
       const model =
-        typeof existingValue?.model === "string" && existingValue.model.length > 0
+        typeof existingValue?.model === "string" &&
+        existingValue.model.length > 0
           ? existingValue.model
           : defaultModel;
+      if (!model) return param;
 
       const litellmParams = litellmParamsByModel.get(model);
       if (!litellmParams) return param;
 
       // Use existing value if present, otherwise fall back to default_llm or { model }.
       // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
-      const rawBaseValue =
-        existingValue ??
-        defaultLlm ??
-        { model };
+      const rawBaseValue = existingValue ?? defaultLlm ?? { model };
       // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
       // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -803,18 +896,19 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
       : [],
   );
 
-  const outputs: WorkflowField[] = (Array.isArray(rawOutputs) ? rawOutputs : [])
-    .flatMap((o: unknown): WorkflowField[] => {
-      if (typeof o !== "object" || o === null) return [];
-      const field = o as { identifier?: unknown; type?: unknown };
-      if (typeof field.identifier !== "string") return [];
-      return [
-        {
-          identifier: field.identifier,
-          type: typeof field.type === "string" ? field.type : "str",
-        },
-      ];
-    });
+  const outputs: WorkflowField[] = (
+    Array.isArray(rawOutputs) ? rawOutputs : []
+  ).flatMap((o: unknown): WorkflowField[] => {
+    if (typeof o !== "object" || o === null) return [];
+    const field = o as { identifier?: unknown; type?: unknown };
+    if (typeof field.identifier !== "string") return [];
+    return [
+      {
+        identifier: field.identifier,
+        type: typeof field.type === "string" ? field.type : "str",
+      },
+    ];
+  });
 
   return { inputs, outputs };
 }
@@ -984,7 +1078,8 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
 
           return { success: true, params: params as LiteLLMParams };
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           logger.error({ error }, "failed to prepare LiteLLM params");
           return {
             success: false,

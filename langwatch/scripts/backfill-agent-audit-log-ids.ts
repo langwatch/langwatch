@@ -29,7 +29,7 @@ async function backfillCreate() {
 
   const filteredLogs = logs.filter((l) => {
     const args = l.args as Record<string, unknown> | null;
-    return !args?.["id"];
+    return !args?.id;
   });
 
   console.log(`agents.create logs missing args.id: ${filteredLogs.length}`);
@@ -65,7 +65,10 @@ async function backfillCreate() {
     }
 
     const agent = candidates[0]!;
-    const updatedArgs = { ...(log.args as Record<string, unknown>), id: agent.id };
+    const updatedArgs = {
+      ...(log.args as Record<string, unknown>),
+      id: agent.id,
+    };
 
     if (DRY_RUN) {
       console.log(`  [DRY] log ${log.id} → args.id = ${agent.id}`);
@@ -89,7 +92,7 @@ async function backfillCopy() {
 
   const logs = allCopyLogs.filter((l) => {
     const args = l.args as Record<string, unknown> | null;
-    return !args?.["newAgentId"];
+    return !args?.newAgentId;
   });
 
   console.log(`agents.copy logs missing args.newAgentId: ${logs.length}`);
@@ -102,7 +105,7 @@ async function backfillCopy() {
     }
 
     const args = log.args as Record<string, unknown>;
-    const sourceAgentId = args["agentId"] as string | undefined;
+    const sourceAgentId = args.agentId as string | undefined;
 
     if (!sourceAgentId) {
       console.warn(`  [SKIP] log ${log.id} — no args.agentId`);

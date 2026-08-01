@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { PlanTypes, SUBSCRIBABLE_PLANS, SubscriptionStatus } from "../planTypes";
 import {
   PlanTypes as PrismaPlanTypes,
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "@prisma/client";
+import { describe, expect, it } from "vitest";
+import {
+  PlanTypes,
+  SUBSCRIBABLE_PLANS,
+  SubscriptionStatus,
+} from "../planTypes";
 
 describe("SUBSCRIBABLE_PLANS", () => {
   it("includes FREE for downgrade/cancel flow", () => {

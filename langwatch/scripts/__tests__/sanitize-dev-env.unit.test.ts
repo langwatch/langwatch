@@ -26,7 +26,9 @@ function runHelper(env: Record<string, string | undefined>): {
 } {
   const exports = Object.entries(env)
     .map(([k, v]) =>
-      v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
+      v === undefined
+        ? `unset ${k}`
+        : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
     )
     .join("\n");
   const script = `
@@ -65,21 +67,32 @@ describe("sanitize-dev-env.sh (lw#3453)", () => {
   describe("when stale localhost values are inherited from a prior session", () => {
     /** @scenario sanitize rewrites stale localhost NEXTAUTH_URL to current APP_PORT */
     it("rewrites NEXTAUTH_URL to the current APP_PORT", () => {
-      const r = runHelper({ APP_PORT: "5562", NEXTAUTH_URL: "http://localhost:5560" });
+      const r = runHelper({
+        APP_PORT: "5562",
+        NEXTAUTH_URL: "http://localhost:5560",
+      });
       expect(r.exitCode).toBe(0);
       expect(r.nextauthUrl).toBe("http://localhost:5562");
     });
 
     /** @scenario sanitize rewrites stale localhost BASE_HOST to current APP_PORT */
     it("rewrites BASE_HOST to the current APP_PORT", () => {
-      const r = runHelper({ APP_PORT: "5562", BASE_HOST: "http://localhost:5560" });
+      const r = runHelper({
+        APP_PORT: "5562",
+        BASE_HOST: "http://localhost:5560",
+      });
       expect(r.exitCode).toBe(0);
       expect(r.baseHost).toBe("http://localhost:5562");
     });
 
     it("emits a one-line log per overwrite so users see what happened", () => {
-      const r = runHelper({ APP_PORT: "5562", NEXTAUTH_URL: "http://localhost:5560" });
-      expect(r.stdout).toMatch(/rewriting stale NEXTAUTH_URL=http:\/\/localhost:5560/);
+      const r = runHelper({
+        APP_PORT: "5562",
+        NEXTAUTH_URL: "http://localhost:5560",
+      });
+      expect(r.stdout).toMatch(
+        /rewriting stale NEXTAUTH_URL=http:\/\/localhost:5560/,
+      );
     });
   });
 

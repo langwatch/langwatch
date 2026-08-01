@@ -55,7 +55,7 @@ vi.mock("../stores/sseStatusStore", () => ({
         fastPollRequestedAt: 0,
         liveUpdatesMode: "live",
       }),
-    { getState: () => ({ liveUpdatesMode: "live" }) }
+    { getState: () => ({ liveUpdatesMode: "live" }) },
   ),
 }));
 
@@ -88,7 +88,7 @@ describe("useTraceNewCount", () => {
 
       act(() => {
         initialOptions.onError(
-          new Error("Too many simultaneous queries. Maximum: 100.")
+          new Error("Too many simultaneous queries. Maximum: 100."),
         );
       });
 
@@ -100,7 +100,7 @@ describe("useTraceNewCount", () => {
 
       act(() => {
         lastOptions().onError(
-          new Error("Too many simultaneous queries. Maximum: 100.")
+          new Error("Too many simultaneous queries. Maximum: 100."),
         );
       });
       expect(lastOptions().refetchInterval).toBe(30000);

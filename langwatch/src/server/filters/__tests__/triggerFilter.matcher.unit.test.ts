@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { PreconditionTraceData } from "../precondition-matchers";
-import type { TriggerFilters } from "../types";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
@@ -9,7 +9,7 @@ import {
   matchesTriggerFilters,
   triggerFiltersReferenceEvents,
 } from "../triggerFilter.matcher";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TriggerFilters } from "../types";
 
 function makeTraceData(
   overrides: Partial<PreconditionTraceData> = {},
@@ -681,6 +681,22 @@ describe("matchesEvaluationFilters", () => {
         "evaluations.state": { "eval-abc": ["processed"] },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("does not match when filter value is phantom ES value 'Error_Message' and status is 'error'", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", status: "error" })];
+      const filters: TriggerFilters = {
+        "evaluations.state": { "eval-abc": ["Error_Message"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("matches when canonical status 'error' is used in the filter", () => {
+      const evals = [makeEval({ evaluatorId: "eval-abc", status: "error" })];
+      const filters: TriggerFilters = {
+        "evaluations.state": { "eval-abc": ["error"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(true);
     });
   });
 

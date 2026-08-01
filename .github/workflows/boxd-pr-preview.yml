@@ -1,0 +1,325 @@
+name: Boxd PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+# Per-PR isolation for fork/update/destroy; per-event isolation for main/schedule/dispatch.
+# cancel-in-progress on PR events: a new push should supersede the older in-flight deploy.
+# Abandoned work may leak a half-built VM — the daily reaper cleans orphans.
+concurrency:
+  group: boxd-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # TODO: rename to langwatch-staging once the source VM is renamed from the legacy "golden-image" name
+  STAGING_VM: langwatch-main-golden-image
+  APP_PORT: "5560"
+  # Evict oldest pr<N> when this many already exist. Drew's account has ~5 permanent VMs of 10.
+  PR_VM_SOFT_CAP: "4"
+
+jobs:
+  preview-up:
+    if: >
+      github.event_name == 'pull_request'
+      && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Install boxd CLI
+        run: |
+          curl -fsSL https://boxd.sh/downloads/cli/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Start ssh-agent with CI key
+        env:
+          BOXD_SSH_KEY: ${{ secrets.BOXD_SSH_KEY }}
+        run: |
+          if [ -z "$BOXD_SSH_KEY" ]; then
+            echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
+            echo "::warning::BOXD_SSH_KEY is not configured; preview VM steps skipped"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -T 10 boxd.sh >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          printf '%s\n' "$BOXD_SSH_KEY" | ssh-add -
+
+      - name: FIFO-evict oldest pr<N> if over soft cap
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          set -euo pipefail
+          pr_num="${{ github.event.pull_request.number }}"
+          # Sorted by numeric PR suffix, ascending → oldest first
+          mapfile -t pr_vms < <(
+            boxd list --json | jq -r '.[] | select(.name | test("^pr[0-9]+$")) | .name' \
+              | sort -t r -k 2 -n
+          )
+          count=${#pr_vms[@]}
+          echo "Current pr<N> VMs: $count (soft cap $PR_VM_SOFT_CAP)"
+          if printf '%s\n' "${pr_vms[@]}" | grep -qx "pr${pr_num}"; then
+            echo "pr${pr_num} already exists — no eviction"
+            exit 0
+          fi
+          if [ "$count" -ge "$PR_VM_SOFT_CAP" ]; then
+            oldest="${pr_vms[0]}"
+            echo "At soft cap — evicting $oldest"
+            boxd destroy "$oldest" -y || echo "Eviction failed (already gone?)"
+          fi
+
+      - name: Fork staging (or reuse existing fork for this PR)
+        if: env.BOXD_SKIP != 'true'
+        id: fork
+        run: |
+          set -euo pipefail
+          pr="pr${{ github.event.pull_request.number }}"
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          if boxd list --json | jq -e --arg n "$pr" '.[] | select(.name == $n)' > /dev/null; then
+            echo "Reusing existing $pr"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Forking $STAGING_VM -> $pr"
+            boxd fork "$STAGING_VM" --name "$pr"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+            # Wait for fork to accept exec (up to 60s)
+            ready=0
+            for i in $(seq 1 12); do
+              if boxd exec "$pr" --timeout 5 -- true 2>/dev/null; then
+                echo "Fork ready after ${i}x5s"
+                ready=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$ready" -eq 0 ]; then
+              echo "::error::Fork $pr did not become ready within 60s"
+              exit 1
+            fi
+          fi
+
+      - name: Check out PR SHA + boot with per-fork env
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          set -euo pipefail
+          pr="${{ steps.fork.outputs.pr }}"
+          sha="${{ github.event.pull_request.head.sha }}"
+          url="https://${pr}.boxd.sh"
+          # Fetch PR ref explicitly; staging normally tracks origin/main only.
+          boxd exec "$pr" \
+            -e BASE_HOST="$url" \
+            -e NEXTAUTH_URL="$url" \
+            -e POSTHOG_KEY="" \
+            --timeout 900 \
+            -- "set -e; cd workspace/langwatch && \
+                git fetch origin 'pull/${{ github.event.pull_request.number }}/head:pr-head' && \
+                git checkout $sha && \
+                docker compose -f compose.yml -f compose.dev.yml up -d"
+          boxd proxy set-port --vm "$pr" --port "$APP_PORT"
+
+      - name: Health probe
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          set -euo pipefail
+          pr="${{ steps.fork.outputs.pr }}"
+          url="https://${pr}.boxd.sh"
+          echo "Probing $url"
+          for i in $(seq 1 36); do  # ~6 min
+            code=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 5 "$url/" || echo "000")
+            case "$code" in
+              200|302|307)
+                echo "Healthy: HTTP $code"
+                exit 0
+                ;;
+            esac
+            echo "  attempt $i: $code"
+            sleep 10
+          done
+          echo "::error::Preview $url did not become healthy within 6 min"
+          exit 1
+
+      - name: Comment preview URL on PR
+        if: always() && env.BOXD_SKIP != 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const pr = context.issue.number;
+            const marker = '<!-- boxd-preview-comment -->';
+            const status = '${{ job.status }}';
+            const url = `https://pr${pr}.boxd.sh`;
+            const sha = '${{ github.event.pull_request.head.sha }}';
+            const body = status === 'success'
+              ? `${marker}\n:rocket: **Preview:** ${url}\n\nHead: \`${sha.slice(0, 7)}\``
+              : `${marker}\n:warning: **Preview build failed** for \`${sha.slice(0, 7)}\`. See [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: pr, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: pr, body });
+            }
+
+  preview-down:
+    if: >
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Install boxd CLI
+        run: |
+          curl -fsSL https://boxd.sh/downloads/cli/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Start ssh-agent with CI key
+        env:
+          BOXD_SSH_KEY: ${{ secrets.BOXD_SSH_KEY }}
+        run: |
+          if [ -z "$BOXD_SSH_KEY" ]; then
+            echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
+            echo "::warning::BOXD_SSH_KEY is not configured; preview VM steps skipped"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -T 10 boxd.sh >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          printf '%s\n' "$BOXD_SSH_KEY" | ssh-add -
+
+      - name: Destroy pr<N>
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          pr="pr${{ github.event.pull_request.number }}"
+          boxd destroy "$pr" -y || echo "Already gone or never existed"
+
+      - name: Update PR comment
+        if: always() && env.BOXD_SKIP != 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const pr = context.issue.number;
+            const marker = '<!-- boxd-preview-comment -->';
+            const body = `${marker}\n:broom: **Preview destroyed** (PR closed).`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: pr, per_page: 100,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            }
+
+  refresh-staging:
+    if: >
+      github.event_name == 'push'
+      || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install boxd CLI
+        run: |
+          curl -fsSL https://boxd.sh/downloads/cli/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Start ssh-agent with CI key
+        env:
+          BOXD_SSH_KEY: ${{ secrets.BOXD_SSH_KEY }}
+        run: |
+          if [ -z "$BOXD_SSH_KEY" ]; then
+            echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
+            echo "::warning::BOXD_SSH_KEY is not configured; staging refresh steps skipped"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -T 10 boxd.sh >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          printf '%s\n' "$BOXD_SSH_KEY" | ssh-add -
+
+      # Soft refresh: git reset --hard origin/main + compose up --build on the running staging VM.
+      # "Dirty staging" risk is bounded by the no-human-access policy; full destroy/recreate is future work (see TODO below).
+      # TODO: add a full-rebuild path (destroy + bootstrap from empty) when someone builds a bootstrap script.
+      - name: Refresh staging in place
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          set -euo pipefail
+          url="https://${STAGING_VM}.boxd.sh"
+          boxd exec "$STAGING_VM" \
+            -e BASE_HOST="$url" \
+            -e NEXTAUTH_URL="$url" \
+            -e POSTHOG_KEY="" \
+            --timeout 1500 \
+            -- "set -e; cd workspace/langwatch && \
+                git fetch origin main && git reset --hard origin/main && \
+                docker compose -f compose.yml -f compose.dev.yml up -d --build"
+
+      - name: Health probe staging
+        if: env.BOXD_SKIP != 'true'
+        run: |
+          set -euo pipefail
+          url="https://${STAGING_VM}.boxd.sh"
+          for i in $(seq 1 36); do
+            code=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 5 "$url/" || echo "000")
+            case "$code" in
+              200|302|307)
+                echo "Staging healthy: HTTP $code"
+                exit 0
+                ;;
+            esac
+            echo "  attempt $i: $code"
+            sleep 10
+          done
+          echo "::error::Staging refresh did not result in healthy endpoint"
+          exit 1
+
+  reaper:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install boxd CLI
+        run: |
+          curl -fsSL https://boxd.sh/downloads/cli/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Start ssh-agent with CI key
+        env:
+          BOXD_SSH_KEY: ${{ secrets.BOXD_SSH_KEY }}
+        run: |
+          if [ -z "$BOXD_SSH_KEY" ]; then
+            echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
+            echo "::warning::BOXD_SSH_KEY is not configured; orphan reaper steps skipped"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -T 10 boxd.sh >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          printf '%s\n' "$BOXD_SSH_KEY" | ssh-add -
+
+      - name: Reap pr<N> VMs whose PRs are CLOSED or MERGED
+        if: env.BOXD_SKIP != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for pr_vm in $(boxd list --json | jq -r '.[] | select(.name | test("^pr[0-9]+$")) | .name'); do
+            n="${pr_vm#pr}"
+            state=$(gh pr view "$n" --repo "${{ github.repository }}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+            echo "$pr_vm -> PR #$n state=$state"
+            if [ "$state" = "CLOSED" ] || [ "$state" = "MERGED" ]; then
+              echo "  Reaping $pr_vm"
+              boxd destroy "$pr_vm" -y || echo "  Destroy failed"
+            fi
+          done

@@ -2,18 +2,17 @@ import {
   Box,
   Center,
   Container,
-  HStack,
   IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
-import { Link } from "~/components/ui/link";
 import { AnimatePresence, motion } from "motion/react";
-import { signOut } from "~/utils/auth-client";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { signOut } from "~/utils/auth-client";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
@@ -30,6 +29,8 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
+  /** Render the logo inside the card, above the title, instead of floating above it. */
+  isLogoInside?: boolean;
 }
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
@@ -42,6 +43,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   showBackButton,
   onBack,
   skipHref,
+  isLogoInside,
 }) => {
   const { emit } = useAnalytics();
   const isFullWidth = widthVariant === "full";
@@ -83,7 +85,17 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   );
 
   return (
-    <Box w="full" minH="100dvh" bg="bg.page" position="relative" style={{ scrollbarGutter: "stable" }} overflowY="auto">
+    // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
+    // the logo/card column stays visually centered even with always-visible
+    // scrollbars (one-edge "stable" shifted everything left).
+    <Box
+      w="full"
+      minH="100dvh"
+      bg="bg.page"
+      position="relative"
+      style={{ scrollbarGutter: "stable both-edges" }}
+      overflowY="auto"
+    >
       <OnboardingMeshBackground />
 
       {showBackButton && onBack && (
@@ -183,21 +195,24 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         </MotionBox>
       )}
 
-      {/* Logo */}
-      <MotionCenter
-        pt={compressedHeader ? "6vh" : "10vh"}
-        pb={compressedHeader ? "2vh" : "4vh"}
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <FullLogo width={150} />
-      </MotionCenter>
+      {/* Logo (floating above the card unless isLogoInside) */}
+      {!isLogoInside && (
+        <MotionCenter
+          pt={compressedHeader ? "6vh" : "10vh"}
+          pb={compressedHeader ? "2vh" : "4vh"}
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <FullLogo width={150} />
+        </MotionCenter>
+      )}
 
       {/* Content */}
       <Container
         width="full"
         mx="auto"
+        pt={isLogoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
         pb={16}
         maxW={
           isFullWidth
@@ -224,6 +239,11 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           }}
         >
           <VStack gap={isFullWidth ? 8 : 6} align="stretch" w="full">
+            {isLogoInside && (
+              <Center pt={1}>
+                <FullLogo width={130} />
+              </Center>
+            )}
             {titleBlock}
             {loading ? <SpookyScarySkeleton loading /> : children}
           </VStack>

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../utils/spinner";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   PromptsApiService,
@@ -10,7 +10,7 @@ import {
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 /**
@@ -43,7 +43,7 @@ export const pullPrompts = async ({
   );
 
   if (remoteDeps.length > 0) {
-    const fetchSpinner = ora(
+    const fetchSpinner = createSpinner(
       `Checking ${remoteDeps.length} remote prompts...`
     ).start();
 
@@ -198,7 +198,7 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
   const startTime = Date.now();
 
   try {
-    checkApiKey();
+    await resolveCredentials();
 
     const promptsApiService = new PromptsApiService();
 

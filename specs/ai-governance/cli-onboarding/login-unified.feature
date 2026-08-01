@@ -191,6 +191,56 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And the CLI prints that project login is the default and names BOTH escape
       hatches: `--device` for AI tools and `--project` to force project login
 
+  @bdd @cli @login @project @non-tty @headless @integration
+  Scenario: headless `langwatch login --project` fails fast instead of waiting on a browser
+    Given the user is in a non-interactive context (no TTY on stdin, e.g. an agent in a VM)
+    When the user runs `langwatch login --project` with no project slug
+    Then the CLI does NOT start the browser device-code poll
+    And it exits 1 promptly (no multi-minute wait)
+    And stderr names every non-interactive path forward:
+      `langwatch login --project <slug>` (uses the existing device login),
+      `langwatch login --api-key <key>`, and exporting LANGWATCH_API_KEY
+    # Rationale: the browser poll waited up to 10 minutes for an approval that
+    # can never come in a headless VM, so agents got stuck with no way to
+    # switch projects non-interactively (field report).
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: `langwatch login --project <slug>` resolves the key through the device session, no browser
+    Given the user has a valid device session in ~/.langwatch/config.json
+    And a shared project with the given slug exists in the session's organization
+    And the user has write access to that project
+    When the user runs `langwatch login --project <slug>` (TTY or not)
+    Then the CLI calls POST /api/auth/cli/project-key with the slug and its bearer token
+    And the server returns that project's existing API key (nothing new is minted)
+    And the CLI writes LANGWATCH_API_KEY to $CWD/.env
+    And no browser opens and no prompt fires
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: `--project <slug>` without a device session fails with actionable guidance
+    Given no device session exists in ~/.langwatch/config.json
+    When the user runs `langwatch login --project some-slug`
+    Then the CLI exits 1 without a browser
+    And stderr says a device login is needed first (`langwatch login` in a browser-able
+      terminal) or to use `--api-key <key>` instead
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: the project-key endpoint refuses a project the caller cannot write to
+    Given a device-session bearer token
+    When POST /api/auth/cli/project-key names a project the user cannot write to
+    Then the server responds 403 and no key is returned
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: the project-key endpoint returns the caller's own personal project key
+    Given a device-session bearer token
+    When POST /api/auth/cli/project-key names the caller's own personal project slug
+    Then the server returns the personal project's API key
+
+  @bdd @cli @login @project @slug @integration
+  Scenario: the project-key endpoint refuses another user's personal project
+    Given a device-session bearer token
+    When POST /api/auth/cli/project-key names another user's personal project slug
+    Then the server responds 400 personal_project_not_allowed
+
   @bdd @cli @login @agent-aware @fake-tty
   Scenario: agent-hint banner is shown EVEN when stdin reports as TTY (fake-TTY agents)
     Given the agent harness exposes a fake PTY where `process.stdin.isTTY === true`
@@ -207,9 +257,10 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     Given the user is in a non-interactive context (CI, agent stdin, piped)
     When the user runs `langwatch login` with no flags
     Then the CLI does NOT start the AI-tools / device-session flow
-    And the CLI defaults to PROJECT login, writing the resulting project key to `$CWD/.env`
-    And it first prints that project login is the default, so evaluations, prompts and
-      the SDK target a real project, not a personal one
+    And the CLI defaults to PROJECT login semantics: it prints that project login is
+      the default, so evaluations, prompts and the SDK target a real project, not a
+      personal one, then fails fast with the headless guidance (see the headless
+      scenario above) instead of blocking on a browser approval that cannot happen
     And it prints that `--device` is required to log in to AI tools (claude, codex, …)
     # Rationale: a customer's coding agent ran `langwatch login` non-interactively while
     # setting up experiments; the old behavior funnelled it into a personal device-session
@@ -336,8 +387,8 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @cli @logout @existing
-  Scenario: `langwatch logout-device` clears only the user-global config
+  Scenario: `langwatch logout` clears the device session, not the project key
     Given the user has both a device session AND a project API key
-    When the user runs `langwatch logout-device`
+    When the user runs `langwatch logout`
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched

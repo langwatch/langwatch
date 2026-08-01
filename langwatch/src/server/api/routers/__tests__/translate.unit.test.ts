@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "../../../modelProviders/modelProviderDisabledError";
-import { createInnerTRPCContext, errorFormatterForTesting } from "../../trpc";
+import { createInnerTRPCContext, errorFormatter } from "../../trpc";
 import { translateRouter } from "../translate";
 
 // Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
@@ -136,16 +136,38 @@ describe("translateRouter.translate()", () => {
       // Assert the *serialised* wire shape (error.data.cause) the frontend
       // extractor in utils/trpcError.ts::extractAiCallFailedInfo reads — not
       // the raw class property — so this fails if the formatter stops
-      // emitting the field the toast consumes.
-      const wire = errorFormatterForTesting({
+      // emitting the fields the toast consumes.
+      const wire = errorFormatter({
         shape: { data: {} },
         error: error as { cause?: unknown },
       });
       expect(wire.data.cause).toMatchObject({
         code: "AI_CALL_FAILED",
         featureKey: "translate.text",
-        errorMessage: expect.stringContaining("FAKE_KEY_FOR_TESTING"),
       });
+    });
+
+    it("keeps the provider's own text off the wire", async () => {
+      // The provider's response body routinely echoes credential material —
+      // an OpenAI 401 body is literally `Incorrect API key provided: sk-proj-…`
+      // — and when the call used a LangWatch-managed provider that key is
+      // ours, not the customer's. An earlier version of this test asserted the
+      // opposite, which is how the leak survived review.
+      mockGenerateText.mockRejectedValue(
+        new Error("Invalid API key: FAKE_KEY_FOR_TESTING"),
+      );
+
+      const error = await caller
+        .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
+        .then(() => null)
+        .catch((e: unknown) => e);
+
+      const wire = errorFormatter({
+        shape: { data: {} },
+        error: error as { cause?: unknown },
+      });
+
+      expect(JSON.stringify(wire)).not.toContain("FAKE_KEY_FOR_TESTING");
     });
   });
 
@@ -194,10 +216,10 @@ describe("translateRouter.translate()", () => {
       expect(error).toMatchObject({ code: "BAD_REQUEST" });
 
       // Serialised wire shape the frontend extractor reads — proves the
-      // typed error reaches domainErrorMiddleware untouched (the claim the
+      // typed error reaches handledErrorMiddleware untouched (the claim the
       // translate.ts comment makes) instead of being mis-tagged as an
       // AI_CALL_FAILED or flattened to a generic 500.
-      const wire = errorFormatterForTesting({
+      const wire = errorFormatter({
         shape: { data: {} },
         error: error as { cause?: unknown },
       });

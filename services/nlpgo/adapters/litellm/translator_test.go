@@ -66,10 +66,12 @@ func TestTranslateModelID_BareIDsTreatedAsAnthropic(t *testing.T) {
 	}
 }
 
-func TestTranslateModelID_CustomDotToDash(t *testing.T) {
-	got := TranslateModelID("custom/my-llm-1.2")
-	if got != "custom/my-llm-1-2" {
-		t.Errorf("expected custom dot→dash, got %q", got)
+func TestTranslateModelID_CustomKeptVerbatim(t *testing.T) {
+	// Custom model ids are arbitrary customer strings (vLLM serves
+	// "Qwen/Qwen2.5-32B-Instruct") — dots must survive.
+	got := TranslateModelID("custom/Qwen/Qwen2.5-32B-Instruct")
+	if got != "custom/Qwen/Qwen2.5-32B-Instruct" {
+		t.Errorf("expected custom model id kept verbatim, got %q", got)
 	}
 }
 
@@ -327,6 +329,26 @@ func TestFromLiteLLMParams_OpenAI(t *testing.T) {
 	}
 }
 
+func TestFromLiteLLMParams_GenericAPIKeyProviders(t *testing.T) {
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+		t.Run(provider, func(t *testing.T) {
+			ic, err := FromLiteLLMParams(provider, map[string]any{
+				"api_key": "gen-key",
+				"model":   provider + "/some-model",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ic.Provider != provider {
+				t.Errorf("expected provider %q, got %q", provider, ic.Provider)
+			}
+			if ic.Generic["api_key"] != "gen-key" {
+				t.Errorf("expected api_key gen-key, got %q", ic.Generic["api_key"])
+			}
+		})
+	}
+}
+
 func TestFromLiteLLMParams_Anthropic(t *testing.T) {
 	ic, err := FromLiteLLMParams("anthropic", map[string]any{"api_key": "k"})
 	if err != nil {
@@ -362,7 +384,7 @@ func TestFromLiteLLMParams_Azure_PreservesNestedExtraHeaders(t *testing.T) {
 func TestFromLiteLLMParams_Azure_ForwardsDeployment(t *testing.T) {
 	// prepareLitellmParams sets `deployment` when the provider defines an
 	// explicit deploymentMapping (model id != Azure deployment name). It must
-	// survive into the inline credentials so withDeploymentMap can use it.
+	// survive into the inline credentials so domain.WithDeploymentSelfMap can use it.
 	ic, err := FromLiteLLMParams("azure", map[string]any{
 		"api_key":     "azk",
 		"api_base":    "https://acme.openai.azure.com",

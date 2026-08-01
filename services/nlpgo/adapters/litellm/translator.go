@@ -8,10 +8,10 @@ import (
 )
 
 // InlineCredentials is the JSON payload nlpgo sends in the
-// X-LangWatch-Inline-Credentials header. The gateway-side middleware in
-// services/aigateway/adapters/httpapi/internal_auth.go accepts this exact
-// shape — keep them in sync. Only the slot for the active provider should
-// be populated; the rest should be omitted.
+// X-LangWatch-Inline-Credentials header. The consuming side is
+// services/nlpgo/adapters/dispatcheradapter (credentialFromHeaders),
+// which mirrors this shape — keep them in sync. Only the slot for the
+// active provider should be populated; the rest should be omitted.
 type InlineCredentials struct {
 	Provider  string            `json:"provider"`
 	OpenAI    map[string]string `json:"openai,omitempty"`
@@ -21,6 +21,11 @@ type InlineCredentials struct {
 	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
 	Gemini    map[string]string `json:"gemini,omitempty"`
 	Custom    map[string]string `json:"custom,omitempty"`
+	// Generic holds credentials for plain api-key providers (xai, groq,
+	// cerebras, deepseek) that need no provider-specific fields;
+	// Provider disambiguates which one. Dedicated slots exist only
+	// where the shapes genuinely differ (azure, bedrock, vertex).
+	Generic map[string]string `json:"generic,omitempty"`
 }
 
 // Encode returns the base64-JSON header value for the inline-credentials
@@ -83,6 +88,11 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 		return InlineCredentials{
 			Provider: "gemini",
 			Gemini:   pickStrings(params, "api_key"),
+		}, nil
+	case "xai", "groq", "cerebras", "deepseek":
+		return InlineCredentials{
+			Provider: provider,
+			Generic:  pickStrings(params, "api_key", "api_base"),
 		}, nil
 	case "custom":
 		// Custom routes to OpenAI-compat at the gateway, but at the inline-

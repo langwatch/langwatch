@@ -11,16 +11,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "~/utils/compat/next-link";
-import { useSearchParams } from "~/utils/compat/next-navigation";
-import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { authFailureMessage } from "./authFailureMessage";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
 
 export default function SignIn() {
@@ -35,8 +36,7 @@ export default function SignIn() {
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
-  const isSocialProvider =
-    isAuthProvider && isAuthProvider !== "email";
+  const isSocialProvider = isAuthProvider && isAuthProvider !== "email";
 
   useEffect(() => {
     if (!publicEnv.data) return;
@@ -45,10 +45,11 @@ export default function SignIn() {
     // callback (or dashboard) instead of staring at a 'Redirecting to Sign
     // in...' splash forever (ariana dogfood finding #2).
     if (session) {
-      const dest = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
-      window.location.replace(dest);
+      window.location.replace(safeRedirectTarget(callbackUrl));
       return;
     }
+
+    let signInTimeout: ReturnType<typeof setTimeout> | undefined;
 
     // Don't auto-redirect back to the identity provider on a stable failure
     // (wrong method / account collision): the IdP still holds a live session
@@ -56,14 +57,25 @@ export default function SignIn() {
     // and traps the user in a loop. Those errors render SignInError with a
     // federated-logout recovery instead.
     if (!isStableAuthError(error) && isSocialProvider) {
-      setTimeout(
+      signInTimeout = setTimeout(
         () => {
           void signIn(isAuthProvider, { callbackUrl });
         },
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
+
+    return () => {
+      if (signInTimeout) clearTimeout(signInTimeout);
+    };
+  }, [
+    publicEnv.data,
+    session,
+    callbackUrl,
+    isAuthProvider,
+    isSocialProvider,
+    error,
+  ]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -92,7 +104,6 @@ export default function SignIn() {
 
 function SignInForm() {
   const query = useSearchParams();
-  const error = query?.get("error");
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
   const schema = z.object({
@@ -105,28 +116,40 @@ function SignInForm() {
   });
 
   const [signInLoading, setSignInLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
+    setSubmitError(null);
+    setSignInLoading(true);
+
+    let message: string | null = null;
     try {
-      setSignInLoading(true);
       const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
         callbackUrl: callbackUrl,
       });
+
+      if (response?.error ?? (response?.status && response.status >= 400)) {
+        message = authFailureMessage({
+          code: response.code,
+          message: response.error,
+          status: response.status,
+        });
+      }
+    } catch (error) {
+      message = authFailureMessage({
+        message: error instanceof Error ? error.message : void 0,
+      });
+    } finally {
       setSignInLoading(false);
+    }
 
-      if (response?.error) {
-        throw new Error("Sign in failed");
-      }
-
-      if (response?.status && response.status >= 400) {
-        throw new Error("Network response was not ok");
-      }
-    } catch {
+    if (message) {
+      setSubmitError(message);
       toaster.create({
-        title: "Error",
-        description: "Failed to sign in",
+        title: "Could not sign in",
+        description: message,
         type: "error",
         meta: {
           closable: true,
@@ -180,14 +203,10 @@ function SignInForm() {
                   </HStack>
                 </VStack>
               </HorizontalFormControl>
-              {error && (
+              {submitError && (
                 <Alert.Root status="error">
                   <Alert.Indicator />
-                  <Alert.Content>
-                    {error === "CredentialsSignin"
-                      ? "Invalid email or password"
-                      : error}
-                  </Alert.Content>
+                  <Alert.Content>{submitError}</Alert.Content>
                 </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>

@@ -14,7 +14,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
 
 vi.mock("~/hooks/useSSESubscription", () => ({
   useSSESubscription: () => ({
@@ -31,7 +37,9 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
-let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
+let mockQuery: Record<string, string | string[] | undefined> = {
+  project: "my-project",
+};
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
@@ -114,14 +122,27 @@ vi.mock("~/utils/api", () => ({
     scenarios: {
       getSuiteRunData: {
         useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          data: {
+            runs: [],
+            scenarioSetIds: {},
+            hasMore: false,
+            nextCursor: undefined,
+          },
           isLoading: false,
           error: null,
         }),
       },
       getExternalSetSummaries: {
         useQuery: () => ({
-          data: [{ scenarioSetId: "python-examples", passedCount: 5, failedCount: 1, totalCount: 6, lastRunTimestamp: Date.now() }],
+          data: [
+            {
+              scenarioSetId: "python-examples",
+              passedCount: 5,
+              failedCount: 1,
+              totalCount: 6,
+              lastRunTimestamp: Date.now(),
+            },
+          ],
           isLoading: false,
           error: null,
         }),
@@ -168,7 +189,9 @@ vi.mock("~/components/suites/SuiteDetailPanel", () => ({
   SuiteDetailPanel: ({ suite }: { suite: { name: string } }) => (
     <div data-testid="suite-detail-panel">{suite.name} details</div>
   ),
-  SuiteEmptyState: () => <div data-testid="suite-empty-state">No run plan selected</div>,
+  SuiteEmptyState: () => (
+    <div data-testid="suite-empty-state">No run plan selected</div>
+  ),
 }));
 
 vi.mock("~/components/suites/ExternalSetDetailPanel", () => ({
@@ -237,7 +260,10 @@ describe("Simulation Page URL Routing", () => {
 
   describe("when navigating to a non-existent suite slug", () => {
     it("shows the empty state", async () => {
-      mockQuery = { project: "my-project", path: ["run-plans", "non-existent-slug"] };
+      mockQuery = {
+        project: "my-project",
+        path: ["run-plans", "non-existent-slug"],
+      };
       await renderSimulationsPage();
       expect(screen.getByTestId("suite-empty-state")).toBeInTheDocument();
     });
@@ -251,7 +277,10 @@ describe("Simulation Page URL Routing", () => {
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project", path: ["run-plans", "suite-a"] } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project", path: ["run-plans", "suite-a"] },
+        },
         "/my-project/simulations/run-plans/suite-a",
         { shallow: true },
       );
@@ -266,7 +295,10 @@ describe("Simulation Page URL Routing", () => {
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project" } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations",
         { shallow: true },
       );

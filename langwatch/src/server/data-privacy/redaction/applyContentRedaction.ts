@@ -1,14 +1,16 @@
-import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
-import {
-  ESSENTIAL_PII_ENTITIES,
-  redactEssentialPiiInText,
-} from "./essentialPii";
+import { PROVENANCE_ATTR_API_KEY_ID } from "@ee/governance/services/ingestKeyProvenance.utils";
 import {
   compileSecretPatterns,
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
-} from "./secretsRedaction";
+} from "@langwatch/redaction";
+import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
+import {
+  compilePiiExceptPatterns,
+  ESSENTIAL_PII_ENTITIES,
+  redactEssentialPiiInText,
+} from "./essentialPii";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,
@@ -53,10 +55,12 @@ export function redactStringNative({
   text,
   policy,
   compiledSecretPatterns,
+  compiledPiiExceptions,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
+  compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -78,6 +82,7 @@ export function redactStringNative({
     const pii = redactEssentialPiiInText({
       text: result,
       entities: piiEntities === "all" ? undefined : piiEntities,
+      exceptPatterns: compiledPiiExceptions,
     });
     result = pii.text;
     redactedCount += pii.redactedCount;
@@ -87,31 +92,69 @@ export function redactStringNative({
 }
 
 /**
+ * Attribute names the sensitive-NAME deny-list does not apply to.
+ *
+ * `langwatch.api_key.id` is exempt. It holds the id of the
+ * ApiKey row that authenticated the request, which is not key material, and
+ * nuking it to [SECRET] hid the one field that says which key produced a trace.
+ *
+ * WHAT MAKES THAT EXEMPTION SAFE is not the name, which any client can set on
+ * an attribute. It is that the value under this name can never come from the
+ * payload: the OTLP receivers rewrite it from the authenticated identity on
+ * EVERY authenticated request, dropping any payload-supplied copy at resource,
+ * span, event and link level first, and writing the real row id only when one
+ * exists (see `enforceApiKeyIdOnTraceRequest` in ingestKeyProvenance.utils.ts).
+ * No other ingestion path can produce this attribute name at all, because they
+ * build attributes from a fixed key set. So by the time redaction runs, this
+ * attribute is receiver-controlled or absent.
+ *
+ * That invariant is the whole justification. Do not exempt another name without
+ * establishing the same thing for it, and do not weaken the receiver-side
+ * rewrite to "only when the key looks like an ingestion key" — a conditional
+ * rewrite leaves exactly the gap this exemption cannot survive.
+ *
+ * The value still runs the secret VALUE rules below, so real key material
+ * pasted under this name is scrubbed by shape regardless.
+ */
+const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
+  PROVENANCE_ATTR_API_KEY_ID,
+]);
+
+/**
  * Redact one attribute (key + value). When secrets redaction is on and the
  * attribute NAME is obviously sensitive (authorization, api_key, cookie, ...),
  * the whole value is replaced regardless of its shape — the Sentry-style
- * field-name deny-list. Otherwise the value runs through the normal native
- * passes (secrets value-scan + essential PII).
+ * field-name deny-list, minus {@link NAME_RULE_EXEMPT_ATTRIBUTES}. Otherwise
+ * the value runs through the normal native passes (secrets value-scan +
+ * essential PII).
  */
 export function redactAttributeNative({
   key,
   value,
   policy,
   compiledSecretPatterns,
+  compiledPiiExceptions,
 }: {
   key: string;
   value: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
+  compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
   if (
     policy.secrets.enabled &&
     value.length > 0 &&
+    !NAME_RULE_EXEMPT_ATTRIBUTES.has(key) &&
     isSensitiveAttributeKey(key)
   ) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
   }
-  return redactStringNative({ text: value, policy, compiledSecretPatterns });
+  return redactStringNative({
+    text: value,
+    policy,
+    compiledSecretPatterns,
+    compiledPiiExceptions,
+  });
 }
 
 /**
@@ -130,4 +173,14 @@ export function compilePolicySecretPatterns(
   policy: ResolvedDataPrivacy,
 ): RegExp[] {
   return compileSecretPatterns(policy.secrets.customPatterns);
+}
+
+/**
+ * Compile a resolved policy's PII exception patterns once (anchored to full
+ * matches), for reuse across all of a span's strings.
+ */
+export function compilePolicyPiiExceptions(
+  policy: ResolvedDataPrivacy,
+): RegExp[] {
+  return compilePiiExceptPatterns(policy.pii.exceptPatterns);
 }

@@ -7,10 +7,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ParameterField } from "../ParameterField";
-import type {
-  SelectParameterConfig,
-  SliderParameterConfig,
-} from "../parameterConfig";
+import type { SelectParameterConfig } from "../parameterConfig";
 
 function renderWithChakra(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

@@ -1,27 +1,26 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { BookText } from "lucide-react";
+import { BookText, ScrollText } from "lucide-react";
 import { memo, useCallback } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
   LuPin,
   LuPinOff,
+  LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import {
-  abbreviateModel,
-  formatCost,
-  formatDuration,
-} from "../../../utils/formatters";
+import { formatCost, formatDuration } from "../../../utils/formatters";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
+import { isSkillSpan } from "../transcript/skillInvocation";
 import { TipCell } from "./TipCell";
 import {
   getSpanPalette,
   INDENT_PX,
+  isTwoLineSpan,
   LLM_ROW_HEIGHT,
   ROW_HEIGHT,
   SPAN_TYPE_ICONS,
@@ -34,6 +33,7 @@ export const TreeRow = memo(function TreeRow({
   rootDuration,
   isSelected,
   isPrompt,
+  logCount,
   isPinned,
   isCollapsed,
   hasChildren,
@@ -50,6 +50,12 @@ export const TreeRow = memo(function TreeRow({
   isSelected: boolean;
   /** Whether this span carries a managed prompt (shows a book icon). */
   isPrompt: boolean;
+  /**
+   * Log records correlated to this span — a tool the user denied, an API
+   * retry, a compaction — that never show up in the span's own input/output
+   * because they only exist as logs. 0 hides the indicator.
+   */
+  logCount: number;
   /** Whether this span is currently pinned in the SpanTabBar. */
   isPinned: boolean;
   isCollapsed: boolean;
@@ -90,10 +96,22 @@ export const TreeRow = memo(function TreeRow({
   const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
-  const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
-  const TypeIcon =
-    SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
-  const palette = getSpanPalette(span.type);
+  // A named tool span gets the same two-line treatment as an LLM span: the
+  // second line names WHICH tool ran (WebSearch, Read, Bash...), because a
+  // wall of identical `claude_code.tool` rows was unreadable.
+  const isNamedTool = !isLlm && span.toolName != null;
+  // Same predicate the virtualizer's estimator uses — they must agree.
+  const rowH = isTwoLineSpan(span) ? LLM_ROW_HEIGHT : ROW_HEIGHT;
+  // A skill run (a `Skill` tool span) gets the sparkles glyph + purple chip so
+  // it stands out from ordinary tool spans in the tree — the waterfall node
+  // carries no input, so this flags the invocation without naming the skill
+  // (the transcript card shows the slug). Mirrors the block-cost classifier's
+  // skill_invocation category.
+  const isSkill = isSkillSpan({ type: span.type, name: span.name });
+  const TypeIcon = isSkill
+    ? LuSparkles
+    : (SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!);
+  const palette = isSkill ? "purple" : getSpanPalette(span.type);
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
@@ -127,7 +145,7 @@ export const TreeRow = memo(function TreeRow({
           borderColor="colorPalette.muted"
           fontWeight="semibold"
         >
-          {(span.type ?? "span").toUpperCase()}
+          {isSkill ? "SKILL" : (span.type ?? "span").toUpperCase()}
         </Text>
         {isError && (
           <Text
@@ -144,6 +162,11 @@ export const TreeRow = memo(function TreeRow({
         {span.model && (
           <Text textStyle="2xs" color="fg.muted">
             {span.model}
+          </Text>
+        )}
+        {span.toolName && (
+          <Text textStyle="2xs" color="fg.muted">
+            {span.toolName}
           </Text>
         )}
       </HStack>
@@ -203,6 +226,9 @@ export const TreeRow = memo(function TreeRow({
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
         {isCollapsed && hiddenDescendantCount > 0 && (
           <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
+        )}
+        {logCount > 0 && (
+          <TipCell label="Logs" value={`${logCount} — click to view`} />
         )}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {/* Always rendered so the tooltip grid keeps a stable row count
@@ -394,6 +420,20 @@ export const TreeRow = memo(function TreeRow({
                   <BookText />
                 </Icon>
               )}
+              {/* Flags a span that has correlated log records — the ONLY
+                  place a tool the user denied, a mid-run retry, or a
+                  compaction shows up, since none of those produce a span
+                  of their own. Generic: not scoped to any span type. */}
+              {logCount > 0 && (
+                <Icon
+                  boxSize="11px"
+                  color="cyan.fg"
+                  flexShrink={0}
+                  aria-label={`Has ${logCount} log ${logCount === 1 ? "record" : "records"}`}
+                >
+                  <ScrollText />
+                </Icon>
+              )}
               {/* Hidden-descendant count — a collapsed parent says how
                   much it's hiding, so plain collapse reads differently
                   from a GroupRow's "×N repeated" fold. */}
@@ -408,11 +448,12 @@ export const TreeRow = memo(function TreeRow({
                 </Text>
               )}
             </HStack>
-            {isLlm && (
-              // Model as a compact pill (one per span) rather than a bare
-              // text line — matches the header's Chip-based Models pill
-              // idiom. The rich detail (full model name, token breakdown,
-              // cost) lives in the row tooltip, which covers the pill.
+            {(isLlm || isNamedTool) && (
+              // Model / tool name as a compact pill (one per span) rather
+              // than a bare text line — matches the header's Chip-based
+              // Models pill idiom. The rich detail (full model name, token
+              // breakdown, cost) lives in the row tooltip, which covers the
+              // pill.
               <HStack gap={1} marginTop="1px">
                 <Text
                   textStyle="2xs"
@@ -426,7 +467,7 @@ export const TreeRow = memo(function TreeRow({
                   maxWidth="100%"
                   bg="bg.subtle"
                 >
-                  {abbreviateModel(span.model!)}
+                  {isLlm ? span.model! : span.toolName}
                 </Text>
               </HStack>
             )}

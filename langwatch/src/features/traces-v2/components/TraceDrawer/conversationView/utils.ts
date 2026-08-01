@@ -1,8 +1,4 @@
-import {
-  abbreviateModel,
-  formatDuration,
-  formatRelativeTime,
-} from "../../../utils/formatters";
+import { formatDuration, formatRelativeTime } from "../../../utils/formatters";
 import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 
@@ -69,7 +65,7 @@ export function buildConversationMarkdownChunks(
   for (let i = 0; i < parsedTurns.length; i++) {
     const { turn, userText, assistantText } = parsedTurns[i]!;
     const turnNum = i + 1;
-    const model = turn.models[0] ? abbreviateModel(turn.models[0]) : "—";
+    const model = turn.models[0] ? turn.models[0] : "—";
     chunks.push({
       id: `turn-${turnNum}-header`,
       markdown: `## Turn ${turnNum} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
@@ -126,6 +122,10 @@ export function joinConversationMarkdown(
     .trimEnd();
 }
 
+/**
+ * Human-readable wall-clock gap between two turns, e.g. "12.5s gap",
+ * "3m 4s gap", "1h 2m gap". Surfaces how long the user was away between turns.
+ */
 export function formatGap(secs: number): string {
   if (secs < 60) return `${secs.toFixed(1)}s gap`;
   if (secs < 3600) {

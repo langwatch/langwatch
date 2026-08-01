@@ -9,12 +9,14 @@ import { DEFAULT_CLICKHOUSE_SETTINGS } from "./queryDefaults";
  * overrides (e.g. `ANALYTICS_CLICKHOUSE_SETTINGS` with a higher memory cap)
  * still take effect.
  *
- * Non-query methods (`insert`, `command`, `exec`, `close`, etc.) pass through
- * unmodified.
+ * Non-query methods (`insert`, `command`, `exec`, `close`, `queryWindowed`,
+ * etc.) pass through unmodified — the generic return type preserves any
+ * extension (e.g. {@link ResilientClickHouseClient}) so callers keep access to
+ * the wrapped client's extra methods without a cast.
  */
-export function wrapWithDefaultSettings(
-  client: ClickHouseClient,
-): ClickHouseClient {
+export function wrapWithDefaultSettings<T extends ClickHouseClient>(
+  client: T,
+): T {
   return new Proxy(client, {
     get(target, prop, receiver) {
       if (prop !== "query") {
@@ -26,7 +28,9 @@ export function wrapWithDefaultSettings(
           ...params,
           clickhouse_settings: {
             ...DEFAULT_CLICKHOUSE_SETTINGS,
-            ...(params.clickhouse_settings as Record<string, unknown> | undefined),
+            ...(params.clickhouse_settings as
+              | Record<string, unknown>
+              | undefined),
           },
         };
         return target.query(merged as Parameters<typeof target.query>[0]);

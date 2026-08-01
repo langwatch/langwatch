@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
@@ -32,7 +32,9 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       const expectedState = { value: "test" };
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(expectedState);
+      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+        expectedState,
+      );
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -63,9 +65,7 @@ describe("EventSourcingService - Projection Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        foldProjections: [
-          createMockFoldProjectionDefinition("projection"),
-        ],
+        foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
 
       await expect(
@@ -103,7 +103,9 @@ describe("EventSourcingService - Projection Flows", () => {
         store: foldStore,
       });
 
-      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue({ value: "test" });
+      (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        value: "test",
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -152,9 +154,7 @@ describe("EventSourcingService - Projection Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        foldProjections: [
-          createMockFoldProjectionDefinition("projection"),
-        ],
+        foldProjections: [createMockFoldProjectionDefinition("projection")],
       });
 
       await expect(

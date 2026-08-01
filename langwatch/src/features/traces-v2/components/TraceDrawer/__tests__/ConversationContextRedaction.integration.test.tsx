@@ -79,6 +79,17 @@ const turnsState = {
   isLoading: false,
 };
 
+// The panel-level translate toggle dispatches through tRPC; these tests pin
+// redaction rendering, so stub it to an identity passthrough.
+vi.mock("../../../hooks/useTextTranslation", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
 vi.mock("../../../hooks/useConversationContext", () => ({
   useConversationContext: () => turnsState,
 }));

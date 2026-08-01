@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatTraceSummaryDigest } from "../trace-formatting";
 import type { Trace } from "~/server/tracer/types";
+import { formatTraceSummaryDigest } from "../trace-formatting";
 
 describe("formatTraceSummaryDigest()", () => {
-  const baseTrace: Pick<Trace, "trace_id" | "project_id" | "metadata" | "timestamps" | "spans"> = {
+  const baseTrace: Pick<
+    Trace,
+    "trace_id" | "project_id" | "metadata" | "timestamps" | "spans"
+  > = {
     trace_id: "trace-1",
     project_id: "project-1",
     metadata: {},

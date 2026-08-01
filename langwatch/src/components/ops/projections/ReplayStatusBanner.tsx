@@ -1,8 +1,9 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
-import { api } from "~/utils/api";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 export function ReplayStatusBanner() {
   const router = useRouter();
@@ -14,7 +15,11 @@ export function ReplayStatusBanner() {
 
   const status = statusQuery.data;
   // Only show banner while actively running
-  if (!status || status.state !== "running") return null;
+  if (status?.state !== "running") return null;
+
+  const activeProjectionNames = parseActiveProjections(
+    status.currentProjection,
+  );
 
   return (
     <Card.Root borderColor="blue.200" borderWidth="1px">
@@ -27,9 +32,11 @@ export function ReplayStatusBanner() {
             <Text textStyle="sm" fontWeight="semibold">
               Replay running
             </Text>
-            {status.currentProjection && (
+            {activeProjectionNames.length > 0 && (
               <Badge size="sm" variant="subtle">
-                {status.currentProjection}
+                {activeProjectionNames.length === 1
+                  ? activeProjectionNames[0]
+                  : `${activeProjectionNames.length} projections`}
               </Badge>
             )}
           </HStack>

@@ -3,9 +3,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
-import { api } from "../../utils/api";
 
 const changePasswordSchema = z
   .object({
@@ -66,13 +71,16 @@ export function ChangePasswordDialog({
       });
       onClose();
     } catch (error) {
-      toaster.create({
-        title: "Failed to change password",
-        description:
-          error instanceof Error ? error.message : "Please try again",
-        type: "error",
-        meta: { closable: true },
-      });
+      // A rejection that names `currentPassword` or `newPassword` belongs on
+      // that input, not in a toast the user reads after they have already
+      // looked away. Everything else this mutation raises — the wrong current
+      // password, a provider that has no password to change, the attempt
+      // throttle — is about the submission as a whole and has no field to
+      // land on, so it keeps the toast.
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) {
+        return;
+      }
+      showErrorToast({ error, fallbackTitle: "Couldn't change your password" });
     }
   };
 
@@ -95,12 +103,15 @@ export function ChangePasswordDialog({
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <Dialog.Body>
             <Stack gap={4}>
+              {/* The slot `hasFormErrorSlot: true` promises. The two ship
+                  together: claiming a form-level rejection without somewhere
+                  to render it suppresses the toast and shows nothing, and
+                  Save appears to do nothing at all (#3785). */}
+              <FormServerError form={form} />
               <Text fontSize="sm" color="fg.muted">
                 Password must be at least 8 characters long.
               </Text>
-              <Field.Root
-                invalid={!!form.formState.errors.currentPassword}
-              >
+              <Field.Root invalid={!!form.formState.errors.currentPassword}>
                 <Field.Label>Current Password</Field.Label>
                 <Input
                   type="password"

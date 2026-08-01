@@ -1,7 +1,6 @@
 import { Alert, Link } from "@chakra-ui/react";
+import { hasRedactionMarker } from "@langwatch/redaction";
 import NextLink from "~/utils/compat/next-link";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { hasRedactionMarker } from "~/server/data-privacy/redaction/markers";
 
 /**
  * Banner shown when trace content carries redaction markers.
@@ -21,10 +20,8 @@ export function PIIRedactionNotice({
 }: {
   content: string | null | undefined;
 }) {
-  const { project } = useOrganizationTeamProject();
-
   if (!hasRedactionMarker(content)) return null;
-  const settingsHref = project?.slug ? `/${project.slug}/settings` : "/settings";
+  const settingsHref = "/settings/data-privacy";
 
   return (
     <Alert.Root status="info" size="sm" variant="subtle" width="full">

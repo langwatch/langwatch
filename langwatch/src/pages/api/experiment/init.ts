@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -13,7 +14,6 @@ import { ExperimentService } from "~/server/experiments/experiment.service";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:dspy:init");
 
@@ -75,7 +75,8 @@ export default async function handler(
     });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return res.status(denial.status).json({ message: denial.message });
+    // The full handled body — code, permission, tips — not just a sentence.
+    return res.status(denial.status).json(denial.body);
   }
 
   const project = resolved.project;
@@ -89,10 +90,7 @@ export default async function handler(
       "invalid init data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    captureException(
-      toError(error),
-      { extra: { projectId: project.id } },
-    );
+    captureException(toError(error), { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

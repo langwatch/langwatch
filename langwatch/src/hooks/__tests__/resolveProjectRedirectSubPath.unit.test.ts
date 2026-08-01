@@ -8,7 +8,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slug/messages",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("/messages");
     });
 
@@ -17,7 +17,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slug",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("");
     });
   });
@@ -28,7 +28,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/%5Bproject%5D/evaluations",
           oldProject: "[project]",
-        })
+        }),
       ).toBe("/evaluations");
     });
   });
@@ -39,7 +39,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slug/messages/a%23b",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("/messages/a%23b");
     });
 
@@ -48,7 +48,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slug/messages/a%3Fb",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("/messages/a%3Fb");
     });
 
@@ -57,7 +57,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slug/messages/a%2Fb",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("/messages/a%2Fb");
     });
   });
@@ -68,7 +68,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/old-slugger/messages",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("");
     });
   });
@@ -79,7 +79,7 @@ describe("resolveProjectRedirectSubPath()", () => {
         resolveProjectRedirectSubPath({
           pathname: "/unrelated/path",
           oldProject: "old-slug",
-        })
+        }),
       ).toBe("");
     });
   });

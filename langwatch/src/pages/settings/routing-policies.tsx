@@ -28,19 +28,20 @@ import {
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import {
   ScopeChipPicker,
   type ScopeTriadEntry,
 } from "~/components/settings/ScopeChipPicker";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
@@ -76,7 +77,7 @@ const STRATEGY_OPTIONS: Array<{ value: Strategy; label: string }> = [
 ];
 
 function RoutingPoliciesPage() {
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
@@ -87,13 +88,15 @@ function RoutingPoliciesPage() {
   );
 
   // Fuel the structured picker on the drawer with the org's actual
-  // ModelProviders (visible at ORG / TEAM / PROJECT scopes via the
-  // standard scope cascade). Returns id + provider for the drawer's
-  // tagged picker.
-  const credentialsQuery = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id, refetchOnWindowFocus: false },
-  );
+  // ModelProviders. Must be the one-entry-per-row org listing:
+  // `getAllForProject` collapses rows by provider key, so two "custom"
+  // providers would surface as a single picker option and every other
+  // row in an existing policy renders as "Unknown credential".
+  const credentialsQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: orgId },
+      { enabled: !!orgId, refetchOnWindowFocus: false },
+    );
 
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
@@ -158,13 +161,15 @@ function RoutingPoliciesPage() {
       setDrawerError(null);
       toaster.create({ title: "Routing policy created", type: "success" });
     },
+    // No toast: the composer that failed is still open and shows this same
+    // sentence inline, so a toast would only say it twice at once.
     onError: (e) => {
-      setDrawerError(e.message);
-      toaster.create({
-        title: "Failed to create policy",
-        description: e.message,
-        type: "error",
-      });
+      setDrawerError(
+        describeError({
+          error: e,
+          fallbackTitle: "Couldn't create routing policy",
+        }),
+      );
     },
   });
 
@@ -176,13 +181,14 @@ function RoutingPoliciesPage() {
       setDrawerError(null);
       toaster.create({ title: "Routing policy updated", type: "success" });
     },
+    // No toast, for the same reason as `createMutation` above.
     onError: (e) => {
-      setDrawerError(e.message);
-      toaster.create({
-        title: "Failed to update policy",
-        description: e.message,
-        type: "error",
-      });
+      setDrawerError(
+        describeError({
+          error: e,
+          fallbackTitle: "Couldn't update routing policy",
+        }),
+      );
     },
   });
 
@@ -192,10 +198,9 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Default policy updated", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to set default",
-        description: e.message,
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't set the default policy",
       }),
   });
 
@@ -206,10 +211,9 @@ function RoutingPoliciesPage() {
       toaster.create({ title: "Routing policy deleted", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to delete policy",
-        description: e.message,
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't delete routing policy",
       }),
   });
 
@@ -239,12 +243,9 @@ function RoutingPoliciesPage() {
     setDrawerError(null);
     setEditingId("new");
     const seedType = scope.toUpperCase() as ScopeTriadEntry["scopeType"];
-    const seedId =
-      seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
+    const seedId = seedType === "ORGANIZATION" ? orgId : scopeIdDefault;
     setComposer({
-      scopes: seedId
-        ? [{ scopeType: seedType, scopeId: seedId }]
-        : [],
+      scopes: seedId ? [{ scopeType: seedType, scopeId: seedId }] : [],
       name: "",
       description: "",
       strategy: "priority",
@@ -329,14 +330,13 @@ function RoutingPoliciesPage() {
   };
 
   const hasAnyPolicy =
-    grouped.organization.length +
-      grouped.team.length +
-      grouped.project.length >
+    grouped.organization.length + grouped.team.length + grouped.project.length >
     0;
-  const hasAnyDefault =
-    [...grouped.organization, ...grouped.team, ...grouped.project].some(
-      (p) => p.isDefault,
-    );
+  const hasAnyDefault = [
+    ...grouped.organization,
+    ...grouped.team,
+    ...grouped.project,
+  ].some((p) => p.isDefault);
 
   return (
     <GovernanceLayout pageTitle="Routing Policies · AI Governance · LangWatch">
@@ -347,9 +347,9 @@ function RoutingPoliciesPage() {
               Routing Policies
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Define which providers and models personal, team, and project
-              keys route through. The hierarchy is project → team →
-              organization; first match wins.
+              Define which providers and models personal, team, and project keys
+              route through. The hierarchy is project → team → organization;
+              first match wins.
             </Text>
           </VStack>
           <Spacer />
@@ -376,17 +376,17 @@ function RoutingPoliciesPage() {
                     : "Publish a default policy to unblock end-user keys"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  When at least one model provider is reachable from a
-                  user's personal team, personal keys still mint
-                  without a default and the gateway picks providers in {" "}
+                  When at least one model provider is reachable from a user's
+                  personal team, personal keys still mint without a default and
+                  the gateway picks providers in{" "}
                   <Text as="span" fontFamily="mono">
                     fallbackPriorityGlobal
                   </Text>{" "}
-                  order. Orgs with zero accessible providers still hit
-                  a 409 at issue time; configure a model provider first.
-                  Publish an explicit default to pin a deterministic
-                  chain at the organization level, then override
-                  per-team or per-project as needed.
+                  order. Orgs with zero accessible providers still hit a 409 at
+                  issue time; configure a model provider first. Publish an
+                  explicit default to pin a deterministic chain at the
+                  organization level, then override per-team or per-project as
+                  needed.
                 </Text>
                 <HStack gap={3} paddingTop={1}>
                   <Button
@@ -433,10 +433,7 @@ function RoutingPoliciesPage() {
                 size="sm"
                 variant="outline"
                 onClick={() =>
-                  startNew(
-                    scope,
-                    scope === "organization" ? orgId : "",
-                  )
+                  startNew(scope, scope === "organization" ? orgId : "")
                 }
               >
                 <Plus size={14} /> New
@@ -489,16 +486,16 @@ function RoutingPoliciesPage() {
         }
         availableCredentials={
           credentialsQuery.data
-            ? Object.entries(credentialsQuery.data)
-                .filter(([, mp]) => mp && mp.id)
-                .map(([providerKey, mp]: [string, any]) => ({
-                  id: mp.id as string,
-                  modelProviderName: mp.name ?? providerKey,
+            ? credentialsQuery.data.providers
+                .filter((mp) => !!mp.id)
+                .map((mp) => ({
+                  id: mp.id!,
+                  modelProviderName: mp.name ?? mp.provider,
                   slot: "primary",
                   disabledAt: mp.disabledAt
                     ? new Date(mp.disabledAt).toISOString()
                     : null,
-                  healthStatus: (mp.healthStatus as string) ?? "UNKNOWN",
+                  healthStatus: mp.healthStatus ?? "UNKNOWN",
                 }))
             : []
         }
@@ -611,7 +608,8 @@ function PolicyRow({
         )}
         <Text fontSize="xs" color="fg.muted">
           {providerCount} provider{providerCount === 1 ? "" : "s"}
-          {allowCount > 0 && ` · ${allowCount} model glob${allowCount === 1 ? "" : "s"} allow-listed`}
+          {allowCount > 0 &&
+            ` · ${allowCount} model glob${allowCount === 1 ? "" : "s"} allow-listed`}
           {allowCount === 0 && " · no model restrictions"}
         </Text>
       </VStack>
@@ -728,10 +726,14 @@ function policyRulesFromServer(
     if (!dimRaw || typeof dimRaw !== "object") continue;
     const dimObj = dimRaw as { deny?: unknown; allow?: unknown };
     const deny = Array.isArray(dimObj.deny)
-      ? (dimObj.deny as unknown[]).filter((x): x is string => typeof x === "string")
+      ? (dimObj.deny as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
       : [];
     const allow = Array.isArray(dimObj.allow)
-      ? (dimObj.allow as unknown[]).filter((x): x is string => typeof x === "string")
+      ? (dimObj.allow as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
       : [];
     out[dim] = { deny: deny.join("\n"), allow: allow.join("\n") };
   }
@@ -976,8 +978,8 @@ function ProviderCredentialPicker({
             No model providers yet
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            A routing policy points at one or more model providers.
-            Configure at least one before saving this policy.
+            A routing policy points at one or more model providers. Configure at
+            least one before saving this policy.
           </Text>
           {modelProvidersAdminPath && (
             <Link
@@ -1010,9 +1012,9 @@ function ProviderCredentialPicker({
           <Text fontSize="xs" color="fg.muted">
             {available.length === 1
               ? "The org has 1 model provider, but it's disabled."
-              : `The org has ${available.length} model providers, but all are disabled.`}
-            {" "}Re-enable one (or add a fresh one) before this policy can
-            route traffic.
+              : `The org has ${available.length} model providers, but all are disabled.`}{" "}
+            Re-enable one (or add a fresh one) before this policy can route
+            traffic.
           </Text>
           {modelProvidersAdminPath && (
             <Link
@@ -1165,8 +1167,7 @@ function RoutingPolicyDrawer({
   ) => ScopeTriadEntry[];
 }) {
   const submitDisabled =
-    !composer ||
-    !composer.name.trim() ||
+    !composer?.name.trim() ||
     composer.scopes.length === 0 ||
     composer.modelProviderIds.length === 0 ||
     isPending;
@@ -1210,9 +1211,8 @@ function RoutingPolicyDrawer({
                       scopes={resolveScopeEntriesWithNames(composer.scopes)}
                     />
                     <Field.HelperText>
-                      Scope is fixed after create. Delete and recreate to
-                      change which org / team / project this policy
-                      applies to.
+                      Scope is fixed after create. Delete and recreate to change
+                      which org / team / project this policy applies to.
                     </Field.HelperText>
                   </>
                 )}
@@ -1297,7 +1297,8 @@ function RoutingPolicyDrawer({
                   inputAriaLabel="Add model allowlist glob"
                 />
                 <Field.HelperText>
-                  Empty = no restriction. Globs match against the requested model name.
+                  Empty = no restriction. Globs match against the requested
+                  model name.
                 </Field.HelperText>
               </Field.Root>
 
@@ -1352,9 +1353,7 @@ function RoutingPolicyDrawer({
                       onClick={() =>
                         setComposer({
                           ...composer,
-                          aliases: composer.aliases.filter(
-                            (_, i) => i !== idx,
-                          ),
+                          aliases: composer.aliases.filter((_, i) => i !== idx),
                         })
                       }
                     >
@@ -1368,10 +1367,7 @@ function RoutingPolicyDrawer({
                   onClick={() =>
                     setComposer({
                       ...composer,
-                      aliases: [
-                        ...composer.aliases,
-                        { from: "", to: "" },
-                      ],
+                      aliases: [...composer.aliases, { from: "", to: "" }],
                     })
                   }
                 >

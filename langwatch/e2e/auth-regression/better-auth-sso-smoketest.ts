@@ -531,7 +531,7 @@ async function main() {
         name: "Alice",
       },
     });
-  } catch (err) {
+  } catch {
     secondAddThrew = true;
   }
   const aliceMemberships = await prisma.organizationUser.findMany({

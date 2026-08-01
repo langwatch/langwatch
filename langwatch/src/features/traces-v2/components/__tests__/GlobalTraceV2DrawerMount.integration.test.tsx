@@ -36,7 +36,7 @@ describe("GlobalTraceV2DrawerMount", () => {
   });
 
   describe("when a trace is open on the optimization studio page", () => {
-    /** @scenario The new explorer renders on the optimization studio page */
+    /** @scenario "The default applies to every trace entry point, not only the traces table" */
     it("renders the v2 drawer shell", () => {
       mockPathname = "/[project]/studio/[workflow]";
       useDrawerStore.getState().openTrace("trace-from-evaluations-panel");

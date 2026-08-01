@@ -6,12 +6,13 @@ export const MAX_PORT_SLOT_ATTEMPTS = 30;
 export type PortAllocation = {
   base: number;
   // App tier: base..base+9. Each LangWatch-shipped service gets a slot.
-  // 5564..5567 reserved for future services so we never trample the infra
+  // 5565..5567 reserved for future services so we never trample the infra
   // tier when we add the next data plane.
   langwatch: number;
   nlp: number;
   langevals: number;
   aigateway: number;
+  langyagent: number;
   // Infra tier: base+1000..base+1009. Embedded data stores live here so a
   // user with their own postgres/redis/clickhouse on canonical ports
   // doesn't collide. Auto-shift moves both tiers together by +10.
@@ -19,7 +20,6 @@ export type PortAllocation = {
   redis: number;
   clickhouseHttp: number;
   clickhouseNative: number;
-  bullboard: number;
 };
 
 // `npx @langwatch/server` ships the production Hono build, so the langwatch
@@ -34,11 +34,11 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
     nlp: base + 1,
     langevals: base + 2,
     aigateway: base + 3,
+    langyagent: base + 4,
     postgres: infra,
     redis: infra + 1,
     clickhouseHttp: infra + 2,
     clickhouseNative: infra + 3,
-    bullboard: infra + 4,
   };
 }
 
@@ -48,10 +48,10 @@ export function portsToCheck(alloc: PortAllocation): Array<{ port: number; label
     { port: alloc.nlp, label: "nlpgo" },
     { port: alloc.langevals, label: "langevals" },
     { port: alloc.aigateway, label: "ai gateway" },
+    { port: alloc.langyagent, label: "langy agent" },
     { port: alloc.postgres, label: "postgres" },
     { port: alloc.redis, label: "redis" },
     { port: alloc.clickhouseHttp, label: "clickhouse http" },
     { port: alloc.clickhouseNative, label: "clickhouse native" },
-    // bullboard is opt-in (--bullboard) — only verified bound when enabled.
   ];
 }

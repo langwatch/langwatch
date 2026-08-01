@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { GROWTH_TEMPLATE, PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "../planTemplates";
 import { DEFAULT_LIMIT } from "../constants";
+import {
+  ENTERPRISE_TEMPLATE,
+  GROWTH_TEMPLATE,
+  getPlanTemplate,
+  PRO_TEMPLATE,
+} from "../planTemplates";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {
@@ -13,10 +18,6 @@ describe("PRO_TEMPLATE", () => {
 
   it("has maxMembers of 10", () => {
     expect(PRO_TEMPLATE.maxMembers).toBe(10);
-  });
-
-  it("has maxMembersLite of 5", () => {
-    expect(PRO_TEMPLATE.maxMembersLite).toBe(5);
   });
 
   it("has maxMessagesPerMonth of 100000", () => {
@@ -43,10 +44,6 @@ describe("ENTERPRISE_TEMPLATE", () => {
 
   it("has maxMembers of 100", () => {
     expect(ENTERPRISE_TEMPLATE.maxMembers).toBe(100);
-  });
-
-  it("has maxMembersLite of 50", () => {
-    expect(ENTERPRISE_TEMPLATE.maxMembersLite).toBe(50);
   });
 
   it("has maxMessagesPerMonth of 10000000", () => {
@@ -77,15 +74,21 @@ describe("GROWTH_TEMPLATE", () => {
     it("does not preset maxMembers", () => {
       expect(GROWTH_TEMPLATE).not.toHaveProperty("maxMembers");
     });
-
-    it("has maxMembersLite of DEFAULT_LIMIT", () => {
-      expect(GROWTH_TEMPLATE.maxMembersLite).toBe(DEFAULT_LIMIT);
-    });
   });
 
   describe("when inspecting feature limits", () => {
-    it("has maxMessagesPerMonth of DEFAULT_LIMIT", () => {
-      expect(GROWTH_TEMPLATE.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
+    /** @scenario GROWTH plan includes all features with no artificial limits */
+    it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
+      const unlimitedFields = [
+        "maxMembersLite",
+        "maxMessagesPerMonth",
+      ] as const;
+
+      for (const field of unlimitedFields) {
+        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
+          DEFAULT_LIMIT,
+        );
+      }
     });
 
     it("has canPublish true", () => {

@@ -9,7 +9,7 @@ import {
   type MappingState,
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
-  TRACE_MAPPINGS,
+  type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 
 export function serializeMappingsToMappingState(
@@ -31,8 +31,7 @@ export function serializeMappingsToMappingState(
         mapping.sourceId === "thread";
 
       if (isThreadSource) {
-        const selectedFields =
-          parts.length > 1 ? parts.slice(1) : undefined;
+        const selectedFields = parts.length > 1 ? parts.slice(1) : undefined;
         mappingState.mapping[field] = {
           type: "thread" as const,
           source: source as

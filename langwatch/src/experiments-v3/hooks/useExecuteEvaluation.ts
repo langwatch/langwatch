@@ -1,19 +1,22 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import type {
-  EvaluationV3Event,
-  ExecutionRequest,
-  ExecutionScope,
+import {
+  type EvaluationV3Event,
+  type ExecutionRequest,
+  type ExecutionScope,
+  UNNAMED_FAILURE,
 } from "~/server/experiments-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
-import type { EvaluationResults } from "../types";
 import {
   computeExecutionCells,
   createExecutionCellSet,
 } from "../utils/executionScope";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 // ============================================================================
@@ -58,6 +61,21 @@ export type UseExecuteEvaluationReturn = {
   /** Reset state to idle */
   reset: () => void;
 };
+
+/**
+ * The SSE error frame, in the envelope the error layer already reads.
+ *
+ * `readHandledError` and `showErrorToast` take the tRPC shape — the handled
+ * payload under `data.error`, the trace id beside it under `data.traceId` —
+ * so presenting the frame's two fields under those names is all it takes to
+ * get registry copy for a coded failure and, for one we couldn't name, the
+ * generic unknown state PLUS the copyable error id (ADR-045). Without the
+ * trace id that second case tells the customer, and support, nothing at all.
+ */
+const asHandledEnvelope = (event: {
+  domainError?: SerializedHandledError;
+  traceId?: string;
+}) => ({ data: { error: event.domainError, traceId: event.traceId } });
 
 // ============================================================================
 // Hook
@@ -165,13 +183,29 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Helper to update target error in the store.
+   *
+   * Stores the failure, not the sentence: the engine's raw string in `errors`
+   * and the failure's CODE beside it in `targetMetadata`. The cell derives its
+   * copy from the code at render time (`describeCellFailure`), so rewriting an
+   * error's copy changes what every past run says — where concatenating the
+   * rendered title and description into `errors` froze one release's words
+   * into the workbench's autosaved state, then re-parsed them with a regex.
    */
   const updateTargetError = useCallback(
-    (rowIndex: number, targetId: string, errorMsg: string) => {
+    (
+      rowIndex: number,
+      targetId: string,
+      errorMsg: string,
+      domainError?: SerializedHandledError,
+    ) => {
       useEvaluationsV3Store.setState((state) => {
         const existingErrors = state.results.errors[targetId] ?? [];
         const newErrors = [...existingErrors];
         newErrors[rowIndex] = errorMsg;
+
+        const existingMeta = state.results.targetMetadata[targetId] ?? [];
+        const newMeta = [...existingMeta];
+        newMeta[rowIndex] = { ...(newMeta[rowIndex] ?? {}), domainError };
 
         // NOTE: We do NOT remove the cell from executingCells here.
         // The cell stays in executingCells until execution cleanup happens.
@@ -183,6 +217,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             errors: {
               ...state.results.errors,
               [targetId]: newErrors,
+            },
+            targetMetadata: {
+              ...state.results.targetMetadata,
+              [targetId]: newMeta,
             },
             // Keep executingCells unchanged
           },
@@ -263,8 +301,16 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "target_result":
-          if (event.error) {
-            updateTargetError(event.rowIndex, event.targetId, event.error);
+          if (event.domainError ?? event.error) {
+            // The code and the engine's raw string, side by side. The cell
+            // shows the registry's copy for the code and keeps the raw string
+            // for whoever asks — never as the headline.
+            updateTargetError(
+              event.rowIndex,
+              event.targetId,
+              event.error ?? UNNAMED_FAILURE,
+              event.domainError,
+            );
           } else {
             updateTargetOutput(event.rowIndex, event.targetId, event.output, {
               cost: event.cost,
@@ -294,7 +340,22 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           });
           break;
 
-        case "error":
+        case "error": {
+          // Every `error` frame is built by `mapThrownErrorEvent`: a handled
+          // failure carries its code on `domainError`, an unhandled one carries
+          // the unnamed-failure marker and a trace id, and neither carries the
+          // thrown error's own words. So the words here are the client's:
+          // registry copy for a code, our own fallback for a failure nobody
+          // could name.
+          const envelope = asHandledEnvelope(event);
+          const detail = describeError({
+            error: envelope,
+            fallbackTitle:
+              event.rowIndex === undefined
+                ? "The evaluation couldn't be completed"
+                : "This row couldn't be run",
+          });
+
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
@@ -305,25 +366,37 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 {
                   status: "error",
                   error_type: "EvaluatorError",
-                  details: event.message,
+                  details: detail,
                   traceback: [],
+                  ...(event.domainError
+                    ? { domainError: event.domainError }
+                    : {}),
                 },
               );
             } else {
-              // Target error
-              updateTargetError(event.rowIndex, event.targetId, event.message);
+              // Target error — the code, not the sentence it renders as.
+              updateTargetError(
+                event.rowIndex,
+                event.targetId,
+                event.message,
+                event.domainError,
+              );
             }
           } else {
             // Fatal error
-            setError(event.message);
+            setError(detail);
             setResults({ status: "error" });
-            toaster.create({
-              title: "Execution Error",
-              description: event.message,
-              type: "error",
+            // Through `showErrorToast` so the trace id becomes the copyable
+            // error id in the toast. An unhandled failure tells the customer
+            // nothing else, and "Something went wrong" with no id to quote
+            // leaves support nothing to search on.
+            showErrorToast({
+              error: envelope,
+              fallbackTitle: "Couldn't finish the evaluation",
             });
           }
           break;
+        }
 
         case "stopped":
           setStatus("stopped");
@@ -398,10 +471,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       //       them without forcing a re-run.
       // The two cases coexist row-by-row: re-run rows that are missing,
       // seed rows that already have output.
-      const targetPairwiseDeps = (id: string): string[] => {
+      const targetComparisonDeps = (id: string): string[] => {
         const t = targets.find((tg) => tg.id === id);
-        if (!t || t.type !== "evaluator" || !t.pairwise) return [];
-        return [t.pairwise.variantA, t.pairwise.variantB].filter(
+        if (t?.type !== "evaluator") return [];
+        return (toComparisonConfig(t)?.variants ?? []).filter(
           (v): v is string => !!v,
         );
       };
@@ -415,7 +488,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       > = {};
       const expandedCells = [...baseExecutionCells];
       if (scope.type === "target" || scope.type === "cell") {
-        const deps = targetPairwiseDeps(scope.targetId);
+        const deps = targetComparisonDeps(scope.targetId);
         if (deps.length) {
           const rowsForExpansion =
             scope.type === "cell"
@@ -492,7 +565,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           let newTargetOutputs = { ...state.results.targetOutputs };
           let newTargetMetadata = { ...state.results.targetMetadata };
           let newErrors = { ...state.results.errors };
-          let newEvaluatorResults = { ...state.results.evaluatorResults };
+          const newEvaluatorResults = { ...state.results.evaluatorResults };
 
           // For evaluator-only scopes, determine which single evaluator to clear
           const specificEvaluatorId =
@@ -604,14 +677,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: t.mappings,
           localPromptConfig: t.localPromptConfig,
           localEvaluatorConfig: t.localEvaluatorConfig,
-          // Pairwise column-targets (#5100) need this on the wire so the
+          // Comparison column-targets need this on the wire so the
           // orchestrator can skip the column in Phase 1 and emit Phase 2
-          // synthetic cells with both variants' outputs baked in. Without
-          // it, the server falls through to a normal evaluator-target
-          // dispatch whose mappings have no per-row candidate outputs,
-          // and the judge endpoint 400s with "candidate_a_output is
-          // required".
-          pairwise: t.pairwise,
+          // synthetic cells with every variant's output baked in. Without it,
+          // the server falls through to a normal evaluator-target dispatch
+          // whose mappings have no per-row candidate outputs, and the judge
+          // endpoint rejects the empty payload.
+          //
+          // Normalized rather than passed through: a state loaded from a
+          // pre-merge experiment still carries the legacy `pairwise` shape
+          // here, and the server only understands `comparison`.
+          comparison: toComparisonConfig(t),
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,
@@ -620,6 +696,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,
           localEvaluatorConfig: e.localEvaluatorConfig,
+          // The comparison config must survive the wire. The orchestrator keys
+          // its whole Phase-1/Phase-2 split off this field: without it every
+          // comparison evaluator looks like a plain per-row evaluator, gets
+          // attached to each target cell in Phase 1, and dispatches an empty
+          // input payload (nlpgo: "Data required").
+          comparison: toComparisonConfig(e),
         })),
         scope,
         concurrency,
@@ -698,13 +780,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           chunkTimeout: 300_000, // 5min between events
           onError: (err) => {
             setStatus("error");
-            setError(err.message);
+            // `error` is exported hook state that ends up on screen, so it gets
+            // the same treatment as the toast: registry copy, never the wire
+            // message (which is the code slug for a handled failure).
+            setError(
+              describeError({
+                error: err,
+                fallbackTitle: "Couldn't run the evaluation",
+              }),
+            );
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
-            toaster.create({
-              title: "Execution Failed",
-              description: err.message,
-              type: "error",
+            showErrorToast({
+              error: err,
+              fallbackTitle: "Couldn't run the evaluation",
             });
           },
         });
@@ -712,9 +801,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         // Clean up this execution's cells when SSE completes
         cleanupThisExecution();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
-        setError(message);
+        setError(
+          describeError({
+            error: err,
+            fallbackTitle: "Couldn't run the evaluation",
+          }),
+        );
         setIsAborting(false); // Clear aborting state on error
         cleanupThisExecution();
       }
@@ -772,12 +865,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     } catch (err) {
       // On error, reset aborting state since abort failed
       setIsAborting(false);
-      const message = err instanceof Error ? err.message : "Failed to abort";
-      toaster.create({
-        title: "Abort Failed",
-        description: message,
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't stop the run" });
     }
     // Note: No finally block - isAborting stays true until `stopped` event
   }, [project?.id, runId]);

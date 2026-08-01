@@ -263,7 +263,9 @@ describe("useEvaluationsV3Store", () => {
     it("updates a target", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
-      store.updateTarget("target-1", { inputs: [{ identifier: "updated_input", type: "str" }] });
+      store.updateTarget("target-1", {
+        inputs: [{ identifier: "updated_input", type: "str" }],
+      });
 
       const state = useEvaluationsV3Store.getState();
       expect(state.targets[0]?.inputs[0]?.identifier).toBe("updated_input");
@@ -387,6 +389,35 @@ describe("useEvaluationsV3Store", () => {
       // Mappings should be removed for the dataset that referenced the removed target
       expect(target2?.mappings?.[DEFAULT_TEST_DATA_ID]?.input).toBeUndefined();
     });
+
+    // Without this, a deleted target left a phantom entry in
+    // comparison.variants: ComparisonConfigForm renders nothing for an
+    // unresolvable id (no way to remove it from the UI), and the
+    // orchestrator's resolveVariants silently produced zero cells forever
+    // with no error surfaced anywhere.
+    it("removes the target from any comparison evaluator's variants", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      store.addTarget(createTestTarget("target-2"));
+      store.addEvaluator({
+        id: "cmp-1",
+        evaluatorType: "langevals/select_best_compare",
+        inputs: [],
+        mappings: {},
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: false,
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as unknown as EvaluatorConfig);
+
+      store.removeTarget("target-1");
+
+      const state = useEvaluationsV3Store.getState();
+      const evaluator = state.evaluators.find((e) => e.id === "cmp-1");
+      expect(evaluator?.comparison?.variants).toEqual(["target-2"]);
+    });
   });
 
   describe("Global evaluator operations", () => {
@@ -409,7 +440,9 @@ describe("useEvaluationsV3Store", () => {
     it("updates a global evaluator", () => {
       const store = useEvaluationsV3Store.getState();
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.updateEvaluator("eval-1", { inputs: [{ identifier: "updated_output", type: "str" }] });
+      store.updateEvaluator("eval-1", {
+        inputs: [{ identifier: "updated_output", type: "str" }],
+      });
 
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators[0]?.inputs[0]?.identifier).toBe("updated_output");

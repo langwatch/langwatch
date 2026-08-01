@@ -10,15 +10,18 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Square, X } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { buildDisplayTitle } from "./run-history-transforms";
-import { formatRunStatusLabel } from "./format-run-status-label";
+import { Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Tooltip } from "~/components/ui/tooltip";
-import { isCancellableStatus } from "./useCancelScenarioRun";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { formatRunStatusLabel } from "./format-run-status-label";
+import { buildDisplayTitle } from "./run-history-transforms";
+import { isCancellableStatus } from "./useCancelScenarioRun";
+import { usePrefetchRunState } from "./usePrefetchRunState";
 
 type ScenarioTargetRowProps = {
   scenarioRun: ScenarioRunData;
@@ -41,7 +44,11 @@ const STATUS_CIRCLE_COLORS: Record<string, string> = {
   [ScenarioRunStatus.RUNNING]: "orange.400",
 };
 
-function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+function MetricsTooltipContent({
+  scenarioRun,
+}: {
+  scenarioRun: ScenarioRunData;
+}) {
   const roleCosts = scenarioRun.roleCosts ?? {};
   const roleLatencies = scenarioRun.roleLatencies ?? {};
   const latencyRoles = Object.keys(roleLatencies).filter(
@@ -58,7 +65,9 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {scenarioRun.durationInMs > 0 && (
           <HStack justify="space-between">
             <Text color="fg.muted">Duration</Text>
-            <Text fontWeight="medium">{formatLatency(scenarioRun.durationInMs)}</Text>
+            <Text fontWeight="medium">
+              {formatLatency(scenarioRun.durationInMs)}
+            </Text>
           </HStack>
         )}
 
@@ -73,13 +82,24 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {/* Latency per role */}
         {latencyRoles.length > 0 && (
           <>
-            <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
-            <Text color="fg" fontWeight="semibold">Latency</Text>
+            <Box
+              borderTopWidth="1px"
+              borderColor="border.emphasized"
+              marginX={-2}
+            />
+            <Text color="fg" fontWeight="semibold">
+              Latency
+            </Text>
             {latencyRoles.map((role) => {
               const latencies = roleLatencies[role]!;
-              const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+              const avg =
+                latencies.reduce((a, b) => a + b, 0) / latencies.length;
               return (
-                <HStack key={`lat-${role}`} justify="space-between" paddingLeft={2}>
+                <HStack
+                  key={`lat-${role}`}
+                  justify="space-between"
+                  paddingLeft={2}
+                >
                   <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatLatency(avg)}</Text>
                 </HStack>
@@ -92,14 +112,24 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {costRoles.length > 0 && (
           <>
             {latencyRoles.length === 0 && (
-              <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
+              <Box
+                borderTopWidth="1px"
+                borderColor="border.emphasized"
+                marginX={-2}
+              />
             )}
-            <Text color="fg" fontWeight="semibold">Cost</Text>
+            <Text color="fg" fontWeight="semibold">
+              Cost
+            </Text>
             {costRoles.map((role) => {
               const costs = roleCosts[role]!;
               const total = costs.reduce((a, b) => a + b, 0);
               return (
-                <HStack key={`cost-${role}`} justify="space-between" paddingLeft={2}>
+                <HStack
+                  key={`cost-${role}`}
+                  justify="space-between"
+                  paddingLeft={2}
+                >
                   <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatCost(total)}</Text>
                 </HStack>
@@ -113,7 +143,10 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
 }
 
 function StatusCircle({ status }: { status: ScenarioRunStatus }) {
-  if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
+  if (
+    status === ScenarioRunStatus.QUEUED ||
+    status === ScenarioRunStatus.RUNNING
+  ) {
     return <Spinner size="xs" data-testid="queued-spinner" />;
   }
 
@@ -137,109 +170,139 @@ export function ScenarioTargetRow({
   isCancelling = false,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
-  const displayName = buildDisplayTitle({ scenarioName, targetName, iteration });
+  const displayName = buildDisplayTitle({
+    scenarioName,
+    targetName,
+    iteration,
+  });
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
-  const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const hasMetrics =
+    scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const prefetchRunState = usePrefetchRunState();
+  const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
-    <Box
-      position="relative"
-      className="group"
-      borderBottom="1px solid"
-      _last={{ border: "none" }}
-      borderColor="border.subtle"
-      _hover={{ borderColor: "transparent" }}
+    // Armed, the run can be handed to Langy. Same chip id the run drawer
+    // derives, so the row and the drawer opened from it are one chip.
+    <LangyContextTarget
+      target={scenarioContextChip({
+        scenarioId: scenarioRun.scenarioRunId,
+        name: displayName,
+      })}
     >
-      <HStack
-        as="button"
-        width="full"
-        paddingX={4}
-        paddingY={2}
-        gap={4}
-        _hover={{ bg: "bg.muted/80" }}
+      <Box
+        position="relative"
+        className="group"
         borderRadius="lg"
-        cursor="pointer"
-        onClick={onClick}
-        tabIndex={0}
-        aria-label={`View details for ${displayName}`}
+        borderBottom="1px solid"
+        _last={{ border: "none" }}
+        borderColor="border.subtle"
+        _hover={{ borderColor: "transparent" }}
       >
-        <HStack>
-          <StatusCircle status={scenarioRun.status} />
-          <Text fontSize="xs" fontWeight="semibold" color={config.fgColor} minWidth="43px" textAlign="left" whiteSpace="nowrap">
-            {formatRunStatusLabel({
-              status: scenarioRun.status,
-              results: scenarioRun.results ?? undefined,
-            })}
-          </Text>
-        </HStack>
-        <Text fontSize="sm" textAlign="left" truncate>
-          {displayName}
-        </Text>
-        {hasCancelButton && (
-          <HStack
-            as="span"
-            role="button"
-            tabIndex={isCancelling ? -1 : 0}
-            gap={1}
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="md"
-            border="1px solid"
-            borderColor="gray.300"
-            fontSize="xs"
-            color="fg.default"
-            cursor={isCancelling ? "default" : "pointer"}
-            opacity={isCancelling ? 0.6 : 1}
-            flexShrink={0}
-            _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              if (!isCancelling) onCancel?.();
-            }}
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
-                e.stopPropagation();
-                e.preventDefault();
-                onCancel?.();
-              }
-            }}
-            aria-label="Stop run"
-            aria-disabled={isCancelling}
-            data-testid="cancel-run-button"
-          >
-            {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
-            <Text fontSize="xs">Stop</Text>
+        <HStack
+          as="button"
+          width="full"
+          paddingX={4}
+          paddingY={2}
+          gap={4}
+          _hover={{ bg: "bg.muted/80" }}
+          borderRadius="lg"
+          cursor="pointer"
+          onClick={onClick}
+          onMouseEnter={handlePrefetch}
+          onFocus={handlePrefetch}
+          tabIndex={0}
+          aria-label={`View details for ${displayName}`}
+        >
+          <HStack>
+            <StatusCircle status={scenarioRun.status} />
+            <Text
+              fontSize="xs"
+              fontWeight="semibold"
+              color={config.fgColor}
+              minWidth="43px"
+              textAlign="left"
+              whiteSpace="nowrap"
+            >
+              {formatRunStatusLabel({
+                status: scenarioRun.status,
+                results: scenarioRun.results ?? undefined,
+              })}
+            </Text>
           </HStack>
-        )}
-        <Box flex={1} />
-        {hasMetrics && (
-          <Tooltip
-            content={<MetricsTooltipContent scenarioRun={scenarioRun} />}
-            contentProps={{ padding: 0 }}
-            positioning={{ placement: "bottom" }}
-            interactive
-          >
-            <HStack gap={2} flexShrink={0} color="fg.subtle">
-              {scenarioRun.durationInMs > 0 && (
-                <Text fontSize="11px">
-                  {formatLatency(scenarioRun.durationInMs)}
-                </Text>
-              )}
-              {scenarioRun.totalCost != null && (
-                <>
-                  <Text color="gray.300">{"⋅"}</Text>
-                  <Text fontSize="xs">
-                    {formatCost(scenarioRun.totalCost)}
-                  </Text>
-                </>
-              )}
+          <Text fontSize="sm" textAlign="left" truncate>
+            {displayName}
+          </Text>
+          {hasCancelButton && (
+            <HStack
+              as="span"
+              role="button"
+              tabIndex={isCancelling ? -1 : 0}
+              gap={1}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+              border="1px solid"
+              borderColor="gray.300"
+              fontSize="xs"
+              color="fg.default"
+              cursor={isCancelling ? "default" : "pointer"}
+              opacity={isCancelling ? 0.6 : 1}
+              flexShrink={0}
+              _hover={
+                isCancelling
+                  ? undefined
+                  : { bg: "gray.100", borderColor: "gray.400" }
+              }
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                if (!isCancelling) onCancel?.();
+              }}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onCancel?.();
+                }
+              }}
+              aria-label="Stop run"
+              aria-disabled={isCancelling}
+              data-testid="cancel-run-button"
+            >
+              {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
+              <Text fontSize="xs">Stop</Text>
             </HStack>
-          </Tooltip>
-        )}
-      </HStack>
-    </Box>
+          )}
+          <Box flex={1} />
+          {hasMetrics && (
+            <Tooltip
+              content={<MetricsTooltipContent scenarioRun={scenarioRun} />}
+              contentProps={{ padding: 0 }}
+              positioning={{ placement: "bottom" }}
+              interactive
+            >
+              <HStack gap={2} flexShrink={0} color="fg.subtle">
+                {scenarioRun.durationInMs > 0 && (
+                  <Text fontSize="11px">
+                    {formatLatency(scenarioRun.durationInMs)}
+                  </Text>
+                )}
+                {scenarioRun.totalCost != null && (
+                  <>
+                    <Text color="gray.300">{"⋅"}</Text>
+                    <Text fontSize="xs">
+                      {formatCost(scenarioRun.totalCost)}
+                    </Text>
+                  </>
+                )}
+              </HStack>
+            </Tooltip>
+          )}
+        </HStack>
+      </Box>
+    </LangyContextTarget>
   );
 }

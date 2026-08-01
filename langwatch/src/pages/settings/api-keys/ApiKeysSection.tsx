@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Card,
-  Heading,
   HStack,
   Spacer,
   Table,
@@ -12,8 +11,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { showErrorToast } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { useSession } from "~/utils/auth-client";
@@ -27,6 +27,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { apiKeyRowAnchorId } from "./apiKeyAnchor";
 import {
   CreateApiKeyDrawer,
   type CreateApiKeyInput,
@@ -195,6 +196,16 @@ export function ApiKeysSection({
     [serviceApiKeys, scopeFilter, hierarchy, team?.id, project?.id],
   );
 
+  // Deep links land on `#api-key-<id>`, but the rows only exist once the keys
+  // query resolves, long after the browser has given up on the fragment.
+  const isLoadingKeys = apiKeys.isLoading;
+  useEffect(() => {
+    if (isLoadingKeys || typeof window === "undefined") return;
+    const anchorId = window.location.hash.slice(1);
+    if (!anchorId) return;
+    document.getElementById(anchorId)?.scrollIntoView({ block: "center" });
+  }, [isLoadingKeys]);
+
   const handleCreate = (input: CreateApiKeyInput): void => {
     if (input.permissionMode === "restricted" && input.bindings.length === 0) {
       toaster.create({
@@ -244,15 +255,8 @@ export function ApiKeysSection({
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to create API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };
@@ -292,15 +296,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to update API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't update API key" }),
       },
     );
   };
@@ -319,15 +316,8 @@ export function ApiKeysSection({
           });
           void queryClient.apiKey.list.invalidate();
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to revoke API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't revoke API key" }),
       },
     );
   };
@@ -356,12 +346,9 @@ export function ApiKeysSection({
         },
         onError: (error) => {
           setIsRotateConfirmOpen(false);
-          toaster.create({
-            title: "Failed to rotate project API key",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't rotate the project API key",
           });
         },
       },
@@ -428,18 +415,10 @@ export function ApiKeysSection({
   return (
     <>
       <VStack gap={8} width="full" align="stretch">
-        {/* API keys — personal + service keys (ingestSourceType == null).
-            The "Create API key" flow and scope filter belong to this section. */}
+        {/* Personal + service keys (ingestSourceType == null). The page
+            heading titles this table, so the section carries no heading of
+            its own. The "Create API key" flow and scope filter belong here. */}
         <VStack gap={4} width="full" align="start">
-          {ingestionKeys.length > 0 && (
-            <VStack gap={1} align="start">
-              <Heading size="md">API keys</Heading>
-              <Text fontSize="sm" color="fg.muted">
-                Keys scoped to a user or service that honor your role bindings
-                and can be revoked individually.
-              </Text>
-            </VStack>
-          )}
           <HStack width="full" flexWrap="wrap" gap={2}>
             <Text fontSize="sm" color="fg.muted">
               Do not share your API keys or expose them in the browser or other
@@ -547,7 +526,10 @@ export function ApiKeysSection({
 
                   {/* User-scoped API key rows */}
                   {filteredKeys.map((apiKey) => (
-                    <Table.Row key={apiKey.id}>
+                    <Table.Row
+                      key={apiKey.id}
+                      id={apiKeyRowAnchorId(apiKey.id)}
+                    >
                       <Table.Cell>
                         <HStack align="start">
                           <Box paddingTop={1}>

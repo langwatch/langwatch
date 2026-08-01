@@ -18,6 +18,14 @@ Feature: Personal usage REST API
     Then the response status is 200
     And the rollups cover only usage that falls inside the requested window
 
+  Scenario: Ingestion-source spend is included and scoped to this organization
+    Given my account has ingestion-source spend (e.g. Claude Code) in this organization
+    And my account also has ingestion-source spend in another organization
+    When I GET /api/me/usage
+    Then the response status is 200
+    And the rollups include this organization's ingestion-source spend
+    And the rollups exclude ingestion-source spend from other organizations
+
   Scenario: A half-specified window is rejected
     When I GET /api/me/usage with only a start time (or only an end time)
     Then the response status is 400

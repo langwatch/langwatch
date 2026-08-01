@@ -47,14 +47,15 @@ const mockVersions = [
   },
 ] as unknown as VersionedPrompt[];
 
+const { mockUseQuery } = vi.hoisted(() => ({
+  mockUseQuery: vi.fn(),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: {
-        useQuery: () => ({
-          data: mockVersions,
-          isLoading: false,
-        }),
+        useQuery: mockUseQuery,
       },
     },
   },
@@ -79,6 +80,10 @@ const renderWithChakra = (ui: React.ReactElement) => {
 describe("VersionHistoryListPopover", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseQuery.mockReturnValue({
+      data: mockVersions,
+      isLoading: false,
+    });
   });
 
   afterEach(() => {
@@ -271,6 +276,210 @@ describe("VersionHistoryListPopover", () => {
       // Should show "current" tag - only one should exist (for v2)
       const currentTags = screen.getAllByText("current");
       expect(currentTags).toHaveLength(1);
+    });
+  });
+
+  describe("when the popover is closed", () => {
+    it("does not enable the version history query", () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ idOrHandle: "config-1" }),
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+  });
+
+  describe("when the popover is opened", () => {
+    it("enables the version history query", async () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      await waitFor(() => {
+        expect(mockUseQuery).toHaveBeenLastCalledWith(
+          expect.objectContaining({ idOrHandle: "config-1" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
+    });
+  });
+
+  describe("commit message of a version", () => {
+    const openPopover = async () => {
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+    };
+
+    describe("given the commit message is long", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "A long commit message is shown in full" */
+        it("renders the full message text", async () => {
+          const longMessage =
+            "Lowered temperature to reduce hallucination rate on the summarizer step, per eval run #82, and switched to the mini model to cut latency";
+
+          mockUseQuery.mockReturnValue({
+            data: [
+              {
+                id: "config-1",
+                versionId: "version-1",
+                version: 1,
+                commitMessage: longMessage,
+                author: { name: "User 1" },
+              },
+            ] as unknown as VersionedPrompt[],
+            isLoading: false,
+          });
+
+          renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+          await openPopover();
+
+          const messageEl = screen.getByText(longMessage);
+          // Full-text presence is supplementary: the DOM keeps the whole
+          // string even under a 1-line clamp, so it alone can't prove the
+          // text isn't visually cut off. Assert the clamp actually applied
+          // is the generous multi-line bound, not the single-line clamp
+          // that caused the "2-3 words" bug.
+          const style = getComputedStyle(messageEl);
+          expect(style.getPropertyValue("-webkit-line-clamp")).toBe("8");
+          expect(style.getPropertyValue("overflow")).toBe("hidden");
+        });
+      });
+    });
+  });
+
+  describe("author of a version", () => {
+    const openPopover = async () => {
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+    };
+
+    const renderWithAuthor = (author: unknown) => {
+      mockUseQuery.mockReturnValue({
+        data: [
+          {
+            id: "config-1",
+            versionId: "version-1",
+            version: 1,
+            commitMessage: "Initial version",
+            author,
+          },
+        ] as unknown as VersionedPrompt[],
+        isLoading: false,
+      });
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+    };
+
+    // Chakra tooltips open on a pointer gesture; pointerMove bubbles to the
+    // trigger so zag registers the hover.
+    const hover = (element: HTMLElement) => {
+      fireEvent.pointerEnter(element, { pointerType: "mouse" });
+      fireEvent.pointerMove(element, { pointerType: "mouse" });
+    };
+
+    describe("given the author has a display name", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Author with a display name is shown by name" */
+        it("shows the author's name", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+          });
+          await openPopover();
+
+          expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+        });
+
+        it("reveals the author's name and email in a tooltip on hover", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+          });
+          await openPopover();
+
+          hover(screen.getByText("Ada Lovelace"));
+
+          await waitFor(
+            () =>
+              expect(
+                screen.getAllByText("ada@example.com").length,
+              ).toBeGreaterThan(0),
+            { timeout: 3000 },
+          );
+        });
+      });
+    });
+
+    describe("given the author has no display name", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Author without a display name falls back to their email" */
+        it("shows the author's email instead", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: null,
+            email: "grace@example.com",
+          });
+          await openPopover();
+
+          expect(screen.getByText("grace@example.com")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("given the version has no author on record", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Version created outside the app shows Unknown author" */
+        it("labels the row 'Unknown author'", async () => {
+          renderWithAuthor(null);
+          await openPopover();
+
+          expect(screen.getByText("Unknown author")).toBeInTheDocument();
+        });
+
+        it("explains in a tooltip that no author was recorded", async () => {
+          renderWithAuthor(null);
+          await openPopover();
+
+          hover(screen.getByText("Unknown author"));
+
+          await waitFor(
+            () =>
+              expect(
+                screen.getAllByText("No author recorded for this version")
+                  .length,
+              ).toBeGreaterThan(0),
+            { timeout: 3000 },
+          );
+        });
+      });
+    });
+
+    describe("given the author signed in with a profile photo", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "A signed-in author's profile photo is used as the avatar" */
+        it("shows the photo as the avatar", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+            image: "https://example.com/ada.png",
+          });
+          await openPopover();
+
+          expect(
+            document.querySelector('img[src="https://example.com/ada.png"]'),
+          ).not.toBeNull();
+        });
+      });
     });
   });
 });

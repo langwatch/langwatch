@@ -8,8 +8,8 @@ import { useDrawerStore } from "../stores/drawerStore";
 import { useFilterStore } from "../stores/filterStore";
 import { useFocusSectionStore } from "../stores/focusSectionStore";
 import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";
-import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 import { usePromptByHandle } from "./usePromptByHandle";
+import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 
 export interface SdkInfoLike {
   shortLabel: string;
@@ -108,8 +108,11 @@ export function useTraceHeaderChips(
   });
 
   const lastUsedHandle = trace.lastUsedPromptId;
-  const { latestVersion, missing, resolvedHandle: lastUsedResolvedHandle } =
-    usePromptByHandle(lastUsedHandle);
+  const {
+    latestVersion,
+    missing,
+    resolvedHandle: lastUsedResolvedHandle,
+  } = usePromptByHandle(lastUsedHandle);
   // SDKs sometimes emit the opaque slug-id (`prompt_xxx`) instead of the
   // human handle (`pizza-prompt`). When the live prompt config resolves a
   // friendlier handle, prefer it in the chip — fall back to the raw id so

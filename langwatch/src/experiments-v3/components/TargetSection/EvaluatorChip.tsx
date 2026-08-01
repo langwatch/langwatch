@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { useState } from "react";
 import {
   LuChevronDown,
   LuCircleAlert,
@@ -51,14 +52,6 @@ type EvaluatorChipProps = {
   hasAnyTargetOutputs?: boolean;
   /** The type of the target (prompt, agent, evaluator, workflow) — used for tooltip copy */
   targetType?: "prompt" | "agent" | "evaluator" | "workflow";
-  /**
-   * Pairwise verdict role for this chip's target on the current row (#5100).
-   * "winner" tints the chip green, "loser" tints red, "tie" stays neutral,
-   * undefined means there is no pairwise verdict for this (row, target).
-   * Callers compute this by mapping the pairwise result.label ("A" / "B" /
-   * "tie") to the chip's target id via the evaluator's pairwise config.
-   */
-  pairwiseState?: "winner" | "loser" | "tie";
   onEdit: () => void;
   onRemove: () => void;
   /** Called when user wants to run or re-run this evaluator on the current row */
@@ -75,7 +68,6 @@ export function EvaluatorChip({
   hasTargetOutput = false,
   hasAnyTargetOutputs = false,
   targetType = "prompt",
-  pairwiseState,
   onEdit,
   onRemove,
   onRerun,
@@ -83,6 +75,13 @@ export function EvaluatorChip({
 }: EvaluatorChipProps) {
   const evaluatorName = useEvaluatorName(evaluator);
   const parsed = parseEvaluationResult(result);
+
+  // Controlled menu state so the missing-mapping alert icon can force-close
+  // the menu before opening the edit drawer (see its onClick below) —
+  // matches TargetHeader.tsx's fix for the same class of bug: an
+  // uncontrolled Menu.Trigger can start opening on pointerdown before a
+  // later onClick's stopPropagation has a chance to run.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
   // If result already exists, it overrides isRunning (evaluator completed)
@@ -124,29 +123,14 @@ export function EvaluatorChip({
   };
 
   return (
-    <Menu.Root>
+    <Menu.Root open={isMenuOpen} onOpenChange={(e) => setIsMenuOpen(e.open)}>
       <Menu.Trigger asChild>
         <Button
           variant="outline"
           size="xs"
           fontSize="11px"
           fontWeight="medium"
-          borderColor={
-            hasMissingMappings
-              ? "orange.solid"
-              : pairwiseState === "winner"
-                ? "green.solid"
-                : pairwiseState === "loser"
-                  ? "red.solid"
-                  : undefined
-          }
-          bg={
-            pairwiseState === "winner"
-              ? "green.subtle"
-              : pairwiseState === "loser"
-                ? "red.subtle"
-                : undefined
-          }
+          borderColor={hasMissingMappings ? "orange.solid" : undefined}
           minWidth={0}
           maxWidth="100%"
           css={{
@@ -206,7 +190,9 @@ export function EvaluatorChip({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onEdit();
+                    e.preventDefault();
+                    setIsMenuOpen(false); // Close menu if somehow open
+                    onEdit(); // Open drawer directly, don't open the chip's own menu
                   }}
                   data-testid={`evaluator-missing-mapping-alert-${evaluator.id}`}
                 />

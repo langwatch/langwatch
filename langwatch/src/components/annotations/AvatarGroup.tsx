@@ -5,6 +5,7 @@ import type { AnnotationWithUser } from "./AnnotationsTable";
 type User = {
   id: string;
   name: string | null;
+  image?: string | null;
 };
 
 const UserAvatarGroup = ({
@@ -33,6 +34,7 @@ const UserAvatarGroup = ({
           key={user.id}
           size="2xs"
           name={user.name ?? ""}
+          image={user.image}
           css={{
             border: "2px solid white",
             "&:not(:first-of-type)": {

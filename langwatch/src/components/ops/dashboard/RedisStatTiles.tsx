@@ -26,9 +26,7 @@ export function RedisStatTiles({
       ? (data.redisMemoryUsedBytes / data.redisMemoryMaxBytes) * 100
       : null;
   const memoryPercent =
-    memoryPercentRaw === null
-      ? null
-      : Math.round(memoryPercentRaw * 10) / 10;
+    memoryPercentRaw === null ? null : Math.round(memoryPercentRaw * 10) / 10;
 
   const memoryWarning =
     memoryPercentRaw !== null && memoryPercentRaw >= MEMORY_WARN_PERCENT;

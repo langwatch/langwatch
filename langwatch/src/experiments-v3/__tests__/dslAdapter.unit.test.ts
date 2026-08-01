@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import {
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+} from "~/optimization_studio/types/dsl";
 import {
   createInitialState,
   DEFAULT_TEST_DATA_ID,
@@ -15,7 +18,7 @@ describe("DSL Adapter", () => {
       const state = createInitialState();
       const workflow = stateToWorkflow(state);
 
-      expect(workflow.spec_version).toBe("1.4");
+      expect(workflow.spec_version).toBe(LATEST_SPEC_VERSION);
       expect(workflow.name).toBe("New Evaluation");
       expect(workflow.nodes).toHaveLength(1); // Just entry node
       expect(workflow.nodes[0]?.type).toBe("entry");

@@ -87,6 +87,45 @@ func TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs(t *testing.T) {
 	}
 }
 
+// Azure /go/proxy dispatch must resolve a deployment. Once the endpoint check
+// passes, Bifrost's Azure reader looks up AzureKeyConfig.Deployments[model] and
+// fails "deployment not found for model X" when the map is empty. The parser
+// must self-map the requested model so this path resolves like the sibling
+// dispatcheradapter path. Regression: #5760.
+func TestParseCredentialFromHeaders_Azure_BuildsDeploymentMap(t *testing.T) {
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+		"x-litellm-model", "azure/gpt-5-mini",
+		"x-litellm-api_key", "azk-secret",
+		"x-litellm-api_base", "https://acme.openai.azure.com",
+	))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cred.DeploymentMap["gpt-5-mini"]; got != "gpt-5-mini" {
+		t.Errorf("DeploymentMap[gpt-5-mini] = %q, want self-map to the model id", got)
+	}
+}
+
+// An explicit x-litellm-deployment (the Azure deployment name differs from the
+// model id) is captured into Extra and wins in the deployment map.
+func TestParseCredentialFromHeaders_Azure_HonorsExplicitDeploymentHeader(t *testing.T) {
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+		"x-litellm-model", "azure/gpt-5.4",
+		"x-litellm-api_key", "azk-secret",
+		"x-litellm-api_base", "https://acme.openai.azure.com",
+		"x-litellm-deployment", "my-gpt5-prod",
+	))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if got := cred.Extra["deployment"]; got != "my-gpt5-prod" {
+		t.Errorf("Extra[deployment] = %q, want the header value", got)
+	}
+	if got := cred.DeploymentMap["gpt-5.4"]; got != "my-gpt5-prod" {
+		t.Errorf("DeploymentMap[gpt-5.4] = %q, want the explicit deployment name", got)
+	}
+}
+
 func TestParseCredentialFromHeaders_Bedrock_NoApiKeyButAWSExtras(t *testing.T) {
 	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",
@@ -153,6 +192,35 @@ func TestParseCredentialFromHeaders_Gemini_PlainAPIKey(t *testing.T) {
 	}
 	if cred.APIKey != "AIza-test" {
 		t.Errorf("APIKey = %q", cred.APIKey)
+	}
+}
+
+func TestParseCredentialFromHeaders_APIKeyOnlyProviders(t *testing.T) {
+	// The long-tail providers the TS registry ships with just an API key
+	// (XAI_API_KEY, GROQ_API_KEY, ...). A default model like xai/grok-4.3
+	// must route instead of 400ing with missing_provider.
+	cases := map[string]domain.ProviderID{
+		"xai/grok-4.3":           domain.ProviderXAI,
+		"groq/llama-3.3-70b":     domain.ProviderGroq,
+		"cerebras/llama-3.3-70b": domain.ProviderCerebras,
+		"deepseek/deepseek-chat": domain.ProviderDeepSeek,
+	}
+	for model, want := range cases {
+		t.Run(model, func(t *testing.T) {
+			cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+				"x-litellm-model", model,
+				"x-litellm-api_key", "sk-key",
+			))
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if cred.ProviderID != want {
+				t.Errorf("ProviderID = %q, want %q", cred.ProviderID, want)
+			}
+			if cred.APIKey != "sk-key" {
+				t.Errorf("APIKey = %q", cred.APIKey)
+			}
+		})
 	}
 }
 

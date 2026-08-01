@@ -31,9 +31,12 @@ import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  GroupRowsButton,
+  RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
-import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
+import { ComparisonCharts } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
@@ -44,6 +47,8 @@ import {
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
+import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
+import { useResultsGrouping } from "./useResultsGrouping";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -58,6 +63,27 @@ type BatchEvaluationResultsProps = {
 
 /** Grace period after run finishes to continue refetching for final results */
 const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
+
+type RouterQuery = Record<string, string | string[] | undefined>;
+
+/**
+ * The router query that applying `groupBy` would produce, or `null` when
+ * it would be a no-op — replacing the URL with an identical query still
+ * costs a navigation, and in Next that re-runs every `router.query`
+ * effect on the page.
+ */
+const queryWithGroupBy = (
+  query: RouterQuery,
+  groupBy: string | null,
+): RouterQuery | null => {
+  if (groupBy) {
+    if (query.groupBy === groupBy) return null;
+    return { ...query, groupBy };
+  }
+  if (!("groupBy" in query)) return null;
+  const { groupBy: _dropped, ...rest } = query;
+  return rest;
+};
 
 export function BatchEvaluationResults({
   project,
@@ -78,6 +104,12 @@ export function BatchEvaluationResults({
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
     () => new Set(DEFAULT_HIDDEN_COLUMNS),
   );
+
+  // Which target fields render, and how much of each cell's content shows —
+  // see useResultDisplayPreferences for why fields reset per session while
+  // row height persists.
+  const { fields, toggleField, rowHeight, setRowHeight } =
+    useResultDisplayPreferences();
 
   // Toggle column visibility
   const toggleColumn = useCallback((columnName: string) => {
@@ -159,7 +191,6 @@ export function BatchEvaluationResults({
   }, [isFinished, finishedAt]);
 
   // Reset finishedAt when selected run changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: its on purpose
   useEffect(() => {
     setFinishedAt(null);
   }, [selectedRunId]);
@@ -280,6 +311,41 @@ export function BatchEvaluationResults({
     return undefined;
   }, [router.query.compare]);
 
+  // Group-by-metadata URL sync. The dropdown lives inside ComparisonTable
+  // but the URL contract is shared state, so we own it here. `null`
+  // means "no grouping" (URL param absent).
+  const queryGroupBy = useMemo(() => {
+    const value = router.query.groupBy;
+    if (typeof value === "string" && value.length > 0) return value;
+    return null;
+  }, [router.query.groupBy]);
+
+  // In controlled mode a parent owns the URL, so grouping is held here
+  // instead. Returning early without this would leave the dropdown rendered
+  // but inert — ComparisonTable shows it whenever the data has groupable
+  // keys, and it has no way to know the parent swallowed the change.
+  const [localGroupBy, setLocalGroupBy] = useState<string | null>(null);
+
+  const handleGroupByChange = useCallback(
+    (next: string | null) => {
+      // Apply locally first, always. Routing to read the answer back out of
+      // the URL put ~4s between the click and the table regrouping, which
+      // reads as the grouping itself being slow rather than as a round-trip.
+      // The URL is still the source of truth on load and still what a shared
+      // link carries — it just no longer gates the render.
+      setLocalGroupBy(next);
+      if (onSelectRunId) return;
+      const newQuery = queryWithGroupBy(router.query, next);
+      if (!newQuery) return;
+      void router.replace(
+        { pathname: router.pathname, query: newQuery },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [onSelectRunId, router],
+  );
+
   // Handle comparison mode URL sync
   const handleComparisonChange = useCallback(
     (isComparing: boolean, comparedRunIds: string[]) => {
@@ -315,7 +381,6 @@ export function BatchEvaluationResults({
   const stableRunColorMap = useMemo(() => {
     const colorMap: Record<string, string> = {};
     runIds.forEach((runId, idx) => {
-      // biome-ignore lint/style/noNonNullAssertion: its safe
       colorMap[runId] = RUN_COLORS[idx % RUN_COLORS.length]!;
     });
     return colorMap;
@@ -359,6 +424,7 @@ export function BatchEvaluationResults({
   // 1. In compare mode with 2+ runs selected
   // 2. Not in compare mode but with 2+ targets in single run
   const targetCount = transformedData?.targetColumns.length ?? 0;
+
   const canShowCharts =
     (compareMode && (comparisonData?.length ?? 0) >= 2) || targetCount >= 2;
 
@@ -368,7 +434,7 @@ export function BatchEvaluationResults({
   const [chartsVisible, setChartsVisible] = useState(defaultChartsVisible);
 
   // Update charts visibility when charts become available/unavailable
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we don't want to re-render when canShowCharts changes
+  // We don't want to re-render when canShowCharts changes.
   useEffect(() => {
     if (canShowCharts && !chartsVisible) {
       setChartsVisible(true);
@@ -397,6 +463,13 @@ export function BatchEvaluationResults({
   ]);
 
   // Chart data to display - either comparison data or single run data
+  // Derived here so the toolbar button and the table agree on which keys
+  // exist; ComparisonTable derives the same set for its own rendering.
+  const { availableKeys: groupableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+
   const chartDisplayData = compareMode ? comparisonData : singleRunChartData;
 
   // Target colors from charts (when X-axis is "target")
@@ -499,6 +572,17 @@ export function BatchEvaluationResults({
               Charts
             </Button>
           )}
+          {transformedData && transformedData.targetColumns.length > 0 && (
+            <>
+              <RowHeightButton value={rowHeight} onChange={setRowHeight} />
+              <FieldsButton fields={fields} onToggle={toggleField} />
+              <GroupRowsButton
+                availableKeys={groupableKeys}
+                value={localGroupBy ?? queryGroupBy}
+                onChange={handleGroupByChange}
+              />
+            </>
+          )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
             <ColumnVisibilityButton
               datasetColumns={transformedData.datasetColumns}
@@ -539,13 +623,18 @@ export function BatchEvaluationResults({
           )}
         </PageLayout.Header>
 
-        {/* Charts (comparison or single-run with multiple targets) - auto height */}
+        {/* Charts (comparison or single-run with multiple targets) - auto height.
+            The win-rate chart lives INSIDE this component alongside
+            Cost / Latency / (non-comparison) score charts, so the results
+            header reads as one row of siblings rather than a stacked mixture. */}
         {canShowCharts && chartDisplayData && chartDisplayData.length > 0 && (
           <ComparisonCharts
             comparisonData={chartDisplayData}
             isVisible={chartsVisible}
             onVisibilityChange={setChartsVisible}
             onTargetColorsChange={setTargetColors}
+            comparisonColumns={transformedData?.comparisonColumns}
+            comparisonRows={transformedData?.rows}
           />
         )}
 
@@ -573,6 +662,11 @@ export function BatchEvaluationResults({
                   onToggleColumn={toggleColumn}
                   comparisonData={comparisonData}
                   targetColors={targetColors}
+                  showOutputs={fields.outputs}
+                  showEvaluations={fields.scores}
+                  showCostAndLatency={fields.costAndLatency}
+                  rowHeight={rowHeight}
+                  groupBy={localGroupBy ?? queryGroupBy}
                 />
               </Card.Body>
             </Card.Root>

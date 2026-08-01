@@ -1,10 +1,4 @@
 import { env } from "~/env.mjs";
-import {
-  batchPresidioClearPII as defaultBatchPresidioClearPII,
-  googleDLPClearPII,
-  type PIICheckOptions,
-  PRESIDIO_STRICT_ENTITIES,
-} from "~/server/background/workers/collector/piiCheck";
 import type {
   PiiLevel,
   ResolvedDataPrivacy,
@@ -12,6 +6,7 @@ import type {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import {
+  compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
   redactAttributeNative,
@@ -19,6 +14,12 @@ import {
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
+import {
+  batchPresidioClearPII as defaultBatchPresidioClearPII,
+  googleDLPClearPII,
+  type PIICheckOptions,
+  PRESIDIO_STRICT_ENTITIES,
+} from "~/server/tracer/collector/piiCheck";
 
 /**
  * Identifiers the strict analyzer detects that the native engine cannot
@@ -31,12 +32,9 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
     (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),
   );
 
+import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
-import { createLogger } from "~/utils/logger/server";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  type PIIRedactionLevel,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpAnyValue,
   OtlpKeyValue,
@@ -97,20 +95,26 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 const runGoogleDlpBatch = (
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
+  exceptPatterns?: readonly string[],
 ): Promise<(string | null)[]> =>
   Promise.all(
     texts.map(async (text) => {
       const wrapper = { value: text };
-      await googleDLPClearPII(wrapper, "value", piiRedactionLevel);
+      await googleDLPClearPII({
+        currentObject: wrapper,
+        lastKey: "value",
+        piiRedactionLevel,
+        exceptPatterns,
+      });
       return wrapper.value !== text ? wrapper.value : null;
     }),
   );
 
 const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
-  const { piiRedactionLevel, mainMethod, entities } = options;
+  const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
 
   if (mainMethod === "google_dlp") {
-    return runGoogleDlpBatch(texts, piiRedactionLevel);
+    return runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
   }
 
   try {
@@ -122,8 +126,10 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
-    // ever widens the analysis-service entities on a presidio outage.
-    return await runGoogleDlpBatch(texts, piiRedactionLevel);
+    // ever widens the analysis-service entities on a presidio outage. The
+    // policy's do-not-redact exceptions do carry over, so the fallback cannot
+    // re-redact a value an exception kept.
+    return await runGoogleDlpBatch(texts, piiRedactionLevel, exceptPatterns);
   }
 };
 
@@ -244,7 +250,11 @@ export class OtlpSpanPiiRedactionService {
     return {
       policy: {
         ...resolved,
-        pii: { level, entities: resolved.pii.entities },
+        pii: {
+          level,
+          entities: resolved.pii.entities,
+          exceptPatterns: resolved.pii.exceptPatterns,
+        },
       },
       level,
     };
@@ -275,14 +285,40 @@ export class OtlpSpanPiiRedactionService {
    * The analysis-service call a resolved policy still needs after the native
    * pass: `{}` for strict (its default entity list), `{ entities }` for a custom
    * level that selected analysis-service identifiers, or null to skip it.
+   *
+   * When the policy carries PII exception patterns, the strict call is scoped
+   * to the identifiers only the analysis service can detect (names, locations):
+   * the native floor already ran every pattern-based recognizer WITH the
+   * exceptions applied, and re-scanning those entities out-of-process would
+   * re-redact the very values an exception kept (the service returns anonymized
+   * text, so vetoes cannot be applied to its findings).
+   *
+   * Narrowing to name/location entities shrinks the blast radius, it does not
+   * close the gap: `exceptPatterns` still rides along on the returned options
+   * (buildOptions), but `mainMethod` is always "presidio" here, and the
+   * Presidio batch call has no way to honor them (see the doc-comment on
+   * PIICheckOptions.exceptPatterns in piiCheck.ts). A name or location value
+   * that fully matches an exception can still be redacted by this call. That
+   * is a deliberate, tested contract, not a bug — see
+   * span-pii-redaction.nativeScopedPolicy.test.ts's "strict-only exception
+   * scoping" tests and the tooltip in data-privacy.tsx.
    */
-  private lambdaAfterNative(
-    policy: ResolvedDataPrivacy,
-  ): { entities?: readonly string[] } | null {
-    if (policy.pii.level === "strict") return {};
+  private lambdaAfterNative(policy: ResolvedDataPrivacy): {
+    entities?: readonly string[];
+    exceptPatterns?: readonly string[];
+  } | null {
+    const exceptPatterns =
+      policy.pii.exceptPatterns.length > 0
+        ? policy.pii.exceptPatterns
+        : undefined;
+    if (policy.pii.level === "strict") {
+      return exceptPatterns
+        ? { entities: STRICT_ONLY_PII_ENTITIES, exceptPatterns }
+        : {};
+    }
     if (policy.pii.level === "custom") {
       const entities = this.customLambdaEntities(policy);
-      return entities.length > 0 ? { entities } : null;
+      return entities.length > 0 ? { entities, exceptPatterns } : null;
     }
     return null;
   }
@@ -295,10 +331,30 @@ export class OtlpSpanPiiRedactionService {
       : undefined;
   }
 
+  /**
+   * Compile the per-policy patterns once for a whole native pass: the custom
+   * secret patterns and the PII do-not-redact exceptions.
+   */
+  private compileNativePatterns(policy: ResolvedDataPrivacy): {
+    secrets: readonly RegExp[] | undefined;
+    piiExceptions: readonly RegExp[] | undefined;
+  } {
+    return {
+      secrets: this.nativeSecretPatterns(policy),
+      piiExceptions:
+        policy.pii.exceptPatterns.length > 0
+          ? compilePolicyPiiExceptions(policy)
+          : undefined,
+    };
+  }
+
   private redactKeyValuesNative(
     attributes: OtlpKeyValue[],
     policy: ResolvedDataPrivacy,
-    compiledSecretPatterns: readonly RegExp[] | undefined,
+    compiled: {
+      secrets: readonly RegExp[] | undefined;
+      piiExceptions: readonly RegExp[] | undefined;
+    },
   ): void {
     for (const attr of attributes) {
       const value = attr.value.stringValue;
@@ -307,7 +363,8 @@ export class OtlpSpanPiiRedactionService {
           key: attr.key,
           value,
           policy,
-          compiledSecretPatterns,
+          compiledSecretPatterns: compiled.secrets,
+          compiledPiiExceptions: compiled.piiExceptions,
         });
         if (text !== value) attr.value.stringValue = text;
       }
@@ -317,7 +374,10 @@ export class OtlpSpanPiiRedactionService {
   private redactRecordNative(
     record: Record<string, string>,
     policy: ResolvedDataPrivacy,
-    compiledSecretPatterns: readonly RegExp[] | undefined,
+    compiled: {
+      secrets: readonly RegExp[] | undefined;
+      piiExceptions: readonly RegExp[] | undefined;
+    },
   ): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
@@ -326,7 +386,8 @@ export class OtlpSpanPiiRedactionService {
           key,
           value,
           policy,
-          compiledSecretPatterns,
+          compiledSecretPatterns: compiled.secrets,
+          compiledPiiExceptions: compiled.piiExceptions,
         });
         if (text !== value) record[key] = text;
       }
@@ -345,7 +406,7 @@ export class OtlpSpanPiiRedactionService {
     policy: ResolvedDataPrivacy,
   ): void {
     if (!this.nativePassActive(policy)) return;
-    const compiled = this.nativeSecretPatterns(policy);
+    const compiled = this.compileNativePatterns(policy);
     for (const attrs of this.collectAllAttributeSets(span)) {
       this.redactKeyValuesNative(attrs, policy, compiled);
     }
@@ -357,7 +418,8 @@ export class OtlpSpanPiiRedactionService {
       const { text } = redactStringNative({
         text: span.status.message,
         policy,
-        compiledSecretPatterns: compiled,
+        compiledSecretPatterns: compiled.secrets,
+        compiledPiiExceptions: compiled.piiExceptions,
       });
       if (text !== span.status.message) span.status.message = text;
     }
@@ -376,12 +438,13 @@ export class OtlpSpanPiiRedactionService {
     policy: ResolvedDataPrivacy,
   ): void {
     if (!this.nativePassActive(policy)) return;
-    const compiled = this.nativeSecretPatterns(policy);
+    const compiled = this.compileNativePatterns(policy);
     if (log.body) {
       const { text } = redactStringNative({
         text: log.body,
         policy,
-        compiledSecretPatterns: compiled,
+        compiledSecretPatterns: compiled.secrets,
+        compiledPiiExceptions: compiled.piiExceptions,
       });
       if (text !== log.body) log.body = text;
     }
@@ -411,12 +474,10 @@ export class OtlpSpanPiiRedactionService {
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
       try {
-        const ran = await this.lambdaRedactSpan(
-          span,
-          resource,
-          "STRICT",
-          lambda.entities,
-        );
+        const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
+          entities: lambda.entities,
+          exceptPatterns: lambda.exceptPatterns,
+        });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
         // floor redacted the pattern-based identifiers but names/locations slip
@@ -468,9 +529,16 @@ export class OtlpSpanPiiRedactionService {
     span: OtlpSpan,
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<boolean> {
-    const options = await this.buildOptions(piiRedactionLevel, entities);
+    const options = await this.buildOptions(
+      piiRedactionLevel,
+      lambda?.entities,
+      lambda?.exceptPatterns,
+    );
     // No options means the analysis pass was skipped (disabled, or the service
     // is not configured outside production) — report that it did not run so the
     // caller can mark a requested strict pass as incomplete.
@@ -581,7 +649,10 @@ export class OtlpSpanPiiRedactionService {
     this.applyNativeLogPass(log, native.policy);
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
-      await this.lambdaRedactLog(log, "STRICT", lambda.entities);
+      await this.lambdaRedactLog(log, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
     }
   }
 
@@ -592,9 +663,16 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<void> {
-    const options = await this.buildOptions(piiRedactionLevel, entities);
+    const options = await this.buildOptions(
+      piiRedactionLevel,
+      lambda?.entities,
+      lambda?.exceptPatterns,
+    );
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -626,7 +704,7 @@ export class OtlpSpanPiiRedactionService {
       return;
     }
     if (this.nativePassActive(native.policy)) {
-      const compiled = this.nativeSecretPatterns(native.policy);
+      const compiled = this.compileNativePatterns(native.policy);
       this.redactRecordNative(metric.attributes, native.policy, compiled);
       this.redactRecordNative(
         metric.resourceAttributes,
@@ -636,11 +714,10 @@ export class OtlpSpanPiiRedactionService {
     }
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
-      await this.lambdaRedactMetricAttributes(
-        metric,
-        "STRICT",
-        lambda.entities,
-      );
+      await this.lambdaRedactMetricAttributes(metric, "STRICT", {
+        entities: lambda.entities,
+        exceptPatterns: lambda.exceptPatterns,
+      });
     }
   }
 
@@ -650,9 +727,16 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    entities?: readonly string[],
+    lambda?: {
+      entities?: readonly string[];
+      exceptPatterns?: readonly string[];
+    },
   ): Promise<void> {
-    const options = await this.buildOptions(piiRedactionLevel, entities);
+    const options = await this.buildOptions(
+      piiRedactionLevel,
+      lambda?.entities,
+      lambda?.exceptPatterns,
+    );
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -670,6 +754,7 @@ export class OtlpSpanPiiRedactionService {
   private async buildOptions(
     piiRedactionLevel: PIIRedactionLevel,
     entities?: readonly string[],
+    exceptPatterns?: readonly string[],
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_strict_presidio_redaction_disabled",
@@ -694,6 +779,9 @@ export class OtlpSpanPiiRedactionService {
       enforced: piiEnforced,
       mainMethod: "presidio",
       ...(entities && entities.length > 0 ? { entities } : {}),
+      ...(exceptPatterns && exceptPatterns.length > 0
+        ? { exceptPatterns }
+        : {}),
     };
   }
 

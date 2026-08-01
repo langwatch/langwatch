@@ -30,7 +30,7 @@ describe("useNewScenarioFlow()", () => {
     /** @scenario 'Show welcome screen on first scenario creation' */
     it("shows inline welcome", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       expect(result.current.showInlineWelcome).toBe(true);
@@ -38,7 +38,7 @@ describe("useNewScenarioFlow()", () => {
 
     it("shows welcome modal on handleNewScenario", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -52,7 +52,7 @@ describe("useNewScenarioFlow()", () => {
     /** @scenario 'Proceed from welcome screen to scenario creation' */
     it("opens create modal after proceeding from welcome", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -69,7 +69,7 @@ describe("useNewScenarioFlow()", () => {
 
     it("persists welcomeSeen in localStorage after proceeding", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -85,7 +85,7 @@ describe("useNewScenarioFlow()", () => {
 
     it("hides inline welcome after proceeding", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -101,7 +101,7 @@ describe("useNewScenarioFlow()", () => {
       localStorage.setItem(WELCOME_SEEN_KEY, "true");
 
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -116,7 +116,7 @@ describe("useNewScenarioFlow()", () => {
       localStorage.setItem(WELCOME_SEEN_KEY, "true");
 
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       expect(result.current.showInlineWelcome).toBe(false);
@@ -127,7 +127,7 @@ describe("useNewScenarioFlow()", () => {
     /** @scenario 'Skip welcome screen when scenarios already exist' */
     it("opens create modal directly on handleNewScenario", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 3, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 3, isLoading: false }),
       );
 
       act(() => {
@@ -142,7 +142,7 @@ describe("useNewScenarioFlow()", () => {
   describe("when data is still loading", () => {
     it("opens create modal instead of welcome modal", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: true })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: true }),
       );
 
       act(() => {
@@ -157,7 +157,7 @@ describe("useNewScenarioFlow()", () => {
   describe("when closing the create modal", () => {
     it("resets showCreateModal to false", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 3, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 3, isLoading: false }),
       );
 
       act(() => {
@@ -175,7 +175,7 @@ describe("useNewScenarioFlow()", () => {
   describe("when dismissing the welcome modal via onOpenChange", () => {
     it("closes the welcome modal", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {
@@ -193,7 +193,7 @@ describe("useNewScenarioFlow()", () => {
 
     it("persists welcomeSeen in localStorage on dismiss", () => {
       const { result } = renderHook(() =>
-        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
       );
 
       act(() => {

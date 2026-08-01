@@ -6,6 +6,26 @@ import type {
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
 
+/**
+ * A run carrying the two columns the shared mapper drops but an export needs.
+ *
+ * `scenarioSetId` — the UI resolves it per batch instead, but an "All Runs"
+ * export spans sets, so each row has to say which one it came from.
+ *
+ * `traceIds` — the run-level TraceIds column, unioned with the per-message
+ * trace ids by the exporter. On a 228-run sample the run-level column was a
+ * strict subset and contributed nothing, but the two are written by
+ * independent code paths and a run can finish with traces recorded and no
+ * message snapshot, so the union is kept as cheap insurance rather than
+ * because it currently adds ids.
+ *
+ * Both values are already on the ClickHouse row.
+ */
+export type ExportableRun = ScenarioRunData & {
+  scenarioSetId: string;
+  traceIds: string[];
+};
+
 export type AllSuitesRunDataResult =
   | { changed: false; lastUpdatedAt: number }
   | {
@@ -20,6 +40,8 @@ export type AllSuitesRunDataResult =
 export interface SimulationRepository {
   getScenarioSetsData(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]>;
 
   getScenarioRunData(params: {
@@ -32,6 +54,8 @@ export interface SimulationRepository {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<BatchHistoryResult>;
 
   getRunDataForBatchRun(params: {
@@ -59,14 +83,11 @@ export interface SimulationRepository {
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]>;
 
-  getScenarioRunDataByScenarioId(params: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null>;
-
   getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number>;
 
   getExternalSetSummaries(params: {
@@ -91,6 +112,19 @@ export interface SimulationRepository {
   }): Promise<AllSuitesRunDataResult>;
 
   /**
+   * Returns the latest UpdatedAt (Unix ms) across the project's runs in the
+   * given window — a cheap freshness signal the UI polls instead of re-reading
+   * run payloads. Includes archived rows on purpose: archiving bumps UpdatedAt,
+   * and the list must refresh to drop the archived run.
+   */
+  findLastUpdatedAt(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number>;
+
+  /**
    * Returns the run ids for a SPECIFIC scenario set — never the whole project.
    * `scenarioSetId` is required so callers cannot address every run in a tenant
    * with one unqualified request. Results are capped; `reachedCap` signals that
@@ -108,6 +142,36 @@ export interface SimulationRepository {
   getDistinctExternalSetIds(params: {
     projectIds: string[];
   }): Promise<Set<string>>;
+
+  /**
+   * Total runs an export sweep will visit, for the progress total. Shares its
+   * filter construction with findRunsForExport so the two cannot disagree.
+   */
+  countRunsForExport(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number>;
+
+  /**
+   * One forward-only page of runs for a CSV export, oldest first, keyset
+   * paginated. Callers drive it to exhaustion via `nextCursor`.
+   */
+  findRunsForExport(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }>;
 }
 
 export class NullSimulationRepository implements SimulationRepository {
@@ -139,10 +203,6 @@ export class NullSimulationRepository implements SimulationRepository {
     return [];
   }
 
-  async getScenarioRunDataByScenarioId(): Promise<ScenarioRunData[] | null> {
-    return null;
-  }
-
   async getBatchRunCountForScenarioSet(): Promise<number> {
     return 0;
   }
@@ -165,6 +225,10 @@ export class NullSimulationRepository implements SimulationRepository {
     };
   }
 
+  async findLastUpdatedAt(): Promise<number> {
+    return 0;
+  }
+
   async findAllRunIdsForSet(): Promise<{
     runIds: string[];
     reachedCap: boolean;
@@ -174,5 +238,17 @@ export class NullSimulationRepository implements SimulationRepository {
 
   async getDistinctExternalSetIds(): Promise<Set<string>> {
     return new Set();
+  }
+
+  async countRunsForExport(): Promise<number> {
+    return 0;
+  }
+
+  async findRunsForExport(): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    return { runs: [], hasMore: false };
   }
 }

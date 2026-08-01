@@ -36,9 +36,8 @@ find_free_port() {
 }
 
 APP_PORT=$(find_free_port 5560)
-BULLBOARD_PORT=$(find_free_port 3000)
 AI_SERVER_PORT=$(find_free_port 3456)
-export APP_PORT BULLBOARD_PORT AI_SERVER_PORT
+export APP_PORT AI_SERVER_PORT
 
 # Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
 # BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
@@ -109,7 +108,6 @@ $COMPOSE_CMD up -d
 # ---------------------------------------------------------------------------
 cat > .dev-port <<EOF
 APP_PORT=${APP_PORT}
-BULLBOARD_PORT=${BULLBOARD_PORT}
 AI_SERVER_PORT=${AI_SERVER_PORT}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
 VOLUME_PREFIX=${VOLUME_PREFIX}

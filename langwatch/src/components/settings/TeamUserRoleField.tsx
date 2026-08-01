@@ -1,10 +1,5 @@
-import {
-  createListCollection,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
+import { type OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useMemo } from "react";
 import { api } from "../../utils/api";
 import {
@@ -151,36 +146,35 @@ export const TeamRoleSelect = ({
 }) => {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const allRoleOptions = useMemo(
-    () => {
-      const constrainedOptions = [
-        ...Object.values(teamRolesOptions),
-        ...(customRoles.data ?? []).map((role): RoleOption => ({
+  const allRoleOptions = useMemo(() => {
+    const constrainedOptions = [
+      ...Object.values(teamRolesOptions),
+      ...(customRoles.data ?? []).map(
+        (role): RoleOption => ({
           label: role.name,
           value: `custom:${role.id}`,
           description:
             role.description ?? `${role.permissions.length} permissions`,
           isCustom: true,
           customRoleId: role.id,
-        })),
-      ].filter((option) =>
-        isTeamRoleAllowedForOrganizationRole({
-          organizationRole,
-          teamRole: option.value,
         }),
-      );
+      ),
+    ].filter((option) =>
+      isTeamRoleAllowedForOrganizationRole({
+        organizationRole,
+        teamRole: option.value,
+      }),
+    );
 
-      if (
-        value.value === MISSING_CUSTOM_ROLE_VALUE &&
-        !constrainedOptions.some((option) => option.value === value.value)
-      ) {
-        return [value, ...constrainedOptions];
-      }
+    if (
+      value.value === MISSING_CUSTOM_ROLE_VALUE &&
+      !constrainedOptions.some((option) => option.value === value.value)
+    ) {
+      return [value, ...constrainedOptions];
+    }
 
-      return constrainedOptions;
-    },
-    [customRoles.data, organizationRole, value],
-  );
+    return constrainedOptions;
+  }, [customRoles.data, organizationRole, value]);
 
   const correctedSelectedRole = useMemo(() => {
     const correctedValue = getAutoCorrectedTeamRoleForOrganizationRole({

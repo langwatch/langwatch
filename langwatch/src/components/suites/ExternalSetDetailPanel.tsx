@@ -9,18 +9,30 @@
 
 import {
   Box,
+  Button,
+  EmptyState,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
+import { GroupRow } from "./GroupRow";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+} from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
+import { RunRow } from "./RunRow";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -28,21 +40,18 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
-import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { ScenarioTabConnectedBadge } from "./ScenarioTabConnectedBadge";
 import { useAutoExpansion } from "./useAutoExpansion";
-import { useScrollToBatch } from "./useScrollToBatch";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
-import { RunRow } from "./RunRow";
-import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useScrollToBatch } from "./useScrollToBatch";
+import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
   period: Period;
   highlightBatchId?: string | null;
+  /** True when the SDK opened this tab, so new local runs land here. */
+  connectedToLocalRun?: boolean;
 };
 
 /** Group-by options available for external sets (no target). */
@@ -54,6 +63,7 @@ export function ExternalSetDetailPanel({
   scenarioSetId,
   period,
   highlightBatchId,
+  connectedToLocalRun = false,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -73,11 +83,20 @@ export function ExternalSetDetailPanel({
     ? groupBy
     : "none";
 
+  // Live updates: SSE invalidates getSuiteRunData directly; its connection
+  // state disables the fallback freshness polling below.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id,
+    debounceMs: 500,
+    filter: { scenarioSetId },
+  });
 
   const {
     data: runDataResult,
     isLoading,
     error,
+    refetch,
   } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -88,12 +107,23 @@ export function ExternalSetDetailPanel({
     },
     {
       enabled: !!project,
-      refetchInterval: 5000,
+      // No timer on the heavy query: SSE invalidations and the freshness
+      // probe below drive refetches, so quiet sets never re-download runs.
       trpc: { context: { skipBatch: true } },
     },
   );
 
-  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+  const runData =
+    runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+
+  useSuiteRunFreshness({
+    scenarioSetId,
+    startDateMs: period.startDate.getTime(),
+    endDateMs: period.endDate.getTime(),
+    runs: runData ?? [],
+    enabled: !!project,
+    sseConnected,
+  });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -189,11 +219,7 @@ export function ExternalSetDetailPanel({
   return (
     <VStack align="stretch" gap={0} height="100%">
       {/* Header */}
-      <HStack
-        paddingX={6}
-        paddingY={4}
-        justify="space-between"
-      >
+      <HStack paddingX={6} paddingY={4} justify="space-between">
         <VStack align="start" gap={0}>
           <Text
             fontSize="xs"
@@ -207,6 +233,7 @@ export function ExternalSetDetailPanel({
             {scenarioSetId}
           </Text>
         </VStack>
+        <ScenarioTabConnectedBadge visible={connectedToLocalRun} />
       </HStack>
 
       {/* Filter bar — fixed above the scrollable run list */}
@@ -216,6 +243,7 @@ export function ExternalSetDetailPanel({
           paddingY={4}
           bg="bg"
           flexShrink={0}
+          position="relative"
           _after={{
             content: '""',
             position: "absolute",
@@ -224,7 +252,8 @@ export function ExternalSetDetailPanel({
             right: 0,
             height: "5px",
             borderTop: "1px solid var(--chakra-colors-border-muted)",
-            background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+            background:
+              "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
             pointerEvents: "none",
           }}
         >
@@ -245,22 +274,30 @@ export function ExternalSetDetailPanel({
 
       {/* Content — scrollable */}
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
-        {isLoading && (
-          <VStack paddingY={8}>
-            <Spinner />
-            <Text fontSize="sm" color="fg.muted">
-              Loading run data...
-            </Text>
-          </VStack>
-        )}
+        {isLoading && <RunHistorySkeleton />}
 
+        {/* The alert is this panel's whole error surface: one component that
+            reads the handled payload, an authored non-5xx message, or the
+            generic unknown state, and carries the tips, docs link and
+            copyable error id with it. */}
         {error && (
-          <VStack paddingY={8}>
-            <Text color="red.500">Error loading run data</Text>
-            <Text fontSize="sm" color="fg.muted">
-              {error.message}
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <Box maxWidth="420px" width="100%">
+                <HandledErrorAlert
+                  error={error}
+                  fallbackTitle="Couldn't load run data"
+                />
+              </Box>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void refetch()}
+              >
+                <RefreshCw size={14} /> Try again
+              </Button>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
 
         {!isLoading && !error && runData && runData.length > 0 && (
@@ -289,7 +326,9 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
-                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                          isHighlighted={
+                            highlightedBatchId === batchRun.batchRunId
+                          }
                         />
                       );
                     })
@@ -314,11 +353,17 @@ export function ExternalSetDetailPanel({
         )}
 
         {!isLoading && !error && (!runData || runData.length === 0) && (
-          <VStack paddingY={8}>
-            <Text fontSize="sm" color="fg.muted">
-              No run data found for this set.
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <FlaskConical size={28} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>No runs yet</EmptyState.Title>
+              <EmptyState.Description>
+                No run data found for this set.
+              </EmptyState.Description>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>

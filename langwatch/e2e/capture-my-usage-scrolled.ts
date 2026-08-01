@@ -36,17 +36,30 @@ void (async () => {
   });
   const page = await context.newPage();
 
-  await page.goto(`${BASE_URL}/me`, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {});
-  await page.waitForSelector('text=/Claude Code/i', { timeout: 30_000 }).catch(() => {});
-  await page.waitForSelector('text=/Spent this month|SPENT THIS MONTH/i', { timeout: 30_000 }).catch(() => {});
+  await page
+    .goto(`${BASE_URL}/me`, { waitUntil: "domcontentloaded", timeout: 60_000 })
+    .catch(() => {});
+  await page
+    .waitForSelector("text=/Claude Code/i", { timeout: 30_000 })
+    .catch(() => {});
+  await page
+    .waitForSelector("text=/Spent this month|SPENT THIS MONTH/i", {
+      timeout: 30_000,
+    })
+    .catch(() => {});
   // Wait for at least one model row in the By-tool breakdown to render
-  await page.waitForSelector('text=/claude-sonnet|claude-opus|claude-haiku|gpt-5|gemini/i', { timeout: 30_000 }).catch(() => {});
+  await page
+    .waitForSelector(
+      "text=/claude-sonnet|claude-opus|claude-haiku|gpt-5|gemini/i",
+      { timeout: 30_000 },
+    )
+    .catch(() => {});
   // Don't strict-wait for "By tool" header — fall through if missing,
   // we'll see in the screenshot.
   await page.waitForTimeout(3000);
 
   // Scroll My Usage section into view
-  const myUsage = page.locator('text=/My Usage/i').first();
+  const myUsage = page.locator("text=/My Usage/i").first();
   if ((await myUsage.count()) > 0) {
     await myUsage.scrollIntoViewIfNeeded();
   }
@@ -59,10 +72,14 @@ void (async () => {
   await shoot(page, "37b-me-usage-fullpage", true);
 
   // Diagnostic: log whether By tool / Recent activity rendered
-  const byToolCount = await page.locator('text=/By tool/i').count();
-  const recentCount = await page.locator('text=/Recent activity/i').count();
-  console.log(`[diagnostic] 'By tool' rendered: ${byToolCount > 0 ? 'YES' : 'NO'}`);
-  console.log(`[diagnostic] 'Recent activity' rendered: ${recentCount > 0 ? 'YES' : 'NO'}`);
+  const byToolCount = await page.locator("text=/By tool/i").count();
+  const recentCount = await page.locator("text=/Recent activity/i").count();
+  console.log(
+    `[diagnostic] 'By tool' rendered: ${byToolCount > 0 ? "YES" : "NO"}`,
+  );
+  console.log(
+    `[diagnostic] 'Recent activity' rendered: ${recentCount > 0 ? "YES" : "NO"}`,
+  );
 
   await browser.close();
   console.log("done");

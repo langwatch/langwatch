@@ -2,7 +2,7 @@
  * @see specs/features/suites/rename-suites-to-runs.feature - Feature icon label scenarios
  */
 import { describe, expect, it } from "vitest";
-import { featureIcons } from "../featureIcons";
+import { featureIcons, recentItemTypeToFeature } from "../featureIcons";
 
 describe("featureIcons", () => {
   describe("when the suites feature icon configuration is read", () => {
@@ -13,8 +13,15 @@ describe("featureIcons", () => {
   });
 
   describe("when the simulation runs feature icon configuration is read", () => {
+    /** @scenario 'Feature icon label for simulation runs is "Runs"' */
     it("has label 'Runs'", () => {
       expect(featureIcons.simulation_runs.label).toBe("Runs");
+    });
+  });
+
+  describe("when an online evaluation appears in recent items", () => {
+    it("uses the online evaluations feature identity", () => {
+      expect(recentItemTypeToFeature.evaluation).toBe("online_evaluations");
     });
   });
 });

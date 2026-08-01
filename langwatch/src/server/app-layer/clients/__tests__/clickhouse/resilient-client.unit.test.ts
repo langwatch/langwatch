@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   mockQueryLogger: {
@@ -16,7 +16,7 @@ const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: (name: string) =>
     name.includes("query") ? mockQueryLogger : mockLogger,
 }));
@@ -102,7 +102,7 @@ describe("createResilientClickHouseClient()", () => {
           operation: "insert",
           attempt: 1,
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -121,7 +121,7 @@ describe("createResilientClickHouseClient()", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" })
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
       ).rejects.toThrow("Table does_not_exist doesn't exist");
       expect(mock.insert).toHaveBeenCalledTimes(1);
     });
@@ -140,7 +140,7 @@ describe("createResilientClickHouseClient()", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" })
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
       ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
       expect(mock.insert).toHaveBeenCalledTimes(3);
     });
@@ -180,7 +180,7 @@ describe("createResilientClickHouseClient()", () => {
           source: "clickhouse",
           operation: "query",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -197,9 +197,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
@@ -214,16 +214,16 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
 
       expect(mockQueryLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
 
@@ -237,9 +237,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
 
       const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
         string,
@@ -333,9 +333,9 @@ describe("createResilientClickHouseClient()", () => {
         maxRetries: 3,
       });
 
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("Syntax error in query");
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
     });
   });
 
@@ -390,103 +390,34 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when query exceeds default duration threshold (1s)", () => {
-    it("logs at warn level with query preview", async () => {
+  describe("when a query cold-scans a time-partitioned table", () => {
+    it("logs a cold-scan warning naming the table", async () => {
       const queryResult = { response_headers: {} };
       const mock = makeMockClient({
-        query: vi.fn().mockImplementation(async () => {
-          await new Promise((r) => setTimeout(r, 1100));
-          return queryResult;
-        }),
+        query: vi.fn().mockResolvedValue(queryResult),
       });
       const client = createResilientClickHouseClient({ client: mock });
 
-      await client.query({ query: "SELECT * FROM big_table WHERE x = 1" });
+      await client.query({
+        query:
+          "SELECT SpanId FROM stored_spans WHERE TenantId = {tenantId:String}",
+      });
 
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
-          query: expect.stringContaining("SELECT * FROM big_table"),
+          coldScan: true,
+          coldScanTable: "stored_spans",
         }),
-        expect.stringContaining("ClickHouse slow query")
+        expect.stringContaining("cold scan of stored_spans"),
       );
       expect(mockQueryLogger.debug).not.toHaveBeenCalled();
     });
   });
 
-  describe("when query result exceeds default size threshold (3MB)", () => {
-    it("logs at warn level with readBytes", async () => {
-      const queryResult = {
-        response_headers: {
-          "x-clickhouse-summary": JSON.stringify({ read_bytes: "4000000" }),
-        },
-      };
-      const mock = makeMockClient({
-        query: vi.fn().mockResolvedValue(queryResult),
-      });
-      const client = createResilientClickHouseClient({ client: mock });
-
-      await client.query({ query: "SELECT messages FROM traces" });
-
-      expect(mockQueryLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: "clickhouse",
-          operation: "query",
-          readBytes: 4000000,
-        }),
-        expect.stringContaining("3.0MB expected")
-      );
-    });
-  });
-
-  describe("when query is fast and light", () => {
+  describe("when a successful query does not cold-scan", () => {
     it("logs at debug level only", async () => {
-      const queryResult = {
-        response_headers: {
-          "x-clickhouse-summary": JSON.stringify({ read_bytes: "500" }),
-        },
-      };
-      const mock = makeMockClient({
-        query: vi.fn().mockResolvedValue(queryResult),
-      });
-      const client = createResilientClickHouseClient({ client: mock });
-
-      await client.query({ query: "SELECT count() FROM t" });
-
-      expect(mockQueryLogger.debug).toHaveBeenCalled();
-      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when per-query expectations override defaults", () => {
-    it("uses custom thresholds for slow query detection", async () => {
-      const queryResult = {
-        response_headers: {
-          "x-clickhouse-summary": JSON.stringify({ read_bytes: "4000000" }),
-        },
-      };
-      const mock = makeMockClient({
-        query: vi.fn().mockResolvedValue(queryResult),
-      });
-      const client = createResilientClickHouseClient({ client: mock });
-
-      // 4MB is over the default 3MB, but under the custom 5MB
-      await client.query({
-        query: "SELECT * FROM heavy_table",
-        clickhouse_settings: {
-          langwatch_expected_max_duration_ms: 5000,
-          langwatch_expected_max_read_bytes: 5_000_000,
-        },
-      } as any);
-
-      expect(mockQueryLogger.debug).toHaveBeenCalled();
-      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when langwatch_* settings are passed", () => {
-    it("strips them before forwarding to ClickHouse", async () => {
       const queryResult = { response_headers: {} };
       const mock = makeMockClient({
         query: vi.fn().mockResolvedValue(queryResult),
@@ -494,43 +425,11 @@ describe("createResilientClickHouseClient()", () => {
       const client = createResilientClickHouseClient({ client: mock });
 
       await client.query({
-        query: "SELECT 1",
-        clickhouse_settings: {
-          max_memory_usage: 1000000,
-          langwatch_expected_max_duration_ms: 5000,
-          langwatch_expected_max_read_bytes: 10_000_000,
-        },
-      } as any);
-
-      const forwarded = (mock.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-      expect(forwarded.clickhouse_settings).toEqual({
-        max_memory_usage: 1000000,
+        query: "SELECT count() FROM t WHERE TenantId = {tenantId:String}",
       });
-      expect(forwarded.clickhouse_settings).not.toHaveProperty("langwatch_expected_max_duration_ms");
-      expect(forwarded.clickhouse_settings).not.toHaveProperty("langwatch_expected_max_read_bytes");
-    });
-  });
 
-  describe("when both duration and size exceed thresholds", () => {
-    it("includes both reasons in the warn message", async () => {
-      const queryResult = {
-        response_headers: {
-          "x-clickhouse-summary": JSON.stringify({ read_bytes: "5000000" }),
-        },
-      };
-      const mock = makeMockClient({
-        query: vi.fn().mockImplementation(async () => {
-          await new Promise((r) => setTimeout(r, 1100));
-          return queryResult;
-        }),
-      });
-      const client = createResilientClickHouseClient({ client: mock });
-
-      await client.query({ query: "SELECT * FROM huge" });
-
-      const msg = mockQueryLogger.warn.mock.calls[0]![1] as string;
-      expect(msg).toContain("ms >");
-      expect(msg).toContain("MB >");
+      expect(mockQueryLogger.debug).toHaveBeenCalled();
+      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
     });
   });
 
@@ -552,5 +451,47 @@ describe("createResilientClickHouseClient()", () => {
       await client.close();
       expect(mock.close).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("query error translation after retries are exhausted", () => {
+  it("throws QueryMemoryExceededError for a 241 driver error, preserving the raw error in reasons", async () => {
+    const raw = new Error(
+      "Code: 241. DB::Exception: Memory limit (for query) exceeded. (MEMORY_LIMIT_EXCEEDED)",
+    );
+    const mock = makeMockClient({
+      query: vi.fn().mockRejectedValue(raw),
+    });
+    const client = createResilientClickHouseClient({
+      client: mock,
+      maxRetries: 1,
+      baseDelayMs: 1,
+    });
+
+    const { QueryMemoryExceededError } = await import(
+      "~/server/app-layer/traces/errors"
+    );
+    const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
+
+    expect(rejection).toBeInstanceOf(QueryMemoryExceededError);
+    expect(rejection.reasons).toEqual([raw]);
+    // Retries happened first — translation only fires after exhaustion.
+    expect(mock.query).toHaveBeenCalledTimes(2);
+  });
+
+  it("rethrows unmapped driver errors unchanged", async () => {
+    const raw = new Error("Code: 62. DB::Exception: Syntax error");
+    const mock = makeMockClient({
+      query: vi.fn().mockRejectedValue(raw),
+    });
+    const client = createResilientClickHouseClient({
+      client: mock,
+      maxRetries: 1,
+      baseDelayMs: 1,
+    });
+
+    const rejection = await client.query({ query: "SELECT 1" }).catch((e) => e);
+
+    expect(rejection).toBe(raw);
   });
 });

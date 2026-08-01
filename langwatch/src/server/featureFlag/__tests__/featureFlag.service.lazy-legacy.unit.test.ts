@@ -28,7 +28,10 @@ vi.mock("../featureFlagService.posthog", () => ({
   FeatureFlagServicePostHog: {
     create: () => {
       posthogCreateSpy();
-      return { isEnabled: vi.fn().mockResolvedValue(false), isAvailable: () => true };
+      return {
+        isEnabled: vi.fn().mockResolvedValue(false),
+        isAvailable: () => true,
+      };
     },
   },
 }));
@@ -37,12 +40,15 @@ vi.mock("../featureFlagService.memory", () => ({
   FeatureFlagServiceMemory: {
     create: () => {
       memoryCreateSpy();
-      return { isEnabled: vi.fn().mockResolvedValue(false), isAvailable: () => true };
+      return {
+        isEnabled: vi.fn().mockResolvedValue(false),
+        isAvailable: () => true,
+      };
     },
   },
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -123,8 +129,14 @@ describe("FeatureFlagService legacy backend construction", () => {
       it("constructs it only once across repeated evaluations", async () => {
         const service = buildService();
 
-        await service.isEnabled(PRODUCT_FLAG, { distinctId: "user-1", defaultValue: false });
-        await service.isEnabled(PRODUCT_FLAG, { distinctId: "user-2", defaultValue: false });
+        await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-1",
+          defaultValue: false,
+        });
+        await service.isEnabled(PRODUCT_FLAG, {
+          distinctId: "user-2",
+          defaultValue: false,
+        });
 
         expect(posthogCreateSpy).toHaveBeenCalledTimes(1);
       });

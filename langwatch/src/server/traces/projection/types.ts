@@ -14,8 +14,8 @@
  */
 
 import { z } from "zod";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 
 /**
  * Entity roots the DSL can read `from`. Only "traces" ships in M1; the RFC

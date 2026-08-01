@@ -11,8 +11,8 @@ export function CommandBarFooter({ isMac }: CommandBarFooterProps) {
   return (
     <HStack
       borderTop="1px solid"
-      borderColor="border.muted"
-      px={4}
+      borderColor="border.subtle"
+      px={{ base: 4, md: 5 }}
       py={2.5}
       gap={5}
       fontSize="12px"

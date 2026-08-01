@@ -41,7 +41,7 @@ Feature: Evaluator Slug Generation
     Given a new evaluator with name "LLM Judge (v2.0) - Beta!"
     When the evaluator is created
     Then the slug should contain only lowercase letters, numbers, and hyphens
-    And the slug should match pattern "llm-judge-v2-0-beta-XXXXX"
+    And the slug should match pattern "llm-judge-v20-beta-XXXXX"
 
   Scenario: Handle unicode characters in name
     Given a new evaluator with name "Safety Check"

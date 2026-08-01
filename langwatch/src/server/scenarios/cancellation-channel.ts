@@ -8,7 +8,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:scenarios:cancellation-channel");
 
@@ -30,7 +30,10 @@ export interface CancellationPublisher {
 /** Minimal subscriber interface (subset of ioredis). */
 export interface CancellationSubscriber {
   subscribe(channel: string): Promise<unknown>;
-  on(event: "message", handler: (channel: string, message: string) => void): void;
+  on(
+    event: "message",
+    handler: (channel: string, message: string) => void,
+  ): void;
   quit(): Promise<unknown>;
 }
 
@@ -50,7 +53,10 @@ export async function publishCancellation({
 }): Promise<void> {
   const payload = JSON.stringify(message);
   await publisher.publish(CANCELLATION_CHANNEL, payload);
-  logger.debug({ scenarioRunId: message.scenarioRunId, batchRunId: message.batchRunId }, "Cancellation published");
+  logger.debug(
+    { scenarioRunId: message.scenarioRunId, batchRunId: message.batchRunId },
+    "Cancellation published",
+  );
 }
 
 /**

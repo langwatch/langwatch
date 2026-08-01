@@ -50,9 +50,9 @@ export function PersonalFeatureGateDialog({
         <Dialog.Body>
           <VStack align="start" gap={3}>
             <Text fontSize="sm">
-              {label} is part of the advanced-features bundle for your
-              personal workspace. Turning it on enables Evaluations,
-              Datasets, Annotations, and Automations together.
+              {label} is part of the advanced-features bundle for your personal
+              workspace. Turning it on enables Evaluations, Datasets,
+              Annotations, and Automations together.
             </Text>
             <Text fontSize="xs" color="fg.muted">
               You can disable them later in /me/configure, your data is

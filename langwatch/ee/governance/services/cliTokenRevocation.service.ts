@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-
 import { connection as defaultRedisConnection } from "~/server/redis";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
@@ -23,7 +22,7 @@ type RedisLike = Redis | Cluster;
  * CLI endpoint. Without this revoker, a deactivated user's existing
  * access_token continues to authenticate against the control plane until
  * the 1h TTL expires, and their refresh_token continues to mint new
- * access tokens for up to 30d.
+ * access tokens for up to the refresh-token idle window (90d by default).
  *
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  *

@@ -2,12 +2,13 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
+import { LATEST_ALIAS_PROVIDERS } from "../../server/modelProviders/latestAliases";
 import { modelSelectorOptions } from "../ModelSelector";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "../settings/ProviderModelSelector";
-import { LATEST_ALIAS_PROVIDERS } from "../../server/modelProviders/latestAliases";
 
 /**
  * Model picker for the scenario user-simulator and judge roles.
@@ -64,8 +65,7 @@ export function SimulationModelSelect({
     const registry = modelSelectorOptions
       .filter(
         (o) =>
-          o.mode === "chat" &&
-          enabledKeys.has(o.value.split("/")[0] ?? ""),
+          o.mode === "chat" && enabledKeys.has(o.value.split("/")[0] ?? ""),
       )
       .map((o) => o.value);
 
@@ -78,6 +78,12 @@ export function SimulationModelSelect({
 
     return Array.from(new Set([...aliases, ...custom, ...registry]));
   }, [projectProviders.data]);
+
+  // Configured custom-model display names, keyed by `<provider>/<modelId>`.
+  const displayNames = useMemo(
+    () => buildCustomModelDisplayNames(projectProviders.data?.providers ?? []),
+    [projectProviders.data],
+  );
 
   const inheritModel = resolvedDefault.data?.model ?? "";
 
@@ -98,6 +104,7 @@ export function SimulationModelSelect({
             ? { model: inheritModel, label: "Default model" }
             : undefined
         }
+        displayNames={displayNames}
       />
     </VStack>
   );

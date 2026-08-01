@@ -558,7 +558,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/runs/{runId}": {
+    "/api/experiments/runs/{runId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -575,7 +575,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/{slug}/run": {
+    "/api/experiments/{slug}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -640,239 +640,6 @@ export interface paths {
         post?: never;
         /** @description Archive (soft-delete) an evaluator */
         delete: operations["deleteApiEvaluatorsById"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/budgets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List budgets applicable to the project
-         * @description Returns every budget that could apply to requests routed through this project — org, team, and project scope. VK and principal-scoped budgets are returned via their detail pages.
-         */
-        get: operations["getApiGatewayV1Budgets"];
-        put?: never;
-        /**
-         * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).
-         */
-        post: operations["postApiGatewayV1Budgets"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/budgets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Archive budget
-         * @description Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
-         */
-        delete: operations["deleteApiGatewayV1BudgetsById"];
-        options?: never;
-        head?: never;
-        /**
-         * Update budget
-         * @description Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.
-         */
-        patch: operations["patchApiGatewayV1BudgetsById"];
-        trace?: never;
-    };
-    "/api/gateway/v1/cache-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List cache-control rules
-         * @description Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.
-         */
-        get: operations["getApiGatewayV1Cache-rules"];
-        put?: never;
-        /**
-         * Create a cache rule
-         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.
-         */
-        post: operations["postApiGatewayV1Cache-rules"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/cache-rules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a cache rule
-         * @description Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).
-         */
-        get: operations["getApiGatewayV1Cache-rulesById"];
-        put?: never;
-        post?: never;
-        /**
-         * Archive a cache rule
-         * @description Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
-         */
-        delete: operations["deleteApiGatewayV1Cache-rulesById"];
-        options?: never;
-        head?: never;
-        /**
-         * Update a cache rule
-         * @description Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.
-         */
-        patch: operations["patchApiGatewayV1Cache-rulesById"];
-        trace?: never;
-    };
-    "/api/gateway/v1/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List provider bindings
-         * @description Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.
-         */
-        get: operations["getApiGatewayV1Providers"];
-        put?: never;
-        /**
-         * Bind a model provider to the gateway
-         * @description Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).
-         */
-        post: operations["postApiGatewayV1Providers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/providers/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Disable provider binding
-         * @description Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.
-         */
-        delete: operations["deleteApiGatewayV1ProvidersById"];
-        options?: never;
-        head?: never;
-        /**
-         * Update provider binding
-         * @description Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.
-         */
-        patch: operations["patchApiGatewayV1ProvidersById"];
-        trace?: never;
-    };
-    "/api/gateway/v1/virtual-keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List virtual keys
-         * @description Returns every non-archived virtual key in the caller's project, ordered by creation time.
-         */
-        get: operations["getApiGatewayV1Virtual-keys"];
-        put?: never;
-        /**
-         * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash.
-         */
-        post: operations["postApiGatewayV1Virtual-keys"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/virtual-keys/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get virtual key */
-        get: operations["getApiGatewayV1Virtual-keysById"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update virtual key
-         * @description Partial update — send only the fields you want to change. `provider_credential_ids` replaces the entire fallback chain. `config` is deep-merged.
-         */
-        patch: operations["patchApiGatewayV1Virtual-keysById"];
-        trace?: never;
-    };
-    "/api/gateway/v1/virtual-keys/{id}/revoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Revoke virtual key
-         * @description Marks the virtual key as revoked. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period).
-         */
-        post: operations["postApiGatewayV1Virtual-keysByIdRevoke"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gateway/v1/virtual-keys/{id}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rotate virtual key secret
-         * @description Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.
-         */
-        post: operations["postApiGatewayV1Virtual-keysByIdRotate"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1207,7 +974,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenario-events"];
-        /** @description Delete all events */
+        /** @description Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported. */
         delete: operations["deleteApiScenario-events"];
         options?: never;
         head?: never;
@@ -1623,7 +1390,7 @@ export interface paths {
                                 evaluation_id?: string;
                                 /** @example Ragas Answer Relevancy */
                                 name?: string;
-                                /** @example ragas/answer_relevancy */
+                                /** @example ragas/response_relevancy */
                                 type?: string;
                                 /** @example trace_BKZL_X0TKSD4oa1aBJTc_ */
                                 trace_id?: string;
@@ -1877,6 +1644,440 @@ export interface paths {
         head?: never;
         /** @description Update a workflow's metadata (name, icon, description) */
         patch: operations["patchApiWorkflowsById"];
+        trace?: never;
+    };
+    "/api/model-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
+        get: operations["getApiModel-defaults"];
+        put?: never;
+        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
+        post: operations["postApiModel-defaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
+        put: operations["putApiModel-defaultsById"];
+        post?: never;
+        /** @description Delete a default-model config. Scope attachments cascade. */
+        delete: operations["deleteApiModel-defaultsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates
+         * @description Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.
+         */
+        get: operations["getApiGovernanceIngestion-templates"];
+        put?: never;
+        /**
+         * Create org-authored ingestion template
+         * @description Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.
+         */
+        post: operations["postApiGovernanceIngestion-templates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates (admin shape, includes OTTL)
+         * @description Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.
+         */
+        get: operations["getApiGovernanceIngestion-templatesAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ingestion template
+         * @description Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).
+         */
+        get: operations["getApiGovernanceIngestion-templatesById"];
+        put?: never;
+        post?: never;
+        /**
+         * Soft-archive an org-authored template
+         * @description Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.
+         */
+        delete: operations["deleteApiGovernanceIngestion-templatesById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}/ottl-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace ottl_rules on an org-authored template
+         * @description Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.
+         */
+        patch: operations["patchApiGovernanceIngestion-templatesByIdOttl-rules"];
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clone a platform-published template into the caller's org
+         * @description Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
+         */
+        post: operations["postApiGovernanceIngestion-templatesClone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`. */
+        post: operations["postApiEventsTrack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/{traceId}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update trace metadata
+         * @description Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
+         */
+        patch: operations["patchApiTracesByTraceIdMetadata"];
+        trace?: never;
+    };
+    "/api/gateway/v1/virtual-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List virtual keys
+         * @description Returns every virtual key visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Ordered by creation time.
+         */
+        get: operations["getApiGatewayV1Virtual-keys"];
+        put?: never;
+        /**
+         * Create virtual key
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+         */
+        post: operations["postApiGatewayV1Virtual-keys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/virtual-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get virtual key */
+        get: operations["getApiGatewayV1Virtual-keysById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update virtual key
+         * @description Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         */
+        patch: operations["patchApiGatewayV1Virtual-keysById"];
+        trace?: never;
+    };
+    "/api/gateway/v1/virtual-keys/{id}/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a virtual key's spend
+         * @description Aggregate spend and request count for one key over a window (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
+         */
+        get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/virtual-keys/{id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate virtual key secret
+         * @description Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.
+         */
+        post: operations["postApiGatewayV1Virtual-keysByIdRotate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/virtual-keys/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke virtual key
+         * @description Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.
+         */
+        post: operations["postApiGatewayV1Virtual-keysByIdRevoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provider bindings
+         * @description Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.
+         */
+        get: operations["getApiGatewayV1Providers"];
+        put?: never;
+        /**
+         * Bind a model provider to the gateway
+         * @description Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).
+         */
+        post: operations["postApiGatewayV1Providers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List budgets
+         * @description Returns every non-archived budget in the caller's organization across all six scope types (organization / team / project / virtual_key / principal / group), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.
+         */
+        get: operations["getApiGatewayV1Budgets"];
+        put?: never;
+        /**
+         * Create budget
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
+         */
+        post: operations["postApiGatewayV1Budgets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/budgets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Archive budget
+         * @description Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
+         */
+        delete: operations["deleteApiGatewayV1BudgetsById"];
+        options?: never;
+        head?: never;
+        /**
+         * Update budget
+         * @description Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.
+         */
+        patch: operations["patchApiGatewayV1BudgetsById"];
+        trace?: never;
+    };
+    "/api/gateway/v1/providers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disable provider binding
+         * @description Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.
+         */
+        delete: operations["deleteApiGatewayV1ProvidersById"];
+        options?: never;
+        head?: never;
+        /**
+         * Update provider binding
+         * @description Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.
+         */
+        patch: operations["patchApiGatewayV1ProvidersById"];
+        trace?: never;
+    };
+    "/api/gateway/v1/cache-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List cache-control rules
+         * @description Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.
+         */
+        get: operations["getApiGatewayV1Cache-rules"];
+        put?: never;
+        /**
+         * Create a cache rule
+         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.
+         */
+        post: operations["postApiGatewayV1Cache-rules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/cache-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a cache rule
+         * @description Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).
+         */
+        get: operations["getApiGatewayV1Cache-rulesById"];
+        put?: never;
+        post?: never;
+        /**
+         * Archive a cache rule
+         * @description Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
+         */
+        delete: operations["deleteApiGatewayV1Cache-rulesById"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a cache rule
+         * @description Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.
+         */
+        patch: operations["patchApiGatewayV1Cache-rulesById"];
         trace?: never;
     };
 }
@@ -2533,7 +2734,7 @@ export interface operations {
                     negateFilters?: boolean;
                     series: {
                         /** @enum {string} */
-                        metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
+                        metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
                         key?: string;
                         subkey?: string;
                         /** @enum {string} */
@@ -3357,7 +3558,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The run ID returned from POST /api/evaluations/v3/{slug}/run */
+                /** @description The run ID returned from POST /api/experiments/{slug}/run */
                 runId: string;
             };
             cookie?: never;
@@ -3954,1652 +4155,6 @@ export interface operations {
             };
             /** @description Evaluator not found */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getApiGatewayV1Budgets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Applicable budgets */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            organization_id: string;
-                            scope_type: string;
-                            scope_id: string;
-                            name: string;
-                            description: string | null;
-                            window: string;
-                            /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
-                            limit_usd: string;
-                            spent_usd: string;
-                            resets_at: string;
-                            archived_at: string | null;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    postApiGatewayV1Budgets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Budget created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        budget: {
-                            id: string;
-                            organization_id: string;
-                            scope_type: string;
-                            scope_id: string;
-                            name: string;
-                            description: string | null;
-                            window: string;
-                            /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
-                            limit_usd: string;
-                            spent_usd: string;
-                            resets_at: string;
-                            archived_at: string | null;
-                        };
-                    };
-                };
-            };
-            /** @description Validation error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    deleteApiGatewayV1BudgetsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Archived */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        budget: {
-                            id: string;
-                            organization_id: string;
-                            scope_type: string;
-                            scope_id: string;
-                            name: string;
-                            description: string | null;
-                            window: string;
-                            /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
-                            limit_usd: string;
-                            spent_usd: string;
-                            resets_at: string;
-                            archived_at: string | null;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    patchApiGatewayV1BudgetsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        budget: {
-                            id: string;
-                            organization_id: string;
-                            scope_type: string;
-                            scope_id: string;
-                            name: string;
-                            description: string | null;
-                            window: string;
-                            /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
-                            limit_usd: string;
-                            spent_usd: string;
-                            resets_at: string;
-                            archived_at: string | null;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "getApiGatewayV1Cache-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cache rules for the organisation */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            organization_id: string;
-                            name: string;
-                            description: string | null;
-                            priority: number;
-                            enabled: boolean;
-                            matchers: {
-                                [key: string]: unknown;
-                            };
-                            action: {
-                                /** @enum {string} */
-                                mode: "respect" | "force" | "disable";
-                                ttl?: number;
-                                salt?: string;
-                            };
-                            /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
-                            archived_at: string | null;
-                            created_at: string;
-                            updated_at: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiGatewayV1Cache-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        cache_rule: {
-                            id: string;
-                            organization_id: string;
-                            name: string;
-                            description: string | null;
-                            priority: number;
-                            enabled: boolean;
-                            matchers: {
-                                [key: string]: unknown;
-                            };
-                            action: {
-                                /** @enum {string} */
-                                mode: "respect" | "force" | "disable";
-                                ttl?: number;
-                                salt?: string;
-                            };
-                            /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
-                            archived_at: string | null;
-                            created_at: string;
-                            updated_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Validation error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "getApiGatewayV1Cache-rulesById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The rule */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        cache_rule: {
-                            id: string;
-                            organization_id: string;
-                            name: string;
-                            description: string | null;
-                            priority: number;
-                            enabled: boolean;
-                            matchers: {
-                                [key: string]: unknown;
-                            };
-                            action: {
-                                /** @enum {string} */
-                                mode: "respect" | "force" | "disable";
-                                ttl?: number;
-                                salt?: string;
-                            };
-                            /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
-                            archived_at: string | null;
-                            created_at: string;
-                            updated_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "deleteApiGatewayV1Cache-rulesById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Archived */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        cache_rule: {
-                            id: string;
-                            organization_id: string;
-                            name: string;
-                            description: string | null;
-                            priority: number;
-                            enabled: boolean;
-                            matchers: {
-                                [key: string]: unknown;
-                            };
-                            action: {
-                                /** @enum {string} */
-                                mode: "respect" | "force" | "disable";
-                                ttl?: number;
-                                salt?: string;
-                            };
-                            /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
-                            archived_at: string | null;
-                            created_at: string;
-                            updated_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "patchApiGatewayV1Cache-rulesById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        cache_rule: {
-                            id: string;
-                            organization_id: string;
-                            name: string;
-                            description: string | null;
-                            priority: number;
-                            enabled: boolean;
-                            matchers: {
-                                [key: string]: unknown;
-                            };
-                            action: {
-                                /** @enum {string} */
-                                mode: "respect" | "force" | "disable";
-                                ttl?: number;
-                                salt?: string;
-                            };
-                            /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
-                            archived_at: string | null;
-                            created_at: string;
-                            updated_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getApiGatewayV1Providers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Provider bindings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            model_provider_id: string;
-                            model_provider_name: string;
-                            slot: string;
-                            rate_limit_rpm: number | null;
-                            rate_limit_tpm: number | null;
-                            rate_limit_rpd: number | null;
-                            rotation_policy: string;
-                            fallback_priority_global: number | null;
-                            health_status: string;
-                            disabled_at: string | null;
-                            created_at: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    postApiGatewayV1Providers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Binding created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    deleteApiGatewayV1ProvidersById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Disabled */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                            disabled_at: string | null;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    patchApiGatewayV1ProvidersById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "getApiGatewayV1Virtual-keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Virtual keys for the project */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiGatewayV1Virtual-keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Virtual key created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        virtual_key: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        };
-                        secret: string;
-                    };
-                };
-            };
-            /** @description Validation error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "getApiGatewayV1Virtual-keysById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Virtual key detail */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        virtual_key: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "patchApiGatewayV1Virtual-keysById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        virtual_key: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Validation error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiGatewayV1Virtual-keysByIdRevoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Revoked */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        virtual_key: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiGatewayV1Virtual-keysByIdRotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Rotated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        virtual_key: {
-                            id: string;
-                            display_prefix: string;
-                            name: string;
-                            description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
-                            status: "active" | "revoked";
-                            principal_user_id: string | null;
-                            provider_credential_ids: string[];
-                            revision: string;
-                            last_used_at: string | null;
-                            created_at: string;
-                        };
-                        secret: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7358,7 +5913,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     }[];
@@ -7459,7 +6014,7 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                 };
@@ -7560,7 +6115,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8037,7 +6592,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8146,7 +6701,7 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                     /** @enum {string} */
@@ -8250,7 +6805,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8508,7 +7063,7 @@ export interface operations {
                             } | null;
                         };
                     };
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                     localVersion?: number;
@@ -8614,7 +7169,7 @@ export interface operations {
                                 versionId: string;
                             }[];
                             /** @default {} */
-                            config: {
+                            parameters: {
                                 [key: string]: unknown;
                             };
                         };
@@ -8961,7 +7516,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     }[];
@@ -9135,7 +7690,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -9397,9 +7952,6 @@ export interface operations {
                             /** @constant */
                             type: "text";
                             text?: string;
-                        } | {
-                            /** @constant */
-                            type: "text";
                             content?: string;
                         } | {
                             text: string;
@@ -9422,14 +7974,19 @@ export interface operations {
                             toolName?: string;
                             toolCallId?: string;
                             result?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            data?: string;
+                            url?: string;
+                            id?: string;
+                            filename?: string;
                         })[] | null;
                         parts?: ({
                             /** @constant */
                             type: "text";
                             text?: string;
-                        } | {
-                            /** @constant */
-                            type: "text";
                             content?: string;
                         } | {
                             text: string;
@@ -9452,6 +8009,14 @@ export interface operations {
                             toolName?: string;
                             toolCallId?: string;
                             result?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            data?: string;
+                            url?: string;
+                            id?: string;
+                            filename?: string;
                         })[];
                         function_call?: {
                             name?: string;
@@ -9623,14 +8188,17 @@ export interface operations {
     };
     "deleteApiScenario-events": {
         parameters: {
-            query?: never;
+            query?: {
+                batchRunId?: string;
+                scenarioSetId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Events deleted successfully */
+            /** @description Matching runs archived successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9642,7 +8210,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
+            /** @description No scope provided — a batchRunId or scenarioSetId is required */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -9650,7 +8218,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };
@@ -11777,6 +10344,18 @@ export interface operations {
                     /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. */
                     includeSpans?: boolean;
                     llmMode?: boolean;
+                    /**
+                     * @description Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
+                     * @enum {string}
+                     */
+                    dateField?: "occurred" | "updated";
+                    /**
+                     * @description Entity root to read from. Only 'traces' is supported today. Defaults to 'traces' when 'select' is present.
+                     * @enum {string}
+                     */
+                    from?: "traces";
+                    /** @description Flat list of dotted-path columns to project, e.g. ['trace_id','metadata.user_id','events.type','evaluations.score']. Paths group by root in the response: scalar fields stay top-level, 'metadata.*' nests under a metadata object, and 'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is unchanged from the legacy shape. */
+                    select?: string[];
                 };
             };
         };
@@ -11792,6 +10371,15 @@ export interface operations {
                         pagination: {
                             totalHits: number;
                             scrollId?: string;
+                        };
+                        /** @description Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader. */
+                        schema?: {
+                            from: string;
+                            columns: {
+                                path: string;
+                                type: string;
+                                collection: boolean;
+                            }[];
                         };
                     };
                 };
@@ -12765,6 +11353,3065 @@ export interface operations {
             };
             /** @description Workflow not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        scope: {
+                            projectId: string;
+                            teamId: string | null;
+                            organizationId: string | null;
+                            organizationName: string | null;
+                        };
+                        effective: {
+                            DEFAULT: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            FAST: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            EMBEDDINGS: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                        };
+                        configs: {
+                            id: string;
+                            config: {
+                                [key: string]: string;
+                            };
+                            scopes: {
+                                /** @enum {string} */
+                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                id: string;
+                                name: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config: {
+                        [key: string]: string;
+                    };
+                    scopes: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "putApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config?: {
+                        [key: string]: string;
+                    };
+                    scopes?: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Templates visible to the caller */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGovernanceIngestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Template created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templatesAdmin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templatesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Template detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiGovernanceIngestion-templatesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        archived: true;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Platform template immutable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "patchApiGovernanceIngestion-templatesByIdOttl-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Platform template immutable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGovernanceIngestion-templatesClone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cloned */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Source template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiEventsTrack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event tracked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "Event tracked";
+                    };
+                };
+            };
+            /** @description Invalid event payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiTracesByTraceIdMetadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                traceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    metadata: {
+                        [key: string]: string | number | boolean | string[] | {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Metadata updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        traceId: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGatewayV1Virtual-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Visible virtual keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGatewayV1Virtual-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Virtual key created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        };
+                        secret: string;
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Caller lacks virtualKeys:manage at a requested scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGatewayV1Virtual-keysById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Virtual key detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "patchApiGatewayV1Virtual-keysById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGatewayV1Virtual-keysByIdSpend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Spend summary for the key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key_id: string;
+                        spent_usd: string;
+                        requests: number;
+                        window: {
+                            from: string;
+                            to: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description No spend source on this deployment */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGatewayV1Virtual-keysByIdRotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rotated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        };
+                        secret: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGatewayV1Virtual-keysByIdRevoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        virtual_key: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            status: "active" | "revoked";
+                            /** @enum {string} */
+                            purpose: "user" | "langy";
+                            display_prefix: string;
+                            principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            scopes: {
+                                scope_type: string;
+                                scope_id: string;
+                            }[];
+                            routing_policy_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            config?: unknown;
+                            revision: string;
+                            created_at: string;
+                            updated_at: string;
+                            last_used_at: string | null;
+                            revoked_at: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiGatewayV1Providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider bindings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            model_provider_id: string;
+                            model_provider_name: string;
+                            slot: string;
+                            rate_limit_rpm: number | null;
+                            rate_limit_tpm: number | null;
+                            rate_limit_rpd: number | null;
+                            rotation_policy: string;
+                            fallback_priority_global: number | null;
+                            health_status: string;
+                            disabled_at: string | null;
+                            created_at: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiGatewayV1Providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Binding created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        provider_credential: {
+                            id: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiGatewayV1Budgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Budgets for the organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            organization_id: string;
+                            /** @enum {string} */
+                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP";
+                            scope_id: string;
+                            name: string;
+                            description: string | null;
+                            window: string;
+                            /** @enum {string} */
+                            on_breach: "BLOCK" | "WARN";
+                            limit_usd: string;
+                            spent_usd: string;
+                            timezone: string | null;
+                            provider_key: string | null;
+                            current_period_started_at: string;
+                            resets_at: string;
+                            last_reset_at: string | null;
+                            archived_at: string | null;
+                            created_at: string;
+                            member_count?: number;
+                        }[];
+                        spend_available: boolean;
+                    };
+                };
+            };
+            /** @description Invalid scope_type filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiGatewayV1Budgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    scope: {
+                        /** @constant */
+                        kind: "ORGANIZATION";
+                        organization_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "TEAM";
+                        team_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PROJECT";
+                        project_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "VIRTUAL_KEY";
+                        virtual_key_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PRINCIPAL";
+                        principal_user_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "GROUP";
+                        group_id: string;
+                    };
+                    name: string;
+                    description?: string;
+                    /** @enum {string} */
+                    window: "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+                    limit_usd: number | string;
+                    /** @enum {string} */
+                    on_breach?: "BLOCK" | "WARN";
+                    timezone?: string | null;
+                    provider_key?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Budget created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        budget: {
+                            id: string;
+                            organization_id: string;
+                            /** @enum {string} */
+                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP";
+                            scope_id: string;
+                            name: string;
+                            description: string | null;
+                            window: string;
+                            /** @enum {string} */
+                            on_breach: "BLOCK" | "WARN";
+                            limit_usd: string;
+                            spent_usd: string;
+                            timezone: string | null;
+                            provider_key: string | null;
+                            current_period_started_at: string;
+                            resets_at: string;
+                            last_reset_at: string | null;
+                            archived_at: string | null;
+                            created_at: string;
+                            member_count?: number;
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiGatewayV1BudgetsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        budget: {
+                            id: string;
+                            organization_id: string;
+                            /** @enum {string} */
+                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP";
+                            scope_id: string;
+                            name: string;
+                            description: string | null;
+                            window: string;
+                            /** @enum {string} */
+                            on_breach: "BLOCK" | "WARN";
+                            limit_usd: string;
+                            spent_usd: string;
+                            timezone: string | null;
+                            provider_key: string | null;
+                            current_period_started_at: string;
+                            resets_at: string;
+                            last_reset_at: string | null;
+                            archived_at: string | null;
+                            created_at: string;
+                            member_count?: number;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiGatewayV1BudgetsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        budget: {
+                            id: string;
+                            organization_id: string;
+                            /** @enum {string} */
+                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP";
+                            scope_id: string;
+                            name: string;
+                            description: string | null;
+                            window: string;
+                            /** @enum {string} */
+                            on_breach: "BLOCK" | "WARN";
+                            limit_usd: string;
+                            spent_usd: string;
+                            timezone: string | null;
+                            provider_key: string | null;
+                            current_period_started_at: string;
+                            resets_at: string;
+                            last_reset_at: string | null;
+                            archived_at: string | null;
+                            created_at: string;
+                            member_count?: number;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiGatewayV1ProvidersById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disabled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        provider_credential: {
+                            id: string;
+                            disabled_at: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiGatewayV1ProvidersById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        provider_credential: {
+                            id: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGatewayV1Cache-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cache rules for the organisation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            priority: number;
+                            enabled: boolean;
+                            matchers: {
+                                [key: string]: unknown;
+                            };
+                            action: {
+                                /** @enum {string} */
+                                mode: "respect" | "force" | "disable";
+                                ttl?: number;
+                                salt?: string;
+                            };
+                            /** @enum {string} */
+                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            archived_at: string | null;
+                            created_at: string;
+                            updated_at: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGatewayV1Cache-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cache_rule: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            priority: number;
+                            enabled: boolean;
+                            matchers: {
+                                [key: string]: unknown;
+                            };
+                            action: {
+                                /** @enum {string} */
+                                mode: "respect" | "force" | "disable";
+                                ttl?: number;
+                                salt?: string;
+                            };
+                            /** @enum {string} */
+                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            archived_at: string | null;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGatewayV1Cache-rulesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cache_rule: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            priority: number;
+                            enabled: boolean;
+                            matchers: {
+                                [key: string]: unknown;
+                            };
+                            action: {
+                                /** @enum {string} */
+                                mode: "respect" | "force" | "disable";
+                                ttl?: number;
+                                salt?: string;
+                            };
+                            /** @enum {string} */
+                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            archived_at: string | null;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiGatewayV1Cache-rulesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cache_rule: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            priority: number;
+                            enabled: boolean;
+                            matchers: {
+                                [key: string]: unknown;
+                            };
+                            action: {
+                                /** @enum {string} */
+                                mode: "respect" | "force" | "disable";
+                                ttl?: number;
+                                salt?: string;
+                            };
+                            /** @enum {string} */
+                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            archived_at: string | null;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "patchApiGatewayV1Cache-rulesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cache_rule: {
+                            id: string;
+                            organization_id: string;
+                            name: string;
+                            description: string | null;
+                            priority: number;
+                            enabled: boolean;
+                            matchers: {
+                                [key: string]: unknown;
+                            };
+                            action: {
+                                /** @enum {string} */
+                                mode: "respect" | "force" | "disable";
+                                ttl?: number;
+                                salt?: string;
+                            };
+                            /** @enum {string} */
+                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            archived_at: string | null;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

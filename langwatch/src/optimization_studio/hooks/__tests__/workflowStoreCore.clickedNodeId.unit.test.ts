@@ -13,7 +13,7 @@
  * The drawer's render-time predicate is exercised separately by the
  * StudioNodeDrawer component tests; this file does not duplicate it.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 import {
   store as storeCreator,
@@ -55,9 +55,9 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when ReactFlow selects a node via mousedown", () => {
     it("does not set clickedNodeId", () => {
-      store.getState().onNodesChange([
-        { id: "node-1", type: "select", selected: true },
-      ]);
+      store
+        .getState()
+        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
 
       const state = store.getState();
       expect(state.nodes.find((n) => n.id === "node-1")?.selected).toBe(true);
@@ -67,9 +67,9 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when onNodeClick fires after selection", () => {
     it("records clickedNodeId for the selected node", () => {
-      store.getState().onNodesChange([
-        { id: "node-1", type: "select", selected: true },
-      ]);
+      store
+        .getState()
+        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
       store.getState().setClickedNodeId("node-1");
 
       expect(store.getState().clickedNodeId).toBe("node-1");
@@ -78,14 +78,14 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
 
   describe("when a node is deselected", () => {
     it("clears clickedNodeId", () => {
-      store.getState().onNodesChange([
-        { id: "node-1", type: "select", selected: true },
-      ]);
+      store
+        .getState()
+        .onNodesChange([{ id: "node-1", type: "select", selected: true }]);
       store.getState().setClickedNodeId("node-1");
 
-      store.getState().onNodesChange([
-        { id: "node-1", type: "select", selected: false },
-      ]);
+      store
+        .getState()
+        .onNodesChange([{ id: "node-1", type: "select", selected: false }]);
 
       expect(store.getState().clickedNodeId).toBeNull();
     });
@@ -112,17 +112,6 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
     it("clears clickedNodeId", () => {
       store.getState().setSelectedNode("node-1");
       store.getState().deselectAllNodes();
-
-      expect(store.getState().clickedNodeId).toBeNull();
-    });
-  });
-
-  describe("when the workflow itself becomes selected", () => {
-    it("clears clickedNodeId so the drawer cannot reopen on the next mousedown", () => {
-      store.getState().setSelectedNode("node-1");
-      expect(store.getState().clickedNodeId).toBe("node-1");
-
-      store.getState().setWorkflowSelected(true);
 
       expect(store.getState().clickedNodeId).toBeNull();
     });

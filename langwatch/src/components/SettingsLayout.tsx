@@ -1,5 +1,12 @@
-import { Box, Container, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Box,
+  Collapsible,
+  Container,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -28,34 +35,48 @@ function NavSection({
   }, [isActive]);
 
   return (
-    <VStack align="start" width="full" gap={0}>
-      <HStack
-        width="full"
-        px={4}
-        py={1}
-        cursor="pointer"
-        color="fg.muted"
-        _hover={{ color: "fg" }}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {label}
-        </Text>
-        <Box ml="auto">
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </Box>
-      </HStack>
-      {open && (
-        <VStack align="start" width="full" gap={1} pl={2}>
-          {children}
-        </VStack>
-      )}
-    </VStack>
+    <Collapsible.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      width="full"
+    >
+      <VStack align="start" width="full" gap={0}>
+        <Collapsible.Trigger asChild>
+          <Box as="button" width="full" cursor="pointer">
+            <HStack
+              width="full"
+              px={4}
+              py={1}
+              color={isActive ? "fg" : "fg.muted"}
+              _hover={{ color: "fg" }}
+            >
+              <Text
+                fontSize="xs"
+                fontWeight="semibold"
+                textTransform="uppercase"
+                letterSpacing="wider"
+              >
+                {label}
+              </Text>
+              <Box
+                ml="auto"
+                transform={open ? "rotate(0deg)" : "rotate(-90deg)"}
+                transition="transform 0.15s ease-in-out"
+              >
+                <ChevronDown size={12} />
+              </Box>
+            </HStack>
+          </Box>
+        </Collapsible.Trigger>
+        {/* Collapsible.Content animates height open/closed; the manual
+            `{open && …}` it replaced snapped with no transition. */}
+        <Collapsible.Content style={{ width: "100%" }}>
+          <VStack align="start" width="full" gap={1} pl={2} pt={1}>
+            {children}
+          </VStack>
+        </Collapsible.Content>
+      </VStack>
+    </Collapsible.Root>
   );
 }
 
@@ -65,7 +86,7 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();
@@ -171,20 +192,21 @@ export default function SettingsLayout({
               "/settings/annotation-scores",
               "/settings/topic-clustering",
               "/settings/data-retention",
+              "/settings/email-suppressions",
               "/settings/integrations",
               "/settings/data-privacy",
             ]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
+            {hasPermission("triggers:view") && (
+              <MenuLink href="/settings/email-suppressions">
+                Email Suppressions
+              </MenuLink>
+            )}
             <MenuLink href="/settings/data-privacy">Data Privacy</MenuLink>
             <MenuLink href="/settings/annotation-scores">
               Annotation Scores
             </MenuLink>
-            {!isLiteMember && project?.slug && (
-              <MenuLink href={`/${project.slug}/automations`}>
-                Automations
-              </MenuLink>
-            )}
             {!isLiteMember && (
               <MenuLink href="/settings/topic-clustering">
                 Topic Clustering
@@ -218,6 +240,9 @@ export default function SettingsLayout({
               </MenuLink>
               <MenuLink href="/ops/foundry" includePath="/ops/foundry">
                 The Foundry
+              </MenuLink>
+              <MenuLink href="/ops/blobs" includePath="/ops/blobs">
+                Payload store
               </MenuLink>
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
@@ -256,6 +281,12 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/bug-reports"
+                includePath="/ops/backoffice/bug-reports"
+              >
+                Bug Reports
               </MenuLink>
             </NavSection>
           )}

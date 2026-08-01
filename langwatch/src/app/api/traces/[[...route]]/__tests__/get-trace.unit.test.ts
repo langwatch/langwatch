@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 
-// Mock TraceService to verify routing goes through it (not Elasticsearch directly)
+// Mock TraceService to verify routing goes through it
 const mockGetById = vi.fn();
 const mockGetEvaluationsMultiple = vi.fn();
 
@@ -48,7 +48,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
     .mockReturnValue("Input: hello\nOutput: world"),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

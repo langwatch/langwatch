@@ -1,6 +1,6 @@
-import type { Protections } from "~/server/elasticsearch/protections";
 import {
   DEFAULT_MAPPINGS,
+  mappingsReadEvaluationsSource,
   migrateLegacyMappings,
 } from "~/server/evaluations/evaluationMappings";
 import {
@@ -9,6 +9,10 @@ import {
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
+import {
+  evaluatorUnavailability,
+  unavailableEvaluatorMessage,
+} from "~/server/evaluations/installedEvaluators";
 import {
   augmentEvaluationResult,
   executeNativeEvaluation,
@@ -32,6 +36,7 @@ import {
   type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";
 import {
@@ -264,6 +269,24 @@ export class EvaluationExecutionService {
       };
     }
 
+    // Enrich evaluations: getTracesWithSpans does not populate
+    // `trace.evaluations`, but evaluator field mappings that read the
+    // `evaluations` source need them. Fetch and attach before building the
+    // mapped data so they aren't silently empty (parity with
+    // runEvaluationForTrace in runEvaluation.ts). Gated on the mappings
+    // actually reading the `evaluations` source — this runs on the hot
+    // live-monitor path and the fetch is a heavy Inputs-projection
+    // ClickHouse read that most evaluator mappings never need.
+    if (mappingsReadEvaluationsSource(mappings)) {
+      const evaluationsByTrace =
+        await this.deps.traceService.getEvaluationsMultiple(
+          projectId,
+          [traceId],
+          INTERNAL_PROTECTIONS,
+        );
+      trace.evaluations = evaluationsByTrace[traceId] ?? [];
+    }
+
     // 4. Build evaluation data
     const data = await this.buildDataForEvaluation({
       evaluatorType,
@@ -390,6 +413,19 @@ export class EvaluationExecutionService {
     const evaluator = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
     if (!evaluator) {
       throw new EvaluatorNotFoundError(evaluatorType);
+    }
+
+    // An evaluator this install skipped is not a broken one. Say which it is,
+    // and how to get it, rather than letting the request reach an evaluator
+    // service with no route for it and come back as a bare 404.
+    const unavailable = evaluatorUnavailability({ evaluatorType });
+    if (unavailable) {
+      throw new EvaluatorConfigError(
+        unavailableEvaluatorMessage({ unavailability: unavailable }),
+        {
+          meta: { evaluatorType },
+        },
+      );
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];

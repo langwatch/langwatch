@@ -89,11 +89,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     });
 
   return (
-    <TraceTableShell
-      table={table}
-      minWidth={GROUP_MIN_WIDTH}
-      stickyFirstColumn
-    >
+    <TraceTableShell table={table} minWidth={GROUP_MIN_WIDTH} stickyFirstColumn>
       <VirtualSpacer height={paddingTop} colSpan={colSpan} />
       {virtualItems.map((virtualItem) => {
         const row = rows[virtualItem.index];

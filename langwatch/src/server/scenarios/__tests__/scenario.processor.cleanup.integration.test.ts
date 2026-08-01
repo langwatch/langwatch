@@ -9,10 +9,10 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  TRACE_FLUSH_WAIT_MS,
   createMockCollectorServer,
   createTestJobData,
   spawnChildProcessDirectly,
+  TRACE_FLUSH_WAIT_MS,
 } from "./scenario-processor-test-helpers";
 
 describe.skipIf(process.env.CI)("Scenario Processor - OTEL Cleanup", () => {
@@ -31,37 +31,32 @@ describe.skipIf(process.env.CI)("Scenario Processor - OTEL Cleanup", () => {
     mockCollector.requests.length = 0;
   });
 
-  it(
-    "child process exits with code 0 or 1",
-    async () => {
-      const jobData = createTestJobData();
-      const env = {
-        LANGWATCH_API_KEY: "test-api-key",
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
-      };
+  it("child process exits with code 0 or 1", async () => {
+    const jobData = createTestJobData();
+    const env = {
+      LANGWATCH_API_KEY: "test-api-key",
+      LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+    };
 
-      const { exitCode } = await spawnChildProcessDirectly(jobData, env);
+    const { exitCode } = await spawnChildProcessDirectly(jobData, env);
 
-      expect([0, 1]).toContain(exitCode);
-    },
-    60000
-  );
+    expect([0, 1]).toContain(exitCode);
+  }, 60000);
 
-  it(
-    "flushes traces before process termination",
-    async () => {
-      const jobData = createTestJobData();
-      const env = {
-        LANGWATCH_API_KEY: "test-api-key",
-        LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
-      };
+  it("flushes traces before process termination", async () => {
+    const jobData = createTestJobData();
+    const env = {
+      LANGWATCH_API_KEY: "test-api-key",
+      LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+    };
 
-      const { stderr, exitCode } = await spawnChildProcessDirectly(jobData, env);
+    const { stderr, exitCode } = await spawnChildProcessDirectly(jobData, env);
 
-      await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
+    await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
 
-      expect(mockCollector.requests.length, `Expected flushed traces but got 0. Child exit: ${exitCode}, stderr: ${stderr.slice(0, 500)}`).toBeGreaterThan(0);
-    },
-    60000
-  );
+    expect(
+      mockCollector.requests.length,
+      `Expected flushed traces but got 0. Child exit: ${exitCode}, stderr: ${stderr.slice(0, 500)}`,
+    ).toBeGreaterThan(0);
+  }, 60000);
 });

@@ -1,11 +1,11 @@
 import { TraceState } from "@opentelemetry/core";
-import { safeUnflatten } from "~/utils/safeUnflatten";
 import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { match } from "ts-pattern";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
 import {
   type NormalizedAttributes,
@@ -297,10 +297,7 @@ const normalizeOtlpAttributeValue = (
 // Regex to match keys with numeric array indices: prefix.N.remainder
 const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
-type ArrayPatternMap = Map<
-  string,
-  Map<number, Map<string, unknown>>
->;
+type ArrayPatternMap = Map<string, Map<number, Map<string, unknown>>>;
 
 /**
  * Scans all keys to find potential flattened array patterns.
@@ -327,7 +324,7 @@ const detectArrayPatterns = (
 
   for (const [key, value] of Object.entries(attrs)) {
     const match = INDEXED_KEY_REGEX.exec(key);
-    if (!match || match.length !== 4) continue;
+    if (match?.length !== 4) continue;
 
     const [, prefix, indexStr, remainder] = match;
     if (!prefix || !indexStr || !remainder) continue;
@@ -633,7 +630,10 @@ export function normalizeOtlpAttributeMap(
   // Filter to only valid {key, value} entries to guard against malformed OTLP data
   const validEntries = attributes.filter(
     (attr): attr is OtlpKeyValue =>
-      typeof attr === "object" && attr !== null && "key" in attr && "value" in attr,
+      typeof attr === "object" &&
+      attr !== null &&
+      "key" in attr &&
+      "value" in attr,
   );
   const normalized = normalizeOtlpAttributes(validEntries);
   const result: Record<string, string> = {};

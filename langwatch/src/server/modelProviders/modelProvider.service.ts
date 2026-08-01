@@ -1,5 +1,4 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
@@ -7,6 +6,11 @@ import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockC
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
+import {
+  ModelProviderAnchorRequiredError,
+  ModelProviderNotFoundError,
+  ModelProviderScopesRequiredError,
+} from "./errors";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -31,11 +35,35 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 export type AuthzContext = { prisma: PrismaClient; session: Session | null };
 
 /**
+ * A provider row this service materialized, as opposed to a form-time shape.
+ *
+ * `MaybeStoredModelProvider` leaves `scopes` optional because the same type
+ * also describes a provider being filled in before it has any. Every row this
+ * service hands out has them: stored rows map `mp.scopes`, and synthesized
+ * system rows set `[]`. Saying so in the type is what lets the VK drawer
+ * consume the list without a cast, and a cast there would be load-bearing in
+ * the wrong direction, since `resolveEligible` iterates `provider.scopes`
+ * unguarded.
+ */
+export type MaterializedModelProvider = MaybeStoredModelProvider & {
+  scopes: NonNullable<MaybeStoredModelProvider["scopes"]>;
+};
+
+/**
  * Input types for service operations
  */
 export type UpdateModelProviderInput = {
   id?: string;
-  projectId: string;
+  /**
+   * Tenant anchor. A provider belongs to an organization and reaches the
+   * scopes attached to it, so either handle identifies the tenant: a
+   * project resolves to its organization, an organization is already one.
+   * At least one is required, and callers with no project (an
+   * organization on the agent-governance track has none until it needs
+   * one) pass `organizationId` plus an explicit `scopes` set.
+   */
+  projectId?: string;
+  organizationId?: string;
   name?: string;
   provider: string;
   enabled: boolean;
@@ -47,7 +75,8 @@ export type UpdateModelProviderInput = {
   /**
    * Full scope set for this credential. When omitted on create, defaults
    * to `[{ scopeType: "PROJECT", scopeId: projectId }]` for backward
-   * compatibility; when omitted on update, the existing scope set is
+   * compatibility, so it is required when there is no `projectId` to
+   * default from; when omitted on update, the existing scope set is
    * preserved. Replace-all semantics: passing `[]` is rejected at the
    * router boundary.
    */
@@ -73,7 +102,9 @@ export type UpdateModelProviderInput = {
 
 export type DeleteModelProviderInput = {
   id?: string;
-  projectId: string;
+  /** Same tenant anchor as `UpdateModelProviderInput`: one of the two. */
+  projectId?: string;
+  organizationId?: string;
   provider: string;
 };
 
@@ -84,6 +115,22 @@ type AdvancedGatewayInput = {
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
 };
+
+/**
+ * Refuse to act on a row that carries no scope grants.
+ *
+ * `assertCanManageAllScopes` answers "can you manage every one of these
+ * scopes", which an empty list satisfies vacuously. The org-anchored
+ * lookup finds rows by `(id, organizationId)` without a scope predicate,
+ * so a scopeless row is reachable by id even though no listing query can
+ * see it. Without this, the per-scope gate would wave such a row through
+ * on the strength of having nothing to check.
+ */
+function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
+  if (row.scopes.length === 0) {
+    throw new ModelProviderNotFoundError();
+  }
+}
 
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
@@ -97,6 +144,41 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
     out.providerConfig = input.providerConfig;
   }
   return out;
+}
+
+/**
+ * Whether this provider row serves `bareModel` through its effective
+ * catalog: the provider's registry lists (`models` / `embeddingsModels` —
+ * every row of a provider serves its registry models) plus the row's own
+ * custom catalog (chat or embeddings). Registry models short-circuit to
+ * true, so a collapse winner with no custom catalog is never mistaken
+ * for "doesn't serve this model" and swapped away from the project's own
+ * credentials. Accepts both the raw DB shape (legacy string[] or new
+ * object[]) and the normalized `MaybeStoredModelProvider` lists; raw DB
+ * rows carry no registry lists, so for them only the custom catalog
+ * decides — the right question to ask of a candidate row for a
+ * non-registry model.
+ */
+export function providerRowServesModel({
+  row,
+  bareModel,
+}: {
+  row: {
+    models?: string[] | null;
+    embeddingsModels?: string[] | null;
+    customModels?: unknown;
+    customEmbeddingsModels?: unknown;
+  };
+  bareModel: string;
+}): boolean {
+  if ((row.models ?? []).includes(bareModel)) return true;
+  if ((row.embeddingsModels ?? []).includes(bareModel)) return true;
+  const chat = toLegacyCompatibleCustomModels(row.customModels ?? null, "chat");
+  const embeddings = toLegacyCompatibleCustomModels(
+    row.customEmbeddingsModels ?? null,
+    "embedding",
+  );
+  return chat.concat(embeddings).some((m) => m?.modelId === bareModel);
 }
 
 /**
@@ -156,8 +238,14 @@ export class ModelProviderService {
    * Gets model providers with API keys masked for frontend display.
    *
    * Business rules:
-   * - Only masks fields matching KEY_CHECK patterns (API keys)
+   * - Only masks customKeys fields matching KEY_CHECK patterns (API keys)
+   * - Extra-header values are always masked — they routinely carry auth
+   *   secrets for azure/custom providers
    * - URLs and other values remain visible
+   *
+   * Masking runs even when `includeKeys` is false: customKeys are already
+   * nulled by that flag, but extraHeaders are returned regardless, so
+   * skipping the mask would hand view-only users plaintext header values.
    */
   async getProjectModelProvidersForFrontend(
     projectId: string,
@@ -167,10 +255,6 @@ export class ModelProviderService {
       projectId,
       includeKeys,
     );
-
-    if (!includeKeys) {
-      return providers;
-    }
 
     return this.maskApiKeys(providers);
   }
@@ -217,56 +301,13 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -286,9 +327,19 @@ export class ModelProviderService {
    * the env-fed provider, all of them do, so the row shows once at
    * org scope.
    */
+  /**
+   * Both row shapes this returns always carry scopes: stored rows get them
+   * from `toMaybeStoredProvider`, which maps `mp.scopes`, and synthesized
+   * system rows set `scopes: []` explicitly. `MaybeStoredModelProvider`
+   * leaves the field optional because the same type also describes form-time
+   * shapes that have no scopes yet, so saying so here is what lets the VK
+   * drawer consume this without a cast. The drawer's `resolveEligible`
+   * iterates `provider.scopes` unguarded, so an optional field there is the
+   * difference between a compile error and a runtime crash.
+   */
   async listOrgModelProvidersForFrontend(
     organizationId: string,
-  ): Promise<MaybeStoredModelProvider[]> {
+  ): Promise<MaterializedModelProvider[]> {
     const teams = await this.prisma.team.findMany({
       where: { organizationId },
       include: { projects: true },
@@ -306,7 +357,7 @@ export class ModelProviderService {
       await this.repository.findAllInOrganization(organizationId);
     const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
-    const systemRows: MaybeStoredModelProvider[] = [];
+    const systemRows: MaterializedModelProvider[] = [];
     for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
       if (savedProviderKeys.has(providerKey)) continue;
       if (!provider_.enabled) continue;
@@ -332,56 +383,13 @@ export class ModelProviderService {
 
     const storedRows = savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .map((mp) => {
-        const defaultProvider = defaultProviders[mp.provider];
-        const customModels = toLegacyCompatibleCustomModels(
-          mp.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          mp.customEmbeddingsModels,
-          "embedding",
-        );
-        const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (
-          mp.customKeys
-            ? Object.fromEntries(
-                Object.entries(mp.customKeys as Record<string, unknown>).map(
-                  ([key, value]) => [
-                    key,
-                    KEY_CHECK.some((k) => key.includes(k))
-                      ? MASKED_KEY_PLACEHOLDER
-                      : value,
-                  ],
-                ),
-              )
-            : null
-        ) as MaybeStoredModelProvider["customKeys"];
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          name: mp.name,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: masked,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels: customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-          scopes: mp.scopes.map((s) => ({
-            scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: s.scopeId,
-          })),
-          scopeType: narrowestScope.scopeType,
-          scopeId: narrowestScope.scopeId,
-        };
-        return provider_;
-      });
+      .map((mp) => ({
+        ...this.toMaybeStoredProvider(mp, defaultProviders, true),
+        customKeys: this.maskRowCustomKeys(mp.customKeys),
+        extraHeaders: this.maskExtraHeaders(
+          mp.extraHeaders as { key: string; value: string }[] | null,
+        ),
+      }));
     return [...storedRows, ...systemRows];
   }
 
@@ -438,6 +446,7 @@ export class ModelProviderService {
     const {
       id,
       projectId,
+      organizationId,
       provider,
       enabled,
       customKeys,
@@ -452,6 +461,10 @@ export class ModelProviderService {
       fallbackPriorityGlobal,
       providerConfig,
     } = input;
+
+    if (!projectId && !organizationId) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
 
     const advanced = {
       rateLimitRpm,
@@ -476,7 +489,11 @@ export class ModelProviderService {
     // intentionally do NOT auto-match by (provider, projectId) here,
     // since that would clobber an existing row at a different scope when
     // a user adds a second instance of the same provider type.
-    const existingProvider = await this.findExistingProvider(id, projectId);
+    const existingProvider = await this.findExistingProvider({
+      id,
+      projectId,
+      organizationId,
+    });
 
     // When the caller supplied an `id` but no row resolves, the target
     // row was concurrently deleted or is not visible from this project.
@@ -484,10 +501,7 @@ export class ModelProviderService {
     // row in the caller's project instead of erroring; surface
     // NOT_FOUND so the client can refetch and retry.
     if (id && !existingProvider) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
@@ -508,6 +522,7 @@ export class ModelProviderService {
     // is one they have no rights on. Validate against the row's
     // *current* scopes before considering any incoming changes.
     if (ctx && existingProvider) {
+      assertRowCarriesScopes(existingProvider);
       await assertCanManageAllScopes(
         ctx,
         existingProvider.scopes.map((s) => ({
@@ -526,6 +541,21 @@ export class ModelProviderService {
       await assertCanManageAllScopes(ctx, scopes);
     }
 
+    // The scope set a brand-new row lands on. `scopes` is the caller's
+    // choice; a caller that supplies none is on the legacy single-scope
+    // path and gets the project it wrote through. With no project there
+    // is nothing to default from, so the set has to be explicit.
+    const createScopes: ScopeInput[] | undefined = existingProvider
+      ? undefined
+      : (scopes ??
+        (projectId
+          ? [{ scopeType: "PROJECT" as const, scopeId: projectId }]
+          : undefined));
+
+    if (!existingProvider && !createScopes) {
+      throw new ModelProviderScopesRequiredError();
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -533,7 +563,6 @@ export class ModelProviderService {
         result = await this.updateExisting(
           existingProvider,
           {
-            projectId,
             provider,
             enabled,
             name,
@@ -550,11 +579,10 @@ export class ModelProviderService {
       } else {
         result = await this.createNew(
           {
-            projectId,
             provider,
             enabled,
             name: name ?? this.deriveDefaultName(provider),
-            scopes,
+            scopes: createScopes!,
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
@@ -576,10 +604,7 @@ export class ModelProviderService {
         // "not configured" on every role despite having a provider
         // enabled. See
         // specs/model-providers/model-resolver-and-registry.feature.
-        const targetScopes: ScopeInput[] = scopes ?? [
-          { scopeType: "PROJECT", scopeId: projectId },
-        ];
-        for (const scope of targetScopes) {
+        for (const scope of createScopes!) {
           await seedOnboardingDefaultsForProvider({
             prisma: tx as unknown as PrismaClient,
             provider,
@@ -609,7 +634,7 @@ export class ModelProviderService {
    * from the UI is unaffected.
    */
   async upsertByProviderKey(
-    input: UpdateModelProviderInput,
+    input: UpdateModelProviderInput & { projectId: string },
     ctx?: AuthzContext,
   ) {
     const existing = await this.repository.findByProvider(
@@ -670,23 +695,36 @@ export class ModelProviderService {
   ) {
     const { id, projectId, provider } = input;
 
+    if (!projectId && !input.organizationId) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+    // Matching by provider string is the legacy project-shaped contract —
+    // it asks for "this provider type in this project", which needs one.
+    if (!id && !projectId) {
+      throw new ModelProviderAnchorRequiredError("project");
+    }
+
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId: input.organizationId,
+    });
+
     if (ctx) {
-      const organizationId = await this.resolveProjectOrganizationId(projectId);
       // Org-anchored lookup when we can resolve the tenant; otherwise fall
       // back to the legacy project-scope lookup so a missing project can't
       // widen the blast radius.
       const existing =
-        id && organizationId
-          ? await this.repository.findByIdForOrganization(id, organizationId)
-          : id
+        id && anchor
+          ? await this.repository.findByIdForOrganization(id, anchor)
+          : id && projectId
             ? await this.repository.findById(id, projectId)
-            : await this.repository.findByProvider(provider, projectId);
+            : projectId
+              ? await this.repository.findByProvider(provider, projectId)
+              : null;
       if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Model provider not found for this project",
-        });
+        throw new ModelProviderNotFoundError();
       }
+      assertRowCarriesScopes(existing);
       await assertCanManageAllScopes(
         ctx,
         existing.scopes.map((s) => ({
@@ -697,10 +735,9 @@ export class ModelProviderService {
     }
 
     if (id) {
-      return await this.repository.delete(id, projectId);
-    } else {
-      return await this.repository.deleteByProvider(provider, projectId);
+      return await this.repository.delete(id);
     }
+    return await this.repository.deleteByProvider(provider, projectId!);
   }
 
   /**
@@ -728,12 +765,29 @@ export class ModelProviderService {
     projectId: string,
     ctx: AuthzContext,
   ): Promise<ModelProviderWithScopes> {
-    const existing = await this.repository.findById(id, projectId);
+    // Org-anchored, for the same reason the edit path is (see
+    // `findEditableById`): `findById` matches only rows carrying a PROJECT
+    // scope for this project, so an ORGANIZATION- or TEAM-scoped provider —
+    // which the settings list surfaces here by inheritance — resolved to null
+    // and 404'd. Worse, it made the read gate below unreachable for exactly
+    // the scopes it exists to judge: a row that never loads is never asked
+    // about.
+    //
+    // Two boundaries, both load-bearing, and neither substitutes for the
+    // other: `findByIdForOrganization` is the TENANT boundary — it cannot
+    // return a row belonging to another organization — and `canReadAnyScope`
+    // below is the SCOPE-VISIBILITY boundary, deciding whether this caller may
+    // see this row within that tenant. Widening the lookup is only safe
+    // because the second one exists; do not drop either.
+    //
+    // Falls back to the project lookup when the tenant can't be resolved, so
+    // a missing project can't widen the blast radius.
+    const anchor = await this.resolveOrganizationAnchor({ projectId });
+    const existing = anchor
+      ? await this.repository.findByIdForOrganization(id, anchor)
+      : await this.repository.findById(id, projectId);
     if (!existing) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     const readable = await canReadAnyScope(
       ctx,
@@ -743,10 +797,7 @@ export class ModelProviderService {
       })),
     );
     if (!readable) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     return existing;
   }
@@ -809,10 +860,11 @@ export class ModelProviderService {
     // Walk the multi-scope access relation: every MP whose scope set
     // intersects the project's (projectId, teamId, organizationId) is
     // returned. When the same provider string appears multiple times
-    // (e.g. an ORG row and a PROJECT override), narrower-scope wins for
-    // the legacy `Record<provider, …>` shape we still return here —
-    // new consumers that need the full list should call
-    // `listAccessibleForProject` directly on the service.
+    // (e.g. an ORG row and a PROJECT override), an enabled row beats a
+    // disabled one, then narrower-scope wins for the legacy
+    // `Record<provider, …>` shape we still return here — new consumers
+    // that need the full list should call
+    // `listProjectModelProvidersForFrontend` directly on the service.
     const savedProviders =
       await this.repository.findAllAccessibleForProject(projectId);
 
@@ -820,48 +872,16 @@ export class ModelProviderService {
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .reduce(
         (acc, mp) => {
-          // Always use registry models for models/embeddingsModels
-          const defaultProvider = defaultProviders[mp.provider];
-
-          // Convert DB custom models (may be legacy string[] or new object[])
-          const customModels = toLegacyCompatibleCustomModels(
-            mp.customModels,
-            "chat",
-          );
-          const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-            mp.customEmbeddingsModels,
-            "embedding",
+          const provider_ = this.toMaybeStoredProvider(
+            mp,
+            defaultProviders,
+            includeKeys,
           );
 
-          const narrowestScope = this.pickNarrowestScope(mp.scopes);
-
-          const provider_: MaybeStoredModelProvider = {
-            id: mp.id,
-            name: mp.name,
-            provider: mp.provider,
-            enabled: mp.enabled,
-            customKeys: includeKeys ? mp.customKeys : null,
-            models: defaultProvider?.models ?? null,
-            embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-            customModels: customModels.length > 0 ? customModels : null,
-            customEmbeddingsModels:
-              customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
-            deploymentMapping: mp.deploymentMapping,
-            disabledByDefault: defaultProvider?.disabledByDefault,
-            extraHeaders: mp.extraHeaders as
-              | { key: string; value: string }[]
-              | null,
-            scopes: mp.scopes.map((s) => ({
-              scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-              scopeId: s.scopeId,
-            })),
-            scopeType: narrowestScope.scopeType,
-            scopeId: narrowestScope.scopeId,
-          };
-
-          // Narrower-scope wins when the same provider string has
-          // multiple accessible rows (preserves iter 107/108 semantics
-          // for the Record<provider, …> consumers).
+          // Collapse rules when the same provider string has multiple
+          // accessible rows: an enabled row beats a disabled one, then
+          // narrower scope wins (preserves iter 107/108 semantics for
+          // the Record<provider, …> consumers).
           const existing = acc[mp.provider];
           if (!existing || this.isNarrower(provider_, existing)) {
             return { ...acc, [mp.provider]: provider_ };
@@ -870,6 +890,171 @@ export class ModelProviderService {
         },
         {} as Record<string, MaybeStoredModelProvider>,
       );
+  }
+
+  /** Map a stored row to the `MaybeStoredModelProvider` shape consumers
+   * expect: registry models for models/embeddingsModels, normalized
+   * custom lists, and the narrowest scope surfaced as scopeType/scopeId. */
+  private toMaybeStoredProvider(
+    mp: ModelProviderWithScopes,
+    defaultProviders: Record<string, MaybeStoredModelProvider>,
+    includeKeys: boolean,
+  ): MaterializedModelProvider {
+    // Always use registry models for models/embeddingsModels
+    const defaultProvider = defaultProviders[mp.provider];
+
+    // Convert DB custom models (may be legacy string[] or new object[])
+    const customModels = toLegacyCompatibleCustomModels(
+      mp.customModels,
+      "chat",
+    );
+    const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+      mp.customEmbeddingsModels,
+      "embedding",
+    );
+
+    const narrowestScope = this.pickNarrowestScope(mp.scopes);
+
+    return {
+      id: mp.id,
+      name: mp.name,
+      provider: mp.provider,
+      enabled: mp.enabled,
+      // Whether the credential has been withdrawn. The gateway already
+      // refuses to route to a withdrawn provider; surfacing it lets the
+      // frontend surfaces that preview routing agree with that decision
+      // instead of advertising reach the key does not have.
+      disabledAt: mp.disabledAt,
+      customKeys: includeKeys ? mp.customKeys : null,
+      models: defaultProvider?.models ?? null,
+      embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+      customModels: customModels.length > 0 ? customModels : null,
+      customEmbeddingsModels:
+        customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
+      deploymentMapping: mp.deploymentMapping,
+      disabledByDefault: defaultProvider?.disabledByDefault,
+      extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
+      scopes: mp.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+      scopeType: narrowestScope.scopeType,
+      scopeId: narrowestScope.scopeId,
+    };
+  }
+
+  /** Mask key-bearing fields of a row's customKeys for frontend display,
+   * leaving URLs and other non-secret values visible. */
+  private maskRowCustomKeys(
+    customKeys: unknown,
+  ): MaybeStoredModelProvider["customKeys"] {
+    if (!customKeys) return null;
+    return Object.fromEntries(
+      Object.entries(customKeys as Record<string, unknown>).map(
+        ([key, value]) => [
+          key,
+          KEY_CHECK.some((k) => key.includes(k))
+            ? MASKED_KEY_PLACEHOLDER
+            : value,
+        ],
+      ),
+    ) as MaybeStoredModelProvider["customKeys"];
+  }
+
+  /**
+   * The accessible row that actually serves `bareModel` for this provider
+   * key: the narrowest-scope ENABLED row whose custom catalog (chat or
+   * embeddings) lists the model. Null when no enabled row lists it —
+   * callers then keep the scope-collapse winner, which also covers
+   * registry-model providers whose rows list nothing custom.
+   *
+   * Why this exists: with multi-instance providers the default-models
+   * picker offers the union of every accessible row's catalog, so a
+   * configured default may only be served by a wider-scope row than the
+   * collapse winner. Executing it against the narrower row's credentials
+   * targets a deployment that doesn't exist there (Azure answers 404
+   * "Resource not found"). See
+   * specs/model-providers/scope-and-multi-instance.feature ("Runtime
+   * provider-row selection follows the model").
+   */
+  async findRowServingModel(params: {
+    projectId: string;
+    provider: string;
+    bareModel: string;
+  }): Promise<MaybeStoredModelProvider | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: params.projectId },
+      include: { team: { select: { organizationId: true } } },
+    });
+    if (!project) return null;
+
+    const defaultProviders = this.buildDefaultProviders(project);
+    const rows = await this.repository.findAllAccessibleForProject(
+      params.projectId,
+    );
+
+    const candidates = rows.filter(
+      (mp) =>
+        mp.provider === params.provider &&
+        mp.enabled &&
+        providerRowServesModel({ row: mp, bareModel: params.bareModel }),
+    );
+    if (candidates.length === 0) return null;
+
+    // Rank by the scope that grants THIS project access to the row — a
+    // multi-scope row's attachment to some other project's scope must not
+    // inflate its specificity here (that scope grants nothing to us).
+    const chain = {
+      projectId: project.id,
+      teamId: project.teamId,
+      organizationId: project.team?.organizationId ?? null,
+    };
+    // Deterministic order within the same tier: fallbackPriorityGlobal
+    // ASC (nulls last) then createdAt ASC — two same-tier rows both
+    // serving the model must not route by the DB's unspecified row
+    // order.
+    const sorted = [...candidates].sort((a, b) => {
+      const tier =
+        this.chainSpecificity(b.scopes, chain) -
+        this.chainSpecificity(a.scopes, chain);
+      if (tier !== 0) return tier;
+      const aPriority = a.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      const bPriority = b.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    return this.toMaybeStoredProvider(sorted[0]!, defaultProviders, true);
+  }
+
+  /**
+   * Specificity of a row RELATIVE to a project's scope chain: the highest
+   * tier among the row's attachments that actually grant this project
+   * access (its own PROJECT scope > its TEAM > its ORGANIZATION).
+   * Attachments outside the chain — e.g. another project's PROJECT scope
+   * on a shared row — contribute nothing.
+   */
+  private chainSpecificity(
+    scopes: { scopeType: string; scopeId: string }[],
+    chain: {
+      projectId: string;
+      teamId: string | null;
+      organizationId: string | null;
+    },
+  ): number {
+    let best = 0;
+    for (const s of scopes) {
+      if (s.scopeType === "PROJECT" && s.scopeId === chain.projectId) {
+        best = Math.max(best, 3);
+      } else if (s.scopeType === "TEAM" && s.scopeId === chain.teamId) {
+        best = Math.max(best, 2);
+      } else if (
+        s.scopeType === "ORGANIZATION" &&
+        s.scopeId === chain.organizationId
+      ) {
+        best = Math.max(best, 1);
+      }
+    }
+    return best;
   }
 
   private scopePriority(
@@ -902,6 +1087,15 @@ export class ModelProviderService {
     a: MaybeStoredModelProvider,
     b: MaybeStoredModelProvider,
   ): boolean {
+    // Prefer an enabled row over a disabled one, regardless of scope.
+    // A disabled narrower-scope row must not mask an enabled wider-scope
+    // one — otherwise `hasEnabledProviders` on the frontend gates off
+    // Ask AI even though an enabled row exists at a wider scope (#5575).
+    if (a.enabled !== b.enabled) {
+      return a.enabled;
+    }
+    // Same enabled state: narrower scope wins (preserves iter 107/108
+    // semantics for the Record<provider, …> consumers).
     return this.scopePriority(a.scopeType) > this.scopePriority(b.scopeType);
   }
 
@@ -942,22 +1136,33 @@ export class ModelProviderService {
     const masked = { ...providers };
 
     for (const [providerKey, config] of Object.entries(masked)) {
-      if (config.customKeys) {
+      if (config.customKeys || config.extraHeaders?.length) {
         masked[providerKey] = {
           ...config,
-          customKeys: Object.fromEntries(
-            Object.entries(config.customKeys).map(([key, value]) => [
-              key,
-              KEY_CHECK.some((k) => key.includes(k))
-                ? MASKED_KEY_PLACEHOLDER
-                : value,
-            ]),
-          ),
+          customKeys: this.maskRowCustomKeys(config.customKeys),
+          extraHeaders: this.maskExtraHeaders(config.extraHeaders),
         };
       }
     }
 
     return masked;
+  }
+
+  /**
+   * Header values are masked wholesale — unlike customKeys there is no
+   * name pattern to distinguish secrets, and azure/custom extra headers
+   * routinely carry auth tokens. Keys stay visible so the form can be
+   * edited; `mergeExtraHeaders` restores real values when the masked
+   * placeholder comes back on save.
+   */
+  private maskExtraHeaders(
+    extraHeaders: { key: string; value: string }[] | null | undefined,
+  ): { key: string; value: string }[] | null {
+    if (extraHeaders == null) return null;
+    return extraHeaders.map(({ key }) => ({
+      key,
+      value: MASKED_KEY_PLACEHOLDER,
+    }));
   }
 
   private validateAndCleanKeys(
@@ -1012,10 +1217,15 @@ export class ModelProviderService {
    * REST upsert-by-provider-key entrypoint uses
    * `upsertByProviderKey` below, not this code path.
    */
-  private async findExistingProvider(
-    id: string | undefined,
-    projectId: string,
-  ) {
+  private async findExistingProvider({
+    id,
+    projectId,
+    organizationId,
+  }: {
+    id: string | undefined;
+    projectId?: string;
+    organizationId?: string;
+  }) {
     if (!id) return null;
     // Org-anchored lookup so an edit from a project view resolves providers
     // granted at the org or team scope (which the settings list surfaces by
@@ -1025,16 +1235,45 @@ export class ModelProviderService {
     // submitted scope set still gates the write. Falls back to the
     // project-scope lookup when the tenant can't be resolved, so a missing
     // project can't widen the blast radius.
-    const organizationId = await this.resolveProjectOrganizationId(projectId);
-    return organizationId
-      ? await this.repository.findByIdForOrganization(id, organizationId)
-      : await this.repository.findById(id, projectId);
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId,
+    });
+    if (anchor) {
+      return await this.repository.findByIdForOrganization(id, anchor);
+    }
+    return projectId ? await this.repository.findById(id, projectId) : null;
+  }
+
+  /**
+   * The organization a write is anchored to. A caller-supplied
+   * `organizationId` is only ever an anchor, never a grant: the router's
+   * organization-membership middleware has already established the caller
+   * belongs to it, and every lookup bounded by it stays inside that one
+   * tenant. A project resolves to its own organization and wins, since it
+   * is the narrower handle.
+   */
+  private async resolveOrganizationAnchor({
+    projectId,
+    organizationId,
+  }: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<string | null> {
+    if (projectId) {
+      const fromProject = await this.resolveProjectOrganizationId(projectId);
+      if (fromProject) return fromProject;
+    }
+    return organizationId ?? null;
   }
 
   private async updateExisting(
-    existingProvider: { id: string; customKeys: unknown },
+    existingProvider: {
+      id: string;
+      customKeys: unknown;
+      extraHeaders: unknown;
+    },
     data: {
-      projectId: string;
       provider: string;
       enabled: boolean;
       name?: string;
@@ -1059,12 +1298,16 @@ export class ModelProviderService {
 
     return await this.repository.update(
       existingProvider.id,
-      data.projectId,
       {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        extraHeaders: this.mergeExtraHeaders(
+          data.extraHeaders,
+          existingProvider.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+        ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
         ...(customKeysToSave !== undefined && {
@@ -1078,14 +1321,13 @@ export class ModelProviderService {
 
   private async createNew(
     data: {
-      projectId: string;
       name: string;
       provider: string;
       enabled: boolean;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
-      scopes?: ScopeInput[];
+      scopes: ScopeInput[];
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1094,13 +1336,14 @@ export class ModelProviderService {
   ) {
     return await this.repository.create(
       {
-        projectId: data.projectId,
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
-        extraHeaders: data.extraHeaders,
+        // No existing row to restore from — placeholder values are dropped
+        // instead of being stored literally.
+        extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
@@ -1133,5 +1376,33 @@ export class ModelProviderService {
           .map(([key, value]) => [key, value]),
       ),
     };
+  }
+
+  /**
+   * Header counterpart of `mergeCustomKeys`: the frontend receives header
+   * values as the masked placeholder, so an untouched header comes back
+   * masked on save and must be restored from the stored row. Restore by
+   * header key first; when the key was renamed in place, fall back to the
+   * header at the same position — but only when that positional header
+   * isn't also claimed by name elsewhere in the submission, so a
+   * rename+reorder can never copy one header's secret under another
+   * header's name. A placeholder that matches nothing is dropped rather
+   * than stored as a literal value.
+   */
+  private mergeExtraHeaders(
+    incoming: { key: string; value: string }[],
+    existing: { key: string; value: string }[] | null,
+  ): { key: string; value: string }[] {
+    const incomingKeys = new Set(incoming.map((h) => h.key));
+    return incoming.flatMap((header, index) => {
+      if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
+      const byKey = existing?.find((h) => h.key === header.key);
+      if (byKey) return [{ key: header.key, value: byKey.value }];
+      const positional = existing?.[index];
+      if (positional && !incomingKeys.has(positional.key)) {
+        return [{ key: header.key, value: positional.value }];
+      }
+      return [];
+    });
   }
 }

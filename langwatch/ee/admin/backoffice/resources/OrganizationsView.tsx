@@ -17,25 +17,23 @@ import { Currency, PricingModel } from "@prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   BackofficeTable,
-  EmptyCell,
   dateInputToISO,
+  EmptyCell,
   formatDate,
 } from "../BackofficeTable";
-import {
-  useAdminList,
-  useAdminUpdate,
-} from "../useAdminResource";
+import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Organization shape — intentionally does NOT include
- * elasticsearchNodeUrl / elasticsearchApiKey / s3Endpoint / s3AccessKeyId /
+ * s3Endpoint / s3AccessKeyId /
  * s3SecretAccessKey / s3Bucket. Those are credentials and the admin Hono
  * route strips them from every list / getOne response (see
  * ee/admin/safeSelects.ts). The edit drawer still accepts *new* values for
@@ -56,7 +54,6 @@ interface AdminOrganization {
   pricingModel: PricingModel;
   license: string | null;
   licenseExpiresAt: string | null;
-  useCustomElasticsearch: boolean;
   useCustomS3: boolean;
   createdAt: string;
 }
@@ -134,9 +131,7 @@ export default function OrganizationsView() {
                 <Table.Cell>{org.slug}</Table.Cell>
                 <Table.Cell>{org.pricingModel}</Table.Cell>
                 <Table.Cell>{org.currency}</Table.Cell>
-                <Table.Cell>
-                  {org.ssoDomain ?? <EmptyCell />}
-                </Table.Cell>
+                <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{formatDate(org.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box
@@ -150,10 +145,7 @@ export default function OrganizationsView() {
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          onClick={() => setEditing(org)}
-                        >
+                        <Menu.Item value="edit" onClick={() => setEditing(org)}>
                           <Pencil size={16} />
                           Edit
                         </Menu.Item>
@@ -189,9 +181,6 @@ interface FormState {
   pricingModel: PricingModel;
   license: string;
   licenseExpiresAt: string;
-  useCustomElasticsearch: boolean;
-  elasticsearchNodeUrl: string;
-  elasticsearchApiKey: string;
   useCustomS3: boolean;
   s3Endpoint: string;
   s3AccessKeyId: string;
@@ -243,14 +232,11 @@ function OrganizationEditDrawer({
       pricingModel: organization.pricingModel,
       license: organization.license ?? "",
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
-      useCustomElasticsearch: !!organization.useCustomElasticsearch,
       useCustomS3: !!organization.useCustomS3,
       // Credentials are write-only: the server doesn't echo them back in
       // list/getOne responses (see ee/admin/safeSelects.ts), so the form
       // always starts empty. A non-empty value on save is the user typing
       // a *new* secret; an empty value is left unchanged.
-      elasticsearchNodeUrl: "",
-      elasticsearchApiKey: "",
       s3Endpoint: "",
       s3AccessKeyId: "",
       s3SecretAccessKey: "",
@@ -291,22 +277,11 @@ function OrganizationEditDrawer({
     if (nextExpires !== organization.licenseExpiresAt) {
       data.licenseExpiresAt = nextExpires;
     }
-    if (
-      form.useCustomElasticsearch !== !!organization.useCustomElasticsearch
-    ) {
-      data.useCustomElasticsearch = form.useCustomElasticsearch;
-    }
     if (form.useCustomS3 !== !!organization.useCustomS3)
       data.useCustomS3 = form.useCustomS3;
     // Credentials are write-only — the form starts empty and the server
     // never echoes the stored value. Only forward fields the user typed
     // into; an empty input is treated as "leave the stored secret alone".
-    if (form.elasticsearchNodeUrl.trim() !== "") {
-      data.elasticsearchNodeUrl = form.elasticsearchNodeUrl;
-    }
-    if (form.elasticsearchApiKey.trim() !== "") {
-      data.elasticsearchApiKey = form.elasticsearchApiKey;
-    }
     if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
     if (form.s3AccessKeyId.trim() !== "")
       data.s3AccessKeyId = form.s3AccessKeyId;
@@ -331,12 +306,9 @@ function OrganizationEditDrawer({
           onClose();
         },
         onError: (err) =>
-          toaster.create({
-            title: "Update failed",
-            description: err.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't update the organization",
           }),
       },
     );
@@ -410,9 +382,7 @@ function OrganizationEditDrawer({
                 <Field.Label>Stripe customer ID</Field.Label>
                 <Input
                   value={form.stripeCustomerId}
-                  onChange={(e) =>
-                    setField("stripeCustomerId", e.target.value)
-                  }
+                  onChange={(e) => setField("stripeCustomerId", e.target.value)}
                 />
               </Field.Root>
               <Field.Root>
@@ -449,8 +419,8 @@ function OrganizationEditDrawer({
                   placeholder="e.g. acme.com"
                 />
                 <Field.HelperText>
-                  Lowercased server-side. Users with this email domain can
-                  sign in via SSO.
+                  Lowercased server-side. Users with this email domain can sign
+                  in via SSO.
                 </Field.HelperText>
               </Field.Root>
               <Field.Root>
@@ -477,46 +447,7 @@ function OrganizationEditDrawer({
                 <Input
                   type="date"
                   value={form.licenseExpiresAt}
-                  onChange={(e) =>
-                    setField("licenseExpiresAt", e.target.value)
-                  }
-                />
-              </Field.Root>
-
-              <SectionHeading>Custom Elasticsearch</SectionHeading>
-              <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them
-                back. Leave blank to keep the stored value; type to replace.
-              </Text>
-              <ToggleRow
-                label="Use custom Elasticsearch"
-                hint="Override the platform-managed ClickHouse/ES cluster for this tenant."
-                checked={form.useCustomElasticsearch}
-                onChange={(v) => setField("useCustomElasticsearch", v)}
-              />
-              <Field.Root>
-                <Field.Label>Node URL</Field.Label>
-                <Input
-                  type="url"
-                  value={form.elasticsearchNodeUrl}
-                  onChange={(e) =>
-                    setField("elasticsearchNodeUrl", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomElasticsearch}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>API key</Field.Label>
-                <Input
-                  type="password"
-                  value={form.elasticsearchApiKey}
-                  onChange={(e) =>
-                    setField("elasticsearchApiKey", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomElasticsearch}
-                  autoComplete="new-password"
+                  onChange={(e) => setField("licenseExpiresAt", e.target.value)}
                 />
               </Field.Root>
 

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import {
@@ -5,7 +6,6 @@ import {
   parseLicenseKey,
   verifySignature,
 } from "../../../ee/licensing/validation";
-import { createLogger } from "../../utils/logger/server";
 import {
   type ISsoLicenseRepository,
   SsoLicenseRepository,

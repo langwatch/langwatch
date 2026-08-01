@@ -11,7 +11,11 @@ import { toaster } from "../ui/toaster";
 import { TeamForm, type TeamFormData } from "./TeamForm";
 import { teamRolesOptions } from "./TeamUserRoleField";
 
-export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.ReactElement {
+export function CreateTeamDrawer({
+  open = true,
+}: {
+  open?: boolean;
+}): React.ReactElement {
   const { organization } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
   const { closeDrawer } = useDrawer();

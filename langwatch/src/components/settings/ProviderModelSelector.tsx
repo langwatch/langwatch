@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import { modelDisplayLabel } from "../../server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import {
   isLatestAlias,
@@ -62,6 +63,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   size = "full",
   disabled = false,
   inheritOption,
+  displayNames,
 }: {
   model: string;
   options: string[];
@@ -74,6 +76,9 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     /** Short label shown above the model, e.g. "Inherit (from organization)" or "Suggested from openai". */
     label: string;
   };
+  /** Configured custom-model display names, keyed by `<provider>/<modelId>`.
+   *  Falls back to the id-derived label for any model without an entry. */
+  displayNames?: Record<string, string>;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -101,13 +106,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           };
         }
         return {
-          label: modelValue.split("/").slice(1).join("/"),
+          label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
           value: modelValue,
           icon,
           subtitle: "",
         };
       }),
-    [options],
+    [options, displayNames],
   );
 
   // Group models by provider
@@ -187,40 +192,45 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
   const isUnknown = !!model && !selectedItem;
 
-  const selectValueText = !model && inheritOption ? (
-    <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
-      {inheritIcon && (
-        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-          {inheritIcon}
+  const selectValueText =
+    !model && inheritOption ? (
+      <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
+        {inheritIcon && (
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+            {inheritIcon}
+          </Box>
+        )}
+        <Box
+          fontSize={size === "sm" ? 12 : 14}
+          fontFamily="mono"
+          lineClamp={1}
+          wordBreak="break-all"
+        >
+          {modelDisplayLabel({
+            fullModelId: inheritOption.model,
+            displayNames,
+          })}
         </Box>
-      )}
-      <Box
-        fontSize={size === "sm" ? 12 : 14}
-        fontFamily="mono"
-        lineClamp={1}
-        wordBreak="break-all"
-      >
-        {inheritOption.model.split("/").slice(1).join("/")}
-      </Box>
-    </HStack>
-  ) : (
-    <HStack overflow="hidden" gap={2} align="center">
-      {selectedIcon && (
-        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-          {selectedIcon}
+      </HStack>
+    ) : (
+      <HStack overflow="hidden" gap={2} align="center">
+        {selectedIcon && (
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+            {selectedIcon}
+          </Box>
+        )}
+        <Box
+          fontSize={size === "sm" ? 12 : 14}
+          fontFamily="mono"
+          lineClamp={1}
+          wordBreak="break-all"
+          color={isUnknown ? "gray.500" : undefined}
+        >
+          {selectedItem?.label ??
+            modelDisplayLabel({ fullModelId: model, displayNames })}
         </Box>
-      )}
-      <Box
-        fontSize={size === "sm" ? 12 : 14}
-        fontFamily="mono"
-        lineClamp={1}
-        wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
-      >
-        {selectedItem?.label ?? model.split("/").slice(1).join("/")}
-      </Box>
-    </HStack>
-  );
+      </HStack>
+    );
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(
     model,
@@ -333,7 +343,10 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                   fontFamily="mono"
                   lineClamp={1}
                 >
-                  {inheritOption.model.split("/").slice(1).join("/")}
+                  {modelDisplayLabel({
+                    fullModelId: inheritOption.model,
+                    displayNames,
+                  })}
                 </Text>
               </Box>
             </HStack>

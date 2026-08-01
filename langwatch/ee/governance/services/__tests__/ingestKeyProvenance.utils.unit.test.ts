@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   AI_TOOL_ORIGIN_VALUE,
   CODING_AGENT_ORIGIN_VALUE,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
   originForIngestSourceType,
+  PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
 } from "../ingestKeyProvenance.utils";
@@ -14,29 +17,36 @@ const PROVENANCE = {
   organizationId: "org_1",
 };
 
-function attrMap(attrs: { key: string; value: { stringValue?: string | null } }[]) {
+function attrMap(
+  attrs: { key: string; value: { stringValue?: string | null } }[],
+) {
   return Object.fromEntries(attrs.map((a) => [a.key, a.value.stringValue]));
 }
 
 describe("originForIngestSourceType", () => {
   describe("given a CLI coding-assistant source type", () => {
-    it.each(["claude_code", "codex", "gemini", "opencode", "cursor"])(
-      "maps %s to coding_agent",
-      (sourceType) => {
-        expect(originForIngestSourceType(sourceType)).toBe(
-          CODING_AGENT_ORIGIN_VALUE,
-        );
-      },
-    );
+    it.each([
+      "claude_code",
+      "codex",
+      "gemini",
+      "opencode",
+      "cursor",
+    ])("maps %s to coding_agent", (sourceType) => {
+      expect(originForIngestSourceType(sourceType)).toBe(
+        CODING_AGENT_ORIGIN_VALUE,
+      );
+    });
   });
 
   describe("given any other ingest source type", () => {
-    it.each(["claude_cowork", "otel_generic", "workato", "unknown_tool"])(
-      "maps %s to ai_tool",
-      (sourceType) => {
-        expect(originForIngestSourceType(sourceType)).toBe(AI_TOOL_ORIGIN_VALUE);
-      },
-    );
+    it.each([
+      "claude_cowork",
+      "otel_generic",
+      "workato",
+      "unknown_tool",
+    ])("maps %s to ai_tool", (sourceType) => {
+      expect(originForIngestSourceType(sourceType)).toBe(AI_TOOL_ORIGIN_VALUE);
+    });
   });
 });
 
@@ -45,16 +55,24 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
     it("stamps source, key id, coding_agent origin and org on every resource", () => {
       const request = {
         resourceMetrics: [
-          { resource: { attributes: [{ key: "service.name", value: { stringValue: "claude" } }] } },
+          {
+            resource: {
+              attributes: [
+                { key: "service.name", value: { stringValue: "claude" } },
+              ],
+            },
+          },
           { resource: { attributes: [] } },
         ],
       };
-      const stamped = stampIngestKeyProvenanceOnMetricRequest(request, PROVENANCE);
+      const stamped = stampIngestKeyProvenanceOnMetricRequest(
+        request,
+        PROVENANCE,
+      );
       expect(stamped).toBe(2);
       for (const rm of request.resourceMetrics) {
         const map = attrMap(rm.resource.attributes);
         expect(map["langwatch.source"]).toBe("claude_code");
-        expect(map["langwatch.api_key.id"]).toBe("key_abc");
         expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
         expect(map["langwatch.organization_id"]).toBe("org_1");
       }
@@ -82,7 +100,10 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
             resource: {
               attributes: [
                 { key: "langwatch.source", value: { stringValue: "spoofed" } },
-                { key: "langwatch.api_key.id", value: { stringValue: "spoofed_key" } },
+                {
+                  key: PROVENANCE_ATTR_API_KEY_ID,
+                  value: { stringValue: "spoofed_key" },
+                },
                 { key: "langwatch.origin", value: { stringValue: "gateway" } },
               ],
             },
@@ -90,14 +111,16 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
         ],
       };
       stampIngestKeyProvenanceOnMetricRequest(request, PROVENANCE);
+      enforceApiKeyIdOnMetricRequest(request, PROVENANCE.apiKeyId);
       const map = attrMap(request.resourceMetrics[0]!.resource.attributes);
       expect(map["langwatch.source"]).toBe("claude_code");
-      expect(map["langwatch.api_key.id"]).toBe("key_abc");
+      expect(map[PROVENANCE_ATTR_API_KEY_ID]).toBe("key_abc");
       expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
       // No duplicate keys remain after the strip-then-push.
-      const sourceCount = request.resourceMetrics[0]!.resource.attributes.filter(
-        (a) => a.key === "langwatch.source",
-      ).length;
+      const sourceCount =
+        request.resourceMetrics[0]!.resource.attributes.filter(
+          (a) => a.key === "langwatch.source",
+        ).length;
       expect(sourceCount).toBe(1);
     });
   });
@@ -137,13 +160,28 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
 
   describe("given a template-derived ingest key", () => {
     it("stamps the template id only when present", () => {
-      const withTemplate = { resourceMetrics: [{ resource: { attributes: [] } }] };
-      stampIngestKeyProvenanceOnMetricRequest(withTemplate, { ...PROVENANCE, templateId: "tmpl_1" });
-      expect(attrMap(withTemplate.resourceMetrics[0]!.resource.attributes)["langwatch.template.id"]).toBe("tmpl_1");
+      const withTemplate = {
+        resourceMetrics: [{ resource: { attributes: [] } }],
+      };
+      stampIngestKeyProvenanceOnMetricRequest(withTemplate, {
+        ...PROVENANCE,
+        templateId: "tmpl_1",
+      });
+      expect(
+        attrMap(withTemplate.resourceMetrics[0]!.resource.attributes)[
+          "langwatch.template.id"
+        ],
+      ).toBe("tmpl_1");
 
-      const noTemplate = { resourceMetrics: [{ resource: { attributes: [] } }] };
+      const noTemplate = {
+        resourceMetrics: [{ resource: { attributes: [] } }],
+      };
       stampIngestKeyProvenanceOnMetricRequest(noTemplate, PROVENANCE);
-      expect(attrMap(noTemplate.resourceMetrics[0]!.resource.attributes)["langwatch.template.id"]).toBeUndefined();
+      expect(
+        attrMap(noTemplate.resourceMetrics[0]!.resource.attributes)[
+          "langwatch.template.id"
+        ],
+      ).toBeUndefined();
     });
   });
 });
@@ -156,7 +194,13 @@ describe("stampIngestKeyProvenanceOnLogRequest", () => {
     it("stamps origin, source and langwatch.cost.non_billable on every resource", () => {
       const request = {
         resourceLogs: [
-          { resource: { attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }] } },
+          {
+            resource: {
+              attributes: [
+                { key: "service.name", value: { stringValue: "claude-code" } },
+              ],
+            },
+          },
           { resource: { attributes: [] } },
         ],
       };
@@ -187,5 +231,117 @@ describe("stampIngestKeyProvenanceOnLogRequest", () => {
         ],
       ).toBe("false");
     });
+  });
+});
+
+/**
+ * The redaction deny-list exempts `langwatch.api_key.id` by name, so the only
+ * thing standing between that exemption and a free "store my secret verbatim"
+ * slot is that the receiver rewrites the value on EVERY authenticated request.
+ * These pin that rule, including the branch with no ApiKey row behind it.
+ */
+describe("enforceApiKeyIdOnTraceRequest", () => {
+  function requestWith({
+    resourceAttrs = [],
+    spanAttrs = [],
+    eventAttrs = [],
+    linkAttrs = [],
+  }: {
+    resourceAttrs?: { key: string; value: { stringValue: string } }[];
+    spanAttrs?: { key: string; value: { stringValue: string } }[];
+    eventAttrs?: { key: string; value: { stringValue: string } }[];
+    linkAttrs?: { key: string; value: { stringValue: string } }[];
+  }) {
+    return {
+      resourceSpans: [
+        {
+          resource: { attributes: [...resourceAttrs] },
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  attributes: [...spanAttrs],
+                  events: [{ attributes: [...eventAttrs] }],
+                  links: [{ attributes: [...linkAttrs] }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const forged = {
+    key: PROVENANCE_ATTR_API_KEY_ID,
+    value: { stringValue: "sk-lw-attacker-secret" },
+  };
+
+  /** @scenario A caller cannot forge the API key id attribute */
+  it("replaces a payload-supplied resource value with the authenticated id", () => {
+    const request = requestWith({ resourceAttrs: [forged] });
+
+    enforceApiKeyIdOnTraceRequest(request, "key_real");
+
+    const map = attrMap(request.resourceSpans[0]!.resource.attributes);
+    expect(map[PROVENANCE_ATTR_API_KEY_ID]).toBe("key_real");
+  });
+
+  it("leaves exactly one copy of the attribute on the resource", () => {
+    const request = requestWith({ resourceAttrs: [forged, forged] });
+
+    enforceApiKeyIdOnTraceRequest(request, "key_real");
+
+    const count = request.resourceSpans[0]!.resource.attributes.filter(
+      (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
+    ).length;
+    expect(count).toBe(1);
+  });
+
+  /** @scenario A caller cannot forge the API key id attribute */
+  it.each([
+    ["span", "spanAttrs"],
+    ["span event", "eventAttrs"],
+    ["span link", "linkAttrs"],
+  ])("drops a payload-supplied %s copy outright", (_label, field) => {
+    const request = requestWith({ [field]: [forged] });
+
+    enforceApiKeyIdOnTraceRequest(request, "key_real");
+
+    const span = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
+    const holders = [span, span.events[0]!, span.links[0]!];
+    for (const holder of holders) {
+      expect(
+        holder.attributes.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID),
+      ).toBe(false);
+    }
+  });
+
+  /** @scenario Legacy project key auth leaves no API key id behind */
+  it("removes a forged value and writes nothing when there is no ApiKey row", () => {
+    const request = requestWith({ resourceAttrs: [forged] });
+
+    const applied = enforceApiKeyIdOnTraceRequest(request, null);
+
+    expect(applied).toBe(0);
+    expect(
+      request.resourceSpans[0]!.resource.attributes.some(
+        (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps unrelated attributes untouched", () => {
+    const request = requestWith({
+      resourceAttrs: [
+        forged,
+        { key: "service.name", value: { stringValue: "acme-api" } },
+      ],
+    });
+
+    enforceApiKeyIdOnTraceRequest(request, "key_real");
+
+    const map = attrMap(request.resourceSpans[0]!.resource.attributes);
+    expect(map["service.name"]).toBe("acme-api");
   });
 });

@@ -27,7 +27,7 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { abbreviateModel, formatDuration } from "../../utils/formatters";
+import { formatDuration } from "../../utils/formatters";
 import {
   extractPromptReference,
   type PromptReference,
@@ -545,7 +545,7 @@ function SpanRow({
       </Text>
       {span?.model && (
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-          {abbreviateModel(span.model)}
+          {span.model}
         </Text>
       )}
       {span && (

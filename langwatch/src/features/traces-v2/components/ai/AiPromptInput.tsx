@@ -20,8 +20,8 @@ const aiThinkingShimmer = keyframes`
   100% { background-position: -200% 0; }
 `;
 
-// Sweep the three AI brand stops (orange → pink → violet) through the
-// muted body colour so the shimmer reads as the same "AI" gradient the
+// Sweep the three Langy brand stops (blue → purple → amber) through the
+// muted body colour so the shimmer reads as the same Langy gradient the
 // Sparkles icon and Ask AI button use, instead of a single flat accent.
 const thinkingShimmerStyles = {
   background: `linear-gradient(
@@ -271,4 +271,3 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
     </Flex>
   );
 };
-

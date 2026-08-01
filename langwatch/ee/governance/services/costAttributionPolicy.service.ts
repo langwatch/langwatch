@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 /**
  * Resolves whether a tool's direct-OTLP usage is "non-billable" (bundled into
  * a subscription plan rather than billed per token), so the receiver can stamp
@@ -21,9 +22,7 @@
  * flip visible within ~30s.
  */
 import type { PrismaClient } from "@prisma/client";
-
 import { prisma as defaultPrismaClient } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:cost-attribution-policy");
 

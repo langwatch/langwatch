@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
@@ -5,13 +6,22 @@ import {
   coerceScore,
   extractTargetOutput,
   isEvaluatorNode,
-  mapErrorEvent,
   mapEvaluatorResult,
   mapNlpEvent,
   mapTargetResult,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   parseNodeId,
 } from "../resultMapper";
+import { UNNAMED_FAILURE } from "../types";
+
+class DatasetColumnMissingError extends HandledError {
+  constructor() {
+    super("invalid_dataset", 'Column "expected_output" is not mapped', {
+      httpStatus: 422,
+    });
+  }
+}
 
 describe("resultMapper", () => {
   describe("parseNodeId", () => {
@@ -259,6 +269,42 @@ describe("resultMapper", () => {
       });
     });
 
+    it("lifts a coded engine failure onto the handled channel", () => {
+      const result = mapTargetResult("target-1", 1, {
+        error:
+          'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+        error_type: "http_error",
+        trace_id: "trace-9",
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      // The raw string is kept as a legacy fallback, but a domainError now
+      // rides alongside it carrying the code.
+      expect(result.domainError?.code).toBe("http_error");
+      expect(result.domainError?.traceId).toBe("trace-9");
+      // The leaky message never crosses in the handled payload (#5984).
+      expect(JSON.stringify(result.domainError)).not.toContain("no such host");
+    });
+
+    it("carries the upstream status for an upstream_http_error", () => {
+      const result = mapTargetResult("target-1", 0, {
+        error: "httpblock: upstream returned 500",
+        error_type: "upstream_http_error",
+        upstream_status: 500,
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError?.meta).toEqual({ upstreamStatus: 500 });
+    });
+
+    it("leaves domainError unset when the engine sent no code", () => {
+      const result = mapTargetResult("target-1", 0, { error: "plain string" });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError).toBeUndefined();
+      expect(result.error).toBe("plain string");
+    });
+
     it("handles missing timestamps", () => {
       const result = mapTargetResult("target-1", 0, {
         outputs: { output: "test" },
@@ -293,7 +339,107 @@ describe("resultMapper", () => {
           details: undefined,
           cost: { currency: "USD", amount: 0.0001 },
         },
+        duration: 500,
       });
+    });
+
+    it("includes duration when timestamps are present", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+        timestamps: { started_at: 1000, finished_at: 2500 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBe(1500);
+      }
+    });
+
+    it("omits duration when timestamps are missing", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBeUndefined();
+      }
+    });
+
+    it("includes the evaluator's request inputs when provided", () => {
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        {
+          status: "success",
+          outputs: { label: "target-a" },
+        },
+        { inputs: { candidates } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({ candidates });
+      }
+    });
+
+    it("keeps only the candidate ids, not the whole request payload", () => {
+      // Everything but the ids duplicates what the run already stores per
+      // target, and this column reaches ClickHouse twice, the browser via a
+      // `SELECT *`, and the storage meter — at rows x targets x evaluators.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { label: "target-a" } },
+        {
+          inputs: {
+            candidates: [
+              { id: "target-a", output: "a long answer", cost: 0.01 },
+              { id: "target-b", output: "another long answer", cost: 0.02 },
+            ],
+            golden: "the reference answer",
+            input: "the task",
+          },
+        },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({
+          candidates: [{ id: "target-a" }, { id: "target-b" }],
+        });
+      }
+    });
+
+    it("omits inputs for an evaluator that has no candidate list", () => {
+      // A non-Comparison evaluator persists nothing here rather than an
+      // empty object.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { passed: true, score: 1.0 } },
+        { inputs: { input: "the task", output: "the answer" } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
+    });
+
+    it("omits inputs when none are provided", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
     });
 
     it("maps successful evaluator result with passed=false", () => {
@@ -343,6 +489,39 @@ describe("resultMapper", () => {
           traceback: [],
         });
       }
+    });
+
+    describe("given the evaluator failed with provider auth", () => {
+      /** @scenario Judge auth failures are serialized as domain errors */
+      it("serializes a domain error for raw 403 responses", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "error",
+          error: '403 {\n  "message": "Missing Authentication Token"\n}',
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result.domainError).toMatchObject({
+            kind: "evaluator_execution_error",
+            meta: { httpStatus: 403 },
+          });
+          expect(result.result.details).toContain(
+            "Missing Authentication Token",
+          );
+        }
+      });
+
+      it("does not reclassify non-auth error strings", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "error",
+          error: "Evaluator timeout",
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result.domainError).toBeUndefined();
+        }
+      });
     });
 
     it("maps evaluator error result from outputs.status === 'error'", () => {
@@ -650,7 +829,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -676,11 +859,39 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).evaluatorId).toBe("eval-1");
       expect((result as any).result.passed).toBe(true);
+    });
+
+    it("threads the evaluator's request inputs through to the mapped event", () => {
+      const event: StudioServerEvent = {
+        type: "component_state_change",
+        payload: {
+          component_id: "target-1.eval-1",
+          execution_state: {
+            status: "success",
+            outputs: { label: "target-a" },
+          },
+        },
+      };
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        evaluatorInputs: { candidates },
+      });
+
+      expect(result?.type).toBe("evaluator_result");
+      expect((result as any).inputs).toEqual({ candidates });
     });
 
     it("ignores running state events", () => {
@@ -695,7 +906,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -711,7 +926,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -721,7 +940,11 @@ describe("resultMapper", () => {
         payload: { message: "starting execution" },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -730,7 +953,11 @@ describe("resultMapper", () => {
         type: "done",
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
       expect(result).toBeNull();
     });
 
@@ -746,7 +973,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result).toEqual({
         type: "target_result",
@@ -772,7 +1003,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).result.status).toBe("error");
@@ -791,8 +1026,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes, {
-        stripScoreEvaluatorIds: new Set(["eval-strip"]),
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        config: { stripScoreEvaluatorIds: new Set(["eval-strip"]) },
       });
 
       expect(result?.type).toBe("evaluator_result");
@@ -817,8 +1055,12 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes, {
-        stripScoreEvaluatorIds: new Set(["eval-strip"]), // Only eval-strip should be stripped
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes,
+        // Only eval-strip should be stripped.
+        config: { stripScoreEvaluatorIds: new Set(["eval-strip"]) },
       });
 
       expect(result?.type).toBe("evaluator_result");
@@ -843,7 +1085,11 @@ describe("resultMapper", () => {
         },
       };
 
-      const result = mapNlpEvent(event, 0, targetNodes);
+      const result = mapNlpEvent({
+        event,
+        rowIndex: 0,
+        targetNodes: targetNodes,
+      });
 
       expect(result?.type).toBe("evaluator_result");
       if (result?.type === "evaluator_result") {
@@ -855,35 +1101,96 @@ describe("resultMapper", () => {
       }
     });
   });
+});
 
-  describe("mapErrorEvent", () => {
-    it("creates generic error event", () => {
-      const result = mapErrorEvent("Something went wrong");
+/**
+ * The single choke point deciding whether a thrown error's message reaches a
+ * customer. Everything the orchestrator and the two route-level catches emit
+ * for a failure passes through here.
+ */
+describe("mapThrownErrorEvent", () => {
+  describe("given a handled error", () => {
+    it("carries the code as the wire message", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
+        targetId: "target-1",
+      });
 
-      expect(result).toEqual({
+      expect(event).toMatchObject({
         type: "error",
-        message: "Something went wrong",
-        rowIndex: undefined,
-        targetId: undefined,
-        evaluatorId: undefined,
+        message: "invalid_dataset",
+        rowIndex: 3,
+        targetId: "target-1",
       });
     });
 
-    it("creates error event with context", () => {
-      const result = mapErrorEvent(
-        "Failed to execute",
-        2,
-        "target-1",
-        "eval-1",
-      );
-
-      expect(result).toEqual({
-        type: "error",
-        message: "Failed to execute",
-        rowIndex: 2,
-        targetId: "target-1",
-        evaluatorId: "eval-1",
+    it("carries the serialised handled payload the client renders from", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
       });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.domainError).toMatchObject({
+        code: "invalid_dataset",
+        httpStatus: 422,
+      });
+    });
+  });
+
+  describe("given an unhandled infrastructure error", () => {
+    const connectionRefused = () =>
+      new Error("connect ECONNREFUSED 10.0.0.5:5432");
+
+    it("puts neither host nor port anywhere on the event", () => {
+      const event = mapThrownErrorEvent({
+        error: connectionRefused(),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      // The whole event, not just the wire slice: this one is persisted into
+      // the run row too, and the row is read back into the customer's grid.
+      const serialised = JSON.stringify(event);
+      expect(serialised).not.toContain("10.0.0.5");
+      expect(serialised).not.toContain("5432");
+      expect(serialised).not.toContain("ECONNREFUSED");
+    });
+
+    it("carries a marker rather than words somebody has to write", () => {
+      const event = mapThrownErrorEvent({
+        error: connectionRefused(),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.message).toBe(UNNAMED_FAILURE);
+      expect(event.domainError).toBeUndefined();
+    });
+  });
+
+  describe("given a failure that took the whole run", () => {
+    it("names no failure it could not name, wherever it happened", () => {
+      const runLevel = mapThrownErrorEvent({ error: new Error("boom") });
+      const cellLevel = mapThrownErrorEvent({
+        error: new Error("boom"),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      expect(runLevel.type).toBe("error");
+      expect(cellLevel.type).toBe("error");
+      if (runLevel.type !== "error" || cellLevel.type !== "error") return;
+      // Scope is `rowIndex`, which the client reads; the message is a marker,
+      // and the words for each scope are the client's to choose.
+      expect(runLevel.message).toBe(UNNAMED_FAILURE);
+      expect(cellLevel.message).toBe(UNNAMED_FAILURE);
+      expect(runLevel.rowIndex).toBeUndefined();
+      expect(cellLevel.rowIndex).toBe(0);
     });
   });
 });

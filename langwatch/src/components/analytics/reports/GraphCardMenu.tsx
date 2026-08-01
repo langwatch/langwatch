@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "~/components/ui/menu";
+import { useRouter } from "~/utils/compat/next-router";
 
 type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";
 
@@ -93,5 +93,5 @@ export function GraphCardMenu({
   );
 }
 
-export { sizeOptions, getCurrentSize };
 export type { SizeOption };
+export { getCurrentSize, sizeOptions };

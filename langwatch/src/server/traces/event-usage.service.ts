@@ -1,10 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import { isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
 import {
-  queryBillableEventsTotalUniq,
-  queryBillableEventsByProjectApprox,
   getBillingMonth,
+  queryBillableEventsByProjectApprox,
+  queryBillableEventsTotalUniq,
 } from "../../../ee/billing/services/billableEventsQuery";
-import { createLogger } from "~/utils/logger/server";
+import {
+  type ProjectUsageCounts,
+  USAGE_UNKNOWN,
+  type UsageCount,
+} from "./usage-count";
 
 const logger = createLogger("langwatch:traces:eventUsage");
 
@@ -12,20 +17,22 @@ const logger = createLogger("langwatch:traces:eventUsage");
  * Events-only counting execution service.
  *
  * Queries the ClickHouse `billable_events` table for event counts.
- * Returns 0 when ClickHouse is unavailable (fail-open).
+ *
+ * Answers {@link USAGE_UNKNOWN} — never 0 — when it cannot count. A zero here
+ * is a real measurement that callers act on; see `usage-count.ts`.
  */
 export class EventUsageService {
   async getCurrentMonthCount({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<number> {
+  }): Promise<UsageCount> {
     if (!isClickHouseEnabled()) {
       logger.warn(
         { organizationId },
-        "getCurrentMonthCount: ClickHouse unavailable, returning 0 (fail-open)",
+        "getCurrentMonthCount: ClickHouse unavailable, usage is unknown",
       );
-      return 0;
+      return USAGE_UNKNOWN;
     }
 
     const billingMonth = getBillingMonth();
@@ -38,7 +45,15 @@ export class EventUsageService {
       { organizationId, count, billingMonth },
       "getCurrentMonthCount: billable events total",
     );
-    return count ?? 0;
+    // A null total means the query did not run, not that nothing was billed.
+    if (count === null || count === undefined) {
+      logger.warn(
+        { organizationId, billingMonth },
+        "getCurrentMonthCount: no total returned, usage is unknown",
+      );
+      return USAGE_UNKNOWN;
+    }
+    return count;
   }
 
   async getCountByProjects({
@@ -47,7 +62,7 @@ export class EventUsageService {
   }: {
     organizationId: string;
     projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<ProjectUsageCounts> {
     if (projectIds.length === 0) {
       return [];
     }
@@ -55,9 +70,9 @@ export class EventUsageService {
     if (!isClickHouseEnabled()) {
       logger.warn(
         { organizationId },
-        "getCountByProjects: ClickHouse unavailable, returning zeros (fail-open)",
+        "getCountByProjects: ClickHouse unavailable, usage is unknown",
       );
-      return projectIds.map((projectId) => ({ projectId, count: 0 }));
+      return USAGE_UNKNOWN;
     }
 
     const billingMonth = getBillingMonth();

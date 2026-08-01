@@ -1,5 +1,5 @@
+import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { createLogger } from "~/utils/logger";
 import { toError } from "~/utils/posthogErrorCapture";
 import { FetchSSETimeoutError } from "./errors";
 
@@ -146,9 +146,7 @@ export async function fetchSSE<T>({
         }
       })
       .catch((error) => {
-        handleError(
-          toError(error),
-        );
+        handleError(toError(error));
       });
   });
 }

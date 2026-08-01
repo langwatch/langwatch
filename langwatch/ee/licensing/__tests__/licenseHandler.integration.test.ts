@@ -1,26 +1,18 @@
-import {
-  beforeAll,
-  afterAll,
-  afterEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../../../src/server/db";
-import { LicenseHandler, type ITraceUsageService } from "../licenseHandler";
-import { OrganizationNotFoundError } from "../errors";
+import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
+import { UNLIMITED_PLAN } from "../constants";
+import { type ITraceUsageService, LicenseHandler } from "../licenseHandler";
+import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
-  VALID_LICENSE_KEY,
-  EXPIRED_LICENSE_KEY,
-  TAMPERED_LICENSE_KEY,
   ENTERPRISE_LICENSE_KEY,
+  EXPIRED_LICENSE_KEY,
   GARBAGE_DATA,
+  TAMPERED_LICENSE_KEY,
+  VALID_LICENSE_KEY,
 } from "./fixtures/testLicenses";
-import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import { FREE_PLAN } from "../constants";
-import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
 
 // Mock TraceUsageService for testing - returns 0 for all counts
 const mockTraceUsageService: ITraceUsageService = {
@@ -199,8 +191,8 @@ describe("LicenseHandler Integration", () => {
       expect(status.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
 
       // Cleanup member
-      await prisma.organizationUser.deleteMany({
-        where: { organizationId, userId: user.id },
+      await prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: user.id, organizationId } },
       });
       await prisma.user.delete({ where: { id: user.id } });
     });
@@ -214,14 +206,14 @@ describe("LicenseHandler Integration", () => {
     it("stores valid license and returns success with planInfo", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        ENTERPRISE_LICENSE_KEY
+        ENTERPRISE_LICENSE_KEY,
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.planInfo.type).toBe(ENTERPRISE_LICENSE.plan.type);
         expect(result.planInfo.maxMembers).toBe(
-          ENTERPRISE_LICENSE.plan.maxMembers
+          ENTERPRISE_LICENSE.plan.maxMembers,
         );
       }
 
@@ -243,7 +235,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for invalid license format", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        GARBAGE_DATA
+        GARBAGE_DATA,
       );
 
       expect(result.success).toBe(false);
@@ -262,7 +254,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for invalid signature", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        TAMPERED_LICENSE_KEY
+        TAMPERED_LICENSE_KEY,
       );
 
       expect(result.success).toBe(false);
@@ -275,7 +267,7 @@ describe("LicenseHandler Integration", () => {
     it("returns error for expired license", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        EXPIRED_LICENSE_KEY
+        EXPIRED_LICENSE_KEY,
       );
 
       expect(result.success).toBe(false);
@@ -284,10 +276,13 @@ describe("LicenseHandler Integration", () => {
       }
     });
 
-    it("throws OrganizationNotFoundError for non-existent org", async () => {
+    it("raises organization_not_found for a non-existent org", async () => {
       await expect(
-        handler.validateAndStoreLicense("non-existent-org-id", VALID_LICENSE_KEY)
-      ).rejects.toThrow(OrganizationNotFoundError);
+        handler.validateAndStoreLicense(
+          "non-existent-org-id",
+          VALID_LICENSE_KEY,
+        ),
+      ).rejects.toMatchObject({ code: "organization_not_found" });
     });
 
     it("updates existing license when storing new one", async () => {
@@ -297,14 +292,14 @@ describe("LicenseHandler Integration", () => {
       // Then store ENTERPRISE license
       const result = await handler.validateAndStoreLicense(
         organizationId,
-        ENTERPRISE_LICENSE_KEY
+        ENTERPRISE_LICENSE_KEY,
       );
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.planInfo.type).toBe(ENTERPRISE_LICENSE.plan.type);
         expect(result.planInfo.maxMembers).toBe(
-          ENTERPRISE_LICENSE.plan.maxMembers
+          ENTERPRISE_LICENSE.plan.maxMembers,
         );
       }
 
@@ -364,10 +359,10 @@ describe("LicenseHandler Integration", () => {
       expect(result.removed).toBe(true);
     });
 
-    it("throws OrganizationNotFoundError for non-existent org", async () => {
+    it("raises organization_not_found for a non-existent org", async () => {
       await expect(
-        handler.removeLicense("non-existent-org-id")
-      ).rejects.toThrow(OrganizationNotFoundError);
+        handler.removeLicense("non-existent-org-id"),
+      ).rejects.toMatchObject({ code: "organization_not_found" });
     });
   });
 
@@ -376,14 +371,13 @@ describe("LicenseHandler Integration", () => {
   // ==========================================================================
 
   describe("getActivePlan", () => {
-    /** @scenario Limits members to FREE_PLAN limit when no license */
-    /** @scenario Limits lite members to FREE_PLAN limit when no license */
-    it("returns FREE_PLAN when no license exists", async () => {
+    /** @scenario An unlicensed deployment runs on the Open Source plan */
+    it("returns the Open Source plan with uncapped seats when no license exists", async () => {
       const plan = await handler.getActivePlan(organizationId);
 
-      expect(plan.type).toBe(FREE_PLAN.type);
-      expect(plan.maxMembers).toBe(FREE_PLAN.maxMembers);
-      expect(plan.maxMembersLite).toBe(FREE_PLAN.maxMembersLite);
+      expect(plan.type).toBe(UNLIMITED_PLAN.type);
+      expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
+      expect(plan.maxMembersLite).toBe(UNLIMITED_PLAN.maxMembersLite);
     });
 
     it("returns license plan when valid license exists", async () => {
@@ -398,7 +392,8 @@ describe("LicenseHandler Integration", () => {
       expect(plan.maxMembers).toBe(ENTERPRISE_LICENSE.plan.maxMembers);
     });
 
-    it("returns FREE_PLAN when license is expired", async () => {
+    /** @scenario An expired license leaves the deployment on the Open Source plan */
+    it("returns the Open Source plan with uncapped seats when the license is expired", async () => {
       await prisma.organization.update({
         where: { id: organizationId },
         data: { license: EXPIRED_LICENSE_KEY },
@@ -406,10 +401,15 @@ describe("LicenseHandler Integration", () => {
 
       const plan = await handler.getActivePlan(organizationId);
 
-      expect(plan.type).toBe(FREE_PLAN.type);
+      // A customer mid-renewal must not end up worse off than one who never
+      // held a license at all, so an expired key falls back to the same
+      // baseline rather than to a seat cap that locks their team out.
+      expect(plan.type).toBe(UNLIMITED_PLAN.type);
+      expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
     });
 
-    it("returns FREE_PLAN when license is tampered", async () => {
+    /** @scenario An unreadable license leaves the deployment on the Open Source plan */
+    it("returns the Open Source plan with uncapped seats when the license is tampered", async () => {
       await prisma.organization.update({
         where: { id: organizationId },
         data: { license: TAMPERED_LICENSE_KEY },
@@ -417,7 +417,8 @@ describe("LicenseHandler Integration", () => {
 
       const plan = await handler.getActivePlan(organizationId);
 
-      expect(plan.type).toBe(FREE_PLAN.type);
+      expect(plan.type).toBe(UNLIMITED_PLAN.type);
+      expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
     });
   });
 });

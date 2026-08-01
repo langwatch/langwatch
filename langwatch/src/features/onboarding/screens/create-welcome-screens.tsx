@@ -15,6 +15,7 @@ import { Link } from "~/components/ui/link";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
+import { IntentSelectionScreen } from "../components/sections/IntentSelectionScreen";
 import {
   desireItems,
   roleItems,
@@ -22,14 +23,11 @@ import {
 } from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
-  type CompanySize,
   type DesireType,
   type OnboardingFlowConfig,
-  type OnboardingFormData,
   type OnboardingScreen,
   OnboardingScreenIndex,
   type RoleType,
-  type SolutionType,
   type UsageStyle,
 } from "../types/types";
 
@@ -55,7 +53,6 @@ const OrganizationScreen: React.FC = () => {
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />
-        <Field.ErrorText />
       </Field.Root>
 
       <Field.Root colorPalette="orange">
@@ -187,6 +184,14 @@ export const useCreateWelcomeScreens = ({
         heading: "Welcome aboard",
         subHeading: "Let's kick off by creating your organization",
         component: OrganizationScreen,
+      },
+      [OnboardingScreenIndex.INTENT]: {
+        id: "intent",
+        required: true,
+        heading: "What do you want to do?",
+        subHeading:
+          "Pick your starting point. You can explore the rest anytime",
+        component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {
         id: "basic-info",

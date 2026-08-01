@@ -104,10 +104,11 @@ export abstract class AbstractFoldProjection<
   CK extends string = "CreatedAt",
   UK extends string = "UpdatedAt",
   LEOAK extends string = "LastEventOccurredAt",
+  Store = FoldProjectionStore<State>,
 > {
   abstract readonly name: string;
   abstract readonly version: string;
-  abstract readonly store: FoldProjectionStore<State>;
+  abstract readonly store: Store;
 
   readonly createdAtKey: CK;
   readonly updatedAtKey: UK;
@@ -156,6 +157,17 @@ export abstract class AbstractFoldProjection<
     /** occurredAt (ms) of the event that triggered the re-fold, used to
      * lower-bound the event_log rehydration scan for time-local aggregates. */
     occurredAtMs?: number;
+  }) => Promise<Event[]>;
+
+  /**
+   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
+   * order, sorted by occurredAt ASC. Used by the executor for
+   * `options.refoldOnStoreMiss`. Auto-wired by EventSourcingService.
+   */
+  eventLoaderUpTo?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
   }) => Promise<Event[]>;
 
   /** Lazily-built dispatch map: event type string → handler method name. */

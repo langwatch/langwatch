@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   buildMcpConfig,
   buildMcpJson,
@@ -8,7 +8,10 @@ import {
 describe("buildMcpConfig()", () => {
   describe("when given only an API key", () => {
     it("returns config with only the API key in env", () => {
-      const result = buildMcpConfig({ apiKey: "lw-abc123", endpoint: undefined });
+      const result = buildMcpConfig({
+        apiKey: "lw-abc123",
+        endpoint: undefined,
+      });
 
       expect(result).toEqual({
         mcpServers: {
@@ -44,7 +47,7 @@ describe("buildMcpConfig()", () => {
 
       const env = (result as any).mcpServers.langwatch.env;
       expect(env.LANGWATCH_ENDPOINT).toBe(
-        "https://langwatch.internal.company.com"
+        "https://langwatch.internal.company.com",
       );
       expect(env.LANGWATCH_API_KEY).toBe("lw-abc123");
     });
@@ -70,7 +73,7 @@ describe("buildMcpJson()", () => {
 
       const parsed = JSON.parse(json);
       expect(parsed.mcpServers.langwatch.env.LANGWATCH_ENDPOINT).toBe(
-        "https://custom.host"
+        "https://custom.host",
       );
     });
   });
@@ -84,7 +87,7 @@ describe("buildMcpJson()", () => {
 
       const parsed = JSON.parse(json);
       expect(parsed.mcpServers.langwatch.env).not.toHaveProperty(
-        "LANGWATCH_ENDPOINT"
+        "LANGWATCH_ENDPOINT",
       );
     });
   });

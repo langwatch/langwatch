@@ -1,5 +1,5 @@
-import type { Node, Edge } from "@xyflow/react";
-import type { Workflow, Entry, Component } from "../types/dsl";
+import type { Edge, Node } from "@xyflow/react";
+import type { Component, Entry, Workflow } from "../types/dsl";
 import { checkIsEvaluator } from "./nodeUtils";
 
 /**

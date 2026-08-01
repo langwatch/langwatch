@@ -4,9 +4,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  applyAuthentication,
   AUTH_STRATEGIES,
   type AuthConfig,
+  applyAuthentication,
 } from "../auth.strategies";
 
 describe("AUTH_STRATEGIES", () => {

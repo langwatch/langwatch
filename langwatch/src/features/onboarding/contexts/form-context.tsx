@@ -1,3 +1,4 @@
+import type { OrganizationIntent } from "@prisma/client";
 import type React from "react";
 import { createContext, useContext } from "react";
 import type {
@@ -12,6 +13,7 @@ import type {
 interface OnboardingFormContextValue extends OnboardingFormData {
   setOrganizationName: (value: string) => void;
   setAgreement: (value: boolean) => void;
+  setIntent: (value: OrganizationIntent | undefined) => void;
   setUsageStyle: (value: UsageStyle | undefined) => void;
   setPhoneNumber: (value: string) => void;
   setPhoneHasValue: (value: boolean) => void;

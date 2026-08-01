@@ -1,164 +1,51 @@
-import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
-import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
-import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
+import {
+  buildScopeHierarchy,
+  type ModelProviderScopeEntry,
+  type OrgModelProvider,
+  resolveEligible,
+  type VirtualKeyScopeEntry,
+} from "./eligibleModelProviders";
 
-type ScopeKey = `${VirtualKeyScopeEntry["scopeType"]}:${string}`;
-
-type OrgModelProvider = {
-  id?: string | null;
-  name?: string | null;
-  provider: string;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
-  models?: string[] | null;
-  customModels?: Array<{ model: string }> | null;
+type ScopeNames = {
+  organizationName?: string;
+  teamNames: Map<string, string>;
+  projectNames: Map<string, string>;
 };
 
-type EligibleModelProvider = {
-  id: string;
-  provider: string;
-  label: string;
-  modelCount: number;
-  inheritedFrom: VirtualKeyScopeEntry;
-  defaultModel: string;
-};
-
-// Resolve the snippet-friendly model string for a provider row. The
-// gateway accepts both bare `gpt-5-mini` (OpenAI-SDK drop-in) and
-// `vendor/model` form. We emit the vendor-prefixed default per the
-// provider registry so a click on the row writes a model that the VK
-// can actually route to that specific provider.
-function resolveProviderDefaultModel(
-  providerKey: string,
-  providerLabel: string,
-  providerModels: string[],
-): string {
-  const registry = modelProviderRegistry.find(
-    (entry) => entry.backendModelProviderKey === providerKey,
-  );
-  const fallbackModel = providerModels[0];
-  const defaultModel = registry?.defaultModel ?? fallbackModel;
-  if (!defaultModel) {
-    // Best-effort: the registry has no default and the provider also
-    // shipped no models in scope. Emit the bare provider name; the
-    // gateway will surface a 404 the user can read instead of a silent
-    // empty model string.
-    return providerLabel.toLowerCase();
+function scopeName(
+  scope: ModelProviderScopeEntry | VirtualKeyScopeEntry,
+  names: ScopeNames,
+): string | undefined {
+  switch (scope.scopeType) {
+    case "ORGANIZATION":
+      return names.organizationName;
+    case "TEAM":
+      return names.teamNames.get(scope.scopeId);
+    case "PROJECT":
+      return names.projectNames.get(scope.scopeId);
   }
-  return `${providerKey}/${defaultModel}`;
 }
 
 /**
- * Resolves the union eligible-ModelProvider set for a multi-scope VirtualKey
- * client-side, mirroring `scopeResolver.eligibleModelProvidersForVk` on the
- * server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
- *
- *   "A VK at scope S sees a ModelProvider P iff P's scope is an ancestor
- *    of S OR equal to S. ORG is the broadest, then TEAM, then PROJECT."
- *
- * Each surviving MP carries the broadest VK scope that admitted it (the
- * "inheritedFrom" chip in the picker UI) — that's the spec's
- * "via ORG"/"via TEAM:platform" annotation.
+ * "Doc Chat", "Doc Chat and Growth", "Doc Chat, Growth and Support" — the
+ * scopes named the way the user picked them in the chips right above, so
+ * the sentence reads back their own choice rather than a scope type.
  */
-function resolveEligible(
+function listScopeNames(
   scopes: VirtualKeyScopeEntry[],
-  providers: OrgModelProvider[],
-  hierarchy: {
-    organizationId: string | undefined;
-    teamOfProject: Map<string, string>;
-  },
-): EligibleModelProvider[] {
-  if (scopes.length === 0 || providers.length === 0) return [];
-  const matchesScope = (
-    mpScope: { scopeType: string; scopeId: string },
-    vkScope: VirtualKeyScopeEntry,
-  ): boolean => {
-    if (mpScope.scopeType === "ORGANIZATION") {
-      return mpScope.scopeId === hierarchy.organizationId;
-    }
-    if (mpScope.scopeType === "TEAM") {
-      if (vkScope.scopeType === "ORGANIZATION") return false;
-      if (vkScope.scopeType === "TEAM") return mpScope.scopeId === vkScope.scopeId;
-      const teamOfVkProject = hierarchy.teamOfProject.get(vkScope.scopeId);
-      return mpScope.scopeId === teamOfVkProject;
-    }
-    if (mpScope.scopeType === "PROJECT") {
-      return vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId;
-    }
-    return false;
-  };
-
-  const result = new Map<string, EligibleModelProvider>();
-  for (const provider of providers) {
-    if (!provider.id) continue;
-    for (const mpScope of provider.scopes) {
-      const winner = scopes.find((vkScope) => matchesScope(mpScope, vkScope));
-      if (!winner) continue;
-      if (result.has(provider.id)) continue;
-      const chatModels = provider.models ?? [];
-      const customCount = provider.customModels?.length ?? 0;
-      const label = provider.name ?? provider.provider;
-      result.set(provider.id, {
-        id: provider.id,
-        provider: provider.provider,
-        label,
-        modelCount: chatModels.length + customCount,
-        inheritedFrom: winner,
-        defaultModel: resolveProviderDefaultModel(
-          provider.provider,
-          label,
-          chatModels,
-        ),
-      });
-    }
-  }
-  return Array.from(result.values()).sort((a, b) =>
-    a.label.localeCompare(b.label),
-  );
-}
-
-function scopeChipLabel(
-  scope: VirtualKeyScopeEntry,
-  names: {
-    organizationName?: string;
-    teamNames: Map<string, string>;
-    projectNames: Map<string, string>;
-  },
+  names: ScopeNames,
 ): string {
-  switch (scope.scopeType) {
-    case "ORGANIZATION":
-      return `via ORG${names.organizationName ? `:${names.organizationName}` : ""}`;
-    case "TEAM":
-      return `via TEAM:${names.teamNames.get(scope.scopeId) ?? scope.scopeId}`;
-    case "PROJECT":
-      return `via PROJECT:${names.projectNames.get(scope.scopeId) ?? scope.scopeId}`;
-  }
-}
-
-function summariseScopes(
-  scopes: VirtualKeyScopeEntry[],
-  names: {
-    organizationName?: string;
-    teamNames: Map<string, string>;
-    projectNames: Map<string, string>;
-  },
-): string {
-  return scopes
-    .map((s) => {
-      const tail =
-        s.scopeType === "ORGANIZATION"
-          ? names.organizationName ?? s.scopeId
-          : s.scopeType === "TEAM"
-          ? names.teamNames.get(s.scopeId) ?? s.scopeId
-          : names.projectNames.get(s.scopeId) ?? s.scopeId;
-      return `${s.scopeType}:${tail}`;
-    })
-    .join(" + ");
+  const labels = scopes.map((s) => scopeName(s, names) ?? s.scopeId);
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]!}`;
 }
 
 export function EligibleModelProvidersPreview({
@@ -188,13 +75,10 @@ export function EligibleModelProvidersPreview({
   selectedModel?: string;
   onSelectProviderModel?: (model: string) => void;
 }) {
-  const hierarchy = useMemo(() => {
-    const teamOfProject = new Map<string, string>();
-    for (const p of availableProjects) {
-      if (p.teamId) teamOfProject.set(p.id, p.teamId);
-    }
-    return { organizationId, teamOfProject };
-  }, [availableProjects, organizationId]);
+  const hierarchy = useMemo(
+    () => buildScopeHierarchy(availableProjects, organizationId),
+    [availableProjects, organizationId],
+  );
 
   const names = useMemo(() => {
     const teamNames = new Map(availableTeams.map((t) => [t.id, t.name]));
@@ -264,9 +148,7 @@ export function EligibleModelProvidersPreview({
       {eligible.map((mp) => {
         const icon =
           mp.provider in modelProviderIcons
-            ? modelProviderIcons[
-                mp.provider as keyof typeof modelProviderIcons
-              ]
+            ? modelProviderIcons[mp.provider as keyof typeof modelProviderIcons]
             : null;
         const isSelected = selectedModel === mp.defaultModel;
         return (
@@ -290,7 +172,11 @@ export function EligibleModelProvidersPreview({
                 ? () => onSelectProviderModel?.(mp.defaultModel)
                 : undefined
             }
-            title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
+            title={
+              interactive
+                ? `Use ${mp.defaultModel} in the snippet above`
+                : undefined
+            }
           >
             <Box
               width="16px"
@@ -317,9 +203,16 @@ export function EligibleModelProvidersPreview({
               </Text>
             )}
             <Box flex={1} />
-            <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
-              {scopeChipLabel(mp.inheritedFrom, names)}
-            </Badge>
+            <ProviderScopeChips
+              size="xs"
+              scopes={[
+                {
+                  scopeType: mp.definedAt.scopeType,
+                  scopeId: mp.definedAt.scopeId,
+                  name: scopeName(mp.definedAt, names),
+                },
+              ]}
+            />
           </HStack>
         );
       })}
@@ -353,13 +246,10 @@ export function EligibleModelProvidersSummary({
   isLoading?: boolean;
   providers: OrgModelProvider[];
 }) {
-  const hierarchy = useMemo(() => {
-    const teamOfProject = new Map<string, string>();
-    for (const p of availableProjects) {
-      if (p.teamId) teamOfProject.set(p.id, p.teamId);
-    }
-    return { organizationId, teamOfProject };
-  }, [availableProjects, organizationId]);
+  const hierarchy = useMemo(
+    () => buildScopeHierarchy(availableProjects, organizationId),
+    [availableProjects, organizationId],
+  );
 
   const names = useMemo(() => {
     const teamNames = new Map(availableTeams.map((t) => [t.id, t.name]));
@@ -379,12 +269,12 @@ export function EligibleModelProvidersSummary({
 
   if (scopes.length === 0 || isLoading || eligible.length === 0) return null;
 
-  const scopeSummary = summariseScopes(scopes, names);
+  const scopeSummary = listScopeNames(scopes, names);
   const totalModels = eligible.reduce((sum, p) => sum + p.modelCount, 0);
 
   return (
     <Text fontSize="xs" color="fg.muted">
-      This VK will be usable within {scopeSummary} and can fall back to{" "}
+      This key works in {scopeSummary} and can route to{" "}
       {eligible.length === 1 ? "1 provider" : `${eligible.length} providers`}
       {totalModels > 0
         ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})`
@@ -433,5 +323,3 @@ export function ConfigureModelProvidersLink({
     </Link>
   );
 }
-
-export type { OrgModelProvider, EligibleModelProvider };

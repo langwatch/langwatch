@@ -1,5 +1,5 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { abbreviateModel, formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "../../../utils/formatters";
 import {
   buildSpanTree,
   type SpanWithChildren,
@@ -51,7 +51,7 @@ function getParticipantDisplay(span: SpanTreeNode): string | null {
       .replace("invoke_agent ", "");
   }
   if (span.type === "llm" && span.model) {
-    return abbreviateModel(span.model);
+    return span.model;
   }
   if (span.type === "tool") return null;
   return span.name ?? null;

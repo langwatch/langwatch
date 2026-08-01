@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { userRouter } from "../user";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { userRouter } from "../user";
 
 vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "email" },
@@ -8,6 +8,12 @@ vi.mock("../../../../env.mjs", () => ({
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../../../ee/admin/isAdmin", () => ({
+  isAdmin: vi.fn(
+    ({ email }: { email: string }) => email === "admin@example.com",
+  ),
 }));
 
 // Mock the redis connection so the revoke helper called by
@@ -33,10 +39,10 @@ describe("userRouter", () => {
     prismaUpdateMock = vi.fn().mockResolvedValue({ id: "user-1" });
   });
 
-  const createCaller = () => {
+  const createCaller = (email = "admin@example.com") => {
     const ctx = createInnerTRPCContext({
       session: {
-        user: { id: "caller-1", name: "Caller", email: "any@example.com" },
+        user: { id: "caller-1", name: "Caller", email },
         expires: "2099-01-01",
       },
     });
@@ -62,7 +68,29 @@ describe("userRouter", () => {
         const callArgs = prismaUpdateMock.mock.calls[0]![0];
         expect(callArgs.where).toEqual({ id: "user-1" });
         expect(callArgs.data.deactivatedAt).toBeInstanceOf(Date);
-        expect(callArgs.data.deactivatedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+        expect(callArgs.data.deactivatedAt.getTime()).toBeGreaterThanOrEqual(
+          before.getTime(),
+        );
+      });
+    });
+
+    describe("when called by a non-admin", () => {
+      it("allows users to deactivate themselves", async () => {
+        await createCaller("member@example.com").deactivate({
+          userId: "caller-1",
+        });
+
+        expect(prismaUpdateMock).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: "caller-1" } }),
+        );
+      });
+
+      it("rejects the request", async () => {
+        await expect(
+          createCaller("member@example.com").deactivate({ userId: "user-1" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(prismaUpdateMock).not.toHaveBeenCalled();
       });
     });
   });
@@ -76,6 +104,16 @@ describe("userRouter", () => {
         const callArgs = prismaUpdateMock.mock.calls[0]![0];
         expect(callArgs.where).toEqual({ id: "user-1" });
         expect(callArgs.data.deactivatedAt).toBeNull();
+      });
+    });
+
+    describe("when called by a non-admin", () => {
+      it("rejects the request", async () => {
+        await expect(
+          createCaller("member@example.com").reactivate({ userId: "user-1" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(prismaUpdateMock).not.toHaveBeenCalled();
       });
     });
   });

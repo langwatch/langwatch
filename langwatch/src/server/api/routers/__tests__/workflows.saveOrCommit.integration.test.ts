@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { nanoid } from "nanoid";
-import { getTestUser } from "~/utils/testUtils";
-import { prisma } from "~/server/db";
-import { saveOrCommitWorkflowVersion } from "../workflows";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth";
+import { prisma } from "~/server/db";
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
+import { getTestUser } from "~/utils/testUtils";
+import { saveOrCommitWorkflowVersion } from "../workflows";
 
 /**
  * Integration test for saveOrCommitWorkflowVersion.
@@ -34,18 +35,24 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
-    await prisma.workflow
-      .update({
-        where: { id: workflowId, projectId },
-        data: { latestVersionId: null, currentVersionId: null },
-      })
-      .catch(() => {});
-    await prisma.workflowVersion
-      .deleteMany({ where: { workflowId, projectId } })
-      .catch(() => {});
-    await prisma.workflow
-      .delete({ where: { id: workflowId, projectId } })
-      .catch(() => {});
+    const wid = requireAssigned({ value: workflowId, name: "workflowId" });
+    const pid = requireAssigned({ value: projectId, name: "projectId" });
+    // Version rows form a parent chain under onDelete: Restrict, which
+    // Postgres checks per row, so the chain must be broken before a
+    // one-shot delete; and the workflow's version pointers must be
+    // detached before the versions go.
+    await prisma.workflow.update({
+      where: { id: wid, projectId: pid },
+      data: { latestVersionId: null, currentVersionId: null },
+    });
+    await prisma.workflowVersion.updateMany({
+      where: { workflowId: wid, projectId: pid },
+      data: { parentId: null },
+    });
+    await cleanupTestRows(prisma, [
+      ["workflowVersion", { workflowId: wid, projectId: pid }],
+      ["workflow", { id: wid, projectId: pid }],
+    ]);
   });
 
   const getCtx = () => ({
@@ -105,9 +112,7 @@ describe("saveOrCommitWorkflowVersion", () => {
 
       // mergeLocalConfigsIntoDsl splits the system message into instructions
       // and keeps only non-system messages in the messages parameter
-      expect(messages?.value).toEqual([
-        { role: "user", content: "{{input}}" },
-      ]);
+      expect(messages?.value).toEqual([{ role: "user", content: "{{input}}" }]);
 
       // localPromptConfig must be stripped
       expect(signatureNode.data.localPromptConfig).toBeUndefined();

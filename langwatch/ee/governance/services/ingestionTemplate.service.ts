@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  HandledError,
+  NotFoundError,
+  ValidationError,
+} from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 /**
  * IngestionTemplateService — owns the catalog read + admin-authoring
  * surface for the personal-project trace-ingest flow.
@@ -13,9 +19,8 @@
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { customAlphabet } from "nanoid";
-
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import {
@@ -23,8 +28,6 @@ import {
   type GovernanceCallSurface,
 } from "./auditSurface";
 import { seedPlatformIngestionTemplates } from "./platformIngestionTemplates.seeds";
-
-import { createLogger } from "~/utils/logger/server";
 
 const slugSuffixGenerator = customAlphabet(
   "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -36,27 +39,45 @@ const logger = createLogger("langwatch:governance:ingestion-template");
 
 const SOURCE_TYPE_PATTERN = /^[a-z0-9_]{1,40}$/;
 
-export class PlatformTemplateImmutableError extends Error {
+/**
+ * The three ways a template call is refused, all on the handled channel.
+ *
+ * They were plain `Error`s whose copy survived only because the tRPC
+ * formatter's `authored` heuristic lets an uncaused 4xx message through —
+ * a fragile channel for three failures with obvious codes and obvious
+ * remedies. Now each carries a stable `code` the client registry keys copy
+ * off, and the REST surface's own `instanceof` mapping in
+ * `src/app/api/governance/[[...route]]/app.ts` keeps working unchanged.
+ *
+ * All three are `fault: "customer"` (the default) and 4xx: nothing here is an
+ * incident, and each has one action that resolves it.
+ */
+export class PlatformTemplateImmutableError extends HandledError {
   constructor() {
     super(
+      "template_immutable",
       "Platform-published templates are read-only. Clone to your organization to customize.",
+      { httpStatus: 403 },
     );
     this.name = "PlatformTemplateImmutableError";
   }
 }
 
-export class TemplateNotFoundError extends Error {
-  constructor() {
-    super("Ingestion template not found.");
+export class TemplateNotFoundError extends NotFoundError {
+  constructor(templateId: string) {
+    super("template_not_found", "Ingestion template", templateId);
     this.name = "TemplateNotFoundError";
   }
 }
 
-export class InvalidSourceTypeError extends Error {
+export class InvalidSourceTypeError extends ValidationError {
   constructor() {
-    super(
-      "sourceType must be lowercase letters / digits / underscores, max 40 chars.",
-    );
+    // `formErrors` because `sourceType` is not a name the registry knows how
+    // to say, so its `validation_error` copy renders this sentence instead of
+    // the anonymous "Some of the values aren't valid."
+    const complaint =
+      "sourceType must be lowercase letters / digits / underscores, max 40 chars.";
+    super(complaint, { meta: { formErrors: [complaint] } });
     this.name = "InvalidSourceTypeError";
   }
 }
@@ -328,7 +349,7 @@ export class IngestionTemplateService {
           platformPublished: true,
         },
       });
-      if (!existing) throw new TemplateNotFoundError();
+      if (!existing) throw new TemplateNotFoundError(id);
       if (existing.platformPublished) {
         throw new PlatformTemplateImmutableError();
       }
@@ -379,7 +400,7 @@ export class IngestionTemplateService {
         organizationId,
         select: { id: true, slug: true, platformPublished: true },
       });
-      if (!existing) throw new TemplateNotFoundError();
+      if (!existing) throw new TemplateNotFoundError(id);
       if (existing.platformPublished) {
         throw new PlatformTemplateImmutableError();
       }
@@ -429,7 +450,7 @@ export class IngestionTemplateService {
     const source = await this.repo.findPlatformNonArchivedById(this.prisma, {
       id: sourceTemplateId,
     });
-    if (!source) throw new TemplateNotFoundError();
+    if (!source) throw new TemplateNotFoundError(sourceTemplateId);
 
     return await this.createOrgTemplate({
       organizationId,
@@ -463,7 +484,7 @@ export class IngestionTemplateService {
    * have rows in the DB.
    */
   private async ensurePlatformDefaultsSeeded(): Promise<void> {
-    if (lazySeedPromise) {
+    if (lazySeedPromise !== null) {
       await lazySeedPromise;
       return;
     }
@@ -472,12 +493,19 @@ export class IngestionTemplateService {
         const result = await seedPlatformIngestionTemplates(this.prisma);
         if (result.created > 0 || result.archived > 0) {
           logger.info(
-            { created: result.created, updated: result.updated, archived: result.archived },
+            {
+              created: result.created,
+              updated: result.updated,
+              archived: result.archived,
+            },
             "platform IngestionTemplate catalog seeded on first request",
           );
         }
       } catch (err) {
-        logger.error({ err }, "lazy seeding of platform IngestionTemplates failed");
+        logger.error(
+          { err },
+          "lazy seeding of platform IngestionTemplates failed",
+        );
         // Reset so the next call retries instead of caching the failure.
         lazySeedPromise = null;
       }

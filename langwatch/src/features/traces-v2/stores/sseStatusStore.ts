@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 
-const LIVE_UPDATES_STORAGE_KEY =
-  "langwatch:traces-v2:live-updates-mode:v1";
+const LIVE_UPDATES_STORAGE_KEY = "langwatch:traces-v2:live-updates-mode:v1";
 /** Legacy boolean preference from before "ask" mode existed. */
 const LEGACY_LIVE_UPDATES_BOOL_KEY =
   "langwatch:traces-v2:live-updates-enabled:v1";

@@ -11,14 +11,9 @@
  * - GET              /api/scim/v2/ServiceProviderConfig
  */
 import type { Context } from "hono";
-import {
-  createServiceApp,
-  internalSecret,
-} from "~/server/api/security";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import { prisma } from "~/server/db";
-import { ScimGroupService } from "~/server/scim/scim-group.service";
 import { ScimService } from "~/server/scim/scim.service";
-import { ScimTokenService } from "~/server/scim/scim-token.service";
 import {
   isScimError,
   scimCreateGroupRequestSchema,
@@ -26,8 +21,8 @@ import {
   scimPatchRequestSchema,
   scimReplaceGroupRequestSchema,
 } from "~/server/scim/scim.types";
-
-const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
+import { ScimGroupService } from "~/server/scim/scim-group.service";
+import { ScimTokenService } from "~/server/scim/scim-token.service";
 
 const secured = createServiceApp({ basePath: "/api/scim/v2" });
 

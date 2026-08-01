@@ -1,20 +1,12 @@
-import {
-  Alert,
-  Button,
-  HStack,
-  Spinner,
-  type StackProps,
-  Text,
-} from "@chakra-ui/react";
-import { LuListTree, LuRefreshCw } from "react-icons/lu";
+import { Button, HStack, type StackProps } from "@chakra-ui/react";
+import { LuListTree } from "react-icons/lu";
 import { TracePreviewHoverCard } from "~/features/traces-v2/components/TraceIdPeek";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { easyCatchToast } from "../../utils/easyCatchToast";
 
 // Constants
-const TRACE_QUERY_CONFIG = {
+export const TRACE_QUERY_CONFIG = {
   retry: 10,
   retryDelay: (attemptIndex: number) =>
     Math.min(2000 * 2 ** attemptIndex, 60000),
@@ -50,9 +42,8 @@ function TraceSuccessState({
   traceId,
   ...props
 }: { traceId: string } & StackProps) {
-  // useTraceDetailsDrawer routes to v1 or v2 based on the operator's
-  // localStorage opt-in (see `useTracesV2Preference`). The hover-peek
-  // popover is the same in both worlds.
+  // useTraceDetailsDrawer opens the Trace Explorer drawer (see
+  // `routeTraceDrawerForV2`). The hover-peek popover is unaffected.
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (

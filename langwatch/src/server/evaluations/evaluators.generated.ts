@@ -852,6 +852,12 @@ export const evaluatorsSchema = z.object({
         .default(
           'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
         ),
+      has_golden_answer: z
+        .boolean()
+        .describe(
+          "Compare each candidate against a reference answer. Turn off to have the judge compare Candidate A and Candidate B directly on their own merits, with no reference answer involved.",
+        )
+        .default(true),
       swap_and_confirm: z
         .boolean()
         .describe(
@@ -880,6 +886,60 @@ export const evaluatorsSchema = z.object({
         .number()
         .describe("Max tokens allowed for evaluation")
         .default(128000),
+    }),
+  }),
+  "langevals/select_best_compare": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe(
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        )
+        .default(
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
+        ),
+      has_golden_answer: z
+        .boolean()
+        .describe(
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        )
+        .default(false),
+      randomize_order: z
+        .boolean()
+        .describe(
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        )
+        .default(true),
+      allow_tie: z
+        .boolean()
+        .describe(
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        )
+        .default(true),
+      include_metrics: z
+        .array(z.union([z.literal("cost"), z.literal("duration")]))
+        .describe("Per-candidate metrics to inject into the judge prompt")
+        .default([]),
+      temperature: z
+        .number()
+        .describe(
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        )
+        .default(0.0),
+      swap_and_reconcile: z
+        .boolean()
+        .describe(
+          "Check each row twice, the second time with the candidate order reversed, and record no result for that row when the two disagree \u2014 rather than a tie, which would claim the candidates are equally good. Doubles judge-call cost per row (literature: swapping candidate order alone flips 10-30% of verdicts on contested rows).",
+        )
+        .default(true),
     }),
   }),
   "langevals/sentiment": z.object({
@@ -2226,11 +2286,10 @@ This evaluator checks if the user message is concerning one of the allowed topic
     },
   },
   "langevals/pairwise_compare": {
-    name: `Pairwise Compare`,
+    name: `Pairwise Compare (deprecated)`,
     description: `
-Native pairwise LLM-as-judge evaluator. Compare two candidate
-outputs against a golden reference, with optional swap-and-confirm
-position-bias mitigation.
+Compare two candidate outputs against a reference answer and pick the
+better one. Superseded by Comparison, which judges two or more candidates.
 `,
     category: "quality",
     docsUrl: "",
@@ -2262,6 +2321,11 @@ position-bias mitigation.
         description: "Judge prompt template (golden-aware by default)",
         default:
           'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
+      },
+      has_golden_answer: {
+        description:
+          "Compare each candidate against a reference answer. Turn off to have the judge compare Candidate A and Candidate B directly on their own merits, with no reference answer involved.",
+        default: true,
       },
       swap_and_confirm: {
         description:
@@ -2311,6 +2375,77 @@ This evaluator checks if all the user queries in the conversation were resolved.
     },
     envVars: [],
     result: {},
+  },
+  "langevals/select_best_compare": {
+    name: `Comparison`,
+    description: `
+Compare two or more candidate outputs and pick the best one, optionally
+against a reference answer. The judge sees every candidate at once and
+explains why the winner is better. Candidate order is shuffled so that a
+candidate's position never sways the verdict, and by default each row is
+checked twice — once more with the order reversed — recording no result
+for that row when the two checks disagree, rather than guessing.
+`,
+    category: "quality",
+    docsUrl: "",
+    isGuardrail: false,
+    requiredFields: [],
+    optionalFields: ["input", "golden", "candidates", "row_index"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description: "Max tokens allowed for evaluation",
+        default: 128000,
+      },
+      prompt: {
+        description:
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        default:
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
+      },
+      has_golden_answer: {
+        description:
+          "Compare each candidate against a reference answer. Turn off to have the judge compare the candidates directly on their own merits, with no reference answer involved.",
+        default: false,
+      },
+      randomize_order: {
+        description:
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        default: true,
+      },
+      allow_tie: {
+        description:
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        default: true,
+      },
+      include_metrics: {
+        description: "Per-candidate metrics to inject into the judge prompt",
+        default: [],
+      },
+      temperature: {
+        description:
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        default: 0.0,
+      },
+      swap_and_reconcile: {
+        description:
+          "Check each row twice, the second time with the candidate order reversed, and record no result for that row when the two disagree \u2014 rather than a tie, which would claim the candidates are equally good. Doubles judge-call cost per row (literature: swapping candidate order alone flips 10-30% of verdicts on contested rows).",
+        default: true,
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "1.0 when a winner was picked, 0.5 for tie",
+      },
+      label: {
+        description:
+          "The winning candidate id (matches the id supplied in entry.candidates), or 'tie'.",
+      },
+    },
   },
   "langevals/sentiment": {
     name: `Sentiment Evaluator`,

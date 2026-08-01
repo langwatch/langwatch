@@ -1,9 +1,12 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { startTestContainers, stopTestContainers } from "../../../../__tests__/integration/testContainers";
 import { createResilientClickHouseClient } from "../../../../../app-layer/clients/clickhouse";
 import { createTenantId } from "../../../../";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "../../../../__tests__/integration/testContainers";
 import type { SimulationRunState } from "../../projections/simulationRunState.foldProjection";
 import { SimulationRunStateRepositoryClickHouse } from "../simulationRunState.clickhouse.repository";
 

@@ -22,6 +22,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DefaultModelsSection } from "../DefaultModelsSection";
 
@@ -74,7 +75,11 @@ vi.mock("~/utils/api", () => ({
       getAllForProject: {
         useQuery: () => ({
           data: {
-            openai: { enabled: true, customModels: [], customEmbeddingsModels: [] },
+            openai: {
+              enabled: true,
+              customModels: [],
+              customEmbeddingsModels: [],
+            },
           },
           isLoading: false,
         }),
@@ -177,13 +182,34 @@ const FAKE_PAYLOAD = {
   ],
 };
 
-function renderSection() {
+function renderSection(
+  props: Partial<ComponentProps<typeof DefaultModelsSection>> = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <DefaultModelsSection />
+      <DefaultModelsSection {...props} />
     </ChakraProvider>,
   );
 }
+
+// Issue #5759: a custom model's configured Display Name must reach the
+// table chip too, not just the drawer's dropdown - pins the
+// DefaultModelsSection -> ModelChip prop-threading hop. Deliberately
+// disjoint from its own raw id (never "gpt-5.1-custom") so a dropped
+// `displayNames={displayNames}` is provable by exact string identity,
+// not a substring match the raw id could still slip through.
+const CUSTOM_MODEL_ID = "gpt-5.1";
+const CUSTOM_DISPLAY_NAME = "Ada Prod Model";
+const CUSTOM_FULL_ID = `custom/${CUSTOM_MODEL_ID}`;
+
+const CUSTOM_MODEL_CONFIG_ROW = {
+  id: "cfg_custom_display_name",
+  config: { DEFAULT: CUSTOM_FULL_ID },
+  createdAt: new Date("2026-05-15T12:00:00Z"),
+  updatedAt: new Date("2026-05-15T12:00:00Z"),
+  authorId: "user-1",
+  scopes: [{ type: "PROJECT", id: "proj-1", name: "Acme App" }],
+};
 
 describe("<DefaultModelsSection />", () => {
   beforeEach(() => {
@@ -202,9 +228,7 @@ describe("<DefaultModelsSection />", () => {
   /** @scenario The Default Models page shows the list of override rules */
   it("renders one row per config in the All-you-can-see view", () => {
     renderSection();
-    expect(
-      screen.getByTestId("config-row-cfg_acme_org"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("config-row-cfg_acme_org")).toBeInTheDocument();
     expect(
       screen.getByTestId("config-row-cfg_ai_search_override"),
     ).toBeInTheDocument();
@@ -234,12 +258,8 @@ describe("<DefaultModelsSection />", () => {
     renderSection();
     // Open the 3-dot row menu, then pick Edit. Mirrors the model-providers
     // row pattern — Edit + Delete live behind a MoreVertical popover.
-    fireEvent.click(
-      screen.getByTestId("config-row-cfg_acme_org-actions"),
-    );
-    fireEvent.click(
-      await screen.findByTestId("config-row-cfg_acme_org-edit"),
-    );
+    fireEvent.click(screen.getByTestId("config-row-cfg_acme_org-actions"));
+    fireEvent.click(await screen.findByTestId("config-row-cfg_acme_org-edit"));
     // Drawer is opened through the URL-driven currentDrawer registry —
     // the section only fires openDrawer with the row's id, the registry
     // mounts the actual drawer component above the page.
@@ -251,9 +271,7 @@ describe("<DefaultModelsSection />", () => {
   /** @scenario Deleting a config via the row menu removes the row */
   it("fires the delete mutation when Delete is picked from the row menu", async () => {
     renderSection();
-    fireEvent.click(
-      screen.getByTestId("config-row-cfg_acme_org-actions"),
-    );
+    fireEvent.click(screen.getByTestId("config-row-cfg_acme_org-actions"));
     fireEvent.click(
       await screen.findByTestId("config-row-cfg_acme_org-delete"),
     );
@@ -267,5 +285,24 @@ describe("<DefaultModelsSection />", () => {
     // Same URL-routed drawer as Edit — without an editingId so the
     // drawer initialises in create mode.
     expect(mockOpenDrawer).toHaveBeenCalledWith("defaultModelOverride", {});
+  });
+
+  describe("given a config whose role model is a renamed custom model", () => {
+    describe("when the section receives the resolved displayNames map", () => {
+      it("renders the table chip with the configured display name, not the raw model id", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: { ...FAKE_PAYLOAD, configs: [CUSTOM_MODEL_CONFIG_ROW] },
+          isLoading: false,
+        });
+
+        renderSection({
+          displayNames: { [CUSTOM_FULL_ID]: CUSTOM_DISPLAY_NAME },
+        });
+
+        expect(
+          screen.getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent,
+        ).toBe(CUSTOM_DISPLAY_NAME);
+      });
+    });
   });
 });

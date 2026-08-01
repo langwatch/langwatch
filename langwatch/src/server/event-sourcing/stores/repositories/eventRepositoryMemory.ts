@@ -1,4 +1,5 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { compareOrdinal } from "../../utils/compareOrdinal";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
@@ -38,19 +39,44 @@ export class EventRepositoryMemory implements EventRepository {
     return filtered.map((record) => ({ ...record }));
   }
 
-  async getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      occurredAtFromMs,
+    } = request;
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
-    // Filter events up to and including the specified event
-    // Events where: timestamp < upToTimestamp OR (timestamp = upToTimestamp AND eventId <= upToEventId)
+    // Mirrors the ClickHouse lower bound so a window that would drop events in
+    // production drops them here too — otherwise a too-small window passes
+    // every test and only fails against real data.
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+
     const filteredRecords = records.filter((record) => {
+      // Records with an unknown occurred time are always kept, exactly as the
+      // SQL does, so the bound can never drop one. Null and 0 are both
+      // "unknown" here — the column is non-null in ClickHouse, but the memory
+      // record type allows null.
+      if (
+        hasLowerBound &&
+        record.EventOccurredAt != null &&
+        record.EventOccurredAt !== 0 &&
+        record.EventOccurredAt < occurredAtFromMs
+      ) {
+        return false;
+      }
       if (record.EventTimestamp < upToTimestamp) {
         return true;
       }
@@ -63,16 +89,89 @@ export class EventRepositoryMemory implements EventRepository {
       return false;
     });
 
-    // Sort by timestamp then eventId to ensure consistent ordering
+    // Sort by timestamp then eventId to ensure consistent ordering. The id
+    // tie-break is plain relational (byte-wise), never localeCompare: it must
+    // order exactly like ClickHouse's `ORDER BY EventTimestamp, EventId` and
+    // the shared cursor comparator, or a same-millisecond tie folds in a
+    // different order in tests than in prod.
     const sortedRecords = [...filteredRecords].sort((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return compareOrdinal(a.EventId, b.EventId);
     });
 
     // Return a copy to prevent mutation
     return sortedRecords.map((record) => ({ ...record }));
+  }
+
+  async getEventRecordsUpToPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+      occurredAtFromMs,
+    } = request;
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const records = this.eventsByKey.get(key) ?? [];
+
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+
+    // Mirrors the ClickHouse lower bound; unknown occurred times are kept.
+    const withinLowerBound = (record: EventRecord): boolean =>
+      !hasLowerBound ||
+      record.EventOccurredAt == null ||
+      record.EventOccurredAt === 0 ||
+      record.EventOccurredAt >= occurredAtFromMs;
+
+    const withinUpperBound = (record: EventRecord): boolean =>
+      record.EventTimestamp < upToTimestamp ||
+      (record.EventTimestamp === upToTimestamp &&
+        record.EventId <= upToEventId);
+
+    // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
+    const afterCursor = (record: EventRecord): boolean => {
+      if (!after) return true;
+      if (record.EventTimestamp > after.timestamp) return true;
+      return (
+        record.EventTimestamp === after.timestamp &&
+        record.EventId > after.eventId
+      );
+    };
+
+    const filtered = records.filter(
+      (record) =>
+        withinLowerBound(record) &&
+        withinUpperBound(record) &&
+        afterCursor(record),
+    );
+
+    // Plain relational comparison, not localeCompare: withinUpperBound and
+    // afterCursor above already order EventId with `<=`/`>`, so the sort must
+    // use the same (locale-independent) comparison or the cursor's boundary
+    // can disagree with where a record lands in the sorted page.
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.EventTimestamp !== b.EventTimestamp) {
+        return a.EventTimestamp - b.EventTimestamp;
+      }
+      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
+    });
+
+    return sorted.slice(0, limit).map((record) => ({ ...record }));
   }
 
   async countEventRecords(

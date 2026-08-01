@@ -1,24 +1,27 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
-	classifyClickHouseError,
-	SecurityError,
-	StoreError,
-	ValidationError,
+  classifyClickHouseError,
+  SecurityError,
+  StoreError,
+  ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger/server";
 import type {
-	Projection,
-	ProjectionStoreReadContext,
-	ProjectionStoreWriteContext,
+  Projection,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
 import type {
-	ExperimentRunState,
-	ExperimentRunStateData,
+  ExperimentRunState,
+  ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
-import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
+import {
+  makeExperimentRunKey,
+  parseExperimentRunKey,
+} from "../utils/compositeKey";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
@@ -59,7 +62,12 @@ interface ClickHouseExperimentRunRecord {
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   ClickHouseExperimentRunRecord,
-  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
+  | "CreatedAt"
+  | "UpdatedAt"
+  | "StartedAt"
+  | "FinishedAt"
+  | "StoppedAt"
+  | "LastEventOccurredAt"
 >;
 
 export class ExperimentRunStateRepositoryClickHouse<
@@ -134,7 +142,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
-      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt
+        ? new Date(data.LastEventOccurredAt)
+        : new Date(0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -216,8 +226,10 @@ export class ExperimentRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({ runId, tenantId: context.tenantId, error: errorMessage },
-        "Failed to get projection from ClickHouse");
+      logger.error(
+        { runId, tenantId: context.tenantId, error: errorMessage },
+        "Failed to get projection from ClickHouse",
+      );
       throw new StoreError(
         "getProjection",
         "ExperimentRunStateRepositoryClickHouse",
@@ -267,7 +279,9 @@ export class ExperimentRunStateRepositoryClickHouse<
         runId,
       );
 
-      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { experiments?: number | null }
+        | undefined;
       projectionRecord._retention_days =
         retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 
@@ -277,16 +291,18 @@ export class ExperimentRunStateRepositoryClickHouse<
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        runId: String(projection.aggregateId),
-        projectionId: projection.id,
-        error: errorMessage,
-      }, "Failed to store projection in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          runId: String(projection.aggregateId),
+          projectionId: projection.id,
+          error: errorMessage,
+        },
+        "Failed to store projection in ClickHouse",
+      );
       throw new StoreError(
         "storeProjection",
         "ExperimentRunStateRepositoryClickHouse",
@@ -321,7 +337,9 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
-      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      const retentionPolicy = context.metadata?.retentionPolicy as
+        | { experiments?: number | null }
+        | undefined;
       const retentionDays =
         retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
@@ -348,11 +366,14 @@ export class ExperimentRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error({
-        tenantId: context.tenantId,
-        count: projections.length,
-        error: errorMessage,
-      }, "Failed to batch store projections in ClickHouse");
+      logger.error(
+        {
+          tenantId: context.tenantId,
+          count: projections.length,
+          error: errorMessage,
+        },
+        "Failed to batch store projections in ClickHouse",
+      );
       throw new StoreError(
         "storeProjectionBatch",
         "ExperimentRunStateRepositoryClickHouse",

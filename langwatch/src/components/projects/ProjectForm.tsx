@@ -13,7 +13,13 @@ import {
 import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Controller, type Control, type SubmitHandler, useForm } from "react-hook-form";
+import {
+  type Control,
+  Controller,
+  type SubmitHandler,
+  useForm,
+} from "react-hook-form";
+import { applyHandledErrorToForm, HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { Select } from "../ui/select";
@@ -34,7 +40,8 @@ export interface ProjectFormProps {
     data: ProjectFormData & { language: string; framework: string },
   ) => void;
   isLoading?: boolean;
-  error?: string | null;
+  /** The submit mutation's error, passed straight through — handled or not. */
+  error?: unknown;
   defaultTeamId?: string;
   /** Required for creating projects in a different organization via the dropdown menu.
    * Ensures teams are fetched from the target organization, not the current context. */
@@ -52,17 +59,9 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
   // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
-  const effectiveOrganizationId =
-    organizationIdProp ?? currentOrganization?.id;
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-    control,
-  } = useForm<ProjectFormData>({
+  const form = useForm<ProjectFormData>({
     defaultValues: {
       name: "",
       // Seed from defaultTeamId so the form always submits a valid teamId
@@ -74,8 +73,41 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
       teamId: defaultTeamId ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    control,
+  } = form;
 
   const teamId = watch("teamId");
+
+  /**
+   * The part of the submit failure the form itself could not put on a field.
+   *
+   * The mutation lives in the parent drawer, but the inputs live here, so the
+   * rejection has to come back down as a prop and be lifted onto the form on
+   * arrival. Without this the whole thing rendered as one alert reading
+   * "There's a problem with the name and the team" over an untouched form,
+   * leaving the user to work out which of the two the server meant.
+   *
+   * `hasFormErrorSlot` stays at its default `false` on purpose: the alert
+   * below IS this form's form-level slot, and it says more than
+   * `<FormServerError>` would — tips, docs link, error id. So the bridge
+   * claims only what it can mark on an input, and whatever it declines
+   * (a form-level complaint, a field with no input on screen, an error that
+   * isn't a validation failure at all) falls through to the alert intact.
+   */
+  const [unclaimedError, setUnclaimedError] = useState<unknown>(null);
+  useEffect(() => {
+    if (!error) {
+      setUnclaimedError(null);
+      return;
+    }
+    setUnclaimedError(applyHandledErrorToForm({ error, form }) ? null : error);
+  }, [error, form]);
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     { organizationId: effectiveOrganizationId ?? "" },
@@ -176,7 +208,12 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           </>
         )}
 
-        {error && <Text color="red.fg">{error}</Text>}
+        {!!unclaimedError && (
+          <HandledErrorAlert
+            error={unclaimedError}
+            fallbackTitle="Couldn't save this project"
+          />
+        )}
 
         <HStack width="full">
           <Spacer />
@@ -229,8 +266,8 @@ function TeamSelectWithCreateButton({
                 field.value === NEW_TEAM_VALUE ? (
                   <Text color="fg.muted">New team</Text>
                 ) : (
-                  teamOptions.find((o) => o.value === field.value)?.label ??
-                  "Select team"
+                  (teamOptions.find((o) => o.value === field.value)?.label ??
+                  "Select team")
                 )
               }
             </Select.ValueText>

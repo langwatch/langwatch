@@ -8,10 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
+import { isSameOrigin, useSession } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
-import { useSession } from "~/utils/auth-client";
-import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
@@ -104,12 +104,11 @@ export default function Error() {
       return;
     }
 
-    setTimeout(() => {
+    const redirectTimeout = setTimeout(() => {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (isAuth0) {
           const referrer = document.referrer;
-          // Check if referrer is from our own domain
-          const isValidDomain = referrer?.startsWith(window.location.origin);
+          const isValidDomain = !!referrer && isSameOrigin(referrer);
           if (isValidDomain) {
             window.location.href = referrer;
           } else {
@@ -122,6 +121,8 @@ export default function Error() {
         }
       }
     }, 5000);
+
+    return () => clearTimeout(redirectTimeout);
   }, [publicEnv.data, isAuth0, isAzureAD, session, error]);
 
   if (error) {

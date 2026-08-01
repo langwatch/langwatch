@@ -15,7 +15,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -23,15 +26,19 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the test
+          # job spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under sdk-go/. An SDK release
+          # PR still matches via sdk-go/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'sdk-go/**'
               - '.github/workflows/sdk-go-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes
@@ -41,12 +48,12 @@ jobs:
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25'
           cache: true
@@ -72,7 +79,14 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
-        if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.event_name != 'pull_request'
+           || github.actor != 'dependabot[bot]')
         working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
@@ -97,12 +111,12 @@ jobs:
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: '1.25'
           cache: true

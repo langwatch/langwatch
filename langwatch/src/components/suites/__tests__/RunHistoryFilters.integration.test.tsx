@@ -48,9 +48,7 @@ describe("<RunHistoryFilters/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByLabelText("Filter by scenario"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter by scenario")).toBeInTheDocument();
       expect(
         screen.getByLabelText("Filter by pass/fail status"),
       ).toBeInTheDocument();

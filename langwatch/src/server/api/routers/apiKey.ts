@@ -1,26 +1,48 @@
+import { HandledError } from "@langwatch/handled-error";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { DomainError } from "~/server/app-layer/domain-error";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { auditLog } from "~/server/auditLog";
-import { skipPermissionCheck } from "../rbac";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { skipPermissionCheck } from "../rbac";
 
-function mapApiKeyDomainError(error: unknown): never {
-  if (DomainError.isHandled(error)) {
-    switch (error.kind) {
+function mapApiKeyHandledError(error: unknown): never {
+  if (HandledError.isHandled(error)) {
+    switch (error.code) {
       case "api_key_not_found":
-        throw new TRPCError({ code: "NOT_FOUND", message: error.message, cause: error });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: error.message,
+          cause: error,
+        });
       case "api_key_not_owned":
       case "api_key_permission_denied":
       case "api_key_scope_violation":
-        throw new TRPCError({ code: "FORBIDDEN", message: error.message, cause: error });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: error.message,
+          cause: error,
+        });
       case "api_key_already_revoked":
-        throw new TRPCError({ code: "CONFLICT", message: error.message, cause: error });
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: error.message,
+          cause: error,
+        });
+      case "api_key_reserved_name":
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error.message,
+          cause: error,
+        });
       default:
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message, cause: error });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error.message,
+          cause: error,
+        });
     }
   }
   throw error;
@@ -34,10 +56,9 @@ async function ensureCallerIsOrgMember(
   try {
     await service.ensureCallerIsOrgMember({ userId, organizationId });
   } catch (error) {
-    mapApiKeyDomainError(error);
+    mapApiKeyHandledError(error);
   }
 }
-
 
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
@@ -54,18 +75,31 @@ function refineRestrictedPermissions(
   ctx: z.RefinementCtx,
 ) {
   const isRestricted = data.permissionMode === "restricted";
-  const hasCustomBinding = data.bindings?.some((b) => b.role === "CUSTOM") ?? false;
+  const hasCustomBinding =
+    data.bindings?.some((b) => b.role === "CUSTOM") ?? false;
   const hasPermissions = !!data.permissions && data.permissions.length > 0;
 
   if (isRestricted || hasCustomBinding || hasPermissions) {
     if (!isRestricted) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "CUSTOM permissions require permissionMode 'restricted'", path: ["permissionMode"] });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CUSTOM permissions require permissionMode 'restricted'",
+        path: ["permissionMode"],
+      });
     }
     if (!hasCustomBinding) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "restricted mode requires at least one CUSTOM binding", path: ["bindings"] });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "restricted mode requires at least one CUSTOM binding",
+        path: ["bindings"],
+      });
     }
     if (!hasPermissions) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "restricted mode requires at least one permission", path: ["permissions"] });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "restricted mode requires at least one permission",
+        path: ["permissions"],
+      });
     }
   }
 }
@@ -86,7 +120,11 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const bindings = await apiKeyService.getUserBindings({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -110,14 +148,51 @@ export const apiKeyRouter = createTRPCRouter({
           ...b,
           scopeName:
             b.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? orgName.get(b.scopeId) ?? null
+              ? (orgName.get(b.scopeId) ?? null)
               : b.scopeType === RoleBindingScopeType.TEAM
-                ? teamName.get(b.scopeId) ?? null
-                : projectName.get(b.scopeId) ?? null,
+                ? (teamName.get(b.scopeId) ?? null)
+                : (projectName.get(b.scopeId) ?? null),
           customRoleName: b.customRoleId
-            ? customRoleName.get(b.customRoleId) ?? null
+            ? (customRoleName.get(b.customRoleId) ?? null)
             : null,
         }));
+    }),
+
+  /**
+   * Resolve a single API key id to its display name.
+   *
+   * Deliberately narrower than {@link list}, which is admin-gated for the full
+   * org and would otherwise show most of the team a raw row id wherever a key
+   * is referenced. This answers one question, for one id the caller already
+   * has, and returns nothing else: no lookup id, no secret, no owner, no
+   * bindings, no list. Any member of the organization may ask, because anyone
+   * who can already read a trace can already see the id stamped on it, and a
+   * name is less revealing than the id.
+   *
+   * Not an enumeration surface: it takes a whole id rather than a prefix or a
+   * filter, answers one at a time, and returns null identically for an id that
+   * does not exist and one that belongs to another organization.
+   */
+  nameById: protectedProcedure
+    .input(z.object({ organizationId: z.string(), apiKeyId: z.string() }))
+    .use(
+      skipPermissionCheck({
+        allow: {
+          organizationId: "naming an API key the caller can already see",
+        },
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      return apiKeyService.getNameByIdInOrg({
+        id: input.apiKeyId,
+        organizationId: input.organizationId,
+      });
     }),
 
   /**
@@ -132,7 +207,11 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -176,10 +255,12 @@ export const apiKeyRouter = createTRPCRouter({
         permissionMode: apiKey.permissionMode,
         userId: apiKey.userId,
         userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
-        userEmail: apiKey.userId ? (userEmail.get(apiKey.userId) ?? null) : null,
+        userEmail: apiKey.userId
+          ? (userEmail.get(apiKey.userId) ?? null)
+          : null,
         createdByUserId: apiKey.createdByUserId,
         createdByUserName: apiKey.createdByUserId
-          ? userName.get(apiKey.createdByUserId) ?? null
+          ? (userName.get(apiKey.createdByUserId) ?? null)
           : null,
         createdAt: apiKey.createdAt,
         expiresAt: apiKey.expiresAt,
@@ -198,36 +279,40 @@ export const apiKeyRouter = createTRPCRouter({
           role: rb.role,
           customRoleId: rb.customRoleId,
           customRoleName: rb.customRoleId
-            ? customRoleName.get(rb.customRoleId) ?? null
+            ? (customRoleName.get(rb.customRoleId) ?? null)
             : null,
           customRolePermissions: rb.customRoleId
-            ? customRolePermissions.get(rb.customRoleId) ?? null
+            ? (customRolePermissions.get(rb.customRoleId) ?? null)
             : null,
           scopeType: rb.scopeType,
           scopeId: rb.scopeId,
           scopeName:
             rb.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? orgName.get(rb.scopeId) ?? null
+              ? (orgName.get(rb.scopeId) ?? null)
               : rb.scopeType === RoleBindingScopeType.TEAM
-                ? teamName.get(rb.scopeId) ?? null
-                : projectName.get(rb.scopeId) ?? null,
+                ? (teamName.get(rb.scopeId) ?? null)
+                : (projectName.get(rb.scopeId) ?? null),
         })),
       }));
     }),
 
   create: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        name: z.string().min(1).max(100),
-        description: z.string().max(500).optional(),
-        expiresAt: z.coerce.date().optional(),
-        permissionMode: z.enum(["all", "readonly", "restricted"]).default("all"),
-        keyType: z.enum(["personal", "service"]).default("personal"),
-        assignedToUserId: z.string().optional(),
-        permissions: z.array(permissionFormatSchema).optional(),
-        bindings: z.array(roleBindingSchema).max(20),
-      }).superRefine(refineRestrictedPermissions),
+      z
+        .object({
+          organizationId: z.string(),
+          name: z.string().min(1).max(100),
+          description: z.string().max(500).optional(),
+          expiresAt: z.coerce.date().optional(),
+          permissionMode: z
+            .enum(["all", "readonly", "restricted"])
+            .default("all"),
+          keyType: z.enum(["personal", "service"]).default("personal"),
+          assignedToUserId: z.string().optional(),
+          permissions: z.array(permissionFormatSchema).optional(),
+          bindings: z.array(roleBindingSchema).max(20),
+        })
+        .superRefine(refineRestrictedPermissions),
     )
     .use(
       skipPermissionCheck({
@@ -236,11 +321,19 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const isService = input.keyType === "service";
 
       // Service keys and assigning to another user both require admin
-      if (isService || (input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id)) {
+      if (
+        isService ||
+        (input.assignedToUserId &&
+          input.assignedToUserId !== ctx.session.user.id)
+      ) {
         const callerIsAdmin = await apiKeyService.isOrgAdmin({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
@@ -255,7 +348,9 @@ export const apiKeyRouter = createTRPCRouter({
         }
       }
 
-      const targetUserId = isService ? null : (input.assignedToUserId ?? ctx.session.user.id);
+      const targetUserId = isService
+        ? null
+        : (input.assignedToUserId ?? ctx.session.user.id);
       const createdByUserId = ctx.session.user.id;
       try {
         const { token, apiKey } = await apiKeyService.create({
@@ -292,21 +387,23 @@ export const apiKeyRouter = createTRPCRouter({
           },
         };
       } catch (error) {
-        mapApiKeyDomainError(error);
+        mapApiKeyHandledError(error);
       }
     }),
 
   update: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        apiKeyId: z.string(),
-        name: z.string().min(1).max(100).optional(),
-        description: z.string().max(500).nullish(),
-        permissionMode: z.enum(["all", "readonly", "restricted"]).optional(),
-        permissions: z.array(permissionFormatSchema).optional(),
-        bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
-      }).superRefine(refineRestrictedPermissions),
+      z
+        .object({
+          organizationId: z.string(),
+          apiKeyId: z.string(),
+          name: z.string().min(1).max(100).optional(),
+          description: z.string().max(500).nullish(),
+          permissionMode: z.enum(["all", "readonly", "restricted"]).optional(),
+          permissions: z.array(permissionFormatSchema).optional(),
+          bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
+        })
+        .superRefine(refineRestrictedPermissions),
     )
     .use(
       skipPermissionCheck({
@@ -315,7 +412,11 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -351,7 +452,7 @@ export const apiKeyRouter = createTRPCRouter({
           permissionMode: updated.permissionMode,
         };
       } catch (error) {
-        mapApiKeyDomainError(error);
+        mapApiKeyHandledError(error);
       }
     }),
 
@@ -369,7 +470,11 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -390,7 +495,7 @@ export const apiKeyRouter = createTRPCRouter({
           args: { apiKeyId: input.apiKeyId },
         });
       } catch (error) {
-        mapApiKeyDomainError(error);
+        mapApiKeyHandledError(error);
       }
       return { success: true };
     }),
@@ -407,8 +512,14 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
-      return apiKeyService.getOrgProjects({ organizationId: input.organizationId });
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      return apiKeyService.getOrgProjects({
+        organizationId: input.organizationId,
+      });
     }),
 
   orgTeams: protectedProcedure
@@ -420,8 +531,14 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
-      return apiKeyService.getOrgTeams({ organizationId: input.organizationId });
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      return apiKeyService.getOrgTeams({
+        organizationId: input.organizationId,
+      });
     }),
 
   orgMembers: protectedProcedure
@@ -433,13 +550,19 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      await ensureCallerIsOrgMember(apiKeyService, ctx.session.user.id, input.organizationId);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
       const callerIsAdmin = await apiKeyService.isOrgAdmin({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
       if (!callerIsAdmin) return [];
 
-      return apiKeyService.getOrgMembers({ organizationId: input.organizationId });
+      return apiKeyService.getOrgMembers({
+        organizationId: input.organizationId,
+      });
     }),
 });

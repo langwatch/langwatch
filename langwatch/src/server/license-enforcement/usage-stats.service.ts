@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
-import { env } from "../../env.mjs";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
+import { USAGE_UNKNOWN, type UsageCount } from "../traces/usage-count";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -81,14 +81,17 @@ export function buildMessageLimitInfo(
 export interface ITraceUsageService {
   getCurrentMonthCount(params: {
     organizationId: string;
-  }): Promise<number | "unlimited">;
+  }): Promise<UsageCount | "unlimited">;
   /**
    * Real current-month usage count for display, computed even for unlimited
    * (seat-based / metered) plans where getCurrentMonthCount returns "unlimited".
+   *
+   * {@link USAGE_UNKNOWN} when the counting store could not answer — the usage
+   * page has to be able to tell that apart from a genuine zero.
    */
   getCurrentMonthCountForDisplay(params: {
     organizationId: string;
-  }): Promise<number>;
+  }): Promise<UsageCount>;
 }
 
 /**
@@ -174,10 +177,22 @@ export class UsageStatsService {
 
     // Real metered/trace volume for the month — surfaced even for unlimited
     // (seat-based) plans so the usage page shows actual billable events.
-    const resolvedCount = currentMonthMessagesCount;
+    //
+    // `null` when the counting store could not answer. That is what the
+    // `number | null` on UsageStats was always for, and it is the difference
+    // between a page saying "we can't show this right now" and one asserting
+    // that a busy organization sent nothing this month.
+    const resolvedCount =
+      currentMonthMessagesCount === USAGE_UNKNOWN
+        ? null
+        : currentMonthMessagesCount;
 
+    // Built from 0 when the count is unknown, so the bar renders at rest
+    // rather than crashing on a null. It is not shown as a real figure:
+    // `currentMonthMessagesCount` above is null, and that is the field the
+    // page reads before deciding whether to show a number at all.
     const messageLimitInfo = buildMessageLimitInfo(
-      resolvedCount,
+      resolvedCount ?? 0,
       activePlan.maxMessagesPerMonth,
     );
 

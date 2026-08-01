@@ -12,24 +12,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
-  prefetchScenarioData,
+  type AgentFetcher,
   type DataPrefetcherDependencies,
+  type ModelParamsProvider,
+  type ProjectFetcher,
+  type ProjectSecretsFetcher,
+  type PromptFetcher,
+  prefetchScenarioData,
   type ScenarioFetcher,
   type SuiteModelFetcher,
-  type PromptFetcher,
-  type AgentFetcher,
-  type ProjectFetcher,
-  type ModelParamsProvider,
   type WorkflowVersionFetcher,
-  type ProjectSecretsFetcher,
 } from "../data-prefetcher";
-import type { ExecutionContext, TargetConfig, LiteLLMParams } from "../types";
+import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
 
 // Mock only env.mjs since it's a module-level import
 vi.mock("~/env.mjs", () => ({
   env: {
-    LANGWATCH_NLP_SERVICE: "http://localhost:8080",
-    BASE_HOST: "http://localhost:3000",
+    LANGWATCH_NLP_SERVICE: "http://langwatch_nlp:5561",
+    LANGWATCH_ENDPOINT: "http://app:5560",
+    // BASE_HOST no longer needed — telemetry endpoint comes from LANGWATCH_ENDPOINT
   },
 }));
 
@@ -102,7 +103,8 @@ describe("prefetchScenarioData", () => {
       // Distinguish the three feature keys so simulator/judge selection can be
       // asserted independently of the adapter (scenarios.generator) model.
       resolve: vi.fn().mockImplementation(async (featureKey: string) => {
-        if (featureKey === "scenarios.user_simulator") return "openai/sim-default";
+        if (featureKey === "scenarios.user_simulator")
+          return "openai/sim-default";
         if (featureKey === "scenarios.judge") return "openai/judge-default";
         return "anthropic/claude-3-sonnet";
       }),
@@ -146,7 +148,10 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: mockModelParamsProvider,
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
 
           await prefetchScenarioData(defaultContext, target, deps);
 
@@ -176,12 +181,17 @@ describe("prefetchScenarioData", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
+              getPromptByIdOrHandle: vi
+                .fn()
+                .mockResolvedValue(promptWithoutModel),
             },
             modelParamsProvider: mockModelParamsProvider,
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
 
           await prefetchScenarioData(defaultContext, target, deps);
 
@@ -223,7 +233,10 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: mockModelParamsProvider,
           });
 
-          const target: TargetConfig = { type: "http", referenceId: "agent_123" };
+          const target: TargetConfig = {
+            type: "http",
+            referenceId: "agent_123",
+          };
 
           await prefetchScenarioData(defaultContext, target, deps);
 
@@ -242,21 +255,30 @@ describe("prefetchScenarioData", () => {
       type: "http" as const,
       name: "HTTP Agent",
       projectId: "proj_123",
-      config: { url: "https://api.example.com/chat", method: "POST", headers: [] },
+      config: {
+        url: "https://api.example.com/chat",
+        method: "POST",
+        headers: [],
+      },
       workflowId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       archivedAt: null,
     };
-    const httpTarget: TargetConfig = { type: "http", referenceId: "agent_http" };
+    const httpTarget: TargetConfig = {
+      type: "http",
+      referenceId: "agent_http",
+    };
 
     // Echoes the requested model back as params so the resolved simulator /
     // judge model is observable on result.data.{simulator,judge}ModelParams.
     const echoingProvider = (): ModelParamsProvider => ({
-      prepare: vi.fn().mockImplementation(async (_projectId: string, model: string) => ({
-        success: true as const,
-        params: { api_key: "k", model },
-      })),
+      prepare: vi
+        .fn()
+        .mockImplementation(async (_projectId: string, model: string) => ({
+          success: true as const,
+          params: { api_key: "k", model },
+        })),
     });
 
     describe("given a scenario with no simulator or judge override", () => {
@@ -268,7 +290,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
 
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
             "scenarios.user_simulator",
@@ -280,8 +306,12 @@ describe("prefetchScenarioData", () => {
           );
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+            expect(result.data.simulatorModelParams?.model).toBe(
+              "openai/sim-default",
+            );
+            expect(result.data.judgeModelParams?.model).toBe(
+              "openai/judge-default",
+            );
           }
         });
       });
@@ -303,12 +333,20 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+            expect(result.data.simulatorModelParams?.model).toBe(
+              "anthropic/sim-override",
+            );
+            expect(result.data.judgeModelParams?.model).toBe(
+              "openai/judge-default",
+            );
           }
         });
       });
@@ -330,12 +368,20 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+            expect(result.data.judgeModelParams?.model).toBe(
+              "anthropic/judge-override",
+            );
+            expect(result.data.simulatorModelParams?.model).toBe(
+              "openai/sim-default",
+            );
           }
         });
       });
@@ -356,13 +402,21 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
+            expect(result.data.simulatorModelParams?.model).toBe(
+              "groq/plan-sim",
+            );
             // Plan leaves judge unset -> falls through to the default judge.
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+            expect(result.data.judgeModelParams?.model).toBe(
+              "openai/judge-default",
+            );
           }
         });
       });
@@ -383,12 +437,20 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            httpTarget,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+            expect(result.data.simulatorModelParams?.model).toBe(
+              "openai/sim-default",
+            );
+            expect(result.data.judgeModelParams?.model).toBe(
+              "openai/judge-default",
+            );
           }
         });
       });
@@ -405,8 +467,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -425,8 +494,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -445,8 +521,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -465,8 +548,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "http", referenceId: "agent_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "http",
+            referenceId: "agent_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -485,8 +575,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "code",
+            referenceId: "agent_456",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -522,8 +619,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "code",
+            referenceId: "agent_456",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -558,12 +662,21 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(false);
           if (!result.success) {
-            expect(result.error).toBe("Provider 'openai' is not enabled for this project");
+            expect(result.error).toBe(
+              "Provider 'openai' is not enabled for this project",
+            );
             expect(result.reason).toBe("provider_not_enabled");
           }
         });
@@ -580,7 +693,11 @@ describe("prefetchScenarioData", () => {
         projectId: "proj_123",
         config: {
           parameters: [
-            { identifier: "code", type: "code", value: 'def execute(input):\n    return "classified"' },
+            {
+              identifier: "code",
+              type: "code",
+              value: 'def execute(input):\n    return "classified"',
+            },
           ],
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
@@ -599,8 +716,15 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "code",
+            referenceId: "agent_456",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -626,7 +750,10 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: mockModelParamsProvider,
           });
 
-          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const target: TargetConfig = {
+            type: "code",
+            referenceId: "agent_456",
+          };
 
           await prefetchScenarioData(defaultContext, target, deps);
 
@@ -650,14 +777,24 @@ describe("prefetchScenarioData", () => {
             projectSecretsFetcher,
           });
 
-          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = {
+            type: "code",
+            referenceId: "agent_456",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
-          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith("proj_123");
+          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith(
+            "proj_123",
+          );
           expect(result.success).toBe(true);
           // Assert explicitly before narrowing so a type drift fails loudly
           // instead of silently skipping the toEqual below.
-          if (!result.success) throw new Error("prefetch should have succeeded");
+          if (!result.success)
+            throw new Error("prefetch should have succeeded");
           expect(result.data.adapterData.type).toBe("code");
           if (result.data.adapterData.type !== "code") return;
           expect(result.data.adapterData.secrets).toEqual({
@@ -686,42 +823,40 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         /** @scenario "Return success with LiteLLM params on valid configuration" */
         it("returns success with complete data", async () => {
-          // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
-          const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-          process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+          });
 
-          try {
-            const deps = createMockDeps({
-              promptFetcher: {
-                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-              },
+          const target: TargetConfig = {
+            type: "prompt",
+            referenceId: "prompt_123",
+          };
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.context).toEqual(defaultContext);
+            expect(result.data.scenario).toEqual(defaultScenario);
+            expect(result.data.adapterData).toMatchObject({
+              type: "prompt",
+              promptId: "prompt_123",
+              systemPrompt: "You are helpful",
             });
-
-            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-            const result = await prefetchScenarioData(defaultContext, target, deps);
-
-            expect(result.success).toBe(true);
-            if (result.success) {
-              expect(result.data.context).toEqual(defaultContext);
-              expect(result.data.scenario).toEqual(defaultScenario);
-              expect(result.data.adapterData).toMatchObject({
-                type: "prompt",
-                promptId: "prompt_123",
-                systemPrompt: "You are helpful",
-              });
-              expect(result.data.modelParams).toEqual(defaultModelParams);
-              expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
-              expect(result.telemetry).toEqual({
-                endpoint: "http://localhost:3000",
-                apiKey: "test-api-key",
-              });
-            }
-          } finally {
-            if (previousLangwatchEndpoint === undefined) {
-              delete process.env.LANGWATCH_ENDPOINT;
-            } else {
-              process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
-            }
+            expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.data.target).toEqual({
+              type: "prompt",
+              referenceId: "prompt_123",
+            });
+            expect(result.telemetry).toEqual({
+              endpoint: "http://app:5560",
+              apiKey: "test-api-key",
+            });
           }
         });
       });
@@ -987,15 +1122,21 @@ describe("prefetchScenarioData", () => {
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+          const nodes = result.data.adapterData.workflow.nodes as Array<
+            Record<string, unknown>
+          >;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
 
           expect(signatureNode).toBeDefined();
 
-          const data = signatureNode?.data as Record<string, unknown> | undefined;
-          const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
+          const data = signatureNode?.data as
+            | Record<string, unknown>
+            | undefined;
+          const parameters = data?.parameters as
+            | Array<Record<string, unknown>>
+            | undefined;
           const llmParam = parameters?.find(
             (p) => p.identifier === "llm" && p.type === "llm",
           );
@@ -1007,7 +1148,9 @@ describe("prefetchScenarioData", () => {
           expect(value).toBeDefined();
           expect(value?.litellm_params).toBeDefined();
 
-          const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
+          const litellmParams = value?.litellm_params as
+            | Record<string, unknown>
+            | undefined;
           expect(litellmParams?.api_key).toBeDefined();
           expect(litellmParams?.api_key).not.toBe("dummy");
           expect(litellmParams?.api_key).toBe(hydratedApiKey);
@@ -1051,12 +1194,17 @@ describe("prefetchScenarioData", () => {
             prepare: vi.fn().mockResolvedValue({
               success: false as const,
               reason: "provider_not_enabled",
-              message: "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
+              message:
+                "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
             }),
           },
         });
 
-        const result = await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1083,7 +1231,11 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM A",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
+                  {
+                    identifier: "llm",
+                    type: "llm",
+                    value: { model: "openai/gpt-4o-mini" },
+                  },
                 ],
               },
             },
@@ -1093,7 +1245,11 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM B",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "azure/gpt-4o-mini" } },
+                  {
+                    identifier: "llm",
+                    type: "llm",
+                    value: { model: "azure/gpt-4o-mini" },
+                  },
                 ],
               },
             },
@@ -1116,14 +1272,20 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
 
         // Two distinct models → prepare called exactly twice (once for LLM provider model params)
         // Note: prefetchScenarioData also calls prepare for the scenario-level model params
         // so we check the workflow-level prepare calls via the models passed
         const workflowModels = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini");
+          .filter(
+            (m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini",
+          );
         expect(workflowModels).toHaveLength(2);
         expect(workflowModels).toContain("openai/gpt-4o-mini");
         expect(workflowModels).toContain("azure/gpt-4o-mini");
@@ -1147,7 +1309,11 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM A",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
+                  {
+                    identifier: "llm",
+                    type: "llm",
+                    value: { model: "openai/gpt-4o-mini" },
+                  },
                 ],
               },
             },
@@ -1157,7 +1323,11 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM B",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
+                  {
+                    identifier: "llm",
+                    type: "llm",
+                    value: { model: "openai/gpt-4o-mini" },
+                  },
                 ],
               },
             },
@@ -1237,7 +1407,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
 
         // prepare must be called with DEFAULT_MODEL for the workflow node
         const workflowModelCall = prepareFn.mock.calls.find(
@@ -1248,13 +1422,19 @@ describe("prefetchScenarioData", () => {
         // litellm_params must be hydrated on the node
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+          const nodes = result.data.adapterData.workflow.nodes as Array<
+            Record<string, unknown>
+          >;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as Array<Record<string, unknown>> | undefined;
-          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-          const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as Record<string, unknown> | undefined;
+          const parameters = (signatureNode?.data as Record<string, unknown>)
+            ?.parameters as Array<Record<string, unknown>> | undefined;
+          const llmParam = parameters?.find(
+            (p) => p.identifier === "llm" && p.type === "llm",
+          );
+          const litellmParams = (llmParam?.value as Record<string, unknown>)
+            ?.litellm_params as Record<string, unknown> | undefined;
           expect(litellmParams?.api_key).toBe(hydratedApiKey);
         }
       });
@@ -1306,16 +1486,25 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+          const nodes = result.data.adapterData.workflow.nodes as Array<
+            Record<string, unknown>
+          >;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as Array<Record<string, unknown>> | undefined;
-          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+          const parameters = (signatureNode?.data as Record<string, unknown>)
+            ?.parameters as Array<Record<string, unknown>> | undefined;
+          const llmParam = parameters?.find(
+            (p) => p.identifier === "llm" && p.type === "llm",
+          );
           const value = llmParam?.value as Record<string, unknown> | undefined;
 
           expect(value?.model).toBe(DEFAULT_MODEL);
@@ -1324,5 +1513,82 @@ describe("prefetchScenarioData", () => {
       });
     });
 
-});
+    describe("spec-version gating of the legacy default fallback", () => {
+      // Nodes own their model since spec_version 1.5: a modelless llm param
+      // on a modern DSL is stale state that must NOT be silently substituted
+      // with DEFAULT_MODEL — it stays unhydrated so the engine raises its
+      // typed llm_model_not_set error. The comparison is component-wise, so
+      // a hypothetical "1.10" is newer than "1.5", not parseFloat's 1.1.
+      const modellessDsl = (spec_version: string) => ({
+        spec_version,
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                { identifier: "llm", type: "llm", value: undefined },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      });
+
+      const setupFor = (dsl: Record<string, unknown>) => {
+        const prepareFn = vi.fn().mockResolvedValue(defaultModelParamsResult);
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi
+              .fn()
+              .mockResolvedValue({ workflowId: "wf_1", dsl }),
+          },
+          modelParamsProvider: { prepare: prepareFn },
+        });
+        return { deps, prepareFn };
+      };
+
+      it.each([
+        "1.5",
+        "1.10",
+      ])("does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param", async (specVersion) => {
+        const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        expect(
+          prepareFn.mock.calls.some(
+            (call) => (call[1] as string) === DEFAULT_MODEL,
+          ),
+        ).toBe(false);
+      });
+
+      it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
+        const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        expect(
+          prepareFn.mock.calls.some(
+            (call) => (call[1] as string) === DEFAULT_MODEL,
+          ),
+        ).toBe(true);
+      });
+    });
+  });
 });

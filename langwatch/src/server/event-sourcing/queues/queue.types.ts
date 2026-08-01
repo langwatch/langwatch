@@ -5,7 +5,7 @@ export interface EventSourcedQueueProcessorOptions {
   /**
    * Maximum number of groups that can be processed in parallel.
    * Only used by GroupQueueProcessor.
-   * @default 300
+   * @default 100 (or the GLOBAL_QUEUE_CONCURRENCY env var)
    */
   globalConcurrency?: number;
 }
@@ -37,6 +37,21 @@ export interface DeduplicationConfig<Payload> {
    * @default true
    */
   replace?: boolean;
+  /**
+   * Whether a dedup key whose job has already been DISPATCHED (removed from
+   * staging) but whose TTL is still alive should SQUASH a new job rather than be
+   * treated as stale and cleaned up.
+   *
+   * Default (`false`): the historical behavior — once the deduplicated job is
+   * dispatched, the dedup key is considered stale, deleted, and a new job stages
+   * (so a late re-trigger re-runs the command). When `true`, the still-alive TTL
+   * is HONORED: the new job is squashed for the remainder of the TTL window, so a
+   * late re-trigger arriving after dispatch cannot re-run the command. Use it
+   * when the dedup TTL is sized to span the whole window in which duplicate
+   * triggers may arrive (fixes per-trace evaluations running twice, #3912).
+   * @default false
+   */
+  shouldSurviveDispatch?: boolean;
 }
 
 /**
@@ -73,6 +88,20 @@ export type DeduplicationStrategy<Payload> =
   | DeduplicationConfig<Payload>;
 
 /**
+ * What the queue knows about THIS delivery of a job, as opposed to the job's
+ * own payload.
+ *
+ * `attempt` is 1 on a fresh delivery and increments per retry. A fold uses it
+ * to tell a first delivery from a redelivery: on a fresh delivery the previous
+ * batch for that group must already have been acked (the queue holds one
+ * active batch per group), so anything it recorded about applied events is
+ * dead and can be discarded rather than accumulated forever.
+ */
+export interface JobDelivery {
+  attempt: number;
+}
+
+/**
  * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
  */
 export function resolveDeduplicationStrategy<Payload>(
@@ -88,7 +117,9 @@ export function resolveDeduplicationStrategy<Payload>(
   return strategy;
 }
 
-export interface EventSourcedQueueDefinition<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueDefinition<
+  Payload extends Record<string, unknown>,
+> {
   /**
    * Base name for the queue and job.
    * Queue name will be derived as `{name}` (with braces).
@@ -98,7 +129,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
   /**
    * Domain-specific processor that runs inside the worker.
    */
-  process: (payload: Payload) => Promise<void>;
+  process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
 
   /**
    * Optional batch processor. When set together with `coalesceMaxBatch`, the
@@ -107,7 +138,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    * Used by fold projections to collapse a backed-up group's events into one
    * load/apply/store cycle. The first payload is always the dispatched job.
    */
-  processBatch?: (payloads: Payload[]) => Promise<void>;
+  processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
 
   /**
    * Optional per-payload resolver for the maximum number of same-group jobs to
@@ -116,6 +147,17 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    * default, which leaves the per-job path byte-for-byte unchanged.
    */
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
+
+  /**
+   * Optional per-payload resolver for the maximum total byte size of a coalesced
+   * batch (ADR-066 pillar 2). The drain stops before taking a same-group job
+   * that would push the batch past this budget, so a coalesced append stays
+   * inside the downstream flush budget; a job too large to fit is left for its
+   * own later dispatch. Returns undefined to fall back to the GroupQueue default
+   * ({@link DEFAULT_COALESCE_MAX_BYTES}). Only consulted when `coalesceMaxBatch`
+   * enables coalescing.
+   */
+  coalesceMaxBytes?: (payload: Payload) => number | undefined;
 
   /**
    * Optional options for the queue processor.
@@ -157,6 +199,80 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    * Used by GroupQueue to ensure global ordering across nodes.
    */
   score?: (payload: Payload) => number;
+
+  /**
+   * Optional audit adapter that mirrors every job lifecycle event to a
+   * durable side-store (typically PG). Used by the outbox dispatch queue
+   * per ADR-030 revision: the queue owns scheduling and execution, and
+   * the adapter projects each transition into a row that operator
+   * dashboards query against.
+   *
+   * Adapter calls are best-effort relative to the queue's own state: a
+   * PG outage logs+metrics, the queue keeps running, the next
+   * transition's write resyncs the projection. Each call writes the
+   * latest projection, not an event log.
+   */
+  auditAdapter?: QueueAuditAdapter<Payload>;
+}
+
+/**
+ * Lifecycle hooks for queues that want to project state into a durable
+ * side-store. Used by the outbox dispatch queue (ADR-030 revision).
+ *
+ * The queue invokes:
+ *   - `onEnqueue` on a successful new-stage `send` (skipped on a
+ *     dedup-collapsed send — the row already exists from the first
+ *     send).
+ *   - `onLeased` / `onDispatched` / `onFailed` / `onDead` around the
+ *     `process` / `processBatch` callback execution.
+ *
+ * Adapter writes do not block dispatch — a thrown hook is caught and
+ * logged so a PG outage cannot stall the Redis-side queue.
+ */
+export interface QueueAuditAdapter<Payload> {
+  onEnqueue(event: {
+    payload: Payload;
+    groupKey: string;
+    dedupKey: string | undefined;
+    scheduledAt: Date;
+    maxAttempts?: number;
+  }): Promise<void>;
+
+  /**
+   * `attempt` is the current attempt number (1-indexed) carried by the
+   * job. Adapters that maintain a projection use it as a CAS token so a
+   * late event from a stale lease (attempt N) can't overwrite a
+   * re-leased row (attempt N+1).
+   *
+   * `leasedUntil` is the wall-clock time the queue intends to hold the
+   * job before its retry layer reschedules it. Adapters that track
+   * stuck-state observability project it onto the audit row.
+   */
+  onLeased(event: {
+    payload: Payload;
+    attempt: number;
+    leasedUntil?: Date;
+  }): Promise<void>;
+
+  onDispatched(event: {
+    payload: Payload;
+    at: Date;
+    attempt: number;
+  }): Promise<void>;
+
+  onFailed(event: {
+    payload: Payload;
+    error: string;
+    willRetry: boolean;
+    nextAttemptAt?: Date;
+    attempt: number;
+  }): Promise<void>;
+
+  onDead(event: {
+    payload: Payload;
+    lastError: string;
+    attempt: number;
+  }): Promise<void>;
 }
 
 /**
@@ -168,9 +284,14 @@ export interface QueueSendOptions<Payload> {
   deduplication?: DeduplicationConfig<Payload>;
 }
 
-export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueProcessor<
+  Payload extends Record<string, unknown>,
+> {
   send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
-  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
+  sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.

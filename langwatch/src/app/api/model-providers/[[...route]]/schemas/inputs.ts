@@ -1,7 +1,5 @@
 import { z } from "zod";
-import {
-  customModelEntrySchema,
-} from "~/server/modelProviders/customModel.schema";
+import { customModelEntrySchema } from "~/server/modelProviders/customModel.schema";
 
 export const updateModelProviderInputSchema = z.object({
   enabled: z.boolean(),

@@ -1,18 +1,16 @@
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger";
+import { buildFieldsBlock } from "./query-language/fieldCatalogue";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
 const logger = createLogger("langwatch:ai-query");
 
 const MAX_ATTEMPTS = 3;
-const DYNAMIC_VALUES_LIMIT = 20;
-
 export interface AiQueryInput {
   projectId: string;
   prompt: string;
@@ -41,31 +39,94 @@ export type AiActionResult =
       kind: "create_lens";
       name: string;
       query: string;
-    }
-  | { ok: false; error: AiActionError };
+    };
 
 /**
- * Structured error returned to the UI. The composer renders `message`
- * as the inline badge and pops `details` into a "View details"
- * disclosure on hover/click. Stack traces and SDK-internal prefixes
- * are stripped before this leaves the server — only operator-actionable
- * fields cross the wire.
+ * The operator-actionable fields the composer's "View details" disclosure
+ * renders. Stack traces and SDK-internal prefixes are stripped before any of
+ * this leaves the server.
+ *
+ * This is the whole reason these travel in `meta`: `AiErrorDetails`
+ * (`features/traces-v2/components/SearchBar/ErrorBannerDetail.tsx`) is the
+ * named consumer. Nothing else reads them.
+ */
+export interface AiActionErrorDetails {
+  provider?: string;
+  model?: string;
+  httpStatus?: number;
+  /**
+   * Why the last attempt failed, in OUR words — the query validator's own
+   * message ("unexpected token at position 12"), set only on the validation
+   * exit below.
+   *
+   * Never the provider's response text. `summarizeProviderError` used to fill
+   * this by regexing `"message"` out of the failure body, which is the field
+   * an OpenAI 401 fills with `Incorrect API key provided: sk-proj-…` — our own
+   * key, on a managed provider. The structured fields around it carry the
+   * operator-actionable part of a provider failure without any of that risk.
+   */
+  reason?: string;
+  /** The last query the model produced, when it produced one. */
+  lastQuery?: string;
+}
+
+/**
+ * Raised when the AI composer could not turn a prompt into a usable trace
+ * query — the provider threw on every attempt, or every attempt produced
+ * something that would not parse.
+ *
+ * Its code is `ai_query_provider_error`, which exists precisely so this
+ * surface stops minting its own. The old shape declared
+ * `"provider_error" | "validation_error" | "unknown"` — a private code system
+ * whose values collide with real registry codes carrying copy that does not
+ * apply here ("Check your input" for a model that wrote a bad filter) — plus a
+ * free-text `message` built from the SDK's own exception and rendered
+ * verbatim. The words a customer reads now come from the registry entry for
+ * this code, and nowhere else.
+ *
+ * `fault` is `provider`: the model was asked and did not answer usably.
+ */
+export class AiQueryProviderError extends HandledError {
+  declare readonly code: "ai_query_provider_error";
+
+  constructor(details: AiActionErrorDetails = {}) {
+    super(
+      "ai_query_provider_error",
+      "The model did not produce a usable trace query.",
+      {
+        httpStatus: 502,
+        fault: "provider",
+        meta: { ...details },
+      },
+    );
+    this.name = "AiQueryProviderError";
+  }
+}
+
+/**
+ * The composer's view of a failure, assembled client-side from whatever
+ * arrived. Deliberately carries no prose: `code` selects the registry copy and
+ * drives UI branching, `cause` is the error itself so the renderer can call
+ * `explainAnyError`, and `details` feeds the disclosure.
  */
 export type AiActionError = {
-  /** Short, user-readable headline. Always set. */
-  message: string;
-  /** Stable code for UI branching and telemetry. */
-  code: "provider_error" | "validation_error" | "unknown";
+  /**
+   * The handled code the failure carried, or `"unknown"` when it carried
+   * none. Stable enough to branch and report on.
+   *
+   * Typed `string` rather than `AppErrorCode` on purpose: it is lifted off the
+   * wire, and a client cannot assume the server it is talking to enumerates
+   * exactly the codes it knows. An unrecognised one degrades in
+   * `explainAnyError` rather than being a type error here.
+   */
+  code: string;
+  /**
+   * The failure as it arrived, so the UI resolves its words through
+   * `explainAnyError` rather than rendering a sentence the server chose.
+   */
+  cause?: unknown;
   /** Optional structured detail rendered in the disclosure. */
-  details?: {
-    provider?: string;
-    model?: string;
-    httpStatus?: number;
-    /** Cleaned-up provider response text, free of stack traces. */
-    reason?: string;
-    /** For validation errors, the last query the model produced. */
-    lastQuery?: string;
-  };
+  details?: AiActionErrorDetails;
 };
 
 const aiActionSchema = z.discriminatedUnion("kind", [
@@ -183,7 +244,10 @@ function sanitizeLlmOutput(raw: string): string {
  * (`create_lens`). Returns a structured action the frontend dispatches.
  *
  * Validates the embedded query the same way `generateTraceQueryFromPrompt`
- * does, retrying on parse failure.
+ * does, retrying on parse failure. Raises {@link AiQueryProviderError} when
+ * every attempt is exhausted — the failure travels the handled channel like
+ * any other, rather than as an in-band `{ ok: false }` payload the UI had to
+ * know how to word.
  */
 export async function generateTraceAction(
   input: AiQueryInput,
@@ -198,11 +262,10 @@ export async function generateTraceAction(
 
   let lastError = "Unknown error";
   let lastQuery = "";
-  // Track only the *last* attempt's failure kind so the UI message
-  // matches what actually happened on the final try. A transient
-  // provider blip on attempt 1 followed by a validation failure on
-  // attempt 2 should surface as "couldn't parse the query," not
-  // "provider error."
+  // Track only the *last* attempt's failure kind so the detail rows describe
+  // what actually happened on the final try. A transient provider blip on
+  // attempt 1 followed by a validation failure on attempt 2 should show the
+  // unparseable query, not a stale HTTP status.
   let lastFailure: "provider" | "validation" | null = null;
   let lastProviderError: unknown = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -260,39 +323,53 @@ export async function generateTraceAction(
   }
 
   // Don't leak raw SDK exception messages — those carry stack-y prefixes
-  // like "litellm.BadRequestError: OpenAIException - …" plus traces.
+  // like "litellm.BadRequestError: OpenAIException - …" plus traces, and for a
+  // rejected key the provider's body is the credential itself.
   // `summarizeProviderError` extracts the operator-actionable fields
-  // (provider, model, http status, reason) and lets the composer render
-  // a polished one-liner + a "View details" disclosure with the rest.
-  if (lastFailure === "provider") {
-    return {
-      ok: false,
-      error: summarizeProviderError(lastProviderError),
-    };
-  }
-  return {
-    ok: false,
-    error: {
-      code: "validation_error",
-      message:
-        "AI's reply didn't match the trace query syntax. Try rephrasing.",
-      details: { reason: lastError, lastQuery },
-    },
-  };
+  // (provider, model, http status) for the "View details" disclosure; the
+  // headline the customer reads comes from the registry entry for
+  // `ai_query_provider_error`.
+  //
+  // The validation exit passes a `reason` and the provider exit does not, which
+  // is the whole distinction: on that path the sentence is `validateQuery`'s,
+  // written here for a query WE parsed, with no provider body anywhere near it.
+  //
+  // Both exits raise the same code on purpose. From where the customer sits
+  // there is one failure — the model didn't give us something we could search
+  // with — and its remediation ("rephrase, or pick a different model") is the
+  // same whether the provider threw or the reply wouldn't parse.
+  throw new AiQueryProviderError(
+    lastFailure === "provider"
+      ? summarizeProviderError(lastProviderError, { model: model.modelId })
+      : { reason: lastError, lastQuery },
+  );
 }
 
 /**
  * Curate an SDK/provider exception into the operator-actionable fields
- * the UI renders in the AI-search composer. Strips stack traces and
- * `litellm.XYZException` prefixes; pulls out HTTP status, provider key,
- * referenced model id, and the human-readable `'message'` substring
- * embedded in the JSON-shaped body LiteLLM forwards from providers.
+ * the UI renders in the AI-search composer's "View details" disclosure.
+ * Prefers the structured `statusCode` the AI SDK's APICallError carries and
+ * falls back to text extraction: strips stack traces and `litellm.XYZException`
+ * prefixes; pulls out HTTP status, provider key and referenced model id.
  *
- * Never throws — anything we can't parse falls through to a truncated
- * raw-cleaned text so we still produce *something* for the operator
- * instead of a vacant "Unknown error" badge.
+ * Everything it returns is a value from a known set — a status code, one of a
+ * fixed list of vendor names, a model id. It deliberately extracts no prose:
+ * see the note at the return.
+ *
+ * `context.model` is the model the backend actually resolved for the
+ * call — provider errors like Azure's bare "Resource not found" carry
+ * no model of their own, and the operator can't act on the failure
+ * without knowing which configured model to go fix.
+ *
+ * Never throws, and never produces a headline: it used to compose one
+ * ("Provider returned 404 for azure/gpt-5: …"), which put the provider's own
+ * sentence on the customer's screen as if we had written it. The headline is
+ * the registry's job now; this function only fills the disclosure.
  */
-function summarizeProviderError(err: unknown): AiActionError {
+export function summarizeProviderError(
+  err: unknown,
+  context?: { model?: string },
+): AiActionErrorDetails {
   const raw = err instanceof Error ? err.message : String(err ?? "");
   const cleaned = raw
     .split("\n")
@@ -300,48 +377,53 @@ function summarizeProviderError(err: unknown): AiActionError {
     .join("\n")
     .trim();
 
+  // `statusCode` only. The AI SDK's APICallError also carries `responseBody`,
+  // which is the provider's raw failure body — it was read here to mine a
+  // message out of, and there is nothing else in it we want.
+  const structured = err as { statusCode?: unknown } | null | undefined;
+  const structuredStatus =
+    typeof structured?.statusCode === "number"
+      ? structured.statusCode
+      : undefined;
+
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
     cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
-  const httpStatus = statusMatch ? Number(statusMatch[1]) : undefined;
+  const httpStatus =
+    structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
 
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider = providerMatch?.[1]?.toLowerCase();
+  const provider =
+    providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
 
   const modelMatch =
     cleaned.match(
       /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
     ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
-  const model = modelMatch ? modelMatch[1] : undefined;
+  const model = modelMatch ? modelMatch[1] : context?.model;
 
-  const reasonMatch =
-    cleaned.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
-    cleaned.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
-  const reason = reasonMatch?.[1];
-
-  let message = "Couldn't reach the model provider";
-  if (httpStatus && reason) {
-    message = `Provider returned ${httpStatus}: ${reason}`;
-  } else if (httpStatus) {
-    message = `Provider returned ${httpStatus}`;
-  } else if (reason) {
-    message = reason;
-  } else if (cleaned) {
-    const firstLine = cleaned.split("\n")[0]?.trim() ?? "";
-    if (firstLine) message = firstLine.slice(0, 200);
-  }
-
+  // No `reason` on this exit, deliberately.
+  //
+  // It used to be pulled straight out of the failure body with
+  // `/['"]message['"][:\s]+['"](…)['"]/`, falling back to the first line of the
+  // exception. Both land on the provider's own sentence, and `"message"` is
+  // exactly the field OpenAI answers a rejected key with: `Incorrect API key
+  // provided: sk-proj-…`. On a LangWatch-managed provider that key is OURS, so
+  // the disclosure was one 401 away from printing a platform credential — and
+  // masking it after the fact only works for credential shapes someone thought
+  // to enumerate.
+  //
+  // The fields kept below are the operator-actionable ones and none of them is
+  // free text: a status code, a provider key matched against a fixed list of
+  // vendors, a model id. They say which configured model to go fix, which is
+  // what the disclosure is for. The words stay the registry's, keyed by
+  // `ai_query_provider_error`.
   return {
-    code: "provider_error",
-    message,
-    details: {
-      ...(provider ? { provider } : {}),
-      ...(model ? { model } : {}),
-      ...(httpStatus ? { httpStatus } : {}),
-      ...(reason ? { reason } : {}),
-    },
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
+    ...(httpStatus ? { httpStatus } : {}),
   };
 }
 
@@ -498,60 +580,4 @@ If the request is genuinely ambiguous, off-topic, or unexpressible in
 the query language, output an empty string. An empty string is a
 legitimate, polite "I couldn't translate that"; hallucinating a filter
 the operator didn't ask for is worse.`;
-}
-
-async function buildFieldsBlock(input: AiQueryInput): Promise<string> {
-  const dynamicValues = await fetchDynamicCategoricalValues(input);
-  const lines: string[] = [];
-  for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
-    const sample = pickSampleValues(name, meta.facetField, dynamicValues);
-    const sampleStr = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
-    lines.push(`- ${name} (${meta.valueType}): ${meta.label}${sampleStr}`);
-  }
-  return lines.join("\n");
-}
-
-function pickSampleValues(
-  fieldName: string,
-  facetField: string | undefined,
-  dynamic: Map<string, string[]>,
-): string[] {
-  const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
-  const fromStatic = FIELD_VALUES[fieldName] ?? [];
-  const merged = Array.from(new Set([...fromDb, ...fromStatic])).slice(0, 8);
-  return merged;
-}
-
-async function fetchDynamicCategoricalValues(
-  input: AiQueryInput,
-): Promise<Map<string, string[]>> {
-  const app = getApp();
-  const facetFields = Object.values(SEARCH_FIELDS)
-    .filter((meta) => meta.valueType === "categorical" && meta.facetField)
-    .map((meta) => meta.facetField as string);
-
-  const results = await Promise.allSettled(
-    facetFields.map((facetKey) =>
-      app.traces.list.getFacetValues({
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        facetKey,
-        limit: DYNAMIC_VALUES_LIMIT,
-        offset: 0,
-      }),
-    ),
-  );
-
-  const map = new Map<string, string[]>();
-  results.forEach((result, idx) => {
-    const facetKey = facetFields[idx];
-    if (!facetKey) return;
-    if (result.status === "fulfilled") {
-      map.set(
-        facetKey,
-        result.value.values.map((v) => v.value),
-      );
-    }
-  });
-  return map;
 }

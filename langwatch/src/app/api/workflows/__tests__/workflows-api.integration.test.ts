@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // The evaluate endpoint now runs through the evaluations-v3 orchestrator, which
 // dispatches each row to nlpgo in the background. That boundary is mocked so the
@@ -81,9 +82,7 @@ describe("Workflows REST API", () => {
   });
 
   afterEach(async () => {
-    await prisma.workflow.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["workflow", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -146,6 +145,9 @@ describe("Workflows REST API", () => {
         expect(body[0].id).toBe(workflow.id);
         expect(body[0].name).toBe("Test Workflow");
         expect(body[0].description).toBe("A test workflow");
+        // The row's platform link addresses THAT workflow's editor, never
+        // the bare /workflows index.
+        expect(body[0].platformUrl).toContain(`/studio/${workflow.id}`);
       });
 
       it("excludes archived workflows", async () => {
@@ -193,6 +195,7 @@ describe("Workflows REST API", () => {
           isEvaluator: true,
           isComponent: false,
         });
+        expect(body.platformUrl).toContain(`/studio/${workflow.id}`);
       });
     });
 
@@ -359,13 +362,11 @@ describe("Workflows REST API", () => {
     afterEach(async () => {
       // The evaluate endpoint creates the workflow's backing experiment, which
       // must be removed before the project (required Experiment->Project relation).
-      await prisma.experiment.deleteMany({
-        where: { projectId: testProjectId },
-      });
-      await prisma.workflowVersion.deleteMany({
-        where: { projectId: testProjectId },
-      });
-      await prisma.workflow.deleteMany({ where: { projectId: testProjectId } });
+      await cleanupTestRows(prisma, [
+        ["experiment", { projectId: testProjectId }],
+        ["workflowVersion", { projectId: testProjectId }],
+        ["workflow", { projectId: testProjectId }],
+      ]);
       await prisma.user.delete({ where: { id: author.id } });
     });
 
@@ -530,7 +531,10 @@ describe("Workflows REST API", () => {
           { data: [{ question: "x" }], dataset_id: "dataset_123" },
         );
 
-        expect(res.status).toBe(400);
+        // 422: the body failed the request SCHEMA (the two fields are mutually
+        // exclusive). The "no committed version" case below stays 400 — that
+        // one is the handler refusing a well-formed request.
+        expect(res.status).toBe(422);
       });
     });
 

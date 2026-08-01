@@ -3,7 +3,9 @@
  *
  * Consumed only by the LangWatch AI Gateway (Go) service. All paths are
  * protected by the shared HMAC secret `LW_GATEWAY_INTERNAL_SECRET` +
- * `X-LangWatch-Gateway-Signature` header. Never expose publicly.
+ * `X-LangWatch-Gateway-Signature` header. Never expose publicly — the Helm chart
+ * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
+ * the app through its internal Service rather than the ingress.
  *
  * Contract source of truth:
  *   specs/ai-gateway/_shared/contract.md §4 (v0.1)
@@ -12,23 +14,28 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
+import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
-
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
+import {
+  GatewayGuardrailEvaluationService,
+  GUARDRAIL_WIRE_DIRECTIONS,
+} from "~/server/gateway/guardrailEvaluation.service";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
@@ -36,7 +43,8 @@ import {
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { createLogger } from "~/utils/logger/server";
+import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
+import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
 // route (uniform with `files/.../app.ts`), rather than an app-wide
@@ -53,11 +61,27 @@ const gatewayPolicy = () =>
 
 const logger = createLogger("langwatch:gateway-internal");
 
+/**
+ * Contract 4.6. The directions are the wire vocabulary the data plane sends,
+ * which is deliberately not the Prisma enum: an earlier version of this schema
+ * used the storage values, so every real gateway call failed validation and the
+ * data plane fell back to allowing the request.
+ */
 const guardrailCheckRequestSchema = z.object({
   vk_id: z.string().min(1),
-  direction: z.enum(["pre", "post", "stream_chunk"]),
+  project_id: z.string().min(1),
+  gateway_request_id: z.string().optional(),
+  direction: z.enum(GUARDRAIL_WIRE_DIRECTIONS),
   guardrail_ids: z.array(z.string()).default([]),
-  content: z.unknown().optional(),
+  content: z
+    .object({
+      messages: z.unknown().optional(),
+      output: z.unknown().optional(),
+      chunk: z.unknown().optional(),
+      tools: z.unknown().optional(),
+      mcps: z.unknown().optional(),
+    })
+    .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -251,6 +275,21 @@ function notImplemented(c: Context) {
 // ── routes ──────────────────────────────────────────────────────────────
 
 /**
+ * §4.7: connectivity probe for the gateway's public /health endpoint.
+ *
+ * The Go gateway's statusprobe monitor calls this on its own clock
+ * (default every 15s per gateway pod) and serves the cached verdict to
+ * the status page. Riding the signed channel is the point: a 200 proves
+ * not just that the app is up but that the shared HMAC secret matches,
+ * the misconfig where every pod looks green while every virtual-key
+ * resolve is refused. Body deliberately static; the gateway only reads
+ * the status code.
+ */
+secured.access(gatewayPolicy()).get("/health", (c) => {
+  return c.json({ status: "ok" });
+});
+
+/**
  * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
  *
  * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
@@ -351,6 +390,74 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
 });
 
 /**
+ * Codex token refresh — the gateway's recovery road for a 401 from OpenAI's
+ * codex backend. Refreshes the provider row's stored OAuth session (single
+ * issuer round-trip under concurrent 401 bursts — see the service) and hands
+ * back a fresh access token; a dead session comes back as
+ * `codex_session_expired`, which the gateway forwards so Langy can render
+ * the re-authenticate card. Spec:
+ * specs/model-providers/codex-account-provider.feature
+ *
+ * Request:  { provider_row_id }
+ * Response: { access_token, account_id } | error codex_session_expired /
+ *           codex_not_connected
+ */
+secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    provider_row_id?: string;
+  };
+  if (!body.provider_row_id || typeof body.provider_row_id !== "string") {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_provider_row_id",
+          message: "provider_row_id is required",
+        },
+      },
+      400,
+    );
+  }
+  const service = new CodexGatewayRefreshService(
+    new ModelProviderRepository(prisma),
+    new ChangeEventRepository(prisma),
+  );
+  const result = await service.refreshForGateway(body.provider_row_id);
+  if (result.status === "not_connected") {
+    return c.json(
+      {
+        error: {
+          type: "codex_not_connected",
+          code: "codex_not_connected",
+          message: "no connected Codex account on this provider",
+        },
+      },
+      404,
+    );
+  }
+  if (result.status === "session_expired") {
+    logger.warn(
+      { providerRowId: body.provider_row_id },
+      "codex session expired; user must sign in again",
+    );
+    return c.json(
+      {
+        error: {
+          type: "codex_session_expired",
+          code: "codex_session_expired",
+          message: "OpenAI session expired; sign in to Codex again",
+        },
+      },
+      401,
+    );
+  }
+  return c.json({
+    access_token: result.accessToken,
+    account_id: result.accountId,
+  });
+});
+
+/**
  * §4.2 — full warm-cache config by vk_id with `If-None-Match: <revision>`.
  * Returns 304 Not Modified when client has current revision.
  */
@@ -358,7 +465,16 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   const vkId = c.req.param("vk_id");
   const vk = await prisma.virtualKey.findUnique({
     where: { id: vkId },
-    include: { scopes: true },
+    include: {
+      scopes: true,
+      // The routing policy is where model_aliases and policy_rules live.
+      // Without it the materialiser reads an absent relation and emits an
+      // empty alias map plus empty deny/allow lists, so the gateway never
+      // resolves an alias and never enforces a model deny rule.
+      routingPolicy: {
+        select: { id: true, modelAliases: true, policyRules: true },
+      },
+    },
   });
   if (!vk) {
     return c.json(
@@ -611,16 +727,18 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 /**
  * §4.6 — inline guardrail pipeline.
  *
- * Request:  { vk_id, direction, guardrail_ids, content, metadata }
+ * Request:  { vk_id, project_id, direction, guardrail_ids, content, metadata }
  * Response: { decision: allow|block|modify, reason, modified_content, policies_triggered }
  *
- * Current implementation is a plumbing stub: validates the request shape,
- * returns `allow` with no policies triggered, and logs so the Go gateway can
- * exercise the full control-plane round-trip while real evaluator wiring
- * lands. When the langwatch/langwatch_nlp evaluator SDK is connected here,
- * this body swaps for a parallel fan-out with first-block short-circuit
- * (contract §4.6, and @sergey's iter 3 gateway-side fan-out mirrors this
- * contract).
+ * Runs every guardrail the virtual key references for this direction in
+ * parallel and aggregates them: any block blocks. A guardrail whose evaluator
+ * cannot produce a verdict falls to its own failure mode rather than passing,
+ * so a broken evaluator cannot quietly disable an active protection.
+ *
+ * project_id is required. It scopes the guardrail lookup, which is what stops
+ * one project's key from naming another project's guardrail. A key with no
+ * trace project materialises no guardrails, so the data plane never reaches
+ * this endpoint for one.
  */
 secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
   let body: unknown;
@@ -651,20 +769,25 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  logger.info(
-    {
-      vkId: parsed.data.vk_id,
-      direction: parsed.data.direction,
-      guardrailIds: parsed.data.guardrail_ids,
-    },
-    "guardrail/check plumbing stub — returning allow",
-  );
-  return c.json({
-    decision: "allow" as const,
-    reason: null,
-    modified_content: null,
-    policies_triggered: [],
+  const verdict = await GatewayGuardrailEvaluationService.create(prisma).check({
+    projectId: parsed.data.project_id,
+    guardrailIds: parsed.data.guardrail_ids,
+    direction: parsed.data.direction,
+    content: parsed.data.content,
   });
+  if (verdict.decision !== "allow") {
+    logger.info(
+      {
+        vkId: parsed.data.vk_id,
+        projectId: parsed.data.project_id,
+        direction: parsed.data.direction,
+        decision: verdict.decision,
+        policiesTriggered: verdict.policies_triggered,
+      },
+      "guardrail check did not allow the request",
+    );
+  }
+  return c.json(verdict);
 });
 
 /**

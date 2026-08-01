@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**
  * Fetches agents and prompts for the current project and builds a

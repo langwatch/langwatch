@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PLAN_LIMITS, getFreePlanLimits } from "../planLimits";
+import { getFreePlanLimits, PLAN_LIMITS } from "../planLimits";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 
@@ -18,7 +18,10 @@ vi.mock("../../../src/server/db", () => ({
 import { env } from "../../../src/env.mjs";
 import { createSaaSPlanProvider } from "../planProvider";
 
-const mockEnv = env as { IS_SAAS: boolean | undefined; ADMIN_EMAILS: string | undefined };
+const mockEnv = env as {
+  IS_SAAS: boolean | undefined;
+  ADMIN_EMAILS: string | undefined;
+};
 
 const createMockDb = ({
   findFirstResult = null,
@@ -71,7 +74,9 @@ describe("createSaaSPlanProvider", () => {
       const plan = await provider.getActivePlan("org_1");
 
       expect(plan.type).toBe(PlanTypes.ENTERPRISE);
-      expect(plan.maxMembers).toBe(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers);
+      expect(plan.maxMembers).toBe(
+        PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers,
+      );
     });
   });
 
@@ -197,14 +202,14 @@ describe("createSaaSPlanProvider", () => {
       });
     });
 
-    describe("when maxMembers override is set", () => {
+    describe("when maxMembersLite override is set", () => {
       it("applies the override (bug fix)", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
-          maxMembers: 25,
+          maxMembersLite: 25,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
               (f) => [f, null],
             ),
           ),
@@ -214,14 +219,14 @@ describe("createSaaSPlanProvider", () => {
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
-        expect(plan.maxMembers).toBe(25);
+        expect(plan.maxMembersLite).toBe(25);
       });
     });
 
     describe("when new override fields are set", () => {
       it.each([
         ["maxMembersLite", 15],
-        ["maxMessagesPerMonth", 250_000],
+        ["maxMessagesPerMonth", 200_000],
       ] as const)("applies %s override when set to %d", async (field, value) => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
@@ -240,6 +245,28 @@ describe("createSaaSPlanProvider", () => {
         const plan = await provider.getActivePlan("org_1");
 
         expect(plan[field]).toBe(value);
+      });
+    });
+
+    describe("when lite-member capacity is overridden", () => {
+      /** @scenario Subscription with a lite-member override uses that value */
+      it("returns the override value for maxMembersLite", async () => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          maxMembersLite: 50,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map(
+              (f) => [f, null],
+            ),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.maxMembersLite).toBe(50);
       });
     });
 
@@ -278,9 +305,9 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           ...overrides,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter(
-              (f) => !(f in overrides),
-            ).map((f) => [f, null]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map(
+              (f) => [f, null],
+            ),
           ),
         };
 
@@ -307,9 +334,7 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-          ),
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
         const db = createMockDb({ findFirstResult: subscription });
@@ -330,9 +355,7 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
           status: SubscriptionStatus.ACTIVE,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-          ),
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
         const db = createMockDb({ findFirstResult: subscription });

@@ -7,11 +7,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { CodePreview } from "./observability/CodePreview";
-import {
-  buildMcpJson,
-  CLOUD_ENDPOINT,
-  findLangwatchEnvLines,
-} from "./shared/build-mcp-config";
+import { buildMcpJson, findLangwatchEnvLines } from "./shared/build-mcp-config";
 import { TabButton } from "./shared/TabButton";
 
 const MotionVStack = motion.create(VStack);
@@ -131,7 +127,17 @@ export function ViaMcpClientScreen(): React.ReactElement {
 
         <VStack align="stretch" gap={3}>
           <VStack align="stretch" gap={0.5}>
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "baseline", gap: "6px", fontSize: "var(--chakra-font-sizes-md)", fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "baseline",
+                gap: "6px",
+                fontSize: "var(--chakra-font-sizes-md)",
+                fontWeight: 600,
+                letterSpacing: "-0.01em",
+              }}
+            >
               <span>Connect</span>
               <AnimatePresence mode="wait">
                 <motion.span
@@ -233,9 +239,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
           code={configJson}
           filename="mcp.json"
           codeLanguage="json"
-          highlightLines={
-            hasToken ? findLangwatchEnvLines(configJson) : []
-          }
+          highlightLines={hasToken ? findLangwatchEnvLines(configJson) : []}
           sensitiveValue={tokenForConfig ?? undefined}
           enableVisibilityToggle={hasToken}
           disableActions={!hasToken}

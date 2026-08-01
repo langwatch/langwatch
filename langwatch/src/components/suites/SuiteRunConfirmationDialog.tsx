@@ -38,7 +38,11 @@ export function SuiteRunConfirmationDialog({
       }}
       placement="center"
     >
-      <Dialog.Content bg="bg" maxWidth="500px" onClick={(e) => e.stopPropagation()}>
+      <Dialog.Content
+        bg="bg"
+        maxWidth="500px"
+        onClick={(e) => e.stopPropagation()}
+      >
         {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title>{suiteName}</Dialog.Title>
@@ -47,7 +51,8 @@ export function SuiteRunConfirmationDialog({
           <VStack align="stretch" gap={4}>
             <Text fontWeight="semibold">
               {" "}
-              Run {estimatedJobs} {estimatedJobs === 1 ? "simulation" : "simulations"}?
+              Run {estimatedJobs}{" "}
+              {estimatedJobs === 1 ? "simulation" : "simulations"}?
             </Text>
             <HStack gap={6}>
               <VStack gap={0} align="start">

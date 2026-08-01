@@ -35,29 +35,29 @@ describe("Prompt tracing", () => {
       getSpan = await findFinishedSpanByName("PromptsApiService.get");
     });
 
-    it('should create 1 span', () => {
+    it('creates 1 span', () => {
       const allSpans = spanExporter.getFinishedSpans();
       expect(allSpans.length).toBe(1);
     });
 
-    it("should create a span with correct name", () => {
+    it("creates a span with correct name", () => {
       expect(getSpan).toBeDefined();
     });
 
-    it("should set span type to 'prompt'", () => {
+    it("sets span type to 'prompt'", () => {
       expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
         "prompt",
       );
     });
 
-    it("should set prompt metadata attributes", () => {
+    it("sets prompt metadata attributes", () => {
       // New combined format: handle:version
       expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
         "test-prompt-1:1",
       );
     });
 
-    it("should set output data", () => {
+    it("sets output data", () => {
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
       ).toBeDefined();
@@ -90,24 +90,24 @@ describe("Prompt tracing", () => {
       compileSpan = await findFinishedSpanByName("Prompt.compile");
     });
 
-    it("should create a span with correct name", () => {
+    it("creates a span with correct name", () => {
       expect(compileSpan).toBeDefined();
     });
 
-    it("should set span type to 'prompt'", () => {
+    it("sets span type to 'prompt'", () => {
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
         "prompt",
       );
     });
 
-    it("should set prompt metadata attributes", () => {
+    it("sets prompt metadata attributes", () => {
       // New combined format: handle:version
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
         "test-prompt-1:1",
       );
     });
 
-    it("should set output data", () => {
+    it("sets output data", () => {
       // Check that output was set (it should be JSON stringified)
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
@@ -124,7 +124,7 @@ describe("Prompt tracing", () => {
       expect(output.value.messages[1].content).toBe("Tell me about weather");
     });
 
-    it("should set input variables", () => {
+    it("sets input variables", () => {
       // Check that input variables were captured
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VARIABLES],

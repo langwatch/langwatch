@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { createLogger } from "../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
@@ -50,6 +50,18 @@ function normalizePayloadValue(value: unknown): unknown {
   }
 
   return value;
+}
+
+/** Raw `event_log` row shape shared by the paged-read query and its mapper. */
+interface PagedEventLogRow {
+  EventId: string;
+  EventTimestamp: number;
+  EventOccurredAt: number;
+  EventType: string;
+  EventPayload: unknown;
+  EventVersion: string;
+  ProcessingTraceparent: string;
+  IdempotencyKey: string;
 }
 
 /**
@@ -158,15 +170,34 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 
-  async getEventRecordsUpTo(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    upToTimestamp: number,
-    upToEventId: string,
-  ): Promise<EventRecord[]> {
+  async getEventRecordsUpTo(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      occurredAtFromMs,
+    } = request;
     try {
       const client = await this.getClient(tenantId);
+      // Same partition-pruning bound as `getEventRecords`, and for the same
+      // reason: the upper bound is on EventTimestamp (acceptance order), but the
+      // table is PARTITION BY toYearWeek(EventOccurredAt), so ONLY an
+      // EventOccurredAt predicate prunes. Without one this walks every weekly
+      // partition ever written, including the cold tier on S3.
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const occurredAtFilter = hasLowerBound
+        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
+        : "";
       const result = await client.query({
         query: `
           SELECT
@@ -182,6 +213,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
+            ${occurredAtFilter}
             AND (
               EventTimestamp < {upToTimestamp:UInt64}
               OR (
@@ -197,6 +229,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           aggregateId: String(aggregateId),
           upToTimestamp,
           upToEventId,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
       });
@@ -244,6 +277,146 @@ export class EventRepositoryClickHouse implements EventRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Cursor-paginated `getEventRecordsUpTo`. Same (upToTimestamp, upToEventId)
+   * upper bound and (EventTimestamp ASC, EventId ASC) order, plus a strict
+   * `after` cursor and a `LIMIT`, so a re-fold of a huge aggregate streams the
+   * history a page at a time instead of materialising every EventPayload blob
+   * at once (which would exceed max_memory_usage_per_query and OOM the server).
+   */
+  async getEventRecordsUpToPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
+    const { tenantId, aggregateType, aggregateId } = request;
+    try {
+      const client = await this.getClient(tenantId);
+      const { query, query_params } = this.buildPagedQuery(request);
+      const result = await client.query({
+        query,
+        query_params,
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<PagedEventLogRow>();
+      return this.mapPagedRows(rows, { tenantId, aggregateType, aggregateId });
+    } catch (error) {
+      this.logger.error(
+        { ...request, aggregateId: String(aggregateId), error },
+        "Failed to get paged event records up to event from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  /** Query + params for {@link getEventRecordsUpToPaged}. */
+  private buildPagedQuery(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+    occurredAtFromMs?: number;
+  }): { query: string; query_params: Record<string, unknown> } {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+      occurredAtFromMs,
+    } = request;
+    const afterClause = after
+      ? `AND (
+            EventTimestamp > {afterTimestamp:UInt64}
+            OR (
+              EventTimestamp = {afterTimestamp:UInt64}
+              AND EventId > {afterEventId:String}
+            )
+          )`
+      : "";
+    // The cursor and the upper bound are both on EventTimestamp, which is NOT
+    // the partition key — so neither prunes. Only EventOccurredAt does.
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const occurredAtFilter = hasLowerBound
+      ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
+      : "";
+    return {
+      query: `
+        SELECT
+          EventId,
+          EventTimestamp,
+          EventOccurredAt,
+          EventType,
+          EventPayload,
+          EventVersion,
+          ProcessingTraceparent,
+          IdempotencyKey
+        FROM event_log
+        WHERE TenantId = {tenantId:String}
+          AND AggregateType = {aggregateType:String}
+          AND AggregateId = {aggregateId:String}
+          ${occurredAtFilter}
+          AND (
+            EventTimestamp < {upToTimestamp:UInt64}
+            OR (
+              EventTimestamp = {upToTimestamp:UInt64}
+              AND EventId <= {upToEventId:String}
+            )
+          )
+          ${afterClause}
+        ORDER BY EventTimestamp ASC, EventId ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId,
+        aggregateType,
+        aggregateId: String(aggregateId),
+        upToTimestamp,
+        upToEventId,
+        ...(hasLowerBound ? { occurredAtFromMs } : {}),
+        ...(after
+          ? { afterTimestamp: after.timestamp, afterEventId: after.eventId }
+          : {}),
+        limit,
+      },
+    };
+  }
+
+  /** Row-to-record mapping shared by {@link getEventRecordsUpToPaged}. */
+  private mapPagedRows(
+    rows: PagedEventLogRow[],
+    context: { tenantId: string; aggregateType: string; aggregateId: string },
+  ): EventRecord[] {
+    const { tenantId, aggregateType, aggregateId } = context;
+    return rows.map((row) => ({
+      TenantId: tenantId,
+      AggregateType: aggregateType,
+      AggregateId: String(aggregateId),
+      EventId: row.EventId,
+      EventTimestamp: row.EventTimestamp,
+      EventOccurredAt:
+        row.EventOccurredAt != null && row.EventOccurredAt > 0
+          ? row.EventOccurredAt
+          : null,
+      EventType: row.EventType,
+      EventVersion: row.EventVersion,
+      EventPayload: normalizePayloadValue(row.EventPayload),
+      ProcessingTraceparent: row.ProcessingTraceparent || "",
+      IdempotencyKey: row.IdempotencyKey || "",
+    }));
   }
 
   async countEventRecords(

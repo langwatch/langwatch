@@ -17,11 +17,32 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "~/server/simulations/simulation-run.mappers";
-import type { SimulationRepository } from "./simulation.repository";
+import {
+  queryWindowed,
+  type WindowFragment,
+} from "../../clients/clickhouse/windowed-read";
+import type {
+  ExportableRun,
+  SimulationRepository,
+} from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
 
 export const RUN_ID_CAP = 10000;
+
+/**
+ * Sort key for the export sweep, as a single SQL expression.
+ *
+ * ORDER BY, the cursor predicate and the value returned as the cursor must all
+ * be *the same* expression. Sorting on StartedAt while seeding the cursor from
+ * a CreatedAt fallback makes the next page filter on a column it did not sort
+ * by, which silently drops or repeats runs at the boundary — and ClickHouse
+ * sorts NULLs first under ASC, so any NULL StartedAt rows land on page one and
+ * become unreachable for the rest of the sweep while the count still includes
+ * them. Coalescing here means there is one definition and no fallback in TS.
+ */
+const EXPORT_SORT_KEY =
+  "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
 /**
  * Returns an IN-tuple dedup predicate for simulation_runs.
@@ -44,6 +65,34 @@ function simulationRunDedupPredicate(whereFilters: string): string {
     WHERE ${whereFilters}
     GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
   )`;
+}
+
+/**
+ * Dedup predicate for a query that reads simulation_runs through the `t` alias.
+ *
+ * The outer columns MUST be table-qualified. RUN_COLUMNS aliases the timestamp
+ * columns to strings (`toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt`)
+ * and ClickHouse resolves WHERE against SELECT aliases, so an unqualified
+ * `UpdatedAt` here compares a String against the subquery's DateTime64 and the
+ * IN-tuple matches nothing. That failure is silent — the query succeeds and
+ * returns zero rows — so it surfaces as a mysteriously empty result rather than
+ * an error. Qualifying with `t.` binds to the column instead of the alias.
+ */
+function qualifiedDedupPredicate(whereFilters: string): string {
+  return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+    FROM ${TABLE_NAME}
+    WHERE ${whereFilters}
+    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+  )`;
+}
+
+/**
+ * Strips the `t.` qualifier for reuse inside the dedup subquery, which selects
+ * from the bare table and has no such alias in scope.
+ */
+function unqualify(clause: string): string {
+  return clause.replace(/\bt\./g, "");
 }
 
 /**
@@ -98,6 +147,77 @@ function buildDateFilter({
   };
 }
 
+/**
+ * Extracts a StartedAt partition-pruning window from a page of batch aggregates,
+ * as a [min, max] range hint for {@link queryWindowed}.
+ *
+ * getBatchHistoryForScenarioSet fetches the batch page (step 1) and then reads
+ * the heavy Messages preview columns for those batches (step 2). simulation_runs
+ * is partitioned by toYearWeek(StartedAt), so without a StartedAt predicate the
+ * step-2 read opens every weekly partition (including cold storage) to serve a
+ * single page. Step 1 already aggregated min/max StartedAt for exactly these
+ * batches over the same (deduped, latest-version) rows step 2 returns, so every
+ * page run's latest StartedAt lies inside [min, max]. Bounding step 2 to that
+ * window prunes the heavy read to the page's few weeks without dropping rows.
+ *
+ * The window must be applied on the OUTER query only, not inside the
+ * max(UpdatedAt) dedup subquery: StartedAt is not strictly immutable across a
+ * run's ReplacingMergeTree versions (a snapshot arriving before the run-started
+ * event seeds a provisional StartedAt that the started event later overwrites),
+ * so filtering versions by StartedAt before picking the latest could resolve the
+ * wrong version. Filtering the already-deduped outer rows is always correct.
+ *
+ * Returns `null` when no valid bound exists (an empty page, or rows whose
+ * StartedAt is still provisional/zero). {@link queryWindowed} meters a null hint
+ * as an `unwindowed` read: the step-2 read then runs unbounded — the same
+ * behaviour as before — but the widening is now counted rather than silent
+ * (ADR-067).
+ */
+export function startedAtBoundsForPage(
+  rows: { MinStartedAt: string; MaxStartedAt: string }[],
+): { minMs: number; maxMs: number } | null {
+  let minMs = Number.POSITIVE_INFINITY;
+  let maxMs = 0;
+  for (const row of rows) {
+    const lo = Number(row.MinStartedAt);
+    const hi = Number(row.MaxStartedAt);
+    if (Number.isFinite(lo) && lo > 0) minMs = Math.min(minMs, lo);
+    if (Number.isFinite(hi) && hi > 0) maxMs = Math.max(maxMs, hi);
+  }
+  if (!Number.isFinite(minMs) || maxMs <= 0 || minMs > maxMs) {
+    return null;
+  }
+  return { minMs, maxMs };
+}
+
+/**
+ * Renders the StartedAt predicate the step-2 read has always emitted, from a
+ * {@link queryWindowed} fragment (or the empty clause for an unbounded `null`
+ * fragment). Deliberately hand-written as `toUInt64({...:String})` rather than
+ * `window.sqlFor` so the migration onto queryWindowed changes only *what is
+ * metered* — the emitted SQL and params stay byte-identical. A windowed
+ * fragment's `[fromMs, toMs]` reproduces the page's exact integer `[min, max]`
+ * (a midpoint hint ± a half-range window), so `String(fromMs)`/`String(toMs)`
+ * equal the bounds' own decimal strings.
+ */
+export function buildStartedAtWindowClause(window: WindowFragment | null): {
+  whereClause: string;
+  params: Record<string, string>;
+} {
+  if (!window) {
+    return { whereClause: "", params: {} };
+  }
+  return {
+    whereClause:
+      "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
+      "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+    params: {
+      minStartedAtMs: String(window.fromMs),
+      maxStartedAtMs: String(window.toMs),
+    },
+  };
+}
+
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
@@ -116,7 +236,10 @@ const RUN_COLUMNS = `
 /**
  * Columns for list/grid views — truncated messages and no heavy JSON blobs.
  * Keeps first 6 messages (3 turns) for grid card previews.
- * Omits Messages.Rest (tool call JSON) and Messages.TraceId.
+ * Omits Messages.Rest (tool call JSON), Messages.TraceId, TraceIds,
+ * Reasoning and Error (detail-drawer-only payloads; Reasoning is the judge's
+ * multi-paragraph rationale and Error can carry stack traces). MetCriteria /
+ * UnmetCriteria stay: the list renders "Passed (met/total)" from their counts.
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -126,8 +249,11 @@ const LIST_COLUMNS = `
   arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
   CAST([] AS Array(String)) AS \`Messages.TraceId\`,
   CAST([] AS Array(String)) AS \`Messages.Rest\`,
-  TraceIds,
-  Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  CAST([] AS Array(String)) AS TraceIds,
+  Verdict,
+  CAST(NULL AS Nullable(String)) AS Reasoning,
+  MetCriteria, UnmetCriteria,
+  CAST(NULL AS Nullable(String)) AS Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -145,21 +271,23 @@ const PREVIEW_COLUMNS = `
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
-/** Minimal columns for inner subquery in aggregation-only queries (count, max, group by) */
-const DEDUP_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, UpdatedAt, CreatedAt, StartedAt, FinishedAt, ArchivedAt` as const;
-
-/** Inner subquery columns for preview queries (getBatchHistory items) */
-const DEDUP_PREVIEW_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId,
-  Status, Name, Description,
-  \`Messages.Role\`, \`Messages.Content\`,
-  DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
-
 interface CursorPayload {
   ts: string;
   batchRunId: string;
+}
+
+/** Slim per-run row shape for the batch-history preview (step-2 heavy read). */
+interface PreviewItemRow {
+  ScenarioRunId: string;
+  BatchRunId: string;
+  Name: string | null;
+  Description: string | null;
+  Status: string;
+  DurationMs: string | null;
+  UpdatedAt: string;
+  FinishedAt: string | null;
+  MessagePreviewRoles: string[];
+  MessagePreviewContents: string[];
 }
 
 export class SimulationClickHouseRepository implements SimulationRepository {
@@ -176,33 +304,27 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
-    options?: {
-      expectedMaxDurationMs?: number;
-      expectedMaxReadBytes?: number;
-    },
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
-      clickhouse_settings: {
-        ...(options?.expectedMaxDurationMs !== undefined && {
-          langwatch_expected_max_duration_ms: options.expectedMaxDurationMs,
-        }),
-        ...(options?.expectedMaxReadBytes !== undefined && {
-          langwatch_expected_max_read_bytes: options.expectedMaxReadBytes,
-        }),
-      },
     });
     return result.json<T>();
   }
 
   async getScenarioSetsData({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]> {
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
     const rows = await this.queryRows<{
       ScenarioSetId: string;
       ScenarioCount: string;
@@ -220,12 +342,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            ArchivedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           ${simulationRunDedupPredicate("TenantId = {tenantId:String}")}
+           ${dateFilter.whereClause}
+           ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId },
+      { tenantId: projectId, ...dateFilter.params },
     );
 
     return rows.map((row) => ({
@@ -246,8 +369,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioRunId = {scenarioRunId:String}
@@ -272,11 +398,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     scenarioSetId,
     limit = 8,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batches: BatchHistoryItem[];
     nextCursor?: string;
@@ -287,10 +417,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorClause = decoded
-      ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})`
-      : "HAVING 1 = 1";
+    const cursorPredicate = decoded
+      ? `((toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
+      : "1 = 1";
+
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     // Step 0: fetch total distinct batch count (runs in parallel with step 1)
     const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
@@ -298,9 +432,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...dateFilter.params,
+      },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -314,6 +453,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
       FirstCompletedAt: string;
       AllCompletedAt: string;
+      MinStartedAt: string;
+      MaxStartedAt: string;
     }>(
       `SELECT
         BatchRunId,
@@ -328,14 +469,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         )) AS FirstCompletedAt,
         toString(toUnixTimestamp64Milli(
           maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
-        )) AS AllCompletedAt
+        )) AS AllCompletedAt,
+        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
-       ${cursorClause}
+       ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
@@ -344,6 +488,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ...(decoded
           ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
           : {}),
+        ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -374,33 +519,59 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
 
+    // Bound the heavy step-2 read to the StartedAt window of the batches on this
+    // page (aggregated in step 1) so it prunes partitions instead of scanning
+    // every weekly partition including cold storage — routed through
+    // queryWindowed so the outcome lands on clickhouse_windowed_read_total{table}
+    // exactly once per call (ADR-067):
+    //
+    //   - Page has a StartedAt range: the read runs windowed and is metered
+    //     `hit` — the cheap, pruned path.
+    //   - Page has no usable StartedAt (empty / provisional): the hint is null,
+    //     so the read runs unbounded and is metered `unwindowed`. This is the
+    //     widening the old empty-clause helper did *silently*; it is now counted.
+    //
+    // The page carries a [min, max] RANGE, not a point, so it maps as a midpoint
+    // hint with a half-range window — the emitted fragment covers exactly
+    // [min, max]. fallback "none": step 1 already bounded these batches to
+    // [min, max], so a run's latest StartedAt always lies inside the window; an
+    // empty windowed read is a genuine empty page and is never widened (widening
+    // here would issue a second unbounded scan the old code never did, changing
+    // the SQL that runs — precisely what byte-identical adoption forbids).
+    const startedAtBounds = startedAtBoundsForPage(pageRows);
+
     // Step 2: fetch slim item rows (preview columns only)
-    const itemRows = await this.queryRows<{
-      ScenarioRunId: string;
-      BatchRunId: string;
-      Name: string | null;
-      Description: string | null;
-      Status: string;
-      DurationMs: string | null;
-      UpdatedAt: string;
-      FinishedAt: string | null;
-      MessagePreviewRoles: string[];
-      MessagePreviewContents: string[];
-    }>(
-      `SELECT ${PREVIEW_COLUMNS}
+    const itemRows = await queryWindowed<PreviewItemRow[]>({
+      table: TABLE_NAME,
+      hintMs: startedAtBounds
+        ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2
+        : null,
+      windowMs: startedAtBounds
+        ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2
+        : undefined,
+      fallback: "none",
+      isEmpty: (rows) => rows.length === 0,
+      run: (window) => {
+        const startedAtWindow = buildStartedAtWindowClause(window);
+        return this.queryRows<PreviewItemRow>(
+          `SELECT ${PREVIEW_COLUMNS}
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          AND BatchRunId IN ({batchRunIds:Array(String)})
          AND ArchivedAt IS NULL
+         ${startedAtWindow.whereClause}
          ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
        ORDER BY CreatedAt ASC`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        batchRunIds,
+          {
+            tenantId: projectId,
+            scenarioSetIds: expandSetIdFilter(scenarioSetId),
+            batchRunIds,
+            ...startedAtWindow.params,
+          },
+        );
       },
-    );
+    });
 
     // Group items by batchRunId
     const itemsByBatch = new Map<string, typeof itemRows>();
@@ -501,8 +672,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       }
     }
 
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -536,51 +710,31 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   async getBatchRunCountForScenarioSet({
     projectId,
     scenarioSetId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number> {
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...dateFilter.params,
+      },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
-  }
-
-  async getScenarioRunDataByScenarioId({
-    projectId,
-    scenarioId,
-  }: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<ScenarioRunData[] | null> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} AS t
-       WHERE t.TenantId = {tenantId:String}
-         AND t.ScenarioId = {scenarioId:String}
-         AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND ScenarioId = {scenarioId:String}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-       ORDER BY CreatedAt DESC
-       LIMIT 1000`,
-      { tenantId: projectId, scenarioId },
-    );
-
-    if (rows.length === 0) return null;
-
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
   }
 
   async getAllRunDataForScenarioSet({
@@ -590,8 +744,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -824,6 +981,49 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     };
   }
 
+  async findLastUpdatedAt({
+    projectId,
+    scenarioSetId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number> {
+    // Freshness probes poll frequently, so an unbounded StartedAt window
+    // (scanning every partition, including cold storage) is never acceptable
+    // here — floor the window at 30 days when the caller omits it.
+    const dateFilter = buildDateFilter({
+      startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
+      endDate,
+    });
+    const setFilter = scenarioSetId
+      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
+      : "";
+
+    // max(UpdatedAt) over all versions equals the latest version's UpdatedAt
+    // (ReplacingMergeTree version column), so no dedup subquery is needed.
+    // Reads only light columns; the StartedAt window prunes partitions.
+    const rows = await this.queryRows<{ LastUpdatedAt: string | null }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         ${setFilter}
+         ${dateFilter.whereClause}`,
+      {
+        tenantId: projectId,
+        ...(scenarioSetId
+          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
+          : {}),
+        ...dateFilter.params,
+      },
+    );
+
+    return Number(rows[0]?.LastUpdatedAt ?? "0");
+  }
+
   async getExternalSetSummaries(params: {
     projectId: string;
     startDate?: number;
@@ -1004,7 +1204,248 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
   }
 
+  // ---- Export sweep ----
+
+  async countRunsForExport({
+    projectId,
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number> {
+    const { stableClause, dateClause, params } = this.buildExportFilters({
+      scenarioSetId,
+      scenarioId,
+      startDate,
+      endDate,
+    });
+
+    const rows = await this.queryRows<{ Total: string }>(
+      `SELECT toString(count()) AS Total
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         ${stableClause}
+         ${dateClause}
+         AND t.ArchivedAt IS NULL
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}`,
+      { tenantId: projectId, ...params },
+    );
+
+    return Number(rows[0]?.Total ?? "0");
+  }
+
+  /**
+   * Forward-only page of runs for a CSV export sweep.
+   *
+   * Distinct from getRunDataForAllSuites, which caps at 100 and is shaped for
+   * the UI's freshness protocol (it can answer `changed: false` and skip the
+   * read entirely). An export needs a plain chronological sweep it can drive to
+   * exhaustion, so it gets its own read rather than bending that one.
+   *
+   * Keyset (not OFFSET) pagination on (StartedAt, ScenarioRunId): OFFSET makes
+   * ClickHouse re-scan and re-sort every preceding row for each page, so a large
+   * export degrades quadratically. The tuple is unique because ScenarioRunId
+   * breaks ties within a millisecond.
+   *
+   * Reads RUN_COLUMNS, never LIST_COLUMNS — the latter nulls out Reasoning and
+   * Error and truncates the conversation to 6 messages for grid cards, which
+   * would silently ship an export with empty judge reasoning.
+   */
+  async findRunsForExport({
+    projectId,
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+    limit,
+    cursor,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    runs: ExportableRun[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    const validatedLimit = Math.min(Math.max(1, limit), 500);
+    const decoded = cursor ? this.decodeExportCursor(cursor) : null;
+
+    const { stableClause, dateClause, params } = this.buildExportFilters({
+      scenarioSetId,
+      scenarioId,
+      startDate,
+      endDate,
+    });
+
+    const cursorPredicate = decoded
+      ? `AND (
+          (${EXPORT_SORT_KEY} > toUInt64({cursorTs:String}))
+          OR (${EXPORT_SORT_KEY} = toUInt64({cursorTs:String}) AND t.ScenarioRunId > {cursorRunId:String})
+        )`
+      : "";
+
+    const rows = await this.queryRows<
+      ClickHouseSimulationRunRow & { ExportSortKey: string }
+    >(
+      `SELECT ${RUN_COLUMNS},
+        toString(${EXPORT_SORT_KEY}) AS ExportSortKey
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         ${stableClause}
+         ${dateClause}
+         ${cursorPredicate}
+         AND t.ArchivedAt IS NULL
+         ${qualifiedDedupPredicate(`TenantId = {tenantId:String} ${unqualify(stableClause)}`)}
+       ORDER BY ${EXPORT_SORT_KEY} ASC, t.ScenarioRunId ASC
+       LIMIT {fetchLimit:UInt32}`,
+      {
+        tenantId: projectId,
+        ...params,
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId }
+          : {}),
+        fetchLimit: String(validatedLimit + 1),
+      },
+    );
+
+    const hasMore = rows.length > validatedLimit;
+    const pageRows = hasMore ? rows.slice(0, validatedLimit) : rows;
+
+    const lastRow = pageRows[pageRows.length - 1];
+    const nextCursor =
+      hasMore && lastRow
+        ? this.encodeExportCursor(lastRow.ExportSortKey, lastRow.ScenarioRunId)
+        : undefined;
+
+    const now = Date.now();
+    return {
+      runs: pageRows.map((row) => ({
+        ...mapClickHouseRowToScenarioRunData(row, now),
+        scenarioSetId:
+          row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
+        traceIds: row.TraceIds ?? [],
+      })),
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Shared WHERE fragments for the export sweep and its count, so the two can
+   * never drift and report a total the sweep does not produce.
+   *
+   * Returned in two halves because only one of them may go inside the dedup
+   * subquery:
+   *
+   *   stable — ScenarioSetId and ScenarioId. A run cannot move between sets or
+   *     scenarios, and ScenarioSetId is part of the dedup key already, so
+   *     narrowing on these picks the same version either way. Keeping them in
+   *     the subquery is what stops it grouping the whole tenant.
+   *
+   *   date — StartedAt, which IS mutable across versions: the projection opens
+   *     a run with StartedAt null (persisted as CreatedAt) and only sets the
+   *     real value when the started event lands. Inside the subquery it would
+   *     make max(UpdatedAt) the newest version *within the range* rather than
+   *     the newest version, so a run whose corrected timestamp moved out of the
+   *     window would export its stale earlier snapshot — old status, missing
+   *     messages — instead of being excluded. It belongs only in the outer
+   *     query, applied to whichever version actually won.
+   *
+   * The cost is that the subquery no longer prunes partitions by date. That is
+   * the trade: an export that is cheaper but occasionally wrong around a range
+   * boundary is not worth having.
+   *
+   * Note the pass/fail filter is deliberately absent: STALLED is derived from
+   * timestamps by resolveRunStatus at map time, not stored in the table, so it
+   * cannot be expressed in SQL. Category filtering happens after mapping.
+   */
+  private buildExportFilters({
+    scenarioSetId,
+    scenarioId,
+    startDate,
+    endDate,
+  }: {
+    scenarioSetId?: string;
+    scenarioId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): {
+    stableClause: string;
+    dateClause: string;
+    params: Record<string, string | string[]>;
+  } {
+    const stableParts: string[] = [];
+    const params: Record<string, string | string[]> = {};
+
+    if (scenarioSetId) {
+      stableParts.push("t.ScenarioSetId IN ({exportSetIds:Array(String)})");
+      params.exportSetIds = expandSetIdFilter(scenarioSetId);
+    }
+
+    if (scenarioId) {
+      stableParts.push("t.ScenarioId = {exportScenarioId:String}");
+      params.exportScenarioId = scenarioId;
+    }
+
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    let dateClause = "";
+    if (dateFilter.whereClause) {
+      // buildDateFilter emits unqualified column names; the export queries read
+      // through the `t` alias, so qualify them here.
+      dateClause = dateFilter.whereClause.replace(/StartedAt/g, "t.StartedAt");
+      Object.assign(params, dateFilter.params);
+    }
+
+    return {
+      stableClause:
+        stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
+      dateClause,
+      params,
+    };
+  }
+
   // ---- Cursor helpers ----
+
+  /**
+   * Export cursors key on (StartedAt, ScenarioRunId); the batch cursors below
+   * key on (max(CreatedAt), BatchRunId). Separate encoders rather than one
+   * shared pair so neither payload carries a field named for the other's key.
+   */
+  private encodeExportCursor(ts: string, scenarioRunId: string): string {
+    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString(
+      "base64",
+    );
+  }
+
+  private decodeExportCursor(
+    cursor: string,
+  ): { ts: string; scenarioRunId: string } | null {
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(cursor, "base64").toString("utf-8"),
+      ) as Record<string, unknown>;
+      if (
+        typeof parsed.ts !== "string" ||
+        typeof parsed.scenarioRunId !== "string"
+      ) {
+        return null;
+      }
+      return { ts: parsed.ts, scenarioRunId: parsed.scenarioRunId };
+    } catch {
+      return null;
+    }
+  }
 
   private encodeCursor(ts: string, batchRunId: string): string {
     const payload: CursorPayload = { ts, batchRunId };
@@ -1071,7 +1512,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
           : {}),
       },
-      { expectedMaxDurationMs: 5000, expectedMaxReadBytes: 5_000_000 },
     );
 
     const now = Date.now();

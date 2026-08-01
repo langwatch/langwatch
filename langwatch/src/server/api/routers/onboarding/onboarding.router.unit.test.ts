@@ -11,9 +11,11 @@ const {
   mockTrackEvent,
   mockGroupUser,
   mockBatch,
+  mockEnsurePersonalWorkspace,
 } = vi.hoisted(() => ({
   mockCreateAndAssign: vi.fn(),
   mockCreateProject: vi.fn(),
+  mockEnsurePersonalWorkspace: vi.fn(),
   mockCaptureException: vi.fn(),
   mockSendSlackSignupEvent: vi.fn(),
   mockSendHubspotSignupForm: vi.fn(),
@@ -50,6 +52,18 @@ vi.mock("../project", () => ({
   },
 }));
 
+// The real service opens its own Prisma transaction, which a unit test has no
+// business reaching. Its behaviour is covered end to end in
+// onboarding.personal-workspace.integration.test.ts; here only the call and
+// its arguments matter. The specifier must match the router's import so
+// vi.mock hooks the same module.
+vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
+  PersonalWorkspaceService: class {
+    constructor(_prisma: unknown) {}
+    ensure = mockEnsurePersonalWorkspace;
+  },
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     notifications: {
@@ -67,7 +81,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 vi.mock("../../../auditLog", () => ({
@@ -90,6 +104,11 @@ describe("onboarding.initializeOrganization", () => {
     mockCreateProject.mockResolvedValue({
       success: true,
       projectSlug: "acme-project",
+    });
+    mockEnsurePersonalWorkspace.mockResolvedValue({
+      team: { id: "personal_team_1" },
+      project: { id: "personal_project_1" },
+      created: true,
     });
   });
 
@@ -168,6 +187,186 @@ describe("onboarding.initializeOrganization", () => {
           yourRole: "Engineer",
         },
       });
+    });
+  });
+
+  describe("when the caller declares a primary intent (ADR-038)", () => {
+    it("forwards the intent to organization creation as a sibling of signUpData", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        signUpData: { terms: true },
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        orgName: "Acme Corp",
+        phoneNumber: undefined,
+        signUpData: { terms: true },
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+    });
+
+    /** @scenario "Governance signup creates organization and team, but no shared project" */
+    it("skips project creation and returns a null projectSlug", async () => {
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).not.toHaveBeenCalled();
+      expect(result.projectSlug).toBeNull();
+      expect(result.success).toBe(true);
+      expect(result.organizationId).toBe("org_1");
+    });
+
+    /** @scenario "LLMOps signup still creates the default project" */
+    it("still creates a project for LLMOps signups", async () => {
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "LLM_OPS",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).toHaveBeenCalledOnce();
+      expect(result.projectSlug).toBe("acme-project");
+    });
+
+    /** @scenario "Governance signup provisions the personal workspace" */
+    it("provisions the signer's personal workspace in the new organization", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+
+      expect(mockEnsurePersonalWorkspace).toHaveBeenCalledWith({
+        userId: "user_1",
+        organizationId: "org_1",
+        displayName: "Jane Doe",
+        displayEmail: "jane@example.com",
+      });
+    });
+
+    /** @scenario "LLMOps signup provisions no personal workspace" */
+    it("provisions no personal workspace for LLMOps signups", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "LLM_OPS",
+      });
+
+      expect(mockEnsurePersonalWorkspace).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Failing to provision the workspace does not cost the user their organization" */
+    it("still completes onboarding when the workspace cannot be provisioned", async () => {
+      mockEnsurePersonalWorkspace.mockRejectedValue(new Error("db down"));
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.organizationId).toBe("org_1");
+      expect(mockCaptureException).toHaveBeenCalled();
+    });
+
+    it("still creates a project when no intent is given (legacy callers)", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario "Nurturing receives the intent as an explicit trait" */
+    it("passes the intent to nurturing as an explicit trait", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        projectName: "Acme Project",
+      });
+
+      expect(mockIdentifyUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          traits: expect.objectContaining({
+            primary_intent: "agent_governance",
+          }),
+        }),
+      );
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            primary_intent: "agent_governance",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("when the caller declares the LLMOps intent", () => {
+    /** @scenario "LLMOps signup produces the same marketing data as today" */
+    it("keeps the signUpData payload byte-identical to today — intent never leaks into it", async () => {
+      const caller = createCaller();
+      const llmOpsSignUpData = {
+        usage: "For my company",
+        solution: "SaaS",
+        terms: true,
+        companySize: "11_to_50",
+        yourRole: "Engineer",
+        featureUsage: "Evaluations",
+        utmCampaign: "launch-week",
+      };
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        phoneNumber: "+31 20 123 4567",
+        primaryIntent: "LLM_OPS",
+        signUpData: llmOpsSignUpData,
+        projectName: "Acme Project",
+      });
+
+      // I2 snapshot: the exact object today's flow sends, with intent as a
+      // SIBLING field only — any drift here breaks Customer.io/HubSpot
+      // segmentation (C2).
+      expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        orgName: "Acme Corp",
+        phoneNumber: "+31 20 123 4567",
+        signUpData: llmOpsSignUpData,
+        primaryIntent: "LLM_OPS",
+      });
+    });
+  });
+
+  describe("when no intent is provided (legacy callers)", () => {
+    it("forwards undefined so the organization persists NULL", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledWith(
+        expect.objectContaining({ primaryIntent: undefined }),
+      );
     });
   });
 

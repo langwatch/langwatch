@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
-	EXPERIMENT_RUN_EVENT_TYPES,
-	EXPERIMENT_RUN_EVENT_VERSIONS,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../schemas/constants";
 import type {
-	EvaluatorResultEvent,
-	ExperimentRunCompletedEvent,
-	ExperimentRunProcessingEvent,
-	ExperimentRunStartedEvent,
-	TargetResultEvent,
-	TraceMetricsComputedEvent,
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
+  ExperimentRunProcessingEvent,
+  ExperimentRunStartedEvent,
+  TargetResultEvent,
+  TraceMetricsComputedEvent,
 } from "../../schemas/events";
 import {
-	ExperimentRunStateFoldProjection,
-	type ExperimentRunStateData,
+  type ExperimentRunStateData,
+  ExperimentRunStateFoldProjection,
 } from "../experimentRunState.foldProjection";
 
 // Create a dummy store — only init/apply are tested, not persistence
@@ -23,7 +23,9 @@ const noopStore: FoldProjectionStore<ExperimentRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const experimentRunStateFoldProjection = new ExperimentRunStateFoldProjection({ store: noopStore });
+const experimentRunStateFoldProjection = new ExperimentRunStateFoldProjection({
+  store: noopStore,
+});
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -126,7 +128,9 @@ function createCompletedEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(events: ExperimentRunProcessingEvent[]): ExperimentRunStateData {
+function foldEvents(
+  events: ExperimentRunProcessingEvent[],
+): ExperimentRunStateData {
   let state = experimentRunStateFoldProjection.init();
   for (const event of events) {
     state = experimentRunStateFoldProjection.apply(state, event);
@@ -149,7 +153,10 @@ describe("experimentRunStateFoldProjection", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent({ index: 0 }),
-      createTargetResultEvent({ index: 1 }, { id: "event-2b", createdAt: 2100 }),
+      createTargetResultEvent(
+        { index: 1 },
+        { id: "event-2b", createdAt: 2100 },
+      ),
     ]);
 
     expect(state.Progress).toBe(2);
@@ -241,11 +248,21 @@ describe("experimentRunStateFoldProjection", () => {
         { id: "event-3b", createdAt: 3100 },
       ),
       createEvaluatorResultEvent(
-        { status: "skipped", evaluatorId: "eval-3", score: undefined, passed: undefined },
+        {
+          status: "skipped",
+          evaluatorId: "eval-3",
+          score: undefined,
+          passed: undefined,
+        },
         { id: "event-3c", createdAt: 3200 },
       ),
       createEvaluatorResultEvent(
-        { status: "error", evaluatorId: "eval-4", score: undefined, passed: undefined },
+        {
+          status: "error",
+          evaluatorId: "eval-4",
+          score: undefined,
+          passed: undefined,
+        },
         { id: "event-3d", createdAt: 3300 },
       ),
     ]);

@@ -44,10 +44,7 @@ describe("getCustomModels()", () => {
         anthropic: makeProvider({ provider: "anthropic", enabled: false }),
       };
 
-      const options = [
-        "openai/gpt-4o",
-        "anthropic/claude-sonnet-4-20250514",
-      ];
+      const options = ["openai/gpt-4o", "anthropic/claude-sonnet-4-20250514"];
 
       const result = getCustomModels(providers, options, "chat");
 
@@ -186,10 +183,7 @@ describe("getCustomModels()", () => {
         openai: makeProvider({ provider: "openai" }),
       };
 
-      const options = [
-        "openai/gpt-4o",
-        "unknown_provider/some-model",
-      ];
+      const options = ["openai/gpt-4o", "unknown_provider/some-model"];
 
       const result = getCustomModels(providers, options, "chat");
 

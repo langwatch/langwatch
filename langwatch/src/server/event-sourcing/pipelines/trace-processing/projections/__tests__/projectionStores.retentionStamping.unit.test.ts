@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
-import type { MetricRecordStorageRepository } from "~/server/app-layer/traces/repositories/metric-record-storage.repository";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -10,15 +8,11 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { EvaluationRunStore } from "../../../evaluation-processing/projections/evaluationRun.store";
-import type { NormalizedLogRecord } from "../../schemas/logRecords";
-import type { NormalizedMetricRecord } from "../../schemas/metricRecords";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "../../schemas/spans";
-import { LogRecordAppendStore } from "../logRecordStorage.store";
-import { MetricRecordAppendStore } from "../metricRecordStorage.store";
 import { SpanAppendStore } from "../spanStorage.store";
 import { TraceSummaryStore } from "../traceSummary.store";
 
@@ -71,6 +65,8 @@ describe("trace-pipeline projection stores retention stamping", () => {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
   });
 
   describe("when the projection context carries no resolved policy", () => {
@@ -84,34 +80,6 @@ describe("trace-pipeline projection stores retention stamping", () => {
 
       expect(insertSpan).toHaveBeenCalledTimes(1);
       expect(insertSpan.mock.calls[0]![0]!.retentionDays).toBe(
-        PLATFORM_DEFAULT_RETENTION_DAYS,
-      );
-    });
-
-    it("stamps stored_log_records with the platform default", async () => {
-      const insertLogRecord = vi.fn().mockResolvedValue(undefined);
-      const store = new LogRecordAppendStore({
-        insertLogRecord,
-      } as unknown as LogRecordStorageRepository);
-
-      await store.append({} as NormalizedLogRecord, nullPolicyContext);
-
-      expect(insertLogRecord).toHaveBeenCalledWith(
-        expect.anything(),
-        PLATFORM_DEFAULT_RETENTION_DAYS,
-      );
-    });
-
-    it("stamps stored_metric_records with the platform default", async () => {
-      const insertMetricRecord = vi.fn().mockResolvedValue(undefined);
-      const store = new MetricRecordAppendStore({
-        insertMetricRecord,
-      } as unknown as MetricRecordStorageRepository);
-
-      await store.append({} as NormalizedMetricRecord, nullPolicyContext);
-
-      expect(insertMetricRecord).toHaveBeenCalledWith(
-        expect.anything(),
         PLATFORM_DEFAULT_RETENTION_DAYS,
       );
     });

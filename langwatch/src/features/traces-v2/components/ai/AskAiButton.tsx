@@ -4,6 +4,7 @@ import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { useColorModeValue } from "~/components/ui/color-mode";
 import {
   PopoverArrow,
   PopoverBody,
@@ -14,24 +15,27 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import NextLink from "~/utils/compat/next-link";
-import { aiBrandPalette } from "./aiBrandPalette";
+import { aiBrandPalette, aiBrandPaletteHot } from "./aiBrandPalette";
 
-// Slow, breathing halo that cycles through the brand palette so the
-// Ask AI affordance reads as alive without becoming a flashing
-// distraction. Each step blends two of the three palette stops so the
-// shadow drifts between orange / pink / violet over a 6s cycle.
-const aiGlowPulse = keyframes`
+// Slow, breathing halo that cycles through the palette so the Ask AI
+// affordance reads as alive without becoming a flashing distraction. Each
+// step blends two of the three palette stops over a 6s cycle. One halo per
+// ground: light runs the hot ramp (orange / pink / violet), dark the langy
+// ramp (blue / purple / amber).
+const createAiGlowPulse = (palette: readonly string[]) => keyframes`
   0%, 100% {
     box-shadow:
-      0 0 0 0 ${aiBrandPalette[0]}33,
-      0 1px 4px ${aiBrandPalette[2]}55;
+      0 0 0 0 ${palette[0]}33,
+      0 1px 4px ${palette[2]}55;
   }
   50% {
     box-shadow:
-      0 0 14px 2px ${aiBrandPalette[1]}66,
-      0 1px 4px ${aiBrandPalette[2]}55;
+      0 0 14px 2px ${palette[1]}66,
+      0 1px 4px ${palette[2]}55;
   }
 `;
+const aiGlowPulseHot = createAiGlowPulse(aiBrandPaletteHot);
+const aiGlowPulse = createAiGlowPulse(aiBrandPalette);
 
 interface AskAiButtonProps {
   onClick: () => void;
@@ -39,8 +43,14 @@ interface AskAiButtonProps {
   tooltip?: string;
   /** aria-label override. */
   ariaLabel?: string;
-  /** Show "Ask AI" text alongside the icon. Defaults to true. */
+  /** Show the label text alongside the icon. Defaults to true. */
   showLabel?: boolean;
+  /**
+   * Button label. Defaults to "Ask AI"; the search bar passes "Ask Langy"
+   * when Langy owns the affordance and the click opens the panel instead of
+   * the inline composer.
+   */
+  label?: string;
   /**
    * When true, the click handler is replaced with a primer popover that
    * explains the user needs to configure a model provider first. Used
@@ -61,10 +71,10 @@ interface AskAiButtonProps {
 }
 
 /**
- * The brand "Ask AI" affordance — gradient-filled button with the
- * `Sparkles` icon and (optionally) the "Ask AI" label. Used in the
- * search bar to enter AI mode and in the lens-creation popover to
- * switch to the AI input. Same visuals everywhere so the AI surface
+ * The brand ask affordance — gradient-filled button with the `Sparkles` icon
+ * and (optionally) a label, "Ask AI" by default. The search bar uses it to
+ * enter the inline AI composer, or — relabelled "Ask Langy" — to hand the
+ * search off to the Langy panel. Same visuals either way so the AI surface
  * reads as one consistent feature.
  */
 const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
@@ -72,11 +82,16 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   tooltip = "Tell us what you want, and let AI make it happen",
   ariaLabel = "Enter AI mode",
   showLabel = true,
+  label = "Ask AI",
   needsProviderPrimer = false,
   disabledReason,
 }) => {
   const reduceMotion = useReducedMotion();
   const isGated = needsProviderPrimer || !!disabledReason;
+  // Light keeps the hot ramp (the langy ramp read lifeless on white); dark
+  // keeps the langy identity ramp untouched.
+  const palette = useColorModeValue(aiBrandPaletteHot, aiBrandPalette);
+  const glowPulse = useColorModeValue(aiGlowPulseHot, aiGlowPulse);
   const button = (
     <Button
       aria-label={ariaLabel}
@@ -95,7 +110,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       overflow="hidden"
       bg="transparent"
       boxShadow="0 1px 4px rgba(168,85,247,0.25), 0 0 0 1px rgba(255,95,31,0.12)"
-      _dark={{ boxShadow: "0 1px 4px rgba(168,85,247,0.18)" }}
+      _dark={{ boxShadow: "0 1px 4px rgba(237,137,38,0.16)" }}
       // Live "AI breathing" halo — only when motion is allowed. Skipped
       // when fully gated by `disabledReason` (sample mode) — a pulsing
       // halo on an inert button reads as broken animation. Provider-
@@ -104,7 +119,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       animation={
         reduceMotion || disabledReason
           ? undefined
-          : `${aiGlowPulse} 6s ease-in-out infinite`
+          : `${glowPulse} 6s ease-in-out infinite`
       }
       _hover={isGated ? undefined : { filter: "brightness(1.08)" }}
       cursor={disabledReason ? "not-allowed" : undefined}
@@ -122,7 +137,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
         _dark={{ opacity: 0.7 }}
       >
         <MeshGradient
-          colors={aiBrandPalette}
+          colors={palette}
           distortion={0.5}
           swirl={0.5}
           grainMixer={0}
@@ -134,7 +149,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       </Box>
       <HStack gap={1} position="relative" zIndex={1}>
         <Sparkles size={11} />
-        {showLabel && <Text textStyle="xs">Ask AI</Text>}
+        {showLabel && <Text textStyle="xs">{label}</Text>}
       </HStack>
     </Button>
   );
@@ -202,11 +217,11 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
                 width="28px"
                 height="28px"
                 borderRadius="full"
-                bg="purple.subtle"
+                bg="orange.subtle"
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                color="purple.fg"
+                color="orange.fg"
               >
                 <Zap size={14} />
               </Box>
@@ -227,9 +242,9 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
               <Button
                 size="xs"
                 width="full"
-                bg="purple.solid"
+                bg="orange.solid"
                 color="white"
-                _hover={{ bg: "purple.fg" }}
+                _hover={{ bg: "orange.fg" }}
               >
                 Add a provider
               </Button>

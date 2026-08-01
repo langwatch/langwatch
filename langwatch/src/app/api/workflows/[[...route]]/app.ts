@@ -1,9 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import type { Workflow } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 import {
@@ -13,7 +15,6 @@ import {
   WorkflowNotFoundError,
 } from "~/server/workflows/workflowEvaluation.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -81,7 +82,7 @@ secured.access(requires("workflows:view")).get(
         ...toWorkflowResponse(w),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/workflows`,
+          path: `/studio/${w.id}`,
         }),
       })),
     );
@@ -127,13 +128,15 @@ secured.access(requires("workflows:view")).get(
       ...toWorkflowResponse(workflow),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${workflow.id}`,
       }),
     });
   },
 );
 
-secured.access(requires("workflows:manage")).patch(
+// Editing metadata on a workflow that already exists is an `:update`.
+// `:manage` still implies it, so no existing caller changes.
+secured.access(requires("workflows:update")).patch(
   "/:id",
   describeRoute({
     description: "Update a workflow's metadata (name, icon, description)",
@@ -186,12 +189,13 @@ secured.access(requires("workflows:manage")).patch(
       ...toWorkflowResponse(updated),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${updated.id}`,
       }),
     });
   },
 );
 
+// Archiving deliberately stays at `:manage`.
 secured.access(requires("workflows:manage")).delete(
   "/:id",
   describeRoute({
@@ -275,7 +279,13 @@ const evaluateBodySchema = z
     path: ["data"],
   });
 
-secured.access(requires("workflows:manage")).post(
+// Running a workflow is not administering it: the committed version, its nodes
+// and its dataset are untouched — the call produces a RUN. So it asks for
+// `workflows:create`, the same grain as the suite run. `:manage` still implies
+// it, so nobody who could trigger an evaluation yesterday loses that, and a
+// viewer holding only `workflows:view` is declined exactly as before. The
+// second gate below is unchanged: the caller must also be able to READ the run.
+secured.access(requires("workflows:create")).post(
   "/:id/evaluate",
   describeRoute({
     description:

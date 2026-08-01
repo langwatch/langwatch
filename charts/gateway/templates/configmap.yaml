@@ -12,8 +12,21 @@ data:
   # them avoids misleading operators into thinking they're tuning behavior.
   SERVER_ADDR: ":5563"
   LOG_LEVEL: {{ .Values.logging.level | quote }}
-  LW_GATEWAY_BASE_URL: {{ .Values.controlPlane.baseUrl | quote }}
+  {{/* The route back to the control plane. Derived from the release name,
+       because that is what the cluster names the app Service after: a fixed
+       address resolves only on an install called the same as ours, and the
+       breakage is silent and late — every pod healthy, every probe green,
+       and nothing wrong until a request arrives carrying a virtual key that
+       then cannot be resolved. */}}
+  LW_GATEWAY_BASE_URL: {{ .Values.controlPlane.baseUrl | default (printf "http://%s-app:5560" .Release.Name) | quote }}
   {{- if .Values.otel.endpoint }}
+  # Official OpenTelemetry name, plus the deprecated LangWatch-only name so
+  # older gateway images keep reading their endpoint during upgrades. The
+  # service accepts both being set as long as the values are equal.
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   OTEL_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   {{- end }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
+  BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
+  REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
+  ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}

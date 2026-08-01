@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
+import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
@@ -8,8 +10,6 @@ import {
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -135,7 +135,12 @@ function createDeps(
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
-        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor", evaluator: null },
+        {
+          id: "mon-1",
+          checkType: "llm/boolean",
+          name: "Test Monitor",
+          evaluator: null,
+        },
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
@@ -175,7 +180,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("accepts depth as a string-valued OTLP attribute", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "2" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "2" },
+        },
       ],
     });
     expect(reason).toBe("depth_direct");
@@ -184,7 +192,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("ignores malformed depth values", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "abc" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "abc" },
+        },
       ],
     });
     expect(reason).toBeNull();
@@ -203,6 +214,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has explicit application origin", () => {
+    /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
     it("dispatches evaluation commands", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -212,7 +224,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createOriginEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -297,6 +311,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
+    /** @scenario "Evaluation trigger dispatches for any known origin (preconditions filter)" */
     it("dispatches normally — preconditions filter, not the reactor", async () => {
       // Per user direction post-2026-05-11 plan-mode debate: origin is a
       // user-configurable precondition, not a hardcoded reactor guard.
@@ -307,7 +322,10 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(createOriginEvent("evaluation"), createContext(state));
+      await reactor.handle(
+        createOriginEvent("evaluation"),
+        createContext(state),
+      );
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -372,6 +390,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has no origin", () => {
+    /** @scenario "Evaluation trigger skips traces with empty origin and no SDK info" */
     it("returns early without dispatching evaluations", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -397,8 +416,59 @@ describe("evaluationTrigger reactor", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
+    });
+
+    it("marks the dedup as surviving dispatch so a re-trigger after dispatch is squashed (#3912)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createOriginEvent(), createContext(state));
+
+      // The reactor can fire a second time after the command was already
+      // dispatched (a late span, then the deferred OriginResolvedEvent). The
+      // dedup key outlives dispatch (6-min TTL), so shouldSurviveDispatch must be set
+      // for that second dispatch to be squashed instead of re-run as a duplicate.
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
+    });
+  });
+
+  describe("when thread-level eval is dispatched", () => {
+    it("also marks the dedup as surviving dispatch (#3912)", async () => {
+      const deps = createDeps({
+        monitors: {
+          getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
+            {
+              id: "mon-1",
+              checkType: "llm/boolean",
+              name: "Test Monitor",
+              evaluator: null,
+              threadIdleTimeout: 300,
+            },
+          ]),
+        } as unknown as EvaluationTriggerReactorDeps["monitors"],
+      });
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: {
+          "langwatch.origin": "application",
+          "gen_ai.conversation.id": "thread-1",
+        },
+      });
+
+      await reactor.handle(createOriginEvent(), createContext(state));
+
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      // delay == threadIdleTimeout * 1000 confirms the thread-level branch was taken.
+      expect(options!.delay).toBe(300 * 1000);
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
     });
   });
 
@@ -457,7 +527,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(event, createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -473,6 +545,83 @@ describe("evaluationTrigger reactor", () => {
       await reactor.handle(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+/**
+ * The guards below used to live inside `handle`, so every span of a 10k-span
+ * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
+ * threw the job away. They are pure and read only the payload `handle` receives,
+ * so `shouldReact` rejects them pre-enqueue instead (ADR-026). See
+ * specs/event-sourcing/hot-trace-fold-amplification.feature.
+ */
+describe("evaluationTrigger relevance check", () => {
+  const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>
+    createFoldState({
+      attributes: { "langwatch.origin": "application" },
+      ...overrides,
+    });
+
+  const shouldReact = (
+    event: TraceProcessingEvent,
+    state: TraceSummaryData,
+  ): boolean => {
+    const reactor = createEvaluationTriggerReactor(createDeps());
+    // The reactor always declares one.
+    return reactor.shouldReact!(event, createContext(state));
+  };
+
+  describe("given a trace with a resolved origin", () => {
+    /** @scenario "The origin guard admits a genuine message event before enqueue" */
+    it("agrees to react to a recent span event", () => {
+      expect(shouldReact(createSpanEvent(), withOrigin())).toBe(true);
+    });
+
+    /** @scenario "The origin guard filters a non-message event before enqueue" */
+    it("declines a topic-assigned event", () => {
+      expect(shouldReact(createTopicAssignedEvent(), withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
+    it("declines a synthetic span", () => {
+      const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      expect(shouldReact(synthetic, withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
+    it("dispatches no evaluation once the span count reaches the processing cap", async () => {
+      // The cap guard deliberately lives in handle, not shouldReact: shouldReact
+      // runs once per event of a coalesced batch and would multiply the
+      // once-per-crossing warn by the batch size.
+      const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
+      expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
+
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      await reactor.handle(createSpanEvent(), createContext(atCap));
+      expect(deps.evaluation).not.toHaveBeenCalled();
+
+      // A coalesced batch can jump the span count clean past the cap without
+      // ever landing on it, so the guard is `>=`, not `===`.
+      const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
+      const depsPast = createDeps();
+      const reactorPast = createEvaluationTriggerReactor(depsPast);
+      await reactorPast.handle(createSpanEvent(), createContext(pastCap));
+      expect(depsPast.evaluation).not.toHaveBeenCalled();
+
+      const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
+      const depsBelow = createDeps();
+      const reactorBelow = createEvaluationTriggerReactor(depsBelow);
+      await reactorBelow.handle(createSpanEvent(), createContext(belowCap));
+      expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a trace whose origin is unresolved", () => {
+    /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
+    it("declines a span event", () => {
+      expect(shouldReact(createSpanEvent(), createFoldState())).toBe(false);
     });
   });
 });

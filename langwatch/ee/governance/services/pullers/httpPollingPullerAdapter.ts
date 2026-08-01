@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 /**
  * HttpPollingPullerAdapter — universal HTTP-polling adapter for
  * paginated REST audit-log APIs. Mirrors Airbyte's HTTP-source
@@ -19,15 +20,13 @@
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { createLogger } from "~/utils/logger/server";
 
 import type {
   NormalizedPullEvent,
+  PullerAdapter,
   PullResult,
   PullRunOptions,
-  PullerAdapter,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:http_polling");
@@ -81,7 +80,7 @@ const httpPollingConfigSchema = z.object({
   cursorQueryParam: z.string().default("cursor"),
   /** JSONPath into the response body to extract the events array. */
   eventsJsonPath: z.string().min(1),
-  /** cron string for scheduling (validated upstream by BullMQ). */
+  /** cron string for scheduling (validated before the process event). */
   schedule: z.string().min(1),
   /** Per-event JSONPath mappings (NormalizedPullEvent shape). */
   eventMapping: eventMappingSchema,
@@ -108,10 +107,7 @@ export class HttpPollingPullerAdapter
 
     while (pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (
-        options.deadlineMs !== undefined &&
-        Date.now() > options.deadlineMs
-      ) {
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         logger.info(
           { adapter: this.id, pageCount, cursor },
           "Deadline reached mid-pagination, returning cursor for next run",
@@ -187,11 +183,19 @@ export class HttpPollingPullerAdapter
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
       try {
+        // Two independent bounds: this request's own timeout, and the run's
+        // deadline. Either one firing must unwind the call.
+        const signal = options.signal
+          ? AbortSignal.any([
+              options.signal,
+              AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            ])
+          : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
         const response = await ssrfSafeFetch(url, {
           method: config.method,
           headers,
           body,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal,
         });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
@@ -210,13 +214,13 @@ export class HttpPollingPullerAdapter
         lastError = error instanceof Error ? error : new Error(String(error));
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
-        if (
-          error instanceof Error &&
-          /^HTTP 4\d{2}/.test(error.message)
-        ) {
+        if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
           throw error;
         }
       }
+      // Retrying past the run's deadline just burns time the scheduler has
+      // already given up waiting for.
+      if (options.signal?.aborted) break;
       const delay = RETRY_DELAYS_MS[attempt];
       if (delay !== undefined && attempt < RETRY_DELAYS_MS.length) {
         await new Promise<void>((resolve) => setTimeout(resolve, delay));

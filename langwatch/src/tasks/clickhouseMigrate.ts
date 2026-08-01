@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { getPrivateClickHouseUrls } from "../server/clickhouse/clickhouseClient";
 import { runMigrations } from "../server/clickhouse/goose";
 import { reconcileTTL } from "../server/clickhouse/ttlReconciler";
-import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:task:clickhouseMigrate");
 
@@ -19,7 +19,10 @@ export default async function execute() {
       await reconcileTTL({ connectionUrl: url, verbose: true });
     } catch (error) {
       logger.error(
-        { orgId, error: error instanceof Error ? error.message : String(error) },
+        {
+          orgId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Failed to run migrations on private ClickHouse instance",
       );
       throw error;

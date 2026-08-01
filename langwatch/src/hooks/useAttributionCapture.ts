@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import {
-  URL_PARAM_TO_FIELD,
-  setAttributionIfAbsent,
   type AttributionField,
+  setAttributionIfAbsent,
+  URL_PARAM_TO_FIELD,
 } from "~/utils/attribution";
 
 /**

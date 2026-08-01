@@ -6,10 +6,11 @@ This directory contains vendored dependencies that are not published to npm.
 
 ### @langwatch/scenario
 
-**File:** `langwatch-scenario-0.4.2.tgz`
+**File:** `langwatch-scenario-1.0.0.tgz`
 
-The scenario testing SDK for LangWatch. This is vendored here instead of being
-published to npm to allow faster iteration during development.
+The scenario testing SDK for LangWatch, vendored as the exact published npm
+artifact so the app pins known bits and can also carry unreleased builds when
+needed.
 
 **Source:** https://github.com/langwatch/scenario
 
@@ -17,8 +18,10 @@ published to npm to allow faster iteration during development.
 
 To update a vendored package:
 
-1. In the source repo (https://github.com/langwatch/scenario), navigate to the `/javascript` directory and run `pnpm buildpack`
-2. Copy the generated `.tgz` file to this directory
+1. For a published version, run `npm pack @langwatch/scenario@<version>` in this
+   directory. For an unreleased build, run `pnpm buildpack` in the source repo's
+   `/javascript` directory (https://github.com/langwatch/scenario) and copy the
+   generated `.tgz` here
 3. Update the dependency in `package.json` to point to the new tarball
 4. Run `pnpm install` to update the lockfile
 5. Commit both the tarball and the lockfile changes

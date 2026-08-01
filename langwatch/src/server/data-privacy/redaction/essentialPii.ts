@@ -1,5 +1,5 @@
+import { formatPiiMarker } from "@langwatch/redaction";
 import { findPhoneNumbersInText } from "libphonenumber-js";
-import { formatPiiMarker } from "./markers";
 
 /**
  * Native, lightweight redaction for the "essential" PII level: the pattern- and
@@ -256,19 +256,281 @@ export interface PiiRedactionResult {
 }
 
 /**
+ * Whether a detected span is vetoed by a do-not-redact exception: one of the
+ * compiled exception regexes matches its ENTIRE matched text. Full-match only,
+ * so an exception for a known-safe prefix can never carve a hole out of a
+ * longer identifier it happens to start. Callers pre-anchor the patterns via
+ * `compilePiiExceptPatterns`.
+ */
+export function matchesPiiException(
+  matchedText: string,
+  exceptPatterns: readonly RegExp[],
+): boolean {
+  return exceptPatterns.some((pattern) => pattern.test(matchedText));
+}
+
+/**
+ * Compile policy exception patterns for the redaction passes, anchoring each
+ * one so it must cover a detected span's whole matched text. Invalid patterns
+ * are skipped defensively: the service layer rejects them at save time, so a
+ * compile failure here means legacy or hand-edited config, and redaction must
+ * keep running rather than crash ingestion.
+ */
+export function compilePiiExceptPatterns(
+  patterns: readonly string[],
+): RegExp[] {
+  const compiled: RegExp[] = [];
+  for (const pattern of patterns) {
+    try {
+      compiled.push(new RegExp(`^(?:${pattern})$`));
+    } catch {
+      // Skip: validated at write time; never let a bad pattern break ingestion.
+    }
+  }
+  return compiled;
+}
+
+/** A [start, end) character range an exception has vetoed from masking. */
+export interface ProtectedRange {
+  start: number;
+  end: number;
+}
+
+/**
+ * Subtract `protectedRanges` from one [start, end) interval, returning the
+ * sub-intervals that remain maskable. Detected spans can overlap an
+ * exception-vetoed span (DLP and the native recognizers both produce
+ * overlapping findings on digit runs); masking must never eat into the vetoed
+ * text, and must still cover whatever falls outside it.
+ */
+export function subtractProtectedRanges(
+  span: { start: number; end: number },
+  protectedRanges: readonly ProtectedRange[],
+): { start: number; end: number }[] {
+  const overlapping = protectedRanges
+    .filter((range) => range.start < span.end && range.end > span.start)
+    .sort((a, b) => a.start - b.start);
+  if (overlapping.length === 0) return [{ start: span.start, end: span.end }];
+
+  const result: { start: number; end: number }[] = [];
+  let cursor = span.start;
+  for (const range of overlapping) {
+    if (range.start > cursor) {
+      result.push({ start: cursor, end: Math.min(range.start, span.end) });
+    }
+    cursor = Math.max(cursor, range.end);
+    if (cursor >= span.end) break;
+  }
+  if (cursor < span.end) result.push({ start: cursor, end: span.end });
+  return result;
+}
+
+/**
+ * Whether a raw recognizer match survives its own recognizer's rules: the
+ * checksum/format validator (if any) and the nearby-context-word requirement
+ * (if any). Does not apply the exception veto — that is shared across
+ * recognizer types, see `excepted` in `collectCandidateSpans`.
+ */
+function isValidRecognizerMatch({
+  recognizer,
+  raw,
+  span,
+  text,
+}: {
+  recognizer: Recognizer;
+  raw: string;
+  span: Span;
+  text: string;
+}): boolean {
+  if (recognizer.validate && !recognizer.validate(raw)) return false;
+  if (
+    recognizer.contextRequired &&
+    !hasContextWord(text, span, recognizer.contextWords ?? [])
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * One regex match reduced to a kept span, or null when the validator, the
+ * context gate, or the exception veto rules it out. Split out of
+ * `collectRecognizerSpans` so its loop body is a single call, not three
+ * nested conditionals per match.
+ */
+function recognizedSpanFor({
+  recognizer,
+  match,
+  text,
+  excepted,
+}: {
+  recognizer: Recognizer;
+  match: RegExpMatchArray;
+  text: string;
+  excepted: (span: Span) => boolean;
+}): Span | null {
+  const raw = match[0];
+  const start = match.index ?? 0;
+  const span: Span = {
+    start,
+    end: start + raw.length,
+    entity: recognizer.entity,
+  };
+  if (!isValidRecognizerMatch({ recognizer, raw, span, text })) return null;
+  if (excepted(span)) return null;
+  return span;
+}
+
+/**
+ * Regex/checksum recognizer pass: every `RECOGNIZERS` entry allowed by
+ * `allowed`, reduced match-by-match via `recognizedSpanFor`. Split out of
+ * `collectCandidateSpans` so each pass stays independently under the
+ * cognitive-complexity budget.
+ */
+function collectRecognizerSpans({
+  text,
+  allowed,
+  excepted,
+}: {
+  text: string;
+  allowed: ReadonlySet<string> | null;
+  excepted: (span: Span) => boolean;
+}): Span[] {
+  const spans: Span[] = [];
+  for (const recognizer of RECOGNIZERS) {
+    if (allowed && !allowed.has(recognizer.entity)) continue;
+    for (const match of text.matchAll(recognizer.regex)) {
+      const span = recognizedSpanFor({ recognizer, match, text, excepted });
+      if (span) spans.push(span);
+    }
+  }
+  return spans;
+}
+
+/**
+ * Phone-number pass via libphonenumber-js, with the same exception veto as
+ * the regex recognizers. Kept separate from `collectRecognizerSpans`: it is a
+ * different library and match shape (`startsAt`/`endsAt`, not a regex match),
+ * not a different set of rules.
+ */
+function collectPhoneSpans({
+  text,
+  allowed,
+  excepted,
+}: {
+  text: string;
+  allowed: ReadonlySet<string> | null;
+  excepted: (span: Span) => boolean;
+}): Span[] {
+  if (allowed && !allowed.has("PHONE_NUMBER")) return [];
+  const spans: Span[] = [];
+  try {
+    for (const phone of findPhoneNumbersInText(text, {
+      defaultCountry: "US",
+    })) {
+      const span: Span = {
+        start: phone.startsAt,
+        end: phone.endsAt,
+        entity: "PHONE_NUMBER",
+      };
+      if (excepted(span)) continue;
+      spans.push(span);
+    }
+  } catch {
+    // Defensive: never let phone parsing break ingestion.
+  }
+  return spans;
+}
+
+/**
+ * Collect every candidate PII span in `text`: the regex/checksum recognizers
+ * (respecting `allowed`) plus the phone detector, running each candidate
+ * through its validator/context gate and the exception veto. Vetoed spans are
+ * appended to `protectedRanges` as a side effect so the caller can shield them
+ * from later overlapping, non-excepted spans.
+ */
+function collectCandidateSpans({
+  text,
+  allowed,
+  exceptPatterns,
+  protectedRanges,
+}: {
+  text: string;
+  allowed: ReadonlySet<string> | null;
+  exceptPatterns: readonly RegExp[] | undefined;
+  protectedRanges: ProtectedRange[];
+}): Span[] {
+  const excepted = (span: Span): boolean => {
+    const veto =
+      !!exceptPatterns &&
+      exceptPatterns.length > 0 &&
+      matchesPiiException(text.slice(span.start, span.end), exceptPatterns);
+    if (veto) protectedRanges.push({ start: span.start, end: span.end });
+    return veto;
+  };
+
+  return [
+    ...collectRecognizerSpans({ text, allowed, excepted }),
+    ...collectPhoneSpans({ text, allowed, excepted }),
+  ];
+}
+
+/**
+ * Rebuild `text` with every maskable span replaced by its typed marker.
+ * `spans` must already be exception-shielded (see `collectCandidateSpans`) and
+ * merged for overlaps; a kept span can still overlap a protected one (a phone
+ * match inside an excepted number), so each is further split against
+ * `protectedRanges` before masking, so an exception always preserves its
+ * entire matched text.
+ */
+function maskSpans({
+  text,
+  spans,
+  protectedRanges,
+}: {
+  text: string;
+  spans: readonly Span[];
+  protectedRanges: readonly ProtectedRange[];
+}): PiiRedactionResult {
+  const maskable = spans.flatMap((span) =>
+    subtractProtectedRanges(span, protectedRanges).map((part) => ({
+      ...part,
+      entity: span.entity,
+    })),
+  );
+  if (maskable.length === 0) return { text, redactedCount: 0 };
+
+  let result = "";
+  let cursor = 0;
+  for (const span of maskable) {
+    result += text.slice(cursor, span.start) + formatPiiMarker(span.entity);
+    cursor = span.end;
+  }
+  result += text.slice(cursor);
+
+  return { text: result, redactedCount: maskable.length };
+}
+
+/**
  * Redact essential PII from one string and report how many spans were replaced.
  *
  * `entities` narrows the recognizers that run: pass a subset (the custom PII
  * level) to redact only those identifiers, or omit it (the essential level) to
  * run every native recognizer. Entity names are the canonical identifiers from
  * `ESSENTIAL_PII_ENTITIES` (e.g. `EMAIL_ADDRESS`, `BR_CPF`).
+ *
+ * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
+ * `compilePiiExceptPatterns`): a detected span whose entire matched text
+ * matches one of them is left as it was.
  */
 export function redactEssentialPiiInText({
   text,
   entities,
+  exceptPatterns,
 }: {
   text: string;
   entities?: readonly string[];
+  exceptPatterns?: readonly RegExp[];
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -278,46 +540,13 @@ export function redactEssentialPiiInText({
     return { text, redactedCount: 0 };
   }
 
-  const allowed = entities ? new Set(entities) : null;
-  const spans: Span[] = [];
-
-  for (const recognizer of RECOGNIZERS) {
-    if (allowed && !allowed.has(recognizer.entity)) continue;
-    for (const match of text.matchAll(recognizer.regex)) {
-      const raw = match[0];
-      const start = match.index ?? 0;
-      const span: Span = {
-        start,
-        end: start + raw.length,
-        entity: recognizer.entity,
-      };
-      if (recognizer.validate && !recognizer.validate(raw)) continue;
-      if (
-        recognizer.contextRequired &&
-        !hasContextWord(text, span, recognizer.contextWords ?? [])
-      ) {
-        continue;
-      }
-      spans.push(span);
-    }
-  }
-
-  if (!allowed || allowed.has("PHONE_NUMBER")) {
-    try {
-      for (const phone of findPhoneNumbersInText(text, {
-        defaultCountry: "US",
-      })) {
-        spans.push({
-          start: phone.startsAt,
-          end: phone.endsAt,
-          entity: "PHONE_NUMBER",
-        });
-      }
-    } catch {
-      // Defensive: never let phone parsing break ingestion.
-    }
-  }
-
+  const protectedRanges: ProtectedRange[] = [];
+  const spans = collectCandidateSpans({
+    text,
+    allowed: entities ? new Set(entities) : null,
+    exceptPatterns,
+    protectedRanges,
+  });
   if (spans.length === 0) return { text, redactedCount: 0 };
 
   // Merge overlaps, preferring earlier-and-longer spans.
@@ -331,13 +560,5 @@ export function redactEssentialPiiInText({
     }
   }
 
-  let result = "";
-  let cursor = 0;
-  for (const span of kept) {
-    result += text.slice(cursor, span.start) + formatPiiMarker(span.entity);
-    cursor = span.end;
-  }
-  result += text.slice(cursor);
-
-  return { text: result, redactedCount: kept.length };
+  return maskSpans({ text, spans: kept, protectedRanges });
 }

@@ -1,16 +1,13 @@
-import type {
-  Command,
-  CommandHandler,
-} from "../../../";
+import { createLogger } from "@langwatch/observability";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { Command, CommandHandler } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createLogger } from "../../../../../utils/logger/server";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import { computeRunMetricsCommandDataSchema } from "../schemas/commands";
 import {
-  SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
 } from "../schemas/constants";
 import type {
@@ -82,7 +79,13 @@ export class ComputeRunMetricsCommand
     const { scenarioRunId, traceId } = data;
 
     logger.debug(
-      { tenantId, scenarioRunId, traceId, hasMetrics: !!data.metrics, retryCount: data.retryCount },
+      {
+        tenantId,
+        scenarioRunId,
+        traceId,
+        hasMetrics: !!data.metrics,
+        retryCount: data.retryCount,
+      },
       "Handling compute run metrics command",
     );
 
@@ -120,13 +123,15 @@ export class ComputeRunMetricsCommand
 
       // Role cost/latency are derived from stored_spans (not carried on the
       // summary anymore); totalCost is still a summary scalar.
-      const { scenarioRoleCosts: roleCosts, scenarioRoleLatencies: roleLatencies } =
-        await this.deps.deriveScenarioRoleMetrics({
-          tenantId: tenantIdStr,
-          traceId,
-          occurredAtMs: traceSummary.occurredAt,
-          foldVersion: traceSummary.spanCount,
-        });
+      const {
+        scenarioRoleCosts: roleCosts,
+        scenarioRoleLatencies: roleLatencies,
+      } = await this.deps.deriveScenarioRoleMetrics({
+        tenantId: tenantIdStr,
+        traceId,
+        occurredAtMs: traceSummary.occurredAt,
+        foldVersion: traceSummary.spanCount,
+      });
 
       // Summary exists but not yet populated (cost enrichment still in progress).
       // Treat like missing summary — schedule retry so we pick it up later.
@@ -212,4 +217,3 @@ export class ComputeRunMetricsCommand
     return `${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}:compute-run-metrics`;
   }
 }
-

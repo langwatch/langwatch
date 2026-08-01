@@ -14,6 +14,7 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
@@ -119,34 +120,41 @@ export const IntegratePane: React.FC = () => {
               saw it before scrolling through the integration content. */}
           <HStack justify="space-between" align="flex-start" gap={4}>
             <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
-              <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
+              <Text
+                textStyle="2xl"
+                fontWeight="600"
+                color="fg"
+                letterSpacing="-0.015em"
+              >
                 Instrument your agents in seconds
               </Text>
               <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                Mint a token, then pick how you want to send traces. Skills
-                and MCP take under a minute; the SDK takes a couple more.
+                Mint a token, then pick how you want to send traces. Skills and
+                MCP take under a minute; the SDK takes a couple more.
               </Text>
             </VStack>
-            <Button
-              size="sm"
-              variant="outline"
-              colorPalette="orange"
-              onClick={enterSampleMode}
-              flexShrink={0}
-              transition="all 0.15s ease"
-              _hover={{
-                bg: "orange.subtle",
-                borderColor: "orange.emphasized",
-                transform: "translateY(-1px)",
-              }}
-              _active={{
-                bg: "orange.muted",
-                transform: "translateY(0)",
-              }}
-            >
-              <Icon as={Compass} boxSize={4} />
-              See sample data
-            </Button>
+            <HStack gap={2} flexShrink={0}>
+              <SetupWithAgentButton surface="traces" />
+              <Button
+                size="sm"
+                variant="outline"
+                colorPalette="orange"
+                onClick={enterSampleMode}
+                transition="all 0.15s ease"
+                _hover={{
+                  bg: "orange.subtle",
+                  borderColor: "orange.emphasized",
+                  transform: "translateY(-1px)",
+                }}
+                _active={{
+                  bg: "orange.muted",
+                  transform: "translateY(0)",
+                }}
+              >
+                <Icon as={Compass} boxSize={4} />
+                See sample data
+              </Button>
+            </HStack>
           </HStack>
 
           <IntegrationContent
@@ -163,4 +171,3 @@ export const IntegratePane: React.FC = () => {
     </IntegratePaneShell>
   );
 };
-

@@ -1,7 +1,13 @@
-import { ToggleLeft } from "lucide-react";
+import { Pin, PinOff, ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
+import {
+  setFeatureFlagOverride,
+  useFeatureFlagOverrides,
+} from "~/hooks/useFeatureFlagOverrides";
+import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
+import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
 import { useRouter } from "~/utils/compat/next-router";
-import type { Command } from "../types";
 import {
   actionCommands,
   filterCommands,
@@ -9,15 +15,12 @@ import {
   supportCommands,
   themeCommands,
 } from "../command-registry";
-import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
-import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
-import { getPageCommands } from "../pageCommands";
 import {
-  setFeatureFlagOverride,
-  useFeatureFlagOverrides,
-} from "~/hooks/useFeatureFlagOverrides";
-import { useOpsPermission } from "~/hooks/useOpsPermission";
-import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
+  MIN_CATEGORY_MATCH_LENGTH,
+  MIN_SEARCH_QUERY_LENGTH,
+} from "../constants";
+import { getPageCommands } from "../pageCommands";
+import type { Command } from "../types";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -55,7 +58,8 @@ export function useFilteredCommands(
     const navKeywords = ["navigation", "navigate", "go to", "jump to", "pages"];
     const isSearchingCategory = navKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -67,7 +71,9 @@ export function useFilteredCommands(
 
   const featureFlagOverrides = useFeatureFlagOverrides();
   const featureFlagToggleCommands = useMemo<Command[]>(() => {
-    if (!isDevMode) return [];
+    // In dev, and to ops admins in any environment: flipping a local override
+    // is a legitimate admin capability, and it only ever affects this browser.
+    if (!isDevMode && !hasOpsAccess) return [];
     return FRONTEND_FEATURE_FLAGS.map((flag) => {
       const current = featureFlagOverrides[flag];
       const stateLabel =
@@ -98,17 +104,55 @@ export function useFilteredCommands(
         },
       };
     });
-  }, [isDevMode, featureFlagOverrides]);
+  }, [isDevMode, hasOpsAccess, featureFlagOverrides]);
+
+  // A per-browser pin for the Ops sidebar section, offered only to users who
+  // already have ops access. Unlike the dev-only feature-flag toggles above,
+  // this is available in every environment — it is the admin-facing way to
+  // flip `ops_ui_ops_menu_pinned` without a dev build or a settings page. The
+  // pin only affects visibility, and the sidebar still gates on ops access, so
+  // exposing it here widens nothing.
+  const opsPinCommand = useMemo<Command[]>(() => {
+    if (!hasOpsAccess) return [];
+    const pinned = featureFlagOverrides.ops_ui_ops_menu_pinned === true;
+    return [
+      {
+        id: "action-toggle-ops-pin",
+        label: pinned ? "Unpin Ops from sidebar" : "Pin Ops in sidebar",
+        description: pinned
+          ? "Remove the Ops sidebar pin (this browser)"
+          : "Keep Ops visible in the sidebar (this browser)",
+        icon: pinned ? PinOff : Pin,
+        category: "actions",
+        keywords: [
+          "ops",
+          "pin",
+          "sidebar",
+          "always",
+          "show",
+          "operations",
+          "menu",
+        ],
+        action: () => {
+          setFeatureFlagOverride(
+            "ops_ui_ops_menu_pinned",
+            pinned ? undefined : true,
+          );
+        },
+      },
+    ];
+  }, [hasOpsAccess, featureFlagOverrides]);
 
   const availableActionCommands = useMemo(() => {
     let commands = hasOpsAccess
       ? actionCommands
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
-    if (!isDevMode) {
+    // The Feature Flags drawer opens for dev builds and for ops admins anywhere.
+    if (!isDevMode && !hasOpsAccess) {
       commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
     }
-    return [...commands, ...featureFlagToggleCommands];
-  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands]);
+    return [...commands, ...featureFlagToggleCommands, ...opsPinCommand];
+  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands, opsPinCommand]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
@@ -119,7 +163,8 @@ export function useFilteredCommands(
     const actionKeywords = ["new", "create", "add new", "actions"];
     const isSearchingCategory = actionKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -136,10 +181,17 @@ export function useFilteredCommands(
     const lowerQuery = query.toLowerCase().trim();
 
     // Check if searching for support/help category
-    const supportKeywords = ["support", "help", "docs", "documentation", "chat"];
+    const supportKeywords = [
+      "support",
+      "help",
+      "docs",
+      "documentation",
+      "chat",
+    ];
     const isSearchingCategory = supportKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     // Filter out "Open Chat" if not SAAS and set dynamic paths
@@ -170,7 +222,8 @@ export function useFilteredCommands(
     const themeKeywords = ["theme", "dark", "light", "mode", "appearance"];
     const isSearchingCategory = themeKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {

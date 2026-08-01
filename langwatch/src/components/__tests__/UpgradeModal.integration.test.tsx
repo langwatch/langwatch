@@ -10,7 +10,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { trackEvent } from "../../utils/tracking";
-import { UpgradeModal } from "../UpgradeModal";
+import { UpgradeModal } from "../UpgradeModalContent";
 import { toaster } from "../ui/toaster";
 
 const { pushMock, previewProrationMock, subscriptionEnabled } = vi.hoisted(
@@ -349,6 +349,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.getByText("Feature Not Available")).toBeDefined();
     });
 
+    /** @scenario Restriction modal uses role-based messaging */
     it("renders role-based messaging without billing references", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,
@@ -366,6 +367,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.queryByText(/upgrade/i)).toBeNull();
     });
 
+    /** @scenario Restriction modal offers "Contact Admin" not "Upgrade your plan" */
     it("does not render an 'Upgrade' button", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,

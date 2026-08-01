@@ -1,11 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
-
+import type { CustomModelEntry } from "../modelProviders/customModel.schema";
 import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
 } from "../modelProviders/resolveSupportedParameters";
-import type { CustomModelEntry } from "../modelProviders/customModel.schema";
 
 type LLMLike = {
   model?: string;
@@ -63,7 +62,6 @@ function filterLLMNode(
 /**
  * Walk a workflow DSL payload and strip unsupported sampling params on
  * every place an LLMConfig lives:
- *   - workflow.default_llm
  *   - node.data.llm (top-level on signature components)
  *   - node.data.parameters[].value (when identifier === "llm")
  *
@@ -76,7 +74,6 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
   prisma: PrismaClient;
   projectId: string;
   workflow: {
-    default_llm?: LLMLike;
     nodes?: Array<{
       data?: {
         llm?: LLMLike;
@@ -93,10 +90,6 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
     opts.projectId,
   );
   const { workflow } = opts;
-  if (workflow.default_llm) {
-    const filtered = filterLLMNode(workflow.default_llm, customModelsByProvider);
-    replaceObjectContents(workflow.default_llm, filtered);
-  }
   for (const node of workflow.nodes ?? []) {
     const data = node.data;
     if (!data) continue;

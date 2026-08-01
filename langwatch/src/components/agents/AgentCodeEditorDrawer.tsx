@@ -18,6 +18,10 @@ import {
   OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
+import {
+  isScenarioMappingValid,
+  ScenarioInputMappingSection,
+} from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
 import {
   type AvailableSource,
@@ -25,6 +29,7 @@ import {
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -32,41 +37,25 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "~/components/ui/toaster";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
   CodeComponentConfig,
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "~/optimization_studio/utils/codeAgentConfig";
 import type {
   AgentComponentConfig,
   TypedAgent,
 } from "~/server/agents/agent.repository";
-import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
-
-const DEFAULT_CODE = `class Code:
-    def __call__(self, input: str):
-        # Your code goes here
-
-        return {"output": input.upper()}
-`;
+import { api } from "~/utils/api";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
 const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
-
-/**
- * Extract code value from CodeComponentConfig parameters
- */
-const getCodeFromConfig = (config: AgentComponentConfig): string => {
-  const codeConfig = config as CodeComponentConfig;
-  const codeParam = codeConfig.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code",
-  );
-  return (codeParam?.value as string) ?? DEFAULT_CODE;
-};
 
 /**
  * Extract inputs from CodeComponentConfig
@@ -83,31 +72,6 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
   const codeConfig = config as CodeComponentConfig;
   return codeConfig.outputs ?? DEFAULT_OUTPUTS;
 };
-
-/**
- * Build DSL-compatible config for code agent
- */
-const buildCodeConfig = (
-  code: string,
-  inputs: DSLField[],
-  outputs: DSLField[],
-  scenarioMappings: Record<string, FieldMapping>,
-  scenarioOutputField: string | undefined,
-): CodeComponentConfig => ({
-  name: "Code",
-  description: "Python code block",
-  parameters: [
-    {
-      identifier: "code",
-      type: "code",
-      value: code,
-    },
-  ],
-  inputs: inputs as CodeComponentConfig["inputs"],
-  outputs: outputs as CodeComponentConfig["outputs"],
-  scenarioMappings: Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
-  scenarioOutputField,
-});
 
 export type AgentCodeEditorDrawerProps = {
   open?: boolean;
@@ -170,8 +134,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
   const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
-  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
-  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(undefined);
+  const [scenarioMappings, setScenarioMappings] = useState<
+    Record<string, FieldMapping>
+  >({});
+  const [scenarioOutputField, setScenarioOutputField] = useState<
+    string | undefined
+  >(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
@@ -191,16 +159,22 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       const agentInputs = getInputsFromConfig(agentQuery.data.config);
       setInputs(agentInputs);
       setOutputs(getOutputsFromConfig(agentQuery.data.config));
-      const existingMappings = (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
+      const existingMappings =
+        (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
       // If no saved mappings, compute best-match defaults from input names
-      const effectiveInputs = agentInputs.length > 0
-        ? agentInputs
-        : [{ identifier: "input", type: "str" }];
-      const mappings = Object.keys(existingMappings).length > 0
-        ? existingMappings
-        : computeBestMatchMappings({ inputs: effectiveInputs });
+      const effectiveInputs =
+        agentInputs.length > 0
+          ? agentInputs
+          : [{ identifier: "input", type: "str" }];
+      const mappings =
+        Object.keys(existingMappings).length > 0
+          ? existingMappings
+          : computeBestMatchMappings({ inputs: effectiveInputs });
       setScenarioMappings(mappings);
-      setScenarioOutputField((agentQuery.data.config as CodeComponentConfig).scenarioOutputField ?? undefined);
+      setScenarioOutputField(
+        (agentQuery.data.config as CodeComponentConfig).scenarioOutputField ??
+          undefined,
+      );
       setHasUnsavedChanges(false);
     } else if (!agentId) {
       // Reset form for new agent — compute best-match from default inputs
@@ -221,14 +195,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating agent",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -244,13 +212,21 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings, outputs, outputField: scenarioOutputField });
+  const isValid =
+    name.trim().length > 0 &&
+    isScenarioMappingValid({ mappings: scenarioMappings });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
     // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
-    const config = buildCodeConfig(code, inputs, outputs, scenarioMappings, scenarioOutputField);
+    const config = buildCodeConfig({
+      code,
+      inputs,
+      outputs,
+      scenarioMappings,
+      scenarioOutputField,
+    });
 
     if (agentId) {
       // Editing existing agent
@@ -302,9 +278,10 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     setInputs(newInputs);
     // Recompute best-match for any new inputs that don't already have a mapping
     setScenarioMappings((prev) => {
-      const effectiveInputs = newInputs.length > 0
-        ? newInputs
-        : [{ identifier: "input", type: "str" }];
+      const effectiveInputs =
+        newInputs.length > 0
+          ? newInputs
+          : [{ identifier: "input", type: "str" }];
       const bestMatch = computeBestMatchMappings({ inputs: effectiveInputs });
       const merged = { ...prev };
       for (const inp of effectiveInputs) {
@@ -378,9 +355,10 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   // For scenario mappings, mirror the backend's implicit input fallback
   // (code-agent.adapter.ts synthesizes { identifier: "input", type: "str" } when inputs is empty)
-  const scenarioInputsForUI: Variable[] = variablesForUI.length > 0
-    ? variablesForUI
-    : [{ identifier: "input", type: "str" }];
+  const scenarioInputsForUI: Variable[] =
+    variablesForUI.length > 0
+      ? variablesForUI
+      : [{ identifier: "input", type: "str" }];
 
   // Convert DSL outputs to Output[] for OutputsSection
   const outputsForUI: Output[] = outputs.map((output) => ({

@@ -30,6 +30,8 @@ const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   droppedAttributesCount: 0 as const,
   droppedEventsCount: 0 as const,
   droppedLinksCount: 0 as const,
+  cost: null,
+  nonBilledCost: null,
   ...overrides,
 });
 
@@ -430,6 +432,89 @@ describe("mapNormalizedSpanToSpan", () => {
     });
   });
 
+  describe("when extracting RAG contexts", () => {
+    const chunks = [
+      { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+      { document_id: "doc-2", content: "second chunk" },
+    ];
+
+    it("maps contexts when the attribute is a parsed array", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": chunks,
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+        { document_id: "doc-2", chunk_id: null, content: "second chunk" },
+      ]);
+    });
+
+    it("maps contexts when the attribute is a JSON string (ClickHouse Map round-trip)", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify(chunks),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+        { document_id: "doc-2", chunk_id: null, content: "second chunk" },
+      ]);
+    });
+
+    it("maps string-only contexts arrays", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify(["plain chunk"]),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { content: "plain chunk" },
+      ]);
+    });
+
+    it("returns empty contexts for malformed JSON strings without throwing", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": "[not valid json",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([]);
+    });
+
+    it("returns empty contexts for JSON strings that are not arrays", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify({ not: "an array" }),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect((result as { contexts: unknown }).contexts).toEqual([]);
+    });
+  });
+
   describe("when extracting error information", () => {
     it("returns null when statusCode is not ERROR", () => {
       const span = makeSpan({
@@ -638,6 +723,55 @@ describe("unflattenDotNotation", () => {
     it("returns an empty object", () => {
       const result = unflattenDotNotation({});
       expect(result).toEqual({});
+    });
+  });
+
+  describe("when a tool span carries only the tool-call semconv keys", () => {
+    it("maps gen_ai.tool.call.arguments to input as parsed json", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "gen_ai.tool.name": "bash",
+          "gen_ai.tool.call.arguments": '{"command":"ls -la"}',
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({
+        type: "json",
+        value: { command: "ls -la" },
+      });
+    });
+
+    it("maps gen_ai.tool.call.result to output, keeping non-JSON as text", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "gen_ai.tool.call.result": "total 12\ndrwxr-xr-x .",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "text",
+        value: "total 12\ndrwxr-xr-x .",
+      });
+    });
+
+    it("keeps langwatch.input priority over the tool-call fallback", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "langwatch.input": "explicit input",
+          "gen_ai.tool.call.arguments": '{"command":"ls"}',
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "text", value: "explicit input" });
     });
   });
 });

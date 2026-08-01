@@ -38,11 +38,13 @@ function makePrisma({
       findFirst: vi.fn().mockResolvedValue(teamUser),
     },
     customRole: {
-      findUnique: vi.fn().mockResolvedValue(
-        customRolePermissions !== null
-          ? { permissions: customRolePermissions }
-          : null,
-      ),
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(
+          customRolePermissions !== null
+            ? { permissions: customRolePermissions }
+            : null,
+        ),
     },
   } as unknown as Parameters<typeof checkRoleBindingPermission>[0]["prisma"];
 }

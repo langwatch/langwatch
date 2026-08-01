@@ -12,9 +12,17 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { makeScenarioRunData } from "./test-helpers";
+
+const prefetchMock = vi.hoisted(() => vi.fn());
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => prefetchMock,
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -82,12 +90,8 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Angry refund request"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/:/),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("Angry refund request")).toBeInTheDocument();
+      expect(screen.queryByText(/:/)).not.toBeInTheDocument();
     });
   });
 
@@ -121,9 +125,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Angry refund request (#1)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Angry refund request (#1)")).toBeInTheDocument();
     });
   });
 
@@ -281,6 +283,30 @@ describe("<ScenarioTargetRow/>", () => {
       );
       await user.click(row);
       expect(onClick).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when the user hovers a row", () => {
+    /** @scenario "Hovering a run pre-loads its details" */
+    it("prefetches the run state for the hovered run", async () => {
+      prefetchMock.mockClear();
+      const user = userEvent.setup();
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ scenarioRunId: "run_hover" })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.hover(
+        screen.getByLabelText(
+          "View details for Prod Agent: Angry refund request",
+        ),
+      );
+
+      expect(prefetchMock).toHaveBeenCalledWith("run_hover");
     });
   });
 });

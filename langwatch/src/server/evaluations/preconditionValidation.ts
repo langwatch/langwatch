@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { PRECONDITION_ALLOWED_RULES } from "../filters/precondition-matchers";
 import type { PreconditionField } from "../filters/precondition-matchers";
+import { PRECONDITION_ALLOWED_RULES } from "../filters/precondition-matchers";
 import { checkPreconditionsSchema } from "./types";
 
 /**
@@ -16,8 +16,7 @@ export function validatePreconditionRules(
   for (let i = 0; i < preconditions.length; i++) {
     const precondition = preconditions[i]!;
     const { field, rule } = precondition;
-    const allowedRules =
-      PRECONDITION_ALLOWED_RULES[field as PreconditionField];
+    const allowedRules = PRECONDITION_ALLOWED_RULES[field as PreconditionField];
     if (!allowedRules || allowedRules.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

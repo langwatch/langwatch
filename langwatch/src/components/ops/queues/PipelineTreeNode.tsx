@@ -49,7 +49,11 @@ export function PipelineTreeNode({
       >
         <Box width="14px" flexShrink={0}>
           {hasChildren ? (
-            isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
+            isExpanded ? (
+              <ChevronDown size={12} />
+            ) : (
+              <ChevronRight size={12} />
+            )
           ) : null}
         </Box>
 
@@ -64,29 +68,47 @@ export function PipelineTreeNode({
         </Text>
 
         {paused && (
-          <Badge size="xs" colorPalette="orange" variant="subtle">Paused</Badge>
+          <Badge size="xs" colorPalette="orange" variant="subtle">
+            Paused
+          </Badge>
         )}
 
         <HStack gap={1} flexShrink={0}>
           {node.pending > 0 && (
-            <Badge size="xs" colorPalette="blue" variant="subtle">{node.pending}</Badge>
+            <Badge size="xs" colorPalette="blue" variant="subtle">
+              {node.pending}
+            </Badge>
           )}
           {node.active > 0 && (
-            <Badge size="xs" colorPalette="green" variant="subtle">{node.active}</Badge>
+            <Badge size="xs" colorPalette="green" variant="subtle">
+              {node.active}
+            </Badge>
           )}
           {node.blocked > 0 && (
-            <Badge size="xs" colorPalette="red" variant="subtle">{node.blocked}</Badge>
+            <Badge size="xs" colorPalette="red" variant="subtle">
+              {node.blocked}
+            </Badge>
           )}
         </HStack>
 
         {hasAccess && (
           <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
             {directlyPaused ? (
-              <Button variant="ghost" size="2xs" colorPalette="green" onClick={() => onUnpause(path)}>
+              <Button
+                variant="ghost"
+                size="2xs"
+                colorPalette="green"
+                onClick={() => onUnpause(path)}
+              >
                 <Play size={10} />
               </Button>
             ) : !paused ? (
-              <Button variant="ghost" size="2xs" colorPalette="orange" onClick={() => onPause(path)}>
+              <Button
+                variant="ghost"
+                size="2xs"
+                colorPalette="orange"
+                onClick={() => onPause(path)}
+              >
                 <Pause size={10} />
               </Button>
             ) : null}
@@ -94,7 +116,8 @@ export function PipelineTreeNode({
         )}
       </HStack>
 
-      {hasChildren && isExpanded &&
+      {hasChildren &&
+        isExpanded &&
         node.children.map((child) => (
           <PipelineTreeNode
             key={child.name}

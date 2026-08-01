@@ -5,7 +5,7 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 // Mock langwatch so the tracer's withActiveSpan is a passthrough in tests.
@@ -15,18 +15,19 @@ vi.mock("langwatch", () => ({
       _name: string,
       _opts: unknown,
       fn: (span: { setAttributes: () => void }) => unknown,
-    ) => fn({ setAttributes: () => {} }),
+    ) => fn({ setAttributes: () => undefined }),
   }),
 }));
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,8 @@ function makeSpan(
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
     ...overrides,
   };
 }
@@ -81,12 +84,22 @@ function createMockLogger() {
  */
 function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
   return {
-    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
-      if (field in resolvedValues) {
-        return resolvedValues[field]!;
-      }
-      throw new BlobNotFoundError("evt-test", field, "proj-1");
-    }),
+    getFromEventLog: vi.fn(
+      async ({
+        field,
+      }: {
+        eventId: string;
+        field: string;
+        tenantId: string;
+        aggregateType: string;
+        aggregateId: string;
+      }) => {
+        if (field in resolvedValues) {
+          return resolvedValues[field]!;
+        }
+        throw new BlobNotFoundError("evt-test", field, "proj-1");
+      },
+    ),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
@@ -101,15 +114,18 @@ const realIOService = new TraceIOExtractionService();
 
 describe("resolveOffloadedTraces()", () => {
   describe("given a trace whose span has a reserved eventref pointer", () => {
-    const fullOutput = "The full 50 KB output value that was offloaded via event_log";
+    const fullOutput =
+      "The full 50 KB output value that was offloaded via event_log";
 
     const spanWithRef = makeSpan({
       traceId: "trace-1",
       spanId: "span-1",
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify({ field: "langwatch.output", eventId: "evt-001" }),
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-001",
+        }),
       },
     });
 
@@ -182,6 +198,38 @@ describe("resolveOffloadedTraces()", () => {
     });
   });
 
+  describe("given an eventref already decoded by attribute deserialization", () => {
+    describe("when resolved", () => {
+      it("restores the full value and removes the reserved attribute", async () => {
+        const span = makeSpan({
+          spanAttributes: {
+            "langwatch.output": "preview",
+            [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: {
+              field: "langwatch.output",
+              eventId: "evt-decoded",
+            },
+          },
+        });
+        const result = await resolveOffloadedTraces({
+          projectId: "proj-1",
+          normalizedSpans: [span],
+          blobStore: fakeBlobStore({ "langwatch.output": "full output" }),
+          ioExtractionService: realIOService,
+          logger: createMockLogger(),
+        });
+
+        expect(result.resolvedSpans[0]!.spanAttributes).toMatchObject({
+          "langwatch.output": "full output",
+        });
+        expect(
+          result.resolvedSpans[0]!.spanAttributes[
+            `${EVENTREF_ATTR_PREFIX}langwatch.output`
+          ],
+        ).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a trace with no eventref pointers in any span", () => {
     const spanClean = makeSpan({
       spanAttributes: {
@@ -207,7 +255,9 @@ describe("resolveOffloadedTraces()", () => {
 
       it("calls BlobStore.getFromEventLog zero times", async () => {
         const blobSvc = fakeBlobStore({});
-        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<typeof vi.fn>;
+        const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<
+          typeof vi.fn
+        >;
         const logger = createMockLogger();
 
         await resolveOffloadedTraces({
@@ -244,8 +294,10 @@ describe("resolveOffloadedTraces()", () => {
       spanId: "span-1",
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]:
-          JSON.stringify({ field: "langwatch.output", eventId: "evt-001" }),
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+          field: "langwatch.output",
+          eventId: "evt-001",
+        }),
       },
     });
 
@@ -329,7 +381,7 @@ describe("resolveOffloadedTraces()", () => {
     const spanWithMalformedRef = makeSpan({
       spanAttributes: {
         "langwatch.output": "preview…",
-        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: 'not-json{',
+        [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: "not-json{",
       },
     });
 

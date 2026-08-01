@@ -1,23 +1,19 @@
-import { useMemo, useCallback } from "react";
 import {
-  ReactFlow,
   Background,
   Controls,
-  type Node,
   type Edge,
-  type NodeTypes,
   Handle,
+  type Node,
+  type NodeTypes,
   Position,
+  ReactFlow,
 } from "@xyflow/react";
+import { useCallback, useMemo } from "react";
 import "@xyflow/react/dist/style.css";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useTraceStore } from "../traceStore";
-import {
-  SPAN_TYPE_ICONS,
-  SPAN_TYPE_COLORS,
-  type SpanConfig,
-} from "../types";
+import { SPAN_TYPE_COLORS, SPAN_TYPE_ICONS, type SpanConfig } from "../types";
 
 interface SpanNodeData {
   label: string;

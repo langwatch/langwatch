@@ -109,7 +109,7 @@ Feature: Custom Models Management
 
   # Migration Logic
 
-  @unit @unimplemented
+  @unit
   Scenario: Migration drops custom models that match registry entries
     Given a provider has custom models stored as plain strings
     And some custom model names match existing registry models

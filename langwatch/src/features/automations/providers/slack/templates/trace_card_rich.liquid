@@ -1,0 +1,40 @@
+{%- capture _title -%}
+{% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _subtitle -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | mrkdwn_escape }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.passed == false %} · failed{% elsif match.evaluation.passed == true %} · passed{% endif %}{%- else -%}Matched trace{%- endif -%}
+{%- if trigger.alertType %} · {{ trigger.alertType }}{% endif -%}
+{%- endcapture -%}
+{%- assign _snippet_src = match.trace.input | default: match.trace.output -%}
+{%- capture _card_body -%}
+{{ _snippet_src | truncate: 190 | mrkdwn_escape }}
+{%- endcapture -%}
+{%- capture _footer -%}
+`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | mrkdwn_escape }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View trace ↗>
+{%- endcapture -%}
+{%- assign _input = match.trace.input | truncate: 1500 -%}
+{%- assign _output = match.trace.output | truncate: 1500 -%}
+{%- capture _rt_body -%}
+{%- if _input != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Input", "style": { "bold": true } }] },
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _input | json }} }] }
+{%- endif -%}
+{%- if _input != "" and _output != "" -%},{%- endif -%}
+{%- if _output != "" -%}
+{ "type": "rich_text_section", "elements": [{ "type": "text", "text": "Output", "style": { "bold": true } }] },
+{ "type": "rich_text_quote", "elements": [{ "type": "text", "text": {{ _output | json }} }] }
+{%- endif -%}
+{%- endcapture -%}
+[
+  { "type": "card",
+    "title": { "type": "mrkdwn", "text": {{ _title | truncate: 150 | json }} },
+    "subtitle": { "type": "mrkdwn", "text": {{ _subtitle | truncate: 150 | json }} }
+    {%- if _card_body != "" -%}
+    ,"body": { "type": "mrkdwn", "text": {{ _card_body | json }} }
+    {%- endif -%}
+  }
+  {%- if _rt_body != "" -%}
+  ,{ "type": "rich_text", "elements": [ {{ _rt_body }} ] }
+  {%- endif -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _footer | json }} }] }
+]

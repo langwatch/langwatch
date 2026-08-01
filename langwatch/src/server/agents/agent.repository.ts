@@ -1,5 +1,5 @@
-import { Prisma } from "@prisma/client";
 import type { Agent, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
   type CodeComponentConfig,
@@ -127,20 +127,6 @@ export type UpdateAgentInput = {
  */
 export class AgentRepository {
   constructor(private readonly prisma: PrismaClient) {}
-
-  /**
-   * Find an agent by ID regardless of its archived status.
-   * Used for checking archived vs. missing status during suite run resolution.
-   */
-  async findByIdIncludingArchived(input: {
-    id: string;
-    projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null } | null> {
-    return this.prisma.agent.findFirst({
-      where: { id: input.id, projectId: input.projectId },
-      select: { id: true, archivedAt: true },
-    });
-  }
 
   /**
    * Find multiple agents by IDs regardless of archived status.
@@ -405,7 +391,10 @@ export class AgentRepository {
     const configToStore =
       data.config === null
         ? Prisma.JsonNull
-        : (validateConfig(type, data.config) as unknown as Prisma.InputJsonValue);
+        : (validateConfig(
+            type,
+            data.config,
+          ) as unknown as Prisma.InputJsonValue);
     await this.prisma.agent.update({
       where: { id: agentId, projectId },
       data: { name: data.name, config: configToStore },
@@ -416,7 +405,9 @@ export class AgentRepository {
    * Finds all non-archived agents that are copies of the given source agent,
    * with project/team/org for building fullPath. Used by getCopies (push-to-replicas UI).
    */
-  async findCopiesBySourceAgentId(sourceAgentId: string): Promise<AgentCopyRow[]> {
+  async findCopiesBySourceAgentId(
+    sourceAgentId: string,
+  ): Promise<AgentCopyRow[]> {
     const copies = await this.prisma.agent.findMany({
       where: {
         copiedFromAgentId: sourceAgentId,

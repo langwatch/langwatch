@@ -1,5 +1,5 @@
-import { getAnalyticsService } from "../../../analytics/analytics.service";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
+import { getAnalyticsService } from "../../../app-layer/analytics";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 

@@ -36,9 +36,9 @@ const mockPrisma = {
   organizationUser: {
     findFirst: vi.fn(),
   },
-  $transaction: vi.fn().mockImplementation((fn: (tx: any) => Promise<any>) =>
-    fn(mockPrisma),
-  ),
+  $transaction: vi
+    .fn()
+    .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -50,7 +50,8 @@ describe("RoleService Tests", () => {
   });
 
   describe("getAllRoles", () => {
-    it("should return all custom roles for organization", async () => {
+    /** @scenario "Non-enterprise org can list custom roles" */
+    it("returns all custom roles for organization", async () => {
       const mockRoles = [
         {
           id: "role-1",
@@ -107,7 +108,8 @@ describe("RoleService Tests", () => {
   });
 
   describe("getRoleById", () => {
-    it("should return role by ID", async () => {
+    /** @scenario "Non-enterprise org can view a custom role" */
+    it("returns role by ID", async () => {
       const mockRole = {
         id: "role-1",
         name: "Data Analyst",
@@ -129,7 +131,7 @@ describe("RoleService Tests", () => {
       });
     });
 
-    it("should throw NOT_FOUND when role does not exist", async () => {
+    it("throws NOT_FOUND when role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
@@ -142,7 +144,7 @@ describe("RoleService Tests", () => {
   });
 
   describe("createRole", () => {
-    it("should create new custom role", async () => {
+    it("creates new custom role", async () => {
       const mockRole = {
         id: "role-1",
         name: "Data Analyst",
@@ -178,7 +180,7 @@ describe("RoleService Tests", () => {
       });
     });
 
-    it("should throw CONFLICT when role with same name exists", async () => {
+    it("throws CONFLICT when role with same name exists", async () => {
       const existingRole = {
         id: "role-1",
         name: "Data Analyst",
@@ -207,7 +209,7 @@ describe("RoleService Tests", () => {
   });
 
   describe("updateRole", () => {
-    it("should update custom role", async () => {
+    it("updates custom role", async () => {
       const existingRole = {
         id: "role-1",
         name: "Data Analyst",
@@ -241,7 +243,7 @@ describe("RoleService Tests", () => {
       });
     });
 
-    it("should throw NOT_FOUND when role does not exist", async () => {
+    it("throws NOT_FOUND when role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -253,7 +255,7 @@ describe("RoleService Tests", () => {
   });
 
   describe("deleteRole", () => {
-    it("should delete custom role when not assigned to users", async () => {
+    it("deletes custom role when not assigned to users", async () => {
       const mockRoleWithUsers = {
         id: "role-1",
         name: "Data Analyst",
@@ -274,7 +276,7 @@ describe("RoleService Tests", () => {
       });
     });
 
-    it("should throw NOT_FOUND when role does not exist", async () => {
+    it("throws NOT_FOUND when role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(roleService.deleteRole("nonexistent-role")).rejects.toThrow(
@@ -282,7 +284,7 @@ describe("RoleService Tests", () => {
       );
     });
 
-    it("should throw PRECONDITION_FAILED when role is assigned to users", async () => {
+    it("throws PRECONDITION_FAILED when role is assigned to users", async () => {
       const mockRoleWithUsers = {
         id: "role-1",
         name: "Data Analyst",
@@ -305,7 +307,7 @@ describe("RoleService Tests", () => {
   });
 
   describe("assignRoleToUser", () => {
-    it("should assign custom role to user", async () => {
+    it("assigns custom role to user", async () => {
       const mockCustomRole = {
         id: "role-123",
         organizationId: "org-123",
@@ -347,7 +349,11 @@ describe("RoleService Tests", () => {
       });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+          where: expect.objectContaining({
+            userId: "user-123",
+            scopeType: "TEAM",
+            scopeId: "team-123",
+          }),
         }),
       );
       expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
@@ -361,7 +367,7 @@ describe("RoleService Tests", () => {
       );
     });
 
-    it("should throw NOT_FOUND when custom role does not exist", async () => {
+    it("throws NOT_FOUND when custom role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -380,7 +386,7 @@ describe("RoleService Tests", () => {
       ).rejects.toThrow("Custom role not found");
     });
 
-    it("should throw NOT_FOUND when team does not exist", async () => {
+    it("throws NOT_FOUND when team does not exist", async () => {
       const mockCustomRole = {
         id: "role-123",
         organizationId: "org-123",
@@ -398,7 +404,7 @@ describe("RoleService Tests", () => {
       ).rejects.toThrow("Team not found");
     });
 
-    it("should throw FORBIDDEN when user is not a team member", async () => {
+    it("throws FORBIDDEN when user is not a team member", async () => {
       const mockCustomRole = {
         id: "role-123",
         organizationId: "org-123",
@@ -429,7 +435,7 @@ describe("RoleService Tests", () => {
   });
 
   describe("removeRoleFromUser", () => {
-    it("should remove custom role from user", async () => {
+    it("removes custom role from user", async () => {
       mockPrisma.team.findUniqueOrThrow.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
@@ -446,7 +452,11 @@ describe("RoleService Tests", () => {
       expect(result).toEqual({ success: true });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+          where: expect.objectContaining({
+            userId: "user-123",
+            scopeType: "TEAM",
+            scopeId: "team-123",
+          }),
         }),
       );
       expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(

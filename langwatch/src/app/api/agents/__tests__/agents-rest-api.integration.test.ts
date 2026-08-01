@@ -5,10 +5,11 @@ import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -113,11 +114,7 @@ describe("Feature: Agent REST API", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.agent.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["agent", { projectId: testProjectId }]]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });
@@ -300,7 +297,10 @@ describe("Feature: Agent REST API", () => {
   describe("GET /api/agents/:id", () => {
     /** @scenario Get an agent by id */
     it("returns agent details by id", async () => {
-      const agent = await createAgent({ name: "Detail Agent", id: "agent_detail123" });
+      const agent = await createAgent({
+        name: "Detail Agent",
+        id: "agent_detail123",
+      });
 
       const res = await helpers.api.get(`/api/agents/${agent.id}`);
       expect(res.status).toBe(200);
@@ -310,6 +310,11 @@ describe("Feature: Agent REST API", () => {
       expect(body.name).toBe("Detail Agent");
       expect(body.type).toBe("signature");
       expect(body.config).toBeDefined();
+      // The platform link addresses THIS agent (its editor drawer), never the
+      // bare /agents index.
+      expect(body.platformUrl).toContain(
+        `drawer.agentId=${encodeURIComponent(agent.id)}`,
+      );
     });
 
     /** @scenario Get agent returns 404 for non-existent id */

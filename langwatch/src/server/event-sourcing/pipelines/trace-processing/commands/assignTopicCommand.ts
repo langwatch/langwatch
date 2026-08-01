@@ -1,28 +1,23 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../";
-import {
-	createTenantId,
-	defineCommandSchema,
-	EventUtils,
-} from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
+import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { AssignTopicCommandData } from "../schemas/commands";
 import { assignTopicCommandDataSchema } from "../schemas/commands";
 import {
-	ASSIGN_TOPIC_COMMAND_TYPE,
-	TOPIC_ASSIGNED_EVENT_TYPE,
-	TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+  ASSIGN_TOPIC_COMMAND_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TopicAssignedEvent } from "../schemas/events";
 
 /**
  * Command handler for assigning topics to traces in the trace processing pipeline.
  */
-export class AssignTopicCommand implements CommandHandler<
-  Command<AssignTopicCommandData>,
-  TopicAssignedEvent
-> {
+export class AssignTopicCommand
+  implements CommandHandler<Command<AssignTopicCommandData>, TopicAssignedEvent>
+{
   static readonly schema = defineCommandSchema(
     ASSIGN_TOPIC_COMMAND_TYPE,
     assignTopicCommandDataSchema,

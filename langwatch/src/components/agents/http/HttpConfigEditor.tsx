@@ -1,4 +1,12 @@
-import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  HStack,
+  Input,
+  Tabs,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useState } from "react";
 
 import type {

@@ -1,13 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Projection } from "../../domain/types";
 import type { TenantId } from "../../domain/tenantId";
-import type {
-  ProjectionStore,
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../stores/projectionStore.types";
-import { RepositoryFoldStore } from "../repositoryFoldStore";
+import type { Projection } from "../../domain/types";
+import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
+import { RepositoryFoldStore } from "../repositoryFoldStore";
 
 interface TestData {
   total: number;
@@ -16,7 +12,9 @@ interface TestData {
   UpdatedAt: number;
 }
 
-function makeContext(overrides: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext {
+function makeContext(
+  overrides: Partial<ProjectionStoreContext> = {},
+): ProjectionStoreContext {
   return {
     aggregateId: "agg-1",
     tenantId: "tenant-1" as TenantId,
@@ -89,8 +87,14 @@ describe("RepositoryFoldStore", () => {
         const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1" }) },
-          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2" }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({ aggregateId: "agg-1" }),
+          },
+          {
+            state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 },
+            context: makeContext({ aggregateId: "agg-2" }),
+          },
         ]);
 
         expect(batchSpy).toHaveBeenCalledOnce();
@@ -111,7 +115,10 @@ describe("RepositoryFoldStore", () => {
         const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ tenantId: "proj_xyz" as TenantId }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({ tenantId: "proj_xyz" as TenantId }),
+          },
         ]);
 
         expect(batchSpy).toHaveBeenCalledWith(
@@ -128,8 +135,14 @@ describe("RepositoryFoldStore", () => {
         const retentionPolicy = { traces: 49, scenarios: 63, experiments: 91 };
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", retentionPolicy }) },
-          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", retentionPolicy }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({ aggregateId: "agg-1", retentionPolicy }),
+          },
+          {
+            state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 },
+            context: makeContext({ aggregateId: "agg-2", retentionPolicy }),
+          },
         ]);
 
         expect(batchSpy).toHaveBeenCalledWith(
@@ -148,8 +161,20 @@ describe("RepositoryFoldStore", () => {
         const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", tenantId: "tenant-1" as TenantId }) },
-          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", tenantId: "tenant-2" as TenantId }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({
+              aggregateId: "agg-1",
+              tenantId: "tenant-1" as TenantId,
+            }),
+          },
+          {
+            state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 },
+            context: makeContext({
+              aggregateId: "agg-2",
+              tenantId: "tenant-2" as TenantId,
+            }),
+          },
         ]);
 
         // Native batch would stamp tenant-1 onto both rows — must not run.
@@ -166,8 +191,20 @@ describe("RepositoryFoldStore", () => {
         const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1", retentionPolicy: { traces: 49, scenarios: 0, experiments: 0 } }) },
-          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2", retentionPolicy: { traces: 91, scenarios: 0, experiments: 0 } }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({
+              aggregateId: "agg-1",
+              retentionPolicy: { traces: 49, scenarios: 0, experiments: 0 },
+            }),
+          },
+          {
+            state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 },
+            context: makeContext({
+              aggregateId: "agg-2",
+              retentionPolicy: { traces: 91, scenarios: 0, experiments: 0 },
+            }),
+          },
         ]);
 
         expect(batchSpy).not.toHaveBeenCalled();
@@ -181,8 +218,14 @@ describe("RepositoryFoldStore", () => {
         const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
         await store.storeBatch([
-          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1" }) },
-          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2" }) },
+          {
+            state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
+            context: makeContext({ aggregateId: "agg-1" }),
+          },
+          {
+            state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 },
+            context: makeContext({ aggregateId: "agg-2" }),
+          },
         ]);
 
         expect(repo.storeProjection).toHaveBeenCalledTimes(2);
@@ -241,7 +284,10 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      await store.get("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
+      await store.get(
+        "agg-1",
+        makeContext({ tenantId: "tenant-99" as TenantId }),
+      );
 
       expect(repo.getProjection).toHaveBeenCalledWith(
         "agg-1",

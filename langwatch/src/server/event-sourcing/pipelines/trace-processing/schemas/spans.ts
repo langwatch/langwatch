@@ -72,6 +72,17 @@ const normalizedSpanSchema = z.object({
   droppedAttributesCount: z.literal(0),
   droppedEventsCount: z.literal(0),
   droppedLinksCount: z.literal(0),
+  // Per-span cost, computed at projection time from the span's tokens ×
+  // pricing via the same SpanCostService the trace-summary fold uses, so a
+  // span's stored cost matches its contribution to the trace total. Null when
+  // the span carries no costable usage (no tokens / no explicit cost).
+  cost: z.number().nullable(),
+  // Portion of `cost` covered by a flat plan rather than billed per token
+  // (the span's / resource's `langwatch.cost.non_billable` marker). Equals
+  // `cost` for a fully-bundled span, null/0 for a fully-billed one — mirrors
+  // how `trace_summaries.NonBilledCost` is summed in the fold. Billed portion
+  // is `cost - nonBilledCost`.
+  nonBilledCost: z.number().nullable(),
 });
 
 export type NormalizedEvent = z.infer<typeof normalizedEventSchema>;

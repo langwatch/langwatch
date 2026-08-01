@@ -4,11 +4,7 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import {
-  abbreviateModel,
-  formatCost,
-  formatDuration,
-} from "../../../utils/formatters";
+import { formatCost, formatDuration } from "../../../utils/formatters";
 import type { MarkdownConfig } from "./types";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
@@ -789,7 +785,7 @@ export function buildTraceMarkdown(
           span.type ?? "span",
           formatDuration(span.durationMs),
         ];
-        if (span.model) bits.push(abbreviateModel(span.model));
+        if (span.model) bits.push(span.model);
         if (span.status === "error") bits.push("error");
         return `${indent}- ${span.name} (${bits.join(", ")})`;
       };

@@ -1,14 +1,27 @@
-export { ReplayService, type ReplayLogWriter } from "./replayService";
-export { createReplayRuntime, type ReplayRuntime } from "./replayPreset";
+export {
+  COMPLETED_KEY_PREFIX,
+  CUTOFF_KEY_PREFIX,
+  isAtOrBeforeCutoff,
+  isAtOrBeforeCutoffMarker,
+} from "./replayConstants";
 export type {
-  RegisteredFoldProjection,
-  ReplayConfig,
-  ReplayResult,
-  ReplayCallbacks,
-  ReplayProgress,
-  BatchPhase,
+  CutoffInfo,
+  DiscoveredAggregate,
+  ReplayEvent,
+} from "./replayEventLoader";
+export type { ReplayLogWriter } from "./replayLog";
+export { createReplayRuntime, type ReplayRuntime } from "./replayPreset";
+export { ReplayService } from "./replayService";
+export type {
   BatchCompleteInfo,
+  BatchPhase,
   DiscoveryResult,
+  ProjectionKind,
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  RegisteredStateProjection,
+  ReplayCallbacks,
+  ReplayConfig,
+  ReplayProgress,
+  ReplayResult,
 } from "./types";
-export type { DiscoveredAggregate, ReplayEvent, CutoffInfo } from "./replayEventLoader";
-export { isAtOrBeforeCutoff, isAtOrBeforeCutoffMarker, CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX } from "./replayConstants";

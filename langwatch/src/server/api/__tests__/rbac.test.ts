@@ -10,6 +10,7 @@ import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
   isDemoProject,
+  isDemoProjectId,
   organizationRoleHasPermission,
   type Permission,
   Resources,
@@ -676,6 +677,55 @@ describe("RBAC Permission System", () => {
 
     it.skip("allows playground view for demo project", () => {
       // This test would require mocking the env module
+    });
+  });
+
+  describe("isDemoProjectId (Langy hard gate)", () => {
+    // isDemoProjectId prefers process.env.DEMO_PROJECT_ID, so it is directly
+    // testable without mocking ~/env.mjs (unlike the skipped block above).
+    const DEMO_PROJECT_ID = "demo-project-123";
+
+    beforeEach(() => {
+      process.env.DEMO_PROJECT_ID = DEMO_PROJECT_ID;
+    });
+    afterEach(() => {
+      delete process.env.DEMO_PROJECT_ID;
+    });
+
+    describe("given the demo project id", () => {
+      it("is the demo project regardless of permission", () => {
+        expect(isDemoProjectId(DEMO_PROJECT_ID)).toBe(true);
+      });
+
+      it("gates Langy where isDemoProject would still grant a view permission", () => {
+        // The point of the hard gate: the demo grants evaluations:view to
+        // everyone, so isDemoProject(..., "evaluations:view") is true — Langy
+        // must refuse on isDemoProjectId instead of that permission.
+        expect(isDemoProject(DEMO_PROJECT_ID, "evaluations:view")).toBe(true);
+        expect(isDemoProjectId(DEMO_PROJECT_ID)).toBe(true);
+      });
+    });
+
+    describe("when the project is not the demo", () => {
+      it("returns false for a normal project", () => {
+        expect(isDemoProjectId("some-other-project")).toBe(false);
+      });
+
+      it("returns false for null/undefined/empty", () => {
+        expect(isDemoProjectId(null)).toBe(false);
+        expect(isDemoProjectId(undefined)).toBe(false);
+        expect(isDemoProjectId("")).toBe(false);
+      });
+    });
+
+    describe("when DEMO_PROJECT_ID is unset", () => {
+      it("returns false even for the string 'demo-project-123'", () => {
+        delete process.env.DEMO_PROJECT_ID;
+        // env.mjs may still carry a build-time DEMO_PROJECT_ID; the contract is
+        // only that an unset dynamic value never spuriously matches an arbitrary
+        // id. Assert the negative that matters: a random id is not the demo.
+        expect(isDemoProjectId("some-other-project")).toBe(false);
+      });
     });
   });
 

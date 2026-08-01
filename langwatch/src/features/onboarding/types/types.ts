@@ -1,10 +1,14 @@
+import type { OrganizationIntent } from "@prisma/client";
 import type { Attribution } from "~/utils/attribution";
 
+// Enum values are identities, not positions — order comes from
+// OnboardingFlowConfig.visibleScreens (ADR-038: INTENT renders second).
 export enum OnboardingScreenIndex {
   ORGANIZATION = 0,
   BASIC_INFO = 1,
   DESIRES = 2,
   ROLE = 3,
+  INTENT = 4,
 }
 
 export enum ProductScreenIndex {
@@ -13,6 +17,7 @@ export enum ProductScreenIndex {
   VIA_PLATFORM = 2,
   VIA_CLAUDE_DESKTOP = 3,
   MANUALLY = 4,
+  MODEL_PROVIDER = 5,
 }
 
 export enum OnboardingFlowDirection {
@@ -65,6 +70,8 @@ export type RoleType = (typeof ROLE_TYPES)[number];
 export interface OnboardingFormData {
   organizationName?: string;
   agreement?: boolean;
+  /** ADR-038 declared signup intent; picked on the INTENT screen. */
+  intent?: OrganizationIntent;
   usageStyle?: UsageStyle;
   phoneNumber?: string;
   companySize?: CompanySize;

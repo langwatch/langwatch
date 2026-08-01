@@ -17,9 +17,10 @@
  *
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
-import type React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // -- Shared mocks (cover transitive deps across all three drawers) ----------
@@ -135,8 +136,8 @@ vi.mock("~/utils/api", () => ({
 
 // Drawer registry imports the modules directly — pull them after mocks are set.
 import {
-  AgentHttpEditorDrawerFromUrl,
   AgentCodeEditorDrawerFromUrl,
+  AgentHttpEditorDrawerFromUrl,
   WorkflowSelectorDrawerFromUrl,
 } from "../drawerFromUrl";
 

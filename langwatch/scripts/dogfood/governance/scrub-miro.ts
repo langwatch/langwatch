@@ -9,10 +9,7 @@ import { prisma } from "~/server/db";
 async function main(): Promise<void> {
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { email: { contains: "miro" } },
-        { name: { contains: "Miro" } },
-      ],
+      OR: [{ email: { contains: "miro" } }, { name: { contains: "Miro" } }],
     },
     select: { id: true, email: true, name: true },
   });

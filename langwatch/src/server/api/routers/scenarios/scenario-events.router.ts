@@ -1,12 +1,12 @@
-import { TRPCError } from "@trpc/server";
 import { on } from "node:events";
+import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
-import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { createLogger } from "~/utils/logger/server";
+import { getApp } from "~/server/app-layer/app";
+import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
+import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
 import { checkProjectPermission } from "../../rbac";
-import type { BatchRunDataResult, ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
@@ -37,7 +37,7 @@ const dateRangeFields = {
  * Unified helper that fetches suite run data for either a single suite
  * (when scenarioSetId is provided) or all suites (when absent).
  *
- * Returns data from ES/ClickHouse. Pending items are visible immediately
+ * Returns data from ClickHouse. Pending items are visible immediately
  * because SuiteRunService dispatches simulation startRun commands at
  * scheduling time (before BullMQ jobs begin processing).
  *
@@ -60,7 +60,7 @@ async function fetchSuiteRunData({
   endDate?: number;
   sinceTimestamp?: number;
 }) {
-  const service = SimulationFacade.create();
+  const service = getApp().simulations.runs;
 
   if (scenarioSetId) {
     // Single suite/set view — no conditional fetch support yet
@@ -80,7 +80,14 @@ async function fetchSuiteRunData({
       }
     }
 
-    return { changed: true as const, lastUpdatedAt: 0, runs: data.runs, scenarioSetIds, hasMore: data.hasMore, nextCursor: data.nextCursor };
+    return {
+      changed: true as const,
+      lastUpdatedAt: 0,
+      runs: data.runs,
+      scenarioSetIds,
+      hasMore: data.hasMore,
+      nextCursor: data.nextCursor,
+    };
   }
 
   // Cross-suite view — supports conditional fetch via sinceTimestamp
@@ -100,10 +107,13 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId },
+        "Fetching scenario sets data",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
-      return service.getScenarioSetsDataForProject({
+      return service.getScenarioSetsData({
         projectId: input.projectId,
         ...dates,
       });
@@ -124,7 +134,12 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
         "Fetching suite run data (unified)",
       );
       const dates = resolveDateRange(input);
@@ -133,10 +148,31 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        ...dates,
         sinceTimestamp: input.sinceTimestamp,
       });
+    }),
+
+  // Cheap freshness probe for the run history views: returns only the latest
+  // UpdatedAt across the project's runs in the window. Clients poll this tiny
+  // response and invalidate getSuiteRunData only when the value advances,
+  // instead of re-downloading run payloads on a timer.
+  getSuiteRunFreshness: protectedProcedure
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string().optional() })
+        .extend(dateRangeFields),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      const lastUpdatedAt = await service.getLastUpdatedAt({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        ...dates,
+      });
+      return { lastUpdatedAt };
     }),
 
   // Get all run data for a scenario set (paginated, no BullMQ merge)
@@ -153,10 +189,15 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
         "Fetching scenario set run data",
       );
-      const service = SimulationFacade.create();
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const data = await service.getRunDataForScenarioSet({
         projectId: input.projectId,
@@ -172,10 +213,17 @@ export const scenarioEventsRouter = createTRPCRouter({
    * @deprecated Use getSuiteRunData instead. Kept for backward compatibility.
    */
   getAllScenarioSetRunData: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string() })
+        .extend(dateRangeFields),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching all scenario set run data (deprecated)");
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
+        "Fetching all scenario set run data (deprecated)",
+      );
       const dates = resolveDateRange(input);
       const result = await fetchSuiteRunData({
         projectId: input.projectId,
@@ -191,17 +239,20 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(
       projectSchema.extend({
         scenarioRunId: z.string(),
-      }).extend(dateRangeFields),
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioRunId: input.scenarioRunId }, "Fetching scenario run state");
-      const service = SimulationFacade.create();
-      const dates = resolveDateRange(input);
+      logger.debug(
+        { projectId: input.projectId, scenarioRunId: input.scenarioRunId },
+        "Fetching scenario run state",
+      );
+      const service = getApp().simulations.runs;
+      // Point lookup by unique run id — no date window, so runs older than any
+      // default range stay reachable.
       const data = await service.getScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
-        ...dates,
       });
 
       if (!data) {
@@ -215,11 +266,18 @@ export const scenarioEventsRouter = createTRPCRouter({
 
   // Get total count of batch runs for a scenario set (for pagination)
   getScenarioSetBatchRunCount: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string() })
+        .extend(dateRangeFields),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching batch run count");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
+        "Fetching batch run count",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const count = await service.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
@@ -227,26 +285,6 @@ export const scenarioEventsRouter = createTRPCRouter({
         ...dates,
       });
       return { count };
-    }),
-
-  // Get scenario run data by scenario id
-  getRunDataByScenarioId: protectedProcedure
-    .input(
-      projectSchema.extend({
-        scenarioId: z.string(),
-      }).extend(dateRangeFields),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioId: input.scenarioId }, "Fetching run data by scenario id");
-      const service = SimulationFacade.create();
-      const dates = resolveDateRange(input);
-      const data = await service.getScenarioRunDataByScenarioId({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        ...dates,
-      });
-      return { data };
     }),
 
   // Get pre-aggregated batch history for the sidebar (no full messages)
@@ -263,10 +301,14 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+        },
         "Fetching scenario set batch history",
       );
-      const service = SimulationFacade.create();
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getBatchHistoryForScenarioSet({
         projectId: input.projectId,
@@ -285,22 +327,26 @@ export const scenarioEventsRouter = createTRPCRouter({
         batchRunId: z.string(),
         sinceTimestamp: z.number().optional(),
         runTimestamps: z.record(z.string(), z.number()).optional(),
-      }).extend(dateRangeFields),
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, batchRunId: input.batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          batchRunId: input.batchRunId,
+        },
         "Fetching batch run data",
       );
-      const service = SimulationFacade.create();
-      const dates = resolveDateRange(input);
+      const service = getApp().simulations.runs;
+      // Point lookup by batch run id — no date window, so old batches stay
+      // reachable when opened directly.
       const result = await service.getRunDataForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
         sinceTimestamp: input.sinceTimestamp,
-        ...dates,
       });
       return filterRunsByTimestamp(result, input.runTimestamps);
     }),
@@ -310,8 +356,11 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId },
+        "Fetching external set summaries",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getExternalSetSummaries({
         projectId: input.projectId,
@@ -333,8 +382,15 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, limit: input.limit, hasCursor: !!input.cursor }, "Fetching all suite run data");
-      const service = SimulationFacade.create();
+      logger.debug(
+        {
+          projectId: input.projectId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
+        "Fetching all suite run data",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getRunDataForAllSuites({
         projectId: input.projectId,
@@ -345,23 +401,62 @@ export const scenarioEventsRouter = createTRPCRouter({
     }),
 
   onSimulationUpdate: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        // Present only on a tab the SDK opened. While the subscription lives,
+        // that tab is offered runs started on the same machine instead of the
+        // SDK opening yet another browser tab.
+        tabKey: z.string().min(1).max(200).optional(),
+        tabId: z.string().min(1).max(200).optional(),
+      }),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .subscription(async function* (opts) {
-      const { projectId } = opts.input;
+      const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
-      for await (const eventArgs of on(emitter, "simulation_updated", {
-        // @ts-expect-error - signal is not typed
-        signal: opts.signal,
-      })) {
-        logger.debug(
-          { projectId, event: eventArgs[0] },
-          "Simulation SSE event received",
-        );
-        yield eventArgs[0];
+      const presence =
+        tabKey && tabId
+          ? await startScenarioTabPresence({ projectId, tabKey, tabId })
+          : null;
+
+      if (presence?.parkedNavigate) {
+        // Same envelope the broadcast path emits, so the client has one shape
+        // to parse.
+        yield {
+          event: JSON.stringify(presence.parkedNavigate),
+          timestamp: Date.now(),
+        };
+      }
+
+      // tRPC v10 callers leave `opts.signal` undefined, so the request's own
+      // signal rides in on the context. Without it a disconnected client keeps
+      // this generator suspended, its emitter listener attached, and its tab
+      // registered forever.
+      const signal =
+        opts.ctx.signal ??
+        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
+        (opts.signal as AbortSignal | undefined);
+
+      try {
+        for await (const eventArgs of on(emitter, "simulation_updated", {
+          signal,
+        })) {
+          logger.debug(
+            { projectId, event: eventArgs[0] },
+            "Simulation SSE event received",
+          );
+          yield eventArgs[0];
+        }
+      } catch (error) {
+        // A disconnect aborts the wait; that is the normal end of a
+        // subscription, not something to surface as a stream error.
+        if ((error as { name?: string })?.name !== "AbortError") throw error;
+      } finally {
+        await presence?.stop();
       }
     }),
 });
@@ -387,5 +482,9 @@ export function filterRunsByTimestamp(
     return { changed: false as const, lastUpdatedAt: result.lastUpdatedAt };
   }
 
-  return { changed: true as const, lastUpdatedAt: result.lastUpdatedAt, runs: filtered };
+  return {
+    changed: true as const,
+    lastUpdatedAt: result.lastUpdatedAt,
+    runs: filtered,
+  };
 }

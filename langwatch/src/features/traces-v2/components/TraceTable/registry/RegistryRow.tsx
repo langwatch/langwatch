@@ -1,5 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
+import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
+import type { LangyContextTarget } from "~/features/langy/stores/langyContextTargetStore";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore } from "../../../stores/densityStore";
 import { useRowPulseStore } from "../../../stores/rowPulseStore";
@@ -63,6 +65,16 @@ interface RegistryRowProps<TRow> {
    * rows) instead of having each row look at its neighbours.
    */
   isFirstOfErrorRun?: boolean;
+  /**
+   * The context chip this row would become if the user pointed Langy at it (see
+   * `useLangyContextTarget`). Set by the trace lens, where a row IS a trace;
+   * left null by the conversation / group lenses (whose rows are aggregates,
+   * not a single addressable resource) and while skeletons are rendering.
+   *
+   * Everything downstream of it is inert unless the Langy panel is open, so a
+   * row that declares itself a target costs nothing on a page without Langy.
+   */
+  langyTarget?: LangyContextTarget | null;
   /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
   ref?: React.Ref<HTMLTableSectionElement>;
   "data-index"?: number;
@@ -85,9 +97,11 @@ function RegistryRowComponent<TRow>({
   expandedBg,
   isLoading = false,
   isFirstOfErrorRun = false,
+  langyTarget,
   ref,
   "data-index": dataIndex,
 }: RegistryRowProps<TRow>): React.ReactElement {
+  const langy = useLangyContextTarget(langyTarget);
   const tokens = useDensityTokens();
   const densityMode = useDensityStore((s) => s.density);
   const isPulsing = useRowPulseStore(
@@ -361,6 +375,7 @@ function RegistryRowComponent<TRow>({
         traceId={rowDomId}
         isNew={isNew}
         isPulsing={isPulsing}
+        langyTargetProps={langy.targetProps}
       >
         {mainRow}
         {addonRows}
@@ -408,6 +423,12 @@ function areRegistryRowPropsEqual<TRow>(
     prev.rowDomId === next.rowDomId &&
     prev.isLoading === next.isLoading &&
     prev.isFirstOfErrorRun === next.isFirstOfErrorRun &&
+    // Compared by id alone: parents build the descriptor as a fresh object
+    // literal each render, and every other field on it is derived from the row
+    // data already compared above. The row's live Langy state (open? added?)
+    // comes from store subscriptions inside the component, which re-render it
+    // regardless of what this comparator says.
+    prev.langyTarget?.id === next.langyTarget?.id &&
     prev.ref === next.ref &&
     prev["data-index"] === next["data-index"]
   );

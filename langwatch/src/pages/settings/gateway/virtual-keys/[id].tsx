@@ -3,8 +3,8 @@ import {
   Box,
   Button,
   Code,
-  HStack,
   Heading,
+  HStack,
   Separator,
   Spacer,
   Spinner,
@@ -18,37 +18,42 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip as RechartsTooltip,
+  ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import {
   ConfigureModelProvidersLink,
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "~/components/gateway/EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
+import {
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+} from "~/components/gateway/eligibleModelProviders";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
-import { Link } from "~/components/ui/link";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 function VirtualKeyDetailPage() {
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const vkId = typeof router.query.id === "string" ? router.query.id : "";
   const orgId = organization?.id ?? "";
@@ -63,8 +68,7 @@ function VirtualKeyDetailPage() {
       { enabled: !!orgId },
     );
   const availableTeams = useMemo(
-    () =>
-      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
   );
   const availableProjects = useMemo(
@@ -90,19 +94,15 @@ function VirtualKeyDetailPage() {
     }
     return map;
   }, [organization?.teams]);
-  const usageWindow = useMemo(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { fromDate: from.toISOString(), toDate: to.toISOString() };
-  }, []);
+  const usageWindow = useRollingWindow(30);
   const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
-      projectId: project?.id ?? "",
+      organizationId: orgId,
       virtualKeyId: vkId,
-      fromDate: usageWindow.fromDate,
-      toDate: usageWindow.toDate,
+      fromDate: usageWindow.fromIso,
+      toDate: usageWindow.toIso,
     },
-    { enabled: !!project?.id && !!vkId },
+    { enabled: !!orgId && !!vkId },
   );
   const utils = api.useContext();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
@@ -121,18 +121,38 @@ function VirtualKeyDetailPage() {
     name: string;
     secret: string;
   } | null>(null);
-  // Drives the model name written into the "How to use" snippet. Starts
-  // at the bare OpenAI-SDK default; clicking a provider row in the
-  // eligible-MP preview rewrites this to `${vendor}/${defaultModel}` so
-  // the copy-pasteable example points at a model the VK can actually
-  // serve through that provider.
-  const [snippetModel, setSnippetModel] = useState<string>("gpt-5-mini");
+  // Manual override for the model written into the "How to use" snippet.
+  // Null until the user clicks a provider row in the eligible-MP preview;
+  // otherwise the snippet model is derived from the key's first eligible
+  // provider (see snippetModel below).
+  const [snippetModelOverride, setSnippetModelOverride] = useState<
+    string | null
+  >(null);
 
   const canUpdate = hasPermission("virtualKeys:update");
   const canRotate = hasPermission("virtualKeys:rotate");
   const canAttachGuardrails = hasPermission("gatewayGuardrails:attach");
 
   const vk = detailQuery.data;
+
+  // The model shown in the "How to use" snippet: the manual override wins,
+  // else the key's first eligible provider in resolver-safe `vendor/model`
+  // form (so a self-hosted / custom key shows `custom/<model>`, not the
+  // OpenAI-only `gpt-5-mini`). `gpt-5-mini` is only the placeholder shown
+  // before the eligible providers resolve.
+  const computedDefaultModel = useMemo(
+    () =>
+      firstEligibleDefaultModel({
+        scopes: vk?.scopes ?? [],
+        providers: (orgProvidersQuery.data?.providers ??
+          []) as OrgModelProvider[],
+        availableProjects,
+        organizationId: orgId,
+      }),
+    [vk?.scopes, orgProvidersQuery.data?.providers, availableProjects, orgId],
+  );
+  const snippetModel =
+    snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
 
   // Guardrails are project-scoped: only a VK reachable from exactly one
   // PROJECT scope has a single guardrail surface to edit.
@@ -169,10 +189,7 @@ function VirtualKeyDetailPage() {
       setRevealSecret({ name: vk.name, secret: result.secret });
       setRotating(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to rotate key",
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
     }
   };
 
@@ -182,10 +199,7 @@ function VirtualKeyDetailPage() {
       await revokeMutation.mutateAsync({ organizationId: orgId, id: vk.id });
       setRevoking(false);
     } catch (err) {
-      toaster.create({
-        title: err instanceof Error ? err.message : "Failed to revoke key",
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't revoke the key" });
     }
   };
 
@@ -355,9 +369,7 @@ function VirtualKeyDetailPage() {
                     availableTeams={availableTeams}
                     availableProjects={availableProjects}
                     isLoading={orgProvidersQuery.isLoading}
-                    providers={
-                      (orgProvidersQuery.data?.providers ?? []) as any
-                    }
+                    providers={(orgProvidersQuery.data?.providers ?? []) as any}
                   />
                   <Box>
                     <HStack
@@ -366,7 +378,11 @@ function VirtualKeyDetailPage() {
                       gap={2}
                       justifyContent="space-between"
                     >
-                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="semibold"
+                        color="fg.muted"
+                      >
                         Eligible model providers
                       </Text>
                       <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
@@ -382,7 +398,7 @@ function VirtualKeyDetailPage() {
                         (orgProvidersQuery.data?.providers ?? []) as any
                       }
                       selectedModel={snippetModel}
-                      onSelectProviderModel={setSnippetModel}
+                      onSelectProviderModel={setSnippetModelOverride}
                     />
                   </Box>
                 </VStack>
@@ -401,7 +417,6 @@ function VirtualKeyDetailPage() {
               <ConfigurationSection config={vk.config as VkConfig | null} />
 
               <UsageSection data={usageQuery.data ?? null} />
-
             </VStack>
           )}
         </Box>
@@ -445,6 +460,7 @@ function VirtualKeyDetailPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        model={snippetModel}
         kind="rotate"
       />
     </AiGatewayLayout>
@@ -492,7 +508,11 @@ type VkConfig = {
   modelAliases?: Record<string, string>;
   modelsAllowed?: string[] | null;
   cache?: { mode?: "respect" | "force" | "disable"; ttlS?: number };
-  rateLimits?: { rpm?: number | null; tpm?: number | null; rpd?: number | null };
+  rateLimits?: {
+    rpm?: number | null;
+    tpm?: number | null;
+    rpd?: number | null;
+  };
   policyRules?: {
     tools?: { deny?: string[]; allow?: string[] | null };
     mcp?: { deny?: string[]; allow?: string[] | null };
@@ -539,8 +559,8 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
     return (
       <Section title="Usage (last 30 days)">
         <Text fontSize="sm" color="fg.muted">
-          No usage in the last 30 days. Send a request through this
-          virtual key and it'll show up here.
+          No usage in the last 30 days. Send a request through this virtual key
+          and it'll show up here.
         </Text>
       </Section>
     );
@@ -554,8 +574,14 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
     <Section title="Usage (last 30 days)">
       <VStack align="stretch" gap={4}>
         <HStack gap={6} wrap="wrap">
-          <VkStat label="Total spend" value={`$${Number(data.totalUsd).toFixed(2)}`} />
-          <VkStat label="Requests" value={data.totalRequests.toLocaleString()} />
+          <VkStat
+            label="Total spend"
+            value={`$${Number(data.totalUsd).toFixed(2)}`}
+          />
+          <VkStat
+            label="Requests"
+            value={data.totalRequests.toLocaleString()}
+          />
           <VkStat
             label="Avg $/request"
             value={formatVkAvgCost(data.avgUsdPerRequest)}
@@ -587,7 +613,11 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
                     <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#e2e8f0"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="day"
                   tick={{ fontSize: 11, fill: "#64748b" }}
@@ -652,7 +682,9 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
                 {data.recentDebits.slice(0, 10).map((d) => (
                   <Table.Row key={d.id}>
                     <Table.Cell>
-                      <Tooltip content={new Date(d.occurredAt).toLocaleString()}>
+                      <Tooltip
+                        content={new Date(d.occurredAt).toLocaleString()}
+                      >
                         <Text fontSize="xs" color="fg.muted">
                           {formatTimeAgo(new Date(d.occurredAt).getTime())}
                         </Text>
@@ -700,7 +732,11 @@ function VkStat({
       <Text fontSize="2xs" color="fg.muted" textTransform="uppercase">
         {label}
       </Text>
-      <Text fontSize="xl" fontWeight="semibold" color={tone === "red" ? "red.600" : undefined}>
+      <Text
+        fontSize="xl"
+        fontWeight="semibold"
+        color={tone === "red" ? "red.600" : undefined}
+      >
         {value}
       </Text>
     </VStack>
@@ -722,7 +758,6 @@ function formatVkAmount(raw: string | number): string {
   if (n >= 0.01) return `$${n.toFixed(5)}`;
   return `$${n.toFixed(6)}`;
 }
-
 
 function ConfigurationSection({ config }: { config: VkConfig | null }) {
   if (!config) return null;
@@ -747,7 +782,11 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
     (config.guardrails?.streamChunk?.length ?? 0);
 
   const cacheTone =
-    cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
+    cacheMode === "force"
+      ? "orange"
+      : cacheMode === "disable"
+        ? "red"
+        : "green";
 
   return (
     <Section title="Configuration">
@@ -755,7 +794,12 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
         <DetailRow label="Tags">
           <HStack gap={1} flexWrap="wrap">
             {tags.map((t) => (
-              <Badge key={t} variant="subtle" colorPalette="gray" fontSize="2xs">
+              <Badge
+                key={t}
+                variant="subtle"
+                colorPalette="gray"
+                fontSize="2xs"
+              >
                 {t}
               </Badge>
             ))}
@@ -836,10 +880,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
         )}
       </DetailRow>
       <DetailRow label="Guardrails">
-        <Text
-          fontSize="sm"
-          color={guardrailCount > 0 ? undefined : "fg.muted"}
-        >
+        <Text fontSize="sm" color={guardrailCount > 0 ? undefined : "fg.muted"}>
           {guardrailCount > 0
             ? `${guardrailCount} monitor${guardrailCount > 1 ? "s" : ""} attached (pre/post/stream_chunk)`
             : "—"}

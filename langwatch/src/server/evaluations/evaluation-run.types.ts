@@ -2,7 +2,7 @@
  * Canonical camelCase type for per-trace evaluation state.
  *
  * This is the public API type returned by EvaluationService.
- * Internal backends (ClickHouse, Elasticsearch) map their native
+ * The ClickHouse backend maps its native
  * formats to this type via mappers.
  */
 export interface TraceEvaluation {

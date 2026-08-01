@@ -3,14 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { Span, Trace } from "~/server/tracer/types";
 
 import {
+  redactSpanContent,
+  redactTraceContent,
   TEASER_ELLIPSIS,
   TEASER_FRACTION,
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
-  VisibilityWindowService,
-  redactSpanContent,
-  redactTraceContent,
   teaserOf,
+  VisibilityWindowService,
 } from "../visibility-window.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -54,7 +54,9 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
 describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
     it("caps the teaser at TEASER_MAX_CHARS", () => {
-      expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(teaserOf("a".repeat(5000))).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
 
     it("keeps 10% when that lands between the floor and the cap", () => {
@@ -85,11 +87,19 @@ describe("given a trace beyond the visibility window", () => {
   describe("when redactTraceContent runs", () => {
     it("truncates input, output, and error bodies to the teaser", () => {
       const redacted = redactTraceContent(makeTrace());
-      expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
-      expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
-      expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(redacted.input?.value).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
+      expect(redacted.output?.value).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
+      expect(redacted.error?.message).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
       // joined stacktrace is 503 chars -> ceil(10%) = 51 kept
-      expect(redacted.error?.stacktrace.join("")).toHaveLength(51 + TEASER_ELLIPSIS.length);
+      expect(redacted.error?.stacktrace.join("")).toHaveLength(
+        51 + TEASER_ELLIPSIS.length,
+      );
     });
 
     it("marks the trace as redacted by the visibility window", () => {
@@ -150,7 +160,9 @@ describe("given a span beyond the visibility window", () => {
       const messages = (
         redacted.input as { value: { content?: string | null }[] }
       ).value;
-      expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(messages[0]?.content).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
       expect(messages[1]?.content).toBe("hi");
     });
 
@@ -172,7 +184,9 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       // 2000-char message -> ceil(10%) = 200 kept
-      expect(redacted.error?.message).toHaveLength(200 + TEASER_ELLIPSIS.length);
+      expect(redacted.error?.message).toHaveLength(
+        200 + TEASER_ELLIPSIS.length,
+      );
     });
   });
 
@@ -183,7 +197,9 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       expect(redacted.input?.type).toBe("raw");
-      expect((redacted.input as { value: string }).value).toHaveLength(200 + TEASER_ELLIPSIS.length);
+      expect((redacted.input as { value: string }).value).toHaveLength(
+        200 + TEASER_ELLIPSIS.length,
+      );
     });
 
     it("recursively teases rich chat content parts (text, tool args)", () => {

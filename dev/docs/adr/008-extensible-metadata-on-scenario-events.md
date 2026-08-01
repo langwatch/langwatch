@@ -4,6 +4,8 @@
 
 **Status:** Accepted
 
+> **Amendment (2026-07, PR #4547):** Scenario events are no longer stored in Elasticsearch. They are ingested through the event-sourcing pipeline and stored in ClickHouse; the read projections are served from the ClickHouse scenario-run read model. The metadata extensibility decision below still stands — the outer `metadata` remains pass-through and the `langwatch` namespace remains strictly typed — but the "ES mappings" section describes the removed backend and is kept only as history.
+
 ## Context
 
 Scenario run events (`SCENARIO_RUN_STARTED`, `SCENARIO_RUN_FINISHED`, `SCENARIO_MESSAGE_SNAPSHOT`) follow the AG-UI event design and are emitted by the `@langwatch/scenario` SDK. The server receives them as-is and stores them in Elasticsearch -- there is no server-side enrichment.

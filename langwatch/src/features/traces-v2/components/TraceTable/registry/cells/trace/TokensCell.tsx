@@ -13,7 +13,9 @@ import type { CellDef } from "../../types";
 // NON-cached portion, so the cache counts are additive, not a subset.
 function totalWithCacheOf(row: TraceListItem): number {
   return (
-    row.totalTokens + (row.cacheReadTokens ?? 0) + (row.cacheCreationTokens ?? 0)
+    row.totalTokens +
+    (row.cacheReadTokens ?? 0) +
+    (row.cacheCreationTokens ?? 0)
   );
 }
 

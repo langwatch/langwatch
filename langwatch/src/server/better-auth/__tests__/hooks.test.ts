@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
@@ -8,6 +8,14 @@ vi.mock("~/server/app-layer/app", () => ({
     },
     nurturing: null,
   }),
+}));
+
+const { mockTrackServerEvent } = vi.hoisted(() => ({
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
 }));
 
 // ADR-027 (Decision 7, site #4): `afterUserCreate`'s domain auto-join is
@@ -20,6 +28,7 @@ vi.mock("../../sso/sso-gate", () => ({
 }));
 
 import { platformSSOAllowed } from "../../sso/sso-gate";
+
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -95,6 +104,66 @@ describe("beforeUserCreate", () => {
 });
 
 describe("afterUserCreate", () => {
+  beforeEach(() => {
+    mockTrackServerEvent.mockClear();
+  });
+
+  describe("for every new user", () => {
+    /** @scenario BetterAuth signup tracks the PostHog signed_up milestone */
+    it("tracks the signed_up analytics event with the user id", async () => {
+      const prisma = makePrismaMock();
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "u@other.com", name: "User" },
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user_1",
+        event: "signed_up",
+      });
+    });
+
+    /** @scenario PostHog signed_up still fires when the SSO auto-add path runs */
+    it("tracks signed_up even when the SSO auto-add path runs", async () => {
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_2", email: "new@acme.com", name: "New User" },
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user_2",
+        event: "signed_up",
+      });
+    });
+
+    /** @scenario PostHog signed_up still fires when the email has no parsable domain */
+    it("tracks signed_up even when the user has no parsable email domain", async () => {
+      const prisma = makePrismaMock();
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_3", email: "", name: "User" },
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user_3",
+        event: "signed_up",
+      });
+    });
+  });
+
   describe("when the email domain matches an organization with ssoDomain", () => {
     /** @scenario New user with matching SSO domain joins the SSO org */
     it("adds the user to the organization as a MEMBER", async () => {

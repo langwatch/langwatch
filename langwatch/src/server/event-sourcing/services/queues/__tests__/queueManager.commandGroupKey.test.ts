@@ -26,9 +26,7 @@ const payloadSchema = z.object({
 function createMockCommandHandlerClass(
   name: string,
 ): CommandHandlerClass<any, CommandType, Event> {
-  class MockCommandHandler
-    implements CommandHandler<Command<any, any>, Event>
-  {
+  class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
       payloadSchema,
@@ -120,9 +118,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         "test-pipeline",
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:command:recordResult",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
       expect(entry?.groupKeyFn).toBeDefined();
 
       const payload = {
@@ -174,7 +170,9 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
+      expect(groupKey).toBe(
+        `${tenantId}/command/startRun/${aggregateType}:exp1:run1`,
+      );
     });
   });
 
@@ -190,8 +188,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         globalJobRegistry,
       });
 
-      const optionsGroupKey = (payload: any) =>
-        `custom:${payload.aggregateId}`;
+      const optionsGroupKey = (payload: any) => `custom:${payload.aggregateId}`;
 
       manager.initializeCommandQueues(
         [
@@ -206,9 +203,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         "test-pipeline",
       );
 
-      const entry = globalJobRegistry.get(
-        "test-pipeline:command:recordResult",
-      );
+      const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
 
       const payload = {
         tenantId: String(tenantId),
@@ -220,7 +215,150 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
+      expect(groupKey).toBe(
+        `${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`,
+      );
+    });
+  });
+});
+
+// ADR-066 pillar 2 — append coalescing wiring + the un-coalesced-producer
+// visibility record. See specs/event-sourcing/producer-append-coalescing.feature.
+describe("QueueManager.initializeCommandQueues append coalescing", () => {
+  const aggregateType = createTestAggregateType();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function buildManager() {
+    const globalJobRegistry = new Map<string, JobRegistryEntry>();
+    const manager = new QueueManager({
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: createMockSharedQueue(),
+      globalJobRegistry,
+    });
+    return { manager, globalJobRegistry };
+  }
+
+  function loggerInfoSpyOf(manager: QueueManager) {
+    return vi.spyOn(
+      (manager as unknown as { logger: { info: (...a: any[]) => void } })
+        .logger,
+      "info",
+    );
+  }
+
+  describe("given a command that opts into coalescing", () => {
+    describe("when the command queue is initialized", () => {
+      it("wires coalesceMaxBatch, coalesceMaxBytes, and processBatch onto the registry entry", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: {
+                serializeByAggregate: true,
+                coalesceMaxBatch: 200,
+                coalesceMaxBytes: 1024,
+              },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:hot");
+        expect(entry?.coalesceMaxBatch).toBe(200);
+        expect(entry?.coalesceMaxBytes).toBe(1024);
+        expect(entry?.processBatch).toBeDefined();
+      });
+    });
+  });
+
+  describe("given a command that does not coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("leaves processBatch and the coalesce bounds unset", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:cold");
+        expect(entry?.processBatch).toBeUndefined();
+        expect(entry?.coalesceMaxBatch).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a serialized producer registered without coalescing", () => {
+    describe("when the command queue is initialized", () => {
+      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).toHaveBeenCalledWith(
+          { pipeline: "test-pipeline", command: "cold" },
+          "serialized command producer registered without append coalescing",
+        );
+      });
+    });
+  });
+
+  describe("given a serialized producer that DOES coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: 200 },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).not.toHaveBeenCalledWith(
+          expect.anything(),
+          "serialized command producer registered without append coalescing",
+        );
+      });
     });
   });
 });

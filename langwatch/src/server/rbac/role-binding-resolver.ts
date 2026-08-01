@@ -1,21 +1,22 @@
+import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
+  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-  type PrismaClient,
 } from "@prisma/client";
 import {
   bindingScopeCanGrant,
+  EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
-  teamRoleHasPermission,
   type Permission,
+  teamRoleHasPermission,
 } from "../api/rbac";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
 } from "./custom-role-permissions";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:rbac:role-binding-resolver");
 // ============================================================================
@@ -93,10 +94,20 @@ async function collectBindingsForScope({
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
   if (principal.type === "apiKey") {
-    return collectBindingsForApiKey({ prisma, apiKeyId: principal.id, organizationId, scope });
+    return collectBindingsForApiKey({
+      prisma,
+      apiKeyId: principal.id,
+      organizationId,
+      scope,
+    });
   }
 
-  return collectBindingsForUser({ prisma, userId: principal.id, organizationId, scope });
+  return collectBindingsForUser({
+    prisma,
+    userId: principal.id,
+    organizationId,
+    scope,
+  });
 }
 
 async function collectBindingsForUser({
@@ -112,15 +123,44 @@ async function collectBindingsForUser({
 }): Promise<ResolvedBinding[]> {
   const [directBindings, groupBindings] = await Promise.all([
     prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
-    }),
-    prisma.roleBinding.findMany({
+      // Gate the direct binding on current organization membership so a stale
+      // cross-org binding does not confer access — this is the API-key ceiling
+      // path (resolveApiKeyPermission checks the owning user's bindings here),
+      // and it must fail closed on membership just like the tRPC resolver.
       where: {
         organizationId,
-        group: { members: { some: { userId } } },
+        userId,
+        user: { orgMemberships: { some: { organizationId } } },
       },
-      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+      select: {
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    }),
+    prisma.roleBinding.findMany({
+      // Group-derived bindings carry the same current-membership gate as the
+      // direct bindings above. A GroupMembership row outlives removal from the
+      // organization, so without this an offboarded user keeps whatever their
+      // groups granted.
+      where: {
+        organizationId,
+        group: {
+          members: {
+            some: {
+              userId,
+              user: { orgMemberships: { some: { organizationId } } },
+            },
+          },
+        },
+      },
+      select: {
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
     }),
   ]);
 
@@ -128,12 +168,23 @@ async function collectBindingsForUser({
 
   const ancestorScopeList = ancestorScopes(scope);
   if (scope.type !== "org") {
-    ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
+    ancestorScopeList.push({
+      type: RoleBindingScopeType.ORGANIZATION,
+      id: organizationId,
+    });
   }
 
   return allOrgBindings
-    .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
+    .filter((b) =>
+      ancestorScopeList.some(
+        (s) => s.type === b.scopeType && s.id === b.scopeId,
+      ),
+    )
+    .map((b) => ({
+      role: b.role,
+      customRoleId: b.customRoleId,
+      scopeType: b.scopeType,
+    }));
 }
 
 async function collectBindingsForApiKey({
@@ -156,12 +207,23 @@ async function collectBindingsForApiKey({
 
   const ancestorScopeList = ancestorScopes(scope);
   if (scope.type !== "org") {
-    ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
+    ancestorScopeList.push({
+      type: RoleBindingScopeType.ORGANIZATION,
+      id: organizationId,
+    });
   }
 
   return bindings
-    .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
+    .filter((b) =>
+      ancestorScopeList.some(
+        (s) => s.type === b.scopeType && s.id === b.scopeId,
+      ),
+    )
+    .map((b) => ({
+      role: b.role,
+      customRoleId: b.customRoleId,
+      scopeType: b.scopeType,
+    }));
 }
 
 // ============================================================================
@@ -192,9 +254,17 @@ export async function checkRoleBindingPermission({
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  const resolvedPrincipal: Principal = principal ?? { type: "user", id: userId! };
+  const resolvedPrincipal: Principal = principal ?? {
+    type: "user",
+    id: userId!,
+  };
 
-  const bindings = await collectBindingsForScope({ prisma, principal: resolvedPrincipal, organizationId, scope });
+  const bindings = await collectBindingsForScope({
+    prisma,
+    principal: resolvedPrincipal,
+    organizationId,
+    scope,
+  });
 
   for (const binding of bindings) {
     // A team/project binding can never grant an org-exclusive permission,
@@ -252,7 +322,10 @@ export async function checkRoleBindingPermission({
       binding.role !== TeamUserRole.CUSTOM
     ) {
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      if (
+        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
+      )
+        return true;
       continue;
     }
 
@@ -262,6 +335,128 @@ export async function checkRoleBindingPermission({
   }
 
   return false;
+}
+
+/**
+ * A user's legacy `TeamUser` ceiling, resolved once and then asked about as
+ * many permissions as the caller needs.
+ *
+ * `checkRoleBindingPermission` reports RoleBindings and nothing else, on
+ * purpose — its own suite pins that. The tRPC path layers a legacy fallback on
+ * top of it for users who predate the RoleBinding migration, and every OTHER
+ * consumer has to layer the same thing or it disagrees with tRPC about who can
+ * do what. That disagreement is exactly how a user came to pass every
+ * authorization check and then be refused those same permissions when minting
+ * a key: Langy mints a per-turn key mirroring the caller's permissions, so on
+ * an affected workspace every turn died with an opaque error.
+ *
+ * Two-phase on purpose. The mint path checks ~23 permissions inside a
+ * five-second interactive transaction, and a per-permission query fan-out has
+ * already starved the connection pool there once. The database work happens
+ * here, once; `grants` is pure.
+ *
+ * It is one function rather than a role returned to each caller because the
+ * three rules below have to be applied to that role EVERY time, and the
+ * version that returned a bare role had already lost two of them at one call
+ * site apiece.
+ */
+export type LegacyCeiling = {
+  /** Whether the legacy role confers this permission, all floors applied. */
+  grants: (permission: Permission) => boolean;
+};
+
+const LEGACY_CEILING_DENIES_ALL: LegacyCeiling = { grants: () => false };
+
+export async function resolveLegacyCeiling({
+  prisma,
+  userId,
+  organizationId,
+  scope,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scope: ScopeRef;
+}): Promise<LegacyCeiling> {
+  // An org-wide grant is not something a team role should be able to reach.
+  if (scope.type === "org") return LEGACY_CEILING_DENIES_ALL;
+  const teamId = scope.type === "project" ? scope.teamId : scope.id;
+
+  // Current membership (fail closed on it, exactly as the binding queries do)
+  // and the group ids, in one round trip. The org role is needed because
+  // EXTERNAL members are capped before any team role is consulted.
+  const user = await prisma.user.findFirst({
+    where: { id: userId, orgMemberships: { some: { organizationId } } },
+    select: {
+      orgMemberships: {
+        where: { organizationId },
+        select: { role: true },
+      },
+      groupMemberships: {
+        where: { group: { organizationId } },
+        select: { groupId: true },
+      },
+    },
+  });
+  const organizationRole = user?.orgMemberships[0]?.role;
+  if (!user || organizationRole === undefined) return LEGACY_CEILING_DENIES_ALL;
+
+  const groupIds = user.groupMemberships.map((m) => m.groupId);
+
+  // The fallback applies only to a user with NO bindings AT THE SCOPES IN
+  // PLAY — the same predicate `loadScopeResolution` uses, group bindings
+  // included. Two narrower versions of this test were both wrong in their own
+  // direction: counting only DIRECT bindings let a binding held through a
+  // group sit unnoticed beside a stale legacy row, so the legacy role stacked
+  // on top of a real one; counting ORG-WIDE let a binding on an unrelated team
+  // suppress the fallback here while tRPC still applied it, which is the very
+  // scope violation this fallback exists to cure.
+  const bindingCount = await prisma.roleBinding.count({
+    where: {
+      organizationId,
+      scopeId: {
+        in: [organizationId, ...ancestorScopes(scope).map((s) => s.id)],
+      },
+      OR: [
+        { userId },
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+      ],
+    },
+  });
+  if (bindingCount > 0) return LEGACY_CEILING_DENIES_ALL;
+
+  const teamUser = await prisma.teamUser.findFirst({
+    // The team must belong to the organization being asked about, not just
+    // exist. The membership gate above proves the USER is in this org; without
+    // this, a legacy row on a team in a DIFFERENT org would still resolve a
+    // grant here. Unreachable today — both callers derive `scope` from a
+    // validated project or team — but `loadScopeResolution` carries the same
+    // predicate, and this function's docstring claims parity with it.
+    where: { userId, teamId, team: { organizationId } },
+    select: { role: true },
+  });
+
+  // A CUSTOM legacy role carries its permissions on an assigned role rather
+  // than the enum, which `teamRoleHasPermission` cannot answer — leave those
+  // to the binding path rather than guessing at a grant.
+  if (!teamUser || teamUser.role === TeamUserRole.CUSTOM) {
+    return LEGACY_CEILING_DENIES_ALL;
+  }
+  const legacyRole = teamUser.role;
+
+  return {
+    grants: (permission) =>
+      // ADR-021: a team-scoped grant can never confer an org-exclusive
+      // permission. `rbac.ts` applies this to legacy roles via `bindingGrants`,
+      // which opens with the same check.
+      bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission) &&
+      // EXTERNAL members are capped by their ORG role before the team role is
+      // read at all (`bindingGrants`, same order). A ceiling that skipped this
+      // accepted permissions the tRPC path refuses.
+      (organizationRole === OrganizationUserRole.EXTERNAL
+        ? hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission)
+        : teamRoleHasPermission(legacyRole, permission)),
+  };
 }
 
 /**
@@ -302,11 +497,34 @@ export async function resolveApiKeyPermission({
   if (!userId) return true;
 
   // 3. Check owning user's current bindings (ceiling)
-  return checkRoleBindingPermission({
+  const userAllowed = await checkRoleBindingPermission({
     prisma,
     principal: { type: "user", id: userId },
     organizationId,
     scope,
     permission,
   });
+  if (userAllowed) return true;
+
+  // 4. Fall back to legacy membership, the same way the mint-side ceiling and
+  //    the tRPC path do.
+  //
+  //    Without this the mint-side fix was no fix at all: the population it
+  //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
+  //    false for every permission and the key it just allowed to be minted is
+  //    a dead credential. Every REST route funnels through
+  //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal at
+  //    mint time to every tool call 403ing after the turn had already started
+  //    streaming, which is the worse of the two.
+  //
+  //    Safe by construction: this can only restore access the same legacy role
+  //    already grants through tRPC, which is what the key's permission set was
+  //    measured from in the first place.
+  const legacy = await resolveLegacyCeiling({
+    prisma,
+    userId,
+    organizationId,
+    scope,
+  });
+  return legacy.grants(permission);
 }

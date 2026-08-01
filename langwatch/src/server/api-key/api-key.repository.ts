@@ -1,10 +1,6 @@
-import type {
-  ApiKey,
-  Prisma,
-  PrismaClient,
-  RoleBinding,
-} from "@prisma/client";
+import type { ApiKey, Prisma, PrismaClient, RoleBinding } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 export type ApiKeyWithBindings = ApiKey & {
   roleBindings: RoleBinding[];
@@ -139,23 +135,37 @@ export class ApiKeyRepository {
     return this.prisma.apiKey.findFirst({
       where: {
         lookupId,
-        OR: [
-          { userId: null },
-          { user: { deactivatedAt: null } },
-        ],
+        OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
       include: { roleBindings: true },
     });
   }
 
-  async findById({
-    id,
-  }: {
-    id: string;
-  }): Promise<ApiKeyWithBindings | null> {
+  async findById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.prisma.apiKey.findUnique({
       where: { id },
       include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * The display name of one key the caller already holds an id for, scoped to
+   * an organization so an id from another org resolves to nothing.
+   *
+   * Selects only the two display fields on purpose. This backs a read that is
+   * broader than key administration, so it must not be able to hand back the
+   * lookup id, the hashed secret, the owner, or the role bindings.
+   */
+  async findNameByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ name: string; revokedAt: Date | null } | null> {
+    return this.prisma.apiKey.findFirst({
+      where: { id, organizationId },
+      select: { name: true, revokedAt: true },
     });
   }
 
@@ -171,10 +181,14 @@ export class ApiKeyRepository {
     // ingestion keys are org-owned (userId = null) but must NOT leak their
     // source/template/activity metadata to non-admins, so they are excluded
     // here; admins reach them via the admin-gated company-wide list.
+    //
+    // Hidden system keys (ephemeral per-Langy-session keys) are excluded so a
+    // user's own key list isn't flooded with one row per chat session.
     return this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
@@ -191,8 +205,16 @@ export class ApiKeyRepository {
   }: {
     organizationId: string;
   }): Promise<ApiKeyWithBindings[]> {
+    // Admins see every human-managed key in the org, but NOT the ephemeral
+    // per-Langy-session keys — there is one per chat session per user, which
+    // would swamp the admin list. They remain auth-functional (verify/revoke go
+    // by id, not this query).
     return this.prisma.apiKey.findMany({
-      where: { organizationId, revokedAt: null },
+      where: {
+        organizationId,
+        revokedAt: null,
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
+      },
       include: {
         roleBindings: {
           include: { customRole: { select: { id: true, name: true } } },
@@ -223,7 +245,13 @@ export class ApiKeyRepository {
     });
   }
 
-  async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
+  async upgradeHash({
+    id,
+    hashedSecret,
+  }: {
+    id: string;
+    hashedSecret: string;
+  }): Promise<void> {
     await this.prisma.apiKey.update({
       where: { id },
       data: { hashedSecret },
@@ -306,11 +334,7 @@ export class ApiKeyRepository {
     });
   }
 
-  async findProjectWithTeam({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<{
+  async findProjectWithTeam({ projectId }: { projectId: string }): Promise<{
     id: string;
     team: { id: string; organizationId: string };
   } | null> {

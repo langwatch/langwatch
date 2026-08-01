@@ -21,18 +21,18 @@
  * Spec contracts:
  *   - specs/ai-gateway/governance/folds.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
 } from "../governanceKpisSync.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -43,11 +43,12 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const FIXED_OCCURRED_AT_MS = 1_700_000_000_000; // 2023-11-14T22:13:20Z
-const EXPECTED_HOUR_BUCKET_MS = 1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
+const EXPECTED_HOUR_BUCKET_MS =
+  1_700_000_000_000 - (1_700_000_000_000 % 3_600_000);
 
 function createFoldState(
   attributes: Record<string, string> = {},

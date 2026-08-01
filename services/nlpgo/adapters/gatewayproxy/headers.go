@@ -35,6 +35,7 @@ const (
 	headerAPIBase      = "x-litellm-api_base"
 	headerOrganization = "x-litellm-organization"
 	headerAPIVersion   = "x-litellm-api_version"
+	headerDeployment   = "x-litellm-deployment"
 
 	headerAWSAccessKeyID     = "x-litellm-aws_access_key_id"
 	headerAWSSecretAccessKey = "x-litellm-aws_secret_access_key"
@@ -74,7 +75,9 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 
 	//nolint:exhaustive // playground credential header extraction only models the provider shapes that ship credentials inline today; unmapped providers (e.g. ProviderVoyage) fall through with empty Extra.
 	switch provider {
-	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini:
+	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
+		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
+		domain.ProviderDeepSeek:
 		cred.APIKey = h.Get(headerAPIKey)
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
@@ -86,9 +89,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 	case domain.ProviderAzure:
 		cred.APIKey = h.Get(headerAPIKey)
-		// api_base + api_version are required for Azure routing; we
-		// don't validate at this layer — let the provider adapter
-		// surface a typed error if the customer has misconfigured.
+		// api_base carries the Azure resource endpoint and is required for
+		// routing; api_version is optional — when the provider has none
+		// configured we leave the key unset so the adapter can fall back to
+		// Bifrost's own default (an empty value here would defeat it). We
+		// don't validate at this layer — let the provider adapter surface a
+		// typed error if the customer has misconfigured.
 		if base := h.Get(headerAPIBase); base != "" {
 			cred.Extra["api_base"] = base
 		}
@@ -100,6 +106,12 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 		if v := h.Get(headerUseAzureGW); v != "" {
 			cred.Extra["use_azure_gateway"] = v
+		}
+		// The control plane forwards an explicit Azure deployment name (when
+		// the deployment differs from the model id) as x-litellm-deployment.
+		// WithDeploymentSelfMap below honors it; default is deployment == model.
+		if dep := h.Get(headerDeployment); dep != "" {
+			cred.Extra["deployment"] = dep
 		}
 	case domain.ProviderBedrock:
 		// Bedrock uses AWS access keys, not api_key.
@@ -128,6 +140,13 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		}
 	}
 
+	// Populate the Azure / Bedrock / Vertex deployment map from the requested
+	// model so Bifrost resolves a deployment on this path too. The sibling
+	// dispatcheradapter path already does this; /go/proxy did not, so Azure
+	// calls that cleared the endpoint check then failed deployment resolution
+	// ("deployment not found for model X") (#5760).
+	cred = domain.WithDeploymentSelfMap(cred, BareModel(model))
+
 	return cred, nil
 }
 
@@ -135,35 +154,25 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 // figure out which provider should serve a request.
 var ErrMissingProvider = errors.New("gatewayproxy: missing provider — supply x-litellm-model with provider prefix or x-litellm-custom_llm_provider")
 
-// inferProvider derives the provider id from the model header (e.g.
-// "openai/gpt-5-mini" → "openai") falling back to the explicit
-// custom_llm_provider header. Returns false when neither resolves.
+// inferProvider derives the provider id from the explicit
+// custom_llm_provider header, falling back to the model header's
+// prefix (e.g. "openai/gpt-5-mini" → "openai"). Returns false when
+// neither resolves.
 func inferProvider(model, customProvider string) (domain.ProviderID, bool) {
 	if customProvider != "" {
-		switch customProvider {
-		case "openai":
-			return domain.ProviderOpenAI, true
-		case "anthropic":
-			return domain.ProviderAnthropic, true
-		case "azure", "azure_ai":
-			return domain.ProviderAzure, true
-		case "bedrock":
-			return domain.ProviderBedrock, true
-		case "vertex_ai", "vertex":
-			return domain.ProviderVertex, true
-		case "gemini", "google":
-			return domain.ProviderGemini, true
+		if p, ok := providerForPrefix(customProvider); ok {
+			return p, true
 		}
 	}
 	if i := strings.IndexByte(model, '/'); i > 0 {
-		prefix := strings.ToLower(model[:i])
-		if p, ok := providerForPrefix(prefix); ok {
-			return p, true
-		}
+		return providerForPrefix(strings.ToLower(model[:i]))
 	}
 	return "", false
 }
 
+// providerForPrefix maps a TS-registry provider name (as it appears in
+// model-id prefixes and the custom_llm_provider header, aliases
+// included) to a routable domain provider.
 func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 	switch prefix {
 	case "openai":
@@ -176,8 +185,16 @@ func providerForPrefix(prefix string) (domain.ProviderID, bool) {
 		return domain.ProviderBedrock, true
 	case "vertex_ai", "vertex":
 		return domain.ProviderVertex, true
-	case "gemini":
+	case "gemini", "google":
 		return domain.ProviderGemini, true
+	case "xai":
+		return domain.ProviderXAI, true
+	case "groq":
+		return domain.ProviderGroq, true
+	case "cerebras":
+		return domain.ProviderCerebras, true
+	case "deepseek":
+		return domain.ProviderDeepSeek, true
 	}
 	return "", false
 }

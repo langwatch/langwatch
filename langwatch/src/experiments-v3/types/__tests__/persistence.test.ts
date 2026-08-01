@@ -85,6 +85,20 @@ describe("Persistence", () => {
       expect(persisted).not.toHaveProperty("rowHeightMode");
     });
 
+    it("excludes pending saved dataset changes from persisted state", () => {
+      const state = createInitialState();
+      state.pendingSavedChanges = {
+        "dataset-1": { "record-1": { input: "local edit" } },
+      };
+
+      const persisted = extractPersistedState(state);
+
+      expect(persisted).not.toHaveProperty("pendingSavedChanges");
+      expect(
+        persistedEvaluationsV3StateSchema.safeParse(persisted).success,
+      ).toBe(true);
+    });
+
     it("persists hiddenColumns as array for JSON serialization", () => {
       const state = createInitialState();
       state.ui.hiddenColumns = new Set(["input", "expected_output"]);

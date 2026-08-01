@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 export interface ReplayStatus {
   state: "idle" | "running" | "completed" | "failed" | "cancelled";
   runId: string | null;
@@ -53,10 +55,13 @@ export interface ReplayRepository {
   getStatus(): Promise<ReplayStatus>;
   writeStatus(params: { status: ReplayStatus }): Promise<void>;
 
-  acquireLock(params: {
-    runId: string;
-    ttlSeconds: number;
-  }): Promise<boolean>;
+  acquireLock(params: { runId: string; ttlSeconds: number }): Promise<boolean>;
+  /**
+   * Extend the lock's TTL, but only while `runId` still holds it. Long
+   * replays heartbeat this per batch — without it the lock expires mid-run
+   * and progress updates silently stop.
+   */
+  refreshLock(params: { runId: string; ttlSeconds: number }): Promise<boolean>;
   releaseLock(params: { runId: string }): Promise<void>;
   getLockHolder(): Promise<string | null>;
 
@@ -76,6 +81,10 @@ export class NullReplayRepository implements ReplayRepository {
   async writeStatus(): Promise<void> {}
 
   async acquireLock(): Promise<boolean> {
+    return false;
+  }
+
+  async refreshLock(): Promise<boolean> {
     return false;
   }
 

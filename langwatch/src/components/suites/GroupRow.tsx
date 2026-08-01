@@ -13,11 +13,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { groupRunsByBatchId } from "./run-history-transforms";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { BatchSection } from "./BatchSection";
 import { RunMetricsSummary } from "./RunMetricsSummary";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
+import { groupRunsByBatchId } from "./run-history-transforms";
 import type { ViewMode } from "./useRunHistoryStore";
 
 type GroupRowProps = {
@@ -53,7 +53,14 @@ export function GroupRow({
   return (
     <Box>
       {/* Group header — same card style as RunRow */}
-      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
+      <Box
+        padding={2}
+        paddingBottom={0}
+        width="full"
+        position="sticky"
+        top={0}
+        zIndex={20}
+      >
         <HStack
           as="button"
           width="full"
@@ -66,8 +73,12 @@ export function GroupRow({
           className="group"
           aria-expanded={isExpanded}
           aria-label={`${group.groupLabel} group`}
-          bg="bg.subtle/50"
-          backdropFilter="blur(4px)"
+          bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
+          borderWidth="1px"
+          borderColor="border.muted"
+          transition="border-color 0.15s ease"
+          _hover={{ borderColor: "border.emphasized" }}
           data-testid="group-row-header"
           borderRadius="lg"
           boxShadow="xs"
@@ -77,7 +88,14 @@ export function GroupRow({
           ) : (
             <ChevronRight size={14} style={{ flexShrink: 0 }} />
           )}
-          <Text fontSize="sm" fontWeight="medium" color="fg.default" truncate minWidth={0} flexShrink={1}>
+          <Text
+            fontSize="sm"
+            fontWeight="medium"
+            color="fg.default"
+            truncate
+            minWidth={0}
+            flexShrink={1}
+          >
             {group.groupLabel}
           </Text>
           <Text fontSize="sm" color="fg.muted" flexShrink={0}>

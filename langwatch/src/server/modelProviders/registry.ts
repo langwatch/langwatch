@@ -1,8 +1,10 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
+import { codexTokenKeysSchema } from "./codexAccount.schema";
+import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
-import { llmModels } from "./loadModelCatalog";
 import type { LLMModelEntry } from "./llmModels.types";
+import { llmModels } from "./loadModelCatalog";
 
 // ============================================================================
 // Parameter Constraint Types
@@ -40,13 +42,31 @@ type ModelProviderDefinition = {
   /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
   parameterConstraints?: ParameterConstraints;
   /**
-   * Keys that are operationally optional for manual setup. The credential
-   * schemas use `.nullable().optional()` to permit env-var fallback, so
-   * Zod's `.isOptional()` can't distinguish "truly optional override" from
-   * "required but nullable for storage". This list is the UI source of
-   * truth for which fields render the muted "optional" affordance.
+   * Keys that are never required for manual setup. The credential schemas
+   * use `.nullable().optional()` to permit env-var fallback, so Zod's
+   * `.isOptional()` can't distinguish "truly optional override" from
+   * "required but nullable for storage" — this list settles that.
+   *
+   * It is a floor, not the whole answer: a schema whose refinement accepts
+   * one credential in place of another relaxes the remaining fields as the
+   * customer fills the form in. See `getRequiredCredentialKeys`.
    */
   optionalKeys?: string[];
+  /**
+   * How the provider is credentialed. "api-key" (the default) renders the
+   * schema's fields as inputs; "oauth-device" replaces them with a
+   * sign-in-with-the-provider flow — the customKeys then hold the OAuth
+   * token set rather than anything the user typed.
+   */
+  authFlow?: "api-key" | "oauth-device";
+  /**
+   * When set, this provider's models may only serve the listed feature keys
+   * (plus nothing else): pickers on other surfaces hide them and execution
+   * paths reject them. Used by providers whose upstream terms limit usage,
+   * e.g. the Codex plan backend is licensed for coding-assistant surfaces
+   * only. Absent = unrestricted. See allowedCodexFeatures.ts.
+   */
+  restrictedToFeatureKeys?: readonly string[];
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -239,6 +259,18 @@ export const modelProviders = {
     blurb:
       "Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.",
   },
+  openai_codex: {
+    name: "Codex (OpenAI account)",
+    type: "llm",
+    apiKey: "CODEX_ACCESS_TOKEN",
+    endpointKey: undefined,
+    keysSchema: codexTokenKeysSchema,
+    authFlow: "oauth-device",
+    restrictedToFeatureKeys: CODEX_ALLOWED_FEATURE_KEYS,
+    enabledSince: new Date("2026-07-20"),
+    blurb:
+      "Sign in with your OpenAI account and Langy runs on your ChatGPT plan. Serves the coding-assistant surfaces only.",
+  },
   openai: {
     name: "OpenAI",
     type: "llm",
@@ -254,17 +286,20 @@ export const modelProviders = {
           (!data.OPENAI_API_KEY || data.OPENAI_API_KEY.trim() === "") &&
           (!data.OPENAI_BASE_URL || data.OPENAI_BASE_URL.trim() === "")
         ) {
+          // Reaches the customer as the drawer's inline error, so it reads
+          // as guidance rather than as a schema complaint.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              "Either OPENAI_API_KEY or OPENAI_BASE_URL must be provided with a non-empty value",
+              "Add an API key, or a base URL if your endpoint does not need one.",
           });
         }
       }),
-    // The base URL is an override (defaults to api.openai.com). The API
-    // key is the primary credential — the superRefine still permits an
-    // empty key when a base URL is set, but the typical user path is
-    // "paste key here".
+    // The base URL is an override (defaults to api.openai.com), so it is
+    // never required. The API key is required until a base URL is set: a
+    // self-hosted OpenAI-compatible server commonly runs unauthenticated,
+    // and the drawer follows the refinement above rather than a second
+    // list that could disagree with it.
     optionalKeys: ["OPENAI_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
   },
@@ -273,10 +308,31 @@ export const modelProviders = {
     type: "llm",
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: "ANTHROPIC_BASE_URL",
-    keysSchema: z.object({
-      ANTHROPIC_API_KEY: z.string().min(1),
-      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
-    }),
+    keysSchema: z
+      .object({
+        ANTHROPIC_API_KEY: z.string().nullable().optional(),
+        ANTHROPIC_BASE_URL: z.string().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (
+          (!data.ANTHROPIC_API_KEY || data.ANTHROPIC_API_KEY.trim() === "") &&
+          (!data.ANTHROPIC_BASE_URL || data.ANTHROPIC_BASE_URL.trim() === "")
+        ) {
+          // Reaches the customer as the drawer's inline error, so it reads
+          // as guidance rather than as a schema complaint.
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Add an API key, or a base URL if your endpoint does not need one.",
+          });
+        }
+      }),
+    // The base URL points at an Anthropic-compatible self-hosted server
+    // (vLLM >= 0.24). Such servers commonly run unauthenticated, so the
+    // API key may be empty when a base URL is set — mirroring openai
+    // above. api.anthropic.com itself always requires the key, and the
+    // drawer follows this refinement rather than a second list that could
+    // disagree with it.
     optionalKeys: ["ANTHROPIC_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
     // Anthropic API limits temperature to 0-1 range
@@ -293,6 +349,43 @@ export const modelProviders = {
       GEMINI_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
+  },
+  // Gemini models served by Gemini Enterprise Agent Platform rather than by
+  // AI Studio. Its own provider, not a mode of `gemini`, for the same reason
+  // `vertex_ai` is: different host, different auth header, and a path that
+  // names the project and location. A key minted for it is refused by
+  // generativelanguage.googleapis.com, which is what made this look like an
+  // invalid key rather than the wrong service. See
+  // specs/model-providers/google-agent-platform.feature.
+  google_agent_platform: {
+    name: "Google Agent Platform",
+    type: "llm",
+    apiKey: "GOOGLE_AGENT_PLATFORM_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
+      GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
+      // Both `global` and a region such as `us-central1` resolve; the path
+      // requires one either way, so it is asked for rather than guessed.
+      GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-07-29"),
+  },
+  elevenlabs: {
+    name: "ElevenLabs",
+    // Ships audio only (TTS + STT through the gateway's /v1/audio routes).
+    // Registered like every provider so the key lives in Settings -> Model
+    // Providers; the LLM model catalog carries no elevenlabs chat models, so
+    // it never shows up in chat model selectors.
+    type: "llm",
+    apiKey: "ELEVENLABS_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      ELEVENLABS_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-07-25"),
+    blurb:
+      "Voice models for lifelike text to speech and accurate transcription.",
   },
   azure: {
     name: "Azure OpenAI",
@@ -464,12 +557,14 @@ export function hasVariantSuffix(modelId: string): boolean {
  * Maps to the new registry format
  * Excludes models with variant suffixes (:free, :thinking, etc.)
  */
-export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
-  Object.fromEntries(
-    Object.entries(llmModels.models)
-      .filter(([id]) => !hasVariantSuffix(id))
-      .map(([id, model]) => [id, { mode: model.mode }]),
-  );
+export const allLitellmModels: Record<
+  string,
+  { mode: "chat" | "embedding" | "audio" }
+> = Object.fromEntries(
+  Object.entries(llmModels.models)
+    .filter(([id]) => !hasVariantSuffix(id))
+    .map(([id, model]) => [id, { mode: model.mode }]),
+);
 
 // ============================================================================
 // Utility Functions

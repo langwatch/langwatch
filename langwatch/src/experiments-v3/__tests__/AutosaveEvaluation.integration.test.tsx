@@ -75,7 +75,7 @@ vi.mock("../../components/ui/toaster", () => ({
 // Mock posthog
 vi.mock("../../utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 // Import hook after mocks
@@ -179,18 +179,18 @@ describe("Autosave evaluation state", () => {
     });
 
     // After mutation completes, should be at "saved"
-    expect(
-      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-    ).toBe("saved");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
+      "saved",
+    );
 
     // Advance past the 2s delay in markSaved to go back to idle
     await act(async () => {
       vi.advanceTimersByTime(2100);
     });
 
-    expect(
-      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-    ).toBe("idle");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
+      "idle",
+    );
   });
 
   it("sets autosave status to error when save fails", async () => {
@@ -217,9 +217,9 @@ describe("Autosave evaluation state", () => {
     });
 
     // Should show error status
-    expect(
-      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-    ).toBe("error");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
+      "error",
+    );
   });
 
   it("saves when a new dataset is added", async () => {

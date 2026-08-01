@@ -63,6 +63,35 @@ Feature: AI Gateway — Virtual Keys
     And after dismissal the full secret can never be retrieved again
     And only the key prefix "vk-lw-xxxx…" is visible in the list
 
+  # ============================================================================
+  # Usage-snippet default model. The copy-paste example must name a model the
+  # key can actually serve. A key bound to a self-hosted OpenAI-compatible
+  # provider (vLLM, LiteLLM) that shows the OpenAI drop-in "gpt-5-mini" sends a
+  # model the endpoint has never heard of, so the first copy-paste call 404s.
+  # The gateway strips the provider prefix before dispatch, so the
+  # "<provider>/<model>" form is always safe: it selects the provider, then
+  # forwards the bare model name upstream.
+  # ============================================================================
+
+  @integration
+  Scenario: Usage example defaults to a model the key can serve
+    Given a virtual key scoped to a custom provider whose model is "Qwen2.5-0.5B-Instruct"
+    When the secret-reveal dialog shows the usage example after create
+    Then the example calls model "custom/Qwen2.5-0.5B-Instruct"
+    And it does not fall back to "gpt-5-mini"
+
+  @integration
+  Scenario: Usage example on the key detail page matches the key's provider
+    Given a virtual key scoped only to a custom provider whose model is "Qwen2.5-0.5B-Instruct"
+    When I open the key detail page usage example
+    Then the example calls model "custom/Qwen2.5-0.5B-Instruct"
+
+  @integration
+  Scenario: Usage example falls back to a safe placeholder when no provider is resolvable
+    Given a virtual key whose eligible providers cannot be resolved on the client
+    When the usage example renders
+    Then the example calls model "gpt-5-mini" as a safe placeholder
+
   @integration
   Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
     Given I created a virtual key "demo-key" with secret "vk-lw-01HZX9K3M…"
@@ -127,6 +156,41 @@ Feature: AI Gateway — Virtual Keys
       Anthropic cache_control, OpenAI/Azure automatic caching, and Gemini
       cachedContent
     And the description does NOT frame caching as Anthropic-specific
+
+  # ============================================================================
+  # Tags field — typing a tag here is the moment a person decides what will be
+  # visible on every trace the key produces, so the field has to say so. The
+  # explanation lives behind the label's information icon, the way every other
+  # field in the drawer explains itself, and the field itself stays quiet
+  # unless what is typed would not survive the save.
+  # ============================================================================
+
+  @integration
+  Scenario: The Tags field explains itself behind the label's information icon
+    When I open the "New virtual key" drawer
+    Then no explanation sits under the Tags field
+    When I open the information icon next to the "Tags" label
+    Then it says tags group this key's traffic by team, app, or environment
+    And it says every trace the key sends carries its tags as labels that
+      anyone with access to the project can see and filter on
+    And it says a cache rule listing tags applies to any key carrying all of them
+    And it says how many tags are kept, how long each may be, and that
+      blanks and repeats are dropped
+    And it links to the cache-rules documentation
+
+  @integration
+  Scenario: A tag list that will not survive the save says so before saving
+    When I open the "New virtual key" drawer
+    And I type more tags than the key keeps
+    Then the field warns that only the first tags will be saved
+    When I type a tag longer than a tag may be
+    Then the field warns that over-long tags will be shortened
+
+  @integration
+  Scenario: A tag list within the limits gets no warning
+    When I open the "New virtual key" drawer
+    And I type a handful of ordinary tags
+    Then the field shows no warning under it
 
   # ============================================================================
   # Cache control (Lane B iter 35) — provider-agnostic framing in the edit

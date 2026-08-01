@@ -270,3 +270,19 @@ describe("drawerStore.backfillOccurredAtMs", () => {
     });
   });
 });
+
+describe("drawerStore.closeDrawer", () => {
+  describe("given an open trace drawer", () => {
+    describe("when closeDrawer fires", () => {
+      it("clears the trace and closes the drawer", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+        expect(useDrawerStore.getState().traceId).toBe("trace-1");
+
+        useDrawerStore.getState().closeDrawer();
+
+        expect(useDrawerStore.getState().traceId).toBeNull();
+        expect(useDrawerStore.getState().isOpen).toBe(false);
+      });
+    });
+  });
+});

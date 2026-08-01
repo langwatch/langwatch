@@ -1,22 +1,39 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
-import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import {
+  type VirtualKeyBudgetInput,
+  type VirtualKeyRoutingMode,
+  VirtualKeysApiService,
+} from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope, parseScopeArg } from "./_shared";
+import {
+  buildBudgetFlags,
+  formatScope,
+  parseRoutingModeArg,
+  parseScopeArg,
+} from "./_shared";
+import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
   name?: string;
   description?: string;
   clearDescription?: boolean;
   scope?: string[];
+  traceProject?: string;
+  clearTraceProject?: boolean;
   routingPolicy?: string;
   clearRoutingPolicy?: boolean;
+  routingMode?: string;
+  budgetLimit?: string;
+  budgetWindow?: string;
+  budgetBreach?: "block" | "warn";
+  clearBudget?: boolean;
   configJson?: string;
   configFile?: string;
-  format?: string;
 }
+
 
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
@@ -41,15 +58,26 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
   return undefined;
 }
 
+/**
+ * Returns the updated key rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts). The update
+ * response carries no secret, only the record and its config.
+ */
 export const updateVirtualKeyCommand = async (
   id: string,
   options: UpdateVirtualKeyOptions,
-): Promise<void> => {
-  checkApiKey();
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   let config: Record<string, unknown> | undefined;
+  let budget: VirtualKeyBudgetInput | null | undefined;
+  let routingMode: VirtualKeyRoutingMode | undefined;
   try {
     config = parseConfig(options);
+    budget = buildBudgetFlags(options);
+    if (options.routingMode !== undefined) {
+      routingMode = parseRoutingModeArg(options.routingMode);
+    }
   } catch (err) {
     console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
     process.exit(1);
@@ -60,14 +88,18 @@ export const updateVirtualKeyCommand = async (
     options.description === undefined &&
     !options.clearDescription &&
     (options.scope === undefined || options.scope.length === 0) &&
+    options.traceProject === undefined &&
+    !options.clearTraceProject &&
     options.routingPolicy === undefined &&
     !options.clearRoutingPolicy &&
+    routingMode === undefined &&
+    budget === undefined &&
     config === undefined;
 
   if (noFieldsProvided) {
     console.error(
       chalk.red(
-        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --routing-policy, --clear-routing-policy, --config-json, --config-file.",
+        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --trace-project, --clear-trace-project, --routing-policy, --clear-routing-policy, --routing-mode, --budget-limit/--budget-window, --clear-budget, --config-json, --config-file.",
       ),
     );
     process.exit(1);
@@ -84,35 +116,42 @@ export const updateVirtualKeyCommand = async (
   }
 
   const service = new VirtualKeysApiService();
-  const spinner = ora(`Updating virtual key "${id}"...`).start();
+  const spinner = createSpinner(`Updating virtual key "${id}"...`).start();
 
   try {
     const updated = await service.update(id, {
       name: options.name,
       description: options.clearDescription ? null : options.description,
       scopes,
+      ...(options.clearTraceProject
+        ? { trace_project_id: null }
+        : options.traceProject !== undefined
+          ? { trace_project_id: options.traceProject }
+          : {}),
       routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
+      routing_mode: routingMode,
+      budget,
       config,
     });
 
     spinner.succeed(`Updated virtual key "${chalk.cyan(updated.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(updated, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`${chalk.bold("ID:")}           ${updated.id}`);
-    console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
-    if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
-    console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-    console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-    console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
-    console.log();
-    console.log(chalk.gray("Config after update:"));
-    console.log(JSON.stringify(updated.config, null, 2));
-    console.log();
+    return {
+      data: updated,
+      table: () => {
+        console.log();
+        console.log(`${chalk.bold("ID:")}           ${updated.id}`);
+        console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
+        if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
+        console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+        console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
+        console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
+        console.log();
+        console.log(chalk.gray("Config after update:"));
+        console.log(JSON.stringify(updated.config, null, 2));
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update virtual key" });
     process.exit(1);

@@ -82,12 +82,12 @@ describe("parseLLMError", () => {
   });
 
   it("extracts message from Python SyntaxError", () => {
-    const raw = "SyntaxError('unterminated string literal (detected at line 78)')";
+    const raw =
+      "SyntaxError('unterminated string literal (detected at line 78)')";
 
     expect(parseLLMError(raw)).toEqual({
       type: "unknown",
-      message:
-        "SyntaxError\nunterminated string literal (detected at line 78)",
+      message: "SyntaxError\nunterminated string literal (detected at line 78)",
     });
   });
 

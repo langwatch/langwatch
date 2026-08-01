@@ -15,10 +15,14 @@
  * computedOutput is the extracted text, not the raw wrapper.
  */
 import { describe, expect, it } from "vitest";
-import { TraceIOAccumulationService } from "../trace-io-accumulation.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "../../../schemas/spans";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { LogRecordReceivedEventData } from "../../../schemas/events";
+import type { NormalizedSpan } from "../../../schemas/spans";
+import {
+  extractIOFromLogRecord,
+  TraceIOAccumulationService,
+} from "../trace-io-accumulation.service";
 
 function emptyState(): TraceSummaryData {
   return {
@@ -96,10 +100,8 @@ function stubExtractor(opts: {
   output?: { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 }): TraceIOExtractionService {
   return {
-    extractRichIOFromSpan: (
-      _span: NormalizedSpan,
-      type: "input" | "output",
-    ) => (type === "input" ? opts.input ?? null : opts.output ?? null),
+    extractRichIOFromSpan: (_span: NormalizedSpan, type: "input" | "output") =>
+      type === "input" ? (opts.input ?? null) : (opts.output ?? null),
     extractFallbackIOFromSpan: () => null,
   } as unknown as TraceIOExtractionService;
 }
@@ -129,9 +131,7 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
     });
 
     expect(result.computedInput).toBe("hey there");
-    expect(result.computedOutput).toBe(
-      "Hey what can I help you with today?",
-    );
+    expect(result.computedOutput).toBe("Hey what can I help you with today?");
     // The bug we're fixing produced these instead:
     expect(result.computedOutput).not.toBe(
       JSON.stringify({ output: "Hey what can I help you with today?" }),
@@ -235,6 +235,68 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
       });
 
       expect(result.computedOutput).toBe("echo 'test otlp 4'");
+    });
+  });
+});
+
+describe("extractIOFromLogRecord — claude assistant_response fallback", () => {
+  function claudeLog(
+    attributes: Record<string, string>,
+  ): LogRecordReceivedEventData {
+    return {
+      traceId: "t1",
+      spanId: "s1",
+      timeUnixMs: 1000,
+      severityNumber: 9,
+      severityText: "INFO",
+      body: "claude_code.assistant_response",
+      attributes,
+      resourceAttributes: {},
+      scopeName: "com.anthropic.claude_code.events",
+      scopeVersion: null,
+      piiRedactionLevel: "STRICT",
+    };
+  }
+
+  describe("given a conversational assistant_response event (light path, no raw bodies)", () => {
+    it("lifts the reply text as the trace output", () => {
+      const result = extractIOFromLogRecord(
+        claudeLog({
+          "event.name": "assistant_response",
+          query_source: "repl_main_thread",
+          response: "E aí! Tudo bem?",
+        }),
+      );
+
+      expect(result).toEqual({ input: null, output: "E aí! Tudo bem?" });
+    });
+  });
+
+  describe("given a non-conversational assistant_response event", () => {
+    it("does not let a utility reply become the trace output", () => {
+      const result = extractIOFromLogRecord(
+        claudeLog({
+          "event.name": "assistant_response",
+          query_source: "generate_session_title",
+          response: "Telemetry chat",
+        }),
+      );
+
+      expect(result).toEqual({ input: null, output: null });
+    });
+  });
+
+  describe("given an assistant_response event with an empty response", () => {
+    it("returns no output", () => {
+      const result = extractIOFromLogRecord(
+        claudeLog({
+          "event.name": "assistant_response",
+          query_source: "repl_main_thread",
+          response: "",
+        }),
+      );
+
+      expect(result).toEqual({ input: null, output: null });
     });
   });
 });

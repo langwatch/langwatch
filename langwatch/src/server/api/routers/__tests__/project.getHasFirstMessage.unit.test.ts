@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { projectRouter } from "../project";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { projectRouter } from "../project";
 
 const mockGetById = vi.fn();
 

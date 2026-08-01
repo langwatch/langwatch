@@ -57,7 +57,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => createMockLogger()),
 }));
 
@@ -116,9 +116,7 @@ describe("extractDeduplicationKey", () => {
         "../orgBillableEventsMeter.mapProjection"
       );
 
-      const result = extractDeduplicationKey(
-        makeEvent({ id: "evt-42" }),
-      );
+      const result = extractDeduplicationKey(makeEvent({ id: "evt-42" }));
 
       expect(result).toBe("evt-42");
     });
@@ -166,14 +164,14 @@ describe("orgBillableEventsMeterProjection.map", () => {
         makeEvent({
           id: "evt-1",
           idempotencyKey: "idem-key-abc",
-          type: "lw.evaluation.started",
+          type: "lw.evaluation.reported",
         }),
       );
 
       expect(result).toEqual(
         expect.objectContaining({
           deduplicationKey: "idem-key-abc",
-          eventType: "lw.evaluation.started",
+          eventType: "lw.evaluation.reported",
         }),
       );
     });
@@ -203,7 +201,6 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-
 
       await orgBillableEventsMeterStore.append(
         {
@@ -246,7 +243,6 @@ describe("orgBillableEventsMeterStore", () => {
         "../orgBillableEventsMeter.store"
       );
 
-
       await orgBillableEventsMeterStore.append(
         {
           organizationId: "",
@@ -287,7 +283,7 @@ describe("orgBillableEventsMeterStore", () => {
             organizationId: "",
             tenantId: "proj-1",
             eventId: "evt-1",
-  
+
             eventType: "lw.obs.trace.span_received",
             deduplicationKey: "trace-abc:span-123",
             eventTimestamp: 1739613600000,

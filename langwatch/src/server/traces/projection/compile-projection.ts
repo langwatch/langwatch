@@ -9,7 +9,7 @@
  * ClickHouse/Postgres execution that consumes `plan` lives in the trace service.
  */
 
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 import {
   type ProjectionSource,
   type ResolvedField,

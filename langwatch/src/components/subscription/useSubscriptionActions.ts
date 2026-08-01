@@ -1,14 +1,15 @@
 import { toaster } from "~/components/ui/toaster";
-import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
+import { showErrorToast } from "~/features/errors";
+import type { MemberType } from "~/server/license-enforcement/member-classification";
 import { api } from "~/utils/api";
+import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
+import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import {
-  type Currency,
   type BillingInterval,
+  type Currency,
   resolveGrowthSeatPlanType,
 } from "./billing-plans";
-import { type PlannedUser } from "./subscription-types";
-import { type MemberType } from "~/server/license-enforcement/member-classification";
-import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
+import type { PlannedUser } from "./subscription-types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
@@ -88,12 +89,9 @@ export function useSubscriptionActions({
         window.location.href = result.url;
       }
     } catch (err) {
-      toaster.create({
-        title: "Error upgrading subscription",
-        description:
-          err instanceof Error ? err.message : "An unexpected error occurred",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't upgrade your plan",
       });
     }
   };
@@ -109,9 +107,13 @@ export function useSubscriptionActions({
       newSeats: updateTotalMembers,
       onConfirm: async () => {
         try {
-          const plan = activePlanType && isGrowthSeatEventPlan(activePlanType)
-            ? activePlanType
-            : resolveGrowthSeatPlanType({ currency, interval: billingPeriod });
+          const plan =
+            activePlanType && isGrowthSeatEventPlan(activePlanType)
+              ? activePlanType
+              : resolveGrowthSeatPlanType({
+                  currency,
+                  interval: billingPeriod,
+                });
 
           await addTeamMemberOrEvents.mutateAsync({
             organizationId,
@@ -128,12 +130,9 @@ export function useSubscriptionActions({
           });
           void organizationWithMembers.refetch();
         } catch (err) {
-          toaster.create({
-            title: "Error updating seats",
-            description:
-              err instanceof Error ? err.message : "An unexpected error occurred",
-            type: "error",
-            meta: { closable: true },
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't update your seats",
           });
         }
       },
@@ -153,12 +152,9 @@ export function useSubscriptionActions({
         window.location.href = result.url;
       }
     } catch (err) {
-      toaster.create({
-        title: "Error opening subscription portal",
-        description:
-          err instanceof Error ? err.message : "An unexpected error occurred",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't open your billing settings",
       });
     }
   };
@@ -167,7 +163,8 @@ export function useSubscriptionActions({
     handleUpgrade,
     handleUpdateSeats,
     handleManageSubscription,
-    isUpgradeLoading: createSubscription.isPending || upgradeWithInvites.isPending,
+    isUpgradeLoading:
+      createSubscription.isPending || upgradeWithInvites.isPending,
     isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,
     isManageLoading: manageSubscription.isPending,
   };

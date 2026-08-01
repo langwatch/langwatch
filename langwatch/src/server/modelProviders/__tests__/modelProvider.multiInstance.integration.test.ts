@@ -15,13 +15,13 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService multi-instance create (real DB)",
   () => {
     const ns = `mp-multi-${nanoid(8)}`;
@@ -81,17 +81,18 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      await prisma.modelProvider.deleteMany({
-        where: {
-          scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
-        },
-      });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.user.deleteMany({ where: { id: orgAdminUserId } });
-      await prisma.project.deleteMany({ where: { id: projectId } });
-      await prisma.team.deleteMany({ where: { id: teamId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await cleanupTestRows(prisma, [
+        [
+          "modelProvider",
+          { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
+        ],
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["user", { id: orgAdminUserId }],
+        ["project", { id: projectId }],
+        ["team", { id: teamId }],
+        ["organization", { id: organizationId }],
+      ]);
     });
 
     function service() {
@@ -139,7 +140,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       expect(second.id).not.toBe(first.id);
 
       const rows = await prisma.modelProvider.findMany({
-        where: { projectId, provider: "openai" },
+        where: { organizationId, provider: "openai" },
         include: { scopes: true },
       });
 
@@ -199,7 +200,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         ctx(),
       );
       const createdRow = await prisma.modelProvider.findFirst({
-        where: { id: created.id, projectId },
+        where: { id: created.id },
       });
 
       // The drawer's masked-only save: id + scopes, no customKeys. The row is
@@ -219,7 +220,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
       expect(updated.id).toBe(created.id);
       const rows = await prisma.modelProvider.findMany({
-        where: { name: `OpenAI Org Edit ${ns}`, projectId },
+        where: { name: `OpenAI Org Edit ${ns}`, organizationId },
         include: { scopes: true },
       });
       expect(rows).toHaveLength(1);

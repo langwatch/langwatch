@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-restricted-imports
 import { Link as ChakraLink } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import type { ComponentProps } from "react";
+import NextLink from "~/utils/compat/next-link";
 
 type LinkProps = {
   href: string | undefined;

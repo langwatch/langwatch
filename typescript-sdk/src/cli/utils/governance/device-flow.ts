@@ -45,6 +45,19 @@ export interface ExchangeProject {
 }
 
 /**
+ * The caller's personal workspace project, shipped on device-session
+ * exchanges so data commands can authenticate with its API key without
+ * any env var. Older servers omit it; the CLI then lazily exchanges via
+ * `GET /api/auth/cli/personal-project` on first use.
+ */
+export interface ExchangePersonalProject {
+  id: string;
+  slug: string;
+  name: string;
+  api_key: string;
+}
+
+/**
  * The CLI device-code flow can mint two distinct credential types:
  *   - "device_session" — the user-scoped OAuth-style access+refresh
  *     token pair used by `langwatch claude/codex/...` wrappers.
@@ -67,6 +80,7 @@ export interface ExchangeDeviceSessionResult {
   user: ExchangeUser;
   organization: ExchangeOrganization;
   default_personal_vk?: ExchangePersonalVK;
+  personal_project?: ExchangePersonalProject;
   endpoint?: string;
 }
 
@@ -136,7 +150,7 @@ export async function startDeviceCode(
 /**
  * Device fingerprint stamped onto the CLI session at /exchange time.
  * The control plane persists it on the access + refresh token records
- * so /me/sessions can render "Mac (rchaves.local)" instead of
+ * so /me/devices can render "Mac (rchaves.local)" instead of
  * "Unknown device" — multi-device users need this to revoke
  * individual sessions without nuking every device they're logged in
  * on (Ariana QA finding). See

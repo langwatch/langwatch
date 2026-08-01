@@ -1,13 +1,14 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import type { ProcessRole } from "~/server/app-layer/config";
+import { type ProcessRole, roleRunsWorkers } from "~/server/app-layer/config";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
-import { makeQueueName } from "~/server/background/queues/makeQueueName";
-import { createLogger } from "~/utils/logger/server";
+import { makeQueueName } from "~/server/queues/makeQueueName";
+import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
+import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
 import type {
@@ -20,14 +21,13 @@ import type {
   RegisteredPipeline,
 } from "./pipeline/types";
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
+import { ProcessRuntime } from "./process-manager/processRuntime";
+import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
+import type { ProcessStore } from "./process-manager/stores/processStore.types";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import type { ReactorDefinition } from "./reactors/reactor.types";
-import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import { ConfigurationError } from "./services/errorHandling";
-
-import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
@@ -51,6 +51,12 @@ export interface EventSourcingOptions {
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * Durable persistence for `withProcess` declarations (inbox, state,
+   * outbox). Production passes the PrismaProcessStore; when absent, an
+   * in-memory store backs the processes (tests / no-Postgres dev).
+   */
+  processStore?: ProcessStore;
 }
 
 /**
@@ -107,6 +113,8 @@ export class EventSourcing {
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly _processStore?: ProcessStore;
+  private _processRuntimeInstance?: ProcessRuntime;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
@@ -114,13 +122,11 @@ export class EventSourcing {
     this._redis = options.redis;
     this._processRole = options.processRole;
     this._retentionPolicyResolver = options.retentionPolicyResolver;
+    this._processStore = options.processStore;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
     if (options.isSaas) {
-      this.projectionRegistry.registerFoldProjection(
-        projectDailySdkUsageProjection,
-      );
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
@@ -141,31 +147,18 @@ export class EventSourcing {
   }
 
   /**
-   * Register a reactor on a global fold projection.
-   *
-   * Must be called before the projection registry is initialized
-   * (i.e., before the first pipeline is registered).
-   *
-   * Silently skips registration when the fold projection does not exist
-   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
+   * The `withProcessManager` runtime — lazily constructed so an EventSourcing
+   * instance with no process declarations pays nothing. Public so the
+   * composition root can feed lifecycle envelopes from outside a pipeline.
    */
-  registerGlobalFoldReactor(
-    foldName: string,
-    reactor: ReactorDefinition<Event>,
-  ): void {
-    try {
-      this.projectionRegistry.registerReactor(foldName, reactor);
-    } catch (error) {
-      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
-        logger.debug(
-          { foldName, reactorName: reactor.name },
-          "Skipping global fold reactor — fold not registered",
-        );
-        return;
-      }
-      throw error;
+  get processRuntime(): ProcessRuntime {
+    if (!this._processRuntimeInstance) {
+      this._processRuntimeInstance = new ProcessRuntime({
+        store: this._processStore ?? new InMemoryProcessStore(),
+        consumersEnabled: roleRunsWorkers(this._processRole),
+      });
     }
+    return this._processRuntimeInstance;
   }
 
   get eventStore(): EventStore | undefined {
@@ -272,6 +265,21 @@ export class EventSourcing {
 
         const serviceOptions = buildServiceOptions(definition);
 
+        // Process managers consume their declaring pipeline's committed
+        // events directly through generated live subscribers.
+        if (definition.processManagers.size > 0) {
+          const artifacts = this.processRuntime.registerPipeline<EventType>({
+            pipelineName: definition.metadata.name,
+            processManagers: definition.processManagers,
+          });
+          if (artifacts.subscribers.length > 0) {
+            serviceOptions.subscribers = [
+              ...(serviceOptions.subscribers ?? []),
+              ...artifacts.subscribers,
+            ];
+          }
+        }
+
         // Initialize the projection registry if it has projections and hasn't been initialized yet
         if (
           this.projectionRegistry.hasProjections &&
@@ -324,6 +332,13 @@ export class EventSourcing {
    * Gracefully closes all pipelines, the projection registry, and the global queue.
    */
   async close(): Promise<void> {
+    if (this._processRuntimeInstance) {
+      try {
+        await this._processRuntimeInstance.stop();
+      } catch (error) {
+        logger.error({ error }, "Failed to stop process runtime");
+      }
+    }
     for (const [name, pipeline] of this.pipelines) {
       try {
         await pipeline.service.close();
@@ -436,16 +451,36 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
+    // ADR-052 cutover tombstone: the legacy ReactorOutbox stack staged
+    // settle/cadence/graphEval payloads onto this queue. A deploy can race
+    // jobs staged by the previous release, so recognize the legacy shape and
+    // ACK-drop it with a log instead of parsing it as an event (which would
+    // poison-retry). Removable after one release.
+    // Intentionally loose for that one-release bridge: old payload revisions
+    // did not share reliable routing metadata, so a matching top-level stage
+    // is enough. Remove this stage-only matcher with the tombstone next release.
+    const isLegacyOutboxPayload = (payload: Record<string, unknown>): boolean =>
+      payload.stage === "settle" ||
+      payload.stage === "cadence" ||
+      payload.stage === "graphEval";
+    const dropLegacyOutboxPayload = (payload: Record<string, unknown>) => {
+      logger.warn(
+        { stage: payload.stage, projectId: payload.projectId },
+        "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
+      );
+    };
+
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
+        if (isLegacyOutboxPayload(payload)) return "__legacy_outbox__";
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";
         return result.entry.groupKeyFn(result.clean);
       },
       score: (payload: Record<string, unknown>) => {
         const result = this.lookupEntry(payload);
-        if (!result) return 0;
+        if (!result) return Date.now();
         return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {
@@ -455,6 +490,10 @@ export class EventSourcing {
         return result.entry.spanAttributes(result.clean);
       },
       process: async (payload: Record<string, unknown>) => {
+        if (isLegacyOutboxPayload(payload)) {
+          dropLegacyOutboxPayload(payload);
+          return;
+        }
         const result = this.lookupEntry(payload);
         if (!result) {
           logger.warn({ payload }, "Skipping unknown job in global queue");
@@ -466,6 +505,12 @@ export class EventSourcing {
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
       },
+      coalesceMaxBytes: (payload: Record<string, unknown>) => {
+        // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
+        // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
+        const result = this.lookupEntry(payload);
+        return result?.entry.coalesceMaxBytes;
+      },
       processBatch: async (payloads: Record<string, unknown>[]) => {
         if (payloads.length === 0) return;
         // A coalesced batch is always one group → one registry entry. Resolve
@@ -473,8 +518,16 @@ export class EventSourcing {
         // happen — the GroupQueue only coalesces same-group jobs — but a stray
         // payload must never be misrouted to the wrong handler). On any mismatch
         // fall back to per-item processing.
-        const first = this.lookupEntry(payloads[0]!);
-        const resolved = payloads.map((payload) => this.lookupEntry(payload));
+        const survivors = payloads.filter((p) => {
+          if (isLegacyOutboxPayload(p)) {
+            dropLegacyOutboxPayload(p);
+            return false;
+          }
+          return true;
+        });
+        if (survivors.length === 0) return;
+        const first = this.lookupEntry(survivors[0]!);
+        const resolved = survivors.map((payload) => this.lookupEntry(payload));
         const homogeneous =
           !!first?.entry.processBatch &&
           resolved.every((r) => r?.entry === first.entry);
@@ -491,7 +544,9 @@ export class EventSourcing {
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
-        consumerEnabled: this._processRole === "worker",
+        consumerEnabled: roleRunsWorkers(this._processRole),
+        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+        resolveStorageDestination: resolveProjectStorageDestination,
       });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
@@ -576,6 +631,9 @@ function buildServiceOptions<
   const foldProjections = Array.from(definition.foldProjections.values()).map(
     ({ definition: fold }) => fold,
   );
+  const stateProjections = Array.from(
+    definition.stateProjections?.values() ?? [],
+  );
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
     ({ definition: mapProj }) => mapProj,
@@ -591,27 +649,35 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const reactors =
-    definition.foldReactors.size > 0
-      ? Array.from(definition.foldReactors.values()).map((entry) => ({
-          foldName: entry.projectionName,
-          definition: entry.definition,
-        }))
-      : undefined;
+  const foldReactorList = Array.from(definition.foldReactors.values()).map(
+    (entry) => ({
+      foldName: entry.projectionName as string,
+      definition: entry.definition,
+    }),
+  );
 
-  const mapReactors =
-    definition.mapReactors.size > 0
-      ? Array.from(definition.mapReactors.values()).map((entry) => ({
-          mapName: entry.projectionName,
-          definition: entry.definition,
-        }))
+  const mapReactorList = Array.from(definition.mapReactors.values()).map(
+    (entry) => ({
+      mapName: entry.projectionName as string,
+      definition: entry.definition,
+    }),
+  );
+
+  const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
+  const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
+  const subscribers =
+    definition.eventSubscribers.size > 0
+      ? Array.from(definition.eventSubscribers.values())
       : undefined;
 
   return {
     foldProjections: foldProjections.length > 0 ? foldProjections : undefined,
+    stateProjections:
+      stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
     reactors,
     mapReactors,
+    subscribers,
   };
 }

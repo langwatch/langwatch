@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:trace-limit");
 
@@ -33,7 +33,10 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
         });
       }
     } catch (error) {
-      logger.error({ error, projectId: project.id }, "Plan limit notification failed");
+      logger.error(
+        { error, projectId: project.id },
+        "Plan limit notification failed",
+      );
     }
 
     logger.info(

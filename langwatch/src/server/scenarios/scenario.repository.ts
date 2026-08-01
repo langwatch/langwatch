@@ -1,9 +1,9 @@
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type { Prisma, PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");
 const logger = createLogger("langwatch:scenarios:repository");
@@ -33,7 +33,10 @@ export class ScenarioRepository {
         },
       },
       async (span) => {
-        logger.debug({ projectId: input.projectId, operation: "INSERT" }, "Inserting scenario");
+        logger.debug(
+          { projectId: input.projectId, operation: "INSERT" },
+          "Inserting scenario",
+        );
         const result = await this.prisma.scenario.create({
           data: {
             id: generate(KSUID_RESOURCES.SCENARIO).toString(),
@@ -63,7 +66,14 @@ export class ScenarioRepository {
         },
       },
       async (span) => {
-        logger.debug({ projectId: input.projectId, scenarioId: input.id, operation: "SELECT" }, "Finding scenario by id");
+        logger.debug(
+          {
+            projectId: input.projectId,
+            scenarioId: input.id,
+            operation: "SELECT",
+          },
+          "Finding scenario by id",
+        );
         const result = await this.prisma.scenario.findFirst({
           where: {
             id: input.id,
@@ -99,7 +109,11 @@ export class ScenarioRepository {
       },
       async (span) => {
         logger.debug(
-          { projectId: input.projectId, scenarioId: input.id, operation: "SELECT" },
+          {
+            projectId: input.projectId,
+            scenarioId: input.id,
+            operation: "SELECT",
+          },
           "Finding scenario by id including archived",
         );
         const result = await this.prisma.scenario.findFirst({
@@ -135,7 +149,11 @@ export class ScenarioRepository {
       },
       async (span) => {
         logger.debug(
-          { projectId: input.projectId, idCount: input.ids.length, operation: "SELECT" },
+          {
+            projectId: input.projectId,
+            idCount: input.ids.length,
+            operation: "SELECT",
+          },
           "Finding scenarios by ids including archived",
         );
         const results = await this.prisma.scenario.findMany({
@@ -164,7 +182,10 @@ export class ScenarioRepository {
         },
       },
       async (span) => {
-        logger.debug({ projectId: input.projectId, operation: "SELECT" }, "Finding all scenarios");
+        logger.debug(
+          { projectId: input.projectId, operation: "SELECT" },
+          "Finding all scenarios",
+        );
         const result = await this.prisma.scenario.findMany({
           where: {
             projectId: input.projectId,
@@ -210,7 +231,10 @@ export class ScenarioRepository {
         },
       },
       async () => {
-        logger.debug({ projectId, scenarioId: id, operation: "UPDATE" }, "Updating scenario");
+        logger.debug(
+          { projectId, scenarioId: id, operation: "UPDATE" },
+          "Updating scenario",
+        );
         return this.prisma.scenario.update({
           where: { id, projectId },
           data,

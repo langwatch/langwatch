@@ -9,23 +9,27 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { PricingModel } from "@prisma/client";
 import { ArrowRight } from "lucide-react";
+import {
+  getPlanActionLabel,
+  shouldShowPlanLimits,
+  usePlanManagementUrl,
+} from "~/hooks/usePlanManagementUrl";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { usePlanManagementUrl, getPlanActionLabel, shouldShowPlanLimits } from "~/hooks/usePlanManagementUrl";
+import { PlanTypes } from "../../../ee/billing/planTypes";
+import { UNLIMITED_PLAN } from "../../../ee/licensing/constants";
+import {
+  mapLicenseStatusToLimits,
+  mapUsageToLimits,
+  RESOURCE_LABELS,
+  ResourceLimitsDisplay,
+} from "../../components/license/ResourceLimitsDisplay";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import {
-  RESOURCE_LABELS,
-  ResourceLimitsDisplay,
-  mapLicenseStatusToLimits,
-  mapUsageToLimits,
-} from "../../components/license/ResourceLimitsDisplay";
-import { FREE_PLAN } from "../../../ee/licensing/constants";
-import { PricingModel } from "@prisma/client";
-import { PlanTypes } from "../../../ee/billing/planTypes";
 
 function ResourceLimitsCard({
   planLabel,
@@ -79,7 +83,12 @@ function ResourceLimitsCard({
               </Link>
             </Button>
           </Flex>
-          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} showLiteMembers={showLiteMembers} messagesLabel={messagesLabel} />
+          <ResourceLimitsDisplay
+            limits={limits}
+            showLimits={showLimits}
+            showLiteMembers={showLiteMembers}
+            messagesLabel={messagesLabel}
+          />
         </VStack>
       </Card.Body>
     </Card.Root>
@@ -93,9 +102,16 @@ function Usage() {
   const { url: planManagementUrl } = usePlanManagementUrl();
 
   const organizationId = organization?.id ?? "";
-  const queryOpts = { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false } as const;
+  const queryOpts = {
+    enabled: !!organization,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  } as const;
 
-  const activePlan = api.plan.getActivePlan.useQuery({ organizationId }, queryOpts);
+  const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId },
+    queryOpts,
+  );
   const usage = api.limits.getUsage.useQuery({ organizationId }, queryOpts);
   const licenseStatus = api.license.getStatus.useQuery(
     { organizationId },
@@ -109,7 +125,8 @@ function Usage() {
         : organization?.pricingModel === PricingModel.TIERED
           ? RESOURCE_LABELS.tracesPerMonth
           : RESOURCE_LABELS.eventsPerMonth;
-  const showLiteMembers = organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
+  const showLiteMembers =
+    organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
 
   const isSelfHosted = isSaaS === false;
   const isLoadingLimits =
@@ -123,7 +140,7 @@ function Usage() {
     isSelfHosted &&
     licenseStatus.data?.hasLicense &&
     "plan" in licenseStatus.data;
-  const isFreeTier =
+  const isUnlicensed =
     isSelfHosted &&
     licenseStatus.data &&
     !licenseStatus.data.hasLicense &&
@@ -142,12 +159,28 @@ function Usage() {
     isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
     hasValidLicense: false,
   });
-  const licensedActionLabel = getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: true });
-  const unlicensedActionLabel = getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: false });
+  const licensedActionLabel = getPlanActionLabel({
+    isSaaS: false,
+    isFree: false,
+    isEnterprise: false,
+    hasValidLicense: true,
+  });
+  const unlicensedActionLabel = getPlanActionLabel({
+    isSaaS: false,
+    isFree: false,
+    isEnterprise: false,
+    hasValidLicense: false,
+  });
 
   return (
     <SettingsLayout>
-      <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
+      <VStack
+        gap={6}
+        width="full"
+        align="stretch"
+        maxWidth="900px"
+        marginX="auto"
+      >
         <Flex justifyContent="space-between" alignItems="flex-start">
           <VStack align="start" gap={1}>
             <Heading size="xl">Usage</Heading>
@@ -163,7 +196,10 @@ function Usage() {
             planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
             planColorPalette={saasPlan?.free ? "gray" : "blue"}
             subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
-            limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
+            limits={mapUsageToLimits(
+              usage.data,
+              saasPlan ?? usage.data.activePlan,
+            )}
             showLimits={showLimits}
             showLiteMembers={showLiteMembers}
             actionHref={planManagementUrl}
@@ -177,7 +213,9 @@ function Usage() {
           <Card.Root borderWidth={1} borderColor="border">
             <Card.Body paddingY={5} paddingX={6}>
               <VStack align="start" gap={4}>
-                <Text fontWeight="semibold" fontSize="lg">Resource Limits</Text>
+                <Text fontWeight="semibold" fontSize="lg">
+                  Resource Limits
+                </Text>
                 <Skeleton height="20px" width="200px" />
                 <Skeleton height="80px" width="full" />
               </VStack>
@@ -187,7 +225,12 @@ function Usage() {
 
         {/* Self-hosted: Error state */}
         {hasLimitsError && (
-          <Card.Root borderWidth={1} colorPalette="red" borderColor="colorPalette.muted" bg="colorPalette.subtle">
+          <Card.Root
+            borderWidth={1}
+            colorPalette="red"
+            borderColor="colorPalette.muted"
+            bg="colorPalette.subtle"
+          >
             <Card.Body paddingY={5} paddingX={6}>
               <Text color="colorPalette.fg" fontSize="sm">
                 Unable to load resource limits. Please refresh the page or
@@ -213,14 +256,13 @@ function Usage() {
             />
           )}
 
-        {/* Self-hosted: Free tier */}
-        {isFreeTier && (
+        {/* Self-hosted without a license: the Open Source baseline, uncapped */}
+        {isUnlicensed && (
           <ResourceLimitsCard
-            planLabel="Free"
+            planLabel="Open Source"
             planColorPalette="gray"
-            subtitle="Current usage versus free tier limits"
-            limits={mapUsageToLimits(usage.data, FREE_PLAN)}
-            showLimits
+            subtitle="Current usage on this deployment"
+            limits={mapUsageToLimits(usage.data, UNLIMITED_PLAN)}
             showLiteMembers={showLiteMembers}
             actionHref="/settings/license"
             actionLabel={unlicensedActionLabel}

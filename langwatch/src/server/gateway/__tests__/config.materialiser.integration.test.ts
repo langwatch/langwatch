@@ -38,6 +38,7 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { GatewayGuardrailService } from "../guardrail.service";
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "../virtualKey.config";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 
 const suffix = nanoid(8);
@@ -50,11 +51,20 @@ const EVALUATOR_NOT_GUARDRAIL_ID = `eval-mat-nongr-${suffix}`;
 const MONITOR_ID = `mon-mat-${suffix}`;
 const MONITOR_NOT_GUARDRAIL_ID = `mon-mat-nongr-${suffix}`;
 const MP_ID = `mp-mat-${suffix}`;
+const MP_CUSTOM_ID = `mp-mat-custom-${suffix}`;
+const CUSTOM_BASE_URL = "http://llm-server:8000/v1";
+const MP_OPENAI_BASE_ID = `mp-mat-openai-base-${suffix}`;
+const OPENAI_BASE_URL_OVERRIDE = "https://proxy.example.com/v1";
+const MP_ANTHROPIC_BASE_ID = `mp-mat-anthropic-base-${suffix}`;
+const ANTHROPIC_BASE_URL_OVERRIDE = "http://vllm-anthropic:8000";
+const MP_ANTHROPIC_PLAIN_ID = `mp-mat-anthropic-plain-${suffix}`;
+const MP_ANTHROPIC_KEYLESS_ID = `mp-mat-anthropic-keyless-${suffix}`;
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
 const VK_NO_RP_ID = `vk-mat-norp-${suffix}`;
 const VK_NO_PROJECT_ID = `vk-mat-noproj-${suffix}`;
+const VK_TAGSTORM_ID = `vk-mat-tagstorm-${suffix}`;
 
 describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   beforeAll(async () => {
@@ -149,6 +159,100 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // Custom (OpenAI-compatible) provider: base URL required, API key
+    // legitimately empty (unauthenticated self-hosted vLLM/LiteLLM).
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_CUSTOM_ID,
+        name: "custom",
+        provider: "custom",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          CUSTOM_API_KEY: "",
+          CUSTOM_BASE_URL,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // OpenAI provider pointed at a self-hosted proxy via OPENAI_BASE_URL.
+    // The materialiser must surface it as the slot base_url (from the
+    // registry endpointKey), otherwise gateway traffic hits api.openai.com.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_OPENAI_BASE_ID,
+        name: "openai-proxy",
+        provider: "openai",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          OPENAI_API_KEY: "sk-proxy-test",
+          OPENAI_BASE_URL: OPENAI_BASE_URL_OVERRIDE,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // Anthropic provider pointed at a self-hosted Anthropic-compatible
+    // server (vLLM >= 0.24) via ANTHROPIC_BASE_URL. The materialiser must
+    // surface it as the slot base_url, otherwise /v1/messages traffic
+    // hits api.anthropic.com instead of the customer's endpoint.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ANTHROPIC_BASE_ID,
+        name: "anthropic-selfhosted",
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          ANTHROPIC_API_KEY: "sk-ant-selfhosted",
+          ANTHROPIC_BASE_URL: ANTHROPIC_BASE_URL_OVERRIDE,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // Anthropic provider with only an API key: no base_url may leak into
+    // the slot, or the gateway would derive a per-endpoint custom provider
+    // for plain api.anthropic.com traffic.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ANTHROPIC_PLAIN_ID,
+        name: "anthropic-plain",
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          ANTHROPIC_API_KEY: "sk-ant-plain",
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
+    // Anthropic provider with a base URL and NO API key — the exact shape
+    // #5938 exists to support (unauthenticated self-hosted server), and
+    // the shape keysSchema used to reject. Anchors the keyless credential
+    // through the real Prisma -> materialiser pipeline.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ANTHROPIC_KEYLESS_ID,
+        name: "anthropic-keyless",
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          ANTHROPIC_BASE_URL: ANTHROPIC_BASE_URL_OVERRIDE,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -157,7 +261,14 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         },
         name: `mat-rp-${suffix}`,
-        modelProviderIds: [MP_ID],
+        modelProviderIds: [
+          MP_ID,
+          MP_CUSTOM_ID,
+          MP_OPENAI_BASE_ID,
+          MP_ANTHROPIC_BASE_ID,
+          MP_ANTHROPIC_PLAIN_ID,
+          MP_ANTHROPIC_KEYLESS_ID,
+        ],
         modelAliases: { "gpt-5": "gpt-5-mini" },
         policyRules: {
           tools: { deny: ["^shell_.*$"], allow: null },
@@ -201,6 +312,37 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
               guardrailIds: [GUARDRAIL_ID, "not-a-real-guardrail-id"],
             },
           ],
+          metadata: { tags: ["app=nexttrace", "team=offsecops"] },
+        },
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      },
+    });
+    // VK 4 — a config row written straight to PG with a tag list no UI
+    // would produce: hundreds of tags, one enormous tag, duplicates and
+    // blanks. Rows like this predate the tag bounds and the REST API can
+    // still post one, so materialise has to hand the gateway something
+    // bounded regardless.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_TAGSTORM_ID,
+        organizationId: ORG_ID,
+        name: "vk-tagstorm",
+        hashedSecret: `hash-tagstorm-${suffix}`,
+        displayPrefix: "lw_vk_live_xxx_4",
+        principalUserId: USER_ID,
+        createdById: USER_ID,
+        config: {
+          metadata: {
+            tags: [
+              "team=ml",
+              " team=ml ",
+              "",
+              "x".repeat(5_000),
+              ...Array.from({ length: 500 }, (_, i) => `noise-${i}`),
+            ],
+          },
         },
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
@@ -245,7 +387,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
 
   afterAll(async () => {
     await prisma.virtualKey.deleteMany({
-      where: { id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID] } },
+      where: {
+        id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID, VK_TAGSTORM_ID] },
+      },
     });
     await prisma.gatewayGuardrail.deleteMany({
       where: { projectId: PROJECT_ID },
@@ -260,10 +404,22 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       where: { routingPolicyId: RP_ID },
     });
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
+    const modelProviderIds = [
+      MP_ID,
+      MP_CUSTOM_ID,
+      MP_OPENAI_BASE_ID,
+      MP_ANTHROPIC_BASE_ID,
+      MP_ANTHROPIC_PLAIN_ID,
+      MP_ANTHROPIC_KEYLESS_ID,
+    ];
     await prisma.modelProviderScope.deleteMany({
-      where: { modelProviderId: MP_ID },
+      where: {
+        modelProviderId: { in: modelProviderIds },
+      },
     });
-    await prisma.modelProvider.deleteMany({ where: { id: MP_ID } });
+    await prisma.modelProvider.deleteMany({
+      where: { id: { in: modelProviderIds } },
+    });
     await prisma.evaluator.deleteMany({
       where: { id: { in: [EVALUATOR_ID, EVALUATOR_NOT_GUARDRAIL_ID] } },
     });
@@ -297,6 +453,111 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(bundle.organization_id).toBe(ORG_ID);
       expect(bundle.project_id).toBe(PROJECT_ID);
       expect(bundle.providers.length).toBeGreaterThan(0);
+    });
+
+    it("materialises the custom provider slot with its base_url and empty api_key", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_CUSTOM_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("custom");
+      expect(slot!.base_url).toBe(CUSTOM_BASE_URL);
+      expect(slot!.credentials.api_key).toBe("");
+    });
+
+    it("materialises an openai provider slot with OPENAI_BASE_URL as its base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_OPENAI_BASE_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("openai");
+      expect(slot!.base_url).toBe(OPENAI_BASE_URL_OVERRIDE);
+    });
+
+    // Spec: specs/ai-gateway/custom-provider-base-url.feature
+    // "Anthropic provider with a base URL routes /v1/messages to the
+    // customer's endpoint" — the gateway reads the slot base_url, so the
+    // materialiser must emit ANTHROPIC_BASE_URL there.
+    it("materialises an anthropic provider slot with ANTHROPIC_BASE_URL as its base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_BASE_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("anthropic");
+      expect(slot!.base_url).toBe(ANTHROPIC_BASE_URL_OVERRIDE);
+      expect(slot!.credentials.api_key).toBe("sk-ant-selfhosted");
+    });
+
+    // Spec: specs/ai-gateway/custom-provider-base-url.feature
+    // "Empty API key is accepted for unauthenticated Anthropic-compatible
+    // servers" — the keyless credential must survive the real
+    // Prisma -> materialiser pipeline with an empty api_key and the
+    // configured base_url, mirroring the Go-side keyless dispatch test at
+    // the layer where the original #5938 rejection manifested.
+    it("materialises a keyless anthropic provider slot with its base_url and empty api_key", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find(
+        (p) => p.id === MP_ANTHROPIC_KEYLESS_ID,
+      );
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("anthropic");
+      expect(slot!.base_url).toBe(ANTHROPIC_BASE_URL_OVERRIDE);
+      expect(slot!.credentials.api_key).toBe("");
+    });
+
+    // Spec: specs/ai-gateway/custom-provider-base-url.feature
+    // "Anthropic provider without a base URL keeps default routing" — a
+    // leaked base_url would make the gateway derive a per-endpoint custom
+    // provider for plain api.anthropic.com traffic.
+    it("materialises an anthropic provider slot without ANTHROPIC_BASE_URL with no base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_ANTHROPIC_PLAIN_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("anthropic");
+      expect(slot!.base_url).toBeUndefined();
+    });
+
+    // Spec: specs/ai-gateway/span-shape.feature §8 — the gateway stamps
+    // these tags on customer spans as langwatch.labels, and cache-rule
+    // vk_tags matchers compare against them. Without a top-level vk_tags
+    // in the bundle both consumers read a permanently-empty list.
+    it("lifts config.metadata.tags to the bundle's top-level vk_tags", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      expect(bundle.vk_tags).toEqual(["app=nexttrace", "team=offsecops"]);
+    });
+
+    // Every tag is stamped on every span this VK produces and aggregated by
+    // the Label facet, so the bundle is the last place to bound them before
+    // they become per-request ClickHouse cardinality.
+    it("bounds vk_tags for a stored config the drawer could never have written", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_TAGSTORM_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+
+      const bundle = await mat.materialise(vk!);
+
+      expect(bundle.vk_tags).toHaveLength(VK_TAGS_MAX_COUNT);
+      expect(bundle.vk_tags[0]).toBe("team=ml");
+      expect(new Set(bundle.vk_tags).size).toBe(bundle.vk_tags.length);
+      for (const tag of bundle.vk_tags) {
+        expect(tag).not.toBe("");
+        expect([...tag].length).toBeLessThanOrEqual(VK_TAG_MAX_LENGTH);
+      }
     });
 
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {

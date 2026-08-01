@@ -21,20 +21,30 @@
  * optional-chain on the data, so null surfaces as a clean "loading"
  * state. The UI's poll picks the row up the moment it materialises.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const getClickHouseClientForProjectMock = vi.fn();
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForProject: (...args: unknown[]) =>
+    getClickHouseClientForProjectMock(...args),
+}));
+
 import { ExperimentRunService } from "../experiment-run.service";
 
-describe("ExperimentRunService.getRun", () => {
-  describe("when ClickHouse returns null for the run row", () => {
-    it("returns null instead of throwing so the UI can poll without 500-cascade", async () => {
-      const service = new ExperimentRunService({} as any);
-      // Replace the ClickHouse facade with one that simulates the
-      // "not folded yet" window.
-      (service as any).clickHouseService = {
-        getRun: vi.fn().mockResolvedValue(null),
-      };
+function makeService() {
+  return new ExperimentRunService({} as any);
+}
 
-      const result = await service.getRun({
+describe("ExperimentRunService.getRun", () => {
+  beforeEach(() => {
+    getClickHouseClientForProjectMock.mockReset();
+  });
+
+  describe("when the ClickHouse client is unavailable", () => {
+    it("returns null instead of throwing so the UI can poll without 500-cascade", async () => {
+      getClickHouseClientForProjectMock.mockResolvedValue(null);
+
+      const result = await makeService().getRun({
         projectId: "project_x",
         experimentId: "experiment_y",
         runId: "run_z",
@@ -44,28 +54,21 @@ describe("ExperimentRunService.getRun", () => {
     });
   });
 
-  describe("when ClickHouse returns a populated run row", () => {
-    it("forwards the row through unchanged", async () => {
-      const populatedRun = {
-        experimentId: "experiment_y",
-        runId: "run_z",
-        projectId: "project_x",
-        dataset: [],
-        evaluations: [],
-        timestamps: { createdAt: 1, updatedAt: 2 },
-      };
-      const service = new ExperimentRunService({} as any);
-      (service as any).clickHouseService = {
-        getRun: vi.fn().mockResolvedValue(populatedRun),
-      };
+  describe("when the run row has not been folded into ClickHouse yet", () => {
+    it("returns null so the UI can poll until the projection lands", async () => {
+      getClickHouseClientForProjectMock.mockResolvedValue({
+        query: vi.fn().mockResolvedValue({
+          json: vi.fn().mockResolvedValue([]),
+        }),
+      });
 
-      const result = await service.getRun({
+      const result = await makeService().getRun({
         projectId: "project_x",
         experimentId: "experiment_y",
         runId: "run_z",
       });
 
-      expect(result).toEqual(populatedRun);
+      expect(result).toBeNull();
     });
   });
 });

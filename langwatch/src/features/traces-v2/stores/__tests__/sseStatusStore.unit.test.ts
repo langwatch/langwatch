@@ -9,10 +9,7 @@ const LEGACY_LIVE_UPDATES_BOOL_KEY =
  * The store reads localStorage at module-load time, so each test bootstraps
  * a fresh module instance after seeding the storage it cares about.
  */
-async function loadStoreWith(initial: {
-  mode?: string;
-  legacy?: string;
-}) {
+async function loadStoreWith(initial: { mode?: string; legacy?: string }) {
   if (initial.mode != null) {
     window.localStorage.setItem(LIVE_UPDATES_STORAGE_KEY, initial.mode);
   }
@@ -94,17 +91,17 @@ describe("sseStatusStore", () => {
       expect(window.localStorage.getItem(LIVE_UPDATES_STORAGE_KEY)).toBe("ask");
       // Keep the legacy boolean roughly in sync so old consumers reading
       // the original key still see something sensible.
-      expect(
-        window.localStorage.getItem(LEGACY_LIVE_UPDATES_BOOL_KEY),
-      ).toBe("true");
+      expect(window.localStorage.getItem(LEGACY_LIVE_UPDATES_BOOL_KEY)).toBe(
+        "true",
+      );
 
       useSseStatusStore.getState().toggleLiveUpdates(); // → paused
       expect(window.localStorage.getItem(LIVE_UPDATES_STORAGE_KEY)).toBe(
         "paused",
       );
-      expect(
-        window.localStorage.getItem(LEGACY_LIVE_UPDATES_BOOL_KEY),
-      ).toBe("false");
+      expect(window.localStorage.getItem(LEGACY_LIVE_UPDATES_BOOL_KEY)).toBe(
+        "false",
+      );
     });
 
     it("flips sseConnectionState to disconnected when paused, connecting otherwise", async () => {
@@ -118,6 +115,5 @@ describe("sseStatusStore", () => {
         "connecting",
       );
     });
-
   });
 });

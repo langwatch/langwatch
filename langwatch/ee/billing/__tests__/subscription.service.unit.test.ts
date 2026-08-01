@@ -11,13 +11,16 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import type { PrismaClient } from "@prisma/client";
-import type Stripe from "stripe";
-import { PlanTypes, SubscriptionStatus } from "../planTypes";
-import { EESubscriptionService, RECENT_INVOICES_LIMIT } from "../services/subscription.service";
-import { InvalidPlanError, OrganizationNotFoundError, SeatBillingUnavailableError } from "../errors";
-import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
-import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
+import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
+import { PlanTypes, SubscriptionStatus } from "../planTypes";
+import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
+import {
+  EESubscriptionService,
+  RECENT_INVOICES_LIMIT,
+} from "../services/subscription.service";
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -76,6 +79,7 @@ const createMockOrganizationRepository = (): {
   getUserOrgRole: vi.fn(),
   getUserOrgRoleByTeamId: vi.fn(),
   getProjectIds: vi.fn(),
+  findPrimaryIntentById: vi.fn(),
   findWithAdmins: vi.fn(),
   updateSentPlanLimitAlert: vi.fn(),
   findProjectsWithName: vi.fn(),
@@ -136,8 +140,33 @@ describe("EESubscriptionService", () => {
   let db: ReturnType<typeof createMockDb>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
+  let organizationRepository: ReturnType<
+    typeof createMockOrganizationRepository
+  >;
   let service: EESubscriptionService;
+
+  describe("interface conformance", () => {
+    /** @scenario "New class implements the same interface as old factory" */
+    it("implements the SubscriptionService app-layer interface", () => {
+      const localService = new EESubscriptionService({
+        prisma: createMockDb() as unknown as PrismaClient,
+        repository: createMockRepository() as unknown as SubscriptionRepository,
+        stripe: createMockStripe() as unknown as Stripe,
+        itemCalculator: createMockItemCalculator(),
+        organizationRepository:
+          createMockOrganizationRepository() as unknown as OrganizationRepository,
+      });
+      const asInterface: SubscriptionService = localService;
+
+      expect(typeof asInterface.updateSubscriptionItems).toBe("function");
+      expect(typeof asInterface.createOrUpdateSubscription).toBe("function");
+      expect(typeof asInterface.createBillingPortalSession).toBe("function");
+      expect(typeof asInterface.getLastNonCancelledSubscription).toBe(
+        "function",
+      );
+      expect(typeof asInterface.notifyProspective).toBe("function");
+    });
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -151,7 +180,8 @@ describe("EESubscriptionService", () => {
       repository: repository as unknown as SubscriptionRepository,
       stripe: stripe as unknown as Stripe,
       itemCalculator,
-      organizationRepository: organizationRepository as unknown as OrganizationRepository,
+      organizationRepository:
+        organizationRepository as unknown as OrganizationRepository,
     });
   });
 
@@ -363,7 +393,7 @@ describe("EESubscriptionService", () => {
     });
 
     describe("when plan is invalid", () => {
-      it("throws InvalidPlanError without creating a pending subscription", async () => {
+      it("raises billing_plan_price_missing without creating a pending subscription", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
 
         await expect(
@@ -373,7 +403,7 @@ describe("EESubscriptionService", () => {
             plan: "INVALID_PLAN" as any,
             customerId: "cus_123",
           }),
-        ).rejects.toThrow(InvalidPlanError);
+        ).rejects.toMatchObject({ code: "billing_plan_price_missing" });
 
         expect(repository.createPending).not.toHaveBeenCalled();
       });
@@ -494,8 +524,7 @@ describe("EESubscriptionService", () => {
         const mockSub = { id: "sub_1", status: "ACTIVE" };
         repository.findLastNonCancelled.mockResolvedValue(mockSub);
 
-        const result =
-          await service.getLastNonCancelledSubscription("org_123");
+        const result = await service.getLastNonCancelledSubscription("org_123");
 
         expect(result).toEqual(mockSub);
         expect(repository.findLastNonCancelled).toHaveBeenCalledWith("org_123");
@@ -535,7 +564,7 @@ describe("EESubscriptionService", () => {
     });
 
     describe("when organization not found", () => {
-      it("throws OrganizationNotFoundError", async () => {
+      it("raises organization_not_found", async () => {
         organizationRepository.findNameById.mockResolvedValue(null);
 
         await expect(
@@ -544,14 +573,14 @@ describe("EESubscriptionService", () => {
             plan: PlanTypes.LAUNCH,
             actorEmail: "actor@example.com",
           }),
-        ).rejects.toThrow(OrganizationNotFoundError);
+        ).rejects.toMatchObject({ code: "organization_not_found" });
       });
     });
   });
 
   describe("createSubscriptionWithInvites()", () => {
     describe("when seatEventFns is not configured", () => {
-      it("throws SeatBillingUnavailableError", async () => {
+      it("raises seat_billing_unavailable", async () => {
         await expect(
           service.createSubscriptionWithInvites({
             organizationId: "org_123",
@@ -560,7 +589,7 @@ describe("EESubscriptionService", () => {
             customerId: "cus_123",
             invites: [{ email: "alice@example.com", role: "MEMBER" as any }],
           }),
-        ).rejects.toThrow(SeatBillingUnavailableError);
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 
@@ -611,13 +640,13 @@ describe("EESubscriptionService", () => {
 
   describe("previewProration()", () => {
     describe("when seatEventFns is not configured", () => {
-      it("throws SeatBillingUnavailableError", async () => {
+      it("raises seat_billing_unavailable", async () => {
         await expect(
           service.previewProration({
             organizationId: "org_123",
             newTotalSeats: 5,
           }),
-        ).rejects.toThrow(SeatBillingUnavailableError);
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 
@@ -677,6 +706,53 @@ describe("EESubscriptionService", () => {
         });
 
         expect(result).toEqual([]);
+      });
+    });
+
+    describe("when the provider rate-limits the invoice list", () => {
+      it("fails with a retryable provider-unavailable error", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(
+          new Stripe.errors.StripeRateLimitError({
+            message: "slow down",
+            type: "rate_limit_error",
+          }),
+        );
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the provider is unreachable for the invoice list", () => {
+      it("fails with the same retryable provider-unavailable error", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(
+          new Stripe.errors.StripeConnectionError({
+            message: "network down",
+            type: "api_error",
+          }),
+        );
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the invoice list fails for a reason we cannot name", () => {
+      it("lets the original error through rather than dressing it as handled", async () => {
+        const providerError = new Error("No such customer");
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(providerError);
+
+        const error = await service
+          .listInvoices({ organizationId: "org_with_stripe" })
+          .catch((caught: unknown) => caught);
+
+        expect(error).toBe(providerError);
+        expect(error).not.toHaveProperty("isHandled");
       });
     });
 

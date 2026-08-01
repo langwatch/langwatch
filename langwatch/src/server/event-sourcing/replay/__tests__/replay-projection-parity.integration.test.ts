@@ -20,19 +20,19 @@
  * @scenario Replay produces byte-identical projection state as live ingestion
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  startTestContainers,
-  stopTestContainers,
-  getTestClickHouseClient,
-} from "../../__tests__/integration/testContainers";
-import {
-  generateTestTenantId,
-  generateTestAggregateId,
-} from "../../__tests__/integration/testHelpers";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+  stopTestContainers,
+} from "../../__tests__/integration/testContainers";
+import {
+  generateTestAggregateId,
+  generateTestTenantId,
+} from "../../__tests__/integration/testHelpers";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,7 +57,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -149,7 +149,10 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
               name: "test-span",
               kind: 1,
               attributes: [
-                { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
+                {
+                  key: "langwatch.output",
+                  value: { stringValue: LARGE_OUTPUT },
+                },
               ],
               events: [],
               links: [],
@@ -218,7 +221,9 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
 
       // Apply leanForProjection to every row — mimicking replayExecutor.apply.
       const leanedEvents = eventLogRows.map((row) => {
-        const event = JSON.parse(row.EventPayload) as Parameters<typeof leanForProjection>[0];
+        const event = JSON.parse(row.EventPayload) as Parameters<
+          typeof leanForProjection
+        >[0];
         return leanForProjection(event);
       });
 
@@ -228,7 +233,12 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
 
       for (const leaned of leanedEvents) {
         const leanedSpanData = leaned?.data as {
-          span: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+          span: {
+            attributes?: Array<{
+              key: string;
+              value: { stringValue?: string };
+            }>;
+          };
         };
         const outputAttr = leanedSpanData?.span?.attributes?.find(
           (a) => a.key === "langwatch.output",

@@ -2,6 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
+import type { TraceListCursor } from "../../stores/filterStore";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { ColumnEducationDialog } from "./ColumnEducationDialog";
@@ -14,6 +15,8 @@ import {
 
 interface TraceTableLayoutProps {
   totalHits: number;
+  nextCursor?: TraceListCursor | null;
+  visibleCount?: number;
   children: React.ReactNode;
   /**
    * When true, hide the pagination chrome (totals are unknown until
@@ -21,6 +24,7 @@ interface TraceTableLayoutProps {
    * matches the eventual layout exactly.
    */
   isLoading?: boolean;
+  isTransitioning?: boolean;
   /**
    * True when the lens body has no rows (data is empty or skeleton is
    * filling the slot). Used to crossfade between the data and empty
@@ -31,8 +35,11 @@ interface TraceTableLayoutProps {
 
 export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   totalHits,
+  nextCursor = null,
+  visibleCount = 0,
   children,
   isLoading = false,
+  isTransitioning = false,
   isEmpty = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -90,7 +97,13 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
       <RefreshProgressBar />
       <NewTracesScrollUpIndicator scrollRef={scrollRef} />
       <ColumnEducationDialog />
-      <Pagination totalHits={totalHits} isLoading={isLoading} />
+      <Pagination
+        totalHits={totalHits}
+        nextCursor={nextCursor}
+        visibleCount={visibleCount}
+        isLoading={isLoading}
+        isTransitioning={isTransitioning}
+      />
     </Flex>
   );
 };

@@ -14,6 +14,7 @@ describe("projectRoutes", () => {
   });
 
   describe("when the simulation runs route configuration is read", () => {
+    /** @scenario 'Route title for simulation runs is "Runs"' */
     it("has title 'Runs'", () => {
       expect(projectRoutes.simulation_runs.title).toBe("Runs");
     });

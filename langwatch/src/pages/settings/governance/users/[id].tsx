@@ -8,14 +8,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useRouter } from "~/utils/compat/next-router";
-
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
 const fmtUsd = (n: number) =>
@@ -82,11 +81,11 @@ function GovernanceUserDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={
-                actor ? getHexColorForString(actor) : "fg.muted"
-              }
+              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
             />
-            <Heading size="md">{user?.actor ?? actor ?? "User not found"}</Heading>
+            <Heading size="md">
+              {user?.actor ?? actor ?? "User not found"}
+            </Heading>
           </HStack>
         </VStack>
 
@@ -115,10 +114,7 @@ function GovernanceUserDetailPage() {
                 label="Last active"
                 value={fmtRelative(user.lastActivityIso)}
               />
-              <Stat
-                label="Most-used"
-                value={user.mostUsedTarget ?? "—"}
-              />
+              <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
             <Box
@@ -131,8 +127,8 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user
-                will land here in a follow-up.
+                Per-day spend trend and per-model breakdown for this user will
+                land here in a follow-up.
               </Text>
               {personalProject && (
                 <>
@@ -144,9 +140,14 @@ function GovernanceUserDetailPage() {
                   >
                     View {personalProject.displayName}'s personal workspace →
                   </Link>
-                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
-                    Opens their trace explorer with a 'Viewing as admin'
-                    banner. Each access is recorded at /settings/audit-log.
+                  <Text
+                    fontSize="xs"
+                    color="fg.subtle"
+                    marginTop={1}
+                    marginBottom={3}
+                  >
+                    Opens their trace explorer with a 'Viewing as admin' banner.
+                    Each access is recorded at /settings/audit-log.
                   </Text>
                 </>
               )}
@@ -159,9 +160,8 @@ function GovernanceUserDetailPage() {
                 See this user in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By User'`} toggle exercises the same data
-                through one orthogonal lens until the dedicated drilldown
-                ships.
+                The chart's {`'By User'`} toggle exercises the same data through
+                one orthogonal lens until the dedicated drilldown ships.
               </Text>
             </Box>
           </>

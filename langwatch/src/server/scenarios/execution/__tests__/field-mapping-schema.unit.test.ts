@@ -4,7 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import { suiteTargetSchema } from "~/server/suites/types";
-import { CodeAgentDataSchema, ChildProcessJobDataSchema, TargetConfigSchema } from "../types";
+import {
+  ChildProcessJobDataSchema,
+  CodeAgentDataSchema,
+  TargetConfigSchema,
+} from "../types";
 
 describe("CodeAgentDataSchema", () => {
   describe("when scenarioOutputField is provided", () => {
@@ -103,21 +107,31 @@ describe("TargetConfigSchema", () => {
     it("accepts every valid target type", () => {
       for (const type of ["prompt", "http", "code", "workflow"] as const) {
         expect(
-          TargetConfigSchema.safeParse({ type, referenceId: `${type}_ref` }).success,
+          TargetConfigSchema.safeParse({ type, referenceId: `${type}_ref` })
+            .success,
         ).toBe(true);
       }
     });
 
     it("accepts prompt type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "prompt", referenceId: "p1" }).success).toBe(true);
+      expect(
+        TargetConfigSchema.safeParse({ type: "prompt", referenceId: "p1" })
+          .success,
+      ).toBe(true);
     });
 
     it("accepts http type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "http", referenceId: "h1" }).success).toBe(true);
+      expect(
+        TargetConfigSchema.safeParse({ type: "http", referenceId: "h1" })
+          .success,
+      ).toBe(true);
     });
 
     it("accepts code type", () => {
-      expect(TargetConfigSchema.safeParse({ type: "code", referenceId: "c1" }).success).toBe(true);
+      expect(
+        TargetConfigSchema.safeParse({ type: "code", referenceId: "c1" })
+          .success,
+      ).toBe(true);
     });
   });
 });
@@ -148,7 +162,11 @@ describe("ChildProcessJobDataSchema", () => {
           inputs: [{ identifier: "query", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           scenarioMappings: {
-            query: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
+            query: {
+              type: "source",
+              sourceId: "scenario",
+              path: ["scenario_message"],
+            },
           },
         },
         modelParams: {
@@ -196,7 +214,11 @@ describe("ChildProcessJobDataSchema", () => {
           method: "POST",
           headers: [],
           scenarioMappings: {
-            input: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
+            input: {
+              type: "source",
+              sourceId: "scenario",
+              path: ["scenario_message"],
+            },
           },
         },
         modelParams: {

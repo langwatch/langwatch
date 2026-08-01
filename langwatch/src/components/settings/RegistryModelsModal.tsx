@@ -1,13 +1,8 @@
-import {
-  Box,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getProviderModelOptions } from "../../server/modelProviders/registry";
+import { SmallLabel } from "../SmallLabel";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -16,7 +11,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from "../ui/dialog";
-import { SmallLabel } from "../SmallLabel";
 
 type RegistryModelsModalProps = {
   open: boolean;
@@ -80,7 +74,9 @@ export function RegistryModelsModal({
       onOpenChange={(e) => !e.open && handleClose()}
       size="lg"
     >
-      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
+      <DialogContent
+        {...(dialogBackground ? { background: dialogBackground } : {})}
+      >
         <DialogHeader>
           <DialogTitle>Registry Models</DialogTitle>
         </DialogHeader>

@@ -43,6 +43,46 @@ type Options struct {
 	RunnerPath string
 	// DefaultTimeout caps execution when the request doesn't specify one.
 	DefaultTimeout time.Duration
+	// EnvAllowlist names the environment variables propagated into the
+	// user-code subprocess. Anything not named here is withheld — the
+	// runner never inherits the pod environment, so AWS credentials, the
+	// projected service-account token path, LANGWATCH_* internals, and
+	// DB/Redis/ClickHouse secrets stay out of reach of user code.
+	//
+	// Semantics:
+	//   - nil            → defaultEnvAllowlist (secure default)
+	//   - non-nil empty  → pass nothing (maximally locked down)
+	//   - populated      → pass exactly those names, when present
+	//
+	// A project's own secrets reach user code via Request.Secrets (piped
+	// over stdin into the `secrets` namespace), never via the environment,
+	// so withholding the environment does not break the secrets contract.
+	EnvAllowlist []string
+}
+
+// defaultEnvAllowlist is the environment passed into the code-block
+// subprocess when Options.EnvAllowlist is nil. It carries only what the
+// Python runner legitimately needs — interpreter/locale/TLS-trust plumbing —
+// and deliberately excludes every credential-bearing variable in the pod.
+// Being an allowlist, any secret env var added to the deployment in future
+// is withheld automatically without a code change here.
+var defaultEnvAllowlist = []string{
+	"PATH",
+	"HOME",
+	"LANG",
+	"LC_ALL",
+	"LC_CTYPE",
+	"TMPDIR",
+	"PYTHONPATH",
+	"PYTHONHOME",
+	"PYTHONHASHSEED",
+	"PYTHONIOENCODING",
+	"PYTHONUNBUFFERED",
+	"PYTHONDONTWRITEBYTECODE",
+	"SSL_CERT_FILE",
+	"SSL_CERT_DIR",
+	"REQUESTS_CA_BUNDLE",
+	"CURL_CA_BUNDLE",
 }
 
 // Executor runs code blocks via a Python subprocess.
@@ -59,6 +99,12 @@ func New(opts Options) (*Executor, error) {
 	}
 	if opts.DefaultTimeout == 0 {
 		opts.DefaultTimeout = 60 * time.Second
+	}
+	// Secure default: a nil allowlist means "the caller didn't opt out of
+	// the safe default", NOT "inherit everything". A non-nil empty slice is
+	// respected as an explicit "pass nothing".
+	if opts.EnvAllowlist == nil {
+		opts.EnvAllowlist = defaultEnvAllowlist
 	}
 	runnerPath := opts.RunnerPath
 	if runnerPath == "" {
@@ -112,7 +158,43 @@ type Error struct {
 	Traceback string
 }
 
+// TimeoutType and RunnerErrorType are the only two Error.Type values this
+// package produces itself; every other value is whatever Python exception class
+// the customer's own code raised.
+//
+// They are exported because the engine switches on them to pick the NodeError
+// code the client is shown, and that switch has no `default` that could tell a
+// renamed discriminant apart from a customer exception — a bare literal here
+// and a bare literal there meant renaming one side reclassified the timeout as
+// a generic code-runner error with nothing failing to compile.
+const (
+	// TimeoutType marks a run the executor stopped for exceeding its limit.
+	TimeoutType = "Timeout"
+	// RunnerErrorType marks the runner itself failing, as opposed to the
+	// customer's code raising.
+	RunnerErrorType = "RunnerError"
+)
+
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
+
+// childEnv builds the environment handed to the user-code subprocess from
+// the configured allowlist. It always returns a non-nil slice — even when
+// no allowlisted variable is present — so the caller can assign it to
+// cmd.Env without risk of exec inheriting the full parent environment
+// (which is what a nil cmd.Env would do).
+func (e *Executor) childEnv() []string {
+	allow := e.opts.EnvAllowlist
+	if allow == nil {
+		allow = defaultEnvAllowlist
+	}
+	env := make([]string, 0, len(allow))
+	for _, name := range allow {
+		if v, ok := os.LookupEnv(name); ok {
+			env = append(env, name+"="+v)
+		}
+	}
+	return env
+}
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
@@ -142,6 +224,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	cmd := exec.CommandContext(runCtx, e.opts.Python, e.runnerPath, resultPath) //nolint:gosec // runnerPath is operator-controlled
+	// Withhold the pod environment from user code. cmd.Env is always set to
+	// a non-nil slice so exec never falls back to inheriting os.Environ();
+	// see childEnv. Project secrets travel via the request payload, not here.
+	cmd.Env = e.childEnv()
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stderrBuf bytes.Buffer
@@ -176,7 +262,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 				TimedOut:   timedOut,
 			}
 			if timedOut && res.Error == nil {
-				res.Error = &Error{Type: "Timeout", Message: "code_block_timeout"}
+				res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
 			}
 			return res, nil
 		}
@@ -189,7 +275,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   true,
 			Stderr:     stderrBuf.String(),
-			Error:      &Error{Type: "Timeout", Message: "code_block_timeout"},
+			Error:      &Error{Type: TimeoutType, Message: "code_block_timeout"},
 		}, nil
 	}
 	if runErr != nil {
@@ -197,7 +283,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			DurationMS: elapsed.Milliseconds(),
 			Stderr:     stderrBuf.String(),
 			Error: &Error{
-				Type:    "RunnerError",
+				Type:    RunnerErrorType,
 				Message: runErr.Error(),
 			},
 		}, nil
@@ -205,7 +291,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrBuf.String(),
-		Error:      &Error{Type: "RunnerError", Message: "empty_result"},
+		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
 	}, nil
 }
 

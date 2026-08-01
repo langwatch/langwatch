@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef } from "react";
+import { createLogger } from "@langwatch/observability";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
-  isCompactStreamingEvent,
-  type CompactStreamingEvent,
-} from "~/utils/streaming-event-codec";
-import { api } from "~/utils/api";
+  isScenarioTabNavigatePayload,
+  type ScenarioTabNavigatePayload,
+} from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { createLogger } from "~/utils/logger";
+import { api } from "~/utils/api";
+import {
+  type CompactStreamingEvent,
+  isCompactStreamingEvent,
+} from "~/utils/streaming-event-codec";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 
@@ -29,6 +33,14 @@ interface UseSimulationUpdateListenerOptions {
   filter?: SimulationUpdateFilter;
   onNewBatchRun?: (batchRunId: string) => void;
   onStreamingEvent?: (payload: CompactStreamingEvent) => void;
+  /**
+   * Registers this tab as reusable for the given machine key while the
+   * subscription is open. Only the page-level listener should pass these —
+   * they are what lets the SDK skip opening another browser tab.
+   */
+  tabKey?: string | null;
+  tabId?: string | null;
+  onTabNavigate?: (payload: ScenarioTabNavigatePayload) => void;
 }
 
 export interface SimulationBroadcastPayload {
@@ -47,6 +59,9 @@ export function useSimulationUpdateListener({
   filter,
   onNewBatchRun,
   onStreamingEvent,
+  tabKey,
+  tabId,
+  onTabNavigate,
 }: UseSimulationUpdateListenerOptions) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFireRef = useRef<number>(0);
@@ -57,9 +72,19 @@ export function useSimulationUpdateListener({
   const matchesFilter = useCallback(
     (payload: SimulationBroadcastPayload): boolean => {
       if (!filter) return true;
-      if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
-      if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
-      if (filter.scenarioSetId && normalizeSetId(payload.scenarioSetId) !== normalizeSetId(filter.scenarioSetId)) return false;
+      if (
+        filter.scenarioRunId &&
+        payload.scenarioRunId !== filter.scenarioRunId
+      )
+        return false;
+      if (filter.batchRunId && payload.batchRunId !== filter.batchRunId)
+        return false;
+      if (
+        filter.scenarioSetId &&
+        normalizeSetId(payload.scenarioSetId) !==
+          normalizeSetId(filter.scenarioSetId)
+      )
+        return false;
       return true;
     },
     [filter],
@@ -108,13 +133,18 @@ export function useSimulationUpdateListener({
     };
   }, []);
 
-  useSSESubscription<
+  const subscriptionInput = useMemo(
+    () => (tabKey && tabId ? { projectId, tabKey, tabId } : { projectId }),
+    [projectId, tabId, tabKey],
+  );
+
+  const subscription = useSSESubscription<
     { event: string; timestamp: number },
-    { projectId: string }
+    { projectId: string; tabKey?: string; tabId?: string }
   >(
     // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
     api.scenarios.onSimulationUpdate,
-    { projectId },
+    subscriptionInput,
     {
       enabled: Boolean(enabled && projectId),
       onData: (data) => {
@@ -122,12 +152,24 @@ export function useSimulationUpdateListener({
 
         try {
           const parsed =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+            typeof data.event === "string"
+              ? JSON.parse(data.event)
+              : data.event;
+
+          // Tab handoffs address a machine, not a run, so they are matched on
+          // the tab key alone and never against the run/batch filter below.
+          if (isScenarioTabNavigatePayload(parsed)) {
+            if (onTabNavigate && tabKey && parsed.tabKey === tabKey) {
+              onTabNavigate(parsed);
+            }
+            return;
+          }
 
           // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
           if (isCompactStreamingEvent(parsed)) {
             if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
-            if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId) return;
+            if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId)
+              return;
 
             if (onStreamingEvent) {
               onStreamingEvent(parsed);
@@ -172,4 +214,12 @@ export function useSimulationUpdateListener({
       },
     },
   );
+
+  // Callers use the connection state to disable fallback polling while the
+  // event stream is healthy — SSE is the primary freshness signal, polling
+  // exists only for disconnected sessions.
+  return {
+    connectionState: subscription.connectionState,
+    isConnected: subscription.isConnected,
+  } as const;
 }

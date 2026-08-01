@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 
 /**
@@ -76,7 +76,11 @@ describe("ModelProviderService business logic", () => {
       expect(result).toEqual({ OPENAI_API_KEY: "new-key" });
     });
 
-    /** @scenario Preserve original API key when saving with masked placeholder */
+    // Shape check against a copy of the rule. The scenario it belongs to is
+    // bound where the real path runs, in
+    // modelProvider.credentialPreservation.integration.test.ts and
+    // ModelProviderForm.credential-rules.integration.test.tsx: a copy stayed
+    // green while the credential was being dropped end to end.
     it("preserves existing key when new value is masked placeholder", () => {
       const validatedKeys = {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,

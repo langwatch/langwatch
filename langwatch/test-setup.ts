@@ -166,6 +166,15 @@ vi.mock("recharts", () => {
     Pie: MockComponent,
     Cell: MockComponent,
     ComposedChart: MockComponent,
+    // Every one of these is imported somewhere in src/. A name missing from
+    // this list does not degrade gracefully — the first test to render the
+    // chart that uses it dies with "No <X> export is defined on the recharts
+    // mock", which reads as a broken test rather than a stale mock.
+    ErrorBar: MockComponent,
+    Label: MockComponent,
+    LabelList: MockComponent,
+    ReferenceDot: MockComponent,
+    ZAxis: MockComponent,
     ReferenceLine: MockComponent,
     ReferenceArea: MockComponent,
     Brush: MockComponent,
@@ -314,6 +323,41 @@ vi.mock("~/utils/compat/next-dynamic", () => ({
     };
   },
 }));
+
+// Inside vitest's vm-sandboxed worker pool, Node 25 and 26 both define
+// `localStorage` as a global property even when `--localstorage-file` was
+// never passed, instead of leaving it genuinely absent the way plain Node
+// (and every other Node version) does. zustand's persist middleware defaults
+// to this bare global when no `storage` option is given: `createJSONStorage`
+// only falls back gracefully when READING the global throws (an absent
+// global does that), but here the property exists, so the read succeeds and
+// hands back either a broken stub missing `setItem`, or, in one of these
+// Node versions, the bare value `undefined`, which `typeof` can't tell
+// apart from the property being absent, so it still gets wrapped instead of
+// triggering the graceful fallback, and crashes the moment persist actually
+// calls `.setItem`. `in` distinguishes "property exists" from "genuinely
+// undeclared", and `defineProperty` (not assignment) replaces it even if the
+// existing property is a getter with no setter. Only touches a broken or
+// empty global, never jsdom's real, fully-functional `window.localStorage`.
+if (
+  "localStorage" in globalThis &&
+  (globalThis.localStorage == null ||
+    typeof globalThis.localStorage.setItem !== "function")
+) {
+  const noopStorage = {
+    length: 0,
+    clear: () => {},
+    getItem: () => null,
+    key: () => null,
+    removeItem: () => {},
+    setItem: () => {},
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", {
+    value: noopStorage,
+    configurable: true,
+    writable: true,
+  });
+}
 
 // Polyfill window.matchMedia for Vitest/JSDOM (not implemented by default).
 // Prevents "TypeError: window.matchMedia is not a function" when components

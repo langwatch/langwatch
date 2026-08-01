@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable } from "monaco-editor";
+import type { editor, IDisposable, Position } from "monaco-editor";
 import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "../pythonStdlib";
 import { scanImports } from "./shared";
 
@@ -14,7 +14,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
   return monaco.languages.registerSignatureHelpProvider("python", {
     signatureHelpTriggerCharacters: ["(", ","],
     signatureHelpRetriggerCharacters: [","],
-    provideSignatureHelp: (model, position) => {
+    provideSignatureHelp: (model: editor.ITextModel, position: Position) => {
       const lineBefore = model.getValueInRange({
         startLineNumber: position.lineNumber,
         startColumn: 1,
@@ -61,7 +61,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
         entry = PYTHON_BUILTIN_BY_NAME.get(callee);
         if (entry) label = entry.name;
       }
-      if (!entry || !entry.signature) return null;
+      if (!entry?.signature) return null;
 
       const sigLabel = entry.signature ?? label ?? callee;
       // Cheap parameter slice: anything between the first `(` and the matching `)`.
@@ -72,9 +72,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
         .map((p) => p.trim())
         .filter((p) => p.length > 0)
         .map((p) => ({ label: p }));
-      const activeArgIdx = lineBefore
-        .slice(openIdx + 1)
-        .split(",").length - 1;
+      const activeArgIdx = lineBefore.slice(openIdx + 1).split(",").length - 1;
 
       return {
         value: {
@@ -86,7 +84,10 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
             },
           ],
           activeSignature: 0,
-          activeParameter: Math.min(activeArgIdx, Math.max(0, params.length - 1)),
+          activeParameter: Math.min(
+            activeArgIdx,
+            Math.max(0, params.length - 1),
+          ),
         },
         dispose: () => undefined,
       };

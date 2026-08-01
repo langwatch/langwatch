@@ -8,7 +8,7 @@ import { type SpanInputOutput, type ChatMessage } from "../../../internal/genera
 import { INPUT_OUTPUT_TYPES, type InputOutputType } from "../types";
 
 describe("INPUT_OUTPUT_TYPES", () => {
-  it("should include all expected types", () => {
+  it("includes all expected types", () => {
     const expectedTypes = [
       "text",
       "raw",
@@ -22,18 +22,18 @@ describe("INPUT_OUTPUT_TYPES", () => {
     expect(INPUT_OUTPUT_TYPES).toEqual(expectedTypes);
   });
 
-  it("should be a readonly array", () => {
+  it("is a readonly array", () => {
     const types: readonly string[] = INPUT_OUTPUT_TYPES;
     expect(types).toBe(INPUT_OUTPUT_TYPES);
   });
 
-  it("should have correct length", () => {
+  it("has correct length", () => {
     expect(INPUT_OUTPUT_TYPES).toHaveLength(7);
   });
 });
 
 describe("InputOutputType", () => {
-  it("should accept valid input/output types", () => {
+  it("accepts valid input/output types", () => {
     const validTypes: InputOutputType[] = [
       "text",
       "raw",
@@ -51,13 +51,13 @@ describe("InputOutputType", () => {
 });
 
 describe("isValidInputOutputType", () => {
-  it("should return true for valid types", () => {
+  it("returns true for valid types", () => {
     INPUT_OUTPUT_TYPES.forEach(type => {
       expect(isValidInputOutputType(type)).toBe(true);
     });
   });
 
-  it("should return false for invalid types", () => {
+  it("returns false for invalid types", () => {
     const invalidTypes = [
       "invalid",
       "TEXT", // case sensitive
@@ -75,7 +75,7 @@ describe("isValidInputOutputType", () => {
     });
   });
 
-  it("should handle edge cases", () => {
+  it("handles edge cases", () => {
     expect(isValidInputOutputType("unknown_type")).toBe(false);
     expect(isValidInputOutputType("text_extended")).toBe(false);
     expect(isValidInputOutputType("json_data")).toBe(false);
@@ -84,7 +84,7 @@ describe("isValidInputOutputType", () => {
 
 describe("processSpanInputOutput", () => {
   describe("explicit type scenarios", () => {
-    it("should process text type correctly", () => {
+    it("processes text type correctly", () => {
       const result = processSpanInputOutput("text", "Hello world");
 
       expect(result).toEqual({
@@ -93,7 +93,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should process raw type correctly", () => {
+    it("processes raw type correctly", () => {
       const result = processSpanInputOutput("raw", "Raw content");
 
       expect(result).toEqual({
@@ -102,7 +102,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should process chat_messages type correctly", () => {
+    it("processes chat_messages type correctly", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi there!" }
@@ -114,7 +114,7 @@ describe("processSpanInputOutput", () => {
       expect(Array.isArray(result.value)).toBe(true);
     });
 
-    it("should process list type correctly", () => {
+    it("processes list type correctly", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Item 1" },
         { type: "text", value: "Item 2" }
@@ -126,7 +126,7 @@ describe("processSpanInputOutput", () => {
       expect(Array.isArray(result.value)).toBe(true);
     });
 
-    it("should process json type correctly", () => {
+    it("processes json type correctly", () => {
       const jsonData = { key: "value", number: 42, nested: { array: [1, 2, 3] } };
 
       const result = processSpanInputOutput("json", jsonData);
@@ -137,13 +137,13 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should handle invalid type gracefully", () => {
+    it("handles invalid type gracefully", () => {
       const result = processSpanInputOutput("invalid_type", "test");
 
       expect(result.type).toBe("json");
     });
 
-    it("should convert non-string to string for text type", () => {
+    it("converts non-string to string for text type", () => {
       const result = processSpanInputOutput("text", 123);
 
       expect(result).toEqual({
@@ -152,14 +152,14 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should handle non-array for chat_messages", () => {
+    it("handles non-array for chat_messages", () => {
       const result = processSpanInputOutput("chat_messages", "not an array");
 
       expect(result.type).toBe("chat_messages");
       expect(Array.isArray(result.value)).toBe(true);
     });
 
-    it("should handle invalid JSON gracefully", () => {
+    it("handles invalid JSON gracefully", () => {
       const circularObj: any = {};
       circularObj.self = circularObj;
 
@@ -170,7 +170,7 @@ describe("processSpanInputOutput", () => {
       expect(result.value).toBeDefined();
     });
 
-    it("should prefer explicit type over auto-detection", () => {
+    it("prefers explicit type over auto-detection", () => {
       // This object would normally auto-detect as "json", but explicit "text" should be preferred
       const obj = { key: "value" };
       const result = processSpanInputOutput("text", obj);
@@ -179,7 +179,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should prefer explicit json type for string input", () => {
+    it("prefers explicit json type for string input", () => {
       // This string would normally auto-detect as "text", but explicit "json" should be preferred
       const result = processSpanInputOutput("json", "Hello world");
 
@@ -187,7 +187,7 @@ describe("processSpanInputOutput", () => {
       expect(result.value).toBe("Hello world");
     });
 
-    it("should prefer explicit raw type for complex object", () => {
+    it("prefers explicit raw type for complex object", () => {
       const complexObj = { nested: { data: [1, 2, 3] } };
       const result = processSpanInputOutput("raw", complexObj);
 
@@ -197,7 +197,7 @@ describe("processSpanInputOutput", () => {
   });
 
   describe("auto-detection scenarios", () => {
-    it("should auto-detect string as text", () => {
+    it("autoes-detect string as text", () => {
       const result = processSpanInputOutput("Hello world");
 
       expect(result).toEqual({
@@ -206,7 +206,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should auto-detect null/undefined as json", () => {
+    it("autoes-detect null/undefined as json", () => {
       const nullResult = processSpanInputOutput(null);
       const undefinedResult = processSpanInputOutput(undefined);
 
@@ -221,7 +221,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should auto-detect single chat message", () => {
+    it("autoes-detect single chat message", () => {
       const message: ChatMessage = { role: "user", content: "Hello" };
       const result = processSpanInputOutput(message);
 
@@ -231,7 +231,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should auto-detect chat message array", () => {
+    it("autoes-detect chat message array", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi!" }
@@ -245,7 +245,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should auto-detect mixed array as list", () => {
+    it("autoes-detect mixed array as list", () => {
       const mixedArray = ["text", 123, { key: "value" }];
       const result = processSpanInputOutput(mixedArray);
 
@@ -253,7 +253,7 @@ describe("processSpanInputOutput", () => {
       expect(Array.isArray(result.value)).toBe(true);
     });
 
-    it("should auto-detect object as json", () => {
+    it("autoes-detect object as json", () => {
       const obj = {
         string: "test",
         number: 42,
@@ -269,7 +269,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should handle primitives", () => {
+    it("handles primitives", () => {
       const numberResult = processSpanInputOutput(42);
       const booleanResult = processSpanInputOutput(true);
 
@@ -280,7 +280,7 @@ describe("processSpanInputOutput", () => {
       expect(booleanResult.value).toBe("true");
     });
 
-    it("should handle empty array", () => {
+    it("handles empty array", () => {
       const result = processSpanInputOutput([]);
 
       expect(result).toEqual({
@@ -289,7 +289,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should handle empty object", () => {
+    it("handles empty object", () => {
       const result = processSpanInputOutput({});
 
       expect(result).toEqual({
@@ -298,7 +298,7 @@ describe("processSpanInputOutput", () => {
       });
     });
 
-    it("should handle complex nested structures", () => {
+    it("handles complex nested structures", () => {
       const complex = {
         users: [
           { id: 1, messages: [{ role: "user", content: "Hello" }] },
@@ -319,7 +319,7 @@ describe("processSpanInputOutput", () => {
   });
 
   describe("edge cases and error handling", () => {
-    it("should handle functions gracefully", () => {
+    it("handles functions gracefully", () => {
       const fn = () => "test";
       const result = processSpanInputOutput(fn);
 
@@ -328,7 +328,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should handle symbols gracefully", () => {
+    it("handles symbols gracefully", () => {
       const sym = Symbol("test");
       const result = processSpanInputOutput(sym);
 
@@ -337,7 +337,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should handle dates", () => {
+    it("handles dates", () => {
       const date = new Date("2024-01-01");
       const result = processSpanInputOutput(date);
 
@@ -346,7 +346,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should handle regular expressions", () => {
+    it("handles regular expressions", () => {
       const regex = /test/g;
       const result = processSpanInputOutput(regex);
 
@@ -355,7 +355,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should handle bigint gracefully", () => {
+    it("handles bigint gracefully", () => {
       const bigIntValue = BigInt(123);
       const result = processSpanInputOutput(bigIntValue);
 
@@ -364,7 +364,7 @@ describe("processSpanInputOutput", () => {
       expect(typeof result.value).toBe("string");
     });
 
-    it("should handle malformed chat messages", () => {
+    it("handles malformed chat messages", () => {
       const malformedMessages = [
         { role: "user" }, // missing content
         { content: "Hello" }, // missing role
@@ -379,7 +379,7 @@ describe("processSpanInputOutput", () => {
   });
 
   describe("validation fallbacks", () => {
-    it("should handle extreme edge cases gracefully", () => {
+    it("handles extreme edge cases gracefully", () => {
       // Test with undefined values
       const result1 = processSpanInputOutput("text", undefined);
       expect(result1.type).toBe("text");
@@ -397,7 +397,7 @@ describe("processSpanInputOutput", () => {
       expect(result2.type).toBe("json");
     });
 
-    it("should handle objects with safe fallback", () => {
+    it("handles objects with safe fallback", () => {
       // Test objects that can't be JSON serialized
       const objWithCircularRef: any = { name: "test" };
       objWithCircularRef.self = objWithCircularRef;
@@ -407,7 +407,7 @@ describe("processSpanInputOutput", () => {
       expect(result.value).toBeDefined();
     });
 
-    it("should handle non-serializable objects gracefully", () => {
+    it("handles non-serializable objects gracefully", () => {
       // Test with objects that have non-serializable properties
       const objWithFunction = {
         data: "test",
@@ -419,7 +419,7 @@ describe("processSpanInputOutput", () => {
       expect(result.value).toBeDefined();
     });
 
-    it("should provide meaningful fallback for objects in text mode", () => {
+    it("provides meaningful fallback for objects in text mode", () => {
       const obj = { key: "value" };
       const result = processSpanInputOutput("text", obj);
 
@@ -428,7 +428,7 @@ describe("processSpanInputOutput", () => {
       expect(result.value).toBe(JSON.stringify(obj)); // Objects are JSON stringified for text type
     });
 
-    it("should handle circular references gracefully", () => {
+    it("handles circular references gracefully", () => {
       const circular: any = { name: "test" };
       circular.self = circular;
 
@@ -441,7 +441,7 @@ describe("processSpanInputOutput", () => {
 });
 
 describe("SpanInputOutputMethod type", () => {
-  it("should define correct method signatures", () => {
+  it("defines correct method signatures", () => {
     // This test verifies that the type definition is correct
     // by creating a mock function that implements the interface
     const mockMethod: SpanInputOutputMethod<void> = (
@@ -471,7 +471,7 @@ describe("SpanInputOutputMethod type", () => {
 });
 
 describe("integration scenarios", () => {
-  it("should handle realistic LLM input/output", () => {
+  it("handles realistic LLM input/output", () => {
     const input = processSpanInputOutput("chat_messages", [
       { role: "system", content: "You are a helpful assistant." },
       { role: "user", content: "What is the capital of France?" }
@@ -487,7 +487,7 @@ describe("integration scenarios", () => {
     expect(Array.isArray(output.value)).toBe(true);
   });
 
-  it("should handle tool call scenarios", () => {
+  it("handles tool call scenarios", () => {
     const toolInput = processSpanInputOutput("json", {
       function: "get_weather",
       arguments: { location: "Paris", unit: "celsius" }
@@ -503,7 +503,7 @@ describe("integration scenarios", () => {
     expect(toolOutput.type).toBe("json");
   });
 
-  it("should handle RAG context scenarios", () => {
+  it("handles RAG context scenarios", () => {
     const contexts = [
       "Paris is the capital and most populous city of France.",
       "Paris is located in northern central France, in a north-bending arc of the river Seine.",
@@ -518,7 +518,7 @@ describe("integration scenarios", () => {
     expect(Array.isArray(result.value)).toBe(true);
   });
 
-  it("should handle streaming scenarios", () => {
+  it("handles streaming scenarios", () => {
     const chunks = [
       "The",
       " capital",
@@ -537,7 +537,7 @@ describe("integration scenarios", () => {
     expect(result.value).toHaveLength(6);
   });
 
-  it("should handle auto-detection in real scenarios", () => {
+  it("handles auto-detection in real scenarios", () => {
     // Auto-detect string
     const stringResult = processSpanInputOutput("Simple string input");
     expect(stringResult.type).toBe("text");

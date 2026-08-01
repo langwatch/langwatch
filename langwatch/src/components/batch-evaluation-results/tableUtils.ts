@@ -4,18 +4,56 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
 import { getImageUrl } from "~/components/ExternalImage";
 
-/** Estimated row height for virtualization */
-export const ROW_HEIGHT = 180;
+/**
+ * How much of a cell's content shows before it needs expanding. Applies
+ * uniformly to every cell in a row (dataset columns via
+ * {@link ExpandableDatasetCell}, target columns via {@link BatchTargetCell})
+ * so a row's cells all clip at the same height.
+ */
+export type RowHeight = "s" | "m" | "l";
+
+export const ROW_HEIGHT_OPTIONS: ReadonlyArray<{
+  value: RowHeight;
+  label: string;
+}> = [
+  { value: "s", label: "Small" },
+  { value: "m", label: "Medium" },
+  { value: "l", label: "Large" },
+];
+
+export const DEFAULT_ROW_HEIGHT: RowHeight = "m";
+
+/** Max height (px) for a cell's collapsed content, per row-height tier. */
+export const COLLAPSED_CELL_HEIGHT_PX: Record<RowHeight, number> = {
+  s: 60,
+  m: 140,
+  l: 360,
+};
+
+/**
+ * Estimated row height for virtualization, per tier — keeps the
+ * virtualizer's first-paint guess close to the real height so switching
+ * tiers doesn't visibly jump before dynamic measurement catches up.
+ */
+export const ESTIMATED_ROW_HEIGHT_PX: Record<RowHeight, number> = {
+  s: 100,
+  m: 180,
+  l: 400,
+};
 
 /**
  * Calculate minimum table width based on column counts
  * Row number (40) + dataset cols (210 each) + target cols (300 each)
+ * + comparison winner cols (240 each — see ComparisonWinnerCell).
  */
 export const calculateMinTableWidth = (
   datasetColCount: number,
   targetColCount: number,
+  comparisonColCount = 0,
 ): number => {
-  return 40 + datasetColCount * 210 + targetColCount * 300;
+  return (
+    40 + datasetColCount * 210 + targetColCount * 300 + comparisonColCount * 240
+  );
 };
 
 /**

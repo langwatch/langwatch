@@ -12,7 +12,7 @@
  *     mapToOcsfRow (real composition) →
  *     GovernanceOcsfEventsClickHouseRepository.insertEvent (real CH client) →
  *     governance_ocsf_events row in real ClickHouse →
- *     PG IngestionSource cursor + status update (real Prisma)
+ *     durable pull-effect outcome returned to the process outbox
  *
  * The unit tier (`pullerWorker.dispatch.unit.test.ts`) covers the dispatch
  * branches with mocked storage; this tier proves the framework actually
@@ -21,18 +21,18 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
-import http from "http";
-import type { AddressInfo } from "net";
 
-import { type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
+import http from "http";
 import { nanoid } from "nanoid";
+import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-
-import { runIngestionPullerJob } from "../pullerWorker";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
+import { runIngestionPull } from "../pullerWorker";
 
 const ns = `puller-e2e-${nanoid(8)}`;
 
@@ -165,29 +165,20 @@ afterAll(async () => {
       })
       .catch(() => {});
   }
-  await prisma.ingestionSource
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.project
-    .deleteMany({ where: { team: { organizationId } } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { id: organizationId } })
-    .catch(() => {});
+  await cleanupTestRows(prisma, [
+    ["ingestionSource", { organizationId }],
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { id: organizationId }],
+  ]);
 });
 
 describe("PullerAdapter framework — end-to-end with real CH + real fetch", () => {
   it("fetches a paginated audit-log feed and lands one OCSF row per event", async () => {
-    await runIngestionPullerJob({
-      id: `job-${ns}`,
-      data: {
-        ingestionSourceId,
-        scheduledAt: Date.now(),
-      },
-    } as any);
+    const outcome = await runIngestionPull({
+      sourceId: ingestionSourceId,
+      cursor: null,
+    });
 
     const govProject = await ensureHiddenGovernanceProject(
       prisma,
@@ -228,9 +219,9 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
 
     expect(rows).toHaveLength(3);
     expect(rows.map((r) => r.EventId)).toEqual([
-      "claude_compliance:evt-001",
-      "claude_compliance:evt-002",
-      "claude_compliance:evt-003",
+      `claude_compliance:${ingestionSourceId}:evt-001`,
+      `claude_compliance:${ingestionSourceId}:evt-002`,
+      `claude_compliance:${ingestionSourceId}:evt-003`,
     ]);
     expect(rows[0]).toMatchObject({
       ActorEmail: "alice@acme.test",
@@ -238,17 +229,18 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
       TargetName: "claude-sonnet-4-6",
       SourceType: "claude_compliance",
       TenantId: govProjectId,
-      TraceId: "pull:claude_compliance:evt-001",
+      TraceId: `pull:claude_compliance:${ingestionSourceId}:evt-001`,
     });
 
-    // PG side: cursor drained (null), status promoted to active,
-    // lastEventAt stamped.
+    // The effect reports its outcome; the event-sourced completion command
+    // and projection own durable cursor/status updates.
+    expect(outcome).toEqual({ nextCursor: null, eventCount: 3 });
     const updated = await prisma.ingestionSource.findUnique({
       where: { id: ingestionSourceId },
     });
     expect(updated?.pollerCursor).toBeNull();
-    expect(updated?.status).toBe("active");
-    expect(updated?.lastEventAt).toBeInstanceOf(Date);
+    expect(updated?.status).toBe("awaiting_first_event");
+    expect(updated?.lastEventAt).toBeNull();
     expect(updated?.errorCount).toBe(0);
   });
 });

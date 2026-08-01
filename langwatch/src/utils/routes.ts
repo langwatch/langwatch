@@ -19,39 +19,48 @@ export const projectRoutes = {
     path: "/[project]/traces",
     title: "Trace Explorer",
   },
+  traces_v2_trace: {
+    path: "/[project]/traces/[trace]",
+    title: "Trace",
+    parent: "traces_v2",
+  },
   evaluations: {
     path: "/[project]/evaluations",
-    title: "Evaluations",
+    title: "Experiments",
+  },
+  online_evaluations: {
+    path: "/[project]/online-evaluations",
+    title: "Online Evaluations",
   },
   evaluations_new_choose: {
     path: "/[project]/evaluations/new/choose",
     title: "New Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_new: {
     path: "/[project]/evaluations/new",
     title: "New Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_edit_choose: {
     path: "/[project]/evaluations/[id]/edit/choose",
     title: "Editing Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   evaluations_edit: {
     path: "/[project]/evaluations/[id]/edit",
     title: "Editing Evaluation",
-    parent: "evaluations",
+    parent: "online_evaluations",
   },
   experiments_workbench: {
     path: "/[project]/experiments/workbench/[slug]",
     title: "Experiments Workbench",
-    parent: "evaluations",
+    parent: "experiments",
   },
   evaluations_wizard: {
     path: "/[project]/evaluations/wizard/[slug]",
     title: "Evaluation Wizard",
-    parent: "evaluations",
+    parent: "experiments",
   },
   experiments: {
     path: "/[project]/experiments",
@@ -117,6 +126,30 @@ export const projectRoutes = {
   triggers: {
     path: "/[project]/triggers",
     title: "Triggers",
+  },
+  automations: {
+    path: "/[project]/automations",
+    title: "Automations",
+  },
+  automations_automations: {
+    path: "/[project]/automations/automations",
+    title: "Automations",
+    parent: "automations",
+  },
+  automations_alerts: {
+    path: "/[project]/automations/alerts",
+    title: "Alerts",
+    parent: "automations",
+  },
+  automations_schedules: {
+    path: "/[project]/automations/schedules",
+    title: "Schedules",
+    parent: "automations",
+  },
+  automations_activity: {
+    path: "/[project]/automations/activity",
+    title: "Recent activity",
+    parent: "automations",
   },
   prompts: {
     path: "/[project]/prompts",

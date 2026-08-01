@@ -70,6 +70,27 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
       | x-litellm-vertex_location          | vertex_ai.vertex_location              |
       | x-litellm-api_version              | azure.api_version                      |
 
+  @integration @v1 @unimplemented
+  Scenario Outline: provider-prefixed models route to the matching provider
+    Given the TS app sends "x-litellm-model: <model>" and "x-litellm-api_key: k" with the playground request
+    When nlpgo forwards the request to the gateway
+    Then the dispatch credential's provider is "<provider>"
+    And the outbound model id is "<bare_model>"
+
+    Examples:
+      | model                  | provider | bare_model      |
+      | openai/gpt-5-mini      | openai   | gpt-5-mini      |
+      | xai/grok-4.3           | xai      | grok-4.3        |
+      | groq/llama-3.3-70b     | groq     | llama-3.3-70b   |
+      | cerebras/llama-3.3-70b | cerebras | llama-3.3-70b   |
+      | deepseek/deepseek-chat | deepseek | deepseek-chat   |
+
+  @integration @v1 @unimplemented
+  Scenario: DeepSeek routes through the OpenAI-compatible path with its public endpoint
+    Given the TS app sends "x-litellm-model: deepseek/deepseek-chat" with an api_key and no api_base
+    When nlpgo forwards the request to the gateway
+    Then the gateway dispatches an OpenAI-shape call to DeepSeek's public API endpoint
+
   # ============================================================================
   # Streaming pass-through
   # ============================================================================

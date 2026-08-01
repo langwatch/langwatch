@@ -14,11 +14,11 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { maybeSpool, type SpoolLogger } from "../edge-spool";
-import { COMMAND_INLINE_THRESHOLD } from "../lean-for-projection";
+import { describe, expect, it, vi } from "vitest";
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { BlobStore } from "../blob-store.service";
+import { maybeSpool, type SpoolLogger } from "../edge-spool";
+import { COMMAND_INLINE_THRESHOLD } from "../lean-for-projection";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +29,11 @@ const TRACE_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaabb";
 const SPAN_ID = "bbbbbbbbbbbbbbbb";
 
 /** Build a RecordSpanCommandData with a langwatch.output of `outputSize` bytes. */
-function makeCommandData({ outputSize }: { outputSize: number }): RecordSpanCommandData {
+function makeCommandData({
+  outputSize,
+}: {
+  outputSize: number;
+}): RecordSpanCommandData {
   return {
     tenantId: TENANT_ID,
     occurredAt: 1700000000000,
@@ -79,7 +83,9 @@ function makeBlobStore({
 }
 
 function makeLogger(): SpoolLogger & { warn: ReturnType<typeof vi.fn> } {
-  return { warn: vi.fn() } as unknown as SpoolLogger & { warn: ReturnType<typeof vi.fn> };
+  return { warn: vi.fn() } as unknown as SpoolLogger & {
+    warn: ReturnType<typeof vi.fn>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +110,10 @@ describe("given a command payload ≤ COMMAND_INLINE_THRESHOLD (256 KB)", () => 
       expect(result.spoolRef).toBeUndefined();
 
       // putSpool was never called
-      expect((blobStore as unknown as { putSpool: ReturnType<typeof vi.fn> }).putSpool).not.toHaveBeenCalled();
+      expect(
+        (blobStore as unknown as { putSpool: ReturnType<typeof vi.fn> })
+          .putSpool,
+      ).not.toHaveBeenCalled();
     });
   });
 });
@@ -161,9 +170,9 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PU
       const outputAttr = result.span.attributes?.find(
         (a) => a.key === "langwatch.output",
       );
-      expect(Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8")).toBe(
-        300 * 1024,
-      );
+      expect(
+        Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
+      ).toBe(300 * 1024);
     });
 
     it("emits a warn log containing 'oversize protection skipped'", async () => {

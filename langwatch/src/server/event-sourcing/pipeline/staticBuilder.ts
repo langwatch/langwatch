@@ -1,9 +1,11 @@
+import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type {
   CommandHandlerOptions,
-  NoCommands, PipelineMetadata, RegisteredCommand,
-  StaticPipelineDefinition
+  NoCommands,
+  PipelineMetadata,
+  RegisteredCommand,
+  StaticPipelineDefinition,
 } from "..";
-import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandler } from "../commands/command";
 import type {
   CommandHandlerClass,
@@ -12,22 +14,42 @@ import type {
 } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import {
+  buildProcessManager,
+  type ProcessManagerApplier,
+} from "./processBuilder";
+import type {
+  ProcessManagerDefinition,
+  SubscriberSpec,
+  TriggerContext,
+} from "./processManagerDefinition";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
 export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
-  [K in C as K extends { name: infer N extends string } ? N : never]:
-    K extends { payload: infer P } ? P : never;
+  [K in C as K extends { name: infer N extends string }
+    ? N
+    : never]: K extends { payload: infer P } ? P : never;
 };
 
 // Convenience: command name union from a StaticPipelineDefinition
 export type CommandNamesFromPipeline<
-  P extends StaticPipelineDefinition<any, any, any>
-> = keyof CommandsUnionToRegistry<P extends StaticPipelineDefinition<any, any, infer C> ? C : never>;
+  P extends StaticPipelineDefinition<any, any, any>,
+> = keyof CommandsUnionToRegistry<
+  P extends StaticPipelineDefinition<any, any, infer C> ? C : never
+>;
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
@@ -66,7 +88,8 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
     Record<string, Projection>,
     NoCommands,
     never,
-    never
+    never,
+    Record<never, never>
   > {
     return new StaticPipelineBuilderWithNameAndType(this.name, aggregateType);
   }
@@ -81,10 +104,14 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
 
 export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
-  RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
+  RegisteredProjections extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
   RegisteredCommands extends RegisteredCommand = NoCommands,
   FoldNames extends string = never,
   MapNames extends string = never,
+  RegisteredFoldStates extends Record<string, unknown> = Record<never, never>,
 > {
   private foldProjections = new Map<
     string,
@@ -100,6 +127,10 @@ export class StaticPipelineBuilderWithNameAndType<
       options?: MapProjectionOptions;
     }
   >();
+  private stateProjections = new Map<
+    string,
+    StateProjectionDefinition<any, EventType>
+  >();
   private commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
@@ -113,6 +144,11 @@ export class StaticPipelineBuilderWithNameAndType<
   private mapReactors = new Map<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
+  >();
+  private processManagers = new Map<string, ProcessManagerDefinition>();
+  private eventSubscribers = new Map<
+    string,
+    EventSubscriberDefinition<EventType>
   >();
   private featureFlagService?: FeatureFlagServiceInterface;
 
@@ -129,16 +165,17 @@ export class StaticPipelineBuilderWithNameAndType<
    * @param options - Optional configuration for projection processing
    * @returns Builder instance for method chaining
    */
-  withFoldProjection<ProjectionName extends string>(
+  withFoldProjection<ProjectionName extends string, State>(
     name: ProjectionName,
-    definition: FoldProjectionDefinition<any, EventType>,
+    definition: FoldProjectionDefinition<State, EventType>,
     options?: FoldProjectionOptions,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
     RegisteredCommands,
     FoldNames | ProjectionName,
-    MapNames
+    MapNames,
+    RegisteredFoldStates & Record<ProjectionName, State>
   > {
     if (this.foldProjections.has(name)) {
       throw new ConfigurationError(
@@ -170,7 +207,8 @@ export class StaticPipelineBuilderWithNameAndType<
     RegisteredProjections,
     RegisteredCommands,
     FoldNames,
-    MapNames | MapName
+    MapNames | MapName,
+    RegisteredFoldStates
   > {
     if (this.mapProjections.has(name)) {
       throw new ConfigurationError(
@@ -186,6 +224,38 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
+   * Register the default operational state projection.
+   *
+   * It runs as one direct repository load/apply/store cycle under the queue's
+   * per-key lock. It is intentionally not a valid parent for `.withReactor()`.
+   */
+  withProjection(
+    name: string,
+    definition: StateProjectionDefinition<any, EventType>,
+  ): this {
+    if (name !== definition.name) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Projection name mismatch: arg "${name}" !== definition.name "${definition.name}"`,
+        { projectionName: name, definitionName: definition.name },
+      );
+    }
+    if (
+      this.stateProjections.has(name) ||
+      this.foldProjections.has(name) ||
+      this.mapProjections.has(name)
+    ) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Projection with name "${name}" already exists`,
+        { projectionName: name },
+      );
+    }
+    this.stateProjections.set(name, definition);
+    return this;
+  }
+
+  /**
    * Register a feature flag service for kill switches.
    * When provided, enables automatic feature flag-based kill switches for all components.
    *
@@ -196,6 +266,203 @@ export class StaticPipelineBuilderWithNameAndType<
     featureFlagService: FeatureFlagServiceInterface,
   ): this {
     this.featureFlagService = featureFlagService;
+    return this;
+  }
+
+  /** Register a live event consumer that receives no projection state. */
+  withEventSubscriber(
+    subscriberName: string,
+    definition: EventSubscriberDefinition<EventType>,
+  ): this {
+    if (subscriberName !== definition.name) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Event subscriber name mismatch: arg "${subscriberName}" !== definition.name "${definition.name}"`,
+        { subscriberName, definitionName: definition.name },
+      );
+    }
+    if (this.eventSubscribers.has(subscriberName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Event subscriber with name "${subscriberName}" already exists`,
+        { subscriberName },
+      );
+    }
+    this.eventSubscribers.set(subscriberName, definition);
+    return this;
+  }
+
+  /**
+   * The best-effort reaction primitive (ADR-052). One trigger descriptor:
+   * `fold`/`map` stages the handler after that projection commits the event
+   * (with the committed state in `ctx.state`); `events` fires on raw
+   * delivery and doubles as a filter when combined with `fold`/`map`.
+   * Retry is queue redelivery — use only where losing one is harmless.
+   */
+  withSubscriber<Fold extends FoldNames & keyof RegisteredFoldStates & string>(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType> & {
+      fold: Fold;
+      handler: (
+        event: EventType,
+        context: TriggerContext<RegisteredFoldStates[Fold]>,
+      ) => Promise<void>;
+    },
+  ): this;
+  withSubscriber(subscriberName: string, spec: SubscriberSpec<EventType>): this;
+  withSubscriber(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType>,
+  ): this {
+    const nameTaken =
+      this.eventSubscribers.has(subscriberName) ||
+      this.foldReactors.has(subscriberName) ||
+      this.mapReactors.has(subscriberName);
+    if (nameTaken) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber with name "${subscriberName}" already exists`,
+        { subscriberName },
+      );
+    }
+
+    if (spec.fold !== undefined || spec.map !== undefined) {
+      const projectionName = (spec.fold ?? spec.map)!;
+      const isFold = spec.fold !== undefined;
+      if (isFold && !this.foldProjections.has(projectionName)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
+          { subscriberName, projectionName },
+        );
+      }
+      if (!isFold && !this.mapProjections.has(projectionName)) {
+        throw new ConfigurationError(
+          "StaticPipelineBuilder",
+          `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
+          { subscriberName, projectionName },
+        );
+      }
+      const eventFilter =
+        spec.events !== undefined ? new Set<string>(spec.events) : null;
+      const passes = (event: EventType): boolean => {
+        if (eventFilter && !eventFilter.has(event.type)) return false;
+        return spec.when?.(event) ?? true;
+      };
+      const definition: ReactorDefinition<EventType> = {
+        name: subscriberName,
+        options: {
+          deduplication: (() => {
+            const defaultId = (event: Event) =>
+              `${event.tenantId}:${String(event.aggregateId)}`;
+            const customDedup =
+              spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
+            if (customDedup) {
+              return {
+                ...customDedup,
+                makeId: (payload: { event: Event; foldState: unknown }) =>
+                  `subscriber:${subscriberName}:${customDedup.makeId(payload.event as EventType)}`,
+                ttlMs: spec.ttl ?? customDedup.ttlMs,
+              };
+            }
+            return {
+              makeId: (payload: { event: Event; foldState: unknown }) =>
+                `subscriber:${subscriberName}:${
+                  spec.dedupId
+                    ? spec.dedupId(payload.event as EventType)
+                    : defaultId(payload.event)
+                }`,
+              ttlMs: spec.ttl ?? 30_000,
+            };
+          })(),
+          delay: spec.delay ?? 0,
+          // Reactor payloads wrap the event; adapt the spec's event-shaped
+          // key so fold/map subscribers get the same lane semantics as raw
+          // ones instead of a silently dropped option.
+          groupKeyFn: spec.groupKeyFn
+            ? (payload: { event: Event; foldState: unknown }) =>
+                spec.groupKeyFn!(payload.event as EventType)
+            : undefined,
+        },
+        // Pre-enqueue rejection: a filtered event never pays serialization.
+        shouldReact: passes,
+        handle: async (event, context) => {
+          if (!passes(event)) return;
+          await spec.handler(event, {
+            tenantId: context.tenantId,
+            aggregateId: context.aggregateId,
+            state: context.foldState,
+          });
+        },
+      };
+      if (isFold) {
+        this.foldReactors.set(subscriberName, { projectionName, definition });
+      } else {
+        this.mapReactors.set(subscriberName, { projectionName, definition });
+      }
+      return this;
+    }
+
+    this.eventSubscribers.set(subscriberName, {
+      name: subscriberName,
+      eventTypes: spec.events ?? [],
+      options: {
+        delay: spec.delay,
+        groupKeyFn: spec.groupKeyFn,
+        deduplication:
+          spec.dedup ??
+          (spec.dedupId
+            ? {
+                makeId: (event) =>
+                  `subscriber:${subscriberName}:${spec.dedupId!(event)}`,
+                ttlMs: spec.ttl,
+              }
+            : undefined),
+      },
+      handle: async (event, context) => {
+        if (spec.when && !spec.when(event)) return;
+        await spec.handler(event, {
+          tenantId: context.tenantId,
+          aggregateId: context.aggregateId,
+          state: undefined,
+        });
+      },
+    });
+    return this;
+  }
+
+  /**
+   * Mount a process manager (ADR-049/052) on this pipeline — the promised
+   * reaction primitive. Author it with the staged callback builder:
+   *
+   *   .withProcessManager("triggerSettlement", triggerSettlementPM(deps))
+   *
+   * where the domain exports `(deps) => (pm) => pm.state(…).intent(…)…`.
+   * The runtime owns its manager, the shared process-outbox and wake
+   * workers, and the trigger adapters generated from its triggers.
+   */
+  withProcessManager(
+    name: string,
+    applier: ProcessManagerApplier<EventType>,
+  ): this;
+  withProcessManager(definition: ProcessManagerDefinition<any, any, any>): this;
+  withProcessManager(
+    definitionOrName: ProcessManagerDefinition<any, any, any> | string,
+    applier?: ProcessManagerApplier<EventType>,
+  ): this {
+    const definition =
+      typeof definitionOrName === "string"
+        ? buildProcessManager({ name: definitionOrName, applier: applier! })
+        : definitionOrName;
+    const name = definition.config.name;
+    if (this.processManagers.has(name)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Process manager "${name}" already declared on this pipeline`,
+        { name },
+      );
+    }
+    this.processManagers.set(name, definition);
     return this;
   }
 
@@ -214,7 +481,9 @@ export class StaticPipelineBuilderWithNameAndType<
     reactorName: string,
     definition: ReactorDefinition<EventType>,
   ): this {
-    if (this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName)) {
+    const nameTaken =
+      this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName);
+    if (nameTaken) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
         `Reactor with name "${reactorName}" already exists`,
@@ -259,7 +528,8 @@ export class StaticPipelineBuilderWithNameAndType<
     | RegisteredCommands
     | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
     FoldNames,
-    MapNames
+    MapNames,
+    RegisteredFoldStates
   > {
     if (this.commands.some((c) => c.name === name)) {
       throw new ConfigurationError(
@@ -276,7 +546,8 @@ export class StaticPipelineBuilderWithNameAndType<
       | RegisteredCommands
       | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
       FoldNames,
-      MapNames
+      MapNames,
+      RegisteredFoldStates
     >;
   }
 
@@ -306,7 +577,8 @@ export class StaticPipelineBuilderWithNameAndType<
     | RegisteredCommands
     | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
     FoldNames,
-    MapNames
+    MapNames,
+    RegisteredFoldStates
   > {
     if (this.commands.some((c) => c.name === name)) {
       throw new ConfigurationError(
@@ -320,7 +592,11 @@ export class StaticPipelineBuilderWithNameAndType<
     // and the zero-arg constructor won't be called since handlerInstance is provided.
     this.commands.push({
       name,
-      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
+      handlerClass: handlerClass as unknown as CommandHandlerClass<
+        any,
+        any,
+        any
+      >,
       handlerInstance: instance,
       options,
     });
@@ -330,7 +606,8 @@ export class StaticPipelineBuilderWithNameAndType<
       | RegisteredCommands
       | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
       FoldNames,
-      MapNames
+      MapNames,
+      RegisteredFoldStates
     >;
   }
 
@@ -362,6 +639,19 @@ export class StaticPipelineBuilderWithNameAndType<
           eventTypes: def.definition.eventTypes as string[],
         }),
       ),
+      stateProjections: Array.from(this.stateProjections.entries()).map(
+        ([name, definition]) => ({
+          name,
+          handlerClassName: `Projection(${definition.name})`,
+          eventTypes: [...definition.eventTypes],
+        }),
+      ),
+      subscribers: Array.from(this.eventSubscribers.values()).map(
+        (subscriber) => ({
+          name: subscriber.name,
+          eventTypes: [...subscriber.eventTypes],
+        }),
+      ),
       commands: this.commands.map((cmd) => ({
         name: cmd.name,
         handlerClassName: cmd.handlerClass.name,
@@ -371,10 +661,13 @@ export class StaticPipelineBuilderWithNameAndType<
     return {
       metadata,
       foldProjections: this.foldProjections,
+      stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,
       commands: this.commands,
       foldReactors: this.foldReactors,
       mapReactors: this.mapReactors,
+      eventSubscribers: this.eventSubscribers,
+      processManagers: this.processManagers,
       featureFlagService: this.featureFlagService,
 
       // Purely for typing: lets downstream code infer the command names + payloads

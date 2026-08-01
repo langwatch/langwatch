@@ -1,8 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { TeamUserRole } from "@prisma/client";
-import { teamRouter } from "../team";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
+import { teamRouter } from "../team";
+
+// Mutations audit through the global prisma, not ctx.prisma — unmocked, the
+// middleware reaches for a real database this unit environment does not have.
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
 
 // team.update writes membership to RoleBinding. A user can hold MORE THAN ONE
 // TEAM binding on a team — a built-in role plus additive custom-role grants —
@@ -10,19 +20,12 @@ import { createInnerTRPCContext } from "../../trpc";
 // (highest-privilege) binding, so a save must update just that one and PRESERVE
 // the user's other bindings. Deleting the extras would let a routine autosaved
 // edit silently revoke custom-role grants. team:manage is real authorization
-// the page passes; it's mocked to a pass-through to isolate the sync logic.
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+// the page passes; the caller is seeded as an org admin on the outer prisma
+// stub so the REAL rbac middleware resolves and grants. (No vi.mock on the
+// rbac module: under the unit pool's shared module registry a module mock can
+// silently fail to apply depending on which files preceded this one in the
+// worker, which let the real middleware run against a stub that couldn't
+// serve it. The seeded-admin path has no such order sensitivity.)
 
 const ORG_ID = "org_1";
 const TEAM_ID = "team_1";
@@ -35,12 +38,14 @@ describe("team.update", () => {
   let deleteMany: ReturnType<typeof vi.fn>;
   let update: ReturnType<typeof vi.fn>;
   let create: ReturnType<typeof vi.fn>;
+  let organizationUserCount: ReturnType<typeof vi.fn>;
   let caller: ReturnType<typeof teamRouter.createCaller>;
 
   beforeEach(() => {
     deleteMany = vi.fn().mockResolvedValue({ count: 0 });
     update = vi.fn().mockResolvedValue({});
     create = vi.fn().mockResolvedValue({});
+    organizationUserCount = vi.fn().mockResolvedValue(1);
 
     const tx = {
       team: { update: vi.fn().mockResolvedValue({}) },
@@ -48,8 +53,18 @@ describe("team.update", () => {
         // The user has a built-in MEMBER binding AND an additive custom-role
         // binding. The form displays the higher-privilege one (MEMBER).
         findMany: vi.fn().mockResolvedValue([
-          { id: MEMBER_BINDING_ID, userId: USER_ID, role: TeamUserRole.MEMBER, customRoleId: null },
-          { id: CUSTOM_BINDING_ID, userId: USER_ID, role: TeamUserRole.CUSTOM, customRoleId: CUSTOM_ROLE_ID },
+          {
+            id: MEMBER_BINDING_ID,
+            userId: USER_ID,
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+          },
+          {
+            id: CUSTOM_BINDING_ID,
+            userId: USER_ID,
+            role: TeamUserRole.CUSTOM,
+            customRoleId: CUSTOM_ROLE_ID,
+          },
         ]),
         deleteMany,
         update,
@@ -58,7 +73,30 @@ describe("team.update", () => {
     };
 
     const prisma = {
-      team: { findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }) },
+      team: {
+        findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
+      },
+      organizationUser: {
+        count: organizationUserCount,
+        // Current-org membership for the caller: the rbac resolver fails
+        // closed without it.
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
+      },
+      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      // The caller's own bindings (rbac middleware, outer prisma) — distinct
+      // from the edited user's bindings, which live on the tx stub above. An
+      // ORG-scoped ADMIN binding grants team:manage unconditionally.
+      roleBinding: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+          },
+        ]),
+      },
       $transaction: (fn: (tx: unknown) => unknown) => fn(tx),
     } as unknown as PrismaClient;
 
@@ -104,6 +142,23 @@ describe("team.update", () => {
       expect(deleteMany).toHaveBeenCalledWith({
         where: { id: { in: [MEMBER_BINDING_ID, CUSTOM_BINDING_ID] } },
       });
+    });
+  });
+
+  describe("when a submitted user belongs to another organization", () => {
+    it("rejects the update before writing bindings", async () => {
+      organizationUserCount.mockResolvedValue(0);
+
+      await expect(
+        caller.update({
+          teamId: TEAM_ID,
+          name: "Team",
+          members: [{ userId: "foreign_user", role: TeamUserRole.ADMIN }],
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
   });
 });

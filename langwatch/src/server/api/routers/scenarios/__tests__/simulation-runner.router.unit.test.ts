@@ -37,7 +37,7 @@ vi.mock("@langwatch/ksuid", () => ({
   }),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn().mockReturnValue({
     info: vi.fn(),
     warn: vi.fn(),
@@ -65,8 +65,8 @@ vi.mock("~/server/auditLog", () => ({
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { simulationRunnerRouter } from "../simulation-runner.router";
 import { createInnerTRPCContext } from "../../../trpc";
+import { simulationRunnerRouter } from "../simulation-runner.router";
 
 const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
 

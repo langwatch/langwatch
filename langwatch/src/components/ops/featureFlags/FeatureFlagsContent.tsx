@@ -3,8 +3,8 @@ import {
   Box,
   Button,
   Center,
-  HStack,
   Heading,
+  HStack,
   IconButton,
   Spinner,
   Stack,
@@ -16,7 +16,7 @@ import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { toaster } from "~/components/ui/toaster";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import type { FeatureFlagRules } from "~/server/featureFlag";
@@ -54,28 +54,21 @@ export function FeatureFlagsContent() {
     onSuccess: async () => {
       await utils.ops.listFeatureFlags.invalidate();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to update flag",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't update the flag" }),
   });
   const clearFlag = api.ops.clearFeatureFlag.useMutation({
     onSuccess: async () => {
       await utils.ops.listFeatureFlags.invalidate();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to clear override",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't clear the override" }),
   });
 
-  const grouped = useMemo(() => groupByScope(query.data?.flags ?? []), [query.data]);
+  const grouped = useMemo(
+    () => groupByScope(query.data?.flags ?? []),
+    [query.data],
+  );
 
   if (query.isLoading) {
     return (
@@ -88,7 +81,10 @@ export function FeatureFlagsContent() {
   if (query.error) {
     return (
       <Center paddingY={20}>
-        <Text color="red.500">{query.error.message}</Text>
+        <HandledErrorAlert
+          error={query.error}
+          fallbackTitle="Couldn't load feature flags"
+        />
       </Center>
     );
   }
@@ -97,9 +93,9 @@ export function FeatureFlagsContent() {
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <Box>
         <Text fontSize="sm" color="fg.muted">
-          System-scoped flags are kill switches and pipeline toggles served
-          from this LangWatch postgres database. They never round-trip to
-          PostHog, so flipping them is fast and free.{" "}
+          System-scoped flags are kill switches and pipeline toggles served from
+          this LangWatch postgres database. They never round-trip to PostHog, so
+          flipping them is fast and free.{" "}
           {isSaas
             ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
             : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
@@ -112,9 +108,7 @@ export function FeatureFlagsContent() {
         rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={({ key, enabled }) =>
-          setFlag.mutateAsync({ key, enabled })
-        }
+        onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
         onClear={({ key }) => clearFlag.mutateAsync({ key })}
         pendingKey={
           (setFlag.isPending ? setFlag.variables?.key : undefined) ??
@@ -132,9 +126,7 @@ export function FeatureFlagsContent() {
         rows={grouped.product}
         canManage={canManage}
         isSaas={isSaas}
-        onToggle={({ key, enabled }) =>
-          setFlag.mutateAsync({ key, enabled })
-        }
+        onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
         onClear={({ key }) => clearFlag.mutateAsync({ key })}
         pendingKey={
           (setFlag.isPending ? setFlag.variables?.key : undefined) ??
@@ -427,9 +419,7 @@ function FlagRowView({
         {row.storedValue !== null ? (
           <VStack align="start" gap={0}>
             <Text fontSize="xs">
-              {row.updatedAt
-                ? new Date(row.updatedAt).toLocaleString()
-                : ""}
+              {row.updatedAt ? new Date(row.updatedAt).toLocaleString() : ""}
             </Text>
             <HStack gap={2}>
               <Text fontSize="xs" color="fg.muted">
@@ -482,7 +472,10 @@ function ScopeBadge({ scope }: { scope: "SYSTEM" | "PRODUCT" }) {
   );
 }
 
-function groupByScope(rows: FlagRow[]): { system: FlagRow[]; product: FlagRow[] } {
+function groupByScope(rows: FlagRow[]): {
+  system: FlagRow[];
+  product: FlagRow[];
+} {
   return rows.reduce<{ system: FlagRow[]; product: FlagRow[] }>(
     (acc, r) => {
       if (r.scope === "SYSTEM") acc.system.push(r);

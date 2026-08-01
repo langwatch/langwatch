@@ -11,6 +11,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
+
 import type { SimulationSuite } from "@prisma/client";
 
 // The existing `vi.mock("~/hooks/useOrganizationTeamProject", ...)` below
@@ -61,7 +68,12 @@ vi.mock("~/utils/api", () => ({
     scenarios: {
       getSuiteRunData: {
         useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          data: {
+            runs: [],
+            scenarioSetIds: {},
+            hasMore: false,
+            nextCursor: undefined,
+          },
           isLoading: false,
           error: null,
         }),
@@ -133,9 +145,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuite(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "project_1",
@@ -185,8 +195,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
       expect(dashboardLayoutRenderCount).toBe(1);
     });
-
-});
+  });
 
   describe("when rendering the SuiteSidebar", () => {
     /** @scenario "Sidebar does not display a redundant SUITES label" */

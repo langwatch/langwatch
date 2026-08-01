@@ -73,7 +73,7 @@ export type VariablesSectionProps = {
   missingMappingIds?: Set<string>;
   /** Whether to show the validation error message for missing mappings (defaults to true when missingMappingIds is provided) */
   showMissingMappingsError?: boolean;
-  /** When true, highlighted fields show yellow background but not "Required" placeholder (for "at least one" validation) */
+  /** When true, highlighted fields show the missing-highlight background but not the "Required" placeholder (for "at least one" validation) */
   optionalHighlighting?: boolean;
 
   /** Set of variable identifiers that cannot be removed (locked variables) */
@@ -283,8 +283,8 @@ export const VariablesSection = ({
         missingMappingIds.size > 0 && (
           <Text
             data-testid="missing-mappings-error"
-            color="red.500"
-            fontSize="sm"
+            color="fg.error"
+            fontSize="xs"
           >
             Please map all required fields:{" "}
             {Array.from(missingMappingIds).join(", ")}
@@ -405,7 +405,7 @@ const VariableRow = ({
           fontFamily="mono"
           fontSize="13px"
           autoFocus
-          borderColor={hasError ? "red.500" : undefined}
+          borderColor={hasError ? "border.error" : undefined}
           data-testid={`variable-name-input-${variable.identifier}`}
         />
       ) : (

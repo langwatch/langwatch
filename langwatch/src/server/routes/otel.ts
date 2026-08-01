@@ -9,10 +9,14 @@
 
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import {
+  enforceApiKeyIdOnLogRequest,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
@@ -35,7 +39,6 @@ import {
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
-import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
@@ -46,6 +49,14 @@ const loggerLogs = createLogger("langwatch:otel:v1:logs");
 const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
+
+// One policy for all three OTLP signals: traces, logs and metrics are the same
+// write to the same tenant, so they answer to the same permission.
+const otelIngestAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:create"],
+  credential: "apiKey",
+});
 
 const secured = createServiceApp({ basePath: "/api/otel/v1" });
 
@@ -96,11 +107,9 @@ async function authenticate(
         ? "Authentication failed: X-Auth-Token sent but empty"
         : "Authentication failed: no auth header present",
     );
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   let resolved;
@@ -111,7 +120,8 @@ async function authenticate(
     });
   } catch (error) {
     logger.error({ ...diag, error }, "Database error during authentication");
-    return { error: "Authentication service error.", status: 500 as const };
+    const message = "Authentication service error.";
+    return { error: message, status: 500 as const, body: { message } };
   }
 
   if (!resolved) {
@@ -124,7 +134,8 @@ async function authenticate(
       },
       "Authentication failed: invalid credentials",
     );
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
@@ -146,7 +157,11 @@ async function authenticate(
       },
       "API key permission denied for traces:create",
     );
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   return { project: resolved.project, resolved };
@@ -221,6 +236,123 @@ async function enforcePlanLimit(
 }
 
 /**
+ * Everything the receiver writes onto an OTLP request on its own authority,
+ * for one signal. Two rules with different scopes live here together because
+ * they are the same concern (what the payload is not allowed to decide) and
+ * because they must not drift apart:
+ *
+ *   - `langwatch.api_key.id` is rewritten on EVERY authenticated request. The
+ *     redaction deny-list exempts that name, which is only sound while the
+ *     value cannot come from the payload, so this must never become
+ *     conditional. See enforceApiKeyIdOnTraceRequest.
+ *   - The ingest-key provenance stamp (source / origin / organization_id /
+ *     template.id) applies only to ingestion-key traffic, which is the only
+ *     traffic that has a source identity to claim.
+ *
+ * The casts bridge nullability differences between the OTLP SDK types and the
+ * structural slice these helpers mutate (resource → attributes); neither helper
+ * reads the deeper fields that differ.
+ */
+async function applyReceiverProvenanceToTraces({
+  request,
+  resolved,
+}: {
+  request: IExportTraceServiceRequest;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): Promise<void> {
+  const typedRequest = request as unknown as Parameters<
+    typeof enforceApiKeyIdOnTraceRequest
+  >[0];
+  enforceApiKeyIdOnTraceRequest(
+    typedRequest,
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
+  // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
+  // billed cost split. Gateway usage never reaches here.
+  const nonBillable = await resolveSourceNonBillable({
+    organizationId: resolved.organizationId,
+    sourceType: resolved.ingestSourceType,
+  });
+  stampIngestKeyProvenanceOnTraceRequest(
+    request as unknown as Parameters<
+      typeof stampIngestKeyProvenanceOnTraceRequest
+    >[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+      nonBillable,
+    },
+  );
+}
+
+/** {@link applyReceiverProvenanceToTraces} for the logs signal. */
+async function applyReceiverProvenanceToLogs({
+  request,
+  resolved,
+}: {
+  request: unknown;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): Promise<void> {
+  enforceApiKeyIdOnLogRequest(
+    request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Log-based tools (Claude Code et al. emit OTLP logs, not spans) need the
+  // same bundled-vs-billed resolution the trace path does; without it their
+  // cost never gets the non-billable marker and a bundled coding session reads
+  // as real spend.
+  const nonBillable = await resolveSourceNonBillable({
+    organizationId: resolved.organizationId,
+    sourceType: resolved.ingestSourceType,
+  });
+  stampIngestKeyProvenanceOnLogRequest(
+    request as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+      nonBillable,
+    },
+  );
+}
+
+/** {@link applyReceiverProvenanceToTraces} for the metrics signal. */
+function applyReceiverProvenanceToMetrics({
+  request,
+  resolved,
+}: {
+  request: unknown;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): void {
+  enforceApiKeyIdOnMetricRequest(
+    request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  stampIngestKeyProvenanceOnMetricRequest(
+    request as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+    },
+  );
+}
+
+/**
  * Best-effort extraction of customer trace_ids from an OTLP traces body.
  * Returns up to `max` unique hex-encoded trace_ids. Never throws — if the
  * body is empty, malformed, or unparsable, returns an empty array. Used to
@@ -267,7 +399,7 @@ export function peekCustomerTraceIds(
 
 // ── POST /traces ─────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
+secured.access(otelIngestAuth).post("/traces", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.traces");
 
   return tracer.withActiveSpan(
@@ -283,10 +415,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -366,36 +495,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      // Receiver-authoritative provenance stamp for ingestion-key traces.
-      // Overwrites any payload-supplied provenance keys (langwatch.source /
-      // langwatch.api_key.id / langwatch.origin / langwatch.organization_id
-      // / langwatch.template.id) — even a malicious upstream cannot forge a
-      // different source / key / org identity onto its own traces.
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        // Whether this tool's direct-OTLP usage is bundled (non-billed per
-        // token). Cached per (org, sourceType); drives the trace summary's
-        // billed-vs-non-billed cost split. Gateway usage never reaches here.
-        const nonBillable = await resolveSourceNonBillable({
-          organizationId: resolved.organizationId,
-          sourceType: resolved.ingestSourceType,
-        });
-        // OTLP SDK types and the local stamp helper agree structurally on
-        // the slice we mutate (resourceSpans → resource → attributes). The
-        // cast bridges nullability differences in deeper fields the helper
-        // never reads.
-        stampIngestKeyProvenanceOnTraceRequest(
-          traceRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnTraceRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-            nonBillable,
-          },
-        );
-      }
+      await applyReceiverProvenanceToTraces({
+        request: traceRequest,
+        resolved,
+      });
 
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
@@ -417,7 +520,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
+secured.access(otelIngestAuth).post("/logs", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.logs");
 
   return tracer.withActiveSpan(
@@ -431,10 +534,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -483,44 +583,45 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
-        // need the same bundled-vs-billed resolution the trace path does —
-        // without it their cost never gets the non-billable marker and a
-        // bundled coding session reads as real spend. Cached per
-        // (org, sourceType).
-        const nonBillable = await resolveSourceNonBillable({
-          organizationId: resolved.organizationId,
-          sourceType: resolved.ingestSourceType,
-        });
-        stampIngestKeyProvenanceOnLogRequest(
-          logRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnLogRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-            nonBillable,
-          },
-        );
-      }
+      await applyReceiverProvenanceToLogs({
+        request: logRequest,
+        resolved,
+      });
 
-      await getApp().traces.logCollection.handleOtlpLogRequest({
+      const result = await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
+        organizationId: project.team.organizationId,
         logRequest,
         piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
-      return c.json({ message: "OK" });
+      // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
+      // with `partialSuccess` as a permanent rejection the client must not
+      // re-send, so answering that here would turn a queue blip into fleet-wide
+      // data loss. 503 is in OTLP's retryable set.
+      if (result.outcome === "unavailable") {
+        return c.json({ error: result.errorMessage }, { status: 503 });
+      }
+
+      return c.json(
+        result.rejectedLogRecords > 0
+          ? {
+              partialSuccess: {
+                rejectedLogRecords: result.rejectedLogRecords,
+                ...(result.errorMessage
+                  ? { errorMessage: result.errorMessage }
+                  : {}),
+              },
+            }
+          : {},
+      );
     },
   );
 });
 
 // ── POST /metrics ────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
+secured.access(otelIngestAuth).post("/metrics", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
   return tracer.withActiveSpan(
@@ -534,10 +635,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -581,36 +679,39 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
-      // Receiver-authoritative provenance stamp for ingestion-key metrics —
-      // same contract as traces + logs, so the source / key / origin / org
-      // identity rides every OTLP signal and an upstream payload cannot forge
-      // a different one.
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        stampIngestKeyProvenanceOnMetricRequest(
-          metricsRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnMetricRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-          },
-        );
-      }
+      applyReceiverProvenanceToMetrics({
+        request: metricsRequest,
+        resolved,
+      });
 
       // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      await getApp().traces.metricCollection.handleOtlpMetricRequest({
-        tenantId: project.id,
-        metricRequest: metricsRequest,
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-      });
+      const result =
+        await getApp().traces.metricCollection.handleOtlpMetricRequest({
+          tenantId: project.id,
+          organizationId: project.team.organizationId,
+          metricRequest: metricsRequest,
+          piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+        });
 
-      return c.json({ message: "OK" });
+      // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
+      // with `partialSuccess` as a permanent rejection the client must not
+      // re-send, so answering that here would turn a queue blip into fleet-wide
+      // data loss. 503 is in OTLP's retryable set.
+      if (result.outcome === "unavailable") {
+        return c.json({ error: result.errorMessage }, { status: 503 });
+      }
+
+      if (result.rejectedDataPoints === 0) return c.json({});
+      return c.json({
+        partialSuccess: {
+          rejectedDataPoints: result.rejectedDataPoints,
+          ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
+        },
+      });
     },
   );
 });

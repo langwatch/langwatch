@@ -22,8 +22,8 @@
 import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Check, Clipboard, Eye, EyeOff } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { copyToClipboard } from "~/features/onboarding/components/sections/shared/copy-to-clipboard";
 import { codeToHtml } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
 
@@ -233,13 +233,7 @@ export function ShikiCommandBox({
       </HStack>
 
       {/* Code area */}
-      <HStack
-        align="start"
-        paddingX={3}
-        paddingY={2}
-        gap={0}
-        overflow="hidden"
-      >
+      <HStack align="start" paddingX={3} paddingY={2} gap={0} overflow="hidden">
         {/* Terminal prompt glyph — purely decorative, NOT in source string or clipboard */}
         {showPrompt && (
           <Box

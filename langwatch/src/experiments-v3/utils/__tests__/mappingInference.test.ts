@@ -13,6 +13,7 @@ import type {
   TargetConfig,
 } from "../../types";
 import {
+  deriveComparisonTargetMappings,
   findMatchingColumn,
   inferAllTargetMappings,
   inferEvaluatorMappings,
@@ -67,6 +68,41 @@ const _createTestEvaluator = (
   evaluatorType: "langevals/exact_match",
   inputs,
   mappings,
+});
+
+describe("deriveComparisonTargetMappings", () => {
+  it("uses an explicit comparison input field when configured", () => {
+    const dataset = createTestDataset("ds-1", "Dataset 1", [
+      createTestColumn("question"),
+      createTestColumn("input"),
+      createTestColumn("expected_output"),
+    ]);
+
+    const mappings = deriveComparisonTargetMappings(
+      {
+        variants: ["target-a", "target-b"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        inputField: "question",
+        includeMetrics: [],
+        randomizeOrder: true,
+      },
+      dataset,
+    );
+
+    expect(mappings.input).toEqual({
+      type: "source",
+      source: "dataset",
+      sourceId: "ds-1",
+      sourceField: "question",
+    });
+    expect(mappings.golden).toEqual({
+      type: "source",
+      source: "dataset",
+      sourceId: "ds-1",
+      sourceField: "expected_output",
+    });
+  });
 });
 
 // ============================================================================

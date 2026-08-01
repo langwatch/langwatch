@@ -6,7 +6,13 @@ import {
   UserMessage,
 } from "@copilotkit/react-ui";
 import clsx from "clsx";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
@@ -14,6 +20,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
+import { isLLMErrorType } from "~/utils/formatLLMError";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { DeletableMessage } from "./DeletableMessage";
@@ -192,14 +199,22 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
           if (isError) {
             try {
               const parsed = JSON.parse(content.replace("[ERROR]", ""));
-              // Validate parsed error has expected shape
+              // Validate parsed error has expected shape. `type` must be one
+              // of OUR failure classes, not merely a string: this payload can
+              // carry the provider's own discriminant (`api_error`), and
+              // ErrorMessage picks the customer's sentence off this field.
+              // Anything unrecognised is `unknown`, which routes to the
+              // registry's generic copy.
               if (
                 typeof parsed === "object" &&
                 parsed !== null &&
                 typeof parsed.type === "string" &&
                 typeof parsed.message === "string"
               ) {
-                parsedError = parsed;
+                parsedError = {
+                  ...parsed,
+                  type: isLLMErrorType(parsed.type) ? parsed.type : "unknown",
+                };
               } else {
                 parsedError = { type: "unknown", message: content };
               }
@@ -225,7 +240,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
                   </StructuredOutputDisplay>
                 )}
               </DeletableMessage>
-              {!isStreaming && (
+              {!isStreaming && !isError && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
             </>

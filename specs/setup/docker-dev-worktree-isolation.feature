@@ -46,14 +46,13 @@ Feature: Docker dev environment worktree isolation and startup speed
   Scenario: Rebuild command works correctly
     Given the rebuild option is selected in dev.sh
     When rebuild runs
-    Then it removes the correct named volumes (app-modules and bullboard-modules)
+    Then it removes the correct named volumes (app-modules)
     And uses the VOLUME_PREFIX for worktree-aware volume names
 
   @unit @unimplemented
   Scenario: Port scan starts at correct base ports
     Given dev.sh scans for free ports
     Then APP_PORT scanning starts at 5560
-    And BULLBOARD_PORT scanning starts at 6380
     And AI_SERVER_PORT scanning starts at 3456
 
   @unit @unimplemented

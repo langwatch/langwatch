@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { ResourceLimitRow } from "../ResourceLimitRow";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -22,9 +23,12 @@ describe("ResourceLimitRow", () => {
     });
 
     it("displays 'Unlimited' for large max values (>= 1M)", () => {
-      render(<ResourceLimitRow label="Projects" current={3} max={1_000_000} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ResourceLimitRow label="Projects" current={3} max={1_000_000} />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("Projects")).toBeInTheDocument();
       expect(screen.getByText("/ Unlimited")).toBeInTheDocument();
@@ -42,9 +46,12 @@ describe("ResourceLimitRow", () => {
 
   describe("when max is omitted", () => {
     it("renders count only without slash separator", () => {
-      const { container } = render(<ResourceLimitRow label="Events" current={42} />, {
-        wrapper: Wrapper,
-      });
+      const { container } = render(
+        <ResourceLimitRow label="Events" current={42} />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("Events")).toBeInTheDocument();
       expect(screen.getByText("42")).toBeInTheDocument();

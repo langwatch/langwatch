@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+
 import { OrganizationUserRole } from "@prisma/client";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CurrentDrawer } from "../CurrentDrawer";
 
 // ---------------------------------------------------------------------------
@@ -214,7 +215,9 @@ describe("<CurrentDrawer/>", () => {
 
     it("recovers and renders the new drawer", () => {
       // Suppress console.error from ErrorBoundary catching the crash
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       // First: render a crashing drawer
       shouldCrash = true;

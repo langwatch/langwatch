@@ -19,11 +19,14 @@ async function main() {
     throw new Error("PROJECT_ID and TRACE_ID required");
   }
 
-  const repo = new EvaluationRunClickHouseRepository(async (tenantId: string) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error(`No ClickHouse client for project ${tenantId}`);
-    return client;
-  });
+  const repo = new EvaluationRunClickHouseRepository(
+    async (tenantId: string) => {
+      const client = await getClickHouseClientForProject(tenantId);
+      if (!client)
+        throw new Error(`No ClickHouse client for project ${tenantId}`);
+      return client;
+    },
+  );
 
   const now = new Date();
   const samples: Array<{
@@ -71,9 +74,9 @@ async function main() {
       error: null,
     },
     {
-      evaluatorId: "ragas/answer_relevancy",
-      evaluatorType: "ragas/answer_relevancy",
-      evaluatorName: "Answer Relevancy",
+      evaluatorId: "ragas/response_relevancy",
+      evaluatorType: "ragas/response_relevancy",
+      evaluatorName: "Response Relevancy",
       status: "processed",
       passed: false,
       score: 0.34,
@@ -148,7 +151,9 @@ async function main() {
   }
 }
 
-main().then(() => process.exit(0)).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

@@ -1,9 +1,10 @@
+import { createLogger } from "@langwatch/observability";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
-import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AgentRepository,
@@ -14,7 +15,6 @@ import {
   renderBodyTemplate,
   renderUrlTemplate,
 } from "../execution/http-template-engine";
-import { injectTraceContextHeaders } from "../execution/trace-context-headers";
 import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
@@ -91,9 +91,16 @@ export class HttpAgentAdapter extends AgentAdapter {
         input,
         scenarioMappings: config.scenarioMappings,
       });
-      const url = renderUrlTemplate({ template: config.url, context: templateContext });
+      const url = renderUrlTemplate({
+        template: config.url,
+        context: templateContext,
+      });
       const headers = this.buildRequestHeaders(config);
-      const body = this.buildRequestBody(config.bodyTemplate, input, templateContext);
+      const body = this.buildRequestBody(
+        config.bodyTemplate,
+        input,
+        templateContext,
+      );
       const responseData = await this.executeHttpRequest(
         url,
         config.method,

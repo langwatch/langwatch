@@ -171,3 +171,59 @@ docker volume rm <volume-name>   # one per worktree, after confirming you don't 
 ```
 
 If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `langwatch/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
+
+## Amendment: In-process workers for local dev (2026-07)
+
+### Context
+
+Locally, the app and the background workers run as two Node processes,
+multiplexed by `concurrently` inside `scripts/start.sh` (the app plus a separate
+`pnpm run start:workers` lane, alongside Vite and the Go services). The second
+worker process has to be handed the exact matching env and Redis DB index, and
+if it silently fails to boot you get an app that looks healthy but never drains
+queues. Some contributors would rather run a single process locally.
+
+Production is different and stays that way: it runs web and worker as separate
+Deployments (`charts/langwatch/templates/{app,workers}`) so they scale
+independently. Collapsing them is a *dev-only* convenience, never a prod change.
+
+### Decision
+
+Add an **opt-in single-process dev mode**, off by default. The default for
+`pnpm dev` is unchanged (two processes). Setting `WORKERS_IN_PROCESS=1` (or
+running `pnpm dev:single`) hosts the worker stack inside the app process.
+
+A new process role `"all"` runs the web server AND the worker-side wiring in one
+process. The three prior `processRole === "worker"` gates now go through
+`roleRunsWorkers(role)` (`src/server/app-layer/config.ts`), which is true for
+both `"worker"` and `"all"`:
+
+- the outbox runtime + consumer/drainer and the heartbeat scheduler
+  (`src/server/app-layer/presets.ts`),
+- the GroupQueue consumer (`src/server/event-sourcing/eventSourcing.ts`),
+- the heartbeat scheduler's `start()` no-op guard
+  (`.../outbox/heartbeat/heartbeat.scheduler.ts`).
+
+The imperative worker boot (topic clustering, scenario pool, anomaly / spend-spike
+/ usage-stats workers, ingestion pullers, storage stats) is extracted from the
+`src/workers.ts` entrypoint into a reusable `startWorkers()`
+(`src/server/workers/startWorkers.ts`). The standalone worker calls it with its
+own metrics HTTP server; `src/start.ts` calls it with `shouldStartMetricsServer: false`
+(the web server already serves the shared prom registry at `/metrics`) after the
+server is listening, and drains it before closing the shared App on shutdown.
+
+`scripts/start.sh` skips the standalone `workers` concurrently lane when
+`WORKERS_IN_PROCESS` is set in development; `scripts/check-ports.sh` stops
+reserving the worker-metrics port in that mode.
+
+### Consequences
+
+- One fewer local process, guaranteed to boot with the app on the same Redis DB.
+- **Prod is unaffected**: `WORKERS_IN_PROCESS` is gated on `NODE_ENV=development`
+  in both `start.sh` and `start.ts`, and prod never sets it.
+- Vite and the Go services (aigateway, nlpgo) remain separate processes — this
+  only folds in the *worker* Node process, not those.
+- Known limitation: the web entrypoint does not load `instrumentation.node`, so
+  in-process workers produce no-op OTel spans. Run the standalone worker
+  (`pnpm dev`, default) to get worker traces. Follow-up if in-process worker
+  tracing is wanted.

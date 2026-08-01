@@ -93,14 +93,32 @@ export function parsePromptIdString(raw: string): PromptReference | null {
   if (slug.length === 0) return null;
 
   if (suffix.length === 0 || suffix === "latest") {
-    return { handle: slug, versionNumber: null, tag: null, variables: null, draft: false };
+    return {
+      handle: slug,
+      versionNumber: null,
+      tag: null,
+      variables: null,
+      draft: false,
+    };
   }
 
   const parsed = Number(suffix);
   if (Number.isInteger(parsed) && parsed > 0) {
-    return { handle: slug, versionNumber: parsed, tag: null, variables: null, draft: false };
+    return {
+      handle: slug,
+      versionNumber: parsed,
+      tag: null,
+      variables: null,
+      draft: false,
+    };
   }
-  return { handle: slug, versionNumber: null, tag: suffix, variables: null, draft: false };
+  return {
+    handle: slug,
+    versionNumber: null,
+    tag: suffix,
+    variables: null,
+    draft: false,
+  };
 }
 
 /**
@@ -170,9 +188,21 @@ export function extractPromptReference(
     if (slug.length > 0 && suffix.length > 0 && suffix !== "latest") {
       const parsed = Number(suffix);
       if (Number.isInteger(parsed) && parsed > 0) {
-        return { handle: slug, versionNumber: parsed, tag: null, variables, draft };
+        return {
+          handle: slug,
+          versionNumber: parsed,
+          tag: null,
+          variables,
+          draft,
+        };
       }
-      return { handle: slug, versionNumber: null, tag: suffix, variables, draft };
+      return {
+        handle: slug,
+        versionNumber: null,
+        tag: suffix,
+        variables,
+        draft,
+      };
     }
 
     if (slug.length > 0) {
@@ -201,10 +231,22 @@ export function extractPromptReference(
     if (versionRaw != null) {
       const version = Number(versionRaw);
       if (Number.isInteger(version) && version > 0) {
-        return { handle: promptId, versionNumber: version, tag: null, variables, draft };
+        return {
+          handle: promptId,
+          versionNumber: version,
+          tag: null,
+          variables,
+          draft,
+        };
       }
     }
-    return { handle: promptId, versionNumber: null, tag: null, variables, draft };
+    return {
+      handle: promptId,
+      versionNumber: null,
+      tag: null,
+      variables,
+      draft,
+    };
   }
 
   return null;

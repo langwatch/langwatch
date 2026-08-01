@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { findEasterEgg, easterEggs } from "../easterEggs";
+import { describe, expect, it } from "vitest";
+import { easterEggs, findEasterEgg } from "../easterEggs";
 
 describe("easterEggs", () => {
   describe("findEasterEgg", () => {
@@ -42,7 +42,7 @@ describe("easterEggs", () => {
       expect(result?.id).toBe("easter-42");
       expect(result?.effect).toBe("toast");
       expect(result?.toastMessage).toBe(
-        "The answer to life, the universe, and everything."
+        "The answer to life, the universe, and everything.",
       );
     });
 
@@ -84,7 +84,7 @@ describe("easterEggs", () => {
 
     it("barrel roll has keepOpen flag", () => {
       const barrelRoll = easterEggs.find(
-        (egg) => egg.id === "easter-barrel-roll"
+        (egg) => egg.id === "easter-barrel-roll",
       );
       expect(barrelRoll?.keepOpen).toBe(true);
     });

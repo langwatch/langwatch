@@ -1,3 +1,5 @@
+import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
+import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
@@ -33,9 +35,33 @@ export const publicEnvRouter = publicProcedure
       HAS_EMAIL_PROVIDER_KEY:
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
+      // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
+      // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see
+      // their own ingress, not the SaaS default. Shares the single resolver
+      // used by the CLI surfaces (login ceremony, personal-VK reveal) so the
+      // public SDK URL and CLI URL can't drift.
+      GATEWAY_BASE_URL: resolveGatewayBaseUrl({
+        publicUrl: env.LW_GATEWAY_PUBLIC_URL,
+        baseUrl: env.LW_GATEWAY_BASE_URL,
+        isSaas: env.IS_SAAS,
+      }),
       SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
+      // Whether the browser should trace itself (ADR-058). A flag rather than a
+      // URL: the browser always exports to this app's own origin, so there is
+      // no endpoint for the client to know.
+      //
+      // Gated on the collector as well as the flag, because the ingest route
+      // 404s without one. Told yes on its own, every open tab would export on a
+      // batch timer into a permanent 404 — work and noise for telemetry that
+      // has nowhere to land. Both are required, so the browser stays quiet
+      // until there is something to be quiet about.
+      RUM_ENABLED: !!env.RUM_ENABLED && !!env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      // Share of browser sessions the client should record. Server-side
+      // because it is a cost lever operators pull without shipping a bundle,
+      // and because the browser has no other way to learn it.
+      RUM_SAMPLE_RATIO: env.RUM_SAMPLE_RATIO ?? RUM_DEFAULT_SAMPLE_RATIO,
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,

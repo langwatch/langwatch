@@ -6,6 +6,7 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
+import { resolveEffectiveFeatures } from "../shared/features.ts";
 
 type VenvSpec = {
   name: "langevals";
@@ -60,8 +61,36 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
+// The extras every install gets (see langevals/pyproject.toml for the full
+// set). `--extra all` is the union of these plus the three optional ones
+// below; naming them individually is how we drop some without dropping the
+// rest.
+const LANGEVALS_BASE_EXTRAS = [
+  "azure",
+  "langevals",
+  "openai",
+  "ragas",
+  "topic_clustering",
+];
+
+function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
+  // Three evaluator families are opt-in. Two for weight: the PII detector
+  // brings a ~620MB spacy model and language detection ~95MB of language
+  // models. The deprecated legacy evaluators are opt-in for a different
+  // reason: they exist only so evaluations saved years ago keep running, and
+  // deprecated things should vanish rather than nag (most of their heavy
+  // dependencies are shared with the current ragas family anyway). The
+  // product tells anyone who reaches for one of these how to get it. Nothing
+  // about redaction depends on the PII toggle: LangWatch's own secret and
+  // PII redaction in the ingestion pipeline is not implemented with presidio.
+  const features = resolveEffectiveFeatures(ctx.envFile);
+  const extras = [
+    ...LANGEVALS_BASE_EXTRAS,
+    ...(features.isLinguaEnabled ? ["lingua"] : []),
+    ...(features.isLegacyEvaluatorsEnabled ? ["legacy"] : []),
+    ...(features.isPresidioEnabled ? ["presidio"] : []),
+  ];
   // langevals is the only Python venv we build — nlpgo runs from the
   // aigateway monobinary and needs no uv environment.
   const specs: VenvSpec[] = [
@@ -76,14 +105,13 @@ function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
       // langevals-presidio, langevals-legacy. Each is a separate `langevals_*`
       // distribution; server.py auto-registers FastAPI routes for any
       // `langevals_*` package found via importlib.metadata.distributions().
-      // Without --extra all, only langevals + langevals-core get installed
+      // Without any extras, only langevals + langevals-core get installed
       // and `/openapi.json` reports just `/healthcheck` and `/` — every
       // evaluator request 404s, langwatch app's runEvaluation throws
       // `404 {"detail":"Not Found"}`, and the experiments workbench column
-      // shows 'Internal error' for every row. We install all extras so the
-      // evaluator dispatch + the legacy-eval REST route can reach a real
-      // evaluator implementation.
-      extras: ["all"],
+      // shows 'Internal error' for every row. So the base set always
+      // installs, and only the three opt-in members have to be asked for.
+      extras,
     },
   ];
 

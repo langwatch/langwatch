@@ -1,5 +1,11 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable, IRange, languages } from "monaco-editor";
+import type {
+  editor,
+  IDisposable,
+  IRange,
+  languages,
+  Position,
+} from "monaco-editor";
 import {
   PYTHON_BUILTINS,
   PYTHON_KEYWORDS,
@@ -70,7 +76,7 @@ export function registerCompletion(
     // space keystroke entirely. Users can still invoke explicitly with
     // Ctrl+Space / Cmd+I.
     triggerCharacters: ["."],
-    provideCompletionItems: (model, position) => {
+    provideCompletionItems: (model: editor.ITextModel, position: Position) => {
       const lineBefore = model.getValueInRange({
         startLineNumber: position.lineNumber,
         startColumn: 1,

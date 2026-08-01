@@ -1,3 +1,5 @@
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
@@ -6,13 +8,14 @@ import type {
   Workflow,
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
+import { migrateDSLVersion } from "../../optimization_studio/types/migrate";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
-import { createLogger } from "../../utils/logger";
+import { type NLPOrigin, nlpgoFetch } from "../nlpgo/nlpgoFetch";
+import { WorkflowExecutionFailedError } from "./errors";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:workflows:runWorkflow");
@@ -25,7 +28,6 @@ const getWorkFlow = (state: Workflow) => {
     icon: state.icon,
     description: state.description,
     version: state.version,
-    default_llm: state.default_llm,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
@@ -55,7 +57,9 @@ const checkForRequiredInputs = (
 
   requiredInputs.forEach((input) => {
     if (!bodyInputs.includes(input)) {
-      throw new Error(`Missing required input: ${input}`);
+      throw new ValidationError(`Missing required input: ${input}`, {
+        meta: { input },
+      });
     }
   });
   return true;
@@ -97,8 +101,9 @@ const checkForRequiredLLMKeys = (
     llmModelsNeeded.includes(key),
   );
   if (missingKey) {
-    throw new Error(
+    throw new ValidationError(
       `Missing required LLM key: ${missingKey}. Please set the LLM key in the project settings`,
+      { meta: { missingKey } },
     );
   }
   return true;
@@ -191,24 +196,37 @@ export async function runWorkflow(
   });
 
   if (!workflow) {
-    throw new Error("Workflow not found.");
+    throw new NotFoundError("workflow_not_found", "Workflow", workflowId);
   }
   if (!workflow.publishedId) {
-    throw new Error("Workflow not published");
+    throw new ValidationError("Workflow not published", {
+      meta: { workflowId },
+    });
   }
 
+  const resolvedVersionId = versionId ?? workflow.publishedId;
   const publishedWorkflowVersion = await prisma.workflowVersion.findUnique({
     where: {
-      id: versionId ?? workflow.publishedId,
+      id: resolvedVersionId,
       projectId,
     },
   });
 
   if (!publishedWorkflowVersion) {
-    throw new Error("Published workflow version not found.");
+    throw new NotFoundError(
+      "published_workflow_version_not_found",
+      "Published workflow version",
+      resolvedVersionId,
+    );
   }
 
-  const workflowData = publishedWorkflowVersion.dsl as unknown as Workflow;
+  // Published versions can predate the node-owned LLM config migration
+  // (spec_version 1.5): migrate on read so legacy workflows whose nodes
+  // relied on the old workflow-level default_llm still dispatch with a
+  // model on every LLM node.
+  const workflowData = migrateDSLVersion(
+    publishedWorkflowVersion.dsl as unknown as Workflow,
+  );
   const modelProviders = await getProjectModelProviders(projectId);
 
   // Validate inputs and LLM keys
@@ -279,7 +297,16 @@ export async function runWorkflow(
   });
 
   if (!response.ok) {
-    throw new Error(`Error running workflow: ${response.statusText}`);
+    logger.error(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        projectId,
+        workflowId,
+      },
+      "nlpgo execute_sync returned a non-OK response",
+    );
+    throw new WorkflowExecutionFailedError();
   }
 
   return await response.json();

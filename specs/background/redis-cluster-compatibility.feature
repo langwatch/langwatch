@@ -1,24 +1,35 @@
-Feature: BullMQ Redis Cluster Compatibility
+Feature: Queue Redis Cluster Compatibility
   As a LangWatch operator deploying with Redis Cluster
-  I want all BullMQ queues to use Redis hash tags
+  I want all Redis-backed queues to use Redis hash tags
   So that queue operations do not fail with CROSSSLOT errors
 
   # Redis Cluster distributes keys across slots by hashing the key name.
-  # BullMQ uses multiple keys per queue (e.g., bull:<name>:wait, bull:<name>:active).
-  # Without hash tags, those keys may land on different slots, causing CROSSSLOT
-  # errors from Lua scripts that touch multiple keys atomically.
+  # A queue uses multiple keys per name; without hash tags those keys may land
+  # on different slots, causing CROSSSLOT errors from Lua scripts that touch
+  # multiple keys atomically. BullMQ itself is gone (every queue migrated to
+  # the event-sourcing process substrate), but the custom GroupQueue keeps the
+  # same multi-key shape, so the requirement stands.
   #
   # Wrapping queue names in {braces} forces Redis to hash only the braced
   # portion, guaranteeing all keys for a queue land on the same slot.
 
-  @integration
+  # The @integration scenarios below were previously bound to
+  # background/__tests__/redis-cluster.integration.test.ts (a testcontainers
+  # 6-node cluster), which was deleted with the background stack in the
+  # Elasticsearch/background removal. They remain valid requirements for the
+  # surviving Redis-backed queue (the event-sourcing GroupQueue) but are
+  # unbound until a cluster testbed is wired up again. The @unit
+  # scenario at the bottom is live — see
+  # src/server/queues/__tests__/makeQueueName.unit.test.ts.
+
+  @integration @unimplemented
   Scenario: Adding a job to a queue without a hash tag fails on Redis Cluster
     Given a Redis Cluster is running
     And a BullMQ queue named "no-hash-tag"
     When a job is added to the queue
     Then the operation fails with a CROSSSLOT error
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding and processing a job succeeds when the queue name has a hash tag
     Given a Redis Cluster is running
     And a BullMQ queue named "{with_hash_tag}"
@@ -26,7 +37,7 @@ Feature: BullMQ Redis Cluster Compatibility
     When a job is added to the queue
     Then the job is processed successfully without errors
 
-  @integration
+  @integration @unimplemented
   Scenario: Background worker queues operate on Redis Cluster
     Given a Redis Cluster is running
     And the background worker queue names are loaded from configuration
@@ -39,7 +50,7 @@ Feature: BullMQ Redis Cluster Compatibility
   # rather than from a static constant. Asserting their names contain
   # a hash tag would require constructing the service with mocks and
   # inspecting each registered queue — feasible but not yet wired up.
-  # Static queue constants are covered by the bound scenarios above.
+  # Static queue constants are covered by the scenarios above.
   @integration @unimplemented
   Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
     Given a Redis Cluster is running

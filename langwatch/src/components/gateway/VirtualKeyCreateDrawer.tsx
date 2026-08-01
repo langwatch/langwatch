@@ -1,10 +1,8 @@
 import {
-  Box,
   Button,
   Field,
   HStack,
   Input,
-  NativeSelect,
   Separator,
   Spacer,
   Text,
@@ -14,27 +12,61 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-
 import {
-  ConfigureModelProvidersLink,
-  EligibleModelProvidersPreview,
-  EligibleModelProvidersSummary,
-} from "./EligibleModelProvidersPreview";
-import { FieldInfoTooltip } from "./FieldInfoTooltip";
+  buildScopeHierarchy,
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+  resolveEligible,
+} from "./eligibleModelProviders";
+import { humanizeGatewayError } from "./gatewayErrorCopy";
 import {
-  VirtualKeyScopePicker,
-  type VirtualKeyScopeEntry,
-} from "./VirtualKeyScopePicker";
+  budgetInvalidReason,
+  EMPTY_BUDGET,
+  VirtualKeyBudgetSection,
+  type VirtualKeyBudgetValue,
+} from "./VirtualKeyBudgetSection";
+import {
+  ownershipIncompleteReason,
+  ownershipToScopes,
+  ownershipTraceProjectId,
+  type VirtualKeyOwnership,
+  VirtualKeyOwnershipSection,
+} from "./VirtualKeyOwnershipSection";
+import {
+  ALL_PROVIDERS,
+  type ProviderAccessValue,
+  providerAccessInvalidReason,
+  providerAccessToConfig,
+  VirtualKeyProviderAccessSection,
+} from "./VirtualKeyProviderAccessSection";
+import {
+  ROUTING_NONE,
+  VirtualKeyRoutingSection,
+  type VirtualKeyRoutingValue,
+} from "./VirtualKeyRoutingSection";
+import {
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (result: { id: string; name: string; secret: string }) => void;
+  onCreated: (result: {
+    id: string;
+    name: string;
+    secret: string;
+    model?: string;
+  }) => void;
 };
 
 export function VirtualKeyCreateDrawer({
@@ -43,16 +75,26 @@ export function VirtualKeyCreateDrawer({
   onOpenChange,
   onCreated,
 }: VirtualKeyCreateDrawerProps) {
-  const { organization, team, project } = useOrganizationTeamProject();
+  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const session = useRequiredSession();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tagsCsv, setTagsCsv] = useState("");
-  const [scopes, setScopes] = useState<VirtualKeyScopeEntry[]>([]);
-  const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
+  const [ownership, setOwnership] = useState<VirtualKeyOwnership>({
+    kind: "PROJECT",
+    projectId: null,
+    teamId: null,
+    traceProjectId: null,
+  });
+  const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
+  const [providerAccess, setProviderAccess] =
+    useState<ProviderAccessValue>(ALL_PROVIDERS);
+  const [routing, setRouting] = useState<VirtualKeyRoutingValue>(ROUTING_NONE);
+
+  const canCreateShared = hasPermission("virtualKeys:manage");
 
   const availableTeams = useMemo(
-    () =>
-      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
   );
   const availableProjects = useMemo(
@@ -67,19 +109,27 @@ export function VirtualKeyCreateDrawer({
     [organization?.teams],
   );
 
-  // Seed the picker with the narrowest scope the user is currently in:
-  // project beats team beats org. Mirrors the ModelProvider create flow.
+  // Seed ownership with the project the user is currently in (the
+  // default shape of a key) the first time the drawer opens. The trace
+  // project of an org- or team-owned key is deliberately NOT seeded:
+  // where a shared key's traces and costs land is an explicit choice.
   useEffect(() => {
-    if (!open || scopes.length > 0) return;
-    const seed: VirtualKeyScopeEntry | null = project?.id
-      ? { scopeType: "PROJECT", scopeId: project.id }
-      : team?.id
-      ? { scopeType: "TEAM", scopeId: team.id }
-      : organizationId
-      ? { scopeType: "ORGANIZATION", scopeId: organizationId }
-      : null;
-    if (seed) setScopes([seed]);
-  }, [open, scopes.length, project?.id, team?.id, organizationId]);
+    if (!open) return;
+    setOwnership((prev) => {
+      if (prev.projectId ?? prev.teamId) return prev;
+      const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
+      const seedTeam =
+        availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
+      // A no-op seed must keep the previous state's identity: a fresh
+      // but value-identical object re-arms this effect through its own
+      // render and spins the drawer at 100% CPU in an org with no
+      // projects.
+      if (prev.projectId === seedProject && prev.teamId === seedTeam) {
+        return prev;
+      }
+      return { ...prev, projectId: seedProject, teamId: seedTeam };
+    });
+  }, [open, project?.id, availableProjects, availableTeams]);
 
   const utils = api.useContext();
   const createMutation = api.virtualKeys.create.useMutation({
@@ -87,21 +137,68 @@ export function VirtualKeyCreateDrawer({
       await utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
-  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-    { organizationId },
-    { enabled: open && !!organizationId },
-  );
+  const orgProvidersQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId },
+      { enabled: open && !!organizationId },
+    );
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: open && !!organizationId },
+  );
+  // Lazily provisions the caller's personal workspace, so Personal
+  // ownership works even for users who predate personal workspaces.
+  const personalContextQuery = api.user.personalContext.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId && ownership.kind === "PERSONAL" },
+  );
+  const personalProjectId =
+    personalContextQuery.data?.workspace.project.id ?? null;
+
+  const providers = (orgProvidersQuery.data?.providers ??
+    []) as OrgModelProvider[];
+  const policies = (policiesQuery.data ?? []) as Array<{
+    id: string;
+    name: string;
+  }>;
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
+
+  const ownershipCtx = {
+    organizationId,
+    organizationName: organization?.name,
+    availableTeams,
+    availableProjects,
+    personalProjectId,
+  };
+
+  const scopes = useMemo(
+    () =>
+      ownershipToScopes(ownership, { organizationId, personalProjectId }) ?? [],
+    [ownership, organizationId, personalProjectId],
+  );
+  const eligible = useMemo(
+    () =>
+      resolveEligible(
+        scopes,
+        providers,
+        buildScopeHierarchy(availableProjects, organizationId),
+      ),
+    [scopes, providers, availableProjects, organizationId],
   );
 
   const reset = () => {
     setName("");
     setDescription("");
     setTagsCsv("");
-    setScopes([]);
-    setRoutingPolicyId("");
+    setOwnership({
+      kind: "PROJECT",
+      projectId: null,
+      teamId: null,
+      traceProjectId: null,
+    });
+    setBudget(EMPTY_BUDGET);
+    setProviderAccess(ALL_PROVIDERS);
+    setRouting(ROUTING_NONE);
   };
 
   const handleClose = () => {
@@ -110,55 +207,80 @@ export function VirtualKeyCreateDrawer({
     onOpenChange(false);
   };
 
-  const handleSubmit = async () => {
-    if (!name) {
-      toaster.create({ title: "Name is required", type: "error" });
-      return;
+  const cannotIssueReason = (() => {
+    if (!name) return "Name is required.";
+    const ownershipReason = ownershipIncompleteReason(ownership, {
+      personalProjectId,
+    });
+    if (ownershipReason) return ownershipReason;
+    const budgetReason = budgetInvalidReason(budget);
+    if (budgetReason) return budgetReason;
+    // An explicit provider selection cannot be validated against a list
+    // that has not arrived; creating now would persist an allowlist
+    // filtered against nothing.
+    if (orgProvidersQuery.isLoading) {
+      return "Loading providers…";
     }
-    if (scopes.length === 0) {
-      toaster.create({
-        title: "Pick at least one scope for this key",
-        type: "error",
-      });
+    const providerReason = providerAccessInvalidReason(
+      providerAccess,
+      eligible,
+    );
+    if (providerReason) return providerReason;
+    return null;
+  })();
+
+  const handleSubmit = async () => {
+    if (cannotIssueReason) {
+      toaster.create({ title: cannotIssueReason, type: "error" });
       return;
     }
     try {
-      const tags = tagsCsv
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
+      const tags = parseTagsCsv(tagsCsv);
+      const access = providerAccessToConfig(providerAccess, eligible);
       const result = await createMutation.mutateAsync({
         organizationId,
         name,
         description: description || undefined,
+        principalUserId:
+          ownership.kind === "PERSONAL"
+            ? (session.data?.user?.id ?? null)
+            : null,
         scopes,
-        routingPolicyId: routingPolicyId ? routingPolicyId : null,
-        config: tags.length > 0 ? { metadata: { tags } } : undefined,
+        traceProjectId: ownershipTraceProjectId(ownership),
+        routingMode: routing.mode,
+        routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
+        budget: budget.limitUsd.trim()
+          ? {
+              limitUsd: budget.limitUsd.trim(),
+              window: budget.window,
+            }
+          : null,
+        config: {
+          providersAllowed: access.providersAllowed,
+          modelsAllowed: access.modelsAllowed,
+          ...(tags.length > 0 ? { metadata: { tags } } : {}),
+        },
       });
       onCreated({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
         secret: result.secret,
+        model: firstEligibleDefaultModel({
+          scopes,
+          providers,
+          availableProjects,
+          organizationId,
+        }),
       });
       reset();
       onOpenChange(false);
     } catch (error) {
       toaster.create({
-        title:
-          error instanceof Error ? error.message : "Failed to create virtual key",
+        title: humanizeGatewayError(error, "Failed to create virtual key"),
         type: "error",
       });
     }
   };
-
-  const providers = orgProvidersQuery.data?.providers ?? [];
-  const policies = policiesQuery.data ?? [];
-
-  const cannotIssueReason = (() => {
-    if (!name) return "Name is required.";
-    if (scopes.length === 0) return "Pick at least one scope.";
-    return null;
-  })();
 
   return (
     <Drawer.Root
@@ -202,94 +324,64 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  description={VK_TAGS_FIELD_DESCRIPTION}
                   docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
                 />
               </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
                 placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              <Field.HelperText>
-                Comma-separated. Cache-control rules match VKs on tags as
-                AND-subset.
-              </Field.HelperText>
+              {tagsNotice && (
+                <Field.HelperText color="orange.600">
+                  {tagsNotice}
+                </Field.HelperText>
+              )}
             </Field.Root>
+
             <Separator />
-
-            <VirtualKeyScopePicker
-              scopes={scopes}
-              onScopesChange={setScopes}
-              organizationId={organizationId}
-              organizationName={organization?.name}
-              teamId={team?.id}
-              teamName={team?.name}
-              projectId={project?.id}
-              projectName={project?.name}
-              availableTeams={availableTeams}
-              availableProjects={availableProjects}
-              currentOrganizationId={organizationId}
-              currentTeamId={team?.id}
-              currentProjectId={project?.id}
+            <VirtualKeyOwnershipSection
+              value={ownership}
+              onChange={setOwnership}
+              ctx={ownershipCtx}
+              canCreateShared={canCreateShared}
             />
-            <EligibleModelProvidersSummary
+
+            <Separator />
+            <VirtualKeyBudgetSection
+              value={budget}
+              onChange={setBudget}
+              organizationId={organizationId}
+              scopes={scopes}
+              principalUserId={
+                ownership.kind === "PERSONAL"
+                  ? (session.data?.user?.id ?? null)
+                  : null
+              }
+            />
+
+            <Separator />
+            <VirtualKeyProviderAccessSection
+              value={providerAccess}
+              onChange={setProviderAccess}
               scopes={scopes}
               organizationId={organizationId}
               organizationName={organization?.name}
               availableTeams={availableTeams}
               availableProjects={availableProjects}
+              providers={providers}
               isLoading={orgProvidersQuery.isLoading}
-              providers={providers as any}
             />
 
-            <Box>
-              <HStack mb={1.5} alignItems="center" gap={2}>
-                <ConfigureModelProvidersLink scopes={scopes} />
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Eligible model providers
-                </Text>
-              </HStack>
-              <EligibleModelProvidersPreview
-                scopes={scopes}
-                organizationId={organizationId}
-                organizationName={organization?.name}
-                availableTeams={availableTeams}
-                availableProjects={availableProjects}
-                isLoading={orgProvidersQuery.isLoading}
-                providers={providers as any}
-              />
-            </Box>
-
-            <Field.Root>
-              <Field.Label>
-                Routing policy (optional)
-                <FieldInfoTooltip
-                  description="Force this VK to use a specific ordered set of ModelProviders instead of the scope-cascade fallback. Useful for compliance lanes (e.g. 'only EU providers') or cost lanes ('prefer cheapest tier first')."
-                  docHref="/ai-gateway/routing-policies"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={routingPolicyId}
-                  onChange={(e) => setRoutingPolicyId(e.target.value)}
-                >
-                  <option value="">
-                    Default — fall back to all eligible providers
-                  </option>
-                  {policies.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Default cascade tries every eligible provider in fallback
-                priority order. Pick a routing policy to constrain the set
-                further.
-              </Field.HelperText>
-            </Field.Root>
+            <Separator />
+            <VirtualKeyRoutingSection
+              value={routing}
+              onChange={setRouting}
+              policies={policies}
+            />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -328,4 +420,3 @@ export function VirtualKeyCreateDrawer({
     </Drawer.Root>
   );
 }
-

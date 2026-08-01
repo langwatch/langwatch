@@ -5,7 +5,7 @@ export default defineConfig({
     test: {
         testTimeout: 15_000,
         hookTimeout: 15_000,
-        setupFiles: ["dotenv/config"],
+        setupFiles: ["dotenv/config", "./test-setup.ts"],
         environment: "node",
         include: [
             "src/**/*.test.ts",

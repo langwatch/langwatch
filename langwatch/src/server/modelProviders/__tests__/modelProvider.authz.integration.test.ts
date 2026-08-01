@@ -18,17 +18,17 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
+import { ModelProviderScopeForbiddenError } from "../errors";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService scope authz (real DB)",
   () => {
     const ns = `mp-authz-${nanoid(8)}`;
@@ -148,7 +148,10 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       // scope-aware read gate recognises them as an org viewer (required
       // for `canReadAnyScope` to return true on org-scoped rows).
       const teamAMember = await prisma.user.create({
-        data: { name: "Team A Member", email: `team-a-member-${ns}@example.com` },
+        data: {
+          name: "Team A Member",
+          email: `team-a-member-${ns}@example.com`,
+        },
       });
       teamAMemberUserId = teamAMember.id;
       await prisma.organizationUser.create({
@@ -185,37 +188,29 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     afterAll(async () => {
       // Order matters: providers (scopes cascade via onDelete: Cascade)
       // → teamUser/orgUser → team/project → user → org.
-      // Multi-tenancy protection requires projectId in the WHERE clause,
-      // so we scope by projectId (safer than the slug-pattern anyway).
-      const projectIds = [projectAId, projectBId].filter(Boolean);
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.modelProvider
-        .deleteMany({
-          where: {
-            scopes: { some: { scopeType: "PROJECT", scopeId: { in: projectIds } } },
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId }],
+        [
+          "modelProvider",
+          {
+            scopes: {
+              some: {
+                scopeType: "PROJECT",
+                scopeId: { in: [projectAId, projectBId] },
+              },
+            },
           },
-        })
-        .catch(() => {});
-      await prisma.teamUser
-        .deleteMany({ where: { team: { slug: { startsWith: `--team-` } } } })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({ where: { organization: { slug: `--test-${ns}` } } })
-        .catch(() => {});
-      await prisma.project
-        .deleteMany({ where: { slug: { startsWith: `--proj-` } } })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({ where: { slug: { startsWith: `--team-` } } })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { slug: `--test-${ns}` } })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({
-          where: {
+        ],
+        ["teamUser", { team: { organizationId } }],
+        // The org-tenancy guard wants a literal organizationId; a relation
+        // filter on the org's slug does not bound the query for it.
+        ["organizationUser", { organizationId }],
+        ["project", { team: { organizationId } }],
+        ["team", { organizationId }],
+        ["organization", { slug: `--test-${ns}` }],
+        [
+          "user",
+          {
             email: {
               in: [
                 `org-admin-${ns}@example.com`,
@@ -225,8 +220,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               ],
             },
           },
-        })
-        .catch(() => {});
+        ],
+      ]);
     });
 
     function ctxFor(userId: string) {
@@ -263,7 +258,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           expect(result).toBeDefined();
           // Read back directly via prisma to check the scope row landed.
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -279,7 +274,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Assigning a provider to an org without manage permission is denied */
         it("rejects with FORBIDDEN and does not persist", async () => {
           const before = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "anthropic" },
+            where: { organizationId, provider: "anthropic" },
           });
           await expect(
             service().updateModelProvider(
@@ -288,16 +283,18 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 provider: "anthropic",
                 enabled: true,
                 customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+                scopes: [
+                  { scopeType: "ORGANIZATION", scopeId: organizationId },
+                ],
               },
               ctxFor(teamAAdminUserId),
             ),
           ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: expect.stringContaining("organization:manage"),
+            code: "model_provider_scope_forbidden",
+            meta: { requiredPermission: "organization:manage" },
           });
           const after = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "anthropic" },
+            where: { organizationId, provider: "anthropic" },
           });
           expect(after).toBe(before);
         });
@@ -312,11 +309,13 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 provider: "gemini",
                 enabled: true,
                 customKeys: { GEMINI_API_KEY: `sk-gem-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+                scopes: [
+                  { scopeType: "ORGANIZATION", scopeId: organizationId },
+                ],
               },
               ctxFor(teamAMemberUserId),
             ),
-          ).rejects.toBeInstanceOf(TRPCError);
+          ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
         });
       });
     });
@@ -336,7 +335,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
           expect(result).toBeDefined();
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -362,7 +361,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(teamAAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
         });
       });
     });
@@ -376,7 +375,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
         it("rejects the entire mutation with no partial persistence", async () => {
           const before = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "deepseek" },
+            where: { organizationId, provider: "deepseek" },
           });
           await expect(
             service().updateModelProvider(
@@ -392,10 +391,10 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(teamAAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "FORBIDDEN" });
+          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
           const after = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "deepseek" },
+            where: { organizationId, provider: "deepseek" },
           });
           expect(after).toBe(before);
         });
@@ -418,7 +417,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -454,7 +453,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           // Sanity check: both scopes persisted.
           {
             const stored = await prisma.modelProvider.findFirst({
-              where: { id: created.id, projectId: projectAId },
+              where: { id: created.id },
               include: { scopes: true },
             });
             expect(stored?.scopes).toHaveLength(2);
@@ -472,7 +471,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
 
           const after = await prisma.modelProvider.findFirst({
-            where: { id: created.id, projectId: projectAId },
+            where: { id: created.id },
             include: { scopes: true },
           });
           expect(after?.scopes).toHaveLength(1);
@@ -503,9 +502,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               provider: "cerebras",
               enabled: true,
               customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-              ],
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
             },
             ctxFor(orgAdminUserId),
           );
@@ -528,8 +525,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               ctxFor(teamAAdminUserId),
             ),
           ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: expect.stringContaining("organization:manage"),
+            code: "model_provider_scope_forbidden",
+            meta: { requiredPermission: "organization:manage" },
           });
 
           const after = await prisma.modelProvider.findFirst({
@@ -548,9 +545,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               provider: "xai",
               enabled: true,
               customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-              ],
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
             },
             ctxFor(orgAdminUserId),
           );
@@ -576,7 +571,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
         it("throws NOT_FOUND instead of falling through to create a new row", async () => {
           const beforeCount = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "groq" },
+            where: { organizationId, provider: "groq" },
           });
           await expect(
             service().updateModelProvider(
@@ -589,9 +584,12 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               },
               ctxFor(orgAdminUserId),
             ),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+            // The service is framework-agnostic, so it raises its own handled
+            // code rather than a transport one. Asserting `code` (not the
+            // class) is what keeps this honest across the tRPC boundary.
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
           const afterCount = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "groq" },
+            where: { organizationId, provider: "groq" },
           });
           expect(afterCount).toBe(beforeCount);
         });
@@ -619,7 +617,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
           await expect(
             service().getById(mp.id, projectAId, ctxFor(unrelatedUserId)),
-          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+          ).rejects.toMatchObject({ code: "model_provider_not_found" });
         });
       });
 
@@ -673,7 +671,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
 
           const remaining = await prisma.modelProvider.findFirst({
-            where: { id: mp.id, projectId: projectAId },
+            where: { id: mp.id },
             include: { scopes: true },
           });
           expect(remaining).toBeNull();
@@ -725,11 +723,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
                 { id: mp.id, projectId: projectAId, provider: "azure_safety" },
                 ctxFor(teamBAdmin.id),
               ),
-            ).rejects.toMatchObject({ code: "FORBIDDEN" });
+            ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
             // Row still present
             const stillThere = await prisma.modelProvider.findFirst({
-              where: { id: mp.id, projectId: projectAId },
+              where: { id: mp.id },
             });
             expect(stillThere).not.toBeNull();
           } finally {

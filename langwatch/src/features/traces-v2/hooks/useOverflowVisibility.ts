@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
@@ -119,7 +119,15 @@ export function useOverflowVisibility({
     }
 
     if (next.size > 0) setHiddenIds(next);
-  }, [measureSeq, hiddenIds, items, scrollerRef, activeId, attribute, reservePx]);
+  }, [
+    measureSeq,
+    hiddenIds,
+    items,
+    scrollerRef,
+    activeId,
+    attribute,
+    reservePx,
+  ]);
 
   return hiddenIds;
 }

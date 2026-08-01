@@ -17,6 +17,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type {
@@ -29,10 +30,14 @@ const {
   mockUseModelProviderForm,
   mockUseModelProvidersSettings,
   mockUseFeatureFlag,
+  mockListAllForOrgQuery,
+  mockListAllForProjectQuery,
 } = vi.hoisted(() => ({
   mockUseModelProviderForm: vi.fn(),
   mockUseModelProvidersSettings: vi.fn(),
   mockUseFeatureFlag: vi.fn(),
+  mockListAllForOrgQuery: vi.fn(),
+  mockListAllForProjectQuery: vi.fn(),
 }));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
@@ -80,13 +85,20 @@ vi.mock("../../../utils/api", () => ({
       isManagedProvider: {
         useQuery: () => ({ data: { managed: false } }),
       },
+      // EditModelProviderForm resolves its edit target from the flat
+      // (uncollapsed) provider list via useAllModelProvidersList (#5380).
+      // primeHooks seeds both with the same mp_existing fixture the
+      // collapsed-record mock below uses, so the id lookup still finds
+      // the row this suite has always intended to render.
+      listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
+      listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
     },
   },
 }));
 
 import { EditModelProviderForm } from "../ModelProviderForm";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
@@ -171,6 +183,18 @@ function primeHooks({ gatewayEnabled }: { gatewayEnabled: boolean }) {
     isLoading: false,
     refetch: vi.fn(),
     hasEnabledProviders: true,
+  });
+  // Flat-list counterpart of the collapsed record above — same row, so
+  // the id-based lookup in ModelProviderForm still resolves "mp_existing".
+  mockListAllForOrgQuery.mockReturnValue({
+    data: { providers: [provider], modelMetadata: {} },
+    isLoading: false,
+    refetch: vi.fn(),
+  });
+  mockListAllForProjectQuery.mockReturnValue({
+    data: { providers: [provider], modelMetadata: {} },
+    isLoading: false,
+    refetch: vi.fn(),
   });
   mockUseModelProviderForm.mockReturnValue([buildState(), buildActions()]);
 }

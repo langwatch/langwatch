@@ -1,6 +1,9 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type {
   CustomRole,
   Organization,
+  OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
@@ -92,6 +95,8 @@ export interface CreateAndAssignInput {
   teamSlug: string;
   phoneNumber?: string;
   signUpData?: Record<string, unknown>;
+  /** ADR-038 signup intent; undefined/null persists NULL (legacy default). */
+  primaryIntent?: OrganizationIntent | null;
   pricingModel: PricingModel;
 }
 
@@ -170,11 +175,14 @@ export interface UpdateOrganizationInput {
   s3Endpoint?: string | null;
   s3AccessKeyId?: string | null;
   s3SecretAccessKey?: string | null;
-  elasticsearchNodeUrl?: string | null;
-  elasticsearchApiKey?: string | null;
   s3Bucket?: string | null;
   presenceEnabled?: boolean;
+  /** Org-level trace-sharing kill switch (ADR-057). Off disables sharing for
+   *  every project in the org. */
+  traceSharingEnabled?: boolean;
   supportContact?: string | null;
+  /** ADR-038 "Primary use" setting; null clears back to legacy behavior. */
+  primaryIntent?: OrganizationIntent | null;
 }
 
 /**
@@ -245,15 +253,16 @@ export interface OrganizationRepository {
   findNameById(
     organizationId: string,
   ): Promise<{ id: string; name: string } | null>;
+  findPrimaryIntentById(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null>;
   getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;
@@ -355,6 +364,12 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async findNameById(
     _organizationId: string,
   ): Promise<{ id: string; name: string } | null> {
+    return null;
+  }
+
+  async findPrimaryIntentById(
+    _organizationId: string,
+  ): Promise<OrganizationIntent | null> {
     return null;
   }
 

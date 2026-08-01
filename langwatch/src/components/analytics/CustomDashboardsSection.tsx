@@ -7,15 +7,15 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
-import { MenuLink } from "~/components/MenuLink";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { MenuLink } from "~/components/MenuLink";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 interface CustomDashboardsSectionProps {
   projectSlug: string;

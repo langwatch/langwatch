@@ -8,8 +8,8 @@
  * The factory functions here are called FROM those vi.mock() calls.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { vi } from "vitest";
 import type React from "react";
+import { vi } from "vitest";
 
 // Standard evaluator output fields
 export const standardOutputFields = [
@@ -196,9 +196,9 @@ export function createRouterMock() {
       const asPath =
         Object.keys(state.mockQuery).length > 0
           ? "/test?" +
-          Object.entries(state.mockQuery)
-            .map(([k, v]) => `${k}=${v}`)
-            .join("&")
+            Object.entries(state.mockQuery)
+              .map(([k, v]) => `${k}=${v}`)
+              .join("&")
           : "/test";
       return {
         query: state.mockQuery,
@@ -348,10 +348,7 @@ export function createApiMock() {
                 { name: "openai/gpt-4", type: "llm" },
                 { name: "my-custom-span", type: "span" },
               ],
-              metadataKeys: [
-                { key: "user_id" },
-                { key: "session_id" },
-              ],
+              metadataKeys: [{ key: "user_id" }, { key: "session_id" }],
             },
             isLoading: false,
             error: null,
@@ -373,6 +370,7 @@ export function createApiMock() {
         },
         monitors: {
           getAllForProject: { invalidate: mockInvalidate },
+          getPerformanceForProject: { invalidate: mockInvalidate },
           getById: { invalidate: mockInvalidate },
         },
       })),
@@ -408,7 +406,7 @@ export function createOrgMock() {
 export function createUpgradeModalMock() {
   return {
     useUpgradeModalStore: (
-      selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown
+      selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown,
     ) => {
       if (typeof selector === "function") {
         return selector({ open: mockOpenUpgradeModal });
@@ -474,4 +472,3 @@ export const isOnlineEvalOpen = () =>
  */
 export const isEvaluatorListOpen = () =>
   state.mockQuery["drawer.open"] === "evaluatorList";
-

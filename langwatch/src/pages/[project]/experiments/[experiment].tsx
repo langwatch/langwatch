@@ -1,6 +1,7 @@
 import { Alert, Box } from "@chakra-ui/react";
 import { ExperimentType } from "@prisma/client";
 
+import { HandledErrorAlert } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { BatchEvaluationResults } from "../../../components/batch-evaluation-results";
 import { DashboardLayout } from "../../../components/DashboardLayout";
@@ -55,14 +56,10 @@ export default function ExperimentPage() {
     return (
       <DashboardLayout>
         <Box padding={6}>
-          <Alert.Root status="error">
-            <Alert.Indicator />
-            <Alert.Title>Failed to load experiment</Alert.Title>
-            <Alert.Description>
-              {experiment.error?.message ??
-                "An unexpected error occurred while loading the experiment."}
-            </Alert.Description>
-          </Alert.Root>
+          <HandledErrorAlert
+            error={experiment.error}
+            fallbackTitle="Couldn't load this experiment"
+          />
         </Box>
       </DashboardLayout>
     );
