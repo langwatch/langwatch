@@ -107,9 +107,20 @@ export class GatewaySpendFoldProjection
   protected readonly events = gatewaySpendEvents;
 
   readonly options = {
-    /** A row written by an older shape refolds once from the log instead of
-     *  decoding column defaults into permanently wrong state. */
-    refoldOnStoreMiss: true,
+    // No refoldOnStoreMiss: this fold is greenfield at version 1, so an
+    // absent row always means "new request", never a lossy or pre-version
+    // row. Opting in would send one event_log re-fold per admitted request
+    // in steady state, the delivery-path read class ADR-066 retires. The
+    // option returns WITH the first row-shape change, as that version
+    // bump's transitional net, once the store reports older stamps as
+    // misses and there is a population to heal.
+    //
+    // The status lattice is deterministic in any arrival order: confirmed
+    // and failed outrank settled, and admission only fills attribution. A
+    // business-time out-of-order event, routinely the late confirmation
+    // superseding a settled request, folds on top of the loaded state;
+    // replaying the aggregate's history from the log would derive nothing.
+    refoldOnOutOfOrder: false,
   } as const;
 
   constructor({ store }: { store: FoldProjectionStore<GatewaySpendState> }) {

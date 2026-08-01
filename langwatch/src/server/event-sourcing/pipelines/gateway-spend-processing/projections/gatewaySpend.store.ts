@@ -8,10 +8,12 @@ import type { GatewaySpendState } from "./gatewaySpend.foldProjection";
  *
  * The `gateway_spend` row round-trips the WHOLE working state (every field
  * is an explicit column), so `get` decodes the last committed row and the
- * delivery path never refolds from the event log in steady state. Rows
- * stamped with an older projection version report a miss; combined with
- * the projection's `refoldOnStoreMiss`, that population self-heals one
- * aggregate at a time with no backfill migration.
+ * delivery path never reads the event log at all: an absent row means a
+ * new request and the fold starts from init(). Rows stamped with an older
+ * projection version report a miss; the version bump that first creates
+ * such rows must reintroduce `refoldOnStoreMiss` on the projection so that
+ * population self-heals one aggregate at a time, or those misses fold from
+ * init() and overwrite committed rows with partial state.
  *
  * No applied-event bookkeeping rides here: the fold is absolute-writes-only
  * and every command carries a per-(request, lifecycle-step) idempotency key
