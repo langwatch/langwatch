@@ -156,9 +156,13 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // its token math — its own per-span detail is left untouched.
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
       this.liftResponseSpan(ctx);
-      // `codex exec` emits no turn rollup at all, so its handle_responses
-      // spans are the trace's ONLY usage record, skipping them there would
-      // zero the trace totals.
+      // Typing applies to every usage-bearing response span: it is a model
+      // call on both wires, and the drawer renders an untyped span as a
+      // generic row rather than under the agent turn.
+      this.typeUsageSpanAsModelCall(ctx);
+      // The skip marker does not. `codex exec` emits no turn rollup at all,
+      // so its response spans are the trace's ONLY usage record, and skipping
+      // them there would zero the trace totals.
       if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
         this.markRedundantUsageSpan(ctx);
       }
@@ -249,32 +253,40 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
   }
 
   /**
-   * Handles a non-turn `codex_cli_rs` span that carries token usage.
+   * A usage-bearing span is a model call, so it gets `llm` and the drawer
+   * renders it under the agent turn with the model icon instead of as a
+   * generic row. True on both wires, which is why this is separate from the
+   * skip marker below: `codex exec` needs the typing but must not be skipped.
+   *
    * GenAIExtractor runs before this one and lifts native gen_ai.usage.* into
    * `out`, so we look there as well as the still-unconsumed bag.
-   *
-   * Two distinct effects, deliberately decoupled:
-   * - Typing: any usage-bearing span is a model call, so it gets `llm` so the
-   *   drawer renders it under the agent turn with the model icon.
-   * - Skip marker: only KNOWN duplicates of the turn rollup
-   *   (`handle_responses`) get `skip_token_accumulation`. An unrecognised
-   *   usage-bearing span keeps its tokens so a future codex span whose usage is
-   *   NOT folded into the rollup is counted rather than silently dropped.
-   * Nothing is removed from the span itself either way.
+   */
+  private typeUsageSpanAsModelCall(ctx: ExtractorContext): void {
+    if (!this.hasTokenUsage(ctx)) return;
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
+  }
+
+  /**
+   * Only KNOWN duplicates of the turn rollup (`handle_responses`) get
+   * `skip_token_accumulation`. An unrecognised usage-bearing span keeps its
+   * tokens so a future codex span whose usage is NOT folded into the rollup is
+   * counted rather than silently dropped. Nothing is removed from the span
+   * itself either way.
    */
   private markRedundantUsageSpan(ctx: ExtractorContext): void {
-    const hasUsage =
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
-      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
-      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
-    if (!hasUsage) return;
-
-    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
-
+    if (!this.hasTokenUsage(ctx)) return;
     if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
     ctx.recordRule("codex/skip-redundant-usage");
+  }
+
+  private hasTokenUsage(ctx: ExtractorContext): boolean {
+    return (
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS)
+    );
   }
 
   /**

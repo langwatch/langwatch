@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { TerminalView } from "../TerminalView";
@@ -303,6 +304,45 @@ describe("TerminalView", () => {
           "Cache rebuilt: 6.0K tokens re-sent instead of reusing 10.0K tokens cached",
         ),
       ).toBeInTheDocument();
+    });
+  });
+  describe("given a session whose system context was captured", () => {
+    const systemEntries: TranscriptEntry[] = [
+      {
+        kind: "system_prompt",
+        atMs: 500,
+        text: "You are Claude Code. CLAUDE.md says always use pnpm.",
+        chars: 52,
+      },
+      ...entries,
+    ];
+
+    /** @scenario "The session's system context is shown once at the top" */
+    it("collapses it to one line, with the size a reader is deciding on", () => {
+      renderView({ entries: systemEntries });
+      expect(
+        screen.getByText(
+          /session context: 52 chars of system prompt and tools/,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/always use pnpm/)).not.toBeInTheDocument();
+    });
+
+    describe("when the reader reaches the header with the keyboard", () => {
+      it("expands and collapses it, so the context is not pointer-only", async () => {
+        const user = userEvent.setup();
+        renderView({ entries: systemEntries });
+        const header = screen.getByRole("button", { name: /session context/ });
+
+        header.focus();
+        await user.keyboard("{Enter}");
+        expect(screen.getByText(/always use pnpm/)).toBeInTheDocument();
+        expect(header).toHaveAttribute("aria-expanded", "true");
+
+        await user.keyboard(" ");
+        expect(screen.queryByText(/always use pnpm/)).not.toBeInTheDocument();
+        expect(header).toHaveAttribute("aria-expanded", "false");
+      });
     });
   });
 });

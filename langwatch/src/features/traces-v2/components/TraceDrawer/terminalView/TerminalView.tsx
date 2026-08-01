@@ -686,20 +686,28 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <VStack align="stretch" gap={0.5}>
-      <HStack
-        align="flex-start"
-        gap={2}
-        cursor="pointer"
-        onClick={() => setExpanded((v) => !v)}
-        role="button"
-        aria-expanded={expanded}
-      >
-        <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
-        <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
-          session context: {chars.toLocaleString("en-US")} chars of system
-          prompt and tools{" "}
-          {expanded ? "(click to collapse)" : "(click to expand)"}
-        </Text>
+      <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+        {/* A real button rather than an aria-labelled row: the header has to
+            answer Enter and Space, not just a pointer. Typed explicitly so a
+            surrounding form cannot make it a submit. */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+            textAlign="start"
+          >
+            session context: {chars.toLocaleString("en-US")} chars of system
+            prompt and tools{" "}
+            {expanded ? "(click to collapse)" : "(click to expand)"}
+          </Text>
+        </button>
       </HStack>
       {expanded && (
         <HStack align="flex-start" gap={2}>

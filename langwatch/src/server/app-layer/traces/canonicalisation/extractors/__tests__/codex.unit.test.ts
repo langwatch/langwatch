@@ -444,6 +444,23 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
     ).toBeUndefined();
   });
 
+  it("still types the response span as a model call, which the skip marker is independent of", () => {
+    const ctx = createExtractorContext(
+      {
+        "gen_ai.usage.input_tokens": 13005,
+        "gen_ai.usage.output_tokens": 10,
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["langwatch.span.type"]).toBe("llm");
+  });
+
   /** @scenario "Codex reasoning effort is canonicalised from the response span when no turn rollup exists" */
   it("lifts reasoning effort, reasoning tokens, and cache writes from the response span", () => {
     const ctx = createExtractorContext(

@@ -179,7 +179,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       ...over,
     });
 
-    /** @scenario "A log record whose event name arrived on the OTLP eventName field still renders" */
+    /** @scenario "Codex events are rendered whichever way the agent named them" */
     it("backfills event.name so attribute-keyed readers can recognise the record", async () => {
       const [log] = await readOneRow(
         storedRow({ EventName: "codex.tool_result" }),

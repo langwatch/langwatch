@@ -625,7 +625,7 @@ export function salvageTruncatedRequestBody(
   ].filter((m): m is { role: string; content: string } => m !== null);
 
   if (out.length === 0) return null;
-  if (messages?.complete !== true || system === null || !system.complete) {
+  if (messages?.isComplete !== true || system === null || !system.isComplete) {
     out.push({
       role: "system",
       content:
@@ -640,13 +640,13 @@ function salvagedSystemMessage(
   system: SalvagedValue | null,
 ): { role: string; content: string } | null {
   if (system === null) return null;
-  const text = system.complete
+  const text = system.isComplete
     ? contentToText(safeParse(system.slice) ?? system.slice)
     : salvagePartialText(system.slice);
   if (!text || text.length === 0) return null;
   return {
     role: "system",
-    content: system.complete
+    content: system.isComplete
       ? text
       : `${text}\n\n[system prompt truncated by claude's 60KB telemetry cap]`,
   };
@@ -672,7 +672,7 @@ function salvagedHistoryMessages(
 /** A salvaged array value, parsed whole when it closed and element-wise when not. */
 function salvagedArray(value: SalvagedValue | null): unknown {
   if (value === null) return null;
-  return value.complete
+  return value.isComplete
     ? safeParse(value.slice)
     : salvageCompleteArrayElements(value.slice);
 }
@@ -689,7 +689,7 @@ interface SalvagedValue {
   /** The raw character span of the value (complete or cut). */
   slice: string;
   /** Whether the value closed before the cut. */
-  complete: boolean;
+  isComplete: boolean;
 }
 
 /**
@@ -778,10 +778,10 @@ function scanValueSpan(raw: string, start: number): SalvagedValue {
     const event = scan.step(raw[i]);
     const closed = event === "string-close" || event === "depth-out";
     if (closed && scan.depth === 0) {
-      return { slice: raw.slice(start, i + 1), complete: true };
+      return { slice: raw.slice(start, i + 1), isComplete: true };
     }
   }
-  return { slice: raw.slice(start), complete: false };
+  return { slice: raw.slice(start), isComplete: false };
 }
 
 /**

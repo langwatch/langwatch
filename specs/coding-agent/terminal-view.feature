@@ -42,37 +42,38 @@ Feature: Coding agent terminal view
 
   @unit
   Scenario: A codex session shows its prompt and its tool calls with real input and output
-    Given a codex session whose tool_result log events carry the tool name, arguments, and output
+    Given a codex session that ran tools
     When the Terminal tab renders the session
-    Then each tool call shows its name, its arguments as input, and its captured output
+    Then each tool call shows its name, the arguments it ran with, and what it returned
 
   @unit
-  Scenario: Codex tool calls are not doubled when both a span and a log record the same call
-    Given a codex tool call recorded both as a tool span and as a tool_result log event sharing a call id
+  Scenario: A tool the agent ran once is shown once
+    Given a codex session whose tool run was reported twice by the agent
     When the Terminal tab renders the session
     Then the tool call appears once
 
   @unit
-  Scenario: Codex model calls appear once per response span when no turn rollup exists
-    Given a codex exec session with usage-bearing response spans and no turn rollup span
+  Scenario: Every model call in a codex exec session is shown with its token counts
+    Given a codex exec session that made several model calls
     When the Terminal tab renders the session
-    Then each response span appears as a model call with its token counts
+    Then each model call appears once with the tokens it used
 
   @unit
-  Scenario: A log record whose event name arrived on the OTLP eventName field still renders
-    Given a stored log record whose event name lives in the EventName column and not in its attributes
-    When the transcript reads the trace's logs
-    Then the event is recognised and rendered the same as an attribute-named event
+  Scenario: Codex events are rendered whichever way the agent named them
+    Given a codex session whose events name themselves the way the OTel Event API does
+    When the Terminal tab renders the session
+    Then those events are read and rendered like any other
 
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 
   @unit
   Scenario: The session's system context is shown once at the top
-    Given a claude code session whose first model call input carries a system message
+    Given a claude code session that carried a system prompt
     When the Terminal tab renders the session
     Then a collapsed system context entry appears before the first prompt
     And it is not repeated for later model calls
+    And expanding it with the keyboard shows the context
 
   Scenario: The bottom bar stays put while the transcript scrolls
     Given a session long enough to scroll

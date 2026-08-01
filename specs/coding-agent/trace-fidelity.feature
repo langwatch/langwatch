@@ -67,7 +67,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   Scenario: Cache TTL split sums accumulate across a session's model calls
     Given a trace with two model call log events each reporting 1h cache creation tokens
     When the trace summary is computed
-    Then the trace summary carries the summed 1h cache creation tokens under a reserved attribute
+    Then the trace summary attributes carry the summed 1h cache creation tokens
     And the token breakdown popover shows the 5m and 1h cache write rows
 
   # --- Codex cache writes -----------------------------------------------------
@@ -195,7 +195,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   Scenario: The context a trace started from is lifted onto the trace summary
     Given a trace whose first model call already carried cached and freshly written input
     When the trace summary is computed
-    Then the trace summary carries that call's context size under a reserved attribute
+    Then the trace summary attributes carry that call's context size
     And the value is that one call's context, not the sum across the trace's calls
 
   @unit
@@ -208,7 +208,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   Scenario: A trace whose calls report no cache carries no context size
     Given a trace whose model calls report no cached or written input
     When the trace summary is computed
-    Then the trace summary carries no context size attribute
+    Then the trace summary attributes carry no context size
 
   @unit
   Scenario: Context size is shown in the trace list next to tokens

@@ -751,7 +751,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
   });
 
   describe("given a tool span and a tool_result log for the same call id", () => {
-    /** @scenario "Codex tool calls are not doubled when both a span and a log record the same call" */
+    /** @scenario "A tool the agent ran once is shown once" */
     it("renders the call once, on the span, filled with the log's content", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
@@ -788,7 +788,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
   });
 
   describe("given usage-bearing response spans and no turn rollup (the exec wire)", () => {
-    /** @scenario "Codex model calls appear once per response span when no turn rollup exists" */
+    /** @scenario "Every model call in a codex exec session is shown with its token counts" */
     it("derives one model call per response span with its token counts", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
