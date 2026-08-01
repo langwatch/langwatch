@@ -826,3 +826,182 @@ describe("computeClaudeInteractionOutput", () => {
     });
   });
 });
+
+describe("computeClaudeSpanEnrichment repeated system prompts", () => {
+  describe("given two calls whose request bodies carry the same system prompt", () => {
+    /** @scenario "Identical system prompts across a session's calls are shown once" */
+    it("keeps the full text on the first call and references it on later calls", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: "req_a", querySource: REPL },
+        { spanId: "span-2", requestId: "req_b", querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 100,
+          body: requestBody({ system: "You are Claude Code", userText: "one" }),
+        },
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 200,
+          body: requestBody({ system: "You are Claude Code", userText: "two" }),
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+      const first = (
+        result.get("span-1")?.input as {
+          value: Array<{ role: string; content: string }>;
+        }
+      ).value;
+      const second = (
+        result.get("span-2")?.input as {
+          value: Array<{ role: string; content: string }>;
+        }
+      ).value;
+
+      expect(first[0]).toEqual({
+        role: "system",
+        content: "You are Claude Code",
+      });
+      expect(second[0]!.role).toBe("system");
+      expect(second[0]!.content).toContain("unchanged since call #1");
+      expect(second[0]!.content).not.toContain("You are Claude Code");
+      expect(second[1]).toEqual({ role: "user", content: "two" });
+    });
+
+    it("keeps distinct system prompts intact on both calls", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: "req_a", querySource: REPL },
+        { spanId: "span-2", requestId: "req_b", querySource: REPL },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 100,
+          body: requestBody({ system: "prompt A", userText: "one" }),
+        },
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 200,
+          body: requestBody({ system: "prompt B", userText: "two" }),
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+      expect(
+        (
+          result.get("span-2")?.input as {
+            value: Array<{ role: string; content: string }>;
+          }
+        ).value[0],
+      ).toEqual({ role: "system", content: "prompt B" });
+    });
+  });
+});
+
+describe("computeClaudeSpanEnrichment when spans carry no query_source", () => {
+  // Claude Code 2.1.x stamps `query_source` on its log events but NOT on the
+  // `llm_request` span. Keying the logs by it then strands every request body
+  // in a group no span can reach, and the span input degrades to the bare
+  // prompt: this is what "we lost the system prompt" actually was.
+  describe("given logs that declare a query_source and spans that do not", () => {
+    it("still pairs each call with its request body, keeping system and history", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "span-1", requestId: "req_1", querySource: null },
+        { spanId: "span-2", requestId: "req_2", querySource: null },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: "sdk",
+          timeUnixMs: 100,
+          body: requestBody({ system: "You are Claude Code", userText: "one" }),
+        },
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: "sdk",
+          timeUnixMs: 200,
+          body: requestBody({ system: "You are Claude Code", userText: "two" }),
+        },
+        {
+          eventName: "user_prompt",
+          requestId: null,
+          querySource: "sdk",
+          timeUnixMs: 50,
+          body: "one",
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+
+      const first = result.get("span-1")?.input;
+      expect(first?.type).toBe("chat_messages");
+      expect(
+        (first as { value: Array<{ role: string; content: string }> }).value[0],
+      ).toEqual({ role: "system", content: "You are Claude Code" });
+
+      const second = result.get("span-2")?.input;
+      expect(second?.type).toBe("chat_messages");
+      expect(
+        (second as { value: Array<{ role: string; content: string }> }).value,
+      ).toContainEqual({ role: "user", content: "two" });
+    });
+  });
+
+  describe("given spans that DO declare a query_source", () => {
+    it("keeps sources isolated, so one source's body never lands on another's span", () => {
+      const spans: ClaudeSpanRef[] = [
+        { spanId: "main-1", requestId: "req_1", querySource: REPL },
+        {
+          spanId: "util-1",
+          requestId: "req_2",
+          querySource: "prompt_suggestion",
+        },
+      ];
+      const logs: ClaudeContentLog[] = [
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: REPL,
+          timeUnixMs: 100,
+          body: requestBody({ system: "main system", userText: "real turn" }),
+        },
+        {
+          eventName: "api_request_body",
+          requestId: null,
+          querySource: "prompt_suggestion",
+          timeUnixMs: 150,
+          body: requestBody({ userText: "autosuggest probe" }),
+        },
+      ];
+
+      const result = computeClaudeSpanEnrichment({ spans, logs });
+
+      expect(
+        (
+          result.get("main-1")?.input as {
+            value: Array<{ role: string; content: string }>;
+          }
+        ).value,
+      ).toContainEqual({ role: "user", content: "real turn" });
+      expect(
+        (
+          result.get("util-1")?.input as {
+            value: Array<{ role: string; content: string }>;
+          }
+        ).value,
+      ).toContainEqual({ role: "user", content: "autosuggest probe" });
+    });
+  });
+});

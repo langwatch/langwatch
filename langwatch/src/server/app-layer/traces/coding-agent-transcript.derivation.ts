@@ -36,6 +36,18 @@ import { isReplyTextPart } from "./canonicalisation/extractors/_parts";
 
 /** One thing that happened, at a point in time. */
 export type TranscriptEntry =
+  | {
+      /**
+       * The session's system context, CLAUDE.md, MCP tool definitions,
+       * skills, from the FIRST model call's system message. Emitted once and
+       * pinned to the top: it is what every call of the session pays for, not
+       * a moment in the sequence.
+       */
+      kind: "system_prompt";
+      atMs: number;
+      text: string;
+      chars: number;
+    }
   | { kind: "user_prompt"; atMs: number; text: string | null; chars: number }
   | {
       kind: "assistant_message";
@@ -155,8 +167,18 @@ export function buildCodingAgentTranscript({
   spans: SpanDetail[];
   logs: TranscriptLogRecord[];
 }): CodingAgentTranscript {
-  const fromSpans = collectSpanEntries(spans);
-  const fromLogs = collectLogEntries(logs);
+  // A codex tool run is recorded twice: a span carrying the tool's identity
+  // and timing but no content, and a `tool_result` log carrying the
+  // arguments and output under the same `call_id`. Index the logs first so
+  // a tool span can be filled from its log, and so the log pass renders only
+  // the calls no span already represents. Codex tool spans normally never
+  // reach storage (the ingest noise filter drops them, since codex gives them
+  // a parent in another trace), so in practice the log side does the work,
+  // but the join keeps traces stored before that filter, and any run with the
+  // filter's kill-switch set, from rendering every tool call twice.
+  const codexToolLogs = indexCodexToolLogsByCallId(logs);
+  const fromSpans = collectSpanEntries(spans, codexToolLogs);
+  const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCallIds);
 
   const entries = [...fromSpans.entries, ...fromLogs.entries];
 
@@ -183,6 +205,16 @@ export function buildCodingAgentTranscript({
   // says anything about what actually happened first.
   entries.sort((a, b) => a.atMs - b.atMs);
 
+  // The system context is pinned above the first prompt regardless of
+  // timestamps: the user's prompt log fires BEFORE the first model call span
+  // starts, so pure time ordering would bury the session's context below the
+  // conversation it applies to.
+  const systemIndex = entries.findIndex((e) => e.kind === "system_prompt");
+  if (systemIndex > 0) {
+    const [systemEntry] = entries.splice(systemIndex, 1);
+    if (systemEntry) entries.unshift(systemEntry);
+  }
+
   return {
     agent: detectAgentFrom({ spans, logs }),
     sessionId: fromLogs.sessionId,
@@ -208,24 +240,101 @@ interface SpanReply {
   windowEndMs: number;
 }
 
-function collectSpanEntries(spans: SpanDetail[]): {
+/** A codex tool_result log's content, joinable to its span by call_id. */
+interface CodexToolLogContent {
+  input: unknown;
+  output: unknown;
+  failed: boolean;
+}
+
+/**
+ * codex tool_result logs are recognised by shape, not scope: they carry a
+ * `call_id` plus `arguments`/`output`, attributes claude's tool events never
+ * use, and their `event.name` keeps the `codex.` prefix on the wire.
+ */
+function indexCodexToolLogsByCallId(
+  logs: TranscriptLogRecord[],
+): Map<string, CodexToolLogContent> {
+  const byCallId = new Map<string, CodexToolLogContent>();
+  for (const log of logs) {
+    if (readString(log.attributes, "event.name") !== "codex.tool_result") {
+      continue;
+    }
+    const callId = readString(log.attributes, "call_id");
+    if (callId === null || byCallId.has(callId)) continue;
+    byCallId.set(callId, {
+      input: parseMaybeJson(readString(log.attributes, "arguments")),
+      output: readString(log.attributes, "output"),
+      failed: readString(log.attributes, "success") === "false",
+    });
+  }
+  return byCallId;
+}
+
+/** Parse a JSON-looking string for structured rendering; pass others through. */
+function parseMaybeJson(raw: string | null): unknown {
+  if (raw === null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return raw;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return raw;
+  }
+}
+
+function collectSpanEntries(
+  spans: SpanDetail[],
+  codexToolLogs: Map<string, CodexToolLogContent>,
+): {
   entries: TranscriptEntry[];
   spanReplies: SpanReply[];
   totals: CodingAgentTranscript["totals"];
   subAgentToolCounts: Map<string, number>;
+  claimedToolCallIds: Set<string>;
 } {
   const entries: TranscriptEntry[] = [];
   const spanReplies: SpanReply[] = [];
   const subAgentToolCounts = new Map<string, number>();
+  const claimedToolCallIds = new Set<string>();
   const totals = { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 };
 
+  // codex 0.146's exec wire has no `session_task.turn` rollup, its
+  // usage-bearing `handle_responses` spans are the model calls. When the
+  // rollup IS present (the TUI wire), those same spans are its per-response
+  // parts and counting both would double every call.
+  const hasCodexTurnRollup = spans.some(
+    (span) => span.name === "session_task.turn",
+  );
+  let systemPromptEmitted = false;
+
   for (const span of spans) {
-    if (isModelCallSpan(span.name)) {
+    const isCodexResponseCall =
+      !hasCodexTurnRollup &&
+      span.name === "handle_responses" &&
+      readNumber(span.params, "gen_ai.usage.input_tokens") !== null;
+    if (isModelCallSpan(span.name) || isCodexResponseCall) {
       const call = modelCallEntry(span);
       totals.modelCalls += 1;
       totals.tokens += call.tokens;
       totals.costUsd += call.costUsd;
       entries.push(call);
+
+      // The session's system context, once, off the first model call that
+      // carries one. Only claude's enriched llm_request inputs have it -
+      // codex/opencode/gemini model spans carry no system message.
+      if (!systemPromptEmitted) {
+        const systemText = extractedSystemText(span.input);
+        if (systemText !== null) {
+          systemPromptEmitted = true;
+          entries.push({
+            kind: "system_prompt",
+            atMs: span.startTimeMs,
+            text: systemText,
+            chars: systemText.length,
+          });
+        }
+      }
       // Agents whose reply rides the SPAN (opencode via the Vercel AI SDK,
       // copilot with content capture, gemini's llm_call) get their assistant
       // message from the span's extracted output. Claude never lands here:
@@ -272,26 +381,42 @@ function collectSpanEntries(spans: SpanDetail[]): {
       );
     }
 
+    // A codex tool span records the run but not its content, that rides the
+    // tool_result log sharing the span's call_id. Claim the call_id either
+    // way so the log pass never renders the same call twice.
+    const callId = readString(span.params, "call_id");
+    const logContent = callId !== null ? codexToolLogs.get(callId) : undefined;
+    if (callId !== null) claimedToolCallIds.add(callId);
+
     entries.push({
       kind: "tool",
       atMs: span.startTimeMs,
       name: toolName,
       mcpServer: parseMcpToolName(toolName)?.server ?? null,
-      input: span.input ?? null,
-      output: span.output ?? null,
+      input: span.input ?? logContent?.input ?? null,
+      output: span.output ?? logContent?.output ?? null,
       durationMs:
         span.endTimeMs && span.startTimeMs
           ? span.endTimeMs - span.startTimeMs
           : null,
       // Both signals, because they are set independently: a span can carry an
       // error payload, or simply an error STATUS with no payload at all.
-      failed: span.status === "error" || span.error != null,
+      failed:
+        span.status === "error" ||
+        span.error != null ||
+        (logContent?.failed ?? false),
       agentId,
       spanId: span.spanId,
     });
   }
 
-  return { entries, spanReplies, totals, subAgentToolCounts };
+  return {
+    entries,
+    spanReplies,
+    totals,
+    subAgentToolCounts,
+    claimedToolCallIds,
+  };
 }
 
 function modelCallEntry(span: SpanDetail): TranscriptEntry & {
@@ -339,6 +464,12 @@ function modelCallEntry(span: SpanDetail): TranscriptEntry & {
     cacheCreationTokens:
       readNumber(span.params, "cache_creation_tokens") ??
       readNumber(span.params, "gen_ai.usage.cache_creation.input_tokens") ??
+      // codex spells cache creation "cache_write", on both its span shapes.
+      readNumber(span.params, "gen_ai.usage.cache_write.input_tokens") ??
+      readNumber(
+        span.params,
+        "codex.turn.token_usage.cache_write_input_tokens",
+      ) ??
       0,
   };
 }
@@ -351,7 +482,10 @@ function modelOf(span: SpanDetail): string | null {
   );
 }
 
-function collectLogEntries(logs: TranscriptLogRecord[]): {
+function collectLogEntries(
+  logs: TranscriptLogRecord[],
+  claimedToolCallIds: Set<string>,
+): {
   entries: TranscriptEntry[];
   sessionId: string | null;
 } {
@@ -364,7 +498,7 @@ function collectLogEntries(logs: TranscriptLogRecord[]): {
 
     sessionId ??= resolveConversationKey(log.attributes);
 
-    const entry = logToEntry({ event, log });
+    const entry = logToEntry({ event, log, claimedToolCallIds });
     if (entry !== null) entries.push(entry);
   }
 
@@ -374,9 +508,11 @@ function collectLogEntries(logs: TranscriptLogRecord[]): {
 function logToEntry({
   event,
   log,
+  claimedToolCallIds,
 }: {
   event: string;
   log: TranscriptLogRecord;
+  claimedToolCallIds: Set<string>;
 }): TranscriptEntry | null {
   const attrs = log.attributes;
   const atMs = log.timestampMs;
@@ -420,6 +556,35 @@ function logToEntry({
     }
 
     case "tool_result": {
+      // codex tool_result logs (recognised by their call_id + arguments
+      // shape) are the CONTENT record of a codex tool run. When a tool span
+      // claimed the call_id, the span entry already carries this log's
+      // content; unclaimed calls (the model-facing harness call, MCP calls
+      // without spans, span-less wires) render from the log alone.
+      const callId = readString(attrs, "call_id");
+      if (
+        callId !== null &&
+        readString(attrs, "event.name") === "codex.tool_result"
+      ) {
+        if (claimedToolCallIds.has(callId)) return null;
+        const codexToolName = readString(attrs, "tool_name");
+        if (codexToolName === null) return null;
+        const mcpServer = readString(attrs, "mcp_server");
+        return {
+          kind: "tool",
+          atMs,
+          name: codexToolName,
+          mcpServer:
+            mcpServer ?? parseMcpToolName(codexToolName)?.server ?? null,
+          input: parseMaybeJson(readString(attrs, "arguments")),
+          output: readString(attrs, "output"),
+          durationMs: readNumber(attrs, "duration_ms"),
+          failed: readString(attrs, "success") === "false",
+          agentId: null,
+          spanId: "",
+        };
+      }
+
       // Gemini tools exist only as this log event (its tool_call, which the
       // vocabulary maps here): no span exists for them. A rejected decision
       // means the human said no and nothing ran. Claude tool_result logs
@@ -655,6 +820,72 @@ function extractedOutputText(output: string | null | undefined): string | null {
   } catch {
     return raw;
   }
+}
+
+/**
+ * Everything the agent was told before the user's own words, out of a span's
+ * serialized chat input (`{type:"chat_messages",value:[{role,content},...]}`,
+ * how the claude read-time enrichment writes the request body's conversation
+ * onto the llm_request span).
+ *
+ * Two sources, because claude uses both. A `system` turn carries the top-level
+ * system prompt and the tool definitions. The rest, the CLAUDE.md files, the
+ * skills preamble, the MCP inventory, rides `<system-reminder>` blocks stapled
+ * to the FIRST user message, so a session whose top-level system field never
+ * reached telemetry (claude cuts the body at 60KB, and the system field
+ * serializes after the message history) still shows what filled the window.
+ */
+function extractedSystemText(input: string | null | undefined): string | null {
+  if (typeof input !== "string") return null;
+  const raw = input.trim();
+  if (!raw.startsWith("[") && !raw.startsWith("{")) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    // The read path serializes a chat input as the bare message ARRAY
+    // (`buildDisplayInput` -> `JSON.stringify(io.value)`); the `{type, value}`
+    // wrapper is the in-process shape. Accept both, like the reply extractor
+    // above, so this reads the same input whichever side hands it over.
+    const messages = Array.isArray(parsed)
+      ? parsed
+      : parsed &&
+          typeof parsed === "object" &&
+          (parsed as { type?: unknown }).type === "chat_messages" &&
+          Array.isArray((parsed as { value?: unknown }).value)
+        ? (parsed as { value: unknown[] }).value
+        : null;
+    if (messages === null) return null;
+    const parts: string[] = [];
+    let firstUserReminders: string | null = null;
+    for (const message of messages) {
+      const m = message as { role?: unknown; content?: unknown } | null;
+      if (typeof m?.content !== "string" || m.content.length === 0) continue;
+      if (m.role === "system") {
+        parts.push(m.content);
+        continue;
+      }
+      if (m.role === "user" && firstUserReminders === null) {
+        firstUserReminders = systemReminderText(m.content);
+      }
+    }
+    if (firstUserReminders !== null) parts.push(firstUserReminders);
+    return parts.length > 0 ? parts.join("\n\n") : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The `<system-reminder>` blocks out of a user message, concatenated. This is
+ * the envelope claude wraps injected context in, and the only thing that
+ * separates it from what the user actually typed.
+ */
+function systemReminderText(content: string): string | null {
+  const blocks = content.match(
+    /<system-reminder>[\s\S]*?(?:<\/system-reminder>|$)/g,
+  );
+  if (blocks === null || blocks.length === 0) return null;
+  const text = blocks.join("\n\n").trim();
+  return text.length > 0 ? text : null;
 }
 
 /**

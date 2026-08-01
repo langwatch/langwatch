@@ -264,10 +264,20 @@ function buildInputIndex({
   const spansByQuerySource = groupBy(spans, (s) =>
     querySourceKey(s.querySource),
   );
+  // Grouping by `query_source` isolates concurrent sources from each other,
+  // but it only works while BOTH sides carry the field. Claude Code 2.1.x
+  // stamps it on the log events and not on the `llm_request` span, so keying
+  // the logs by it puts every body in a group no span can reach, and every
+  // model call silently degrades to the bare `user_prompt` text: no history,
+  // no system prompt, no tool definitions. When no span declares a source
+  // there is nothing to keep apart, so the whole trace pairs as one group.
+  const spansDeclareQuerySource = spans.some((s) => s.querySource !== null);
   const requestBodiesByQuerySource = new Map<string, ClaudeContentLog[]>();
   const promptsByQuerySource = new Map<string, ClaudeContentLog[]>();
   for (const log of logs) {
-    const key = querySourceKey(log.querySource);
+    const key = spansDeclareQuerySource
+      ? querySourceKey(log.querySource)
+      : NULL_QUERY_SOURCE_KEY;
     if (log.eventName === INPUT_BODY_EVENT) {
       pushInto(requestBodiesByQuerySource, key, log);
     } else if (log.eventName === USER_PROMPT_EVENT) {
@@ -290,7 +300,50 @@ function buildInputIndex({
     }
   }
 
+  dedupeRepeatedSystemMessages({ spans, bySpanId });
+
   return bySpanId;
+}
+
+/**
+ * Claude re-sends the identical system prompt (and tool definitions) on every
+ * call of a session, so a 20-call trace repeats the same 40KB of context 20
+ * times in the drawer payload. Keep the full text on the FIRST call that
+ * carries each distinct system message (in span order, which the caller feeds
+ * time-sorted) and replace later identical copies with a short reference, so
+ * the reader still sees on every call THAT the context rode along, without
+ * shipping it again.
+ */
+function dedupeRepeatedSystemMessages({
+  spans,
+  bySpanId,
+}: {
+  spans: ClaudeSpanRef[];
+  bySpanId: Map<string, SpanInputOutput>;
+}): void {
+  const firstCallByContent = new Map<string, number>();
+  let callNumber = 0;
+  for (const span of spans) {
+    const input = bySpanId.get(span.spanId);
+    if (input === undefined || input.type !== "chat_messages") continue;
+    if (!Array.isArray(input.value)) continue;
+    callNumber++;
+    const value = input.value as ChatMessage[];
+    for (let i = 0; i < value.length; i++) {
+      const message = value[i]!;
+      if (message.role !== "system") continue;
+      if (typeof message.content !== "string") continue;
+      const firstCall = firstCallByContent.get(message.content);
+      if (firstCall === undefined) {
+        firstCallByContent.set(message.content, callNumber);
+        continue;
+      }
+      value[i] = {
+        role: "system",
+        content: `[system context unchanged since call #${firstCall} of this trace, ${message.content.length.toLocaleString("en-US")} chars not repeated]`,
+      };
+    }
+  }
 }
 
 /**

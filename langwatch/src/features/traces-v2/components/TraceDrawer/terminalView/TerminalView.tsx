@@ -657,6 +657,8 @@ function EntryLine({
   toolSpans: ToolSpanIndex;
 }) {
   switch (entry.kind) {
+    case "system_prompt":
+      return <SystemContextLine text={entry.text} chars={entry.chars} />;
     case "user_prompt":
       return <PromptLine text={entry.text} />;
     case "assistant_message":
@@ -672,6 +674,50 @@ function EntryLine({
     default:
       return null;
   }
+}
+
+/**
+ * The session's system context (CLAUDE.md, MCP tools, skills), pinned above
+ * the first prompt and collapsed by default: it is the payload every call of
+ * the session carries, and expanding it is how a reader answers "what is
+ * filling my context window". Collapsed it costs one line.
+ */
+function SystemContextLine({ text, chars }: { text: string; chars: number }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <VStack align="stretch" gap={0.5}>
+      <HStack
+        align="flex-start"
+        gap={2}
+        cursor="pointer"
+        onClick={() => setExpanded((v) => !v)}
+        role="button"
+        aria-expanded={expanded}
+      >
+        <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+        <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
+          session context: {chars.toLocaleString("en-US")} chars of system
+          prompt and tools{" "}
+          {expanded ? "(click to collapse)" : "(click to expand)"}
+        </Text>
+      </HStack>
+      {expanded && (
+        <HStack align="flex-start" gap={2}>
+          <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+          >
+            {text}
+          </Text>
+        </HStack>
+      )}
+    </VStack>
+  );
 }
 
 /** The user's prompt: `❯ what they typed`. Sets itself apart with the caret's colour, the same way the CLI does — not a background panel. */
@@ -881,11 +927,11 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
     marker.kind === "deadSite"
       ? [
           TERMINAL_TOKENS.red,
-          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tok re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tok cached`,
+          `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tokens cached`,
         ]
       : [
           marker.color,
-          `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tok`,
+          `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`,
         ];
   return (
     <HStack align="flex-start" gap={2}>
@@ -1099,7 +1145,7 @@ function StatusLine({
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
           {model && <Stat label={model} />}
           {elapsedMs > 0 && <Stat label={formatDuration(elapsedMs)} />}
-          {tokens > 0 && <Stat label={`${formatTokens(tokens)} tok`} />}
+          {tokens > 0 && <Stat label={`${formatTokens(tokens)} tokens`} />}
           {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}
         </HStack>
       </HStack>

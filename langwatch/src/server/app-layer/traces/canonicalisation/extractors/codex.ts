@@ -67,6 +67,17 @@ import type {
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
+/**
+ * codex sets its instrumentation scope to the originator: the interactive TUI
+ * is `codex_cli_rs`, `codex exec` is `codex_exec`. The exec wire has NO
+ * `session_task.turn` rollup, `handle_responses` response spans are its only
+ * usage record, so the redundant-usage skip below must never fire for it.
+ */
+const CODEX_EXEC_SCOPE_NAME = "codex_exec";
+const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
+  CODEX_RUST_SCOPE_NAME,
+  CODEX_EXEC_SCOPE_NAME,
+]);
 const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
@@ -109,7 +120,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // trace summary — that's the log-record path's convention, not the
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
-    if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
+    const scopeName = ctx.span.instrumentationScope?.name ?? "";
+    if (!CODEX_SCOPE_NAMES.has(scopeName)) return;
 
     // codex emits ONE authoritative per-turn rollup span
     // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
@@ -119,7 +131,13 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // totals double. Flag the known-redundant response span so the fold skips
     // its token math — its own per-span detail is left untouched.
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
-      this.markRedundantUsageSpan(ctx);
+      this.liftResponseSpan(ctx);
+      // `codex exec` emits no turn rollup at all, so its handle_responses
+      // spans are the trace's ONLY usage record, skipping them there would
+      // zero the trace totals.
+      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+        this.markRedundantUsageSpan(ctx);
+      }
       return;
     }
 
@@ -139,6 +157,9 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     );
     const cacheReadTokens = asNumber(
       attrs.take("codex.turn.token_usage.cached_input_tokens"),
+    );
+    const cacheWriteTokens = asNumber(
+      attrs.take("codex.turn.token_usage.cache_write_input_tokens"),
     );
     const reasoningTokens = asNumber(
       attrs.take("codex.turn.token_usage.reasoning_output_tokens"),
@@ -167,6 +188,15 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       );
       fired = true;
     }
+    if (cacheWriteTokens !== null) {
+      // codex spells cache creation "cache_write"; our canonical key follows
+      // the Anthropic-derived semconv name.
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        cacheWriteTokens,
+      );
+      fired = true;
+    }
     if (reasoningTokens !== null) {
       ctx.setAttrIfAbsent(
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
@@ -186,6 +216,56 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       fired = true;
     }
     if (fired) ctx.recordRule("codex/session_task.turn");
+  }
+
+  /**
+   * Lifts the codex-namespaced attributes of a non-turn response span
+   * (`handle_responses`) onto canonical keys. The span natively reports
+   * `gen_ai.usage.{input,output,cache_read}` already; what it spells its own
+   * way is the reasoning effort setting (`codex.request.reasoning_effort`),
+   * the reasoning output tokens (`codex.usage.reasoning_output_tokens`), and
+   * cache creation (`gen_ai.usage.cache_write.input_tokens`). Under the TUI
+   * scope these mirror what the turn rollup reports; under `codex_exec`
+   * (no rollup) this span is the only place the trace can learn them.
+   */
+  private liftResponseSpan(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    let fired = false;
+
+    const reasoningEffort = asString(
+      attrs.take("codex.request.reasoning_effort"),
+    );
+    if (reasoningEffort !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
+        reasoningEffort,
+      );
+      fired = true;
+    }
+
+    const reasoningTokens = asNumber(
+      attrs.take("codex.usage.reasoning_output_tokens"),
+    );
+    if (reasoningTokens !== null && reasoningTokens > 0) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        reasoningTokens,
+      );
+      fired = true;
+    }
+
+    const cacheWriteTokens = asNumber(
+      attrs.get("gen_ai.usage.cache_write.input_tokens"),
+    );
+    if (cacheWriteTokens !== null && cacheWriteTokens > 0) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        cacheWriteTokens,
+      );
+      fired = true;
+    }
+
+    if (fired) ctx.recordRule("codex/handle_responses");
   }
 
   /**
@@ -275,8 +355,19 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
     const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
+    const reasoningEffort = asString(
+      ctx.bag.attrs.take("model_reasoning_effort"),
+    );
 
     let fired = false;
+    if (reasoningEffort !== null) {
+      // Straight onto the canonical request key: log lifts merge verbatim
+      // into the trace summary attributes, which is exactly where the span
+      // path (SPAN_ATTR_MAPPINGS) puts it and where the drawer header reads
+      // it, so log-only codex wires get the same reasoning-effort pill.
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, reasoningEffort);
+      fired = true;
+    }
     if (model !== null) {
       ctx.setAttr("langwatch.model", model);
       fired = true;
@@ -307,8 +398,13 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
   private liftConversationStarts(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
+    const reasoningEffort = asString(ctx.bag.attrs.take("reasoning_effort"));
 
     let fired = false;
+    if (reasoningEffort !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, reasoningEffort);
+      fired = true;
+    }
     if (model !== null) {
       ctx.setAttr("langwatch.model", model);
       fired = true;

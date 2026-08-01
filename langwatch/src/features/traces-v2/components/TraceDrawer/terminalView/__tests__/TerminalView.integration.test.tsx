@@ -209,7 +209,7 @@ describe("TerminalView", () => {
   describe("given per-entry token and cost metrics", () => {
     it("shows the cumulative token and cost totals in the timeline HUD", () => {
       renderView();
-      expect(screen.getByText("175 tok")).toBeInTheDocument();
+      expect(screen.getByText("175 tokens")).toBeInTheDocument();
       expect(screen.getByText("$0.06")).toBeInTheDocument();
     });
 
@@ -249,7 +249,7 @@ describe("TerminalView", () => {
       ];
       renderView({ entries: growingEntries });
       expect(
-        screen.getByText("Context growing: 50.0K tok"),
+        screen.getByText("Context growing: 50.0K tokens"),
       ).toBeInTheDocument();
     });
   });
@@ -300,7 +300,7 @@ describe("TerminalView", () => {
       renderView({ entries: rebuildEntries });
       expect(
         screen.getByText(
-          "Cache rebuilt: 6.0K tok re-sent instead of reusing 10.0K tok cached",
+          "Cache rebuilt: 6.0K tokens re-sent instead of reusing 10.0K tokens cached",
         ),
       ).toBeInTheDocument();
     });

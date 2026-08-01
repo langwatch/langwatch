@@ -32,6 +32,10 @@ const RECENT_COLUMN_IDS = [
   "origin",
   "duration",
   "cost",
+  // Context size sits before tokens deliberately: for a coding-agent turn the
+  // two answer different questions, and reading the context the turn started
+  // from first is what makes the summed token count next to it make sense.
+  "contextSize",
   "tokens",
 ];
 const RECENT_ADDONS = ["io-preview"];

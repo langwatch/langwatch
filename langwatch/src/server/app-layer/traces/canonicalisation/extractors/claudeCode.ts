@@ -78,6 +78,13 @@ const LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
  */
 const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
   "repl_main_thread",
+  // `claude -p` / Agent SDK sessions stamp every conversational turn with
+  // query_source "sdk", there is no repl thread. Without this, an SDK-driven
+  // session's reply never reaches the trace headline output ("no output
+  // recorded" on every -p trace). The utility calls this allowlist exists to
+  // exclude (prompt_suggestion, generate_session_title, quota) keep their own
+  // distinct sources either way.
+  "sdk",
 ]);
 
 /**
@@ -139,13 +146,68 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
     if (!CLAUDE_CODE_SCOPE_NAMES.has(ctx.bag.scopeName)) return;
     const eventName = ctx.bag.attrs.get("event.name");
 
-    // The model-call events (api_request / api_request_body /
-    // api_response_body) are folded downstream from the log path itself,
-    // not lifted here — the only claude_code event this extractor lifts
-    // onto canonical attributes is user_prompt.
+    // The model-call events' I/O text is folded downstream from the log path
+    // itself (extractIOFromLogRecord), not lifted here, this extractor lifts
+    // only scalar canonical attributes.
     if (eventName === "user_prompt") {
       this.liftUserPrompt(ctx);
+      return;
     }
+    if (eventName === "api_request") {
+      this.liftApiRequest(ctx);
+      return;
+    }
+    if (eventName === "api_response_body") {
+      this.liftApiResponseBodyUsage(ctx);
+      return;
+    }
+  }
+
+  /**
+   * The reasoning effort setting rides the `effort` attr of api_request
+   * events (e.g. "low" | "high" | "max", Anthropic's adaptive-thinking
+   * knob). Only conversational turns set the trace-level value: utility
+   * calls (title generation, autosuggest) run at their own effort and must
+   * not override what the user's actual turns ran at. Log lifts merge
+   * last-write-wins into the trace attributes, so the trace shows the
+   * session's most recent conversational effort, same key the codex span
+   * path uses and the drawer header pill reads.
+   */
+  private liftApiRequest(ctx: LogExtractorContext): void {
+    const querySource = asString(ctx.bag.attrs.get("query_source"));
+    if (!isConversationalQuerySource(querySource)) return;
+    const effort = asString(ctx.bag.attrs.get("effort"));
+    if (effort === null) return;
+    ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, effort);
+    ctx.recordRule("claude-code/api_request");
+  }
+
+  /**
+   * The per-TTL cache-creation split lives ONLY in the response body's
+   * `usage.cache_creation` object, no span or log attribute carries it.
+   * Lifted per call here; the trace summary fold sums the per-call values
+   * into reserved running totals (these are the only cache numbers that
+   * ride logs exclusively, so summing them can never double-count a span).
+   */
+  private liftApiResponseBodyUsage(ctx: LogExtractorContext): void {
+    const usage = extractCacheCreationTtlSplit(ctx.bag.attrs.get("body"));
+    if (usage === null) return;
+    let fired = false;
+    if (usage.ephemeral5mInputTokens > 0) {
+      ctx.setAttr(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS,
+        usage.ephemeral5mInputTokens,
+      );
+      fired = true;
+    }
+    if (usage.ephemeral1hInputTokens > 0) {
+      ctx.setAttr(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS,
+        usage.ephemeral1hInputTokens,
+      );
+      fired = true;
+    }
+    if (fired) ctx.recordRule("claude-code/api_response_body_usage");
   }
 
   private liftUserPrompt(ctx: LogExtractorContext): void {
@@ -224,6 +286,37 @@ export function extractAssistantTextFromResponseBody(
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/**
+ * Anthropic's per-TTL cache-write split out of a response body's usage:
+ * `usage.cache_creation.{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}`.
+ * Returns null when the body is unparseable or carries no split (older API
+ * responses report only the flat cache_creation_input_tokens total).
+ *
+ * @internal exported for unit testing
+ */
+export function extractCacheCreationTtlSplit(raw: unknown): {
+  ephemeral5mInputTokens: number;
+  ephemeral1hInputTokens: number;
+} | null {
+  const parsed = parseJsonBody(raw);
+  if (!parsed) return null;
+  const usage = parsed.usage;
+  if (!usage || typeof usage !== "object") return null;
+  const cacheCreation = (usage as { cache_creation?: unknown }).cache_creation;
+  if (!cacheCreation || typeof cacheCreation !== "object") return null;
+  const split = cacheCreation as {
+    ephemeral_5m_input_tokens?: unknown;
+    ephemeral_1h_input_tokens?: unknown;
+  };
+  const fiveMinute = asNumber(split.ephemeral_5m_input_tokens) ?? 0;
+  const oneHour = asNumber(split.ephemeral_1h_input_tokens) ?? 0;
+  if (fiveMinute <= 0 && oneHour <= 0) return null;
+  return {
+    ephemeral5mInputTokens: fiveMinute,
+    ephemeral1hInputTokens: oneHour,
+  };
 }
 
 /**
@@ -422,11 +515,21 @@ export function buildInputMessagesFromRequestBody(
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return null;
+      // claude caps the body at ~60KB inline, cutting the JSON mid-string -
+      // and Anthropic's request layout puts `system` and `tools` AFTER the
+      // rolling message history, so the cut destroys exactly the context the
+      // reader most wants. Salvage every complete leading message plus
+      // whatever of the system prompt survived, instead of throwing the body
+      // away (which used to collapse the whole input to the bare user_prompt).
+      return salvageTruncatedRequestBody(raw);
     }
   }
   if (!parsed || typeof parsed !== "object") return null;
-  const obj = parsed as { system?: unknown; messages?: unknown };
+  const obj = parsed as {
+    system?: unknown;
+    messages?: unknown;
+    tools?: unknown;
+  };
   if (!Array.isArray(obj.messages)) return null;
 
   const out: Array<{ role: string; content: string }> = [];
@@ -438,6 +541,9 @@ export function buildInputMessagesFromRequestBody(
     }
   }
 
+  const toolsMessage = toolDefinitionsMessage(obj.tools);
+  if (toolsMessage !== null) out.push(toolsMessage);
+
   for (const m of obj.messages) {
     if (!m || typeof m !== "object") continue;
     const message = m as { role?: unknown; content?: unknown };
@@ -448,4 +554,304 @@ export function buildInputMessagesFromRequestBody(
   }
 
   return out.length > 0 ? out : null;
+}
+
+/**
+ * The request's tool definitions as a compact system-side message: name and
+ * first description line per tool. This is where MCP servers and skills show
+ * up in what the session actually pays for, a request with 40 tools is 40
+ * schemas of context on every call, and until now the whole array was
+ * silently dropped.
+ */
+function toolDefinitionsMessage(
+  tools: unknown,
+): { role: string; content: string } | null {
+  if (!Array.isArray(tools) || tools.length === 0) return null;
+  const lines: string[] = [];
+  for (const tool of tools) {
+    if (!tool || typeof tool !== "object") continue;
+    const t = tool as { name?: unknown; description?: unknown };
+    if (typeof t.name !== "string" || t.name.length === 0) continue;
+    const description =
+      typeof t.description === "string"
+        ? (t.description.split("\n", 1)[0] ?? "").trim()
+        : "";
+    lines.push(description ? `${t.name}: ${description}` : t.name);
+  }
+  if (lines.length === 0) return null;
+  return {
+    role: "system",
+    content: capPayloadString(
+      `[tools available: ${lines.length}]\n${lines.join("\n")}`,
+      undefined,
+      "tool_definitions",
+    ),
+  };
+}
+
+/** claude appends this marker where it cut an oversized inline body. */
+const CLAUDE_TRUNCATION_MARKER = /\s*\[TRUNCATED - [^\]]*\]\s*$/;
+
+/**
+ * Best-effort parse of a request body claude cut mid-JSON: a single scanner
+ * pass finds the complete leading `messages` elements and the `system` /
+ * `tools` values (whole or partial), and rebuilds the same message array the
+ * intact path produces. Partial system text is kept and marked, for a
+ * session past ~60KB of history the head of the system prompt is all that
+ * survives the cap, and it is still what identifies the session's context.
+ *
+ * @internal exported for unit testing
+ */
+export function salvageTruncatedRequestBody(
+  raw: string,
+): Array<{ role: string; content: string }> | null {
+  const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
+  const out: Array<{ role: string; content: string }> = [];
+
+  const system = salvageTopLevelValue(trimmed, "system");
+  if (system !== null) {
+    const systemText = system.complete
+      ? contentToText(safeParse(system.slice) ?? system.slice)
+      : salvagePartialText(system.slice);
+    if (systemText && systemText.length > 0) {
+      out.push({
+        role: "system",
+        content: system.complete
+          ? systemText
+          : `${systemText}\n\n[system prompt truncated by claude's 60KB telemetry cap]`,
+      });
+    }
+  }
+
+  const tools = salvageTopLevelValue(trimmed, "tools");
+  if (tools !== null) {
+    const parsedTools = tools.complete
+      ? safeParse(tools.slice)
+      : salvageCompleteArrayElements(tools.slice);
+    const toolsMessage = toolDefinitionsMessage(parsedTools);
+    if (toolsMessage !== null) out.push(toolsMessage);
+  }
+
+  const messages = salvageTopLevelValue(trimmed, "messages");
+  let truncatedMidMessages = false;
+  if (messages !== null) {
+    const parsedMessages = messages.complete
+      ? safeParse(messages.slice)
+      : salvageCompleteArrayElements(messages.slice);
+    truncatedMidMessages = !messages.complete;
+    if (Array.isArray(parsedMessages)) {
+      for (const m of parsedMessages) {
+        if (!m || typeof m !== "object") continue;
+        const message = m as { role?: unknown; content?: unknown };
+        const role = typeof message.role === "string" ? message.role : "user";
+        const content = contentToText(message.content);
+        if (content.length === 0) continue;
+        out.push({ role, content });
+      }
+    }
+  }
+
+  if (out.length === 0) return null;
+  if (truncatedMidMessages || system === null || !system.complete) {
+    out.push({
+      role: "system",
+      content:
+        "[request body truncated by claude's 60KB telemetry cap, later turns and remaining context omitted]",
+    });
+  }
+  return out;
+}
+
+function safeParse(slice: string): unknown {
+  try {
+    return JSON.parse(slice);
+  } catch {
+    return null;
+  }
+}
+
+interface SalvagedValue {
+  /** The raw character span of the value (complete or cut). */
+  slice: string;
+  /** Whether the value closed before the cut. */
+  complete: boolean;
+}
+
+/**
+ * Single-pass scan for a top-level key's value span in (possibly cut) JSON.
+ * Tracks string/escape state and bracket depth; never allocates a parse tree,
+ * so a 60KB body costs one linear pass per key.
+ */
+function salvageTopLevelValue(raw: string, key: string): SalvagedValue | null {
+  const needle = `"${key}":`;
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      // Only a depth-1 position can start a top-level key.
+      if (depth === 1 && raw.startsWith(needle, i)) {
+        const valueStart = i + needle.length;
+        return scanValueSpan(raw, valueStart);
+      }
+      inString = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") depth--;
+  }
+  return null;
+}
+
+/** The span of one JSON value starting at `start`, or its cut prefix. */
+function scanValueSpan(raw: string, start: number): SalvagedValue {
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+  let began = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') {
+        inString = false;
+        if (depth === 0) {
+          return { slice: raw.slice(start, i + 1), complete: true };
+        }
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      began = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") {
+      depth++;
+      began = true;
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 0) {
+        return { slice: raw.slice(start, i + 1), complete: true };
+      }
+    } else if (depth === 0 && began && (ch === "," || ch === "}")) {
+      // A bare scalar (number/true/false/null) ended.
+      return { slice: raw.slice(start, i), complete: true };
+    }
+  }
+  return { slice: raw.slice(start), complete: false };
+}
+
+/**
+ * The complete leading elements of a CUT array literal, the elements that
+ * closed before the truncation point parse individually; the cut one is
+ * dropped.
+ */
+function salvageCompleteArrayElements(slice: string): unknown[] {
+  const elements: unknown[] = [];
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+  let elementStart = -1;
+  for (let i = 0; i < slice.length; i++) {
+    const ch = slice[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") {
+      depth++;
+      if (depth === 2 && elementStart === -1) elementStart = i;
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 1 && elementStart !== -1) {
+        const parsed = safeParse(slice.slice(elementStart, i + 1));
+        if (parsed !== null) elements.push(parsed);
+        elementStart = -1;
+      }
+    }
+  }
+  return elements;
+}
+
+/**
+ * The readable text out of a CUT string or content-block-array fragment:
+ * for a string value the raw chars up to the cut (minus any dangling escape),
+ * for an array of blocks the complete blocks' text plus the cut block's
+ * partial `"text"` string.
+ */
+function salvagePartialText(slice: string): string | null {
+  const fragment = slice.trimStart();
+  if (fragment.startsWith('"')) {
+    return decodePartialJsonString(fragment.slice(1));
+  }
+  if (fragment.startsWith("[")) {
+    const complete = salvageCompleteArrayElements(fragment);
+    const parts: string[] = [];
+    const completeText = contentToText(complete);
+    if (completeText.length > 0) parts.push(completeText);
+    // The cut element's partial text, when the cut landed inside its "text".
+    const lastTextKey = fragment.lastIndexOf('"text":');
+    if (lastTextKey !== -1) {
+      const afterKey = fragment
+        .slice(lastTextKey + '"text":'.length)
+        .trimStart();
+      if (afterKey.startsWith('"') && !isClosedString(afterKey)) {
+        const partial = decodePartialJsonString(afterKey.slice(1));
+        if (partial && partial.length > 0) parts.push(partial);
+      }
+    }
+    return parts.length > 0 ? parts.join("\n\n") : null;
+  }
+  return null;
+}
+
+/** Whether a fragment starting at a quote closes its string. */
+function isClosedString(fragment: string): boolean {
+  let escaped = false;
+  for (let i = 1; i < fragment.length; i++) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    const ch = fragment[i];
+    if (ch === "\\") escaped = true;
+    else if (ch === '"') return true;
+  }
+  return false;
+}
+
+/**
+ * Decode the content of a JSON string cut before its closing quote: drop a
+ * dangling escape (`\` or incomplete `\uXX`), close the quote, parse.
+ */
+function decodePartialJsonString(content: string): string | null {
+  let body = content;
+  // An unescaped closing quote means the string actually completed.
+  const closed = isClosedString(`"${body}`);
+  if (closed) {
+    const end = `"${body}`.indexOf('"', 1);
+    body = `"${body}`.slice(1, end);
+  }
+  // Trim a trailing incomplete \uXXXX escape, then a trailing lone backslash.
+  body = body.replace(/\\u[0-9a-fA-F]{0,3}$/, "");
+  let backslashes = 0;
+  for (let i = body.length - 1; i >= 0 && body[i] === "\\"; i--) backslashes++;
+  if (backslashes % 2 === 1) body = body.slice(0, -1);
+  const parsed = safeParse(`"${body}"`);
+  return typeof parsed === "string" && parsed.length > 0 ? parsed : null;
 }

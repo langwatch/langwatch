@@ -10,6 +10,14 @@ interface TokenBreakdownTooltipContentProps {
   cacheReadTokens: number | null;
   /** Cache-write tokens; row hidden when null. */
   cacheCreationTokens: number | null;
+  /**
+   * Anthropic's cache-write split by TTL. A 1h write bills at 2x base input
+   * while a 5m write bills at 1.25x, so which TTL a session is writing to is
+   * a cost question, not trivia. Rows hidden when null (only claude code
+   * sessions with raw body telemetry report the split).
+   */
+  cacheCreation5mTokens?: number | null;
+  cacheCreation1hTokens?: number | null;
   /** Reasoning tokens; row hidden when null (e.g. Anthropic never reports them). */
   reasoningTokens: number | null;
   /**
@@ -35,6 +43,8 @@ export function TokenBreakdownTooltipContent({
   outputTokens,
   cacheReadTokens,
   cacheCreationTokens,
+  cacheCreation5mTokens,
+  cacheCreation1hTokens,
   reasoningTokens,
   totalWithCache,
   estimated,
@@ -56,6 +66,18 @@ export function TokenBreakdownTooltipContent({
         <TooltipRow
           label="Cache write"
           value={cacheCreationTokens.toLocaleString()}
+        />
+      )}
+      {cacheCreation5mTokens != null && cacheCreation5mTokens > 0 && (
+        <TooltipRow
+          label="↳ 5m cache"
+          value={cacheCreation5mTokens.toLocaleString()}
+        />
+      )}
+      {cacheCreation1hTokens != null && cacheCreation1hTokens > 0 && (
+        <TooltipRow
+          label="↳ 1h cache"
+          value={cacheCreation1hTokens.toLocaleString()}
         />
       )}
       {reasoningTokens != null && (

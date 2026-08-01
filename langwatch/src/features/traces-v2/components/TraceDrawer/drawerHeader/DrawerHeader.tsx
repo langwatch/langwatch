@@ -531,6 +531,17 @@ export const DrawerHeader = memo(function DrawerHeader({
     "langwatch.reserved.cache_creation_tokens",
     "gen_ai.usage.cache_creation.input_tokens",
   );
+  // Anthropic's cache-write TTL split (5m writes bill 1.25x base input, 1h
+  // writes 2x), summed by the fold off the response bodies. Absent for every
+  // other provider and for sessions without raw body telemetry.
+  const cacheCreation5mTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.cache_creation_5m_tokens",
+  );
+  const cacheCreation1hTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.cache_creation_1h_tokens",
+  );
   const reasoningTokens = readNumberAttribute(
     trace.attributes,
     "langwatch.reserved.reasoning_tokens",
@@ -1154,6 +1165,8 @@ export const DrawerHeader = memo(function DrawerHeader({
                 outputTokens={trace.outputTokens}
                 cacheReadTokens={cacheReadTokens}
                 cacheCreationTokens={cacheCreationTokens}
+                cacheCreation5mTokens={cacheCreation5mTokens}
+                cacheCreation1hTokens={cacheCreation1hTokens}
                 reasoningTokens={reasoningTokens}
                 totalWithCache={totalTokensWithCache}
                 estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
