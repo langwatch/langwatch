@@ -132,6 +132,20 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       "cache_creation_tokens",
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     );
+    // Claude Code keeps its prompt cache for an hour, which Anthropic bills at
+    // twice the input rate rather than the 1.25x a five-minute entry costs. The
+    // span reports how many tokens it wrote but not how long they live, and the
+    // only place that lifetime appears is the response body on the log stream,
+    // which no span can reach. Recording it here is what lets the cost of a
+    // claude call come out at the price Anthropic actually charged for it,
+    // verified against the cost the agent reports for its own calls.
+    //
+    // setAttrIfAbsent, so the day claude reports the split itself, its own
+    // numbers win and this becomes dead weight rather than a wrong answer.
+    liftNumber(
+      "cache_creation_tokens",
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS,
+    );
 
     const model = attrs.get("model");
     if (typeof model === "string" && model.length > 0) {

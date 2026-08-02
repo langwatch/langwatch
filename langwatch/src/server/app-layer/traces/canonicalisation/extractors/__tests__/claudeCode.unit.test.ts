@@ -115,6 +115,8 @@ describe("ClaudeCodeExtractor.apply (span side)", () => {
       "gen_ai.usage.output_tokens": 45,
       "gen_ai.usage.cache_read.input_tokens": 900,
       "gen_ai.usage.cache_creation.input_tokens": 30,
+      // Claude Code keeps its cache for an hour; see the lifetime describe below.
+      "gen_ai.usage.cache_creation_1h.input_tokens": 30,
     });
     expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/llm_request");
   });
@@ -558,5 +560,70 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     expect(
       buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
     ).toBeNull();
+  });
+});
+
+/**
+ * Claude Code keeps its prompt cache for an hour, billed at twice the input
+ * rate rather than the 1.25x a five-minute entry costs. The span says how much
+ * it wrote but not how long the entry lives, and the lifetime appears only in
+ * the response body on the log stream, so the span-side lift records it.
+ */
+describe("ClaudeCodeExtractor.apply cache lifetime", () => {
+  describe("given a claude code model call that wrote to its cache", () => {
+    /** @scenario "Each cache write bucket is priced at its own rate" */
+    it("records the writes as buying an hour-long cache entry", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", cache_creation_tokens: 17854 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(17854);
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBe(
+        17854,
+      );
+    });
+
+    /** @scenario "Each cache write bucket is priced at its own rate" */
+    it("leaves a lifetime the emitter reported itself alone", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 4000,
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      // Writing nothing is how the lift defers: the emitter's own value is
+      // already on the span, and canonical output merges over the span rather
+      // than replacing it, so 4000 is what survives.
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+      expect(
+        ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens"),
+      ).toBe(4000);
+    });
+  });
+
+  describe("given a claude code model call that wrote nothing to its cache", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("records no cache lifetime", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", input_tokens: 100 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
   });
 });
