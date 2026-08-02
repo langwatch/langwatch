@@ -66,11 +66,22 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the settings sent to the judge carry the user's prompt
     And the evaluator does not begin failing on every trace
 
-  # ⚠ The two scenarios below invert behaviour that is currently asserted as
-  # correct, by a passing unit test AND by two scenarios in
-  # specs/monitors/monitor-execution-backend.feature. The fallback split is the
-  # whole point: no evaluator at all still falls back to the monitor's
-  # parameters; an evaluator whose config merely lacks a settings key must not.
+  # ⚠ The fallback SPLIT is the whole point, and one half of it is currently
+  # asserted as correct by a passing test:
+  # executeEvaluation.settings-resolution.unit.test.ts:122-134 pins
+  # "config present but no settings key -> fall back to monitor.parameters".
+  # That test must be updated to the new contract, not deleted -- deleting it
+  # destroys the only evidence the old behaviour was deliberate.
+  #
+  # No evaluator at all still falls back to the monitor's parameters (SURVIVES).
+  # An evaluator whose config merely lacks a settings key must not (INVERTED).
+  #
+  # Note: specs/monitors/monitor-execution-backend.feature does NOT contradict
+  # this fix -- checked. Its "Backward compatibility with legacy monitors"
+  # scenario is the without-evaluatorId case (the surviving half), and its
+  # LangEvals call-structure table already says settings come from
+  # evaluator.config.settings (what this fix enforces). Both are @unimplemented
+  # and bind nothing regardless.
 
   @integration @unimplemented
   Scenario: A monitor with no evaluator still falls back to its own parameters
@@ -231,6 +242,12 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the card is rendered
     Then the card is not coloured as a failure
 
+  @integration @unimplemented
+  Scenario: A best score that has not loaded yet is not shown as zero
+    Given an optimization run whose steps have not loaded
+    When the best score is rendered
+    Then it shows the not-scored indicator rather than a numeric zero
+
   # ============================================================================
   # Regression and ripple
   # ============================================================================
@@ -280,8 +297,10 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters
 #           (the half of the old contract that SURVIVES; the half that does not is covered by
 #           "A prompt saved at the top level of config still reaches the judge" above)
-#        -> plus a PR obligation: update executeEvaluation.settings-resolution.unit.test.ts and
-#           amend specs/monitors/monitor-execution-backend.feature in the same change.
+#        -> plus a PR obligation: update executeEvaluation.settings-resolution.unit.test.ts to the
+#           new contract rather than deleting it. (An earlier draft also required amending
+#           specs/monitors/monitor-execution-backend.feature -- checked, and it does NOT
+#           contradict the fix, so that obligation was dropped.)
 # AC 0f: "The settings ripple one hop earlier is checked"
 #        -> Scenario: Model environment resolution is unchanged for a correctly configured evaluator
 # AC 0d: "Prevalence is measured before this issue closes"
@@ -340,12 +359,14 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           (BatchEvaluationSummary.tsx:298-306 -- guards only !== undefined; else-branch unguarded)
 #        -> Scenario: A not-scored summary card is not coloured as a failure
 #           (BatchEvaluation.tsx:241 -- colour computed OUTSIDE the typeof guard at :245)
+#        -> Scenario: A best score that has not loaded yet is not shown as zero
+#           (DSPyExperiment.tsx:1469 -- run?.steps optional chain yields undefined while loading)
 #        -> plus a PR obligation: quote the repo-wide pattern grep and give every hit a disposition.
 # AC 17: "The behavioral contract is committed and actually bound"
 #        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
 #           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
 #
-# Coverage: 19 behavioral ACs -> 28 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
+# Coverage: 19 behavioral ACs -> 29 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
 # half of 0e) carry no scenario by design, each with its reason stated above and its enforcement
 # named elsewhere. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
 # gate is a real reproduction against a customer account, which is why it stays a PR obligation.
