@@ -1983,6 +1983,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await impl(traceId, command.optsWithGlobals());
   });
 
+  rendersOwnResult(
+    traceCmd
+      .command("transcript <traceId>")
+      .description("Print the coding-agent transcript of a trace (what the agent did, in order)")
+      .option("-f, --format <format>", "Output format: table (default, human-readable) or json", "table"),
+  ).action(async (traceId: string, _options: unknown, command: Command) => {
+    const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
+    await impl(traceId, command.optsWithGlobals());
+  });
+
   // Add scenario command group
   const scenarioCmd = program
     .command("scenario")

@@ -942,10 +942,25 @@ async function loadProtectedSpansFull({
   input: { projectId: string; traceId: string; occurredAtMs?: number };
   ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
 }): Promise<SpanDetail[]> {
-  const app = getApp();
   const protections = await getUserProtectionsForProject(ctx as never, {
     projectId: input.projectId,
   });
+  return loadSpansFullWithProtections({ ...input, protections });
+}
+
+async function loadSpansFullWithProtections({
+  projectId,
+  traceId,
+  occurredAtMs,
+  protections,
+}: {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+  protections: Protections;
+}): Promise<SpanDetail[]> {
+  const app = getApp();
+  const input = { projectId, traceId, occurredAtMs };
   const storedSpans = await app.traces.spans.getSpansByTraceId({
     tenantId: input.projectId,
     traceId: input.traceId,
@@ -990,17 +1005,29 @@ async function loadProtectedTraceLogs({
   input: { projectId: string; traceId: string; occurredAtMs?: number };
   ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
 }): Promise<TraceLogRecordDto[]> {
-  const app = getApp();
   const protections = await getUserProtectionsForProject(ctx as never, {
     projectId: input.projectId,
   });
-  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
-    input.projectId,
-  );
+  return loadTraceLogsWithProtections({ ...input, protections });
+}
+
+async function loadTraceLogsWithProtections({
+  projectId,
+  traceId,
+  occurredAtMs,
+  protections,
+}: {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+  protections: Protections;
+}): Promise<TraceLogRecordDto[]> {
+  const app = getApp();
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
   const rows = await app.traces.logRecords.getLogsByTraceId(
-    input.projectId,
-    input.traceId,
-    input.occurredAtMs,
+    projectId,
+    traceId,
+    occurredAtMs,
   );
   return rows.map((row) =>
     gateTraceLogVisibility(
@@ -1017,6 +1044,41 @@ async function loadProtectedTraceLogs({
       visibilityCutoffMs,
     ),
   );
+}
+
+/**
+ * Transcript read shared by the tRPC procedure below and the REST route
+ * (`GET /api/traces/:traceId/transcript`). The REST caller authenticates with
+ * a project API key, so it resolves {@link Protections} for the project rather
+ * than for a user session and hands them in; both doors then run identical
+ * span and log loads, so transcript content goes through the same redaction
+ * passes as every sibling read.
+ */
+export async function readCodingAgentTranscriptWithProtections({
+  projectId,
+  traceId,
+  occurredAtMs,
+  protections,
+}: {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+  protections: Protections;
+}): Promise<CodingAgentTranscript> {
+  const args = { projectId, traceId, occurredAtMs, protections };
+  const [spans, logs] = await Promise.all([
+    loadSpansFullWithProtections(args),
+    loadTraceLogsWithProtections(args),
+  ]);
+
+  return buildCodingAgentTranscript({
+    spans,
+    logs: logs.map((row) => ({
+      timestampMs: row.timeUnixMs,
+      attributes: (row.attributes ?? {}) as Record<string, unknown>,
+      serviceName: row.resourceAttributes?.["service.name"] ?? null,
+    })),
+  });
 }
 
 export const tracesV2Router = createTRPCRouter({
@@ -1684,18 +1746,12 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
-      const [spans, logs] = await Promise.all([
-        loadProtectedSpansFull({ input, ctx }),
-        loadProtectedTraceLogs({ input, ctx }),
-      ]);
-
-      return buildCodingAgentTranscript({
-        spans,
-        logs: logs.map((row) => ({
-          timestampMs: row.timeUnixMs,
-          attributes: (row.attributes ?? {}) as Record<string, unknown>,
-          serviceName: row.resourceAttributes?.["service.name"] ?? null,
-        })),
+      const protections = await getUserProtectionsForProject(ctx as never, {
+        projectId: input.projectId,
+      });
+      return readCodingAgentTranscriptWithProtections({
+        ...input,
+        protections,
       });
     }),
 

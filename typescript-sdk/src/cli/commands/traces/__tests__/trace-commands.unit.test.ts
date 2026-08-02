@@ -53,6 +53,7 @@ import { TracesApiService } from "@/client-sdk/services/traces/traces-api.servic
 import { exportTracesCommand } from "../export";
 import { getTraceCommand } from "../get";
 import { searchTracesCommand } from "../search";
+import { transcriptTraceCommand } from "../transcript";
 
 class ProcessExitError extends Error {
 	constructor(public code: number) {
@@ -405,6 +406,62 @@ describe("exportTracesCommand()", () => {
 			expect(lines[1]).toContain("trace_0,hi,yo,");
 			expect(lines[1]).toContain(",10,5,0.5,123456,120000,3456,7");
 		});
+	});
+});
+
+describe("transcriptTraceCommand()", () => {
+	let fetchMock: ReturnType<typeof vi.fn>;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+
+	const transcriptDoc = {
+		agent: "claude_code",
+		sessionId: "session-123",
+		entries: [
+			{ kind: "user_prompt", atMs: 1720000000000, text: "summarise the repo", chars: 18 },
+			{ kind: "assistant_message", atMs: 1720000002000, text: "Here is the summary.", model: "claude-opus-5" },
+		],
+		totals: { modelCalls: 1, toolCalls: 0, tokens: 128, costUsd: 0.04 },
+		subAgents: [],
+	};
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		fetchMock = vi
+			.fn()
+			.mockResolvedValue(
+				new Response(JSON.stringify(transcriptDoc), { status: 200 }),
+			);
+		vi.stubGlobal("fetch", fetchMock);
+		logSpy = vi.spyOn(console, "log").mockImplementation(noop);
+		vi.spyOn(console, "error").mockImplementation(noop);
+		mockProcessExit();
+	});
+
+	/** @scenario the CLI prints a trace transcript */
+	it("fetches the transcript endpoint and prints the entries", async () => {
+		await transcriptTraceCommand("trace_abc", {});
+
+		expect(String(fetchMock.mock.calls[0]![0])).toContain(
+			"/api/traces/trace_abc/transcript",
+		);
+		const printed = logSpy.mock.calls
+			.map((c: unknown[]) => c.join(" "))
+			.join("\n");
+		expect(printed).toContain("summarise the repo");
+		expect(printed).toContain("Here is the summary.");
+		expect(printed).toContain("1 model calls");
+	});
+
+	it("exits with code 1 when the endpoint answers an error", async () => {
+		fetchMock.mockResolvedValue(
+			new Response(JSON.stringify({ message: "Trace not found." }), {
+				status: 404,
+			}),
+		);
+
+		await expect(transcriptTraceCommand("nope", {})).rejects.toThrow(
+			ProcessExitError,
+		);
 	});
 });
 

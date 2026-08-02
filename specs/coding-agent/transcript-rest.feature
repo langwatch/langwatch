@@ -8,19 +8,23 @@ Feature: Coding agent transcript over REST and CLI
   # the trace drawer. This feature only opens a REST door to the same
   # derivation for API key callers, plus a CLI command through that door.
 
-  @integration
+  @unit
   Scenario: transcript endpoint returns the derived transcript for a coding-agent trace
     Given a stored coding-agent trace with log records
     When GET /api/traces/{traceId}/transcript is called with a project API key
     Then the response carries the transcript entries the terminal view derives
 
-  @integration
+  @unit
   Scenario: transcript endpoint answers empty for a trace without coding-agent content
     Given a stored trace that is not coding-agent origin
     When GET /api/traces/{traceId}/transcript is called with a project API key
     Then the response carries an empty transcript list rather than an error
 
-  @integration
+  # Endpoint-level 404/409 semantics reuse the exact resolution path of
+  # GET /:traceId (TraceService.getById incl. prefix resolution); an
+  # endpoint-harness integration test is the right binding once one exists
+  # for the traces REST surface.
+  @integration @unimplemented
   Scenario: transcript endpoint rejects an unknown trace
     When GET /api/traces/{traceId}/transcript is called for a trace id that does not exist
     Then the request fails with a not found error

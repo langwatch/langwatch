@@ -44,14 +44,14 @@ Feature: Trace search response carries token metrics and optional enriched spans
     When the summary is mapped to the legacy trace shape
     Then metadata.otel_log_record_count carries the caller's value
 
-  @integration
+  @unit
   Scenario: search with includeSpans returns coding-agent spans enriched from log records
     Given a stored coding-agent trace whose llm_request span carries tokens but no content and no cost
     And the trace's stored log records carry the request body and the cost for that span
     When the search endpoint is called with includeSpans true
     Then the returned trace's spans carry content and cost joined from the log records
 
-  @integration
+  @unit
   Scenario: search without includeSpans keeps the legacy empty spans shape
     Given a stored coding-agent trace
     When the search endpoint is called without includeSpans
