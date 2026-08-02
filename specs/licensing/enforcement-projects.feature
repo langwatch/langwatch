@@ -112,3 +112,54 @@ Feature: Project Limit Enforcement with License
     And the organization has 1 personal project
     When I view the organization usage
     Then the reported project count is 2
+
+  # ----------------------------------------------------------------------------
+  # The exemption is anchored to the workspace, not to a flag
+  # ----------------------------------------------------------------------------
+  #
+  # A project is exempt because it lives in someone's personal workspace, and
+  # a project only lives there when both its own personal flag and its team's
+  # agree. Moving a project across that boundary would settle the question by
+  # flag alone, so the move is refused rather than counted after the fact.
+  #
+  # It also breaks the workspace itself. A personal team without its project
+  # is not a workspace the service can find, and the (organization, owner)
+  # slot stays taken, so provisioning can neither find nor recreate it.
+
+  Scenario: Moving a personal project into a shared team is refused
+    Given the organization has 1 personal project
+    When I move the personal project into team "team-456"
+    Then the request fails with FORBIDDEN
+    And the reported project count is unchanged
+    And the owner still has a personal workspace
+
+  Scenario: Moving a real project into a personal workspace is refused
+    Given the organization has 1 project in team "team-456"
+    And the organization has 1 personal team
+    When I move that project into the personal team
+    Then the request fails with FORBIDDEN
+    And the reported project count is unchanged
+
+  # A personal workspace is its project. Archiving it hides the workspace from
+  # the lookup that provisions it while the team keeps the one slot allowed per
+  # (organization, owner), so the owner is left with no personal workspace and
+  # no way to get one back.
+
+  Scenario: Creating a project in a personal workspace is refused
+    Given the organization has 1 personal team
+    When I create a project in the personal team
+    Then the request fails with FORBIDDEN
+    And the personal workspace still holds exactly one project
+
+  Scenario: Archiving a personal project is refused
+    Given the organization has 1 personal project
+    When I archive the personal project
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
+  Scenario: A project counts unless its own flag and its team both call it personal
+    Given the organization has 2 projects
+    And the organization has 1 project marked personal inside a shared team
+    And the organization has 1 project not marked personal inside a personal team
+    When I view the organization usage
+    Then the reported project count is 4

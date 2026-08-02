@@ -38,6 +38,7 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrCacheReadTokens: string;
   AttrCacheCreationTokens: string;
   AttrReasoningTokens: string;
+  AttrContextSizeTokens: string;
   AttrLabels: string;
   AttrInputMediaRefs: string;
   AttrOutputMediaRefs: string;
@@ -180,6 +181,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrOutputMediaRefs,
           AttrCacheCreationTokens,
           AttrReasoningTokens,
+          AttrContextSizeTokens,
           AttrLabels,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
@@ -234,6 +236,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.reserved.media_refs.output'] AS AttrOutputMediaRefs,
             Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
             Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
+            Attributes['langwatch.reserved.context_size_tokens'] AS AttrContextSizeTokens,
             Attributes['langwatch.labels'] AS AttrLabels,
             OccurredAt,
             CreatedAt,
@@ -1139,6 +1142,10 @@ function buildListAttributes(
   }
   if (row.AttrReasoningTokens) {
     attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
+  }
+  if (row.AttrContextSizeTokens) {
+    attributes["langwatch.reserved.context_size_tokens"] =
+      row.AttrContextSizeTokens;
   }
   // JSON-encoded array of trace labels (e.g. '["prod","beta"]'). Preserve the
   // raw string here because TraceSummaryData.attributes is string-valued; the

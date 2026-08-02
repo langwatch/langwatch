@@ -6,7 +6,28 @@ const service = new CanonicalizeSpanAttributesService();
 
 const stubSpan = makeStubSpan();
 
-describe("CanonicalizeSpanAttributesService — structured IO", () => {
+describe("CanonicalizeSpanAttributesService: structured IO", () => {
+  describe("when the AI SDK emits a flat structured response", () => {
+    it("lifts ai.response.object into canonical output messages for embedded scopes", () => {
+      const objectPayload = { greeting: "Hallo" };
+      const result = service.canonicalize(
+        {
+          "ai.response.object": JSON.stringify(objectPayload),
+        },
+        [],
+        makeStubSpan({
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        }),
+      );
+
+      expect(result.attributes["langwatch.span.type"]).toBe("llm");
+      expect(result.attributes["gen_ai.output.messages"]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+  });
+
   describe("when input type is chat_messages", () => {
     it("sets gen_ai.input.messages from value array (stripping trailing assistant — post-call capture leak)", () => {
       const result = service.canonicalize(

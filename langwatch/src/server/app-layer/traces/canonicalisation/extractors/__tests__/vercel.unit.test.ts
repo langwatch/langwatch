@@ -140,6 +140,85 @@ describe("VercelExtractor", () => {
       expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
       expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
     });
+
+    it("lifts flat structured output from a non-ai instrumentation scope", () => {
+      const objectPayload = { greeting: "Hallo" };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE_OBJECT]: objectPayload,
+        },
+        {
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
+    it("uses structured output when the text attribute is empty", () => {
+      const objectPayload = { greeting: "Hallo" };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE_TEXT]: "",
+          [ATTR_KEYS.AI_RESPONSE_OBJECT]: objectPayload,
+        },
+        {
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
+    it("falls back to response text when the response attribute is empty", () => {
+      const objectPayload = { greeting: "Hallo" };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE]: "",
+          [ATTR_KEYS.AI_RESPONSE_TEXT]: JSON.stringify(objectPayload),
+        },
+        {
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
+    it("handles a parsed JSON response text value", () => {
+      const objectPayload = { text: "structured field" };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE_TEXT]: objectPayload,
+        },
+        {
+          name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
   });
 
   describe("when scope is unrelated AND no ai.* attrs are present", () => {

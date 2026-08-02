@@ -66,6 +66,13 @@ export interface TraceListItem {
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
   reasoningTokens: number | null;
+  /**
+   * How full the context window already was when the trace's first model call
+   * ran. Deliberately not a sum: an agent turn re-sends its conversation on
+   * every call, so the summed cache reads above run into the millions while
+   * this stays the one number a reader means by "how big was my context".
+   */
+  contextSizeTokens: number | null;
   models: string[];
   /** Trace-level labels (the `langwatch.labels` attribute), decoded from
    *  the JSON-encoded array stored on the summary. Empty when unset. */
@@ -1334,6 +1341,9 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     ),
     reasoningTokens: parseTokenCount(
       row.attributes["langwatch.reserved.reasoning_tokens"],
+    ),
+    contextSizeTokens: parseTokenCount(
+      row.attributes["langwatch.reserved.context_size_tokens"],
     ),
     models: row.models,
     labels: parseLabels(row.attributes["langwatch.labels"]),

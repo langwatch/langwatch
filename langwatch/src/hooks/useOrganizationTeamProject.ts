@@ -273,13 +273,6 @@ export const useOrganizationTeamProject = (
   const teamSlug =
     typeof router.query.team == "string" ? router.query.team : undefined;
 
-  // The address bar is what separates "the user is in their personal
-  // workspace" from "the app picked it for them". A personal project or team
-  // named in the URL resolves exactly like any other; the persisted selection
-  // does not, because nothing on an organization-scoped page tells the user
-  // which project it is about to write to.
-  const isAddressedBySlug = !!projectSlugFromUrl || !!teamSlug;
-
   const teamsMatchingSlug = teamSlug
     ? organizations.data?.flatMap((organization) =>
         organization.teams
@@ -287,6 +280,14 @@ export const useOrganizationTeamProject = (
           .map((team) => ({ organization, team })),
       )
     : undefined;
+
+  // The address bar is what separates "the user is in their personal
+  // workspace" from "the app picked it for them". A personal project or team
+  // named in the URL resolves exactly like any other; the persisted selection
+  // does not, because nothing on an organization-scoped page tells the user
+  // which project it is about to write to. A `?team=` that resolves to no team
+  // the user can see addresses nothing, so it stays out of the predicate.
+  const isAddressedBySlug = !!projectSlugFromUrl || !!teamsMatchingSlug?.[0];
 
   const projectsTeamsOrganizationsMatchingSlug = organizations.data?.flatMap(
     (organization) =>

@@ -116,6 +116,27 @@ export const RESERVED_CACHE_READ_TOKENS =
 export const RESERVED_CACHE_CREATION_TOKENS =
   "langwatch.reserved.cache_creation_tokens";
 export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
+/**
+ * Anthropic's cache-creation split by TTL, summed across the trace's model
+ * calls. The split rides ONLY the api_response_body log events (no span
+ * attribute carries it), so unlike the read/creation totals above these sums
+ * accumulate on the LOG contribution path, which also means summing them
+ * there can never double-count a span-side number.
+ */
+export const RESERVED_CACHE_CREATION_5M_TOKENS =
+  "langwatch.reserved.cache_creation_5m_tokens";
+export const RESERVED_CACHE_CREATION_1H_TOKENS =
+  "langwatch.reserved.cache_creation_1h_tokens";
+
+/**
+ * The context the trace's first model call already carried, and the start time
+ * of the call that set it (bookkeeping, so a later-arriving earlier span can
+ * still win). See {@link recordContextSize}.
+ */
+export const RESERVED_CONTEXT_SIZE_TOKENS =
+  "langwatch.reserved.context_size_tokens";
+export const RESERVED_CONTEXT_SIZE_AT_MS =
+  "langwatch.reserved.context_size_at_ms";
 
 /**
  * Merge the models seen on one span (or log turn) into the running list,
@@ -145,6 +166,35 @@ function addReservedTokenSum(
   if (delta <= 0) return;
   const prior = Number(attributes[key] ?? "0");
   attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+}
+
+/**
+ * How full the context window already was when this trace started working:
+ * the cached-plus-freshly-written input of its EARLIEST model call. Unlike
+ * every other token number on a trace this is deliberately NOT a sum, and the
+ * difference matters: a coding-agent turn re-sends its whole conversation on
+ * every call, so summed cache reads run to millions while the thing a reader
+ * actually wants ("how much was I already carrying") is a single call's worth.
+ *
+ * Earliest by span start time rather than fold order: spans arrive in whatever
+ * order their exporter batched them.
+ */
+function recordContextSize({
+  attributes,
+  span,
+  cacheTokens,
+}: {
+  attributes: Record<string, string>;
+  span: NormalizedSpan;
+  cacheTokens: { cacheReadTokens: number; cacheCreationTokens: number };
+}): void {
+  const contextTokens =
+    cacheTokens.cacheReadTokens + cacheTokens.cacheCreationTokens;
+  if (contextTokens <= 0) return;
+  const priorAtMs = Number(attributes[RESERVED_CONTEXT_SIZE_AT_MS]);
+  if (Number.isFinite(priorAtMs) && priorAtMs <= span.startTimeUnixMs) return;
+  attributes[RESERVED_CONTEXT_SIZE_TOKENS] = String(contextTokens);
+  attributes[RESERVED_CONTEXT_SIZE_AT_MS] = String(span.startTimeUnixMs);
 }
 
 /** @internal Exported for unit testing */
@@ -204,6 +254,7 @@ export function applySpanToSummary({
     RESERVED_REASONING_TOKENS,
     cacheTokens.reasoningTokens,
   );
+  recordContextSize({ attributes, span, cacheTokens });
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -345,9 +396,43 @@ function applyLogContribution({
     }
   }
 
+  // The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
+  // not overwrite: sum it into the reserved running totals and keep the
+  // per-call keys out of the generic last-write-wins merge below.
+  const cacheCreation5m = Number(
+    contribution.liftedAttributes[
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS
+    ],
+  );
+  if (Number.isFinite(cacheCreation5m)) {
+    addReservedTokenSum(
+      mergedAttributes,
+      RESERVED_CACHE_CREATION_5M_TOKENS,
+      cacheCreation5m,
+    );
+  }
+  const cacheCreation1h = Number(
+    contribution.liftedAttributes[
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
+    ],
+  );
+  if (Number.isFinite(cacheCreation1h)) {
+    addReservedTokenSum(
+      mergedAttributes,
+      RESERVED_CACHE_CREATION_1H_TOKENS,
+      cacheCreation1h,
+    );
+  }
+
   // The lifts are merged into mergedAttributes here so the reserved +
   // log_count keys set above remain intact.
   for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+    if (
+      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
+      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
+    ) {
+      continue;
+    }
     mergedAttributes[key] = String(value);
   }
 

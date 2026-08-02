@@ -17,13 +17,26 @@
  */
 
 export const CODEX_SCOPE = "codex_cli_rs";
+/**
+ * codex names its instrumentation scope after the originator, so `codex exec`
+ * sessions arrive under `codex_exec` while the interactive TUI stays
+ * `codex_cli_rs`. Same emitter, same noise (auth, rollout persistence, plugin
+ * enumeration, 500+ spans for one exec turn), same filter.
+ */
+export const CODEX_EXEC_SCOPE = "codex_exec";
 export const OPENCODE_SCOPE = "opencode";
 
 /** The per-turn rollup span codex emits (model + tokens + cost + reasoning). */
 const CODEX_TURN_SPAN = "session_task.turn";
 
+const CODEX_SCOPES: ReadonlySet<string> = new Set([
+  CODEX_SCOPE,
+  CODEX_EXEC_SCOPE,
+]);
+
 const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
   CODEX_SCOPE,
+  CODEX_EXEC_SCOPE,
   OPENCODE_SCOPE,
 ]);
 
@@ -48,9 +61,18 @@ function isAiSemanticCodingAgentSpan({
   attributeKeys: readonly string[];
 }): boolean {
   const hasGenAi = attributeKeys.some((k) => k.startsWith("gen_ai."));
-  if (scopeName === CODEX_SCOPE) {
+  if (CODEX_SCOPES.has(scopeName)) {
     // The turn rollup is the authoritative AI span; model-call spans
     // (handle_responses) carry native gen_ai.usage.
+    //
+    // Tool spans are deliberately NOT kept. codex propagates trace context
+    // unreliably for them: a run's harness-level spans (exec_command,
+    // apply_patch) routinely carry a parent that lives in a DIFFERENT trace,
+    // so keeping them mints a one-span trace per tool call, which is the
+    // fragment noise this filter exists to prevent. Nothing is lost: every
+    // codex tool run also emits a `codex.tool_result` log carrying the tool
+    // name, arguments, output, duration and success, and the terminal
+    // transcript renders tool calls from those.
     return spanName === CODEX_TURN_SPAN || hasGenAi;
   }
   if (scopeName === OPENCODE_SCOPE) {

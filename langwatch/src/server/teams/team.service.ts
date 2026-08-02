@@ -10,6 +10,7 @@ import type {
   RoleBindingRepository,
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import { PERSONAL_TEAM_MEMBERSHIP_REFUSAL } from "~/server/app-layer/teams/team.service";
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -606,11 +607,23 @@ export class TeamService {
         // Validate that the team exists
         const team = await tx.team.findUnique({
           where: { id: teamId },
-          select: { id: true, name: true, organizationId: true },
+          select: {
+            id: true,
+            name: true,
+            organizationId: true,
+            isPersonal: true,
+          },
         });
 
         if (!team) {
           throw new NotFoundError("team_not_found", "Team", teamId);
+        }
+
+        // The one member of a personal team is its owner, and the last-admin
+        // projection below stops protecting them the moment a group binding
+        // exists on the team, so the invariant is stated here directly.
+        if (team.isPersonal) {
+          throw new ValidationError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
         }
 
         // Compute the effective set of admin userIds — direct user ADMIN

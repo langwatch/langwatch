@@ -232,6 +232,36 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
     });
   });
 
+  describe("given a ?team= slug that matches no team the user can see", () => {
+    beforeEach(() => {
+      // A team slug left over from a link to a team that was archived, renamed,
+      // or belongs to an organization this user is not in. It addresses
+      // nothing, so it must not license the stale personal selection below.
+      mockRouter.query = { team: "team-that-no-longer-exists" };
+      mockLocalStorage.selectedOrganizationId = "org-acme";
+      mockLocalStorage.selectedTeamId = "team-personal";
+      mockLocalStorage.selectedProjectSlug = "personal-jane-abc123";
+    });
+
+    /** @scenario A team slug that matches nothing does not address the personal workspace */
+    it("resolves the shared team rather than the remembered personal one", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-shared");
+      expect(result.current.project?.id).toBe("proj-app");
+    });
+
+    /** @scenario A team slug that matches nothing does not address the personal workspace */
+    it("still resolves the personal workspace when the slug does match it", () => {
+      mockRouter.query = { team: "personal-jane" };
+
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
   describe("given a shared project is named in the address bar", () => {
     beforeEach(() => {
       mockRouter.query = { project: "acme-app" };

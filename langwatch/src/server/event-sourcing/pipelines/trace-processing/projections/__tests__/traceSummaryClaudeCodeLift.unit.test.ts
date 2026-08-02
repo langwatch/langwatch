@@ -32,7 +32,10 @@ import type {
   LogContributedEvent,
   LogRecordReceivedEvent,
 } from "../../schemas/events";
-import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
+import {
+  applySpanToSummary,
+  TraceSummaryFoldProjection,
+} from "../traceSummary.foldProjection";
 import { createInitState } from "./fixtures/trace-summary-test.fixtures";
 
 function makeProjection() {
@@ -428,6 +431,189 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       expect(after.totalCompletionTokenCount).toBe(
         state.totalCompletionTokenCount,
       );
+    });
+  });
+});
+
+describe("TraceSummaryFoldProjection cache TTL split sums", () => {
+  const responseBodyEvent = (oneHour: number, fiveMinute = 0) =>
+    makeLogEvent(
+      {
+        "event.name": "api_response_body",
+        query_source: "repl_main_thread",
+        body: JSON.stringify({
+          content: [{ type: "text", text: "reply" }],
+          usage: {
+            cache_creation: {
+              ephemeral_5m_input_tokens: fiveMinute,
+              ephemeral_1h_input_tokens: oneHour,
+            },
+          },
+        }),
+      },
+      { body: "claude_code.api_response_body" },
+    );
+
+  describe("when two model calls each report 1h cache creation", () => {
+    /** @scenario "Cache TTL split sums accumulate across a session's model calls" */
+    it("sums the per-call values under the reserved attributes instead of overwriting", () => {
+      const projection = makeProjection();
+      let state = createInitState();
+
+      state = projection.handleTraceLogRecordReceived(
+        responseBodyEvent(36_610, 1_200),
+        state,
+      );
+      state = projection.handleTraceLogRecordReceived(
+        responseBodyEvent(1_024),
+        state,
+      );
+
+      expect(
+        state.attributes["langwatch.reserved.cache_creation_1h_tokens"],
+      ).toBe("37634");
+      expect(
+        state.attributes["langwatch.reserved.cache_creation_5m_tokens"],
+      ).toBe("1200");
+      // The per-call lift keys stay out of the merged attribute map: they
+      // are per-event values, and a lingering last-call scalar would read
+      // as a trace total.
+      expect(
+        state.attributes["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when the model call reports an effort setting", () => {
+    it("lifts the reasoning effort onto the trace attributes", () => {
+      const projection = makeProjection();
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "api_request",
+            query_source: "repl_main_thread",
+            effort: "high",
+            cost_usd: "0.02",
+          },
+          { body: "claude_code.api_request" },
+        ),
+        createInitState(),
+      );
+
+      expect(after.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
+      // The api_request lift stays scalar-only: no cost/token double-count.
+      expect(after.totalCost).toBeNull();
+    });
+  });
+});
+
+describe("TraceSummaryFoldProjection context size", () => {
+  const modelCallSpan = ({
+    spanId,
+    startTimeUnixMs,
+    cacheRead,
+    cacheCreation,
+  }: {
+    spanId: string;
+    startTimeUnixMs: number;
+    cacheRead: number;
+    cacheCreation: number;
+  }) =>
+    ({
+      traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      spanId,
+      parentSpanId: null,
+      name: "claude_code.llm_request",
+      startTimeUnixMs,
+      endTimeUnixMs: startTimeUnixMs + 500,
+      spanAttributes: {
+        "langwatch.span.type": "llm",
+        "gen_ai.request.model": "claude-opus-5",
+        "gen_ai.usage.cache_read.input_tokens": cacheRead,
+        "gen_ai.usage.cache_creation.input_tokens": cacheCreation,
+      },
+      resourceAttributes: {},
+      events: [],
+      status: { code: "STATUS_CODE_OK" },
+    }) as unknown as Parameters<typeof applySpanToSummary>[0]["span"];
+
+  describe("when the trace's calls each carry cached and written input", () => {
+    /** @scenario "The context a trace started from is lifted onto the trace summary" */
+    it("records the FIRST call's context, not the sum across calls", () => {
+      let state = createInitState();
+      state = applySpanToSummary({
+        state,
+        span: modelCallSpan({
+          spanId: "aaaaaaaaaaaaaaa1",
+          startTimeUnixMs: 1_000,
+          cacheRead: 150_000,
+          cacheCreation: 6_800,
+        }),
+      });
+      state = applySpanToSummary({
+        state,
+        span: modelCallSpan({
+          spanId: "aaaaaaaaaaaaaaa2",
+          startTimeUnixMs: 9_000,
+          cacheRead: 900_000,
+          cacheCreation: 1_000,
+        }),
+      });
+
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe(
+        "156800",
+      );
+      // The summed cache read keeps its own, much larger, number: the two
+      // answer different questions and both stay available.
+      expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+        "1050000",
+      );
+    });
+
+    /** @scenario "A later-arriving earlier call wins the context size" */
+    it("takes the earliest-starting call even when spans arrive out of order", () => {
+      let state = createInitState();
+      state = applySpanToSummary({
+        state,
+        span: modelCallSpan({
+          spanId: "bbbbbbbbbbbbbbb1",
+          startTimeUnixMs: 9_000,
+          cacheRead: 900_000,
+          cacheCreation: 0,
+        }),
+      });
+      state = applySpanToSummary({
+        state,
+        span: modelCallSpan({
+          spanId: "bbbbbbbbbbbbbbb2",
+          startTimeUnixMs: 1_000,
+          cacheRead: 12_000,
+          cacheCreation: 500,
+        }),
+      });
+
+      expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBe(
+        "12500",
+      );
+    });
+  });
+
+  describe("when no call reports cached or written input", () => {
+    /** @scenario "A trace whose calls report no cache carries no context size" */
+    it("carries no context size attribute", () => {
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: modelCallSpan({
+          spanId: "ccccccccccccccc1",
+          startTimeUnixMs: 1_000,
+          cacheRead: 0,
+          cacheCreation: 0,
+        }),
+      });
+
+      expect(
+        state.attributes["langwatch.reserved.context_size_tokens"],
+      ).toBeUndefined();
     });
   });
 });

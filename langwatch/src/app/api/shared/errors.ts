@@ -26,22 +26,25 @@ export class BadRequestError extends HttpError {
 }
 
 /**
- * Error for 403 Forbidden responses (authenticated, but the plan or
- * permission does not allow the operation)
- */
-export class ForbiddenError extends HttpError {
-  readonly status = 403;
-  constructor(message = "Forbidden") {
-    super(message);
-  }
-}
-
-/**
  * Error for 401 Unauthorized responses
  */
 export class UnauthorizedError extends HttpError {
   readonly status = 401;
   constructor(message = "Unauthorized") {
+    super(message);
+  }
+}
+
+/**
+ * Error for 403 Forbidden responses.
+ *
+ * The caller is authenticated and holds the permission; the request is
+ * refused on its own merits. Use `UnauthorizedError` when the credentials or
+ * the permission are what is missing.
+ */
+export class ForbiddenError extends HttpError {
+  readonly status = 403;
+  constructor(message = "Forbidden") {
     super(message);
   }
 }

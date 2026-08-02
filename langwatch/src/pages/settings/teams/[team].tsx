@@ -16,6 +16,7 @@ import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { PermissionAlert } from "~/components/PermissionAlert";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import SettingsLayout from "../../../components/SettingsLayout";
@@ -194,6 +195,63 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const apiContext = api.useContext();
   const router = useRouter();
 
+  /** The status code of a tRPC failure, when it carries one. */
+  function trpcErrorCode(error: unknown): string | undefined {
+    return error instanceof TRPCClientError
+      ? (error.data?.code as string | undefined)
+      : undefined;
+  }
+
+  /**
+   * The baseline moves to the submitted values before the mutation answers, so
+   * a save the server rejected would otherwise stay on screen as the local
+   * truth: the form shows membership that was never written, and every later
+   * autosave resubmits it, so even a rename can no longer land. Rolling both
+   * the baseline and the form back to the team's persisted values puts the
+   * refused edit where the server left it.
+   */
+  function restorePersistedTeamValues(): void {
+    const persisted = getInitialValues(team);
+    setDefaultValues(persisted);
+    form.reset(persisted);
+  }
+
+  /**
+   * Saving is autosaved and debounced, so a failure nobody surfaces is a change
+   * that silently did not happen.
+   */
+  function reportTeamSaveFailure(error: unknown): void {
+    restorePersistedTeamValues();
+
+    if (isHandledByGlobalHandler(error)) return;
+
+    const code = trpcErrorCode(error);
+
+    // The server rejects some edits on their merits rather than on the caller's
+    // permissions, and says what to do instead. A FORBIDDEN here is only ever
+    // raised by the personal-workspace guards, and its message is a sentence
+    // written for the customer; RBAC failures arrive as UNAUTHORIZED.
+    if (code === "FORBIDDEN") {
+      toaster.create({
+        title: (error as TRPCClientError<never>).message, // no-raw-error-toast-ok
+        type: "error",
+        duration: 8000,
+        meta: { closable: true },
+      });
+      return;
+    }
+
+    if (code === "UNAUTHORIZED") {
+      toaster.create({
+        title:
+          "You need to be an administrator of the organization to update this team",
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    }
+  }
+
   const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback(
     (data: TeamFormData) => {
       if (isEqual(data, defaultValues)) return;
@@ -222,23 +280,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             });
             void apiContext.organization.getAll.refetch();
           },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            if (
-              error instanceof TRPCClientError &&
-              error.data?.code === "UNAUTHORIZED"
-            ) {
-              toaster.create({
-                title:
-                  "You need to be an administrator of the organization to update this team",
-                type: "error",
-                duration: 5000,
-                meta: {
-                  closable: true,
-                },
-              });
-            }
-          },
+          onError: reportTeamSaveFailure,
         },
       );
     },
@@ -259,11 +301,22 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           setShowArchiveDialog(false);
           void router.push("/settings/teams");
         },
-        onError: () => {
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
+          const refused =
+            error instanceof TRPCClientError &&
+            error.data?.code === "FORBIDDEN";
+          if (!refused) {
+            showErrorToast({ error, fallbackTitle: "Failed to archive team" });
+            return;
+          }
           toaster.create({
-            title: "Failed to archive team",
+            // Same as the save path: a FORBIDDEN here is our own guard
+            // refusing to archive a personal workspace, and its message is
+            // the sentence explaining why.
+            title: error.message, // no-raw-error-toast-ok
             type: "error",
-            duration: 5000,
+            duration: 8000,
             meta: { closable: true },
           });
         },

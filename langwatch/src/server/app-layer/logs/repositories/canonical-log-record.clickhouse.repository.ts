@@ -208,7 +208,8 @@ export class CanonicalLogRecordClickHouseRepository
           AttributesFlatJson,
           ResourceAttributesFlatJson,
           ScopeName,
-          ScopeVersion
+          ScopeVersion,
+          EventName
         FROM log_records FINAL
         WHERE TenantId = {tenantId:String}
           AND CorrelationTraceId = {traceId:String}
@@ -232,6 +233,7 @@ export class CanonicalLogRecordClickHouseRepository
       ResourceAttributesFlatJson: string;
       ScopeName: string;
       ScopeVersion: string;
+      EventName: string;
     }>();
     if (rows.length >= limit) {
       logger.warn(
@@ -239,18 +241,33 @@ export class CanonicalLogRecordClickHouseRepository
         "Canonical trace log read hit its row cap; oldest rows returned, the rest omitted",
       );
     }
-    return rows.map((row) => ({
-      traceId: row.TraceId,
-      spanId: row.SpanId,
-      timeUnixMs: Number(row.TimeUnixMs),
-      body: row.BodyText ?? "",
-      attributes: JSON.parse(row.AttributesFlatJson) as Record<string, string>,
-      resourceAttributes: JSON.parse(row.ResourceAttributesFlatJson) as Record<
+    return rows.map((row) => {
+      const attributes = JSON.parse(row.AttributesFlatJson) as Record<
         string,
         string
-      >,
-      scopeName: row.ScopeName,
-      scopeVersion: row.ScopeVersion || null,
-    }));
+      >;
+      // Emitters using the OTel Event API (codex's Rust SDK among them) put
+      // the event name on the top-level LogRecord.eventName field, not in the
+      // attributes, ingest persists it to the EventName column and backfills
+      // `event.name` only into the normalized fold-side view, never into
+      // AttributesFlatJson. Every attribute-keyed reader downstream (the
+      // transcript derivation gates on `event.name`) would otherwise see those
+      // records as nameless and skip them.
+      if (row.EventName && attributes["event.name"] === undefined) {
+        attributes["event.name"] = row.EventName;
+      }
+      return {
+        traceId: row.TraceId,
+        spanId: row.SpanId,
+        timeUnixMs: Number(row.TimeUnixMs),
+        body: row.BodyText ?? "",
+        attributes,
+        resourceAttributes: JSON.parse(
+          row.ResourceAttributesFlatJson,
+        ) as Record<string, string>,
+        scopeName: row.ScopeName,
+        scopeVersion: row.ScopeVersion || null,
+      };
+    });
   }
 }
