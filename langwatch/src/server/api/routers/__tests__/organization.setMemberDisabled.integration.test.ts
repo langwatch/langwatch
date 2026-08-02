@@ -249,13 +249,23 @@ describe("organization.setMemberDisabled", () => {
       // Exactly the seats now in use, so putting anyone back is one too many.
       licensedSeats = await seats.getMemberCount(organizationId);
 
+      // FORBIDDEN plus the seat counts is what the client's global handler
+      // reads to open the limit modal, so asserting the shape is asserting
+      // that the admin is actually told why.
       await expect(
         adminCaller.organization.setMemberDisabled({
           organizationId,
           userId: memberUserId,
           disabled: false,
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: {
+          limitType: "members",
+          current: licensedSeats,
+          max: licensedSeats,
+        },
+      });
 
       // Still disabled, and still not consuming a seat.
       expect(

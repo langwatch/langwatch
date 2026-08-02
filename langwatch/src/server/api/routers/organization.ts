@@ -39,7 +39,10 @@ import {
 } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
-import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
+import {
+  assertMemberTypeLimitNotExceeded,
+  LICENSE_LIMIT_ERRORS,
+} from "../../license-enforcement/license-limit-guard";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
 import {
   assertEnterprisePlan,
@@ -151,10 +154,18 @@ export const organizationRouter = createTRPCRouter({
         );
 
         if (!result.allowed) {
+          // The same shape every other member-limit refusal throws, so the
+          // client's global handler opens the limit modal with the real
+          // numbers and its "Upgrade license" link, rather than this route
+          // inventing copy of its own.
           throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Re-enabling this member would exceed the seats your license covers",
+            code: "FORBIDDEN",
+            message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+            cause: {
+              limitType: "members",
+              current: result.current,
+              max: result.max,
+            },
           });
         }
       }
