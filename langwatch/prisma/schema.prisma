@@ -176,6 +176,14 @@ model OrganizationUser {
   /// id belongs to this org. See departments.feature.
   departmentId String?
 
+  /// Set when an admin disables this membership to stay within the licensed
+  /// seat count. The person loses access to this organization only, keeps
+  /// their role, department and everything they did, and frees their seat.
+  /// Reversible: re-enabling restores access if a seat is available.
+  /// Seat counting excludes disabled memberships. See
+  /// seat-reconciliation.feature.
+  disabledAt DateTime?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])

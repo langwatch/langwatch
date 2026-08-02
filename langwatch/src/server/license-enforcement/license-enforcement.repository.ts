@@ -87,8 +87,11 @@ export class LicenseEnforcementRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
+    // Disabled memberships are out of the seat pool by definition: they hold
+    // no access, so billing for them would be charging for a locked door.
+    // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId },
+      where: { organizationId, disabledAt: null },
       select: { userId: true, role: true },
     });
 
