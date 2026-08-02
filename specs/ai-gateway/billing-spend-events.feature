@@ -133,6 +133,20 @@ Feature: Billing spend events, one durable record per gateway request
       When the drainer ships a command batch
       Then the request is signed with the gateway's shared HMAC scheme
 
+  Rule: A command the control plane accepted is never dropped in silence
+
+    The ingest route answers 200 and the drainer deletes its spool segment, so
+    from that moment the queued command is the only copy of the charge. A fleet
+    mid-rollout runs two builds against one queue, and a worker on the older
+    build has no handler for a pipeline the newer build just added.
+
+    @unit
+    Scenario: A worker without the spend pipeline refuses the command instead of acknowledging it
+      Given a worker whose build does not register the gateway spend pipeline
+      When a confirm command for that pipeline reaches it
+      Then the command is rejected so another worker retries it
+      And the rejection names the gateway request at error level
+
   Rule: The fold is the spend record
 
     @unit

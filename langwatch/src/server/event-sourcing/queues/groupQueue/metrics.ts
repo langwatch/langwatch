@@ -37,6 +37,7 @@ const metricNames = [
   "gq_blob_sweep_total",
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
+  "gq_jobs_unroutable_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -283,6 +284,29 @@ export const gqJobsDroppedTotal = new Counter({
     "job_name",
     "reason",
   ] as const,
+});
+
+/**
+ * A dispatched job whose routing metadata names a pipeline this worker does
+ * not have registered, so it could not be handed to a handler.
+ *
+ * The body decoded fine and the payload is intact — what is missing is the
+ * pipeline, in THIS process. That makes it a provisioning signal, not a data
+ * signal, and the normal cause is a fleet running two builds at once: during a
+ * rolling deploy the old workers still poll the same queue, so every job for a
+ * newly added pipeline can land on a worker that has never heard of it. The
+ * job is rejected so the queue re-offers it, and a worker on the new build
+ * takes it.
+ *
+ * Read a sustained non-zero rate as "some workers are on the wrong build". A
+ * burst that ends when a deploy finishes is the expected shape; a rate that
+ * outlives the rollout means a pipeline was removed without a tombstone, and
+ * those jobs will retry to exhaustion and park their group.
+ */
+export const gqJobsUnroutableTotal = new Counter({
+  name: "gq_jobs_unroutable_total",
+  help: "Dispatched jobs rejected because their pipeline is not registered in this worker (usually a mid-rollout build skew)",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 /**

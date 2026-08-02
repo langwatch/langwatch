@@ -30,8 +30,10 @@ import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
+import { gqJobsUnroutableTotal } from "./queues/groupQueue/metrics";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
+import { QueueError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
@@ -370,8 +372,11 @@ export class EventSourcing {
 
   /**
    * Strips routing metadata and looks up the registry entry for a job payload.
-   * Returns null when the job type is not (yet) registered — e.g. stale Redis
-   * jobs from a previous deployment picked up before all pipelines register.
+   * Returns null when this worker has no handler for the job's routing key.
+   *
+   * Resolution runs several times per job (group key, score, span attributes,
+   * then processing), so a miss logs at debug here and the processing path
+   * raises it once, loudly, through `rejectUnroutableJob`.
    */
   private lookupEntry(
     payload: Record<string, unknown>,
@@ -381,9 +386,9 @@ export class EventSourcing {
     const jobName = payload.__jobName as string;
 
     if (!pipelineName || !jobType || !jobName) {
-      logger.warn(
+      logger.debug(
         { pipelineName, jobType, jobName },
-        "Job payload missing routing metadata, skipping",
+        "Job payload missing routing metadata",
       );
       return null;
     }
@@ -391,10 +396,7 @@ export class EventSourcing {
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
     const entry = this._globalJobRegistry.get(registryKey);
     if (!entry) {
-      logger.warn(
-        { registryKey },
-        "Unknown job in global queue (pipeline not yet registered or removed), skipping",
-      );
+      logger.debug({ registryKey }, "No handler registered for job");
       return null;
     }
     const {
@@ -404,6 +406,71 @@ export class EventSourcing {
       ...clean
     } = payload;
     return { entry, clean };
+  }
+
+  /**
+   * The identifying fields of a job payload, for a log line that has to name
+   * WHICH record is at risk. Commands carry their aggregate id under the
+   * pipeline's own key, events carry the framework's — take whichever is
+   * present and nothing else, because the rest of the payload is business
+   * data and can hold an end user's identity.
+   */
+  private static jobIdentity(
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const str = (value: unknown): string | undefined =>
+      typeof value === "string" && value.length > 0 ? value : undefined;
+    return {
+      pipelineName: str(payload.__pipelineName) ?? null,
+      jobType: str(payload.__jobType) ?? null,
+      jobName: str(payload.__jobName) ?? null,
+      tenantId: str(payload.tenantId) ?? null,
+      aggregateType: str(payload.aggregateType) ?? null,
+      aggregateId: str(payload.aggregateId) ?? null,
+      eventType: str(payload.type) ?? null,
+      gatewayRequestId: str(payload.gateway_request_id) ?? null,
+    };
+  }
+
+  /**
+   * Refuse a job this worker cannot route, instead of acknowledging it.
+   *
+   * Returning normally here would tell the queue the job SUCCEEDED: it is
+   * removed, its group advances, and the payload is gone. For a spend command
+   * that is money the ledger never records, and the gateway cannot notice
+   * because the ingest route already answered 200 and its spool segment is
+   * acked. The bug this replaces did exactly that, and a fleet running two
+   * builds at once lost whichever records happened to land on the older
+   * workers.
+   *
+   * Throwing puts the job back with the queue's normal bounded retry, so a
+   * worker that does have the pipeline picks it up — which is the whole
+   * behaviour a rolling deploy needs. A pipeline that is genuinely retired
+   * gets an explicit tombstone at the send boundary (see the ADR-052 legacy
+   * matcher below); this generic path never decides on its own that a record
+   * is disposable.
+   */
+  private rejectUnroutableJob(
+    payload: Record<string, unknown>,
+    queueName: string,
+  ): never {
+    const identity = EventSourcing.jobIdentity(payload);
+    gqJobsUnroutableTotal.inc({
+      queue_name: queueName,
+      pipeline_name: (identity.pipelineName as string) ?? "unknown",
+      job_type: (identity.jobType as string) ?? "unknown",
+      job_name: (identity.jobName as string) ?? "unknown",
+    });
+    logger.error(
+      identity,
+      "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
+    );
+    throw new QueueError(
+      queueName,
+      "process",
+      "job routing key is not registered in this worker",
+      identity,
+    );
   }
 
   private initializeStores(): void {
@@ -496,8 +563,7 @@ export class EventSourcing {
         }
         const result = this.lookupEntry(payload);
         if (!result) {
-          logger.warn({ payload }, "Skipping unknown job in global queue");
-          return;
+          this.rejectUnroutableJob(payload, queueName);
         }
         await result.entry.process(result.clean);
       },
@@ -532,8 +598,11 @@ export class EventSourcing {
           !!first?.entry.processBatch &&
           resolved.every((r) => r?.entry === first.entry);
         if (!homogeneous) {
-          for (const result of resolved) {
-            if (result) await result.entry.process(result.clean);
+          for (const [index, result] of resolved.entries()) {
+            if (!result) {
+              this.rejectUnroutableJob(survivors[index]!, queueName);
+            }
+            await result.entry.process(result.clean);
           }
           return;
         }
