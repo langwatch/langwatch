@@ -35,6 +35,8 @@ const traceListItemSchema = z.object({
   cacheReadTokens: z.number().nullable().optional(),
   cacheCreationTokens: z.number().nullable().optional(),
   reasoningTokens: z.number().nullable().optional(),
+  /** Context already carried into the trace's first model call (not a sum). */
+  contextSizeTokens: z.number().nullable().optional(),
   models: z.array(z.string()),
   labels: z.array(z.string()).default([]),
   promptId: z.string().nullable().optional(),

@@ -422,3 +422,136 @@ describe("CodexExtractor.applyLog", () => {
     });
   });
 });
+
+describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollup)", () => {
+  it("keeps the response span's tokens counted: no skip marker under codex_exec", () => {
+    const ctx = createExtractorContext(
+      {
+        "gen_ai.usage.input_tokens": 13005,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.cache_read.input_tokens": "12032",
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(
+      ctx.out["langwatch.reserved.skip_token_accumulation"],
+    ).toBeUndefined();
+  });
+
+  it("still types the response span as a model call, which the skip marker is independent of", () => {
+    const ctx = createExtractorContext(
+      {
+        "gen_ai.usage.input_tokens": 13005,
+        "gen_ai.usage.output_tokens": 10,
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["langwatch.span.type"]).toBe("llm");
+  });
+
+  /** @scenario "Codex reasoning effort is canonicalised from the response span when no turn rollup exists" */
+  it("lifts reasoning effort, reasoning tokens, and cache writes from the response span", () => {
+    const ctx = createExtractorContext(
+      {
+        "codex.request.reasoning_effort": "max",
+        "codex.usage.reasoning_output_tokens": "233",
+        "codex.usage.total_tokens": "13015",
+        "gen_ai.usage.cache_write.input_tokens": "512",
+        "gen_ai.usage.input_tokens": 13005,
+        "gen_ai.usage.output_tokens": 240,
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex_exec", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("max");
+    expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(233);
+    expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(512);
+  });
+
+  it("still lifts the response-span extras under the TUI scope while keeping the skip marker", () => {
+    const ctx = createExtractorContext(
+      {
+        "codex.request.reasoning_effort": "high",
+        "gen_ai.usage.input_tokens": 13297,
+        "gen_ai.usage.output_tokens": 23,
+      },
+      {
+        name: "handle_responses",
+        instrumentationScope: { name: "codex_cli_rs", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
+    expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+  });
+});
+
+describe("CodexExtractor turn-span cache writes", () => {
+  /** @scenario "Codex cache write tokens are canonicalised from the turn span" */
+  it("lifts cache_write_input_tokens onto the canonical cache creation key", () => {
+    const ctx = createExtractorContext(
+      {
+        model: "gpt-5.5",
+        "codex.turn.token_usage.input_tokens": "1000",
+        "codex.turn.token_usage.cache_write_input_tokens": "384",
+      },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_cli_rs", version: null },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(384);
+  });
+});
+
+describe("CodexExtractor.applyLog reasoning effort", () => {
+  it("lifts model_reasoning_effort from the sse_event onto the canonical request key", () => {
+    const ctx = createLogExtractorContext("codex_otel.log_only", {
+      "event.name": "codex.sse_event",
+      "event.kind": "response.completed",
+      model: "gpt-5.5",
+      model_reasoning_effort: "max",
+      input_token_count: "13029",
+      output_token_count: "240",
+    });
+
+    new CodexExtractor().applyLog(ctx);
+
+    expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("max");
+    expect(ctx.out["langwatch.model"]).toBe("gpt-5.5");
+  });
+
+  it("lifts reasoning_effort from conversation_starts", () => {
+    const ctx = createLogExtractorContext("codex_otel.log_only", {
+      "event.name": "codex.conversation_starts",
+      model: "gpt-5.5",
+      reasoning_effort: "high",
+    });
+
+    new CodexExtractor().applyLog(ctx);
+
+    expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
+  });
+});

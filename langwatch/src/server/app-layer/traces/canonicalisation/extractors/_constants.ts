@@ -230,6 +230,15 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: "gen_ai.usage.cache_read.input_tokens",
   GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
     "gen_ai.usage.cache_creation.input_tokens",
+  // Anthropic's per-TTL cache-creation split (usage.cache_creation.
+  // ephemeral_5m_input_tokens / ephemeral_1h_input_tokens in the response
+  // body). The TTL is what decides the write's price, 5m bills at 1.25x base
+  // input, 1h at 2x, so the split, not just the total, is what tells a
+  // reader which cache a session is paying for.
+  GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS:
+    "gen_ai.usage.cache_creation_5m.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS:
+    "gen_ai.usage.cache_creation_1h.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
 
   // Audio usage measures the gateway emits: characters synthesized by a

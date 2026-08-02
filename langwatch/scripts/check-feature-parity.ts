@@ -331,7 +331,6 @@ const LEGACY_INERT: string[] = [
   "specs/claude/telemetry-turn-bounding.feature",
   "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/personal-usage.feature",
-  "specs/coding-agent/terminal-view.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
   "specs/data-retention/ingestion-stamping.feature",

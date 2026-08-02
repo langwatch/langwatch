@@ -147,6 +147,13 @@ const traceColumnDefs = {
     minSize: 80,
     meta: num,
   }),
+  contextSize: traceCol.accessor((row) => row.contextSizeTokens ?? 0, {
+    id: "contextSize",
+    header: "Context Size",
+    size: 120,
+    minSize: 110,
+    meta: num,
+  }),
   tokens: traceCol.accessor("totalTokens", {
     id: "tokens",
     header: "Tokens",

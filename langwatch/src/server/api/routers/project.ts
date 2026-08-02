@@ -11,6 +11,11 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
+import {
+  personalWorkspaceArchiveViolation,
+  personalWorkspaceCreateViolation,
+  personalWorkspaceMoveViolation,
+} from "~/server/app-layer/projects/project.service";
 import type { Session } from "~/server/auth";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
@@ -26,6 +31,52 @@ import {
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+
+/**
+ * The owner is ADMIN of their own personal team, so `project:create` passes
+ * there. A personal workspace holds only the project provisioned with it.
+ */
+async function assertTeamCanHoldANewProject(
+  prisma: PrismaClient,
+  { teamId, organizationId }: { teamId?: string; organizationId: string },
+): Promise<void> {
+  if (!teamId) return;
+
+  const destinationTeam = await prisma.team.findFirst({
+    where: { id: teamId, organizationId },
+    select: { isPersonal: true },
+  });
+  const violation = personalWorkspaceCreateViolation(
+    destinationTeam?.isPersonal ?? false,
+  );
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
+ * The boundary itself is defined once in the projects app layer, which this
+ * router does not go through. See the helper there for why it holds.
+ */
+function assertMoveStaysOutOfPersonalWorkspaces({
+  isMovingTeams,
+  isProjectPersonal,
+  isDestinationTeamPersonal,
+}: {
+  isMovingTeams: boolean;
+  isProjectPersonal: boolean;
+  isDestinationTeamPersonal: boolean;
+}): void {
+  if (!isMovingTeams) return;
+
+  const violation = personalWorkspaceMoveViolation({
+    isProjectPersonal,
+    isDestinationTeamPersonal,
+  });
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
 
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
@@ -63,6 +114,11 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
+
+      await assertTeamCanHoldANewProject(prisma, {
+        teamId: input.teamId,
+        organizationId: input.organizationId,
+      });
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;
@@ -288,7 +344,7 @@ export const projectRouter = createTRPCRouter({
             organizationId: project.team.organizationId,
             archivedAt: null,
           },
-          select: { id: true },
+          select: { id: true, isPersonal: true },
         });
         if (!destinationTeam) {
           throw new TRPCError({
@@ -297,6 +353,12 @@ export const projectRouter = createTRPCRouter({
               "Destination team not found, is archived, or belongs to a different organization",
           });
         }
+
+        assertMoveStaysOutOfPersonalWorkspaces({
+          isMovingTeams: input.teamId !== project.teamId,
+          isProjectPersonal: project.isPersonal,
+          isDestinationTeamPersonal: destinationTeam.isPersonal,
+        });
       }
 
       const updatedProject = await prisma.project.update({
@@ -381,6 +443,17 @@ export const projectRouter = createTRPCRouter({
       );
       if (!canDeleteTarget) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      const target = await prisma.project.findUnique({
+        where: { id: input.projectToArchiveId },
+        select: { isPersonal: true },
+      });
+      const archiveViolation = personalWorkspaceArchiveViolation(
+        target?.isPersonal ?? false,
+      );
+      if (archiveViolation) {
+        throw new TRPCError({ code: "FORBIDDEN", message: archiveViolation });
       }
 
       const result = await prisma.project.updateMany({

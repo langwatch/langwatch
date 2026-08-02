@@ -112,3 +112,53 @@ describe("shouldFilterCodingAgentSpan", () => {
     });
   });
 });
+
+describe("shouldFilterCodingAgentSpan for the codex_exec scope", () => {
+  describe("when the span is ingested", () => {
+    /** @scenario "Codex exec sessions get the same noise filter as the TUI" */
+    it("drops the exec wire's infra spans (auth, rollout persistence, plugin list)", () => {
+      for (const spanName of [
+        "auth",
+        "persist_rollout_items",
+        "plugins_for_config",
+        "environments.snapshot",
+        "session_init.state_db",
+        "app_server.serialized_request_queue",
+      ]) {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex_exec",
+            spanName,
+            attributeKeys: ["code.file.path", "thread.id"],
+          }),
+        ).toBe(true);
+      }
+    });
+
+    it("keeps the exec wire's usage-bearing response spans", () => {
+      expect(
+        shouldFilterCodingAgentSpan({
+          scopeName: "codex_exec",
+          spanName: "handle_responses",
+          attributeKeys: [
+            "gen_ai.usage.input_tokens",
+            "codex.request.reasoning_effort",
+          ],
+        }),
+      ).toBe(false);
+    });
+
+    /** @scenario "Codex tool spans are filtered so a tool call never mints its own trace" */
+    it("drops tool spans, whose parent routinely lives in another trace", () => {
+      for (const scopeName of ["codex_exec", "codex_cli_rs"]) {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName,
+            spanName: "exec_command",
+            attributeKeys: ["tool_name", "call_id", "code.file.path"],
+          }),
+        ).toBe(true);
+      }
+    });
+  });
+});

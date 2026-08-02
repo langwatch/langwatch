@@ -531,6 +531,17 @@ export const DrawerHeader = memo(function DrawerHeader({
     "langwatch.reserved.cache_creation_tokens",
     "gen_ai.usage.cache_creation.input_tokens",
   );
+  // Anthropic's cache-write TTL split (5m writes bill 1.25x base input, 1h
+  // writes 2x), summed by the fold off the response bodies. Absent for every
+  // other provider and for sessions without raw body telemetry.
+  const cacheCreation5mTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.cache_creation_5m_tokens",
+  );
+  const cacheCreation1hTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.cache_creation_1h_tokens",
+  );
   const reasoningTokens = readNumberAttribute(
     trace.attributes,
     "langwatch.reserved.reasoning_tokens",
@@ -542,6 +553,14 @@ export const DrawerHeader = memo(function DrawerHeader({
   // above; shown next to the model since it is a per-request model setting.
   const reasoningEffort =
     trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
+
+  // How full the window already was when this trace's first model call ran.
+  // Sits before Tokens because it is the number a reader checks first: the
+  // sums that follow only mean something once you know what they started from.
+  const contextSizeTokens = readNumberAttribute(
+    trace.attributes,
+    "langwatch.reserved.context_size_tokens",
+  );
 
   // Total tokens the model actually processed = input + output PLUS cache
   // read + cache write. Anthropic reports `input_tokens` as the NON-cached
@@ -1146,6 +1165,19 @@ export const DrawerHeader = memo(function DrawerHeader({
             </Box>
           </Tooltip>
         )}
+        {contextSizeTokens != null && contextSizeTokens > 0 && (
+          <Tooltip
+            content="Context carried into this trace's first model call."
+            positioning={{ placement: "top" }}
+          >
+            <Box>
+              <MetricPill
+                label="Context size"
+                value={formatTokens(contextSizeTokens)}
+              />
+            </Box>
+          </Tooltip>
+        )}
         {trace.totalTokens > 0 && (
           <Tooltip
             content={
@@ -1154,6 +1186,8 @@ export const DrawerHeader = memo(function DrawerHeader({
                 outputTokens={trace.outputTokens}
                 cacheReadTokens={cacheReadTokens}
                 cacheCreationTokens={cacheCreationTokens}
+                cacheCreation5mTokens={cacheCreation5mTokens}
+                cacheCreation1hTokens={cacheCreation1hTokens}
                 reasoningTokens={reasoningTokens}
                 totalWithCache={totalTokensWithCache}
                 estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
