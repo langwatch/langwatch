@@ -1,4 +1,5 @@
 import { toaster } from "../components/ui/toaster";
+import { showErrorToast } from "../features/errors";
 import { api } from "../utils/api";
 
 /**
@@ -6,9 +7,10 @@ import { api } from "../utils/api";
  * reconciles down to the seats its license covers.
  *
  * Re-enabling can be refused by the server when it would take the organization
- * back over its seats, so the failure message is surfaced rather than swallowed
- * behind a generic retry prompt: it is the one thing that tells the admin they
- * have to free a seat first. See seat-reconciliation.feature.
+ * back over its seats. That refusal carries the license-limit shape, so the
+ * global handler opens the limit modal with the current and licensed seat
+ * counts and `showErrorToast` stays quiet rather than reporting it twice. See
+ * seat-reconciliation.feature.
  */
 export function useMemberDisableAction({
   organizationId,
@@ -36,14 +38,11 @@ export function useMemberDisableAction({
           onChanged();
         },
         onError: (error) => {
-          toaster.create({
-            title: disabled
+          showErrorToast({
+            error,
+            fallbackTitle: disabled
               ? "Couldn't disable this member"
               : "Couldn't enable this member",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
           });
         },
       },
