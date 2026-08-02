@@ -499,6 +499,73 @@ describe("webhook delivery via the transactional inbox", () => {
     }
   });
 
+  /** @scenario An outcome that outruns its admission is delivered once admission arrives */
+  it("holds an outcome that arrived before its admission and delivers it on admission", async () => {
+    const requestId = `req-${nanoid(8)}`;
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox();
+    // Nothing can ship yet: the envelope needs the attribution only the
+    // admission carries.
+    expect(await sendMessagesFor(endpointId)).toHaveLength(0);
+    expect(sendWebhookMock).not.toHaveBeenCalled();
+
+    await consume(admittedEnvelope(requestId));
+    await drainOutbox();
+
+    expect(await sendMessagesFor(endpointId)).toHaveLength(1);
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
+      batch: Array<{ id: string; data: Record<string, unknown> }>;
+    };
+    expect(body.batch).toHaveLength(1);
+    expect(body.batch[0]!.id).toBe(`${requestId}:completed`);
+    expect(body.batch[0]!.data.organization_id).toBe(organization.id);
+    expect(body.batch[0]!.data.end_user_id).toBe("end-user-1");
+    expect(body.batch[0]!.data.status).toBe("success");
+
+    // The release rides one admission, so a redelivered admitted event
+    // queues nothing further.
+    const redelivery = await service.handleEvent({
+      envelope: admittedEnvelope(requestId),
+      now: clock + 10,
+    });
+    expect(redelivery.outcome).toBe("duplicateEvent");
+    await drainOutbox();
+    expect(await sendMessagesFor(endpointId)).toHaveLength(1);
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the confirmation, not the settlement, when both outran the admission", async () => {
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      enabledEvents: ["gateway.*"],
+    });
+    try {
+      const requestId = `req-${nanoid(8)}`;
+      await consume(settledEnvelope(requestId));
+      await consume(confirmedEnvelope(requestId));
+      await consume(admittedEnvelope(requestId));
+      await drainOutbox();
+
+      // The endpoint subscribes to both families, so a settlement winning
+      // the slot would have shipped a settled envelope here.
+      expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
+        batch: Array<{ id: string; type: string }>;
+      };
+      expect(body.batch).toHaveLength(1);
+      expect(body.batch[0]!.type).toBe("gateway.request.completed");
+      expect(body.batch[0]!.id).toBe(`${requestId}:completed`);
+    } finally {
+      await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        enabledEvents: ["gateway.request.completed"],
+      });
+    }
+  });
+
   /** @scenario Failed requests are delivered as completed with their error class */
   it("delivers a failed request with its error class", async () => {
     const requestId = `req-${nanoid(8)}`;

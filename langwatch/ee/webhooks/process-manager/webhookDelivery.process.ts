@@ -91,7 +91,9 @@ let maintenanceLastCheckedMs = 0;
  * re-queues an envelope and no first-sight bookkeeping exists anywhere
  * else. One process instance per gateway request: `admitted` stores the
  * attribution the outcome events do not carry, `confirmed`/`failed`/
- * `settled` freeze the full envelope source into a `deliver` intent.
+ * `settled` freeze the full envelope source into a `deliver` intent. An
+ * outcome that arrives before the admission it needs is stashed and
+ * released by the admitted handler, so log order never costs a delivery.
  * Delivery is two outbox levels under this one process name: `deliver`
  * (per request) resolves the org's matching ACTIVE endpoints and commits
  * one `sendBatch` message per endpoint with a deterministic key, so each
@@ -117,10 +119,16 @@ export interface SpendAttribution {
 
 export interface WebhookDeliveryState {
   attribution: SpendAttribution | null;
+  /** An outcome this instance saw before its admission. Outcomes can
+   *  outrun their admit append (the fold's status lattice is built for the
+   *  same ordering), and the envelope needs attribution, so the outcome
+   *  waits here until `admitted` arrives and emits it. */
+  pendingOutcome: DeliverPayload | null;
 }
 
 export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
   attribution: null,
+  pendingOutcome: null,
 };
 
 /** A buffered envelope with its arrival instant, for the coalescing
@@ -957,6 +965,24 @@ function settledDeliverPayload(
   );
 }
 
+/**
+ * The state an outcome that outran its admission leaves behind. Precedence
+ * mirrors the fold's status lattice: a real outcome (confirmed or failed)
+ * always takes the slot, a settlement only fills an empty one, so the
+ * envelope admission finally releases is the one the ledger agrees with.
+ */
+function withStashedOutcome(
+  state: WebhookDeliveryState,
+  incoming: DeliverPayload,
+): WebhookDeliveryState {
+  const keepStashed =
+    incoming.status === "settled" && state.pendingOutcome !== null;
+  return {
+    ...state,
+    pendingOutcome: keepStashed ? state.pendingOutcome : incoming,
+  };
+}
+
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
   return {
     organization_id: data.organization_id,
@@ -987,48 +1013,61 @@ export function webhookDeliveryPM(
       .intent("deliver", deliverSchema, runDeliver(deps))
       .intent("flushEndpoint", flushEndpointSchema, runFlushEndpoint(deps))
       .intent("sendBatch", sendBatchSchema, runWebhookSendBatch(deps))
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data) => ({
-        state: {
-          ...state,
-          attribution: attributionFrom(data as AdmitSpendCommandData),
-        },
-      }))
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => ({
-        state,
-        intents: [
-          ctx.intents.deliver(
-            "deliver:confirmed",
-            confirmedDeliverPayload(data as ConfirmSpendCommandData, {
-              projectId: ctx.projectId,
-              attribution: state.attribution,
-            }),
-          ),
-        ],
-      }))
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => ({
-        state,
-        intents: [
-          ctx.intents.deliver(
-            "deliver:failed",
-            failedDeliverPayload(data as FailSpendCommandData, {
-              projectId: ctx.projectId,
-              attribution: state.attribution,
-            }),
-          ),
-        ],
-      }))
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => ({
-        state,
-        intents: [
-          ctx.intents.deliver(
-            "deliver:settled",
-            settledDeliverPayload(data as SettleSpendCommandData, {
-              projectId: ctx.projectId,
-              attribution: state.attribution,
-            }),
-          ),
-        ],
-      }))
+      // Admission carries the attribution every envelope needs, so it also
+      // releases whatever outcome arrived ahead of it. One admission per
+      // instance (the log's idempotency key, then the inbox) means
+      // `deliver:late` is minted at most once.
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
+        const attribution = attributionFrom(data as AdmitSpendCommandData);
+        const stashed = state.pendingOutcome;
+        const admitted = { ...state, attribution, pendingOutcome: null };
+        if (!stashed) return { state: admitted };
+        return {
+          state: admitted,
+          intents: [
+            ctx.intents.deliver("deliver:late", { ...stashed, attribution }),
+          ],
+        };
+      })
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
+        const payload = confirmedDeliverPayload(
+          data as ConfirmSpendCommandData,
+          { projectId: ctx.projectId, attribution: state.attribution },
+        );
+        if (state.attribution === null) {
+          return { state: withStashedOutcome(state, payload) };
+        }
+        return {
+          state,
+          intents: [ctx.intents.deliver("deliver:confirmed", payload)],
+        };
+      })
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
+        const payload = failedDeliverPayload(data as FailSpendCommandData, {
+          projectId: ctx.projectId,
+          attribution: state.attribution,
+        });
+        if (state.attribution === null) {
+          return { state: withStashedOutcome(state, payload) };
+        }
+        return {
+          state,
+          intents: [ctx.intents.deliver("deliver:failed", payload)],
+        };
+      })
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
+        const payload = settledDeliverPayload(data as SettleSpendCommandData, {
+          projectId: ctx.projectId,
+          attribution: state.attribution,
+        });
+        if (state.attribution === null) {
+          return { state: withStashedOutcome(state, payload) };
+        }
+        return {
+          state,
+          intents: [ctx.intents.deliver("deliver:settled", payload)],
+        };
+      })
       // Endpoint streams arm wakes for their coalescing deadlines; the
       // wake hands the flush to the I/O executor.
       .onWake((state, ctx) => {

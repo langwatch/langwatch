@@ -83,6 +83,15 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a settlement is delivered
       Then only the family-subscribed endpoint gets a send
 
+    @integration
+    Scenario: An outcome that outruns its admission is delivered once admission arrives
+      Given a confirmation consumed before the admission it belongs to
+      When the admission arrives afterwards
+      Then exactly one envelope is delivered, carrying the admission attribution
+      And a real outcome held this way is never displaced by a later settlement
+      # The envelope needs attribution only admission carries, so the outcome
+      # waits rather than shipping an unattributed row or none at all.
+
   Rule: Receiver URLs are https unless the operator opts in
 
     @integration
