@@ -234,6 +234,7 @@ import { createSharedTracePayloadCache } from "./share/shared-trace-cache.servic
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
+import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
@@ -525,15 +526,14 @@ export function initializeDefaultApp(options?: {
           },
         }),
       )
-    : PlanProviderService.create({
-        getActivePlan: async ({ organizationId }) => {
-          const plan = await getLicenseHandler().getActivePlan(organizationId);
-          return {
-            ...plan,
-            planSource: plan.free ? ("free" as const) : ("license" as const),
-          };
-        },
-      });
+    : PlanProviderService.create(
+        createSelfHostedPlanProvider({
+          licensePlanProvider: {
+            getActivePlan: ({ organizationId }) =>
+              getLicenseHandler().getActivePlan(organizationId),
+          },
+        }),
+      );
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
