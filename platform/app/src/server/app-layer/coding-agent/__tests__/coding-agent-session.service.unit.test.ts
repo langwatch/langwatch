@@ -11,6 +11,7 @@ import {
   projectCodingAgentSessionToRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
+import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
 import type {
@@ -150,7 +151,12 @@ function makeService({
     ensure: async () => {},
     findTotalsBySessionIds: async () => totals,
   };
-  return new CodingAgentSessionService(sessions, traceSessions, metricSeries);
+  return new CodingAgentSessionService(
+    sessions,
+    traceSessions,
+    metricSeries,
+    new NullCodingAgentSessionEventsRepository(),
+  );
 }
 
 describe("CodingAgentSessionService", () => {
@@ -195,6 +201,7 @@ describe("CodingAgentSessionService", () => {
           sessions,
           { ensure: async () => {}, findByTraceId: async () => null },
           { ensure: async () => {}, findTotalsBySessionIds: async () => [] },
+          new NullCodingAgentSessionEventsRepository(),
         );
 
         const session = await service.getBySessionId({

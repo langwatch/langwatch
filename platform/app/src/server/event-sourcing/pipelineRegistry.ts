@@ -38,6 +38,7 @@ import type { UsageReportingService } from "../../../ee/billing/services/usageRe
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { CodingAgentSessionEventsRepository } from "../app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
@@ -101,6 +102,7 @@ import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-pr
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
 import {
+  CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
@@ -264,6 +266,8 @@ export interface PipelineRepositories {
   codingAgentTraceSession: CodingAgentTraceSessionRepository;
   /** ADR-056 §5: converged per-series metric totals per session. */
   sessionMetricSeries: SessionMetricSeriesRepository;
+  /** The per-call fact table: one row per session event (migration 00067). */
+  codingAgentSessionEvents: CodingAgentSessionEventsRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
@@ -821,6 +825,10 @@ export class PipelineRegistry {
         sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
           this.deps.repositories.sessionMetricSeries,
         ),
+        codingAgentSessionEventsAppendStore:
+          new CodingAgentSessionEventsAppendStore(
+            this.deps.repositories.codingAgentSessionEvents,
+          ),
       }),
     );
   }

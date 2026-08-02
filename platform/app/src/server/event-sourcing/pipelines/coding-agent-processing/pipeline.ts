@@ -9,6 +9,10 @@ import {
   type CodingAgentSessionState,
 } from "./projections/codingAgentSession.foldProjection";
 import {
+  type CodingAgentSessionEventRecord,
+  CodingAgentSessionEventsMapProjection,
+} from "./projections/codingAgentSessionEvents.mapProjection";
+import {
   type CodingAgentTraceSessionRecord,
   CodingAgentTraceSessionsMapProjection,
 } from "./projections/codingAgentTraceSessions.mapProjection";
@@ -24,6 +28,7 @@ export interface CodingAgentProcessingPipelineDeps {
   codingAgentSessionStore: FoldProjectionStore<CodingAgentSessionState>;
   codingAgentTraceSessionAppendStore: AppendStore<CodingAgentTraceSessionRecord>;
   sessionMetricSeriesAppendStore: AppendStore<SessionMetricSeriesRecord>;
+  codingAgentSessionEventsAppendStore: AppendStore<CodingAgentSessionEventRecord>;
 }
 
 /**
@@ -46,6 +51,9 @@ export interface CodingAgentProcessingPipelineDeps {
  *   (TenantId, TraceId) → SessionId seam the trace drawer resolves through
  * - sessionMetricSeries (map) → `session_metric_series`, the converged
  *   per-series totals (replace, never increment — ADR-056 §5)
+ * - codingAgentSessionEvents (map) → `coding_agent_session_events`, one row
+ *   per session event (model call, compaction, rate limit, tool run, …) —
+ *   the per-call sequence the session fold's converged totals erase
  *
  * Consumption is subscribers + projections + one process manager — no
  * reactors (ADR-056 §3). Commands default to per-aggregate grouping, so one
@@ -74,6 +82,12 @@ export function createCodingAgentProcessingPipeline(
         "sessionMetricSeries",
         new SessionMetricSeriesMapProjection({
           store: deps.sessionMetricSeriesAppendStore,
+        }),
+      )
+      .withMapProjection(
+        "codingAgentSessionEvents",
+        new CodingAgentSessionEventsMapProjection({
+          store: deps.codingAgentSessionEventsAppendStore,
         }),
       )
       // ADR-066 pillar 2: every contribution is keyed on its session, so one

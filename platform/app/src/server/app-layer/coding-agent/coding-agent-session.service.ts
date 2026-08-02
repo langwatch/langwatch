@@ -7,6 +7,11 @@ import {
   normalizeTokenType,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
 import { readWindowAround } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type {
+  CodingAgentSessionEventRow,
+  CodingAgentSessionEventsRepository,
+  SessionEventsCursor,
+} from "./repositories/coding-agent-session-events.repository";
 import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "./repositories/coding-agent-trace-session.repository";
 import type {
@@ -46,7 +51,41 @@ export class CodingAgentSessionService {
     private readonly sessions: CodingAgentSessionRepository,
     private readonly traceSessions: CodingAgentTraceSessionRepository,
     private readonly metricSeries: SessionMetricSeriesRepository,
+    private readonly sessionEvents: CodingAgentSessionEventsRepository,
   ) {}
+
+  /**
+   * One session's event sequence (model calls, compactions, rate limits,
+   * tool runs, prompts) in time order, keyset-paginated. The raw material
+   * for per-call analytics; content stays in the canonical rows.
+   */
+  async getSessionEvents({
+    projectId,
+    sessionId,
+    kinds,
+    occurredAt,
+    cursor,
+    limit,
+  }: {
+    projectId: string;
+    sessionId: string;
+    kinds?: string[];
+    occurredAt?: { fromMs: number; toMs: number };
+    cursor?: SessionEventsCursor;
+    limit: number;
+  }): Promise<{
+    events: CodingAgentSessionEventRow[];
+    nextCursor: SessionEventsCursor | null;
+  }> {
+    return this.sessionEvents.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+      kinds,
+      occurredAt,
+      cursor,
+      limit,
+    });
+  }
 
   /**
    * One session by its key, or null. `startedAtMs` is the partition-pruning

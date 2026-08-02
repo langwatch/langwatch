@@ -2283,6 +2283,25 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await impl(traceId, command.optsWithGlobals());
   });
 
+  // Add session command group
+  const sessionCmd = program
+    .command("session")
+    .description("Inspect coding-agent sessions");
+
+  rendersOwnResult(
+    sessionCmd
+      .command("events <sessionId>")
+      .description("List a coding-agent session's events (model calls, compactions, rate limits, tool runs) in time order")
+      .option("--kinds <kinds>", "Comma-separated event kinds to include (e.g. model_call,compaction,rate_limit)")
+      .option("--limit <n>", "Max events to return (default: 500); larger limits are fetched by cursor paging")
+      .option("--from <date>", "Start date (ISO string or epoch ms); with --to, prunes storage partitions for faster reads")
+      .option("--to <date>", "End date (ISO string or epoch ms)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (sessionId: string, _options: unknown, command: Command) => {
+    const { sessionEventsCommand: impl } = await import("./commands/sessions/events.js");
+    await impl(sessionId, command.optsWithGlobals());
+  });
+
   // Add scenario command group
   const scenarioCmd = program
     .command("scenario")

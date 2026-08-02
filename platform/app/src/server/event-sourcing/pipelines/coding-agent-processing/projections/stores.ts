@@ -1,3 +1,4 @@
+import type { CodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -6,6 +7,7 @@ import type {
   BulkAppendContext,
 } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import type { CodingAgentSessionEventRecord } from "./codingAgentSessionEvents.mapProjection";
 import type { CodingAgentTraceSessionRecord } from "./codingAgentTraceSessions.mapProjection";
 import type { SessionMetricSeriesRecord } from "./sessionMetricSeries.mapProjection";
 
@@ -26,6 +28,33 @@ export class CodingAgentTraceSessionAppendStore
 
   async bulkAppend(
     records: CodingAgentTraceSessionRecord[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    await this.repository.ensure(
+      records,
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+    );
+  }
+}
+
+export class CodingAgentSessionEventsAppendStore
+  implements AppendStore<CodingAgentSessionEventRecord>
+{
+  constructor(private readonly repository: CodingAgentSessionEventsRepository) {}
+
+  async append(
+    record: CodingAgentSessionEventRecord,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    await this.repository.ensure(
+      [record],
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+    );
+  }
+
+  async bulkAppend(
+    records: CodingAgentSessionEventRecord[],
     context: BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;

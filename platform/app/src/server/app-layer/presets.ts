@@ -136,6 +136,10 @@ import {
   NullCodingAgentTraceSessionRepository,
 } from "./coding-agent/repositories/coding-agent-trace-session.repository";
 import {
+  CodingAgentSessionEventsClickHouseRepository,
+  NullCodingAgentSessionEventsRepository,
+} from "./coding-agent/repositories/coding-agent-session-events.repository";
+import {
   NullSessionMetricSeriesRepository,
   SessionMetricSeriesClickHouseRepository,
 } from "./coding-agent/repositories/session-metric-series.repository";
@@ -704,6 +708,9 @@ export function initializeDefaultApp(options?: {
     sessionMetricSeries: clickhouseEnabled
       ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
       : new NullSessionMetricSeriesRepository(),
+    codingAgentSessionEvents: clickhouseEnabled
+      ? new CodingAgentSessionEventsClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentSessionEventsRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -1315,6 +1322,7 @@ export function initializeDefaultApp(options?: {
           repositories.codingAgentSession,
           repositories.codingAgentTraceSession,
           repositories.sessionMetricSeries,
+          repositories.codingAgentSessionEvents,
         ),
         "CodingAgentSessionService",
       ),
@@ -1530,6 +1538,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new NullCodingAgentSessionRepository(),
         new NullCodingAgentTraceSessionRepository(),
         new NullSessionMetricSeriesRepository(),
+        new NullCodingAgentSessionEventsRepository(),
       ),
     },
     langy: {
