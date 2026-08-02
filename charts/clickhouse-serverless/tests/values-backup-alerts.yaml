@@ -1,0 +1,36 @@
+# Renders the backup alerting rules, which are off by default and so are not
+# covered by values-single.yaml or values-replicated.yaml. Exercises both a
+# CronJob shipped by this chart and one that is not, since the alerts are
+# expected to watch any CronJob in the release namespace.
+image:
+  tag: "next"
+  pullPolicy: Never
+replicas: 1
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  password: "e2etest"
+autogen:
+  enabled: true
+
+objectStorage:
+  bucket: "example-backups"
+  region: "eu-central-1"
+
+backup:
+  enabled: true
+  monitoring:
+    enabled: true
+    runbookUrl: "https://github.com/langwatch/langwatch/blob/main/dev/docs/runbooks/clickhouse-backup-alerts.md"
+    additionalLabels:
+      route: page
+    targets:
+      - name: full
+        cronjob: backup-full
+        staleAfterHours: 26
+      - name: incremental
+        cronjob: backup-incremental
+        staleAfterHours: 3

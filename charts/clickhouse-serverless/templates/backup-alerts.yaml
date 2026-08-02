@@ -1,0 +1,199 @@
+{{/*
+Prometheus alerting rules for the backup CronJobs.
+
+Everything here is derived from kube-state-metrics, so the rules see the
+CronJob and Job objects rather than anything the backup scripts report. That is
+deliberate: a backup that stops running produces no output to report on, and an
+alert built on the backup's own telemetry goes quiet at exactly the moment it
+matters.
+*/}}
+{{- define "clickhouse-serverless.backupAlertRules" -}}
+{{- $fullname := include "clickhouse-serverless.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $mon := .Values.backup.monitoring -}}
+groups:
+  - name: {{ $fullname }}-backups
+    rules:
+    {{- range $target := $mon.targets }}
+    {{- $cronjob := printf "%s-%s" $fullname $target.cronjob }}
+    {{- $hours := $target.staleAfterHours | default 26 }}
+    {{- $seconds := mulf $hours 3600 | int64 }}
+    {{- $sel := printf "namespace=%q, cronjob=%q" $ns $cronjob }}
+
+      # Fires when this backup has no successful run inside its window, and also
+      # when it has never had one. The second case needs its own branch: a
+      # CronJob that has never succeeded has no
+      # kube_cronjob_status_last_successful_time series at all, so the
+      # subtraction below produces an empty vector and would never alert. That
+      # is the exact shape of a backup that was broken from the day it was
+      # deployed. The branch is gated on the CronJob being older than the window
+      # so a fresh install does not alert before its first run is due.
+      - alert: ClickHouseBackupStale
+        expr: |-
+          (
+            time() - max by (namespace, cronjob) (
+              kube_cronjob_status_last_successful_time{ {{- $sel }} }
+            ) > {{ $seconds }}
+          )
+          or
+          (
+            (
+              time() - max by (namespace, cronjob) (
+                kube_cronjob_created{ {{- $sel }} }
+              ) > {{ $seconds }}
+            )
+            unless
+            max by (namespace, cronjob) (
+              kube_cronjob_status_last_successful_time{ {{- $sel }} }
+            )
+          )
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: critical
+          backup: {{ $target.name | quote }}
+          cronjob: {{ $cronjob | quote }}
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup has no successful run in %vh" $target.name $hours | quote }}
+          description: >-
+            CronJob {{ $cronjob }} in namespace {{ $ns }} last completed successfully
+            {{ `{{ $value | humanizeDuration }}` }} ago, past its {{ $hours }}h window.
+            If this backup has never succeeded at all, that figure is the age of the
+            CronJob itself. Either way there is no restorable {{ $target.name }} backup
+            from within the window, so the recovery point is older than intended.
+            Check the CronJob and its most recent Job with
+            `kubectl -n {{ $ns }} describe cronjob {{ $cronjob }}` and
+            `kubectl -n {{ $ns }} logs job/<most-recent-job>`.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      # The fast signal. Scoped to Jobs created inside the staleness window,
+      # because failed Job objects are retained until a newer failure evicts
+      # them and an unscoped version would keep firing on a failure from months
+      # ago. Reads the Job's Failed condition rather than kube_job_status_failed,
+      # which counts failed pods and is non-zero for a Job that later succeeded
+      # on retry.
+      - alert: ClickHouseBackupJobFailed
+        expr: |-
+          count by (namespace) (
+            (kube_job_failed{namespace={{ $ns | quote }}, condition="true"} == 1)
+            and on (namespace, job_name)
+            (time() - kube_job_created{namespace={{ $ns | quote }}} < {{ $seconds }})
+            and on (namespace, job_name)
+            (kube_job_owner{namespace={{ $ns | quote }}, owner_kind="CronJob", owner_name={{ $cronjob | quote }}} == 1)
+          ) > 0
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: warning
+          backup: {{ $target.name | quote }}
+          cronjob: {{ $cronjob | quote }}
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup job failed" $target.name | quote }}
+          description: >-
+            {{ `{{ $value }}` }} recent Job(s) owned by CronJob {{ $cronjob }} in
+            namespace {{ $ns }} ended with a Failed condition. The backup itself is
+            not yet outside its {{ $hours }}h window, so this is the early warning:
+            fix it before ClickHouseBackupStale escalates. Get the reason with
+            `kubectl -n {{ $ns }} logs job/<most-recent-job>`.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      # A suspended backup never runs and never fails, so nothing else here
+      # would notice until the staleness window elapsed. Suspension is usually
+      # deliberate and temporary, which is exactly why it gets forgotten.
+      - alert: ClickHouseBackupCronJobSuspended
+        expr: |-
+          max by (namespace, cronjob) (
+            kube_cronjob_spec_suspend{ {{- $sel }} }
+          ) > 0
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: warning
+          backup: {{ $target.name | quote }}
+          cronjob: {{ $cronjob | quote }}
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup CronJob is suspended" $target.name | quote }}
+          description: >-
+            CronJob {{ $cronjob }} in namespace {{ $ns }} has spec.suspend set, so it
+            is not scheduling runs and no {{ $target.name }} backup is being taken.
+            Resume it with
+            `kubectl -n {{ $ns }} patch cronjob {{ $cronjob }} -p '{"spec":{"suspend":false}}'`
+            or remove the backup from backup.monitoring.targets if it is retired.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+
+      # Every other rule here is written against series that disappear when the
+      # CronJob does. Deleting the CronJob, or losing kube-state-metrics, would
+      # therefore resolve all of them and leave the backup unwatched in silence.
+      # This is the rule that makes that state noisy instead.
+      - alert: ClickHouseBackupCronJobMissing
+        expr: absent(kube_cronjob_info{ {{- $sel }} })
+        for: {{ $mon.absentFor | default "30m" | quote }}
+        labels:
+          severity: critical
+          backup: {{ $target.name | quote }}
+          cronjob: {{ $cronjob | quote }}
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup CronJob is not reporting" $target.name | quote }}
+          description: >-
+            No kube_cronjob_info series for {{ $cronjob }} in namespace {{ $ns }}.
+            Either the CronJob was deleted, or kube-state-metrics is down or no
+            longer being scraped. The first means backups stopped; the second means
+            every other backup alert has gone blind. Confirm with
+            `kubectl -n {{ $ns }} get cronjob {{ $cronjob }}`.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
+    {{- end }}
+{{- end -}}
+
+{{- if and .Values.backup.enabled .Values.backup.monitoring.enabled }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+{{- if not .Values.backup.monitoring.targets }}
+{{- fail "backup.monitoring.enabled is true but backup.monitoring.targets is empty: nothing would be watched" }}
+{{- end }}
+{{- if .Values.backup.monitoring.prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullname }}-backup-alerts
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+    {{- with .Values.backup.monitoring.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- include "clickhouse-serverless.backupAlertRules" . | nindent 2 }}
+{{- else }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-backup-alerts
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+    {{- with .Values.backup.monitoring.configMapLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  backup-alerts.rules.yml: |
+    {{- include "clickhouse-serverless.backupAlertRules" . | nindent 4 }}
+{{- end }}
+{{- end }}
