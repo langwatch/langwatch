@@ -33,10 +33,7 @@ import { readCodingAgentTranscriptWithProtections } from "../tracesV2";
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 
-function claudeLogRow(
-  attributes: Record<string, string>,
-  timeUnixMs: number,
-) {
+function claudeLogRow(attributes: Record<string, string>, timeUnixMs: number) {
   return {
     traceId: TRACE_ID,
     spanId: "77bb432be48046f6",

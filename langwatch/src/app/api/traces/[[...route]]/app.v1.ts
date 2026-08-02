@@ -372,7 +372,10 @@ export function registerTracesRoutes(
       const project = c.get("project");
       const { traceId } = c.req.param();
 
-      logger.info({ projectId: project.id, traceId }, "Getting trace transcript");
+      logger.info(
+        { projectId: project.id, traceId },
+        "Getting trace transcript",
+      );
 
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,

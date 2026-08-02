@@ -412,9 +412,7 @@ describe("TraceService — multi-trace read enrichment", () => {
     /** @scenario search without includeSpans keeps the legacy empty spans shape */
     it("does not enrich or read logs when includeSpans is not set", async () => {
       const page = {
-        groups: [
-          [makeTrace({ origin: "coding_agent", spans: [] as Span[] })],
-        ],
+        groups: [[makeTrace({ origin: "coding_agent", spans: [] as Span[] })]],
         totalHits: 1,
         traceChecks: {},
       };

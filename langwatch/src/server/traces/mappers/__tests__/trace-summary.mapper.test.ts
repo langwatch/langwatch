@@ -371,7 +371,9 @@ describe("mapTraceSummaryToTrace — reserved token metrics", () => {
   describe("when a reserved token attribute is not numeric", () => {
     it("adds no metric key for it", () => {
       const summary = makeSummary({
-        attributes: { "langwatch.reserved.context_size_tokens": "not-a-number" },
+        attributes: {
+          "langwatch.reserved.context_size_tokens": "not-a-number",
+        },
       });
 
       const trace = mapTraceSummaryToTrace(summary, [], "project-1");
