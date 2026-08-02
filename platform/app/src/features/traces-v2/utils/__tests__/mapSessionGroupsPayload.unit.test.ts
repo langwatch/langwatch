@@ -32,8 +32,8 @@ function payloadItem(
   };
 }
 
-describe("mapSessionGroupToConversationGroup", () => {
-  describe("given a session group payload from the sessions procedure", () => {
+describe("given a session group payload from the sessions procedure", () => {
+  describe("when mapping it onto the conversation group view model", () => {
     /** @scenario Session rows map to the conversation group view model */
     it("lands totals, trace count, context size and last activity on the row", () => {
       const group = mapSessionGroupToConversationGroup(payloadItem());
@@ -77,6 +77,22 @@ describe("mapSessionGroupToConversationGroup", () => {
       expect(group.contextSizeTokens).toBe(173_000);
     });
 
+    it("keeps a zero peak context instead of falling back to the trace maximum", () => {
+      const group = mapSessionGroupToConversationGroup(
+        payloadItem({
+          contextSizeTokens: 50_000,
+          codingAgent: {
+            modelCalls: 1,
+            compactions: 0,
+            peakContextTokens: 0,
+            subAgents: 0,
+          },
+        }),
+      );
+
+      expect(group.contextSizeTokens).toBe(0);
+    });
+
     it("keeps enrichment fields null for ordinary conversations", () => {
       const group = mapSessionGroupToConversationGroup(payloadItem());
       expect(group.modelCalls).toBeNull();
@@ -96,14 +112,16 @@ describe("mapSessionGroupToConversationGroup", () => {
   });
 });
 
-describe("mapSessionGroupsPayload", () => {
-  describe("when the payload is undefined", () => {
+describe("given no sessions payload yet", () => {
+  describe("when mapping the payload", () => {
     it("returns an empty list", () => {
       expect(mapSessionGroupsPayload(undefined)).toEqual([]);
     });
   });
+});
 
-  describe("when the payload has sessions", () => {
+describe("given a payload carrying several sessions", () => {
+  describe("when mapping the payload", () => {
     it("maps each one", () => {
       const groups = mapSessionGroupsPayload({
         sessions: [payloadItem(), payloadItem({ conversationId: "sess-2" })],

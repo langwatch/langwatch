@@ -48,8 +48,15 @@ export interface SessionEventsCursor {
   recordId: string;
 }
 
-/** A stored row, camel-cased. Same field set the projection writes. */
-export type CodingAgentSessionEventRow = CodingAgentSessionEventRecord;
+/**
+ * A stored row, camel-cased. `tenantId` is absent by construction: the read
+ * is already scoped to one tenant by the caller, so the SELECT never carries
+ * the column back and the type must not claim a value the row does not hold.
+ */
+export type CodingAgentSessionEventRow = Omit<
+  CodingAgentSessionEventRecord,
+  "tenantId"
+>;
 
 /** No-op store for deployments without ClickHouse. */
 export class NullCodingAgentSessionEventsRepository
@@ -99,7 +106,7 @@ interface ClickHouseWriteRecord {
   PrecomputeReuse: string;
   StatusCode: string;
   ErrorType: string;
-  RateLimitKind: string;
+  RateLimitCarrier: string;
   RetryDurationMs: number;
   ToolName: string;
   Success: string;
@@ -119,7 +126,7 @@ const READ_COLUMNS = `
   EventSequence, RequestId, Model, InputTokens, OutputTokens, CacheReadTokens,
   CacheCreationTokens, CostUsd, DurationMs, TtftMs, Attempt, Speed, StopReason,
   PreTokens, PostTokens, CompactionTrigger, PrecomputeReuse, StatusCode,
-  ErrorType, RateLimitKind, RetryDurationMs, ToolName, Success, Decision,
+  ErrorType, RateLimitCarrier, RetryDurationMs, ToolName, Success, Decision,
   DecisionSource, ToolInputBytes, ToolResultBytes, PromptChars, TotalTokens
 `;
 
@@ -154,7 +161,7 @@ interface ClickHouseReadRow {
   PrecomputeReuse: string;
   StatusCode: string;
   ErrorType: string;
-  RateLimitKind: string;
+  RateLimitCarrier: string;
   RetryDurationMs: string;
   ToolName: string;
   Success: string;
@@ -204,7 +211,7 @@ function toWriteRecord(
     PrecomputeReuse: record.precomputeReuse,
     StatusCode: record.statusCode,
     ErrorType: record.errorType,
-    RateLimitKind: record.rateLimitKind,
+    RateLimitCarrier: record.rateLimitCarrier,
     RetryDurationMs: record.retryDurationMs,
     ToolName: record.toolName,
     Success: record.success,
@@ -352,7 +359,6 @@ export class CodingAgentSessionEventsClickHouseRepository
 
 function mapRow(row: ClickHouseReadRow): CodingAgentSessionEventRow {
   return {
-    tenantId: "",
     sessionId: row.SessionId,
     timeUnixMs: Number(row.TimeMs),
     recordId: row.RecordId,
@@ -383,7 +389,7 @@ function mapRow(row: ClickHouseReadRow): CodingAgentSessionEventRow {
     precomputeReuse: row.PrecomputeReuse,
     statusCode: row.StatusCode,
     errorType: row.ErrorType,
-    rateLimitKind: row.RateLimitKind,
+    rateLimitCarrier: row.RateLimitCarrier,
     retryDurationMs: Number(row.RetryDurationMs),
     toolName: row.ToolName,
     success: row.Success,

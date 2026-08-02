@@ -88,7 +88,8 @@ export function translateFilterToClickHouse(
  * The Sessions lens matches these against session transcript content in
  * `log_records`, ON TOP of the trace-level translation above, so a term that
  * only ever appeared in a transcript still finds its session. Returns [] for
- * empty or unparsable input (the translator throws on those first anyway).
+ * empty or unparsable input (the translator throws on those first anyway),
+ * and for any query carrying an OR.
  */
 export function extractFreeTextTerms(queryText: string): string[] {
   const trimmed = normalizeQuery(queryText);
@@ -101,9 +102,39 @@ export function extractFreeTextTerms(queryText: string): string[] {
     return [];
   }
 
+  // The content search joins these terms with AND, which cannot express a
+  // disjunction. So a query carrying OR anywhere contributes NO content
+  // terms: the content branch is skipped entirely and the search falls back
+  // to the trace-level filter, which does translate OR correctly. Fewer
+  // matches beats wrong ones, `checkout OR refund` must never be answered as
+  // `checkout AND refund`.
+  if (containsOrOperator(ast)) return [];
+
   const terms: string[] = [];
   collectFreeTextTerms(ast, false, terms);
   return terms;
+}
+
+/** Whether an OR joins any two branches of the query, at any depth. */
+function containsOrOperator(node: LiqeQuery): boolean {
+  switch (node.type) {
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      return (
+        logExpr.operator.operator === "OR" ||
+        containsOrOperator(logExpr.left) ||
+        containsOrOperator(logExpr.right)
+      );
+    }
+    case "UnaryOperator":
+      return containsOrOperator((node as UnaryOperatorToken).operand);
+    case "ParenthesizedExpression":
+      return containsOrOperator(
+        (node as ParenthesizedExpressionToken).expression,
+      );
+    default:
+      return false;
+  }
 }
 
 /**
@@ -146,15 +177,15 @@ function collectFreeTextTerms(
   }
 }
 
-/** The bare search word this tag carries, or null when it is not one. */
+/**
+ * The bare search word this tag carries, or null when it is not one.
+ * Literals only: the content search matches a term as a plain substring, so a
+ * regex would be looked up by its source text (`/checkout.*failed/` searched
+ * for those very characters) and match nothing.
+ */
 function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
   if (negated || tag.field.type !== "ImplicitField") return null;
-  if (
-    tag.expression.type !== "LiteralExpression" &&
-    tag.expression.type !== "RegexExpression"
-  ) {
-    return null;
-  }
+  if (tag.expression.type !== "LiteralExpression") return null;
   const value = extractStringValue(tag);
   return value.length > 0 ? value : null;
 }

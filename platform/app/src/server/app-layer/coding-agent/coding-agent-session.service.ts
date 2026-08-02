@@ -19,6 +19,19 @@ import type {
   SessionMetricTotal,
 } from "./repositories/session-metric-series.repository";
 
+/**
+ * Ceiling on one session-events page. Every caller is clamped to it here, so
+ * a route that forgot to validate, a CLI flag or a future job can never ask
+ * ClickHouse for an unbounded scan.
+ */
+export const MAX_SESSION_EVENTS_PAGE_SIZE = 1000;
+
+/** One page's row budget: at least one row, at most the ceiling. */
+function clampSessionEventsLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return MAX_SESSION_EVENTS_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit), 1), MAX_SESSION_EVENTS_PAGE_SIZE);
+}
+
 /** The "at a glance" personal-usage figures over a period. */
 export interface CodingAgentUsageTotals {
   sessionCount: number;
@@ -70,6 +83,9 @@ export class CodingAgentSessionService {
    * One session's event sequence (model calls, compactions, rate limits,
    * tool runs, prompts) in time order, keyset-paginated. The raw material
    * for per-call analytics; content stays in the canonical rows.
+   *
+   * `limit` is clamped to {@link MAX_SESSION_EVENTS_PAGE_SIZE}: callers walk
+   * the cursor for more, and no caller gets to size the scan itself.
    */
   async getSessionEvents({
     projectId,
@@ -95,7 +111,7 @@ export class CodingAgentSessionService {
       kinds,
       occurredAt,
       cursor,
-      limit,
+      limit: clampSessionEventsLimit(limit),
     });
   }
 

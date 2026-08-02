@@ -1,4 +1,5 @@
 import { ValidationError } from "@langwatch/handled-error";
+import { z } from "zod";
 import type {
   SessionGroupCursor,
   SessionGroupRow,
@@ -100,35 +101,82 @@ export interface CodingAgentSessionLookup {
   }): Promise<SessionGroupCodingAgentDto | null>;
 }
 
+const SORT_COLUMNS = [
+  "lastActivity",
+  "started",
+  "cost",
+  "tokens",
+  "duration",
+  "traces",
+] as const satisfies readonly SessionGroupSortColumn[];
+
+/**
+ * The decoded cursor. It carries the sort it was minted under because
+ * `sortValue` is meaningless without it: the repository recomputes the keyset
+ * boundary from the CURRENT sort, so a cursor from a cost sort compared
+ * against a timestamp aggregate would silently page through nonsense.
+ */
+const sessionGroupsCursorSchema = z.object({
+  sortValue: z.number().finite(),
+  conversationId: z.string().min(1),
+  sortColumn: z.enum(SORT_COLUMNS),
+  sortDirection: z.enum(["asc", "desc"]),
+});
+
+export type SessionGroupsCursor = z.infer<typeof sessionGroupsCursorSchema>;
+
 /**
  * Opaque session page cursor. Base64url-encoded JSON so the wire shape can
- * evolve (the sort dimension changes what `sortValue` means) without clients
- * ever parsing it.
+ * evolve without clients ever parsing it. Client-supplied on the way back in,
+ * so the decode validates rather than asserts.
  */
-export function encodeSessionGroupsCursor(cursor: SessionGroupCursor): string {
+export function encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
-export function decodeSessionGroupsCursor(encoded: string): SessionGroupCursor {
+export function decodeSessionGroupsCursor(
+  encoded: string,
+): SessionGroupsCursor {
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
   } catch {
     throw new ValidationError("Invalid sessions cursor");
   }
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    typeof (parsed as SessionGroupCursor).sortValue !== "number" ||
-    !Number.isFinite((parsed as SessionGroupCursor).sortValue) ||
-    typeof (parsed as SessionGroupCursor).conversationId !== "string" ||
-    (parsed as SessionGroupCursor).conversationId.length === 0
-  ) {
+  const result = sessionGroupsCursorSchema.safeParse(parsed);
+  if (!result.success) {
     throw new ValidationError("Invalid sessions cursor");
   }
+  return result.data;
+}
+
+/**
+ * The repository's keyset boundary for this request. A cursor minted under
+ * another sort points at a boundary the repository would compare against a
+ * different aggregate expression, so a dollar amount would be measured
+ * against a timestamp and the caller would walk an arbitrary window with no
+ * error. Refuse it instead.
+ */
+function keysetCursorFor({
+  encoded,
+  sortColumn,
+  sortDirection,
+}: {
+  encoded: string | undefined;
+  sortColumn: SessionGroupSortColumn;
+  sortDirection: "asc" | "desc";
+}): SessionGroupCursor | undefined {
+  if (encoded === undefined) return undefined;
+  const cursor = decodeSessionGroupsCursor(encoded);
+  if (
+    cursor.sortColumn !== sortColumn ||
+    cursor.sortDirection !== sortDirection
+  ) {
+    throw new ValidationError("Sessions cursor does not match the sort");
+  }
   return {
-    sortValue: (parsed as SessionGroupCursor).sortValue,
-    conversationId: (parsed as SessionGroupCursor).conversationId,
+    sortValue: cursor.sortValue,
+    conversationId: cursor.conversationId,
   };
 }
 
@@ -192,17 +240,17 @@ export class SessionGroupsService {
     const sortColumn =
       SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
-    const cursor = params.cursor
-      ? decodeSessionGroupsCursor(params.cursor)
-      : undefined;
-
     const page = await this.repository.findSessionGroups({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
       limit: params.pageSize + 1,
-      cursor,
+      cursor: keysetCursorFor({
+        encoded: params.cursor,
+        sortColumn,
+        sortDirection,
+      }),
       filterWhere: params.filterWhere,
       contentTerms: params.contentTerms,
     });
@@ -241,6 +289,8 @@ export class SessionGroupsService {
           ? encodeSessionGroupsCursor({
               sortValue: cursorSortValueForRow(lastRow, sortColumn),
               conversationId: lastRow.conversationId,
+              sortColumn,
+              sortDirection,
             })
           : null,
     };

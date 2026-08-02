@@ -7,6 +7,7 @@ import {
   gateEvaluations,
   gateHeaderCost,
   gateResources,
+  gateSessionCost,
   gateTreeCost,
 } from "../tracesV2.gates";
 import type {
@@ -58,6 +59,23 @@ describe("sharedTrace share-safe gates", () => {
         expect(out.map((n) => n.cost)).toEqual([null, null]);
       });
     });
+
+    describe("when gating Sessions lens rows", () => {
+      /** @scenario A viewer without cost:view sees no session spend */
+      it("strips every session rollup cost", () => {
+        const sessions = [
+          { conversationId: "s-1", totalCost: 4.2, totalTokens: 100 },
+          { conversationId: "s-2", totalCost: 0, totalTokens: 5 },
+        ];
+        const out = gateSessionCost({
+          sessions,
+          protections: anonProtections,
+        });
+        expect(out.map((session) => session.totalCost)).toEqual([0, 0]);
+        // Everything that is not spend survives the gate untouched.
+        expect(out.map((session) => session.totalTokens)).toEqual([100, 5]);
+      });
+    });
   });
 
   describe("given a member with cost:view", () => {
@@ -74,6 +92,14 @@ describe("sharedTrace share-safe gates", () => {
       expect(
         gateTreeCost({ nodes, protections: memberProtections })[0]?.cost,
       ).toBe(0.1);
+    });
+
+    it("leaves Sessions lens spend untouched", () => {
+      const sessions = [{ conversationId: "s-1", totalCost: 4.2 }];
+      expect(
+        gateSessionCost({ sessions, protections: memberProtections })[0]
+          ?.totalCost,
+      ).toBe(4.2);
     });
   });
 

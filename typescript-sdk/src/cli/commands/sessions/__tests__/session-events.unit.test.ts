@@ -23,7 +23,7 @@ vi.mock("../../../utils/apiKey", () => ({
 	resolveCredentials: vi.fn(async () => ({
 		apiKey: "test-key",
 		source: "env",
-		endpoint: "https://app.langwatch.ai",
+		endpoint: "https://langwatch.test",
 	})),
 }));
 
@@ -33,10 +33,6 @@ vi.mock("ora", () => ({
 		succeed: vi.fn(),
 		fail: vi.fn(),
 	}),
-}));
-
-vi.mock("@/cli/utils/governance/resolveEndpoint", () => ({
-	resolveControlPlaneUrl: () => "https://langwatch.test",
 }));
 
 import { sessionEventsCommand } from "../events";
@@ -107,7 +103,9 @@ describe("sessionEventsCommand()", () => {
 
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		const firstUrl = String(fetchMock.mock.calls[0]![0]);
-		expect(firstUrl).toContain("/api/coding-agent/sessions/session-abc/events");
+		expect(firstUrl).toContain(
+			"https://langwatch.test/api/coding-agent/sessions/session-abc/events",
+		);
 		const secondUrl = String(fetchMock.mock.calls[1]![0]);
 		expect(secondUrl).toContain("cursor=cursor-1");
 
@@ -140,5 +138,37 @@ describe("sessionEventsCommand()", () => {
 			sessionEventsCommand("session-abc", { limit: "abc" }),
 		).rejects.toThrow(ProcessExitError);
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("exits with an error for an unparsable --from instead of sending NaN", async () => {
+		await expect(
+			sessionEventsCommand("session-abc", { from: "last tuesday" }),
+		).rejects.toThrow(ProcessExitError);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("exits with an error for an unparsable --to instead of sending NaN", async () => {
+		await expect(
+			sessionEventsCommand("session-abc", {
+				from: "2024-07-03T00:00:00Z",
+				to: "whenever",
+			}),
+		).rejects.toThrow(ProcessExitError);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("sends ISO and epoch-ms bounds as epoch ms", async () => {
+		fetchMock.mockResolvedValueOnce(
+			page([modelCall(1720000000000, "r1")], null),
+		);
+
+		await sessionEventsCommand("session-abc", {
+			from: "2024-07-03T00:00:00.000Z",
+			to: "1720051200000",
+		});
+
+		const url = String(fetchMock.mock.calls[0]![0]);
+		expect(url).toContain("from=1719964800000");
+		expect(url).toContain("to=1720051200000");
 	});
 });

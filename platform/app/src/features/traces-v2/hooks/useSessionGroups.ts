@@ -87,6 +87,25 @@ const SERVER_SORTABLE = new Set([
 ]);
 
 /**
+ * Onboarding sample-preview groups, or null when no preview is active. The
+ * fixture traces are grouped client-side, exactly like the lens used to work,
+ * and they are one page by construction, so page-local grouping is honest
+ * here in a way it never was for live data.
+ */
+function useSamplePreviewGroups(): ConversationGroup[] | null {
+  const sort = useViewStore((s) => s.sort);
+  const samplePreview = useSamplePreview();
+
+  return useMemo<ConversationGroup[] | null>(() => {
+    if (!samplePreview) return null;
+    return sortConversationGroups({
+      groups: groupTracesByConversation(samplePreview.data),
+      sort,
+    });
+  }, [samplePreview, sort]);
+}
+
+/**
  * Data source of the Sessions lens (specs/traces-v2/sessions-lens.feature):
  * server-grouped session rollups over the WHOLE time range, so every total
  * on a row sums all of the session's traces, never just the fetched page.
@@ -94,10 +113,8 @@ const SERVER_SORTABLE = new Set([
  * transcript content, so searching "#6418" finds the session that mentions
  * it even when no trace summary column carries the text.
  *
- * During onboarding sample preview the tRPC call is skipped and the fixture
- * traces are grouped client-side, exactly like the lens used to work, the
- * fixtures are one page by construction, so page-local grouping is honest
- * there.
+ * During onboarding sample preview the tRPC call is skipped and the fixtures
+ * answer instead.
  */
 export function useSessionGroups(): SessionGroupsResult {
   const { project } = useOrganizationTeamProject();
@@ -109,7 +126,7 @@ export function useSessionGroups(): SessionGroupsResult {
   const pageSize = useFilterStore((s) => s.pageSize);
   const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
   const setPage = useFilterStore((s) => s.setPage);
-  const samplePreview = useSamplePreview();
+  const sampleGroups = useSamplePreviewGroups();
 
   const isActive = grouping === "by-conversation";
   // Only the sessions lens's own opaque cursors apply here, a structured
@@ -134,7 +151,7 @@ export function useSessionGroups(): SessionGroupsResult {
       enabled:
         isActive &&
         !!project?.id &&
-        samplePreview === null &&
+        sampleGroups === null &&
         (page === 1 || sessionCursor !== undefined),
       staleTime: 60_000,
       keepPreviousData: true,
@@ -146,15 +163,7 @@ export function useSessionGroups(): SessionGroupsResult {
     [query.data],
   );
 
-  const sampleGroups = useMemo<ConversationGroup[]>(() => {
-    if (!samplePreview) return [];
-    return sortConversationGroups({
-      groups: groupTracesByConversation(samplePreview.data),
-      sort,
-    });
-  }, [samplePreview, sort]);
-
-  if (samplePreview) return settledResult(sampleGroups);
+  if (sampleGroups !== null) return settledResult(sampleGroups);
 
   return {
     groups,

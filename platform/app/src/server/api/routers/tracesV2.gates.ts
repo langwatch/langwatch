@@ -50,6 +50,24 @@ export function gateTreeCost({
   );
 }
 
+/**
+ * Strip session spend from Sessions-lens rows for a viewer without cost:view.
+ * A per-session rollup is strictly more revealing than the per-trace cost the
+ * header and waterfall already gate, so it follows the same permission.
+ * Zeroed rather than nulled: the row's cost is a total, and the chips that
+ * render it already treat zero as "nothing to show".
+ */
+export function gateSessionCost<T extends { totalCost: number }>({
+  sessions,
+  protections,
+}: {
+  sessions: T[];
+  protections: Protections;
+}): T[] {
+  if (protections.canSeeCosts === true) return sessions;
+  return sessions.map((session) => ({ ...session, totalCost: 0 }));
+}
+
 /** Redact resource attributes with the viewer's restricted-attribute rules. */
 export function gateResources({
   resources,

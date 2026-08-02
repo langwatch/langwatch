@@ -23,13 +23,26 @@ function pluralise(count: number, singular: string, plural: string): string {
   return count === 1 ? singular : plural;
 }
 
+/**
+ * The trace-count line. `traceCount` is the server rollup over the whole
+ * session, while the expanded turn list is a capped preview, so once fewer
+ * turns are loaded than the session holds the label says which of the two it
+ * is showing rather than letting the list read as complete.
+ */
+export function traceCountLabel(group: ConversationGroup): string {
+  const noun = pluralise(group.traceCount, "trace", "traces");
+  const loaded = group.traces.length;
+  if (loaded > 0 && loaded < group.traceCount) {
+    return `${loaded} of ${group.traceCount} ${noun}`;
+  }
+  return `${group.traceCount} ${noun}`;
+}
+
 export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} flexWrap="wrap" textStyle="xs" color="fg.subtle">
-      <Text>
-        {group.traceCount} {pluralise(group.traceCount, "trace", "traces")}
-      </Text>
+      <Text>{traceCountLabel(group)}</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
@@ -76,9 +89,7 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} textStyle="xs" color="fg.subtle">
-      <Text>
-        {group.traceCount} {pluralise(group.traceCount, "trace", "traces")}
-      </Text>
+      <Text>{traceCountLabel(group)}</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (

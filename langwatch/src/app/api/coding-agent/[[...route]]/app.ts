@@ -3,6 +3,7 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
+import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
@@ -10,7 +11,10 @@ import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
 
-const MAX_PAGE = 1000;
+// Rejected here so an over-large `limit` reads as a 400 rather than a
+// silently narrower page; the service clamps to the same ceiling for every
+// other caller.
+const MAX_PAGE = MAX_SESSION_EVENTS_PAGE_SIZE;
 const DEFAULT_PAGE = 500;
 
 const EVENT_KINDS = [
@@ -25,28 +29,53 @@ const EVENT_KINDS = [
   "subagent_completed",
 ] as const;
 
-const sessionEventSchema = z
-  .object({
-    timeUnixMs: z.number(),
-    recordId: z.string(),
-    eventKind: z.string(),
-    agent: z.string(),
-    promptId: z.string(),
-    querySource: z.string(),
-    agentType: z.string(),
-    model: z.string(),
-    inputTokens: z.number(),
-    outputTokens: z.number(),
-    cacheReadTokens: z.number(),
-    cacheCreationTokens: z.number(),
-    costUsd: z.number(),
-    durationMs: z.number(),
-    preTokens: z.number(),
-    postTokens: z.number(),
-    compactionTrigger: z.string(),
-    toolName: z.string(),
-  })
-  .passthrough();
+// Every column of the fact table, in the order the row carries them. All of
+// them are always present: the table stores typed scalars with no nullable
+// columns, so a field that does not apply to an event kind comes back as ""
+// or 0 rather than being omitted. `tenantId` is the one column the read does
+// not select, and it is absent here for the same reason.
+const sessionEventSchema = z.object({
+  sessionId: z.string(),
+  timeUnixMs: z.number(),
+  recordId: z.string(),
+  eventKind: z.string(),
+  agent: z.string(),
+  sessionKeySource: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  promptId: z.string(),
+  querySource: z.string(),
+  agentType: z.string(),
+  eventSequence: z.number(),
+  requestId: z.string(),
+  model: z.string(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  cacheCreationTokens: z.number(),
+  costUsd: z.number(),
+  durationMs: z.number(),
+  ttftMs: z.number(),
+  attempt: z.number(),
+  speed: z.string(),
+  stopReason: z.string(),
+  preTokens: z.number(),
+  postTokens: z.number(),
+  compactionTrigger: z.string(),
+  precomputeReuse: z.string(),
+  statusCode: z.string(),
+  errorType: z.string(),
+  rateLimitCarrier: z.string(),
+  retryDurationMs: z.number(),
+  toolName: z.string(),
+  success: z.string(),
+  decision: z.string(),
+  decisionSource: z.string(),
+  toolInputBytes: z.number(),
+  toolResultBytes: z.number(),
+  promptChars: z.number(),
+  totalTokens: z.number(),
+});
 
 const secured = createProjectApp({ basePath: "/api/coding-agent" });
 
@@ -164,7 +193,7 @@ secured.access(requires("traces:view")).get(
       });
 
     return c.json({
-      events: events.map(({ tenantId: _tenantId, ...event }) => event),
+      events,
       nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
     });
   },

@@ -112,8 +112,9 @@ const TRACE_CAPABILITY: LensCapability = {
 // The Sessions grouping (user-facing name; column/addon ids and the
 // persisted "by-conversation" mode key predate the rename and stay stable
 // so saved lens state keeps parsing). Rows come from the server-side
-// session rollup: every total sums ALL traces of the session in range,
-// not the fetched page (specs/traces-v2/sessions-lens.feature).
+// session rollup: trace count, cost, tokens, duration, context size and
+// the error and span counts sum ALL traces of the session in range, not
+// the fetched page (specs/traces-v2/sessions-lens.feature).
 const CONVERSATION_CAPABILITY: LensCapability = {
   // Sections mirror the trace-grouping shape so the Columns dropdown
   // can render the same "Standard" section header on every grouping —

@@ -133,9 +133,9 @@ describe("CodingAgentSessionEventsMapProjection", () => {
       );
 
       expect(event?.eventKind).toBe("rate_limit");
-      expect(event?.rateLimitKind).toBe("event");
+      expect(event?.rateLimitCarrier).toBe("event");
       expect(info?.eventKind).toBe("rate_limit");
-      expect(info?.rateLimitKind).toBe("info");
+      expect(info?.rateLimitCarrier).toBe("info");
     });
   });
 

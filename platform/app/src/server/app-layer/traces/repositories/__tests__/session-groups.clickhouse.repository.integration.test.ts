@@ -422,6 +422,59 @@ describe("SessionGroupsClickHouseRepository", () => {
     });
   });
 
+  describe("given a trace whose newer version no longer matches the filter", () => {
+    it("decides filter membership on the latest version only", async () => {
+      const sessionId = `${tag}-sess-superseded`;
+      const traceId = `${tag}-superseded-1`;
+      await insertTraceSummaries([
+        sessionTrace({
+          sessionId,
+          traceId,
+          occurredAtMs: baseMs - 30_000,
+          cost: 1,
+          promptTokens: 10,
+          completionTokens: 5,
+          updatedAtMs: baseMs - 30_000,
+          computedInput: "superseded prompt text",
+        }),
+        sessionTrace({
+          sessionId,
+          traceId,
+          occurredAtMs: baseMs - 30_000,
+          cost: 1,
+          promptTokens: 10,
+          completionTokens: 5,
+          updatedAtMs: baseMs - 25_000,
+          computedInput: "current prompt text",
+        }),
+      ]);
+
+      const stale = await repository.findSessionGroups(
+        query({
+          filterWhere: {
+            sql: "ComputedInput ILIKE {supersededTerm:String}",
+            params: { supersededTerm: "%superseded prompt text%" },
+          },
+        }),
+      );
+      expect(stale.rows.map((row) => row.conversationId)).not.toContain(
+        sessionId,
+      );
+
+      const current = await repository.findSessionGroups(
+        query({
+          filterWhere: {
+            sql: "ComputedInput ILIKE {currentTerm:String}",
+            params: { currentTerm: "%current prompt text%" },
+          },
+        }),
+      );
+      expect(current.rows.map((row) => row.conversationId)).toContain(
+        sessionId,
+      );
+    });
+  });
+
   describe("given more sessions than one page", () => {
     /** @scenario Session keyset pagination walks every session exactly once */
     it("walks every session exactly once in descending last-activity order", async () => {

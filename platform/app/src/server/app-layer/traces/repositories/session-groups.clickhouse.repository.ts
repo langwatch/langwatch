@@ -121,7 +121,7 @@ export class SessionGroupsClickHouseRepository
         )`;
 
     const { sql: sessionMatchClause, params: matchParams } =
-      this.buildSessionMatchClause(query, baseWhere);
+      this.buildSessionMatchClause(query, baseWhere, dedupFilter);
     Object.assign(params, matchParams);
 
     const sortExpression = SORT_EXPRESSIONS[query.sort.column];
@@ -227,16 +227,23 @@ export class SessionGroupsClickHouseRepository
   private buildSessionMatchClause(
     query: SessionGroupsQuery,
     baseWhere: string,
+    dedupFilter: string,
   ): { sql: string; params: Record<string, unknown> } {
     const branches: string[] = [];
     const params: Record<string, unknown> = {};
 
     if (query.filterWhere) {
+      // Membership is decided on the LATEST version of each trace, same
+      // dedup the rollup applies. Without it an obsolete row version left
+      // behind by a pending ReplacingMergeTree merge still satisfies the
+      // filter and drags its session into the page, even when the current
+      // version no longer matches.
       branches.push(`
             SELECT DISTINCT ${CONVERSATION_ID_EXPR} AS SessionId
             FROM ${TABLE_NAME}
             WHERE ${baseWhere}
               AND ${CONVERSATION_ID_EXPR} != ''
+              AND ${dedupFilter}
               AND (${query.filterWhere.sql})`);
       Object.assign(params, query.filterWhere.params);
     }

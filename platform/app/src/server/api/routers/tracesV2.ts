@@ -88,7 +88,12 @@ import {
 } from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { gateHeaderCost, gateResources, gateTreeCost } from "./tracesV2.gates";
+import {
+  gateHeaderCost,
+  gateResources,
+  gateSessionCost,
+  gateTreeCost,
+} from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
@@ -1165,10 +1170,14 @@ export const tracesV2Router = createTRPCRouter({
       });
       return {
         ...result,
-        // Previews are captured content, same viewer gating as the list.
-        sessions: result.sessions.map((session) =>
-          redactV2Content(session, protections),
-        ),
+        // Previews are captured content, spend follows cost:view — same two
+        // viewer gates the trace header applies (ADR-057).
+        sessions: gateSessionCost({
+          sessions: result.sessions.map((session) =>
+            redactV2Content(session, protections),
+          ),
+          protections,
+        }),
       };
     }),
 

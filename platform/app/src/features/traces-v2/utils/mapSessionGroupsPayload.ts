@@ -72,8 +72,10 @@ export function mapSessionGroupToConversationGroup(
     serviceName: item.serviceName,
     // The coding-agent fold's peak context is the sharper number when the
     // session has one; the per-trace attribute maximum covers everyone else.
+    // `??`, not `||`: a session that has carried no context into any call yet
+    // peaks at 0, and that 0 is the accurate answer, not a missing value.
     contextSizeTokens:
-      item.codingAgent?.peakContextTokens || item.contextSizeTokens,
+      item.codingAgent?.peakContextTokens ?? item.contextSizeTokens,
     modelCalls: item.codingAgent?.modelCalls ?? null,
     compactions: item.codingAgent?.compactions ?? null,
   };

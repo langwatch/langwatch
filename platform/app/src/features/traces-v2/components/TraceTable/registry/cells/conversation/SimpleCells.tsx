@@ -107,11 +107,15 @@ export const SessionContextSizeCell: CellDef<ConversationGroup> = {
  * these only exist when the session's conversation id matches a pre-folded
  * coding-agent session row.
  */
-function createCodingAgentCountCell(
-  id: string,
-  label: string,
-  read: (row: ConversationGroup) => number | null | undefined,
-): CellDef<ConversationGroup> {
+function createCodingAgentCountCell({
+  id,
+  label,
+  read,
+}: {
+  id: string;
+  label: string;
+  read: (row: ConversationGroup) => number | null | undefined;
+}): CellDef<ConversationGroup> {
   return {
     id,
     label,
@@ -130,14 +134,14 @@ function createCodingAgentCountCell(
   };
 }
 
-export const ModelCallsCell = createCodingAgentCountCell(
-  "modelCalls",
-  "Model Calls",
-  (row) => row.modelCalls,
-);
+export const ModelCallsCell = createCodingAgentCountCell({
+  id: "modelCalls",
+  label: "Model Calls",
+  read: (row) => row.modelCalls,
+});
 
-export const CompactionsCell = createCodingAgentCountCell(
-  "compactions",
-  "Compactions",
-  (row) => row.compactions,
-);
+export const CompactionsCell = createCodingAgentCountCell({
+  id: "compactions",
+  label: "Compactions",
+  read: (row) => row.compactions,
+});

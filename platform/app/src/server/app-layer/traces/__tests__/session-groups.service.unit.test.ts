@@ -73,11 +73,20 @@ function lookupReturning(
   };
 }
 
+const CURSOR_SORT = {
+  sortColumn: "lastActivity",
+  sortDirection: "desc",
+} as const;
+
 describe("session groups cursor codec", () => {
-  describe("given a cursor with a sort value and conversation id", () => {
+  describe("given a cursor with a sort value, conversation id and sort", () => {
     /** @scenario Session cursor encode and decode round-trip */
     it("round-trips through encode and decode", () => {
-      const cursor = { sortValue: 1_700_000_600_000, conversationId: "s-1" };
+      const cursor = {
+        sortValue: 1_700_000_600_000,
+        conversationId: "s-1",
+        ...CURSOR_SORT,
+      };
       expect(
         decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor)),
       ).toEqual(cursor);
@@ -92,6 +101,17 @@ describe("session groups cursor codec", () => {
           Buffer.from(JSON.stringify({ sortValue: "high" }), "utf8").toString(
             "base64url",
           ),
+        ),
+      ).toThrow("Invalid sessions cursor");
+    });
+
+    it("rejects a cursor missing the sort it was minted under", () => {
+      expect(() =>
+        decodeSessionGroupsCursor(
+          Buffer.from(
+            JSON.stringify({ sortValue: 1, conversationId: "s-1" }),
+            "utf8",
+          ).toString("base64url"),
         ),
       ).toThrow("Invalid sessions cursor");
     });
@@ -218,6 +238,7 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 200,
         conversationId: "s-2",
+        ...CURSOR_SORT,
       });
     });
 
@@ -244,10 +265,14 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 5,
         conversationId: "s-2",
+        sortColumn: "cost",
+        sortDirection: "desc",
       });
     });
+  });
 
-    it("falls back to last activity for unknown sort columns", async () => {
+  describe("when the sort column is unknown", () => {
+    it("falls back to last activity", async () => {
       const repository = new FakeRepository([makeRow()]);
       const service = new SessionGroupsService(repository, lookupReturning({}));
 
@@ -261,6 +286,55 @@ describe("SessionGroupsService", () => {
       expect(repository.lastQuery?.sort).toEqual({
         column: "lastActivity",
         direction: "asc",
+      });
+    });
+  });
+
+  describe("when the cursor was minted under a different sort", () => {
+    /** @scenario A session cursor from another sort is refused */
+    it("refuses the read instead of paging through another order", async () => {
+      const repository = new FakeRepository([makeRow()]);
+      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const cursor = encodeSessionGroupsCursor({
+        sortValue: 5,
+        conversationId: "s-2",
+        sortColumn: "cost",
+        sortDirection: "desc",
+      });
+
+      await expect(
+        service.getSessionGroups({
+          tenantId: TENANT,
+          timeRange: { from: 0, to: 2_000_000_000_000 },
+          sort: { columnId: "lastTurn", direction: "desc" },
+          pageSize: 10,
+          cursor,
+        }),
+      ).rejects.toThrow("Sessions cursor does not match the sort");
+      expect(repository.lastQuery).toBeNull();
+    });
+
+    it("accepts the cursor when the sort still matches", async () => {
+      const repository = new FakeRepository([makeRow()]);
+      const service = new SessionGroupsService(repository, lookupReturning({}));
+      const cursor = encodeSessionGroupsCursor({
+        sortValue: 5,
+        conversationId: "s-2",
+        sortColumn: "cost",
+        sortDirection: "desc",
+      });
+
+      await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        sort: { columnId: "cost", direction: "desc" },
+        pageSize: 10,
+        cursor,
+      });
+
+      expect(repository.lastQuery?.cursor).toEqual({
+        sortValue: 5,
+        conversationId: "s-2",
       });
     });
   });

@@ -78,10 +78,17 @@ Rule: Session pages walk with a stable keyset cursor
 
   @unit
   Scenario: Session cursor encode and decode round-trip
-    Given a session page cursor with a sort value and conversation id
+    Given a session page cursor with a sort value, conversation id and sort
     When the cursor is encoded and decoded again
     Then the decoded cursor equals the original
     And decoding a malformed cursor is rejected
+
+  @unit
+  Scenario: A session cursor from another sort is refused
+    Given a session page cursor minted while sorting by cost
+    When the same cursor is replayed against a last-activity sort
+    Then the read is refused with a validation error
+    And the repository is never queried
 
   @integration
   Scenario: A larger persisted page size clamps to the sessions cap
@@ -107,3 +114,19 @@ Rule: The sessions lens renders true totals
     When the table renders
     Then the row shows the session's total traces, tokens, cost and last activity
     And the totals come from the server rollup, not the fetched trace page
+
+  @unit
+  Scenario: An expanded session says how much of it the turn list shows
+    Given an expanded session holding more traces than the turn preview loads
+    When the expanded summary renders
+    Then it reports how many of the session's traces are listed
+    And a session whose turns are all loaded reports the plain total
+
+Rule: Session spend follows the viewer's cost permission
+
+  @unit
+  Scenario: A viewer without cost:view sees no session spend
+    Given a page of session rows carrying rolled-up cost
+    When the page is gated for a viewer who may not view costs
+    Then every session's total cost is stripped
+    And a viewer who may view costs keeps the spend

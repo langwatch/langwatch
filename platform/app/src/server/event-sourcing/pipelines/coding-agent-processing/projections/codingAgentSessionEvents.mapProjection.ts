@@ -61,7 +61,7 @@ export interface CodingAgentSessionEventRecord {
   precomputeReuse: string;
   statusCode: string;
   errorType: string;
-  rateLimitKind: string;
+  rateLimitCarrier: string;
   retryDurationMs: number;
   toolName: string;
   success: string;
@@ -158,7 +158,9 @@ export class CodingAgentSessionEventsMapProjection
       precomputeReuse: str(facts.precompute_reuse),
       statusCode: str(facts.status_code),
       errorType: str(facts.error_type),
-      rateLimitKind:
+      // `event` or `info`: which of Claude's two rate-limit carriers reported
+      // this row, not the dimension that was limited.
+      rateLimitCarrier:
         eventKind === "rate_limit"
           ? bare(str(facts["event.name"])).replace("rate_limit_", "")
           : "",

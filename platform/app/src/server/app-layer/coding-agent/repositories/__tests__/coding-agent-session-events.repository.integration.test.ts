@@ -60,7 +60,7 @@ function eventRecord(
     precomputeReuse: "",
     statusCode: "",
     errorType: "",
-    rateLimitKind: "",
+    rateLimitCarrier: "",
     retryDurationMs: 0,
     toolName: "",
     success: "",
@@ -110,20 +110,29 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
   });
 
   describe("given more stored events than one page", () => {
+    const pagedSession = `${tag}-paged`;
+    // Seven events, alternating kinds, owned by the describe rather than by
+    // whichever test happens to run first: both cases below read this fixture
+    // and neither may depend on the other having written it.
+    const records = Array.from({ length: 7 }, (_, index) =>
+      eventRecord({
+        sessionId: pagedSession,
+        timeUnixMs: baseMs + index * 1000,
+        recordId: `c${index}`.padEnd(64, "0"),
+        eventKind: index % 2 === 0 ? "model_call" : "tool_result",
+        eventSequence: index,
+      }),
+    );
+    const toolResultCount = records.filter(
+      (record) => record.eventKind === "tool_result",
+    ).length;
+
+    beforeAll(async () => {
+      await repository.ensure(records);
+    });
+
     /** @scenario a session's events list in time order with stable pagination */
     it("walks every event exactly once in ascending time order", async () => {
-      const pagedSession = `${tag}-paged`;
-      const records = Array.from({ length: 7 }, (_, index) =>
-        eventRecord({
-          sessionId: pagedSession,
-          timeUnixMs: baseMs + index * 1000,
-          recordId: `c${index}`.padEnd(64, "0"),
-          eventKind: index % 2 === 0 ? "model_call" : "tool_result",
-          eventSequence: index,
-        }),
-      );
-      await repository.ensure(records);
-
       const seen: string[] = [];
       let cursor;
       for (;;) {
@@ -144,12 +153,12 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
     it("filters by kind without disturbing the walk", async () => {
       const { events } = await repository.findBySessionId({
         tenantId,
-        sessionId: `${tag}-paged`,
+        sessionId: pagedSession,
         kinds: ["tool_result"],
         limit: 10,
       });
 
-      expect(events.length).toBe(3);
+      expect(events.length).toBe(toolResultCount);
       expect(events.every((event) => event.eventKind === "tool_result")).toBe(
         true,
       );

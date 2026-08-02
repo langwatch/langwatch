@@ -10,7 +10,10 @@ import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   projectCodingAgentSessionToRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CodingAgentSessionService } from "../coding-agent-session.service";
+import {
+  CodingAgentSessionService,
+  MAX_SESSION_EVENTS_PAGE_SIZE,
+} from "../coding-agent-session.service";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
 import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
@@ -164,6 +167,53 @@ function makeService({
 }
 
 describe("CodingAgentSessionService", () => {
+  describe("when a caller asks for more session events than one page holds", () => {
+    it("clamps the limit the repository sees to the page ceiling", async () => {
+      const seen: number[] = [];
+      const service = new CodingAgentSessionService({
+        sessions: {
+          upsert: async () => {},
+          findBySessionId: async () => null,
+          findBySessionIdWithApplied: async () => null,
+          findManyRecent: async () => [],
+        },
+        traceSessions: {
+          ensure: async () => {},
+          findByTraceId: async () => null,
+        },
+        metricSeries: {
+          ensure: async () => {},
+          findTotalsBySessionIds: async () => [],
+        },
+        sessionEvents: {
+          ensure: async () => {},
+          findBySessionId: async ({ limit }) => {
+            seen.push(limit);
+            return { events: [], nextCursor: null };
+          },
+        },
+      });
+
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 10_000_000,
+      });
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 0,
+      });
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 25,
+      });
+
+      expect(seen).toEqual([MAX_SESSION_EVENTS_PAGE_SIZE, 1, 25]);
+    });
+  });
+
   describe("when a trace belongs to a coding-agent session", () => {
     /** @scenario the trace view shows its session */
     it("resolves the session through the trace mapping", async () => {

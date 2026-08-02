@@ -68,7 +68,9 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_session_events
     -- api_error / rate_limit / retries_exhausted
     StatusCode LowCardinality(String) CODEC(ZSTD(1)),
     ErrorType LowCardinality(String) CODEC(ZSTD(1)),
-    RateLimitKind LowCardinality(String) CODEC(ZSTD(1)),
+    -- which of the two rate-limit carriers reported it: `event` (a limit
+    -- engaging) or `info` (a status update), not the limited dimension
+    RateLimitCarrier LowCardinality(String) CODEC(ZSTD(1)),
     RetryDurationMs UInt64 CODEC(ZSTD(1)),
 
     -- tool_result / tool_decision (Success is stringly on the wire and also
