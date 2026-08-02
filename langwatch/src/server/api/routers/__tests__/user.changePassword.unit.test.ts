@@ -83,4 +83,23 @@ describe("userRouter.changePassword", () => {
       expect(accountFindFirst).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a licensed Auth0 deployment", () => {
+    it("passes the provider guard and looks up the Auth0 database account", async () => {
+      resolveAuthProviderMock.mockResolvedValue("auth0");
+
+      // Only the `auth0|` database connection has a password the Management
+      // API can update, so the lookup must be narrowed to it rather than
+      // matching any Auth0-linked social identity.
+      await expect(call()).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(accountFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            provider: "auth0",
+            providerAccountId: { startsWith: "auth0|" },
+          }),
+        }),
+      );
+    });
+  });
 });

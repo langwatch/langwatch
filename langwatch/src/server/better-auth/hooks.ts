@@ -297,7 +297,16 @@ export const beforeAccountCreate = async ({
   // on an unlicensed install — that flag would otherwise strand them behind a
   // permanent "Link your SSO account" banner they can never clear (every SSO
   // path 403s on a denied deployment).
-  if (!(await platformSSOAllowed())) return;
+  if (!(await platformSSOAllowed())) {
+    // warn for the same reason the `afterUserCreate` site does: an operator
+    // grepping warn for "why is federation not happening" has to find both
+    // halves of the answer, not one.
+    logger.warn(
+      { userId: user.id, providerId: account.providerId },
+      "Skipped ssoDomain enforcement: platform SSO gate denies (no genuine license)",
+    );
+    return;
+  }
 
   const domain = extractEmailDomain(user.email);
   if (!domain) return;

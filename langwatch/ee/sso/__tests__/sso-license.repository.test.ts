@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SsoLicenseRepository } from "../sso-license.repository";
 
 describe("SsoLicenseRepository", () => {
-  describe("findOrganizationsWithLicense", () => {
+  describe("when asked for the organizations holding a license", () => {
     it("queries only organizations with a non-null license", async () => {
       const findMany = vi.fn().mockResolvedValue([
         { id: "org_1", license: "encoded-1" },

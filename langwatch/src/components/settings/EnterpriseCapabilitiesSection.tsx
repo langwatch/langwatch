@@ -5,6 +5,7 @@ import {
   Heading,
   HStack,
   Link,
+  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -29,7 +30,7 @@ type Capability = {
  * see. Kept to the ones with a real setup guide behind them, so every row
  * leads somewhere useful rather than to a sales page.
  */
-const CAPABILITIES: Capability[] = [
+const CAPABILITIES = [
   {
     key: "sso",
     name: "Single sign-on",
@@ -54,14 +55,14 @@ const CAPABILITIES: Capability[] = [
       "A record of who changed what, exportable to your SIEM for compliance reviews.",
     docsPath: "/ai-governance/audit-log",
   },
-];
+] as const satisfies readonly Capability[];
 
 function CapabilityRow({
   capability,
-  licensed,
+  isLicensed,
 }: {
   capability: Capability;
-  licensed: boolean;
+  isLicensed: boolean;
 }) {
   const Icon = capability.icon;
 
@@ -81,7 +82,7 @@ function CapabilityRow({
       <VStack align="start" gap={1} flex={1}>
         <HStack gap={2}>
           <Text fontWeight="medium">{capability.name}</Text>
-          {licensed ? (
+          {isLicensed ? (
             <Badge colorPalette="green" size="sm" variant="surface">
               Available
             </Badge>
@@ -118,7 +119,9 @@ function CapabilityRow({
  * the setup guide.
  *
  * Cloud renders nothing: there these are provisioned by LangWatch as part of
- * the plan, so the section would be noise on a page about sign-in methods.
+ * the plan, so the section would be noise on a page about sign-in methods. The
+ * leading separator belongs to the section for that reason, so Cloud does not
+ * get a divider with nothing under it.
  */
 export function EnterpriseCapabilitiesSection() {
   const publicEnv = usePublicEnv();
@@ -128,49 +131,52 @@ export function EnterpriseCapabilitiesSection() {
   if (!isSelfHosted) return null;
 
   return (
-    <VStack
-      align="start"
-      gap={4}
-      width="full"
-      data-testid="enterprise-capabilities"
-    >
-      <VStack align="start" gap={1}>
-        <Heading as="h2" size="md">
-          Organization sign-in and governance
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          {isEnterprise
-            ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
-            : "These run on the deployment you already have, unlocked by an Enterprise license. Everything else in LangWatch, including unlimited members, teams, and projects, stays uncapped without one."}
-        </Text>
-      </VStack>
+    <>
+      <Separator />
+      <VStack
+        align="start"
+        gap={4}
+        width="full"
+        data-testid="enterprise-capabilities"
+      >
+        <VStack align="start" gap={1}>
+          <Heading as="h2" size="md">
+            Organization sign-in and governance
+          </Heading>
+          <Text color="fg.muted" fontSize="sm">
+            {isEnterprise
+              ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
+              : "These run on the deployment you already have, unlocked by an Enterprise license. Everything else in LangWatch, including unlimited members, teams, and projects, stays uncapped without one."}
+          </Text>
+        </VStack>
 
-      <VStack align="start" gap={3} width="full">
-        {CAPABILITIES.map((capability) => (
-          <CapabilityRow
-            key={capability.key}
-            capability={capability}
-            licensed={isEnterprise}
-          />
-        ))}
-      </VStack>
+        <VStack align="start" gap={3} width="full">
+          {CAPABILITIES.map((capability) => (
+            <CapabilityRow
+              key={capability.key}
+              capability={capability}
+              isLicensed={isEnterprise}
+            />
+          ))}
+        </VStack>
 
-      {!isEnterprise && (
-        <HStack gap={3}>
-          <Button asChild size="sm" colorPalette="orange">
-            <a href="/settings/license">Activate a license</a>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <a
-              href={`${DOCS_BASE}/self-hosting/licensing`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              How licensing works
-            </a>
-          </Button>
-        </HStack>
-      )}
-    </VStack>
+        {!isEnterprise && (
+          <HStack gap={3}>
+            <Button asChild size="sm" colorPalette="orange">
+              <a href="/settings/license">Activate a license</a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={`${DOCS_BASE}/self-hosting/licensing`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                How licensing works
+              </a>
+            </Button>
+          </HStack>
+        )}
+      </VStack>
+    </>
   );
 }

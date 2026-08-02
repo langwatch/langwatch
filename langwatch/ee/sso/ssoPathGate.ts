@@ -82,15 +82,6 @@ export const isPasswordResetPath = (pathname: string): boolean =>
   endsWithAny(pathname, PASSWORD_RESET_SUFFIXES);
 
 /**
- * ADR-027 gate site #2 — true for any request refused while the platform SSO
- * gate denies: the initiation paths, plus ANY callback path (pathname-PREFIX
- * match via `includes`, since callbacks carry `?code=&state=` and a provider
- * segment, e.g. `/callback/auth0`, `/oauth2/callback/okta`). This is the only
- * interception point that sees the legacy `/api/auth/callback/auth0|okta`
- * rewrite (`redirectURI` pinned in index.ts), so a path-prefix middleware on
- * `/oauth2/*` alone would miss it entirely.
- */
-/**
  * True for the only paths whose outcome the license gate can change: the
  * password-reset pair and the email-auth pair (refused while the gate allows)
  * and the SSO-initiation/callback set (refused while it denies).
@@ -109,6 +100,15 @@ export const isGateDependentPath = (url: string): boolean => {
   );
 };
 
+/**
+ * ADR-027 gate site #2 — true for any request refused while the platform SSO
+ * gate denies: the initiation paths, plus ANY callback path (pathname-PREFIX
+ * match via `includes`, since callbacks carry `?code=&state=` and a provider
+ * segment, e.g. `/callback/auth0`, `/oauth2/callback/okta`). This is the only
+ * interception point that sees the legacy `/api/auth/callback/auth0|okta`
+ * rewrite (`redirectURI` pinned in index.ts), so a path-prefix middleware on
+ * `/oauth2/*` alone would miss it entirely.
+ */
 export const isGatedSsoPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);
   if (endsWithAny(pathname, GATED_SSO_INITIATION_SUFFIXES)) {

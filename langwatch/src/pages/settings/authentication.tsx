@@ -1,4 +1,4 @@
-import { Heading, Separator, Text, VStack } from "@chakra-ui/react";
+import { Heading, Text, VStack } from "@chakra-ui/react";
 
 import { SignInMethodsSection } from "../../components/me/SignInMethodsSection";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -31,8 +31,6 @@ export default function AuthenticationSettings() {
         </VStack>
 
         <SignInMethodsSection />
-
-        <Separator />
 
         <EnterpriseCapabilitiesSection />
       </VStack>

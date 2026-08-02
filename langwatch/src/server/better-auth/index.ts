@@ -262,9 +262,10 @@ export const auth = betterAuth({
      * transactional mailer (SendGrid / SES via `sendEmail`). Without this the
      * endpoint returns RESET_PASSWORD_DISABLED. We ignore BetterAuth's default
      * `url` and build the link off BASE_HOST + the issued token so it lands on
-     * our own /auth/reset-password page. BetterAuth only enables (and the
-     * cloud-mode `hooks.before` gate only allows) this in email mode, so the
-     * link is always credential-mode.
+     * our own /auth/reset-password page. Reset is deliberately reachable on a
+     * deployment the SSO license gate denies, even with an IdP configured
+     * (ADR-027), so that a user whose account was born through that IdP can
+     * still recover through their inbox. It closes again once the gate allows.
      */
     sendResetPassword: async ({ user, token }) => {
       await sendResetPasswordEmail({

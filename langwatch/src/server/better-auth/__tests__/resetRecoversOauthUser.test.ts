@@ -103,7 +103,10 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
             newPassword: "brand-new-password-1",
           },
         }),
-      ).rejects.toBeDefined();
+        // Pinned to the code, not just "it threw": a misconfigured harness
+        // also rejects, and that would let this pass while proving nothing
+        // about token validation.
+      ).rejects.toMatchObject({ body: { code: "INVALID_TOKEN" } });
 
       const credentialAccounts = db.account!.filter(
         (a) => a.providerId === "credential",
@@ -117,7 +120,9 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
             password: "brand-new-password-1",
           },
         }),
-      ).rejects.toBeDefined();
+      ).rejects.toMatchObject({
+        body: { code: "INVALID_EMAIL_OR_PASSWORD" },
+      });
     });
   });
 });

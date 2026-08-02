@@ -1,8 +1,13 @@
 # ADR-027: SSO is gated on possessing a genuine license, decided once at startup, recoverable via an instance license key
 
-Date: 2026-07-03
-Status: Accepted (v7 — implemented; supersedes the v3 request-time design; red-teamed, and reviewed across design/security/tests/correctness)
-Tracking: [#4673](https://github.com/langwatch/langwatch/issues/4673)
+**Date:** 2026-07-03
+
+**Status:** Accepted
+
+**Tracking:** [#4673](https://github.com/langwatch/langwatch/issues/4673)
+
+**Revision:** v7, implemented. Supersedes the v3 request-time design, and has
+been reviewed across design, security, tests and correctness.
 
 > One-line: every **non-email login provider** is a paid feature, gated **binary on possessing a genuinely-issued license** (`IS_SAAS || hasSignedInstanceLicense || anyOrgHasSignedLicense()` — **signature-valid, expiry deliberately ignored**: once a customer, never blocked), **decided once per process** (restart to change, never per request); a denied deployment **runs in email mode** as if the SSO env vars were unset — with **password reset open** so existing users can self-recover — and bootstraps via the **`LANGWATCH_LICENSE_KEY` env var**; **zero action required** from already-licensed customers, whose in-database org license is honored automatically.
 

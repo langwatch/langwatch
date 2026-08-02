@@ -17,15 +17,18 @@ export function useLicenseActions({
   const publicEnv = usePublicEnv();
   // The SSO license gate is decided once per process (ADR-027), so a license
   // activated on a running self-hosted server only enables SSO after a restart.
-  const isSelfHosted = publicEnv.data?.IS_SAAS === false;
+  // Only a confirmed `true` means Cloud: while the environment is still
+  // resolving, showing the restart line is the harmless reading, and omitting
+  // it on a self-hosted deployment is not.
+  const isSaas = publicEnv.data?.IS_SAAS === true;
 
   const uploadMutation = api.license.upload.useMutation({
     onSuccess: () => {
       toaster.create({
         title: "License activated",
-        description: isSelfHosted
-          ? "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it."
-          : "Your license has been successfully activated.",
+        description: isSaas
+          ? "Your license has been successfully activated."
+          : "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it.",
         type: "success",
       });
       onUploadSuccess();

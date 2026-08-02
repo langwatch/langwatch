@@ -128,9 +128,7 @@ function hasSignedInstanceLicense(licenseKey: string | undefined): boolean {
 
 /**
  * Scans organization license rows for at least one signature-valid license
- * (Decision 1). Skips soft-deleted orgs — see `sso-license.repository.ts`
- * for why that's currently a no-op (no such column exists on `Organization`
- * yet). Lets DB errors propagate so the memoization wrapper can evict
+ * (Decision 1). Lets DB errors propagate so the memoization wrapper can evict
  * instead of caching a false negative (Decision 6).
  */
 async function anyOrgHasSignedLicense(): Promise<boolean> {

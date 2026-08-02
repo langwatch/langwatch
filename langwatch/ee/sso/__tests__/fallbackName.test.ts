@@ -119,7 +119,7 @@ describe("fallbackName", () => {
     });
   });
 
-  describe("fallback precedence ordering", () => {
+  describe("given profiles that each drop the most specific field", () => {
     it("respects name > nickname > displayName > login > username > preferred_username > email > 'User'", () => {
       // 8 progressively less specific profiles
       expect(fallbackName({ name: "A", nickname: "B" })).toBe("A");

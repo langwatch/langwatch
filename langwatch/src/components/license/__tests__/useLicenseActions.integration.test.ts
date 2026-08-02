@@ -11,9 +11,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toaster } from "../../ui/toaster";
 import { useLicenseActions } from "../useLicenseActions";
 
-const { uploadMutationOptions, isSaas } = vi.hoisted(() => ({
+const { uploadMutationOptions, publicEnvData } = vi.hoisted(() => ({
   uploadMutationOptions: { current: null as null | Record<string, any> },
-  isSaas: { value: false },
+  publicEnvData: {
+    current: undefined as undefined | { IS_SAAS: boolean },
+  },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -33,7 +35,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
-  usePublicEnv: () => ({ data: { IS_SAAS: isSaas.value } }),
+  usePublicEnv: () => ({ data: publicEnvData.current }),
 }));
 
 vi.mock("../../ui/toaster", () => ({
@@ -55,7 +57,7 @@ describe("useLicenseActions", () => {
   describe("when a license is activated on a self-hosted deployment", () => {
     /** @scenario Activating a license takes effect at the next restart */
     it("tells the admin a restart is required to enable SSO", () => {
-      isSaas.value = false;
+      publicEnvData.current = { IS_SAAS: false };
 
       renderHook(() =>
         useLicenseActions({
@@ -78,7 +80,7 @@ describe("useLicenseActions", () => {
 
   describe("when a license is activated on LangWatch Cloud", () => {
     it("does not mention a server restart", () => {
-      isSaas.value = true;
+      publicEnvData.current = { IS_SAAS: true };
 
       renderHook(() =>
         useLicenseActions({
@@ -92,6 +94,28 @@ describe("useLicenseActions", () => {
       expect(toaster.create).toHaveBeenCalledWith(
         expect.objectContaining({
           description: expect.not.stringContaining("restart"),
+        }),
+      );
+    });
+  });
+
+  describe("when the environment has not resolved yet", () => {
+    /** @scenario Activating a license takes effect at the next restart */
+    it("still tells the admin to restart, because only a confirmed IS_SAAS means Cloud", () => {
+      publicEnvData.current = undefined;
+
+      renderHook(() =>
+        useLicenseActions({
+          organizationId: "org-1",
+          onUploadSuccess: vi.fn(),
+          onRemoveSuccess: vi.fn(),
+        }),
+      );
+      uploadMutationOptions.current?.onSuccess();
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: expect.stringContaining("restart the server"),
         }),
       );
     });
