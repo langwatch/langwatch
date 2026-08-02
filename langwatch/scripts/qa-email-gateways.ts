@@ -121,7 +121,10 @@ async function scenarioFullSurface() {
     JSON.stringify(detail.Attachments),
   );
   check("reply-to set", /Reply-To:\s*support@langwatch\.ai/i.test(raw));
-  check("custom header delivered", /X-LangWatch-QA:\s*gateway-smoke/i.test(raw));
+  check(
+    "custom header delivered",
+    /X-LangWatch-QA:\s*gateway-smoke/i.test(raw),
+  );
   check(
     "both visible recipients in To header",
     /primary@example\.com/.test(raw) && /second@example\.com/.test(raw),
