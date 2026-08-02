@@ -134,166 +134,12 @@ Feature: An absent evaluator score is never presented or stored as zero
     And it does not throw on every subsequent trace
 
   # ============================================================================
-  # Try it out panel (D1) — absent versus zero at the render boundary
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: An absent score renders as not-scored for a langevals evaluator
-    Given a langevals LLM-judge evaluator that declares a score in its result
-    And a completed run whose score is absent
-    When the Try it out panel renders the result
-    Then the score cell reads "N/A"
-
-  @integration @unimplemented
-  Scenario: An absent score renders as not-scored for a workflow evaluator
-    Given a custom workflow evaluator
-    And a completed run whose score key is present but carries no value
-    When the Try it out panel renders the result
-    Then the score cell reads "N/A"
-
-  @integration @unimplemented
-  Scenario: A genuine zero from a langevals evaluator still renders as zero
-    Given a langevals LLM-judge evaluator that declares a score in its result
-    And a completed run whose score is exactly zero
-    When the Try it out panel renders the result
-    Then the score cell reads "0"
-
-  @integration @unimplemented
-  Scenario: A genuine zero from a workflow evaluator still renders as zero
-    Given a custom workflow evaluator
-    And a completed run whose score is exactly zero
-    When the Try it out panel renders the result
-    Then the score cell reads "0"
-
-  @unit @unimplemented
-  Scenario: No score value reaches the number formatter unguarded
-    Given the Try it out panel source
-    When the score render sites are inspected
-    Then every score is formatted through the shared evaluation-score formatter
-    And no score cell is gated on mere key presence
-
-  @integration @unimplemented
-  Scenario: The duplicate workflow score column is resolved
-    Given a custom workflow evaluator whose run has an absent score
-    When the Try it out panel renders the result
-    Then every score cell shown for that run reads "N/A"
-    And no score cell is left rendering a zero
-
-  # ============================================================================
-  # Evaluation execution (D2) — a non-numeric workflow score
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario Outline: A non-numeric workflow score is never recorded as a processed zero
-    Given a custom workflow evaluator
-    And the workflow returns a successful envelope whose score is "<score>"
-    When the evaluation result is produced
-    Then the result carries no numeric score
-    And the result status is not "processed"
-
-    Examples:
-      | score |
-      |       |
-      | N/A   |
-
-  # ============================================================================
-  # Batch persistence (D3) — absent versus zero at the write boundary
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario Outline: A not-scored batch evaluation stores no score
-    Given a dataset evaluation run that produces a "<outcome>" result
-    When the batch evaluation row is persisted
-    Then the stored score is empty rather than zero
-
-    Examples:
-      | outcome            |
-      | skipped            |
-      | error              |
-      | label-only success |
-
-  @integration @unimplemented
-  Scenario: A genuine zero batch evaluation stores zero
-    Given a dataset evaluation run that produces a processed result scoring exactly zero
-    When the batch evaluation row is persisted
-    Then the stored score is zero
-
-  @integration @unimplemented
-  Scenario: A not-scored batch evaluation stores no cost rather than a zero cost
-    Given a dataset evaluation run that produces a not-scored result carrying no cost
-    When the batch evaluation row is persisted
-    Then the stored cost is empty rather than zero
-
-  @integration @unimplemented
-  Scenario: Passed and details are stored as absent alongside score
-    Given a dataset evaluation run that produces a not-scored result
-    When the batch evaluation row is persisted
-    Then the stored passed value is empty rather than false
-    And the stored details value is empty rather than an empty string
-
-  # ============================================================================
-  # Experiment view (D5) — the read side that would otherwise undo the write fix
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: An all-zero dataset still shows the score metric
-    Given an experiment whose every processed evaluation scored exactly zero
-    When the experiment results are displayed
-    Then the score metric is shown
-    And the displayed average is zero
-
-  @integration @unimplemented
-  Scenario: The average excludes not-scored rows from numerator and denominator
-    Given an experiment with processed evaluations scoring one, not-scored, and zero
-    When the experiment results are displayed
-    Then the displayed average is the mean of the scored rows only
-
-  @integration @unimplemented
-  Scenario: An experiment where nothing was scored shows no numeric average
-    Given an experiment whose every processed evaluation is not-scored
-    When the experiment results are displayed
-    Then no numeric average is displayed
-    And the view does not display a not-a-number value
-
-  @integration @unimplemented
-  Scenario: A not-scored row renders neutrally rather than as a red zero
-    Given an experiment group containing one row scoring zero point eight and one not-scored row
-    When the experiment results are displayed
-    Then the not-scored row shows the not-scored indicator rather than a numeric score
-    And the not-scored row is coloured neither as a failure nor as a pass
-
-  @integration @unimplemented
-  Scenario: A processed row with no pass verdict does not render as a red failure
-    Given an experiment group in which no row carries a numeric score
-    And one processed row in that group has no pass verdict
-    When the experiment results are displayed
-    Then that row shows the not-scored indicator rather than a failure verdict
-    And that row is coloured neither as a failure nor as a pass
-
-  # ============================================================================
-  # Enumeration completeness (D7) — sites the original five-site list missed
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: An experiment summary with no scored rows shows no score rather than zero
-    Given an experiment summary whose average score is not available
-    When the summary line is rendered
-    Then it shows the not-scored indicator rather than a numeric zero
-
-  @integration @unimplemented
-  Scenario: A not-scored summary card is coloured neither as a failure nor as a pass
-    Given an experiment summary card for an evaluation with no numeric score
-    When the card is rendered
-    Then the card is coloured neither as a failure nor as a pass
-
-  @integration @unimplemented
-  Scenario: A best score that has not loaded yet is not shown as zero
-    Given an optimization run whose steps have not loaded
-    When the best score is rendered
-    Then it shows the not-scored indicator rather than a numeric zero
-
-  # ============================================================================
-  # Regression and ripple
+  # MOVED OUT 2026-08-02 — this file is the D6 slice only
+  #   Read surfaces  (D1, D5, D7) -> #6442
+  #   Write surfaces (D2, D3)     -> #6443, ships behind #6442 (acc + null === acc)
+  # The formatter scenario below is ON LOAN to #6442: its test is already bound and
+  # green, and parity fails a file that enforces nothing, so it stays until D6's own
+  # tests bind here or #6442's spec step claims it.
   # ============================================================================
 
   @unit
@@ -308,135 +154,37 @@ Feature: An absent evaluator score is never presented or stored as zero
       | empty     | N/A      |
       | zero      | 0        |
 
-  @integration @unimplemented
-  Scenario: A correctly configured monitor is unaffected
-    Given a monitor whose evaluator config already carries the user's prompt nested under settings
-    When the online evaluation pipeline executes the monitor for a trace
-    Then the settings sent to the judge are identical to those sent before this change
-
-  @regression @unimplemented
-  Scenario: Surfaces outside this change keep their behaviour
-    Given the evaluation result parser and the evaluation status item
-    When their existing suites run
-    Then they behave identically to before this change
-
-  @integration @unimplemented
-  Scenario: Historical coerced zeros are left untouched
-    Given batch evaluation rows written before this change that stored a coerced zero
-    When the score nullability migration is applied
-    Then those rows are not rewritten
-    And a genuine zero remains indistinguishable from a coerced one in that historical data
-
-# --- AC Coverage Map ---
-# AC 0a: "The user's prompt reaches the judge on the online path" (both fixtures)
+# --- AC Coverage Map (D6 slice only) ---
+# AC 0a: prompt reaches the judge, both config shapes
 #        -> Scenario: A prompt saved under config.settings reaches the judge
 #        -> Scenario: A prompt saved at the top level of config still reaches the judge
-# AC 0b: "A settings-less config never reaches the judge as {}"
+# AC 0b: a settings-less config never reaches the judge as {}
 #        -> Scenario: A settings-less config never reaches the judge as an empty object
-# AC 0c: "A config shape the online path cannot read cannot be written" (all four writers)
+# AC 0c: an unreadable config shape cannot be written (all four writers; two bypass the service)
 #        -> Scenario: A config shape the online path cannot read cannot be written
-# AC 0c2: "Evaluators that ALREADY have the bad shape are handled", plus its promoted
-#         kill-switch criterion (the disable path asserted in BOTH positions)
+# AC 0c2: already-bad rows are handled, + the kill switch pinned ON by default
 #        -> Scenario: The new settings resolution is active in the shipped default configuration
-#           (⚠ pins the DEFAULT -- without it the whole D6 slice passes with the fix shipped OFF)
 #        -> Scenario: The new settings resolution can be switched off for rollback
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
-# AC 0e: "The behaviour this fix INVERTS is named, and its existing assertions are updated"
+# AC 0d: prevalence measured. NO SCENARIO -- a one-off production measurement, and a CLOSE gate.
+#        Credential-gated: needs an org-level admin API key or the SQL run against prod.
+# AC 0e: the behaviour this fix INVERTS is named and its assertions updated
 #        -> Scenario: The evaluator's own prompt wins over the monitor's parameters
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters
-#           (the half of the old contract that SURVIVES; the half that does not is covered by
-#           "A prompt saved at the top level of config still reaches the judge" above)
-#        -> plus a PR obligation: update executeEvaluation.settings-resolution.unit.test.ts to the
-#           new contract rather than deleting it. (An earlier draft also required amending
-#           specs/monitors/monitor-execution-backend.feature -- checked, and it does NOT
-#           contradict the fix, so that obligation was dropped.)
-# AC 0g: "A recovered model key naming an unconfigured provider degrades, not throws"
+#        -> plus a PR obligation: update executeEvaluation.settings-resolution.unit.test.ts:122-135
+#           to the new contract rather than deleting it.
+# AC 0f: the model-env ripple one hop earlier
+#        -> Scenario: Model environment is resolved from the recovered settings
+# AC 0g: a recovered model naming an unconfigured provider degrades, does not throw every trace
 #        -> Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
-#           (setupModelEnv throws EvaluatorConfigError; on main it never runs because the config
-#           resolves to {} -- so the rows D6 repairs are exactly the rows that can start erroring)
-# AC 0f: "The settings ripple one hop earlier is checked"
-#        -> Scenario: Model environment is resolved from the recovered prompt settings
-#           (TOP-LEVEL-PROMPT fixture -- the correctly-configured one is forbidden by AC0f as
-#           evidence, being unchanged by construction and therefore unable to go red)
-# AC 0d: "Prevalence is measured before this issue closes"
-#        -> NO SCENARIO. Deliberate: AC0d is a one-off measurement against a production
-#           database, not a behaviour of this system. It is a CLOSE gate: it gates issue closure,
-#           the P0/P1 re-decision, customer comms and AC0c2's backfill scope. It does NOT block
-#           the D6 scenarios above from shipping -- corrected 2026-08-02, an earlier revision
-#           said it did, contradicting the demotion applied in the issue's AC section.
-# AC 1: "An absent score renders exactly N/A, never 0" (per surviving render site)
-#        -> Scenario: An absent score renders as not-scored for a langevals evaluator
-#        -> Scenario: An absent score renders as not-scored for a workflow evaluator
-# AC 2: "A genuine zero still renders 0" (both families)
-#        -> Scenario: A genuine zero from a langevals evaluator still renders as zero
-#        -> Scenario: A genuine zero from a workflow evaluator still renders as zero
-# AC 3: "No unguarded number formatting remains"
-#        -> Scenario: No score value reaches the number formatter unguarded
-# AC 4: "The duplicate score column is resolved"
-#        -> Scenario: The duplicate workflow score column is resolved
-# AC 5: "A non-numeric workflow score is never recorded as a processed zero"
-#        -> Scenario Outline: A non-numeric workflow score is never recorded as a processed zero
-# AC 6: "A not-scored batch evaluation stores NULL, not 0" (+ genuine zero still 0)
-#        -> Scenario Outline: A not-scored batch evaluation stores no score
-#        -> Scenario: A genuine zero batch evaluation stores zero
-# AC 7: "passed, details AND cost get the same treatment in the same migration"
-#        -> Scenario: Passed and details are stored as absent alongside score
-#        -> Scenario: A not-scored batch evaluation stores no cost rather than a zero cost
-#           (cost axis: evaluations-legacy.ts:509 `cost: cost?.amount ?? 0`, cost Float NOT NULL
-#           at schema.prisma:751 -- migrated with the other two, or the scenario is dropped and
-#           the exclusion stated. It previously had a parenthetical and no scenario.)
-# AC 8: "An all-zero dataset still shows the score metric"
-#        -> Scenario: An all-zero dataset still shows the score metric
-# AC 9: "The average excludes not-scored rows from numerator and denominator" (+ K === N case)
-#        -> Scenario: The average excludes not-scored rows from numerator and denominator
-#        -> Scenario: An experiment where nothing was scored shows no numeric average
-# AC 10: "A not-scored row renders neutrally, not as a red zero"
-#        -> Scenario: A not-scored row renders neutrally rather than as a red zero
-# AC 10b: "A processed row whose passed is null does not render as a red False"
-#        -> Scenario: A processed row with no pass verdict does not render as a red failure
-# AC 11: "formatEvaluationScore gets the characterization test it never had"
+# AC 12b: correctly-configured monitors unaffected -- the 99% regression case
+#        -> covered by the AC0c2 shipped-default scenario plus AC0a's nested-config fixture;
+#           needs its own bound test at implementation time (non-custom/, non-native fixture).
+# AC 16a/16b: the reported symptom. NO SCENARIO -- a real reproduction against a customer
+#        account is a PR obligation, not something this suite can assert.
+# AC 11: ON LOAN to #6442 (see the note above)
 #        -> Scenario Outline: The shared score formatter distinguishes absent from zero
-# AC 12: "Genuinely-unchanged surfaces stay unchanged"
-#        -> Scenario: Surfaces outside this change keep their behaviour
-# AC 12b: "Correctly-configured monitors are unaffected — the 99% regression case"
-#        -> Scenario: A correctly configured monitor is unaffected
-# AC 13: "The nullable-score ripple is stated, not discovered later"
-#        -> NO SCENARIO. Deliberate: AC13 is a typecheck and PR-body disclosure obligation,
-#           not runtime behaviour. Enforced by `pnpm typecheck:all`, not by a test.
-# AC 14: "Rollback — the migration is forward-only"
-#        -> Scenario: Historical coerced zeros are left untouched
-# AC 15: "Every defect has a disposition"
-#        -> NO SCENARIO. Deliberate: bookkeeping, explicitly declared by the issue as NOT
-#           behavioral coverage. Verified on the issue, not in CI.
-# AC 16: "The reported symptom is explained, not just the defects that were found"
-#        -> NO SCENARIO in this file. Deliberate: AC16 demands a reproduction against a real
-#           account on the online path, which is an evidence obligation on the PR, not a
-#           behaviour this suite can assert. The D6 scenarios encode the MECHANISM; AC16 asks
-#           whether that mechanism is what the customer actually hit, and only AC0d's
-#           prevalence number can answer that.
 #
-# AC 18: "The five-site enumeration is completed by grep, not by reasoning"
-#        -> Scenario: An experiment summary with no scored rows shows no score rather than zero
-#           (BatchEvaluationSummary.tsx:298-306 -- guards only !== undefined; else-branch unguarded)
-#        -> Scenario: A not-scored summary card is coloured neither as a failure nor as a pass
-#           (BatchEvaluation.tsx:241 -- colour computed OUTSIDE the typeof guard at :245)
-#        -> Scenario: A best score that has not loaded yet is not shown as zero
-#           (DSPyExperiment.tsx:1469 -- run?.steps optional chain yields undefined while loading)
-#        -> plus a PR obligation: quote the repo-wide pattern grep and give every hit a disposition.
-# AC 17: "The behavioral contract is committed and actually bound"
-#        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
-#           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
-#
-# Coverage: every AC in the issue maps to at least one scenario above, EXCEPT the five that
-# carry none by design, each justified inline: 0d (a one-off production measurement; a close
-# gate), 13 (a typecheck + PR-body disclosure), 15 (bookkeeping, declared non-behavioral by
-# the issue), 16 (16a/16b -- a real reproduction against a customer account, a PR obligation),
-# and 17 (a property OF this file; a scenario asserting its own file is bound is circular).
-#
-# ⚠ NO TOTALS ARE STATED HERE ON PURPOSE. Every hardcoded count written into this file or the
-# issue went stale within hours -- 24 -> 28 -> 32 -> 34 scenarios, a "19 behavioral ACs" that
-# was never right, and a "5 exempt / 27 total" that contradicted its own AC16-is-split clause.
-# Derive them instead, and expect the two to agree:
+# Derive the totals, never hardcode them -- every count written during this work went stale:
 #   grep -cE '^\s+Scenario( Outline)?:' <this file>
-#   grep -c '^#        -> Scenario' <this file> AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
-# gate is a real reproduction against a customer account, which is why it stays a PR obligation.
+#   grep -c '^#        -> Scenario' <this file>
