@@ -96,8 +96,12 @@ export function LLMModelCost(props: { projectId?: string }) {
         >
           <Table.Header width="full">
             <Table.Row width="full">
-              <Table.ColumnHeader width="24%">Model name</Table.ColumnHeader>
-              <Table.ColumnHeader width="24%">
+              {/* The five rate columns share what these two leave. A rate runs
+                  to nine decimal places and breaks mid-number when its column
+                  is narrow, so the identifying columns give up some width to
+                  keep the prices readable. */}
+              <Table.ColumnHeader width="18%">Model name</Table.ColumnHeader>
+              <Table.ColumnHeader width="18%">
                 Regex match rule
               </Table.ColumnHeader>
               <Table.ColumnHeader>Input cost</Table.ColumnHeader>
