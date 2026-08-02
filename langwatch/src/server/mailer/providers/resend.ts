@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { EnvHttpProxyAgent } from "undici";
+import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import { env } from "../../../env.mjs";
 import { sanitizeHeaders } from "./mime";
 import { hostnameOf, resolveProxyForHost } from "./proxy";
@@ -84,7 +84,11 @@ export const resendProvider: EmailProviderPort = {
     const dispatcher = proxyDispatcher();
 
     try {
-      const response = await fetch(RESEND_API_URL, {
+      // undici's own fetch, not the global one: Node's global fetch is bound to
+      // the undici bundled with Node, which rejects a dispatcher built by this
+      // package with "invalid onRequestStart method". Using both from the same
+      // package is what makes the proxy actually apply.
+      const response = await undiciFetch(RESEND_API_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -93,7 +97,7 @@ export const resendProvider: EmailProviderPort = {
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ...(dispatcher ? { dispatcher } : {}),
-      } as RequestInit);
+      });
 
       if (!response.ok) {
         // The body is deliberately not read: Resend echoes the request on

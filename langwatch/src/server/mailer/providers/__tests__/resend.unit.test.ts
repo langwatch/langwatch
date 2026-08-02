@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockEnv, envHttpProxyAgentMock } = vi.hoisted(() => ({
+const { mockEnv, envHttpProxyAgentMock, fetchMock } = vi.hoisted(() => ({
   mockEnv: {} as Record<string, unknown>,
   envHttpProxyAgentMock: vi.fn(),
+  fetchMock: vi.fn(),
 }));
 
 vi.mock("../../../../env.mjs", () => ({ env: mockEnv }));
@@ -11,8 +12,12 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }),
 }));
 
+// The provider calls undici's fetch, not the global one, so the mock has to
+// bind here. Stubbing globalThis.fetch would pass while the provider used a
+// different transport entirely.
 vi.mock("undici", () => ({
   EnvHttpProxyAgent: envHttpProxyAgentMock,
+  fetch: fetchMock,
 }));
 
 import { resendProvider } from "../resend";
@@ -23,22 +28,23 @@ const setEnv = (values: Record<string, unknown>) => {
   Object.assign(mockEnv, values);
 };
 
-const originalProxyEnv = {
-  HTTPS_PROXY: process.env.HTTPS_PROXY,
-  HTTP_PROXY: process.env.HTTP_PROXY,
-  NO_PROXY: process.env.NO_PROXY,
-};
+const PROXY_ENV_KEYS = [
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "NO_PROXY",
+  "https_proxy",
+  "http_proxy",
+  "no_proxy",
+] as const;
+
+const originalProxyEnv = Object.fromEntries(
+  PROXY_ENV_KEYS.map((key) => [key, process.env[key]]),
+);
 
 const clearProxyEnv = () => {
-  delete process.env.HTTPS_PROXY;
-  delete process.env.HTTP_PROXY;
-  delete process.env.NO_PROXY;
-  delete process.env.https_proxy;
-  delete process.env.http_proxy;
-  delete process.env.no_proxy;
+  for (const key of PROXY_ENV_KEYS) delete process.env[key];
 };
 
-const fetchMock = vi.fn();
 const sentPayload = () => JSON.parse(fetchMock.mock.calls[0]?.[1]?.body);
 const sentInit = () => fetchMock.mock.calls[0]?.[1];
 
@@ -51,11 +57,9 @@ describe("resendProvider.send", () => {
       ok: true,
       json: async () => ({ id: "msg_123" }),
     });
-    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     for (const [key, value] of Object.entries(originalProxyEnv)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -155,6 +159,25 @@ describe("resendProvider.send", () => {
       expect(sentPayload().headers["X-Custom"]).toBe(
         "value Bcc: attacker@evil.com",
       );
+    });
+  });
+
+  describe("given the transport", () => {
+    it("uses undici's fetch, which is the one a dispatcher can apply to", async () => {
+      // Node's global fetch is bound to the undici bundled with Node and
+      // rejects a dispatcher from this package with "invalid onRequestStart
+      // method", so a proxy silently never applies. Pinning the call site.
+      const globalFetch = vi.fn();
+      vi.stubGlobal("fetch", globalFetch);
+
+      await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(globalFetch).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
     });
   });
 
