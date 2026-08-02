@@ -51982,11 +51982,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
-| `REDIS_URL` | Redis connection string | Yes |, |
+| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | - |
+| `REDIS_URL` | Redis connection string | Yes | - |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes |, |
+| `BASE_HOST` | Internal base URL for the application | Yes | - |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -52125,7 +52125,7 @@ Notification emails (alerts, invites, scheduled reports, password resets) are se
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
 | `EMAIL_PROVIDER` | Gateway to send through: `sendgrid`, `ses`, `smtp` or `resend` | inferred |
-| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
+| `EMAIL_DEFAULT_FROM` | Default "from" address | - |
 
 When `EMAIL_PROVIDER` is not set, the gateway is inferred from whichever credentials are present (`USE_AWS_SES` first, then `SENDGRID_API_KEY`), so existing installs keep working untouched. `smtp` and `resend` must always be named explicitly.
 
@@ -52133,14 +52133,14 @@ When `EMAIL_PROVIDER` is not set, the gateway is inferred from whichever credent
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SENDGRID_API_KEY` | SendGrid API key |, |
+| `SENDGRID_API_KEY` | SendGrid API key | - |
 
 ### AWS SES
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `USE_AWS_SES` | Set to `true` to send through SES | `false` |
-| `AWS_REGION` | AWS region for SES |, |
+| `AWS_REGION` | AWS region for SES | - |
 | `AWS_SES_ENDPOINT` | Override the SES endpoint, for a VPC endpoint or an internal relay | public regional endpoint |
 
 Credentials come from the standard AWS chain (instance role, IRSA, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`).
@@ -52151,38 +52151,39 @@ Use this for an internal relay, Azure Communication Services, Office 365, Google
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465`. Takes precedence over the settings below |, |
-| `SMTP_HOST` | Relay hostname |, |
+| `SMTP_URL` | Full connection URL, e.g. `smtps://user:pass@relay.internal:465`. Takes precedence over the settings below | - |
+| `SMTP_HOST` | Relay hostname | - |
 | `SMTP_PORT` | Relay port | `587` |
 | `SMTP_SECURE` | `true` for implicit TLS, `false` for STARTTLS | `true` on port 465, otherwise `false` |
-| `SMTP_USER` | Username. Omit entirely for an unauthenticated internal relay |, |
-| `SMTP_PASSWORD` | Password |, |
+| `SMTP_USER` | Username. Omit entirely for an unauthenticated internal relay | - |
+| `SMTP_PASSWORD` | Password | - |
 
 ### Resend
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `RESEND_API_KEY` | Resend API key |, |
+| `RESEND_API_KEY` | Resend API key | - |
 
 ### Sending through an outbound proxy
 
-Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses` and `resend` gateways route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+
+The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. `sendgrid` is not proxy-aware either: its client offers no seam to attach a proxy agent, so behind a proxy use `ses`, `resend`, or point `smtp` at SendGrid's own SMTP relay.
 
 <Note>
 The AWS SDK does not read `HTTPS_PROXY` by itself, so before this was supported a proxied deployment failed with a `read ETIMEDOUT` from SES. If you are on an older version and cannot upgrade, `smtp` against an internal relay avoids the proxy entirely.
 </Note>
 
-The `smtp` gateway deliberately ignores these variables, because an SMTP relay is usually an internal host that must be reached directly. Point `SMTP_HOST` at the relay itself.
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | - |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | - |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
 
 ## Feature Flags
 
@@ -52196,8 +52197,8 @@ The `smtp` gateway deliberately ignores these variables, because an SMTP relay i
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking |, |
-| `METRICS_API_KEY` | API key for metrics collection |, |
+| `SENTRY_DSN` | Sentry DSN for error tracking | - |
+| `METRICS_API_KEY` | API key for metrics collection | - |
 
 ## Langy (optional)
 
