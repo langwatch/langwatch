@@ -395,3 +395,39 @@ describe("given a notify key that belongs to another table", () => {
     });
   });
 });
+
+describe("given a multi-line nested array sits above the user's notify", () => {
+  describe("when the block is written", () => {
+    it("still finds the top-level notify, rather than adding a second one", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          "matrix = [",
+          "  [1, 2],",
+          "  [3, 4],",
+          "]",
+          'notify = ["/usr/bin/terminal-notifier"]',
+          "",
+          "[otel]",
+          'environment = "mine"',
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      const content = fs.readFileSync(configPath, "utf8");
+      // A second live `notify` is a duplicate key, and codex then refuses to
+      // parse its config at all.
+      const live = content
+        .split("\n")
+        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+      expect(live).toHaveLength(1);
+      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+      expect(content).toContain("matrix = [");
+    });
+  });
+});

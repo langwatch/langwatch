@@ -383,6 +383,59 @@ export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
 }
 
 /**
+ * Advance a bracket depth across one line, ignoring brackets inside strings and
+ * after an unquoted `#`. Multi-line values are the reason this is needed: a
+ * line's meaning depends on whether an earlier line left an array open.
+ */
+function bracketDepthAfterLine(line: string, depth: number): number {
+	let next = depth;
+	let inString = false;
+	let escaped = false;
+	for (const ch of line) {
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === "\\") escaped = true;
+			else if (ch === '"') inString = false;
+			continue;
+		}
+		if (ch === '"') inString = true;
+		else if (ch === "#") break;
+		else if (ch === "[") next++;
+		else if (ch === "]") next--;
+	}
+	return next;
+}
+
+/**
+ * The offset of codex's own top-level `notify = [` assignment, or null when the
+ * file has none above its first table header.
+ *
+ * Depth is tracked rather than cutting at the first line that starts with `[`.
+ * TOML lets an array span lines, so a nested one puts an element like `[1, 2],`
+ * at the start of a continuation line. Reading that as a table header would
+ * hide a genuinely top-level `notify` below it, and hiding it is not a benign
+ * miss: the writer would then add a second `notify`, and a duplicate key stops
+ * codex parsing its config at all.
+ */
+function topLevelNotifyMatch(content: string): { index: number } | null {
+	let depth = 0;
+	let offset = 0;
+	for (const line of content.split("\n")) {
+		if (depth === 0) {
+			// A table header ends the top level; everything after it belongs to it.
+			if (/^[ \t]*\[/.test(line) && !/^[ \t]*notify[ \t]*=/.test(line)) {
+				const closed = bracketDepthAfterLine(line, 0) === 0;
+				if (closed) return null;
+			}
+			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) return { index: offset };
+		}
+		depth = bracketDepthAfterLine(line, depth);
+		offset += line.length + 1;
+	}
+	return null;
+}
+
+/**
  * The value of codex's own top-level `notify` key in `content`, or null when
  * absent. Returns the raw matched text alongside the parsed argv so a caller
  * can move the exact lines it occupied.
@@ -396,17 +449,6 @@ export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
  * every form codex's own docs show. Anything else is left alone rather than
  * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
  */
-/**
- * The first `notify = [` assignment that sits above every `[section]` header,
- * or null when the only ones found belong to a table.
- */
-function topLevelNotifyMatch(content: string): { index: number } | null {
-	const firstSection = /^[ \t]*\[/m.exec(content);
-	const limit = firstSection ? firstSection.index : content.length;
-	const match = /^[ \t]*notify[ \t]*=[ \t]*\[/m.exec(content.slice(0, limit));
-	return match ? { index: match.index } : null;
-}
-
 function findNotifyAssignment(
 	content: string,
 ): { raw: string; argv: string[] } | null {

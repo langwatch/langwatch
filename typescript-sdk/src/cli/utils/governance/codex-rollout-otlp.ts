@@ -98,6 +98,12 @@ const RECENT_TURN_WINDOW = 3;
  * `onFile`. The depth bound encodes that layout, so it lives here once rather
  * than in each caller, where a layout change would be fixed in one and missed
  * in the other.
+ *
+ * Newest first: the per-turn hook is looking for the session that just ended,
+ * which is under today's date, and `readdir` order is whatever the filesystem
+ * says. The path segments are zero-padded, so a descending name sort is a
+ * descending date sort, and the common lookup stops at the first directory
+ * instead of walking a long-lived account's whole history on every turn.
  */
 async function walkRolloutFiles(
   root: string,
@@ -110,6 +116,7 @@ async function walkRolloutFiles(
     } catch {
       return false;
     }
+    entries.sort((a, b) => b.name.localeCompare(a.name));
     for (const e of entries) {
       const full = join(dir, e.name);
       if (e.isDirectory()) {
