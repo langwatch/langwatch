@@ -60,7 +60,13 @@ Feature: An absent evaluator score is never presented or stored as zero
     And this holds for the copy and replicate flows, which do not pass through the evaluator service
 
   @integration @unimplemented
-  Scenario: The new settings resolution can be switched off
+  Scenario: The new settings resolution is active in the shipped default configuration
+    Given the application is running in its shipped default configuration
+    When the online evaluation pipeline executes a monitor for a trace
+    Then the new settings resolution is active
+
+  @integration @unimplemented
+  Scenario: The new settings resolution can be switched off for rollback
     Given the settings-resolution change is disabled by its kill switch
     When the online evaluation pipeline executes a monitor for a trace
     Then the settings sent to the judge are the ones the previous behaviour produced
@@ -95,11 +101,18 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the online evaluation pipeline executes the monitor for a trace
     Then the settings sent to the judge are the monitor's own parameters
 
+  # ⚠ This scenario deliberately uses the TOP-LEVEL-PROMPT fixture. An assertion on the
+  # correctly-configured fixture is forbidden by AC0f as evidence: its settings are unchanged
+  # by construction, so it is green before and after and cannot go red. This is the only
+  # fixture whose resolved settings value changes, so it is the only one that can catch
+  # the model-env ripple.
+
   @integration @unimplemented
-  Scenario: Model environment resolution is unchanged for a correctly configured evaluator
-    Given a monitor whose evaluator config already carries the user's prompt nested under settings
+  Scenario: Model environment is resolved from the recovered prompt settings
+    Given a monitor whose evaluator config carries the user's prompt at the top level with no settings key
     When the online evaluation pipeline executes the monitor for a trace
-    Then the model environment resolved for that evaluator is unchanged by this fix
+    Then the model environment is resolved from the settings that carry the user's prompt
+    And it is not resolved from the settings the previous behaviour produced
 
   # ============================================================================
   # Try it out panel (D1) — absent versus zero at the render boundary
@@ -187,6 +200,12 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the stored score is zero
 
   @integration @unimplemented
+  Scenario: A not-scored batch evaluation stores no cost rather than a zero cost
+    Given a dataset evaluation run that produces a not-scored result carrying no cost
+    When the batch evaluation row is persisted
+    Then the stored cost is empty rather than zero
+
+  @integration @unimplemented
   Scenario: Passed and details are stored as absent alongside score
     Given a dataset evaluation run that produces a not-scored result
     When the batch evaluation row is persisted
@@ -243,7 +262,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then it shows the not-scored indicator rather than a numeric zero
 
   @integration @unimplemented
-  Scenario: A not-scored summary card is not coloured as a failure
+  Scenario: A not-scored summary card is coloured neither as a failure nor as a pass
     Given an experiment summary card for an evaluation with no numeric score
     When the card is rendered
     Then the card is coloured neither as a failure nor as a pass
@@ -299,7 +318,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: A config shape the online path cannot read cannot be written
 # AC 0c2: "Evaluators that ALREADY have the bad shape are handled", plus its promoted
 #         kill-switch criterion (the disable path asserted in BOTH positions)
-#        -> Scenario: The new settings resolution can be switched off
+#        -> Scenario: The new settings resolution is active in the shipped default configuration
+#           (⚠ pins the DEFAULT -- without it the whole D6 slice passes with the fix shipped OFF)
+#        -> Scenario: The new settings resolution can be switched off for rollback
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
 # AC 0e: "The behaviour this fix INVERTS is named, and its existing assertions are updated"
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters
@@ -310,7 +331,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           specs/monitors/monitor-execution-backend.feature -- checked, and it does NOT
 #           contradict the fix, so that obligation was dropped.)
 # AC 0f: "The settings ripple one hop earlier is checked"
-#        -> Scenario: Model environment resolution is unchanged for a correctly configured evaluator
+#        -> Scenario: Model environment is resolved from the recovered prompt settings
+#           (TOP-LEVEL-PROMPT fixture -- the correctly-configured one is forbidden by AC0f as
+#           evidence, being unchanged by construction and therefore unable to go red)
 # AC 0d: "Prevalence is measured before this issue closes"
 #        -> NO SCENARIO. Deliberate: AC0d is a one-off measurement against a production
 #           database, not a behaviour of this system. It is a CLOSE gate: it gates issue closure,
@@ -333,8 +356,11 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario Outline: A not-scored batch evaluation stores no score
 #        -> Scenario: A genuine zero batch evaluation stores zero
 # AC 7: "passed, details AND cost get the same treatment in the same migration"
-#        (the cost axis -- evaluations-legacy.ts:509 `cost: cost?.amount ?? 0`, cost Float NOT
-#        NULL at schema.prisma:751 -- is migrated with the other two or explicitly excluded)
+#        -> Scenario: Passed and details are stored as absent alongside score
+#        -> Scenario: A not-scored batch evaluation stores no cost rather than a zero cost
+#           (cost axis: evaluations-legacy.ts:509 `cost: cost?.amount ?? 0`, cost Float NOT NULL
+#           at schema.prisma:751 -- migrated with the other two, or the scenario is dropped and
+#           the exclusion stated. It previously had a parenthetical and no scenario.)
 #        -> Scenario: Passed and details are stored as absent alongside score
 # AC 8: "An all-zero dataset still shows the score metric"
 #        -> Scenario: An all-zero dataset still shows the score metric
@@ -369,7 +395,7 @@ Feature: An absent evaluator score is never presented or stored as zero
 # AC 18: "The five-site enumeration is completed by grep, not by reasoning"
 #        -> Scenario: An experiment summary with no scored rows shows no score rather than zero
 #           (BatchEvaluationSummary.tsx:298-306 -- guards only !== undefined; else-branch unguarded)
-#        -> Scenario: A not-scored summary card is not coloured as a failure
+#        -> Scenario: A not-scored summary card is coloured neither as a failure nor as a pass
 #           (BatchEvaluation.tsx:241 -- colour computed OUTSIDE the typeof guard at :245)
 #        -> Scenario: A best score that has not loaded yet is not shown as zero
 #           (DSPyExperiment.tsx:1469 -- run?.steps optional chain yields undefined while loading)
@@ -378,7 +404,12 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
 #           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
 #
-# Coverage: 19 behavioral ACs -> 30 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
-# half of 0e) carry no scenario by design, each with its reason stated above and its enforcement
-# named elsewhere. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
+# Coverage: 32 scenarios across the 22 ACs that carry at least one (0a, 0b, 0c, 0c2, 0e, 0f,
+# 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10b, 11, 12, 12b, 14, 18). Five ACs carry none BY DESIGN, each
+# with its reason stated above and its enforcement named elsewhere: 0d (a one-off production
+# measurement, close-gate), 13 (a typecheck + PR-body disclosure), 15 (bookkeeping, declared
+# non-behavioral by the issue), 16 (16a/16b -- a real reproduction against a customer account,
+# a PR obligation), 17 (a property OF this file; a scenario asserting its own file is bound
+# would be circular). An earlier footer said "19 behavioral ACs", which counted neither
+# correctly nor consistently -- 22 carry scenarios and 5 are exempt, 27 total. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
 # gate is a real reproduction against a customer account, which is why it stays a PR obligation.
