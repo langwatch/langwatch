@@ -10,6 +10,10 @@ import type { PlanProvider } from "./plan-provider";
  *
  * A deployment without a license resolves to the baseline itself, which is
  * flagged `free`; that is what distinguishes the two plan sources here.
+ *
+ * Whether a license still counts is settled before this point, by the resolver
+ * wired in `presets.ts`: a license past its end date arrives here as the plan it
+ * sold, not as the baseline, and is floored and reported like any other.
  */
 export function createSelfHostedPlanProvider({
   licensePlanProvider,

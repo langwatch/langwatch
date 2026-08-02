@@ -69,15 +69,16 @@ Feature: License Lifecycle End-to-End
   # ============================================================================
 
   @unimplemented
-  Scenario: Organization with expired license falls to FREE tier
-    Given the organization has a license that expired yesterday
-    And the organization has 3 members and 3 projects
+  Scenario: Organization with expired license keeps the seats it paid for
+    Given the organization has a license for 3 members that expired yesterday
+    And the organization has 3 members
     When I check the active plan via API
-    Then the plan type is "FREE"
-    And maxMembers is 1
+    Then the plan type is the one the license names
+    And maxMembers is 3
 
     When I try to invite a new member
     Then the invite fails because member limit is exceeded
+    But every existing member can still sign in
 
   # ============================================================================
   # API Access with License

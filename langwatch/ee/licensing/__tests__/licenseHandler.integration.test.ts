@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { isEnterpriseTier } from "../../../src/server/api/enterprise";
 import { prisma } from "../../../src/server/db";
 import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
 import { UNLIMITED_PLAN } from "../constants";
@@ -8,7 +9,9 @@ import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
   ENTERPRISE_LICENSE_KEY,
+  EXPIRED_ENTERPRISE_LICENSE_KEY,
   EXPIRED_LICENSE_KEY,
+  FORGED_EXPIRED_LICENSE_KEY,
   GARBAGE_DATA,
   TAMPERED_LICENSE_KEY,
   VALID_LICENSE_KEY,
@@ -19,9 +22,38 @@ const mockTraceUsageService: ITraceUsageService = {
   getCurrentMonthCount: async () => 0,
 };
 
+/** Email prefix for the memberships seeded by the seat tests, so cleanup can
+ * find them without touching anything else in the dev database. */
+const SEEDED_MEMBER_EMAIL_PREFIX = "license-handler-seat-";
+
 describe("LicenseHandler Integration", () => {
   let organizationId: string;
   let handler: LicenseHandler;
+
+  const seedActiveMembers = async (count: number): Promise<void> => {
+    for (let index = 0; index < count; index++) {
+      const email = `${SEEDED_MEMBER_EMAIL_PREFIX}${index}@acme.corp`;
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: { email, name: `Seat ${index}` },
+      });
+      await prisma.organizationUser.upsert({
+        where: {
+          userId_organizationId: { userId: user.id, organizationId },
+        },
+        update: { disabledAt: null },
+        create: { userId: user.id, organizationId, role: "MEMBER" },
+      });
+    }
+  };
+
+  const removeSeededMembers = async (): Promise<void> => {
+    await prisma.organizationUser.deleteMany({ where: { organizationId } });
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: SEEDED_MEMBER_EMAIL_PREFIX } },
+    });
+  };
 
   beforeAll(async () => {
     // Create handler with test public key, repository, and trace service
@@ -61,10 +93,13 @@ describe("LicenseHandler Integration", () => {
         where: { id: org.id },
       });
     }
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: SEEDED_MEMBER_EMAIL_PREFIX } },
+    });
   });
 
   afterEach(async () => {
-    // Reset license after each test
+    // Reset license and seeded memberships after each test
     await prisma.organization.update({
       where: { id: organizationId },
       data: {
@@ -73,6 +108,7 @@ describe("LicenseHandler Integration", () => {
         licenseLastValidatedAt: null,
       },
     });
+    await removeSeededMembers();
   });
 
   // ==========================================================================
@@ -127,6 +163,7 @@ describe("LicenseHandler Integration", () => {
       expect(status.planName).toBe(BASE_LICENSE.plan.name);
       expect(status.organizationName).toBe(BASE_LICENSE.organizationName);
       expect(status.expiresAt).toBeDefined();
+      expect("expired" in status && status.expired).toBe(true);
     });
 
     it("returns valid=false for tampered license", async () => {
@@ -144,6 +181,21 @@ describe("LicenseHandler Integration", () => {
         throw new Error("Expected license with organizationName metadata");
       }
       expect(status.organizationName).toBe("Hacker Corp");
+    });
+
+    it("does not call a license we did not sign expired, whatever date it claims", async () => {
+      // The forged fixture claims an end date in the past. Comparing that date
+      // would call it expired and start metering the seats it invents, so the
+      // verdict has to follow the signature check instead.
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: { license: FORGED_EXPIRED_LICENSE_KEY },
+      });
+
+      const status = await handler.getLicenseStatus(organizationId);
+
+      expect(status.valid).toBe(false);
+      expect("expired" in status && status.expired).toBe(false);
     });
 
     it("returns valid=false for malformed license string", async () => {
@@ -371,7 +423,6 @@ describe("LicenseHandler Integration", () => {
   // ==========================================================================
 
   describe("getActivePlan", () => {
-    /** @scenario An unlicensed deployment runs on the Open Source plan */
     it("returns the Open Source plan with uncapped seats when no license exists", async () => {
       const plan = await handler.getActivePlan(organizationId);
 
@@ -392,8 +443,8 @@ describe("LicenseHandler Integration", () => {
       expect(plan.maxMembers).toBe(ENTERPRISE_LICENSE.plan.maxMembers);
     });
 
-    /** @scenario An expired license leaves the deployment on the Open Source plan */
-    it("returns the Open Source plan with uncapped seats when the license is expired", async () => {
+    /** @scenario On Cloud a lapsed license steps aside for the subscription */
+    it("reports the baseline for a lapsed license, flagged free so a subscription applies", async () => {
       await prisma.organization.update({
         where: { id: organizationId },
         data: { license: EXPIRED_LICENSE_KEY },
@@ -401,14 +452,16 @@ describe("LicenseHandler Integration", () => {
 
       const plan = await handler.getActivePlan(organizationId);
 
-      // A customer mid-renewal must not end up worse off than one who never
-      // held a license at all, so an expired key falls back to the same
-      // baseline rather than to a seat cap that locks their team out.
+      // This is the license *override* leg of the Cloud composite provider.
+      // Reporting the baseline is how a Cloud org whose license lapsed falls
+      // through to the Stripe subscription underneath it, which is why the
+      // `free` flag matters as much as the numbers. Self-hosted has nothing to
+      // fall through to and asks getSelfHostedPlan instead.
       expect(plan.type).toBe(UNLIMITED_PLAN.type);
       expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
+      expect(plan.free).toBe(true);
     });
 
-    /** @scenario An unreadable license leaves the deployment on the Open Source plan */
     it("returns the Open Source plan with uncapped seats when the license is tampered", async () => {
       await prisma.organization.update({
         where: { id: organizationId },
@@ -419,6 +472,108 @@ describe("LicenseHandler Integration", () => {
 
       expect(plan.type).toBe(UNLIMITED_PLAN.type);
       expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
+    });
+  });
+
+  // ==========================================================================
+  // getSelfHostedPlan Tests
+  // ==========================================================================
+
+  describe("getSelfHostedPlan", () => {
+    describe("given a license whose term has ended", () => {
+      /** @scenario A lapsed license keeps metering the seats it sold */
+      /** @scenario An expired license keeps the seats it sold */
+      it("keeps metering the seats the license sold", async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { license: EXPIRED_LICENSE_KEY },
+        });
+
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        expect(plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
+        expect(plan.type).toBe(BASE_LICENSE.plan.type);
+        expect(plan.maxMembers).not.toBe(UNLIMITED_PLAN.maxMembers);
+      });
+
+      /** @scenario A lapsed license keeps the capabilities it bought */
+      it("keeps the capabilities the license bought", async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { license: EXPIRED_ENTERPRISE_LICENSE_KEY },
+        });
+
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        // isEnterpriseTier is what every enterprise-only tRPC procedure asks
+        // before it will run, so this is the whole SSO / SCIM / audit-log
+        // surface staying switched on past the end date.
+        expect(isEnterpriseTier(plan.type)).toBe(true);
+        expect(plan.free).toBe(false);
+      });
+
+      /** @scenario Nobody loses their seat on the day a license lapses */
+      it("leaves every membership active even when the org is over those seats", async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { license: EXPIRED_LICENSE_KEY },
+        });
+        const memberCount = BASE_LICENSE.plan.maxMembers + 3;
+        await seedActiveMembers(memberCount);
+
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        // Resolving a plan is a read. Landing over the seats is the same
+        // over-seats state an organization reaches by activating a license for
+        // fewer seats than it already had: everyone keeps working and an admin
+        // chooses who to disable. See seat-reconciliation.feature.
+        expect(plan.maxMembers).toBeLessThan(memberCount);
+        const disabled = await prisma.organizationUser.count({
+          where: { organizationId, disabledAt: { not: null } },
+        });
+        expect(disabled).toBe(0);
+      });
+    });
+
+    describe("given a license we did not sign", () => {
+      /** @scenario A license we did not sign is still not a license */
+      /** @scenario An unreadable license leaves the deployment on the Open Source plan */
+      it("resolves to the open-source baseline", async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { license: TAMPERED_LICENSE_KEY },
+        });
+
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        expect(plan.type).toBe(UNLIMITED_PLAN.type);
+        expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
+      });
+    });
+
+    describe("given no license at all", () => {
+      /** @scenario A deployment that never had a license stays uncapped */
+      /** @scenario An unlicensed deployment runs on the Open Source plan */
+      it("resolves to the open-source baseline", async () => {
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        expect(plan.type).toBe(UNLIMITED_PLAN.type);
+        expect(plan.maxMembers).toBe(UNLIMITED_PLAN.maxMembers);
+      });
+    });
+
+    describe("given a license still within its term", () => {
+      it("resolves to the plan the license names", async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { license: ENTERPRISE_LICENSE_KEY },
+        });
+
+        const plan = await handler.getSelfHostedPlan(organizationId);
+
+        expect(plan.type).toBe(ENTERPRISE_LICENSE.plan.type);
+        expect(plan.maxMembers).toBe(ENTERPRISE_LICENSE.plan.maxMembers);
+      });
     });
   });
 });

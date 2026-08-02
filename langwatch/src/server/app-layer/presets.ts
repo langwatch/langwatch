@@ -529,8 +529,12 @@ export function initializeDefaultApp(options?: {
     : PlanProviderService.create(
         createSelfHostedPlanProvider({
           licensePlanProvider: {
+            // Self-hosted asks a different question than the composite provider
+            // above: with no subscription underneath, a license past its end
+            // date has to keep metering the seats it sold instead of stepping
+            // aside. See LicenseHandler.getSelfHostedPlan.
             getActivePlan: ({ organizationId }) =>
-              getLicenseHandler().getActivePlan(organizationId),
+              getLicenseHandler().getSelfHostedPlan(organizationId),
           },
         }),
       );

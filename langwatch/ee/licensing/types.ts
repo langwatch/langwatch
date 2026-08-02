@@ -109,6 +109,13 @@ type InvalidLicenseStatus = {
   hasLicense: true;
   valid: false;
   corrupted?: false;
+  /**
+   * True when the license is one LangWatch signed and its term simply ended,
+   * false when the signature does not check out. Only the first still meters
+   * seats, so the page needs the distinction and cannot derive it from
+   * `expiresAt`, which an unsigned payload controls.
+   */
+  expired: boolean;
   plan: string;
   planName: string;
   expiresAt: string;

@@ -74,7 +74,12 @@ Feature: License to PlanInfo Mapping
   # Constants: FREE_PLAN
   # ============================================================================
 
-  Scenario: FREE_PLAN has correct limits for expired/invalid licenses
+  # FREE_PLAN is the Cloud free tier. A self-hosted deployment never lands here:
+  # with no license, or one we did not sign, it resolves to the uncapped
+  # open-source baseline, and a license past its end date keeps the numbers it
+  # sold. See expired-license-enforcement.feature.
+
+  Scenario: FREE_PLAN has the Cloud free-tier limits
     When I access the FREE_PLAN constant
     Then the plan type is "FREE"
     And the plan name is "Free"

@@ -84,7 +84,7 @@ export function LicenseDetailsCard({
       <VStack align="start" gap={4}>
         <HStack>
           <Badge
-            colorPalette={isValid ? "green" : "red"}
+            colorPalette={isValid ? "green" : isExpired ? "orange" : "red"}
             fontSize="sm"
             paddingX={2}
             paddingY={1}
@@ -128,14 +128,35 @@ export function LicenseDetailsCard({
             <Text
               fontSize="sm"
               fontWeight="medium"
-              color={isExpired ? "red.500" : undefined}
+              color={isExpired ? "orange.600" : undefined}
             >
               {formatLicenseDate(status.expiresAt)}
             </Text>
           </HStack>
         </VStack>
 
-        {!isValid && (
+        {isExpired && (
+          <Box
+            backgroundColor="orange.50"
+            padding={3}
+            borderRadius="md"
+            width="full"
+            _dark={{ backgroundColor: "orange.950" }}
+          >
+            <Text
+              fontSize="sm"
+              color="orange.700"
+              _dark={{ color: "orange.200" }}
+            >
+              Your license reached its end date. Nothing was switched off:
+              everyone keeps their access and your {status.maxMembers}{" "}
+              {status.maxMembers === 1 ? "seat" : "seats"} and enterprise
+              capabilities stay as they are. Renew to add members again.
+            </Text>
+          </Box>
+        )}
+
+        {!isValid && !isExpired && (
           <Box
             backgroundColor="red.50"
             padding={3}
@@ -143,9 +164,8 @@ export function LicenseDetailsCard({
             width="full"
           >
             <Text fontSize="sm" color="red.600">
-              {isExpired
-                ? "Your license has expired. Please renew to continue using licensed features."
-                : "Your license is invalid. Please contact support or upload a valid license."}
+              Your license is invalid. Please contact support or upload a valid
+              license.
             </Text>
           </Box>
         )}
