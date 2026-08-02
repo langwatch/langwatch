@@ -25,3 +25,20 @@ useDefault = true
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
 paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
+
+# The self-hosted license fixtures are base64 payloads signed with the TEST
+# keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
+# purpose: license validation is signature verification, so a test that does not
+# carry a real signature verifies nothing. The keypair signs nothing outside
+# this suite, and the production verifier reads its key from
+# `LANGWATCH_LICENSE_PUBLIC_KEY`, so a fixture key is refused by every real
+# deployment.
+#
+# Scoped to `generic-api-key` only, so a real credential pasted into this file
+# is still caught by every provider-specific rule. Scoped by path rather than by
+# value so a new fixture does not need a config change; the first line of the
+# file already carries the same claim for readers.
+[[allowlists]]
+description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
+targetRules = ["generic-api-key"]
+paths = ['''langwatch/ee/licensing/__tests__/fixtures/testLicenses\.ts''']

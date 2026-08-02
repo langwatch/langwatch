@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { isEnterpriseTier } from "../../../src/server/api/enterprise";
 import { prisma } from "../../../src/server/db";
 import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
+import { cleanupTestRows } from "../../../src/test-utils/cleanupTestRows";
 import { UNLIMITED_PLAN } from "../constants";
 import { type ITraceUsageService, LicenseHandler } from "../licenseHandler";
 import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
@@ -21,6 +22,8 @@ import {
 const mockTraceUsageService: ITraceUsageService = {
   getCurrentMonthCount: async () => 0,
 };
+
+const TEST_ORG_SLUG = "license-handler-test-org";
 
 /** Email prefix for the memberships seeded by the seat tests, so cleanup can
  * find them without touching anything else in the dev database. */
@@ -49,10 +52,30 @@ describe("LicenseHandler Integration", () => {
   };
 
   const removeSeededMembers = async (): Promise<void> => {
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.user.deleteMany({
-      where: { email: { startsWith: SEEDED_MEMBER_EMAIL_PREFIX } },
+    // Both filters are read fresh rather than taken from `organizationId`,
+    // which is a `let` assigned in `beforeAll`: undefined there would make
+    // Prisma drop the predicate and sweep every row in the table (#6219). The
+    // membership delete is also scoped to the seeded users, not to the whole
+    // organization, since this runs against a shared database where the test
+    // org can hold rows this suite did not create.
+    const org = await prisma.organization.findUnique({
+      where: { slug: TEST_ORG_SLUG },
+      select: { id: true },
     });
+    const seeded = await prisma.user.findMany({
+      where: { email: { startsWith: SEEDED_MEMBER_EMAIL_PREFIX } },
+      select: { id: true },
+    });
+    if (!org || seeded.length === 0) return;
+
+    const seededUserIds = seeded.map((user) => user.id);
+    await cleanupTestRows(prisma, [
+      [
+        "organizationUser",
+        { organizationId: org.id, userId: { in: seededUserIds } },
+      ],
+      ["user", { id: { in: seededUserIds } }],
+    ]);
   };
 
   beforeAll(async () => {
@@ -66,7 +89,7 @@ describe("LicenseHandler Integration", () => {
 
     // Create test organization
     const organization = await prisma.organization.upsert({
-      where: { slug: "license-handler-test-org" },
+      where: { slug: TEST_ORG_SLUG },
       update: {
         license: null,
         licenseExpiresAt: null,
@@ -74,7 +97,7 @@ describe("LicenseHandler Integration", () => {
       },
       create: {
         name: "License Handler Test Org",
-        slug: "license-handler-test-org",
+        slug: TEST_ORG_SLUG,
       },
     });
     organizationId = organization.id;
@@ -83,7 +106,7 @@ describe("LicenseHandler Integration", () => {
   afterAll(async () => {
     // Cleanup - delete in correct order for foreign key constraints
     const org = await prisma.organization.findUnique({
-      where: { slug: "license-handler-test-org" },
+      where: { slug: TEST_ORG_SLUG },
     });
     if (org) {
       await prisma.organizationUser.deleteMany({
