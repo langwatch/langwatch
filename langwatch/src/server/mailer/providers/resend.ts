@@ -23,6 +23,46 @@ const proxyDispatcher = (): EnvHttpProxyAgent | undefined =>
     ? new EnvHttpProxyAgent()
     : undefined;
 
+const sanitizeHeaders = (headers: EmailContent["headers"]) => {
+  if (!headers || Object.keys(headers).length === 0) return undefined;
+  return Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [
+      sanitizeHeaderValue(name),
+      sanitizeHeaderValue(value),
+    ]),
+  );
+};
+
+const encodeAttachments = (attachments: EmailContent["attachments"]) => {
+  if (!attachments || attachments.length === 0) return undefined;
+  return attachments.map((att) => ({
+    filename: att.filename,
+    content: Buffer.from(att.content).toString("base64"),
+    content_type: att.contentType,
+  }));
+};
+
+/**
+ * Resend delivers `bcc` via the envelope, so blind recipients stay hidden from
+ * the rendered headers, matching the other gateways.
+ */
+const buildPayload = (content: EmailContent, defaultFrom: string) => {
+  const bccAddresses = toArray(content.bcc);
+  const headers = sanitizeHeaders(content.headers);
+  const attachments = encodeAttachments(content.attachments);
+
+  return {
+    from: content.from ?? defaultFrom,
+    to: toArray(content.to),
+    subject: content.subject,
+    html: content.html,
+    ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
+    ...(content.replyTo && { reply_to: content.replyTo }),
+    ...(headers && { headers }),
+    ...(attachments && { attachments }),
+  };
+};
+
 export const resendProvider: EmailProviderPort = {
   name: "resend",
   async send(content: EmailContent, defaultFrom: string) {
@@ -35,37 +75,7 @@ export const resendProvider: EmailProviderPort = {
 
     logger.info("Sending email using Resend");
     const bccAddresses = toArray(content.bcc);
-
-    const sanitizedHeaders =
-      content.headers && Object.keys(content.headers).length > 0
-        ? Object.fromEntries(
-            Object.entries(content.headers).map(([name, value]) => [
-              sanitizeHeaderValue(name),
-              sanitizeHeaderValue(value),
-            ]),
-          )
-        : undefined;
-
-    // Resend delivers `bcc` via the envelope, so blind recipients stay hidden
-    // from the rendered headers, matching the other gateways.
-    const payload = {
-      from: content.from ?? defaultFrom,
-      to: toArray(content.to),
-      subject: content.subject,
-      html: content.html,
-      ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
-      ...(content.replyTo && { reply_to: content.replyTo }),
-      ...(sanitizedHeaders && { headers: sanitizedHeaders }),
-      ...(content.attachments &&
-        content.attachments.length > 0 && {
-          attachments: content.attachments.map((att) => ({
-            filename: att.filename,
-            content: Buffer.from(att.content).toString("base64"),
-            content_type: att.contentType,
-          })),
-        }),
-    };
-
+    const payload = buildPayload(content, defaultFrom);
     const dispatcher = proxyDispatcher();
 
     try {
