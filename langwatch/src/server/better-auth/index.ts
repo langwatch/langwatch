@@ -2,7 +2,7 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "@ee/sso/providers";
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
@@ -96,6 +96,31 @@ const secondaryStorage: BetterAuthOptions["secondaryStorage"] = redisConnection
   : undefined;
 
 const isBuildTime = !!process.env.BUILD_TIME;
+
+/**
+ * Whether a licensed deployment should refuse this credential route, the
+ * ADR-027 gate site #3 decision.
+ *
+ * Two conditions, and the second is the one that is easy to leave out. The
+ * route has to be one that mints or recovers a password account, and this
+ * deployment has to actually federate — a stronger claim than the license gate
+ * allowing it. `resolveAuthProvider` reports "email" when NEXTAUTH_PROVIDER
+ * names a provider this build cannot mount, and the sign-in page renders the
+ * credential form on exactly that answer. Refusing the form the page just
+ * offered would tell a licensed operator their account is managed by an
+ * identity provider that does not exist, and leave them no way in at all.
+ */
+async function refusesCredentialRoute({
+  pathname,
+  isResetPath,
+}: {
+  pathname: string;
+  isResetPath: boolean;
+}): Promise<boolean> {
+  if (!isResetPath && !isEmailAuthPath(pathname)) return false;
+
+  return (await resolveAuthProvider()) !== "email";
+}
 
 export const auth = betterAuth({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
@@ -465,7 +490,7 @@ export const auth = betterAuth({
       if (await platformSSOAllowed()) {
         // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
         // password account on a licensed SSO-capable deployment (v5 BLOCKER).
-        if (isResetPath || isEmailAuthPath(pathname)) {
+        if (await refusesCredentialRoute({ pathname, isResetPath })) {
           throw APIError.from("BAD_REQUEST", {
             code: "EMAIL_PASSWORD_DISABLED",
             message:

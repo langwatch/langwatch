@@ -10,10 +10,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
-import { ExternalLink, FileClock, KeyRound, Users } from "lucide-react";
+import {
+  ExternalLink,
+  FileClock,
+  KeyRound,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { api } from "~/utils/api";
 
 const DOCS_BASE = "https://docs.langwatch.ai";
 
@@ -123,6 +130,51 @@ function CapabilityRow({
  * leading separator belongs to the section for that reason, so Cloud does not
  * get a divider with nothing under it.
  */
+/**
+ * The one state an operator cannot diagnose from the page alone: an identity
+ * provider is configured, everybody is signing in by email anyway, and the
+ * reason is a license the deployment does not hold. The gate logs it at
+ * startup, but nobody reads server logs to explain a login screen.
+ */
+function SsoConfiguredButUnlicensedNotice() {
+  const ssoGate = api.license.getSsoGateStatus.useQuery(
+    {},
+    { refetchOnWindowFocus: false },
+  );
+
+  if (!ssoGate.data?.configuredProvider || ssoGate.data.licensed) return null;
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="orange.300"
+      backgroundColor="orange.50"
+      borderRadius="lg"
+      padding={4}
+      width="full"
+      data-testid="sso-unlicensed-notice"
+      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
+    >
+      <HStack align="start" gap={3}>
+        <Box color="orange.600" paddingTop={0.5}>
+          <TriangleAlert size={18} />
+        </Box>
+        <VStack align="start" gap={1}>
+          <Text fontWeight="medium">
+            Single sign-on is configured but not licensed on this deployment
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            This deployment is set up for{" "}
+            <b>{ssoGate.data.configuredProvider}</b>, so everyone is signing in
+            by email until a license is activated. Activate one and restart the
+            server to switch single sign-on on.
+          </Text>
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
+
 export function EnterpriseCapabilitiesSection() {
   const publicEnv = usePublicEnv();
   const { isEnterprise } = useActivePlan();
@@ -139,6 +191,8 @@ export function EnterpriseCapabilitiesSection() {
         width="full"
         data-testid="enterprise-capabilities"
       >
+        <SsoConfiguredButUnlicensedNotice />
+
         <VStack align="start" gap={1}>
           <Heading as="h2" size="md">
             Organization sign-in and governance

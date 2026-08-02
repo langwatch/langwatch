@@ -90,6 +90,36 @@ Feature: License-Gated SSO
     And nobody is left without a way to sign in to a licensed deployment
 
   @unit
+  Scenario: The form a misconfigured deployment offers actually accepts a sign-in
+    Given a self-hosted deployment holding a genuine license
+    And the configured identity provider is one this build cannot wire up
+    When a user submits the email and password form the sign-in page offered
+    Then the request is accepted rather than refused as identity-provider managed
+    And the password-reset pair is open for the same reason
+
+  @unit
+  Scenario: A deployment that really does federate still refuses password accounts
+    Given a self-hosted deployment holding a genuine license
+    And its configured identity provider mounted successfully
+    When a user submits the email and password form
+    Then the request is refused because the identity provider owns the password
+
+  @unit
+  Scenario: Password reset does not promise an email nobody can send
+    Given a self-hosted deployment with no outbound email configured
+    When a user opens the forgot-password page
+    Then they are told the deployment cannot send email
+    And they are pointed at the operator instead of a form that would do nothing
+
+  @integration
+  Scenario: An operator whose single sign-on is configured but unlicensed is told so
+    Given a self-hosted deployment configured with an enterprise IdP
+    And the deployment holds no genuine license
+    When an admin opens the authentication settings page
+    Then it says single sign-on is configured but not licensed on this deployment
+    And it explains that users are signing in by email until a license is activated
+
+  @unit
   Scenario: An SSO-only deployment recovers by setting the instance license key
     Given a self-hosted deployment where every user signs in only through SSO
     And the deployment has no genuine license stored

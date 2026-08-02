@@ -7,13 +7,27 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { publicEnvMock, activePlanMock } = vi.hoisted(() => ({
+const { publicEnvMock, activePlanMock, ssoGateRef } = vi.hoisted(() => ({
   publicEnvMock: vi.fn(),
   activePlanMock: vi.fn(),
+  ssoGateRef: {
+    current: undefined as
+      | { configuredProvider: string | null; licensed: boolean }
+      | undefined,
+  },
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({ usePublicEnv: publicEnvMock }));
 vi.mock("~/hooks/useActivePlan", () => ({ useActivePlan: activePlanMock }));
+vi.mock("~/utils/api", () => ({
+  api: {
+    license: {
+      getSsoGateStatus: {
+        useQuery: () => ({ data: ssoGateRef.current }),
+      },
+    },
+  },
+}));
 
 import { EnterpriseCapabilitiesSection } from "../EnterpriseCapabilitiesSection";
 
@@ -32,6 +46,9 @@ describe("<EnterpriseCapabilitiesSection />", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     activePlanMock.mockReturnValue({ isEnterprise: false, isLoading: false });
+    // The common shape: no identity provider configured, so there is nothing
+    // for the unlicensed-SSO notice to report.
+    ssoGateRef.current = { configuredProvider: null, licensed: true };
   });
 
   afterEach(cleanup);
@@ -112,6 +129,45 @@ describe("<EnterpriseCapabilitiesSection />", () => {
       expect(
         container.querySelector("[data-testid='enterprise-capabilities']"),
       ).toBeNull();
+    });
+  });
+
+  describe("given single sign-on is configured but the deployment is unlicensed", () => {
+    beforeEach(() => {
+      selfHosted();
+      ssoGateRef.current = { configuredProvider: "auth0", licensed: false };
+    });
+
+    /** @scenario An operator whose single sign-on is configured but unlicensed is told so */
+    it("names the configured provider and says why nobody is using it", () => {
+      renderSection();
+
+      expect(screen.getByTestId("sso-unlicensed-notice")).toBeTruthy();
+      expect(screen.getByText(/configured but not licensed/i)).toBeTruthy();
+      expect(screen.getByText("auth0")).toBeTruthy();
+      expect(screen.getByText(/signing in by email/i)).toBeTruthy();
+    });
+  });
+
+  describe("given single sign-on is configured and licensed", () => {
+    it("says nothing, because there is nothing to explain", () => {
+      selfHosted();
+      ssoGateRef.current = { configuredProvider: "auth0", licensed: true };
+
+      renderSection();
+
+      expect(screen.queryByTestId("sso-unlicensed-notice")).toBeNull();
+    });
+  });
+
+  describe("given no identity provider is configured at all", () => {
+    it("says nothing, since the deployment never asked for single sign-on", () => {
+      selfHosted();
+      ssoGateRef.current = { configuredProvider: null, licensed: true };
+
+      renderSection();
+
+      expect(screen.queryByTestId("sso-unlicensed-notice")).toBeNull();
     });
   });
 });

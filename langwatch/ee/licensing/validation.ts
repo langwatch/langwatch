@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { LICENSE_ERRORS, PUBLIC_KEY } from "./constants";
+import { normalizePemKey } from "./pem";
 import { mapToPlanInfo } from "./planMapping";
 import type { SignedLicense, ValidationResult } from "./types";
 import { SignedLicenseSchema } from "./types";
@@ -31,6 +32,13 @@ export function parseLicenseKey(licenseKey: string): SignedLicense | null {
 /**
  * Verifies the RSA-SHA256 signature of a license.
  *
+ * The key is normalized first, the same choke point `signLicense` uses for the
+ * private key. An operator supplies the verification key through a `.env` line,
+ * a Helm value or a Kubernetes secret, all of which routinely carry it as one
+ * line with escaped newlines; read as pasted, OpenSSL rejects the layout and
+ * every license reports as a bad signature, which sends the operator to look at
+ * their license instead of at their formatting.
+ *
  * @param signedLicense - The license with data and signature
  * @param publicKey - RSA public key in PEM format (defaults to production key)
  * @returns true if signature is valid, false otherwise
@@ -49,7 +57,11 @@ export function verifySignature(
     verify.update(dataString);
     verify.end();
 
-    return verify.verify(publicKey, signedLicense.signature, "base64");
+    return verify.verify(
+      normalizePemKey(publicKey),
+      signedLicense.signature,
+      "base64",
+    );
   } catch {
     return false;
   }

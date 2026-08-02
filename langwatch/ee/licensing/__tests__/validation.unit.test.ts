@@ -133,6 +133,32 @@ describe("verifySignature", () => {
 
     expect(result).toBe(false);
   });
+
+  describe("given the verification key as an operator actually supplies it", () => {
+    /** @scenario A verification key pasted with escaped newlines still verifies */
+    it("verifies against a key carrying escaped newlines, the way a .env holds one", () => {
+      const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+      if (!signedLicense)
+        throw new Error("Expected signedLicense to be defined");
+      // Exactly what `LANGWATCH_LICENSE_PUBLIC_KEY=...` in a .env file, a Helm
+      // value or a Kubernetes secret hands the process. Read as pasted,
+      // OpenSSL refuses the layout and reports it as a bad signature.
+      const escaped = TEST_PUBLIC_KEY.replace(/\n/g, "\\n");
+
+      expect(escaped).not.toContain("\n");
+      expect(verifySignature(signedLicense, escaped)).toBe(true);
+    });
+
+    it("still rejects a genuinely wrong key however it was pasted", () => {
+      const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
+      if (!signedLicense)
+        throw new Error("Expected signedLicense to be defined");
+
+      expect(
+        verifySignature(signedLicense, WRONG_PUBLIC_KEY.replace(/\n/g, "\\n")),
+      ).toBe(false);
+    });
+  });
 });
 
 describe("isExpired", () => {

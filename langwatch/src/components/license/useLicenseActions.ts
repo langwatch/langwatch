@@ -22,6 +22,18 @@ export function useLicenseActions({
   // it on a self-hosted deployment is not.
   const isSaas = publicEnv.data?.IS_SAAS === true;
 
+  // Activating or removing a license moves the active plan, which half the app
+  // reads: navigation, feature gates, limit copy. Invalidating every query is
+  // the blunt instrument that catches all of them, and it is what replaced a
+  // `window.location.reload()` here. The reload refreshed the same state, and
+  // destroyed the toast on its way: the restart instruction below is the one
+  // thing an operator has to read, and it was being torn off the screen
+  // milliseconds after it appeared.
+  const trpc = api.useContext();
+  const refreshPlanDerivedState = () => {
+    void trpc.invalidate();
+  };
+
   const uploadMutation = api.license.upload.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -32,7 +44,7 @@ export function useLicenseActions({
         type: "success",
       });
       onUploadSuccess();
-      window.location.reload();
+      refreshPlanDerivedState();
     },
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't activate license" }),
@@ -47,7 +59,7 @@ export function useLicenseActions({
         type: "info",
       });
       onRemoveSuccess();
-      window.location.reload();
+      refreshPlanDerivedState();
     },
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't remove license" }),

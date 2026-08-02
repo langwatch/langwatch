@@ -45,6 +45,23 @@ export default function ForgotPassword() {
     );
   }
 
+  // A self-hosted deployment with no mail transport cannot send the link this
+  // form promises. Offering it anyway ends with "if an account exists we have
+  // sent a link" and an inbox that never receives one, which reads as a lost
+  // email rather than as a deployment that was never able to send it.
+  if (!publicEnv.data.HAS_EMAIL_PROVIDER_KEY) {
+    return (
+      <AuthCard title="Forgot password">
+        <Text>
+          This deployment cannot send email, so it cannot send you a reset link.
+          Ask whoever operates it to reset your password for you, or to
+          configure an email provider.
+        </Text>
+        <BackToSignInLink />
+      </AuthCard>
+    );
+  }
+
   return <ForgotPasswordForm />;
 }
 

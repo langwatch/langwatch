@@ -11,6 +11,7 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 // which gate state, per ADR-027 Decision 4 / Constants table.
 vi.mock("@ee/sso/sso-gate", () => ({
   platformSSOAllowed: vi.fn(),
+  resolveAuthProvider: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", async (importOriginal) => {
@@ -33,7 +34,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { env } from "~/env.mjs";
 import { auth } from "../index";
 
@@ -51,6 +52,9 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     envMock.NEXTAUTH_PROVIDER = "auth0";
+    // The everyday case: the configured provider is one this build mounts, so
+    // the resolver hands back the configured id rather than coercing to email.
+    vi.mocked(resolveAuthProvider).mockResolvedValue("auth0");
   });
 
   describe("given a plain email-mode deployment (not SSO-capable)", () => {
@@ -178,6 +182,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     });
 
     /** @scenario A licensed deployment cannot mint password accounts */
+    /** @scenario A deployment that really does federate still refuses password accounts */
     it("refuses email sign-up, email sign-in, and password reset (v5 BLOCKER)", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
@@ -232,6 +237,44 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/get-session")),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given the gate allows but the configured provider never mounted", () => {
+    beforeEach(() => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(true);
+      // What `resolveAuthProvider` reports when NEXTAUTH_PROVIDER names a
+      // provider this build cannot wire up: the sign-in page renders the
+      // credential form off exactly this answer.
+      vi.mocked(resolveAuthProvider).mockResolvedValue("email");
+    });
+
+    /** @scenario The form a misconfigured deployment offers actually accepts a sign-in */
+    it("accepts the email form it just offered, and the reset pair with it", async () => {
+      // Without this the deployment is unusable: the page shows a password
+      // form and every submit comes back "your account is managed by your
+      // identity provider", naming one that does not exist.
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/sign-in/email")),
+      ).resolves.toBeUndefined();
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
+      ).resolves.toBeUndefined();
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/request-password-reset")),
+      ).resolves.toBeUndefined();
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/reset-password?token=abc")),
+      ).resolves.toBeUndefined();
+    });
+
+    it("still refuses the SSO routes there is no provider behind", async () => {
+      // The gate allows, so these are not blocked as unlicensed; they simply
+      // have nothing mounted to serve them. Nothing here should start
+      // pretending otherwise.
+      await expect(
+        runBeforeHook(ctxFor("https://host/api/auth/set-password")),
+      ).rejects.toMatchObject({ statusCode: 400 });
     });
   });
 
