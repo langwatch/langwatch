@@ -140,6 +140,13 @@ export interface TranscriptLogRecord {
   serviceName?: string | null;
 }
 
+/**
+ * The span the codex harvest writes the recovered conversation onto. Codex's
+ * own telemetry carries no content, so this is the only span in a codex trace
+ * that has anything to read.
+ */
+const CODEX_RECOVERED_CONTENT_SPAN_NAME = "codex.turn.response";
+
 const MODEL_CALL_SPAN_NAMES = new Set([
   "claude_code.llm_request",
   "opencode.llm",
@@ -291,6 +298,14 @@ interface SpanEntryAccumulator {
   claimedToolCallIds: Set<string>;
   /** The session's system context is emitted once, off the first call carrying one. */
   hasEmittedSystemPrompt: boolean;
+  /**
+   * How many messages of the recovered codex conversation have already been
+   * turned into entries. Each turn re-sends the whole history, so only the
+   * tail past this is new.
+   */
+  recoveredMessageCount: number;
+  /** The previous recovered turn's reply, which opens the next turn's input. */
+  lastRecoveredReply: string | null;
 }
 
 function collectSpanEntries(
@@ -304,6 +319,8 @@ function collectSpanEntries(
     subAgentToolCounts: new Map(),
     claimedToolCallIds: new Set(),
     hasEmittedSystemPrompt: false,
+    recoveredMessageCount: 0,
+    lastRecoveredReply: null,
   };
 
   // codex 0.146's exec wire has no `session_task.turn` rollup, its
@@ -315,6 +332,16 @@ function collectSpanEntries(
   );
 
   for (const span of spans) {
+    // Codex's conversation is recovered from its session transcript and sent
+    // back on the same trace, since its own telemetry carries no content. That
+    // span is the only place this session's prompts, tool calls and replies
+    // exist; it deliberately does NOT count as a model call, because codex's
+    // own token-bearing spans already did that and counting both would double
+    // every call in the totals.
+    if (span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME) {
+      collectRecoveredCodexTurn(span, acc);
+      continue;
+    }
     const isCodexResponseCall =
       !hasCodexTurnRollup &&
       span.name === "handle_responses" &&
@@ -327,6 +354,188 @@ function collectSpanEntries(
   }
 
   return acc;
+}
+
+/**
+ * Replay one recovered codex turn into transcript entries.
+ *
+ * Each turn's recovered input is the WHOLE conversation as sent to the model,
+ * so consecutive turns overlap almost entirely. Only the tail past what the
+ * previous turn already contributed is emitted, or a three-turn session would
+ * render its first prompt three times.
+ *
+ * The turn's own final reply is not in that input — the transcript records it
+ * after the snapshot — so it rides `span.output` like every other agent whose
+ * reply lands on the span. That does mean the NEXT turn's input opens with it,
+ * which is why an opening assistant message repeating the previous reply is
+ * dropped rather than emitted twice.
+ */
+function collectRecoveredCodexTurn(
+  span: SpanDetail,
+  acc: SpanEntryAccumulator,
+): void {
+  const messages = parsedChatMessages(span.input);
+
+  const systemText = acc.hasEmittedSystemPrompt
+    ? null
+    : extractedSystemText(span.input);
+  if (systemText !== null) {
+    acc.hasEmittedSystemPrompt = true;
+    acc.entries.push({
+      kind: "system_prompt",
+      atMs: span.startTimeMs,
+      text: systemText,
+      chars: systemText.length,
+    });
+  }
+
+  if (messages !== null) {
+    const fresh = messages.slice(acc.recoveredMessageCount);
+    acc.recoveredMessageCount = messages.length;
+    replayRecoveredMessages({ messages: fresh, span, acc });
+  }
+
+  const replyText = extractedOutputText(span.output);
+  if (replyText === null) return;
+  acc.lastRecoveredReply = replyText;
+  acc.spanReplies.push({
+    entry: {
+      kind: "assistant_message",
+      atMs: span.endTimeMs ?? span.startTimeMs,
+      text: replyText,
+      model: modelOf(span),
+    },
+    windowStartMs: span.startTimeMs,
+    windowEndMs: span.endTimeMs ?? span.startTimeMs,
+  });
+}
+
+/** One chat message off a recovered turn, in the shape the harvest writes. */
+interface RecoveredMessage {
+  role?: unknown;
+  content?: unknown;
+  tool_call_id?: unknown;
+  tool_calls?: {
+    id?: unknown;
+    function?: { name?: unknown; arguments?: unknown };
+  }[];
+}
+
+function replayRecoveredMessages({
+  messages,
+  span,
+  acc,
+}: {
+  messages: unknown[];
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+}): void {
+  // A tool call and its result are two separate messages paired by id; the
+  // transcript wants them as one entry, so the call is held until its result
+  // arrives (and still emitted, output-less, if it never does).
+  const pending = new Map<string, Extract<TranscriptEntry, { kind: "tool" }>>();
+
+  for (const raw of messages) {
+    const message = raw as RecoveredMessage | null;
+    if (!message || typeof message !== "object") continue;
+    const content =
+      typeof message.content === "string" ? message.content : null;
+
+    switch (message.role) {
+      case "user":
+        replayUserMessage({ content, span, acc });
+        break;
+      case "tool":
+        attachToolResult({ message, content, pending });
+        break;
+      case "assistant":
+        replayAssistantMessage({ message, content, span, acc, pending });
+        break;
+    }
+  }
+}
+
+function replayUserMessage({
+  content,
+  span,
+  acc,
+}: {
+  content: string | null;
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+}): void {
+  if (content === null || content.length === 0) return;
+  // Already folded into the session context by extractedSystemText.
+  if (isInjectedContextOnly(content)) return;
+  acc.entries.push({
+    kind: "user_prompt",
+    atMs: span.startTimeMs,
+    text: content,
+    chars: content.length,
+  });
+}
+
+function attachToolResult({
+  message,
+  content,
+  pending,
+}: {
+  message: RecoveredMessage;
+  content: string | null;
+  pending: Map<string, Extract<TranscriptEntry, { kind: "tool" }>>;
+}): void {
+  const id =
+    typeof message.tool_call_id === "string" ? message.tool_call_id : null;
+  const entry = id === null ? null : pending.get(id);
+  if (entry) entry.output = content;
+}
+
+function replayAssistantMessage({
+  message,
+  content,
+  span,
+  acc,
+  pending,
+}: {
+  message: RecoveredMessage;
+  content: string | null;
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+  pending: Map<string, Extract<TranscriptEntry, { kind: "tool" }>>;
+}): void {
+  const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  for (const [index, call] of calls.entries()) {
+    const name =
+      typeof call?.function?.name === "string" ? call.function.name : "tool";
+    const id =
+      typeof call?.id === "string" ? call.id : `${span.spanId}-${index}`;
+    const entry: Extract<TranscriptEntry, { kind: "tool" }> = {
+      kind: "tool",
+      atMs: span.startTimeMs,
+      name,
+      mcpServer: null,
+      input: call?.function?.arguments ?? null,
+      output: null,
+      durationMs: null,
+      failed: false,
+      agentId: null,
+      spanId: span.spanId,
+    };
+    pending.set(id, entry);
+    acc.totals.toolCalls += 1;
+    acc.entries.push(entry);
+  }
+
+  // The previous turn's reply opens this turn's input; it was already
+  // emitted off that turn's own output.
+  if (content === null || content.length === 0) return;
+  if (content === acc.lastRecoveredReply) return;
+  acc.entries.push({
+    kind: "assistant_message",
+    atMs: span.startTimeMs,
+    text: content,
+    model: modelOf(span),
+  });
 }
 
 function collectModelCallSpan(
@@ -863,7 +1072,11 @@ function extractedSystemText(input: string | null | undefined): string | null {
     const m = message as { role?: unknown; content?: unknown } | null;
     if (typeof m?.content !== "string" || m.content.length === 0) continue;
     if (m.role === "system") parts.push(m.content);
-    else if (m.role === "user" && firstUserReminders === null) {
+    else if (m.role === "user" && isInjectedContextOnly(m.content)) {
+      // Context the agent injected under the user's name. It is part of what
+      // the session pays for, not part of what the human asked.
+      parts.push(m.content);
+    } else if (m.role === "user" && firstUserReminders === null) {
       firstUserReminders = systemReminderText(m.content);
     }
   }
@@ -896,6 +1109,26 @@ function parsedChatMessages(
     return null;
   }
   return wrapper.value;
+}
+
+/**
+ * Whether a "user" message is entirely context the agent injected, rather than
+ * anything the human typed. Codex opens a session by sending its plugin
+ * inventory and environment description as a user message; rendered as a
+ * prompt, that buries the actual request under a wall of tool names.
+ *
+ * Structural rather than a list of known tag names, so a new envelope does not
+ * silently start showing up as something the user said: strip the top-level
+ * `<tag>…</tag>` blocks and see whether any prose survives. Claude's first user
+ * message is unaffected — it carries `<system-reminder>` blocks AND the real
+ * prompt, so prose remains and it is treated as a prompt, as before.
+ */
+function isInjectedContextOnly(content: string): boolean {
+  if (content.trim().length === 0) return false;
+  const stripped = content
+    .replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "")
+    .trim();
+  return stripped.length === 0;
 }
 
 /**

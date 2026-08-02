@@ -170,6 +170,33 @@ export function codexOtelBlockEndpoint(
 }
 
 /**
+ * The ingest token inlined on the langwatch `[otel]` block's `headers` entry,
+ * or null when the block carries no persisted header.
+ *
+ * This is what lets the turn-completion harvest stand on its own: it runs as a
+ * bare process codex spawned, with no session and no login to lean on, and the
+ * one file that says "capture is on for plain codex" is the same file holding
+ * the endpoint and key codex itself is posting with. Reading them back means
+ * the harvest posts exactly where codex's own spans went.
+ */
+export function codexOtelBlockAuthToken(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const block = content.slice(begin, end);
+	const match = /"Authorization"\s*=\s*"Bearer\s+([^"]+)"/.exec(block);
+	return match?.[1]?.trim() ?? null;
+}
+
+/**
  * Merge result returned by writeCodexOtelBlock so callers can
  * report which action was taken without re-reading the file.
  */
@@ -247,6 +274,257 @@ function writeFile0600(filePath: string, content: string): void {
 	}
 	fs.writeFileSync(filePath, content, { mode: 0o600 });
 	fs.chmodSync(filePath, 0o600);
+}
+
+const NOTIFY_BEGIN = "# >>> langwatch codex notify begin >>>";
+const NOTIFY_END = "# <<< langwatch codex notify end <<<";
+
+/**
+ * Prefix stamped on a user-authored `notify` line we had to move aside. TOML
+ * rejects a duplicate key outright, so leaving theirs in place next to ours
+ * would stop codex from starting at all; the original argv is preserved
+ * verbatim in the comment AND re-run via the chain arg in our own block.
+ */
+const DISPLACED_NOTE =
+	"# langwatch moved this notify into the block at the top of the file, which still runs it:";
+
+export interface CodexNotifyBlockInputs {
+	/**
+	 * The harvest argv up to but NOT including the trailing `--notify`: program
+	 * first, then args. The flag is appended here rather than by the caller
+	 * because it has to stay last, and that is easy to get wrong from outside.
+	 */
+	command: string[];
+	/** A user-authored notify argv to run after ours, when we displaced one. */
+	chained?: readonly string[] | null;
+}
+
+/**
+ * Flag carrying the turn payload. Codex appends its JSON as the final argv, so
+ * this has to be the last thing we write or it captures one of our own args as
+ * its value instead.
+ */
+const NOTIFY_PAYLOAD_FLAG = "--notify";
+
+function tomlStringArray(values: readonly string[]): string {
+	return `[${values.map((v) => `"${tomlStr(v)}"`).join(", ")}]`;
+}
+
+/**
+ * The harvest argv to write into `notify`, as an absolute node binary plus this
+ * CLI's own entry script.
+ *
+ * Spelled out rather than left as the bare `langwatch` name because codex runs
+ * it as a plain process with whatever environment codex itself was started in:
+ * a name resolved against PATH works from the shell the user installed from and
+ * then quietly stops working from a launcher, a cron, or an editor terminal.
+ *
+ * Returns null when the entry script cannot be determined, which is the caller's
+ * cue to skip the install rather than write an argv that will never run.
+ */
+export function defaultCodexNotifyCommand(): string[] | null {
+	const entry = process.argv[1];
+	if (!entry) return null;
+	return [process.execPath, path.resolve(entry), "ingest", "codex"];
+}
+
+/**
+ * Whether the harvest argv points into an ephemeral `npx` cache, which npm is
+ * free to clean up. Capture would work now and silently stop later, so the
+ * install path says so instead of pretending it is wired for good.
+ */
+export function codexNotifyCommandIsEphemeral(
+	command: readonly string[],
+): boolean {
+	return command.some(
+		(part) => part.includes("/_npx/") || part.includes("\\_npx\\"),
+	);
+}
+
+/**
+ * Build the bracketed `notify` block, WITH markers and a trailing newline.
+ *
+ * Codex exports no conversation content on its telemetry signal — the reply is
+ * parsed out of the streaming response and dropped before export, and no codex
+ * setting turns it back on. What codex does offer is `notify`: a program it
+ * runs after every completed turn, handed a JSON payload naming the session
+ * that finished. Pointing that at our own harvest is what lets a plain `codex`
+ * (no langwatch wrapper in front) record the conversation.
+ *
+ * The chained argv, when present, is the user's own notify program: we run it
+ * after ours so installing capture never silently kills their notifications.
+ * It is passed BEFORE `--notify` on purpose — codex appends the turn payload as
+ * the final argv, so `--notify` has to be last to receive it as its value.
+ */
+export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
+	const chained = inputs.chained?.length
+		? ["--chain", JSON.stringify(inputs.chained)]
+		: [];
+	const argv = [...inputs.command, ...chained, NOTIFY_PAYLOAD_FLAG];
+	return [
+		NOTIFY_BEGIN,
+		"# Managed by 'langwatch'. Codex runs this after every completed turn so",
+		"# the conversation (prompt, tool calls, reply) lands on the same trace",
+		"# codex already reports tokens on. Codex's own telemetry carries none of",
+		"# that content. Remove the marker pair above and below to opt out.",
+		`notify = ${tomlStringArray(argv)}`,
+		NOTIFY_END,
+		"",
+	].join("\n");
+}
+
+/**
+ * The value of a top-level `notify` key in `content`, or null when absent.
+ * Returns the raw matched text alongside the parsed argv so a caller can
+ * comment out the exact lines it occupied.
+ *
+ * Only single-line and simple multi-line array forms are recognised, which is
+ * every form codex's own docs show. Anything else is left alone rather than
+ * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
+ */
+function findNotifyAssignment(
+	content: string,
+): { raw: string; argv: string[] } | null {
+	const start = /^[ \t]*notify[ \t]*=[ \t]*\[/m.exec(content);
+	if (!start) return null;
+	const openIndex = content.indexOf("[", start.index);
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = openIndex; i < content.length; i++) {
+		const ch = content[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (ch === "\\") escaped = true;
+			else if (ch === '"') inString = false;
+			continue;
+		}
+		if (ch === '"') inString = true;
+		else if (ch === "[") depth++;
+		else if (ch === "]") {
+			depth--;
+			if (depth === 0) {
+				const raw = content.slice(start.index, i + 1);
+				const argv = Array.from(raw.matchAll(/"((?:[^"\\]|\\.)*)"/g)).map((m) =>
+					(m[1] ?? "").replace(/\\(.)/g, "$1"),
+				);
+				return { raw, argv };
+			}
+		}
+	}
+	return null;
+}
+
+/** The argv codex currently runs on turn completion, or null when unset. */
+export function codexNotifyCommand(
+	filePath: string = defaultCodexConfigPath(),
+): string[] | null {
+	try {
+		return (
+			findNotifyAssignment(fs.readFileSync(filePath, "utf8"))?.argv ?? null
+		);
+	} catch {
+		return null;
+	}
+}
+
+/** Whether config.toml currently carries the langwatch notify block. */
+export function codexHasNotifyBlock(
+	filePath: string = defaultCodexConfigPath(),
+): boolean {
+	return fileHasMarker(filePath, NOTIFY_BEGIN);
+}
+
+export interface CodexNotifyWriteResult {
+	action: CodexOtelWriteAction;
+	path: string;
+	/** The user's own notify argv we displaced and now chain, when there was one. */
+	chained: string[] | null;
+}
+
+/**
+ * Idempotent merge of the notify block into config.toml.
+ *
+ * The block is always written at the TOP of the file. `notify` is a top-level
+ * key, and TOML binds a bare key to whatever table precedes it — appended after
+ * the `[otel]` block the way the other blocks are, it would silently become
+ * `otel.notify`, which codex ignores without complaint. Writing it first is the
+ * one placement that cannot be wrong regardless of what the user's file holds.
+ *
+ * A user-authored `notify` is moved aside rather than left in place: TOML
+ * forbids a duplicate key, so keeping both would stop codex from starting. The
+ * displaced argv is commented out where it stood and re-run from our block.
+ */
+export function writeCodexNotifyBlock(
+	inputs: CodexNotifyBlockInputs,
+	options: { filePath?: string } = {},
+): CodexNotifyWriteResult {
+	const filePath = options.filePath ?? defaultCodexConfigPath();
+
+	let prior = "";
+	try {
+		prior = fs.readFileSync(filePath, "utf8");
+	} catch {
+		/* absent — treated as empty below */
+	}
+
+	// Strip our own block first so the search for a foreign notify can't match
+	// the one we wrote last time, and so a block left mid-file by an older
+	// write is re-seated at the top.
+	const withoutOurs =
+		stripMarkerBlock(prior, NOTIFY_BEGIN, NOTIFY_END) ?? prior;
+
+	const existing = findNotifyAssignment(withoutOurs);
+	const chained = existing?.argv.length ? existing.argv : null;
+	const body = existing
+		? withoutOurs.replace(
+				existing.raw,
+				`${DISPLACED_NOTE}\n${existing.raw
+					.split("\n")
+					.map((line) => `# ${line}`)
+					.join("\n")}`,
+			)
+		: withoutOurs;
+
+	const block = buildCodexNotifyBlock({ ...inputs, chained });
+	const next = body.trim() ? `${block}\n${body.replace(/^\n+/, "")}` : block;
+	if (next === prior) return { action: "unchanged", path: filePath, chained };
+
+	if (!fs.existsSync(filePath)) {
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		writeFile0600(filePath, next);
+		return { action: "created", path: filePath, chained };
+	}
+	writeFile0600(filePath, next);
+	return { action: "updated", path: filePath, chained };
+}
+
+/**
+ * Remove the langwatch notify block, restoring a user-authored `notify` we had
+ * commented out when we installed. Returns true when a block was removed.
+ */
+export function removeCodexNotifyBlock(
+	filePath: string = defaultCodexConfigPath(),
+): boolean {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return false;
+	}
+	const stripped = stripMarkerBlock(content, NOTIFY_BEGIN, NOTIFY_END);
+	if (stripped === null) return false;
+	const restored = stripped.replace(
+		new RegExp(`${escapeRe(DISPLACED_NOTE)}\\n((?:[ \\t]*#[^\\n]*\\n?)+)`, "m"),
+		(_match, commented: string) =>
+			`${commented
+				.replace(/\n$/, "")
+				.split("\n")
+				.map((line) => line.replace(/^[ \t]*# ?/, ""))
+				.join("\n")}\n`,
+	);
+	fs.writeFileSync(filePath, restored);
+	return true;
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";

@@ -32,10 +32,13 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
+	codexNotifyCommandIsEphemeral,
 	codexOtelBlockHasAuthHeader,
 	codexTraceEndpoint,
 	defaultCodexConfigPath,
+	defaultCodexNotifyCommand,
 	displayCodexConfigPath,
+	writeCodexNotifyBlock,
 	writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
@@ -383,6 +386,44 @@ export async function maybeOfferIngestionShellRcPersist({
 		return;
 	}
 
+	// Codex's telemetry export carries tokens, model and timing but no
+	// conversation: the reply is dropped before export and no codex setting
+	// brings it back. What codex does offer is `notify`, a program it runs after
+	// every completed turn — pointed at our own harvest, that is what turns the
+	// "a plain codex captures" state above into traces with something to read.
+	// Best-effort on purpose: the exports are already installed and working by
+	// this point, and failing to add content recovery must not undo that.
+	function installCodexTurnHarvest(): void {
+		const command = defaultCodexNotifyCommand();
+		if (!command) return;
+		try {
+			const result = writeCodexNotifyBlock({ command });
+			if (result.action === "unchanged") return;
+			console.log(
+				chalk.green(
+					"  ✓ Codex will record each turn's conversation as it completes",
+				),
+			);
+			if (result.chained) {
+				console.log(
+					chalk.dim(
+						`    Your existing notify program still runs: ${result.chained[0]}`,
+					),
+				);
+			}
+			if (codexNotifyCommandIsEphemeral(command)) {
+				console.log(
+					chalk.yellow(
+						"    Heads up: this points at an npx cache that npm may clean up.\n" +
+							"    Install the CLI (npm i -g langwatch) so it keeps working.",
+					),
+				);
+			}
+		} catch {
+			/* exports are installed; content recovery is the bonus, not the point */
+		}
+	}
+
 	// codex has a native app-scoped target too: its [otel] block in
 	// ~/.codex/config.toml takes an inline Authorization header, so the
 	// ingest token scopes to codex runs instead of leaking into every
@@ -419,6 +460,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
 				),
 			);
+			installCodexTurnHarvest();
 		} catch (err) {
 			console.log(
 				chalk.yellow(

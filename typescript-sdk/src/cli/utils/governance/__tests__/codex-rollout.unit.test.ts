@@ -168,6 +168,101 @@ describe("parseCodexRollout", () => {
     });
   });
 
+  describe("given a tool call spelled the way codex 0.146 writes it", () => {
+    describe("when it is parsed", () => {
+      // Captured verbatim from a live `codex exec` run on 0.146: the shell call
+      // arrives as `custom_tool_call` with the argument blob under `input`, and
+      // the result as content blocks. Handling only the older `function_call`
+      // spelling dropped every tool call from the recovered conversation while
+      // still producing a perfectly healthy-looking turn.
+      /** @scenario "Tool calls are captured whichever way codex spelled them" */
+      it("records a custom_tool_call the same way as a function_call", () => {
+        const turns = parseCodexRollout(
+          rollout(
+            taskStarted("abc123", "t1"),
+            userMsg("run echo"),
+            {
+              type: "response_item",
+              payload: {
+                type: "custom_tool_call",
+                id: "ctc_0f02",
+                status: "completed",
+                call_id: "call_U9GU",
+                name: "exec",
+                input: 'const r = await tools.exec_command({"cmd":"echo hi"});',
+              },
+            },
+            {
+              type: "response_item",
+              payload: {
+                type: "custom_tool_call_output",
+                id: "ctco_019f",
+                call_id: "call_U9GU",
+                output: [
+                  { type: "input_text", text: "Script completed\\nOutput:\\n" },
+                  { type: "input_text", text: "hi\\n" },
+                ],
+              },
+            },
+            agentMessage("hi"),
+          ),
+        );
+
+        expect(turns[0]!.inputMessages).toContainEqual({
+          role: "assistant",
+          tool_calls: [
+            {
+              id: "call_U9GU",
+              type: "function",
+              function: {
+                name: "exec",
+                arguments:
+                  'const r = await tools.exec_command({"cmd":"echo hi"});',
+              },
+            },
+          ],
+        });
+      });
+
+      /** @scenario "A tool result returned as content blocks reads as its text" */
+      it("reads the printed output rather than serialising the blocks", () => {
+        const turns = parseCodexRollout(
+          rollout(
+            taskStarted("abc123", "t1"),
+            userMsg("run echo"),
+            {
+              type: "response_item",
+              payload: {
+                type: "custom_tool_call",
+                call_id: "call_1",
+                name: "exec",
+                input: "echo hi",
+              },
+            },
+            {
+              type: "response_item",
+              payload: {
+                type: "custom_tool_call_output",
+                call_id: "call_1",
+                output: [
+                  { type: "input_text", text: "Output:\\n" },
+                  { type: "input_text", text: "mango-auto-hook\\n" },
+                ],
+              },
+            },
+            agentMessage("mango-auto-hook"),
+          ),
+        );
+
+        const toolMessage = turns[0]!.inputMessages.find(
+          (m) => m.role === "tool",
+        );
+        expect(toolMessage?.content).toContain("mango-auto-hook");
+        expect(toolMessage?.content).not.toContain("input_text");
+      });
+    });
+  });
+
   describe("given a tool call codex emitted without a call_id", () => {
     describe("when it is parsed", () => {
       /** @scenario "An id-less tool call and its output share one synthetic id so they still pair" */

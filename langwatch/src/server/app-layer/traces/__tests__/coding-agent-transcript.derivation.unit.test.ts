@@ -994,3 +994,198 @@ describe("buildCodingAgentTranscript injected session context", () => {
     });
   });
 });
+
+/**
+ * Codex exports no conversation content, so a codex trace's prompts, tool calls
+ * and replies arrive on a separate span the harvest writes from the session
+ * transcript. Before this was understood here, the Terminal view rendered
+ * "this agent reported tokens and timing only" over a trace that plainly had a
+ * conversation on it.
+ */
+function recoveredCodexTurn({
+  atMs,
+  messages,
+  output,
+  spanId = `codex-io-${atMs}`,
+}: {
+  atMs: number;
+  messages: unknown[];
+  output: string;
+  spanId?: string;
+}): SpanDetail {
+  return {
+    spanId,
+    name: "codex.turn.response",
+    startTimeMs: atMs,
+    endTimeMs: atMs + 900,
+    status: "ok",
+    params: { "gen_ai.request.model": "gpt-5.6-sol" },
+    input: JSON.stringify({ type: "chat_messages", value: messages }),
+    output,
+  } as unknown as SpanDetail;
+}
+
+function codexTokenSpan({ atMs }: { atMs: number }): SpanDetail {
+  return {
+    spanId: `codex-turn-${atMs}`,
+    name: "session_task.turn",
+    startTimeMs: atMs,
+    endTimeMs: atMs + 900,
+    status: "ok",
+    metrics: { promptTokens: 58000, completionTokens: 200, cost: 0.16 },
+    params: {},
+  } as unknown as SpanDetail;
+}
+
+describe("given a codex trace whose conversation was recovered", () => {
+  const turn = () =>
+    recoveredCodexTurn({
+      atMs: 1_000,
+      messages: [
+        { role: "system", content: "You are codex." },
+        {
+          role: "user",
+          content: "echo papaya-toolcall and tell me the output",
+        },
+        { role: "assistant", content: "I'll run that exact command." },
+        {
+          role: "assistant",
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "exec", arguments: '{"cmd":"echo papaya"}' },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "call_1", content: "papaya-toolcall" },
+      ],
+      output: "It printed exactly: papaya-toolcall",
+    });
+
+  describe("when the session transcript is derived", () => {
+    /** @scenario "The terminal view replays a recovered codex session" */
+    it("replays the prompt, the tool call and the reply as readable entries", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [codexTokenSpan({ atMs: 1_000 }), turn()],
+        logs: [],
+      });
+
+      const readable = transcript.entries.filter(
+        (e) => e.kind !== "model_call",
+      );
+      expect(readable.map((e) => e.kind)).toEqual(
+        expect.arrayContaining([
+          "system_prompt",
+          "user_prompt",
+          "tool",
+          "assistant_message",
+        ]),
+      );
+      const prompt = readable.find((e) => e.kind === "user_prompt");
+      expect(prompt).toMatchObject({
+        text: "echo papaya-toolcall and tell me the output",
+      });
+      const tool = readable.find((e) => e.kind === "tool");
+      expect(tool).toMatchObject({ name: "exec", output: "papaya-toolcall" });
+      const reply = readable
+        .filter((e) => e.kind === "assistant_message")
+        .at(-1);
+      expect(reply).toMatchObject({
+        text: "It printed exactly: papaya-toolcall",
+      });
+    });
+
+    /** @scenario "A recovered turn does not inflate the session's model call count" */
+    it("counts codex's own model call once, not once more for the recovered turn", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [codexTokenSpan({ atMs: 1_000 }), turn()],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
+    });
+  });
+});
+
+describe("given a codex session of two turns, where each turn re-sends the whole conversation", () => {
+  describe("when the session transcript is derived", () => {
+    /** @scenario "A multi-turn session shows each prompt once" */
+    it("shows the first prompt and reply once rather than once per turn", () => {
+      const first = [
+        { role: "system", content: "You are codex." },
+        { role: "user", content: "first question" },
+      ];
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: first,
+            output: "first answer",
+          }),
+          recoveredCodexTurn({
+            atMs: 2_000,
+            messages: [
+              ...first,
+              { role: "assistant", content: "first answer" },
+              { role: "user", content: "second question" },
+            ],
+            output: "second answer",
+          }),
+        ],
+        logs: [],
+      });
+
+      const texts = transcript.entries.flatMap((e) =>
+        e.kind === "user_prompt" || e.kind === "assistant_message"
+          ? [e.text]
+          : [],
+      );
+      expect(texts.filter((t) => t === "first question")).toHaveLength(1);
+      expect(texts.filter((t) => t === "first answer")).toHaveLength(1);
+      expect(texts).toContain("second question");
+      expect(texts).toContain("second answer");
+    });
+  });
+});
+
+describe("given a recovered codex turn whose first user message is the agent's own plugin and environment listing", () => {
+  describe("when the session transcript is derived", () => {
+    /** @scenario "Context the agent injected under the user's name is not shown as their prompt" */
+    it("folds the listing into the session context and leaves the human's words as the prompt", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: [
+              { role: "system", content: "You are codex." },
+              {
+                role: "user",
+                content:
+                  "<recommended_plugins>\n- Airtable\n- Asana\n</recommended_plugins>\n<environment_context>\n<shell>zsh</shell>\n</environment_context>",
+              },
+              { role: "user", content: "echo papaya and tell me the output" },
+            ],
+            output: "papaya",
+          }),
+        ],
+        logs: [],
+      });
+
+      const prompts = transcript.entries.filter(
+        (e) => e.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0]).toMatchObject({
+        text: "echo papaya and tell me the output",
+      });
+
+      const context = transcript.entries.find(
+        (e) => e.kind === "system_prompt",
+      );
+      expect(context?.kind === "system_prompt" && context.text).toContain(
+        "recommended_plugins",
+      );
+    });
+  });
+});

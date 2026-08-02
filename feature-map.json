@@ -23,12 +23,14 @@
               "cli": [
                 "trace search",
                 "trace get",
-                "trace export"
+                "trace export",
+                "ingest codex"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
-                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl"
+                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
+                "ingest codex": "langwatch ingest codex --since 24"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
