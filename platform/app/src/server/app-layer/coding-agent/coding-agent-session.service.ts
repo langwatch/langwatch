@@ -26,7 +26,6 @@ import type {
  */
 export const MAX_SESSION_EVENTS_PAGE_SIZE = 1000;
 
-/** One page's row budget: at least one row, at most the ceiling. */
 function clampSessionEventsLimit(limit: number): number {
   if (!Number.isFinite(limit)) return MAX_SESSION_EVENTS_PAGE_SIZE;
   return Math.min(Math.max(Math.trunc(limit), 1), MAX_SESSION_EVENTS_PAGE_SIZE);

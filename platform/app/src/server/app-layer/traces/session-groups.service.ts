@@ -101,14 +101,26 @@ export interface CodingAgentSessionLookup {
   }): Promise<SessionGroupCodingAgentDto | null>;
 }
 
-const SORT_COLUMNS = [
-  "lastActivity",
-  "started",
-  "cost",
-  "tokens",
-  "duration",
-  "traces",
-] as const satisfies readonly SessionGroupSortColumn[];
+/**
+ * Every sort dimension a cursor may name, keyed by the union so the compiler
+ * refuses a list that has drifted in EITHER direction. A new
+ * `SessionGroupSortColumn` missing from here would make the cursor schema
+ * reject a cursor this very service minted, and the caller would lose the
+ * page mid-walk.
+ */
+const SORT_COLUMN_KEYS: Record<SessionGroupSortColumn, true> = {
+  lastActivity: true,
+  started: true,
+  cost: true,
+  tokens: true,
+  duration: true,
+  traces: true,
+};
+
+const SORT_COLUMNS = Object.keys(SORT_COLUMN_KEYS) as [
+  SessionGroupSortColumn,
+  ...SessionGroupSortColumn[],
+];
 
 /**
  * The decoded cursor. It carries the sort it was minted under because

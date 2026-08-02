@@ -313,8 +313,10 @@ describe("SessionGroupsService", () => {
       ).rejects.toThrow("Sessions cursor does not match the sort");
       expect(repository.lastQuery).toBeNull();
     });
+  });
 
-    it("accepts the cursor when the sort still matches", async () => {
+  describe("when the cursor was minted under the same sort", () => {
+    it("passes the keyset boundary through to the repository", async () => {
       const repository = new FakeRepository([makeRow()]);
       const service = new SessionGroupsService(repository, lookupReturning({}));
       const cursor = encodeSessionGroupsCursor({

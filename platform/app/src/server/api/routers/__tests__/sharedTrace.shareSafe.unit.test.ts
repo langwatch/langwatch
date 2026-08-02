@@ -21,6 +21,9 @@ import type {
  * never receives spend, restricted attributes, captured event content or
  * evaluator text that quotes the trace. These assert the leak-prevention
  * contract directly. See ADR-057.
+ *
+ * @see specs/traces-v2/sharing.feature
+ * @see specs/traces-v2/sessions-lens.feature (the session-rollup cost gate)
  */
 
 const anonProtections: Protections = {
