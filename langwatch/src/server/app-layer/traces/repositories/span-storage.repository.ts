@@ -190,6 +190,8 @@ export interface ModelSpanSampleRow {
   outputTokens: number | null;
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
+  /** The portion of the writes that bought an hour-long cache entry. */
+  cacheCreation1hTokens: number | null;
   startTimeMs: number;
 }
 

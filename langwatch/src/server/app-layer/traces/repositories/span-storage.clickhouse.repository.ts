@@ -258,6 +258,7 @@ interface ModelSpanSampleQueryRow {
   CompletionTokensRaw: string;
   CacheReadTokensRaw: string;
   CacheCreationTokensRaw: string;
+  CacheCreation1hTokensRaw: string;
   StartTimeMs: number | string;
 }
 
@@ -285,6 +286,7 @@ function mapModelSpanSampleRow(
     outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
     cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
     cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
+    cacheCreation1hTokens: tokenCount(row.CacheCreation1hTokensRaw),
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -2108,6 +2110,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'], UpdatedAt) AS CacheCreation1hTokensRaw,
           argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
           (InputTokensRaw != '' OR PromptTokensRaw != ''
             OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens

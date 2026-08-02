@@ -71,3 +71,9 @@ Feature: Prompt-cache writes are priced by how long they live
     When the call is priced for the trace header, the analytics graphs, the
       waterfall and the terminal tab
     Then all of them show what the provider charged, to a millionth of a dollar
+
+  @unit
+  Scenario: A custom model cost can set its own hour-long cache write rate
+    Given a project sets its own hour-long cache write rate for a model
+    When a call to that model is priced
+    Then the hour-long writes cost the project's rate rather than the catalog's

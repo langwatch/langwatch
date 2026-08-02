@@ -310,6 +310,8 @@ export const getCustomLLMModelCosts = async ({
           cacheReadCostPerToken: record.cacheReadCostPerToken ?? undefined,
           cacheCreationCostPerToken:
             record.cacheCreationCostPerToken ?? undefined,
+          cacheCreation1hCostPerToken:
+            record.cacheCreation1hCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,

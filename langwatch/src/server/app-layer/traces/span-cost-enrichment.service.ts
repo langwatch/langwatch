@@ -10,12 +10,19 @@ import { extractModelName } from "./utils/spanModel";
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
+ *
+ * The bare `model` comes last because it is the loosest of them: enrichment
+ * runs on the raw OTLP span, before canonicalisation, and coding agents that
+ * export their own telemetry name the model under it and nothing else. Without
+ * it, a custom cost rule silently does nothing to exactly the traffic whose
+ * pricing a customer is most likely to want to override.
  */
 const MODEL_ATTRIBUTE_KEYS = [
   "gen_ai.request.model",
   "gen_ai.response.model",
   "llm.model_name",
   "ai.model",
+  "model",
 ] as const;
 
 /**
@@ -102,6 +109,12 @@ export class OtlpSpanCostEnrichmentService {
       span.attributes.push({
         key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
         value: { doubleValue: matched.cacheCreationCostPerToken },
+      });
+    }
+    if (matched.cacheCreation1hCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheCreation1hCostPerToken },
       });
     }
   }

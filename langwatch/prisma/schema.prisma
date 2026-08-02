@@ -1576,6 +1576,7 @@ model CustomLLMModelCost {
   outputCostPerToken        Float?
   cacheReadCostPerToken     Float?
   cacheCreationCostPerToken Float?
+  cacheCreation1hCostPerToken Float?
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime                    @default(now()) @updatedAt
 

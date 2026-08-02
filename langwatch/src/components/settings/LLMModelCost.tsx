@@ -73,7 +73,8 @@ export function LLMModelCost(props: { projectId?: string }) {
               <Table.ColumnHeader>Input cost</Table.ColumnHeader>
               <Table.ColumnHeader>Output cost</Table.ColumnHeader>
               <Table.ColumnHeader>Cache read</Table.ColumnHeader>
-              <Table.ColumnHeader>Cache write</Table.ColumnHeader>
+              <Table.ColumnHeader>Cache write (5 minutes)</Table.ColumnHeader>
+              <Table.ColumnHeader>Cache write (1 hour)</Table.ColumnHeader>
               <Table.ColumnHeader width="64px" padding={1}></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
@@ -81,7 +82,7 @@ export function LLMModelCost(props: { projectId?: string }) {
             {llmModelCosts.isLoading &&
               Array.from({ length: 3 }).map((_, index) => (
                 <Table.Row key={index}>
-                  {Array.from({ length: 6 }).map((_, index) => (
+                  {Array.from({ length: 7 }).map((_, index) => (
                     <Table.Cell key={index}>
                       <Skeleton height="20px" />
                     </Table.Cell>
@@ -172,6 +173,22 @@ export function LLMModelCost(props: { projectId?: string }) {
                       useGrouping: false,
                       maximumSignificantDigits: 20,
                     })}
+                  </Text>
+                </Table.Cell>
+                <Table.Cell padding={0}>
+                  <Text
+                    justifyContent="space-between"
+                    paddingX={4}
+                    marginX={2}
+                    color={!!row.id ? "green.500" : undefined}
+                  >
+                    {row.cacheCreation1hCostPerToken?.toLocaleString(
+                      "fullwide",
+                      {
+                        useGrouping: false,
+                        maximumSignificantDigits: 20,
+                      },
+                    )}
                   </Text>
                 </Table.Cell>
                 <Table.Cell padding={1}>
