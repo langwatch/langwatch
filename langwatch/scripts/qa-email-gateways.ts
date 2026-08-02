@@ -12,9 +12,20 @@ import { sendRenderedTriggerEmail } from "../src/server/mailer/triggerEmail";
 
 const MAILPIT = "http://127.0.0.1:8025";
 
-/** An SMTP URL with any `user:password@` segment removed. */
-const redactUserinfo = (url: string | undefined): string =>
-  url ? url.replace(/\/\/[^@/]*@/, "//<redacted>@") : "(unset)";
+/**
+ * Only the scheme and host of an SMTP URL. Credentials are dropped entirely
+ * rather than pattern-replaced, so a password containing a raw `@` cannot leak
+ * a fragment of itself.
+ */
+const redactUserinfo = (url: string | undefined): string => {
+  if (!url) return "(unset)";
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "(unparseable SMTP_URL)";
+  }
+};
 
 const api = async (path: string) => {
   const res = await fetch(`${MAILPIT}${path}`);
@@ -185,7 +196,7 @@ async function scenarioUnicode() {
 
 async function main() {
   console.log(`provider: ${process.env.EMAIL_PROVIDER}`);
-  // SMTP_URL can carry inline credentials; never print them.
+  // SMTP_URL can carry inline credentials; print only scheme and host.
   console.log(`smtp:     ${redactUserinfo(process.env.SMTP_URL)}`);
 
   await scenarioPlainAlert();
