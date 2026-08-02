@@ -22,6 +22,11 @@ Feature: An absent evaluator score is never presented or stored as zero
   # discriminate ABSENT from ZERO, never FALSY from TRUTHY. A fix that renders all
   # zeros as "N/A" trades one silent-wrong for another.
 
+  # ⚠ Gherkin applies this Background to EVERY scenario in the file, including the two
+  # @unit scenarios, which call pure functions and neither log in nor touch a project.
+  # It cannot be scoped in Gherkin, so treat it as applying to the @integration scenarios
+  # only; a @unit test binding here must not implement these steps.
+
   Background:
     Given I am logged in
     And I have access to a project
