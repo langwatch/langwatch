@@ -38,8 +38,8 @@ import type { UsageReportingService } from "../../../ee/billing/services/usageRe
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
-import type { CodingAgentSessionEventsRepository } from "../app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentSessionEventsRepository } from "../app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";

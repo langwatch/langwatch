@@ -53,6 +53,7 @@ export const TIME_PARTITIONED_TABLES = {
   evaluation_runs: ["ScheduledAt"],
   coding_agent_sessions: ["StartedAt"],
   coding_agent_trace_sessions: ["OccurredAt"],
+  coding_agent_session_events: ["TimeUnixMs"],
   session_metric_series: ["AsOf"],
 
   // Run / experiment tables.

@@ -41,7 +41,9 @@ export class CodingAgentTraceSessionAppendStore
 export class CodingAgentSessionEventsAppendStore
   implements AppendStore<CodingAgentSessionEventRecord>
 {
-  constructor(private readonly repository: CodingAgentSessionEventsRepository) {}
+  constructor(
+    private readonly repository: CodingAgentSessionEventsRepository,
+  ) {}
 
   async append(
     record: CodingAgentSessionEventRecord,

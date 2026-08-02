@@ -1,8 +1,8 @@
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { createProjectApp, requires } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
@@ -68,7 +68,8 @@ secured.access(requires("traces:view")).get(
         in: "path",
         required: true,
         schema: { type: "string" },
-        description: "The agent's own session id (session.id / conversation id).",
+        description:
+          "The agent's own session id (session.id / conversation id).",
       },
       {
         name: "kinds",
@@ -82,7 +83,8 @@ secured.access(requires("traces:view")).get(
         in: "query",
         required: false,
         schema: { type: "string" },
-        description: "Opaque keyset cursor from the previous response's nextCursor.",
+        description:
+          "Opaque keyset cursor from the previous response's nextCursor.",
       },
       {
         name: "limit",
@@ -109,7 +111,8 @@ secured.access(requires("traces:view")).get(
     responses: {
       ...baseResponses,
       200: {
-        description: "One page of session events plus the cursor for the next page",
+        description:
+          "One page of session events plus the cursor for the next page",
         content: {
           "application/json": {
             schema: resolver(
@@ -152,8 +155,8 @@ secured.access(requires("traces:view")).get(
 
     const cursor = decodeCursor(c.req.query("cursor"));
 
-    const { events, nextCursor } = await getApp().codingAgents.sessions
-      .getSessionEvents({
+    const { events, nextCursor } =
+      await getApp().codingAgents.sessions.getSessionEvents({
         projectId: project.id,
         sessionId,
         kinds,
@@ -175,7 +178,9 @@ function encodeCursor(cursor: SessionEventsCursor): string {
   ).toString("base64url");
 }
 
-function decodeCursor(raw: string | undefined): SessionEventsCursor | undefined {
+function decodeCursor(
+  raw: string | undefined,
+): SessionEventsCursor | undefined {
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(

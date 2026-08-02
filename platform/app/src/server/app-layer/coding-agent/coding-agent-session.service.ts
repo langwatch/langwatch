@@ -7,12 +7,12 @@ import {
   normalizeTokenType,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
 import { readWindowAround } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 import type {
   CodingAgentSessionEventRow,
   CodingAgentSessionEventsRepository,
   SessionEventsCursor,
 } from "./repositories/coding-agent-session-events.repository";
-import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "./repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,

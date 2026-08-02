@@ -77,9 +77,7 @@ function eventRecord(
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repository = new CodingAgentSessionEventsClickHouseRepository(
-    async () => ch,
-  );
+  repository = new CodingAgentSessionEventsClickHouseRepository(async () => ch);
 }, 120_000);
 
 afterAll(async () => {
@@ -152,9 +150,9 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
       });
 
       expect(events.length).toBe(3);
-      expect(
-        events.every((event) => event.eventKind === "tool_result"),
-      ).toBe(true);
+      expect(events.every((event) => event.eventKind === "tool_result")).toBe(
+        true,
+      );
     });
   });
 
