@@ -231,6 +231,181 @@ describe("exportTracesCommand()", () => {
 			expect(body).not.toHaveProperty("filters");
 		});
 	});
+
+	const pageResponse = (args: {
+		count: number;
+		from: number;
+		scrollId?: string;
+		totalHits: number;
+		skipped?: number;
+		trace?: (i: number) => Record<string, unknown>;
+	}) =>
+		new Response(
+			JSON.stringify({
+				traces: Array.from({ length: args.count }, (_, i) =>
+					args.trace
+						? args.trace(args.from + i)
+						: { trace_id: `trace_${args.from + i}` },
+				),
+				pagination: {
+					totalHits: args.totalHits,
+					...(args.scrollId ? { scrollId: args.scrollId } : {}),
+					...(args.skipped ? { skipped: args.skipped } : {}),
+				},
+			}),
+			{ status: 200 },
+		);
+
+	const writtenOutput = () =>
+		(process.stdout.write as unknown as ReturnType<typeof vi.fn>).mock.calls
+			.map((c) => String(c[0]))
+			.join("");
+
+	const requestBodies = () =>
+		fetchMock.mock.calls.map(
+			(c) => JSON.parse((c[1] as { body: string }).body) as Record<string, unknown>,
+		);
+
+	describe("when the limit spans multiple pages", () => {
+		/** @scenario export pages with the server cursor until the requested limit is reached */
+		it("passes each response's scrollId into the next request until the limit is reached", async () => {
+			fetchMock
+				.mockResolvedValueOnce(
+					pageResponse({ count: 1000, from: 0, scrollId: "s1", totalHits: 2500 }),
+				)
+				.mockResolvedValueOnce(
+					pageResponse({ count: 1000, from: 1000, scrollId: "s2", totalHits: 2500 }),
+				)
+				.mockResolvedValueOnce(
+					pageResponse({ count: 500, from: 2000, scrollId: "s3", totalHits: 2500 }),
+				);
+
+			await exportTracesCommand({ limit: "2500" });
+
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+			const bodies = requestBodies();
+			expect(bodies[0]).not.toHaveProperty("scrollId");
+			expect(bodies[0]!.pageSize).toBe(1000);
+			expect(bodies[1]!.scrollId).toBe("s1");
+			expect(bodies[2]!.scrollId).toBe("s2");
+			expect(bodies[2]!.pageSize).toBe(500);
+			expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
+		});
+
+		/** @scenario export stops paging when the server returns no further cursor */
+		it("stops after the page that returns no scrollId", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({ count: 40, from: 0, totalHits: 40 }),
+			);
+
+			await exportTracesCommand({ limit: "1000" });
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(writtenOutput().trim().split("\n")).toHaveLength(40);
+		});
+
+		/** @scenario export keeps paging through a short page whose shortfall is skipped rows */
+		it("continues past a short page whose shortfall is reported as skipped", async () => {
+			fetchMock
+				.mockResolvedValueOnce(
+					pageResponse({
+						count: 990,
+						from: 0,
+						scrollId: "s1",
+						totalHits: 1100,
+						skipped: 10,
+					}),
+				)
+				.mockResolvedValueOnce(
+					pageResponse({ count: 100, from: 990, scrollId: "s2", totalHits: 1100 }),
+				);
+
+			await exportTracesCommand({ limit: "1090" });
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			expect(writtenOutput().trim().split("\n")).toHaveLength(1090);
+		});
+
+		/** @scenario export requests one page when the limit fits in a single page */
+		it("makes exactly one request with pageSize matching the limit", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
+			);
+
+			await exportTracesCommand({ limit: "50" });
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(requestBodies()[0]!.pageSize).toBe(50);
+		});
+	});
+
+	describe("when --include-spans is provided", () => {
+		/** @scenario export with --include-spans requests span data and preserves it in the output */
+		it("sends includeSpans and preserves each trace's spans in the JSONL output", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({
+					count: 2,
+					from: 0,
+					totalHits: 2,
+					trace: (i) => ({
+						trace_id: `trace_${i}`,
+						spans: [{ span_id: `span_${i}` }],
+					}),
+				}),
+			);
+
+			await exportTracesCommand({ includeSpans: true });
+
+			expect(requestBodies()[0]!.includeSpans).toBe(true);
+			const lines = writtenOutput().trim().split("\n");
+			const first = JSON.parse(lines[0]!) as { spans?: unknown[] };
+			expect(first.spans).toEqual([{ span_id: "span_0" }]);
+		});
+
+		/** @scenario export without --include-spans keeps the legacy request shape */
+		it("sends no includeSpans field when the flag is absent", async () => {
+			await exportTracesCommand({});
+
+			expect(requestBodies()[0]).not.toHaveProperty("includeSpans");
+		});
+	});
+
+	describe("when exporting as CSV", () => {
+		/** @scenario CSV export appends token and context columns after the existing ones */
+		it("keeps the legacy columns first and appends the token metric columns", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({
+					count: 1,
+					from: 0,
+					totalHits: 1,
+					trace: (i) => ({
+						trace_id: `trace_${i}`,
+						input: { value: "hi" },
+						output: { value: "yo" },
+						timestamps: { started_at: 1720000000000 },
+						metrics: {
+							prompt_tokens: 10,
+							completion_tokens: 5,
+							total_cost: 0.5,
+							context_size_tokens: 123456,
+							cache_read_input_tokens: 120000,
+							cache_creation_input_tokens: 3456,
+							reasoning_tokens: 7,
+						},
+					}),
+				}),
+			);
+
+			await exportTracesCommand({ format: "csv" });
+
+			const lines = writtenOutput().trim().split("\n");
+			expect(lines[0]).toBe(
+				"trace_id,input,output,started_at,error,prompt_tokens,completion_tokens,total_cost,context_size_tokens,cache_read_input_tokens,cache_creation_input_tokens,reasoning_tokens",
+			);
+			expect(lines[1]).toContain("trace_0,hi,yo,");
+			expect(lines[1]).toContain(",10,5,0.5,123456,120000,3456,7");
+		});
+	});
 });
 
 describe("getTraceCommand()", () => {

@@ -1966,8 +1966,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")
-    .option("--limit <n>", "Max traces to export (default: 1000)")
-    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string }) => {
+    .option("--limit <n>", "Max traces to export (default: 1000); limits above one server page are fetched by cursor paging")
+    .option("--include-spans", "Include full span data for each trace (slower, larger output)")
+    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string; includeSpans?: boolean }) => {
       const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
       await impl(options);
     });

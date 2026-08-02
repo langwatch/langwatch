@@ -21,10 +21,12 @@ const {
   mockGetTracesWithSpans,
   mockGetTracesByThreadId,
   mockGetTracesWithSpansByThreadIds,
+  mockGetAllTracesForProject,
 } = vi.hoisted(() => ({
   mockGetTracesWithSpans: vi.fn(),
   mockGetTracesByThreadId: vi.fn(),
   mockGetTracesWithSpansByThreadIds: vi.fn(),
+  mockGetAllTracesForProject: vi.fn(),
 }));
 
 vi.mock("../clickhouse-trace.service", () => ({
@@ -33,6 +35,7 @@ vi.mock("../clickhouse-trace.service", () => ({
       getTracesWithSpans: mockGetTracesWithSpans,
       getTracesByThreadId: mockGetTracesByThreadId,
       getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+      getAllTracesForProject: mockGetAllTracesForProject,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
     }),
   }),
@@ -365,6 +368,90 @@ describe("TraceService — multi-trace read enrichment", () => {
       await service.getTracesByThreadId(PROJECT_ID, "thread-1", protections);
 
       expect(getLogs).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when reading via getAllTracesForProject with includeSpans", () => {
+    const searchInput = {
+      projectId: PROJECT_ID,
+      startDate: 1_700_000_000_000,
+      endDate: 1_700_000_002_000,
+      filters: {},
+    };
+
+    /** @scenario search with includeSpans returns coding-agent spans enriched from log records */
+    it("enriches coding-agent traces across the page's groups", async () => {
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [
+          [makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] })],
+          [
+            {
+              ...makeTrace({ origin: "application", spans: [claudeLlmSpan()] }),
+              trace_id: "b".repeat(32),
+            },
+          ],
+        ],
+        totalHits: 2,
+        traceChecks: {},
+      });
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const result = await service.getAllTracesForProject(
+        searchInput as never,
+        protections,
+        { includeSpans: true },
+      );
+
+      expect(result.groups[0]?.[0]?.spans?.[0]?.input).toEqual(enrichedInput);
+      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(result.groups[1]?.[0]?.spans?.[0]?.input ?? null).toBeNull();
+      expect(getLogs).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario search without includeSpans keeps the legacy empty spans shape */
+    it("does not enrich or read logs when includeSpans is not set", async () => {
+      const page = {
+        groups: [
+          [makeTrace({ origin: "coding_agent", spans: [] as Span[] })],
+        ],
+        totalHits: 1,
+        traceChecks: {},
+      };
+      mockGetAllTracesForProject.mockResolvedValue(page);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const result = await service.getAllTracesForProject(
+        searchInput as never,
+        protections,
+        {},
+      );
+
+      expect(getLogs).not.toHaveBeenCalled();
+      expect(result).toBe(page);
+    });
+
+    it("returns the page untouched when no trace is coding-agent origin", async () => {
+      const page = {
+        groups: [
+          [makeTrace({ origin: "application", spans: [claudeLlmSpan()] })],
+        ],
+        totalHits: 1,
+        traceChecks: {},
+      };
+      mockGetAllTracesForProject.mockResolvedValue(page);
+      const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
+      const service = makeService(getLogs);
+
+      const result = await service.getAllTracesForProject(
+        searchInput as never,
+        protections,
+        { includeSpans: true },
+      );
+
+      expect(getLogs).not.toHaveBeenCalled();
+      expect(result).toBe(page);
     });
   });
 

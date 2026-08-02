@@ -14,13 +14,35 @@ import { parseOriginOption } from "./origin-filter";
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
 
+/**
+ * The server clamps pageSize to this; limits above one page are satisfied by
+ * walking the keyset cursor the search endpoint returns in
+ * `pagination.scrollId`.
+ */
+const SERVER_PAGE_CAP = 1000;
+
 interface ExportedTrace {
   trace_id: string;
   input?: { value: string };
   output?: { value: string };
   timestamps?: { started_at?: number };
   metadata?: Record<string, unknown>;
+  metrics?: {
+    prompt_tokens?: number | null;
+    completion_tokens?: number | null;
+    total_cost?: number | null;
+    context_size_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+    cache_creation_input_tokens?: number | null;
+    reasoning_tokens?: number | null;
+  };
+  spans?: unknown[];
   error?: Record<string, unknown>;
+}
+
+interface SearchPage {
+  traces: ExportedTrace[];
+  pagination?: { totalHits?: number; scrollId?: string; skipped?: number };
 }
 
 export const exportTracesCommand = async (options: {
@@ -31,6 +53,7 @@ export const exportTracesCommand = async (options: {
   output?: string;
   limit?: string;
   origin?: string;
+  includeSpans?: boolean;
 }): Promise<void> => {
   await resolveCredentials();
 
@@ -59,60 +82,82 @@ export const exportTracesCommand = async (options: {
   try {
     events.started(`Exporting traces as ${format}…`);
 
-    const response = await fetch(`${endpoint}/api/traces/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
-        query: options.query,
-        startDate,
-        endDate,
-        pageSize: Math.min(limit, 100),
-        format: "json",
-        ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
-      }),
-    });
+    const traces: ExportedTrace[] = [];
+    let matched = 0;
+    let scrollId: string | undefined;
 
-    if (!response.ok) {
-      // Read the body off a CLONE before `formatFetchError` consumes it, so the
-      // event keeps the platform's real error kind instead of degrading to one
-      // guessed from the status.
-      const body: unknown = await response
-        .clone()
-        .json()
-        .catch(() => undefined);
+    // Page until the requested limit is met or the result set is exhausted.
+    // The cursor is authoritative for "there may be more"; a page shorter than
+    // requested only ends the walk when the shortfall is not accounted for by
+    // server-side `skipped` rows (traces dropped because they failed to
+    // serialize), since the cursor advances past those.
+    for (;;) {
+      const pageSize = Math.min(limit - traces.length, SERVER_PAGE_CAP);
 
-      const message = await formatFetchError(response);
-      events.failed({
-        error: Object.assign(new Error(message), {
-          status: response.status,
-          originalError: body,
+      const response = await fetch(`${endpoint}/api/traces/search`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+        body: JSON.stringify({
+          query: options.query,
+          startDate,
+          endDate,
+          pageSize,
+          format: "json",
+          ...(options.includeSpans ? { includeSpans: true } : {}),
+          ...(scrollId ? { scrollId } : {}),
+          ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
         }),
-        message: "Trace export failed",
       });
-      await events.flush();
 
-      failSpinner({ spinner, error: new Error(message), action: "export traces" });
-      process.exit(1);
+      if (!response.ok) {
+        // Read the body off a CLONE before `formatFetchError` consumes it, so the
+        // event keeps the platform's real error kind instead of degrading to one
+        // guessed from the status.
+        const body: unknown = await response
+          .clone()
+          .json()
+          .catch(() => undefined);
+
+        const message = await formatFetchError(response);
+        events.failed({
+          error: Object.assign(new Error(message), {
+            status: response.status,
+            originalError: body,
+          }),
+          message: "Trace export failed",
+        });
+        await events.flush();
+
+        failSpinner({ spinner, error: new Error(message), action: "export traces" });
+        process.exit(1);
+      }
+
+      const data = (await response.json()) as SearchPage;
+      const pageTraces = data.traces;
+      traces.push(...pageTraces);
+      matched = data.pagination?.totalHits ?? traces.length;
+
+      if (traces.length === pageTraces.length) {
+        // First page: report the match count the moment it is known.
+        events.count({
+          count: matched,
+          total: matched,
+          message: `${matched.toLocaleString()} trace${matched === 1 ? "" : "s"} to export`,
+        });
+      }
+
+      spinner.text = `Exporting traces (${format})... ${traces.length.toLocaleString()} fetched`;
+
+      scrollId = data.pagination?.scrollId;
+      const consumed = pageTraces.length + (data.pagination?.skipped ?? 0);
+      const exhausted = pageTraces.length === 0 || consumed < pageSize;
+      if (!scrollId || exhausted || traces.length >= limit) break;
     }
 
-    const data = await response.json() as {
-      traces: ExportedTrace[];
-      pagination?: { totalHits?: number };
-    };
-
-    const traces = data.traces;
-    const matched = data.pagination?.totalHits ?? traces.length;
-
-    events.count({
-      count: matched,
-      total: matched,
-      message: `${matched.toLocaleString()} trace${matched === 1 ? "" : "s"} to export`,
-    });
-
-    spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${data.pagination?.totalHits ? ` (${data.pagination.totalHits} total)` : ""}`);
+    spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`);
 
     // Serialising each trace is real per-row work, so this progress is genuinely
     // the file being built — not a bar invented for the sake of having one.
@@ -142,6 +187,26 @@ export const exportTracesCommand = async (options: {
     await events.flush();
   }
 };
+
+/**
+ * CSV columns. The first five are the original export shape and their order is
+ * a compatibility contract for existing consumers; token metric columns are
+ * only ever appended after them.
+ */
+const CSV_HEADERS = [
+  "trace_id",
+  "input",
+  "output",
+  "started_at",
+  "error",
+  "prompt_tokens",
+  "completion_tokens",
+  "total_cost",
+  "context_size_tokens",
+  "cache_read_input_tokens",
+  "cache_creation_input_tokens",
+  "reasoning_tokens",
+] as const;
 
 /** Build the export document, reporting progress as the rows are written. */
 const serialise = ({
@@ -175,8 +240,7 @@ const serialise = ({
   if (format === "json") return JSON.stringify(traces, null, 2);
   if (format === "jsonl") return lines.join("\n") + "\n";
 
-  const headers = ["trace_id", "input", "output", "started_at", "error"];
-  return [headers.join(","), ...lines].join("\n") + "\n";
+  return [CSV_HEADERS.join(","), ...lines].join("\n") + "\n";
 };
 
 const serialiseTrace = ({
@@ -196,8 +260,19 @@ const serialiseTrace = ({
       ? new Date(trace.timestamps.started_at).toISOString()
       : "",
     trace.error ? csvEscape(JSON.stringify(trace.error)) : "",
+    csvNumber(trace.metrics?.prompt_tokens),
+    csvNumber(trace.metrics?.completion_tokens),
+    csvNumber(trace.metrics?.total_cost),
+    csvNumber(trace.metrics?.context_size_tokens),
+    csvNumber(trace.metrics?.cache_read_input_tokens),
+    csvNumber(trace.metrics?.cache_creation_input_tokens),
+    csvNumber(trace.metrics?.reasoning_tokens),
   ].join(",");
 };
+
+function csvNumber(value: number | null | undefined): string {
+  return value == null ? "" : String(value);
+}
 
 function csvEscape(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
