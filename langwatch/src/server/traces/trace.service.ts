@@ -480,11 +480,31 @@ export class TraceService {
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        return this.clickHouseService.getAllTracesForProject(
+        const result = await this.clickHouseService.getAllTracesForProject(
           input,
           protections,
           options,
         );
+        if (!options.includeSpans) return result;
+        // includeSpans callers (bulk export, search) read whole spans, so the
+        // Claude Code content + cost join applies here exactly as on the
+        // single-trace and thread reads. Enrichment runs over the flattened
+        // page so the helper's bounded fan-out caps concurrent log reads for
+        // the whole page; a page with no coding-agent trace returns the same
+        // array reference and pays nothing.
+        const flat = result.groups.flat();
+        const enriched = await this.enrichCodingAgentTraces(
+          input.projectId,
+          flat,
+        );
+        if (enriched === flat) return result;
+        // The helper is positional (same order, same length), so the groups
+        // rebuild by position rather than by id.
+        let cursor = 0;
+        const groups = result.groups.map((group) =>
+          group.map(() => enriched[cursor++] as (typeof group)[number]),
+        );
+        return { ...result, groups };
       },
     );
   }

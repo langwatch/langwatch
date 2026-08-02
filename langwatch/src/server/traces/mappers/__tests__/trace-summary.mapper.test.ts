@@ -310,3 +310,109 @@ describe("mapTraceSummaryToTrace — metadata.models", () => {
     });
   });
 });
+
+describe("mapTraceSummaryToTrace — reserved token metrics", () => {
+  describe("when the fold stamped cache and reasoning token attributes", () => {
+    /** @scenario metrics carries the token fields the projection catalog already advertises */
+    it("surfaces them as the typed metric fields the projection catalog advertises", () => {
+      const summary = makeSummary({
+        attributes: {
+          "langwatch.reserved.cache_read_tokens": "120000",
+          "langwatch.reserved.cache_creation_tokens": "3456",
+          "langwatch.reserved.reasoning_tokens": "789",
+        },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metrics?.cache_read_input_tokens).toBe(120000);
+      expect(trace.metrics?.cache_creation_input_tokens).toBe(3456);
+      expect(trace.metrics?.reasoning_tokens).toBe(789);
+    });
+  });
+
+  describe("when the fold stamped context size and the cache TTL split", () => {
+    /** @scenario metrics carries context size and the cache creation TTL split */
+    it("surfaces context_size_tokens and the 5m and 1h cache creation counts", () => {
+      const summary = makeSummary({
+        attributes: {
+          "langwatch.reserved.context_size_tokens": "523544",
+          "langwatch.reserved.cache_creation_5m_tokens": "111",
+          "langwatch.reserved.cache_creation_1h_tokens": "18205",
+        },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metrics?.context_size_tokens).toBe(523544);
+      expect(trace.metrics?.cache_creation_5m_input_tokens).toBe(111);
+      expect(trace.metrics?.cache_creation_1h_input_tokens).toBe(18205);
+    });
+  });
+
+  describe("when no reserved token attributes are present", () => {
+    /** @scenario absent reserved token attributes leave the metrics fields unset */
+    it("keeps the metrics block at exactly the six legacy fields", () => {
+      const summary = makeSummary({ attributes: {} });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(Object.keys(trace.metrics ?? {}).sort()).toEqual([
+        "completion_tokens",
+        "first_token_ms",
+        "prompt_tokens",
+        "tokens_estimated",
+        "total_cost",
+        "total_time_ms",
+      ]);
+    });
+  });
+
+  describe("when a reserved token attribute is not numeric", () => {
+    it("adds no metric key for it", () => {
+      const summary = makeSummary({
+        attributes: {
+          "langwatch.reserved.context_size_tokens": "not-a-number",
+        },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metrics).not.toHaveProperty("context_size_tokens");
+    });
+  });
+});
+
+describe("mapAttributesToMetadata — otel_log_record_count sibling", () => {
+  describe("when the fold stamped a log record count", () => {
+    /** @scenario existing metadata keys flow untouched and otel_log_record_count is added as a sibling */
+    it("keeps the raw reserved key untouched and adds the clearly named sibling", () => {
+      const summary = makeSummary({
+        attributes: { "langwatch.reserved.log_record_count": "56353" },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metadata["langwatch.reserved.log_record_count"]).toBe(
+        "56353",
+      );
+      expect(trace.metadata.otel_log_record_count).toBe("56353");
+    });
+  });
+
+  describe("when the caller defined its own otel_log_record_count metadata", () => {
+    /** @scenario a caller-defined otel_log_record_count metadata key is never overwritten */
+    it("keeps the caller's value", () => {
+      const summary = makeSummary({
+        attributes: {
+          "metadata.otel_log_record_count": "caller-value",
+          "langwatch.reserved.log_record_count": "56353",
+        },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metadata.otel_log_record_count).toBe("caller-value");
+    });
+  });
+});

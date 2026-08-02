@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
@@ -298,6 +299,119 @@ export function registerTracesRoutes(
       return new Response(stream, {
         headers: { "Content-Type": "application/json" },
       });
+    },
+  );
+
+  // GET /:traceId/transcript - the coding-agent transcript for one trace
+  secured.access(requires("traces:view")).get(
+    "/:traceId/transcript",
+    describeRoute({
+      description:
+        "Derived coding-agent transcript for a trace: what the agent did, in order, " +
+        "with per-call token and cost economics. Empty entries for traces without " +
+        "coding-agent content.",
+      parameters: [
+        {
+          name: "traceId",
+          in: "path",
+          description:
+            "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
+          required: true,
+          schema: { type: "string" },
+        },
+      ],
+      responses: {
+        ...baseResponses,
+        200: {
+          description:
+            "The transcript: ordered entries plus per-session totals and sub-agent tool counts",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  agent: z.string(),
+                  sessionId: z.string().nullable(),
+                  entries: z.array(z.object({}).passthrough()),
+                  totals: z.object({
+                    modelCalls: z.number(),
+                    toolCalls: z.number(),
+                    tokens: z.number(),
+                    costUsd: z.number(),
+                  }),
+                  subAgents: z.array(z.object({}).passthrough()),
+                }),
+              ),
+            },
+          },
+        },
+        404: {
+          description: "Trace not found",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ message: z.string() })),
+            },
+          },
+        },
+        409: {
+          description:
+            "Ambiguous trace ID prefix — the prefix matches more than one trace",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  message: z.string(),
+                  candidateTraceIds: z.array(z.string()),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const { traceId } = c.req.param();
+
+      logger.info(
+        { projectId: project.id, traceId },
+        "Getting trace transcript",
+      );
+
+      const protections = await getProtectionsForProject(prisma, {
+        projectId: project.id,
+      });
+      const traceService = TraceService.create(prisma);
+
+      let trace;
+      try {
+        trace = await traceService.getById(project.id, traceId, protections);
+      } catch (err) {
+        if (err instanceof AmbiguousTraceIdPrefixError) {
+          return c.json(
+            {
+              message: err.message,
+              candidateTraceIds: err.candidateTraceIds,
+            },
+            409,
+          );
+        }
+        throw err;
+      }
+
+      if (!trace) {
+        throw new HTTPException(404, {
+          message: "Trace not found.",
+        });
+      }
+
+      const transcript = await readCodingAgentTranscriptWithProtections({
+        projectId: project.id,
+        traceId: trace.trace_id,
+        occurredAtMs: trace.timestamps.started_at,
+        protections,
+      });
+
+      return c.json(transcript);
     },
   );
 
