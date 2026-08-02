@@ -161,8 +161,9 @@ async function scenarioFullSurface() {
     /primary@example\.com/.test(raw) && /second@example\.com/.test(raw),
   );
   // Mailpit reconstructs a Bcc line from the SMTP envelope for developer
-  // visibility, so it cannot show whether we emitted one; the unit tests assert
-  // the rendered wire format directly.
+  // visibility, so it cannot show whether one was emitted. Confirming the wire
+  // format needs a real SMTP round trip against a sink that records DATA;
+  // streamTransport would false-positive here.
   const envelopeRecipients = await collectEnvelopeRecipients(list);
   check(
     "blind recipient still received the message",

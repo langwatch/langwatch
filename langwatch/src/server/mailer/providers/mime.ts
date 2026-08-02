@@ -113,10 +113,11 @@ export const buildRawMimeMessage = ({
     `From: ${sanitizeHeaderValue(from)}`,
     `To: ${to.map(sanitizeHeaderValue).join(", ")}`,
     ...(replyTo ? [`Reply-To: ${sanitizeHeaderValue(replyTo)}`] : []),
-    // Custom headers come before Subject so they're unambiguously in the header block
-    ...Object.entries(headers ?? {}).map(
-      ([name, value]) =>
-        `${sanitizeHeaderValue(name)}: ${sanitizeHeaderValue(value)}`,
+    // Custom headers come before Subject so they're unambiguously in the header
+    // block. Routed through the same helper the other gateways use, so a name
+    // carrying a colon or leading space cannot misparse or fold this header.
+    ...Object.entries(sanitizeHeaders(headers) ?? {}).map(
+      ([name, value]) => `${name}: ${value}`,
     ),
     `Subject: ${rfc2047EncodeHeader(subject)}`,
     `MIME-Version: 1.0`,

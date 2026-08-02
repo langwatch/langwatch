@@ -40,13 +40,30 @@ const isKnownProvider = (value: string): value is EmailProviderName =>
   (EMAIL_PROVIDER_NAMES as readonly string[]).includes(value);
 
 /**
+ * When the named gateway is unusable but another one is fully configured, the
+ * likely cause is a name that was never reviewed: the helm chart has always
+ * emitted `EMAIL_PROVIDER=sendgrid` by default, and installs that ran SES
+ * through extra environment variables were silently inferred before this
+ * setting was read. Naming the alternative lets that shape diagnose itself.
+ */
+const inferredProviderHint = (configured: EmailProviderName): string => {
+  const alternative = EMAIL_PROVIDER_NAMES.find(
+    (name) => name !== configured && isConfigured[name](),
+  );
+  return alternative
+    ? ` Settings for "${alternative}" are present — did you mean EMAIL_PROVIDER=${alternative}?`
+    : "";
+};
+
+/**
  * The gateway to send through, or null when email is not configured at all.
  *
- * `EMAIL_PROVIDER` is authoritative when set. Deployments that predate it are
- * still inferred from their credentials, so upgrading changes nothing for
- * them. A named-but-unusable provider throws rather than silently falling back
- * to another gateway, because quietly sending from an unexpected sender domain
- * is worse than a loud failure.
+ * `EMAIL_PROVIDER` is authoritative when set; deployments that never set it are
+ * inferred from their credentials as before. A named-but-unusable provider
+ * throws rather than silently falling back to another gateway, because quietly
+ * sending from an unexpected sender domain is worse than a loud failure. The
+ * error names a configured alternative when there is one, since a chart default
+ * can supply a name the operator never chose.
  */
 export const resolveEmailProvider = (): EmailProviderPort | null => {
   const configured = env.EMAIL_PROVIDER?.trim().toLowerCase();
@@ -59,7 +76,7 @@ export const resolveEmailProvider = (): EmailProviderPort | null => {
     }
     if (!isConfigured[configured]()) {
       throw new EmailProviderConfigurationError(
-        `EMAIL_PROVIDER is "${configured}" but it is not configured — ${missingSettingHint[configured]}.`,
+        `EMAIL_PROVIDER is "${configured}" but it is not configured — ${missingSettingHint[configured]}.${inferredProviderHint(configured)}`,
       );
     }
     return providers[configured];

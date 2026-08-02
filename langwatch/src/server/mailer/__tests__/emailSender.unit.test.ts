@@ -265,7 +265,9 @@ describe("buildRawMimeMessage", () => {
 
         // The injected CRLF must be collapsed to a space
         expect(headerBlock).not.toContain("X-Evil\r\nInjected");
-        expect(headerBlock).toContain("X-Evil Injected");
+        // A header name is a token, so the break is removed rather than turned
+        // into a space, which would itself be invalid in a name.
+        expect(headerBlock).toContain("X-EvilInjected");
         expect(headerBlock).not.toContain("val\r\nue");
       });
     });

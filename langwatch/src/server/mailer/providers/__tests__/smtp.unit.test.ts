@@ -197,7 +197,7 @@ describe("smtpProvider.send", () => {
     // Passing `bcc` to nodemailer renders a real Bcc header, which would leak
     // every blind recipient to everyone on the message. Delivery must ride the
     // SMTP envelope instead.
-    it("never passes bcc as a message field, which would render a Bcc header", async () => {
+    it("keeps blind recipients out of the message fields entirely", async () => {
       await smtpProvider.send({
         content: {
           to: "a@example.com",

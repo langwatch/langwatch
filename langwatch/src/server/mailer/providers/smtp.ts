@@ -88,11 +88,12 @@ export const smtpProvider: EmailProviderPort = {
     const toAddresses = toArray(content.to);
 
     try {
-      // Passing `bcc` to nodemailer renders a real `Bcc:` header, which would
-      // expose every blind recipient to everyone on the message. Instead the
-      // blind addresses go only into the SMTP envelope, so delivery reaches
-      // them while the rendered headers show just the public To list — the
-      // same guarantee SES `SendRawEmail` and SendGrid give.
+      // Blind addresses go only into the SMTP envelope. nodemailer would also
+      // keep them off the wire if passed as a `bcc` field (mail-composer drops
+      // the header unless keepBcc is set), but that is a library default rather
+      // than a property of this code. Stating the envelope explicitly makes the
+      // guarantee ours: the rendered headers carry only the public To list,
+      // matching SES `SendRawEmail` and SendGrid.
       const info = await transporter.sendMail({
         from,
         to: toAddresses,

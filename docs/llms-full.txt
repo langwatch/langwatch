@@ -52171,7 +52171,7 @@ Deployments whose only egress is a corporate HTTP proxy can set the standard `HT
 The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. `sendgrid` is not proxy-aware either: its client offers no seam to attach a proxy agent, so behind a proxy use `ses`, `resend`, or point `smtp` at SendGrid's own SMTP relay.
 
 <Note>
-The AWS SDK does not read `HTTPS_PROXY` by itself, so before this was supported a proxied deployment failed with a `read ETIMEDOUT` from SES. If you are on an older version and cannot upgrade, `smtp` against an internal relay avoids the proxy entirely.
+Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches the proxy to the SES and Resend clients itself. Without that, a proxied deployment fails with a `read ETIMEDOUT` reaching the provider.
 </Note>
 
 

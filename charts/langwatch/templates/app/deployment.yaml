@@ -204,9 +204,11 @@ spec:
             - name: SMTP_PORT
               value: {{ .Values.app.email.providers.smtp.port | quote }}
             {{- end }}
-            {{- if .Values.app.email.providers.smtp.secure }}
+            {{- /* Emptiness, not truthiness: `secure: false` is a real setting
+                   (force STARTTLS on 465) and must not be dropped. */}}
+            {{- if ne (toString .Values.app.email.providers.smtp.secure) "" }}
             - name: SMTP_SECURE
-              value: {{ .Values.app.email.providers.smtp.secure | quote }}
+              value: {{ .Values.app.email.providers.smtp.secure | toString | quote }}
             {{- end }}
             {{- if .Values.app.email.providers.smtp.user }}
             - name: SMTP_USER
