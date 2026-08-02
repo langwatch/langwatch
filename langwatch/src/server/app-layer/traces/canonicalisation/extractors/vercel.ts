@@ -8,15 +8,15 @@
  * from OTel GenAI conventions. This extractor normalises those to canonical
  * attributes.
  *
- * Detection: Presence of ai.prompt, ai.prompt.messages, ai.response, ai.model,
- * or ai.usage attributes
+ * Detection: Presence of ai.prompt, ai.prompt.messages, ai.response,
+ * ai.response.text, ai.response.object, ai.model, or ai.usage attributes
  *
  * Canonical attributes produced:
  * - langwatch.span.type (llm / tool)
  * - gen_ai.request.model / gen_ai.response.model (from ai.model)
  * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens (from ai.usage)
  * - gen_ai.input.messages (from ai.prompt / ai.prompt.messages)
- * - gen_ai.output.messages (from ai.response / ai.response.text)
+ * - gen_ai.output.messages (from ai.response / ai.response.text / ai.response.object)
  * - gen_ai.tool.name + langwatch.input/output (from ai.toolCall.* on tool spans)
  *
  * Special handling:
@@ -86,6 +86,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       attrs.has(ATTR_KEYS.AI_PROMPT) ||
       attrs.has(ATTR_KEYS.AI_RESPONSE) ||
       attrs.has(ATTR_KEYS.AI_RESPONSE_TEXT) ||
+      attrs.has(ATTR_KEYS.AI_RESPONSE_OBJECT) ||
       attrs.has(ATTR_KEYS.AI_USAGE) ||
       // AI SDK v5 emits usage as flat-dotted attributes rather than the
       // ai.usage object, and embedders (opencode) re-export under their own
@@ -284,11 +285,28 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // Note: Custom handling required for toolCalls extraction
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
-      const response =
-        attrs.take(ATTR_KEYS.AI_RESPONSE) ??
-        attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT);
+      const responseAttr = attrs.take(ATTR_KEYS.AI_RESPONSE);
+      const hasUsableResponse =
+        isNonEmptyString(responseAttr) || isRecord(responseAttr);
+      const responseTextAttr = !hasUsableResponse
+        ? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
+        : undefined;
+      const response = hasUsableResponse ? responseAttr : responseTextAttr;
+      const parsedResponseText =
+        responseTextAttr !== undefined &&
+        (isRecord(responseTextAttr) || Array.isArray(responseTextAttr));
 
-      if (isRecord(response)) {
+      if (parsedResponseText) {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
+          {
+            role: "assistant",
+            content: JSON.stringify(responseTextAttr),
+          },
+        ]);
+        ctx.recordRule(
+          `${this.id}:ai.response.text(parsed)->gen_ai.output.messages`,
+        );
+      } else if (isRecord(response)) {
         const responseObj = response as Record<string, unknown>;
         const messages: unknown[] = [];
 
@@ -319,7 +337,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
           ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
           ctx.recordRule(`${this.id}:ai.response->gen_ai.output.messages`);
         }
-      } else if (typeof response === "string") {
+      } else if (isNonEmptyString(response)) {
         // Simple string response
         ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
           { role: "assistant", content: response },

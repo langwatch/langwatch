@@ -10,6 +10,8 @@ import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   DestinationTeamNotFoundError,
+  PersonalProjectProtectedError,
+  PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   type ProjectService,
   ProjectSlugConflictError,
@@ -22,7 +24,11 @@ import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
-import { BadRequestError, NotFoundError } from "../../shared/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../shared/errors";
 import { handleProjectError } from "./error-handler";
 
 patchZodOpenapi();
@@ -138,6 +144,9 @@ secured.access(requires("project:create")).post(
       if (error instanceof TeamNotInOrganizationError) {
         throw new BadRequestError(error.message);
       }
+      if (error instanceof PersonalWorkspaceBoundaryError) {
+        throw new ForbiddenError(error.message);
+      }
       if (error instanceof ProjectSlugConflictError) {
         return c.json({ error: "Conflict", message: error.message }, 409);
       }
@@ -191,6 +200,20 @@ secured.access(requires("project:view")).get(
   },
 );
 
+/** The service's update failures, as the status codes they mean. */
+function asProjectUpdateHttpError(error: unknown): unknown {
+  if (error instanceof ProjectNotFoundError) {
+    return new NotFoundError("Project not found");
+  }
+  if (error instanceof DestinationTeamNotFoundError) {
+    return new BadRequestError(error.message);
+  }
+  if (error instanceof PersonalWorkspaceBoundaryError) {
+    return new ForbiddenError(error.message);
+  }
+  return error;
+}
+
 secured.access(requires("project:update")).patch(
   "/:id",
   projectServiceMiddleware,
@@ -218,13 +241,7 @@ secured.access(requires("project:update")).patch(
         },
       });
     } catch (error) {
-      if (error instanceof ProjectNotFoundError) {
-        throw new NotFoundError("Project not found");
-      }
-      if (error instanceof DestinationTeamNotFoundError) {
-        throw new BadRequestError(error.message);
-      }
-      throw error;
+      throw asProjectUpdateHttpError(error);
     }
 
     return c.json(projectResponse(project));
@@ -251,6 +268,9 @@ secured.access(requires("project:delete")).delete(
     } catch (error) {
       if (error instanceof ProjectNotFoundError) {
         throw new NotFoundError("Project not found");
+      }
+      if (error instanceof PersonalProjectProtectedError) {
+        throw new ForbiddenError(error.message);
       }
       throw error;
     }

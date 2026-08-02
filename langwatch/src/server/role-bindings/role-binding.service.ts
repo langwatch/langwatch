@@ -14,6 +14,7 @@ import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/rep
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
 export class RoleBindingService {
   constructor(
@@ -428,6 +429,7 @@ export class RoleBindingService {
     }
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
+    await assertNoPersonalTeamScope(this.prisma, [{ scopeType, scopeId }]);
     await this.validatePrincipalInOrganization({
       organizationId,
       userId,
@@ -470,6 +472,7 @@ export class RoleBindingService {
     if (!binding) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
     }
+    await assertNoPersonalTeamScope(this.prisma, [binding]);
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: [{ role, customRoleId }],
@@ -497,6 +500,7 @@ export class RoleBindingService {
     if (!binding) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
     }
+    await assertNoPersonalTeamScope(this.prisma, [binding]);
     await this.prisma.roleBinding.delete({ where: { id: bindingId } });
     return { success: true };
   }
@@ -532,6 +536,7 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
+    await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: bindingsToCreate,
@@ -541,7 +546,7 @@ export class RoleBindingService {
       if (bindingIdsToDelete.length > 0) {
         const existing = await tx.roleBinding.findMany({
           where: { id: { in: bindingIdsToDelete }, organizationId },
-          select: { id: true },
+          select: { id: true, scopeType: true, scopeId: true },
         });
         if (existing.length !== bindingIdsToDelete.length) {
           throw new TRPCError({
@@ -549,6 +554,7 @@ export class RoleBindingService {
             message: "One or more bindings not found",
           });
         }
+        await assertNoPersonalTeamScope(tx, existing);
         await tx.roleBinding.deleteMany({
           where: { id: { in: bindingIdsToDelete }, organizationId },
         });
@@ -608,6 +614,7 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
+    await assertNoPersonalTeamScope(this.prisma, bindingsToCreate);
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: bindingsToCreate,
@@ -642,7 +649,7 @@ export class RoleBindingService {
             organizationId,
             groupId,
           },
-          select: { id: true },
+          select: { id: true, scopeType: true, scopeId: true },
         });
         if (existing.length !== bindingIdsToDelete.length) {
           throw new TRPCError({
@@ -650,6 +657,7 @@ export class RoleBindingService {
             message: "One or more bindings not found",
           });
         }
+        await assertNoPersonalTeamScope(tx, existing);
         await tx.roleBinding.deleteMany({
           where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
         });

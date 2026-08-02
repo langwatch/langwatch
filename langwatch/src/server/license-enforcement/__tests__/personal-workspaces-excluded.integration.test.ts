@@ -365,6 +365,117 @@ describe("given an organization with both personal and real workspaces", () => {
     });
   });
 
+  describe("when a project's personal flag disagrees with its team", () => {
+    let strandedFlagProjectId: string | undefined;
+    let sharedProjectInPersonalTeamId: string | undefined;
+
+    beforeAll(async () => {
+      const personalTeam = await prisma.team.findFirstOrThrow({
+        where: { organizationId, isPersonal: true },
+        select: { id: true },
+      });
+
+      // A project flagged personal but sitting in a shared team, and a project
+      // not flagged personal sitting in a personal team. Neither is anyone's
+      // personal workspace: that takes both flags. The exemption keying on the
+      // project row alone is what makes one flipped flag worth an uncounted
+      // project, so both shapes have to count.
+      const strandedFlagProject = await prisma.project.create({
+        data: {
+          name: "Personal Flag In A Shared Team",
+          slug: `--test-proj-${testNamespace}-stranded-flag`,
+          apiKey: `sk-lw-test-${nanoid()}`,
+          teamId: realTeamId,
+          language: "en",
+          framework: "test",
+          isPersonal: true,
+        },
+      });
+      strandedFlagProjectId = strandedFlagProject.id;
+
+      const sharedProjectInPersonalTeam = await prisma.project.create({
+        data: {
+          name: "Shared Project In A Personal Team",
+          slug: `--test-proj-${testNamespace}-in-personal-team`,
+          apiKey: `sk-lw-test-${nanoid()}`,
+          teamId: personalTeam.id,
+          language: "en",
+          framework: "test",
+          isPersonal: false,
+        },
+      });
+      sharedProjectInPersonalTeamId = sharedProjectInPersonalTeam.id;
+    });
+
+    afterAll(async () => {
+      const ids = [strandedFlagProjectId, sharedProjectInPersonalTeamId].filter(
+        (id): id is string => !!id,
+      );
+      if (ids.length > 0) {
+        await prisma.project.deleteMany({ where: { id: { in: ids } } });
+      }
+    });
+
+    /** @scenario A project counts unless its own flag and its team both call it personal */
+    it("counts both, because neither lives in a personal workspace", async () => {
+      await expect(repository.getProjectCount(organizationId)).resolves.toBe(
+        REAL_PROJECTS + 2,
+      );
+    });
+
+    /** @scenario A project counts unless its own flag and its team both call it personal */
+    it("still leaves the genuine personal projects out", async () => {
+      const personalProjects = await prisma.project.count({
+        where: { team: { organizationId, isPersonal: true }, isPersonal: true },
+      });
+
+      expect(personalProjects).toBe(PERSONAL_PROJECTS);
+      await expect(repository.getProjectCount(organizationId)).resolves.toBe(
+        REAL_PROJECTS + 2,
+      );
+    });
+  });
+
+  describe("when a real team has been archived", () => {
+    let archivedTeamId: string | undefined;
+
+    beforeAll(async () => {
+      const archived = await prisma.team.create({
+        data: {
+          name: "Archived Team",
+          slug: `--test-team-${testNamespace}-archived`,
+          organizationId,
+          archivedAt: new Date(),
+        },
+      });
+      archivedTeamId = archived.id;
+    });
+
+    afterAll(async () => {
+      if (archivedTeamId) {
+        await cleanupTestRows(prisma, [["team", { id: archivedTeamId }]]);
+      }
+    });
+
+    /** @scenario Archived teams do not count toward the team limit */
+    it("leaves it out of the team count, the way an archived project is", async () => {
+      await expect(repository.getTeamCount(organizationId)).resolves.toBe(
+        REAL_TEAMS,
+      );
+    });
+
+    /** @scenario Archived teams do not count toward the team limit */
+    it("frees the allowance the archived team was holding", async () => {
+      const service = enforcementFor(
+        freePlanWith({ maxTeams: REAL_TEAMS + 1 }),
+      );
+
+      await expect(
+        service.checkLimit(organizationId, "teams"),
+      ).resolves.toMatchObject({ allowed: true, current: REAL_TEAMS });
+    });
+  });
+
   // Runs last: it adds a real project, which shifts the counts the
   // assertions above pin.
   describe("when a free organization still has real allowance left", () => {

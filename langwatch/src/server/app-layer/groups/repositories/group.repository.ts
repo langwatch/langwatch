@@ -134,6 +134,14 @@ export interface GroupRepository {
     scopeId: string;
   }): Promise<boolean>;
 
+  /**
+   * Whether any of these scopes is a personal team. Group bindings are how a
+   * personal workspace would gain a second member by proxy.
+   */
+  anyScopeIsPersonalTeam(
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+  ): Promise<boolean>;
+
   findUniqueSlug(params: {
     organizationId: string;
     baseSlug: string;

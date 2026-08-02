@@ -43,6 +43,26 @@ function createTestSpan(
 }
 
 describe("TraceIOExtractionService", () => {
+  describe("when gen_ai.output.messages contains a structured JSON result", () => {
+    it("keeps assistant content as readable JSON text", () => {
+      const output = { greeting: "Hallo" };
+      const messages = [{ role: "assistant", content: JSON.stringify(output) }];
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.output.messages": messages,
+        },
+      });
+
+      const result = service.extractRichIOFromSpan(span, "output");
+
+      expect(result).toEqual({
+        raw: messages,
+        text: JSON.stringify(output),
+        source: "gen_ai",
+      });
+    });
+  });
+
   describe("extractRichIOFromSpan", () => {
     describe("when langwatch.input is a JSON object with 'input' key", () => {
       it("extracts the text from the input key", () => {
