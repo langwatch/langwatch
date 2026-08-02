@@ -382,34 +382,77 @@ export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
 	].join("\n");
 }
 
+/** Where a line left the scanner: array nesting, and any open multi-line string. */
+interface ScanState {
+	depth: number;
+	/** The delimiter of the multi-line string still open, null when none is. */
+	openMultiline: '"""' | "'''" | null;
+}
+
 /**
- * Advance a bracket depth across one line, ignoring brackets inside strings and
- * after an unquoted `#`. Multi-line values are the reason this is needed: a
- * line's meaning depends on whether an earlier line left an array open.
+ * Advance the scan across one line, ignoring brackets inside strings and after
+ * an unquoted `#`. Multi-line values are the reason this is needed: a line's
+ * meaning depends on what an earlier line left open.
  *
- * Both TOML string forms are tracked. Literal strings are single-quoted and
+ * All four TOML string forms are tracked. Literal strings are single-quoted and
  * have no escape mechanism at all, so `path = 'C:\dir['` is an unbalanced
- * bracket that must not count — and single-quoted values are the form codex's
- * own documentation uses for commands.
+ * bracket that must not count, and single-quoted values are the form codex's
+ * own documentation uses for commands. The triple-delimited forms span lines
+ * and are opaque in between: an `instructions = """..."""` block full of
+ * brackets and `#` characters is prose, not structure, and reading it as
+ * structure would leave the scanner at a depth that hides the real top-level
+ * `notify` below it.
  */
-function bracketDepthAfterLine(line: string, depth: number): number {
-	let next = depth;
+function scanLine(line: string, state: ScanState): ScanState {
+	let next = state.depth;
+	let openMultiline = state.openMultiline;
 	let quote: '"' | "'" | null = null;
 	let escaped = false;
-	for (const ch of line) {
+
+	for (let i = 0; i < line.length; i++) {
+		const ch = line[i]!;
+
+		if (openMultiline !== null) {
+			// Basic multi-line strings honour backslash escapes; literal ones do
+			// not, so a lone backslash there cannot hide the terminator.
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (openMultiline === '"""' && ch === "\\") {
+				escaped = true;
+				continue;
+			}
+			if (line.startsWith(openMultiline, i)) {
+				i += openMultiline.length - 1;
+				openMultiline = null;
+			}
+			continue;
+		}
+
 		if (quote !== null) {
-			// Only basic (double-quoted) strings honour backslash escapes.
 			if (escaped) escaped = false;
 			else if (quote === '"' && ch === "\\") escaped = true;
 			else if (ch === quote) quote = null;
 			continue;
 		}
-		if (ch === '"' || ch === "'") quote = ch;
-		else if (ch === "#") break;
+
+		if (ch === '"' || ch === "'") {
+			const triple = `${ch}${ch}${ch}` as '"""' | "'''";
+			if (line.startsWith(triple, i)) {
+				openMultiline = triple;
+				i += 2;
+			} else {
+				quote = ch;
+			}
+		} else if (ch === "#") break;
 		else if (ch === "[") next++;
 		else if (ch === "]") next--;
 	}
-	return next;
+
+	// An unterminated single-line string cannot continue onto the next line in
+	// TOML, so only the multi-line state survives the line break.
+	return { depth: next, openMultiline };
 }
 
 /**
@@ -420,7 +463,7 @@ function bracketDepthAfterLine(line: string, depth: number): number {
 function isTableHeaderLine(line: string): boolean {
 	if (!/^[ \t]*\[/.test(line)) return false;
 	if (/^[ \t]*notify[ \t]*=/.test(line)) return false;
-	return bracketDepthAfterLine(line, 0) === 0;
+	return scanLine(line, { depth: 0, openMultiline: null }).depth === 0;
 }
 
 /**
@@ -429,15 +472,17 @@ function isTableHeaderLine(line: string): boolean {
  */
 function topLevelNotifyOffsets(content: string): number[] {
 	const found: number[] = [];
-	let depth = 0;
+	let state: ScanState = { depth: 0, openMultiline: null };
 	let offset = 0;
 	for (const line of content.split("\n")) {
-		if (depth === 0) {
+		// Inside a multi-line string every line is prose, including one that
+		// happens to read like `[a.table]` or `notify = [...]`.
+		if (state.depth === 0 && state.openMultiline === null) {
 			// Everything past a table header belongs to that table.
 			if (isTableHeaderLine(line)) return found;
 			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) found.push(offset);
 		}
-		depth = bracketDepthAfterLine(line, depth);
+		state = scanLine(line, state);
 		offset += line.length + 1;
 	}
 	return found;
@@ -472,7 +517,14 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
  * Only single-line and simple multi-line array forms are recognised, which is
  * every form codex's own docs show. Anything else is left alone rather than
  * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
+ *
+ * Both quoting forms are read. A literal (single-quoted) element is valid TOML
+ * and is what codex's own docs use for a Windows path, and since the assignment
+ * would be displaced either way, failing to parse it would comment the user's
+ * program out and chain nothing in its place, silently dropping it.
  */
+const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
+
 function findNotifyAssignment(
 	content: string,
 ): { raw: string; argv: string[] } | null {
@@ -480,24 +532,26 @@ function findNotifyAssignment(
 	if (!start) return null;
 	const openIndex = content.indexOf("[", start.index);
 	let depth = 0;
-	let inString = false;
+	let quote: '"' | "'" | null = null;
 	let escaped = false;
 	for (let i = openIndex; i < content.length; i++) {
 		const ch = content[i];
-		if (inString) {
+		if (quote !== null) {
+			// Literal strings have no escape mechanism, so only a basic string's
+			// backslash can hide its closing quote.
 			if (escaped) escaped = false;
-			else if (ch === "\\") escaped = true;
-			else if (ch === '"') inString = false;
+			else if (quote === '"' && ch === "\\") escaped = true;
+			else if (ch === quote) quote = null;
 			continue;
 		}
-		if (ch === '"') inString = true;
+		if (ch === '"' || ch === "'") quote = ch;
 		else if (ch === "[") depth++;
 		else if (ch === "]") {
 			depth--;
 			if (depth === 0) {
 				const raw = content.slice(start.index, i + 1);
-				const argv = Array.from(raw.matchAll(/"((?:[^"\\]|\\.)*)"/g)).map((m) =>
-					(m[1] ?? "").replace(/\\(.)/g, "$1"),
+				const argv = Array.from(raw.matchAll(TOML_ARRAY_ELEMENT)).map((m) =>
+					m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
 				);
 				return { raw, argv };
 			}

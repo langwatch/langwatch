@@ -462,3 +462,88 @@ describe("given a single-quoted literal string holding an unbalanced bracket", (
     });
   });
 });
+
+describe("given a multi-line string holding brackets above the user's notify", () => {
+  describe("when the block is written", () => {
+    /** @scenario "A user's own notify program keeps running" */
+    it("reads a basic multi-line string as prose, not as structure", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          // Between its triple quotes this is prose: the bracket opens nothing
+          // and the `#` starts no comment.
+          'instructions = """',
+          "Use [brackets for grouping, and # for a heading.",
+          '"""',
+          'notify = ["/usr/bin/terminal-notifier"]',
+          "",
+          "[otel]",
+          'environment = "mine"',
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      const live = fs
+        .readFileSync(configPath, "utf8")
+        .split("\n")
+        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+      expect(live).toHaveLength(1);
+      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+    });
+
+    /** @scenario "A user's own notify program keeps running" */
+    it("reads a literal multi-line string as prose too", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          "instructions = '''",
+          "Backslashes \\ and [brackets stay literal in here.",
+          "'''",
+          "notify = ['/usr/bin/terminal-notifier']",
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      const live = fs
+        .readFileSync(configPath, "utf8")
+        .split("\n")
+        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+      expect(live).toHaveLength(1);
+      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+    });
+
+    /** @scenario "A user's own notify program keeps running" */
+    it("ignores a notify assignment that is only text inside a multi-line string", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          'instructions = """',
+          "To wire notifications yourself, write:",
+          'notify = ["/usr/bin/my-notifier"]',
+          '"""',
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      // The documented example is not a live key, so nothing was displaced.
+      expect(result.chained).toBeNull();
+      const contents = fs.readFileSync(configPath, "utf8");
+      expect(contents).toContain('notify = ["/usr/bin/my-notifier"]');
+    });
+  });
+});
