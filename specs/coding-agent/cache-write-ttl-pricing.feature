@@ -64,3 +64,10 @@ Feature: Prompt-cache writes are priced by how long they live
     When the call is opened in the trace drawer
     Then the cost shown is the one computed from the call's tokens
     And it is the same figure the analytics graphs and the alerts count
+
+  @unit
+  Scenario: Every surface prices one call at one number
+    Given a Claude Code call that wrote 17854 tokens to an hour-long cache
+    When the call is priced for the trace header, the analytics graphs, the
+      waterfall and the terminal tab
+    Then all of them show what the provider charged, to a millionth of a dollar
