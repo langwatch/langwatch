@@ -142,6 +142,21 @@ Feature: An absent evaluator score is never presented or stored as zero
   # tests bind here or #6442's spec step claims it.
   # ============================================================================
 
+  # ⚠ The evaluator TYPE in this scenario's fixture is load-bearing. custom/*,
+  # workflow and code types return at evaluation-execution.service.ts:405-410,
+  # and native types at :596 -- all before langevalsClient.evaluate (:617). With
+  # any of those the captured payload is empty and "unchanged" degenerates to
+  # [] vs []: green, silent, asserting nothing. The bound test guards this by
+  # asserting the payload is non-empty BEFORE comparing it, and by separately
+  # asserting the judge was reached at all.
+
+  @integration
+  Scenario: A correctly configured evaluator's settings reach the judge unchanged
+    Given an evaluator whose config already carries the user's settings nested under settings
+    When the online evaluation pipeline executes it for a trace
+    Then the settings the judge receives are exactly the user's settings
+    And the settings the judge receives are not empty
+
   @unit
   Scenario Outline: The shared score formatter distinguishes absent from zero
     Given a score value of "<value>"
@@ -178,8 +193,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 # AC 0g: a recovered model naming an unconfigured provider degrades, does not throw every trace
 #        -> Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
 # AC 12b: correctly-configured monitors unaffected -- the 99% regression case
-#        -> covered by the AC0c2 shipped-default scenario plus AC0a's nested-config fixture;
-#           needs its own bound test at implementation time (non-custom/, non-native fixture).
+#        -> Scenario: A correctly configured evaluator's settings reach the judge unchanged
+#           (asserted one hop below executeForTrace, at langevalsClient.evaluate, which is
+#           where the existing settings-resolution tests do NOT reach)
 # AC 16a/16b: the reported symptom. NO SCENARIO -- a real reproduction against a customer
 #        account is a PR obligation, not something this suite can assert.
 # AC 11: ON LOAN to #6442 (see the note above)

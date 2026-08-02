@@ -323,6 +323,53 @@ describe("EvaluationExecutionService", () => {
       });
     });
 
+    describe("given a correctly-configured evaluator — the 99% regression case", () => {
+      // AC12b for langwatch#6397. The D6 change alters settings resolution on the
+      // hottest path in the product; this pins that a monitor whose config was
+      // ALREADY correct sends an unchanged payload.
+      //
+      // The fixture type is load-bearing. `custom/*`, `workflow` and code types
+      // return at evaluation-execution.service.ts:405-410, and native types
+      // return at :596 — all before `langevalsClient.evaluate` (:617). With any
+      // of those the capture is empty, and a "byte-identical payload" assertion
+      // degenerates to `[] vs []`: green, silent, and asserting nothing.
+      const USER_SETTINGS = {
+        prompt: "Score this answer for factual accuracy.",
+        model: "openai/gpt-5-mini",
+      };
+
+      /** @scenario A correctly configured evaluator's settings reach the judge unchanged */
+      it("forwards the user's settings to the judge unchanged", async () => {
+        const { service, mockClient } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...USER_SETTINGS },
+        });
+
+        const payload = (mockClient.evaluate as ReturnType<typeof vi.fn>).mock
+          .calls[0]?.[0] as { settings?: Record<string, unknown> };
+
+        // Guard FIRST: an empty capture would make the equality below vacuous.
+        expect(Object.keys(payload?.settings ?? {})).not.toHaveLength(0);
+        expect(payload?.settings).toEqual(USER_SETTINGS);
+      });
+
+      it("reaches the judge at all with this fixture type", async () => {
+        // Pins the guard above: if someone swaps the fixture to a custom/*,
+        // workflow or native type, evaluate is never called and the assertion
+        // that matters stops running.
+        const { service, mockClient } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...USER_SETTINGS },
+        });
+
+        expect(mockClient.evaluate).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("given a valid trace with default mappings", () => {
       describe("when evaluator is a built-in type", () => {
         it("calls langevalsClient.evaluate with mapped data", async () => {
