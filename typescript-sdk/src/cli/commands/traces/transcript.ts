@@ -1,5 +1,6 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
+import { z } from "zod";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
@@ -13,30 +14,39 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
-interface TranscriptEntry {
-  kind: string;
-  atMs: number;
-  text?: string | null;
-  chars?: number;
-  model?: string | null;
-  tokens?: number;
-  costUsd?: number;
-  name?: string | null;
-  [key: string]: unknown;
-}
+/** Bound the request so a quiet socket cannot hold the CLI open forever. */
+const REQUEST_TIMEOUT_MS = 60_000;
 
-interface TranscriptDocument {
-  agent: string;
-  sessionId: string | null;
-  entries: TranscriptEntry[];
-  totals: {
-    modelCalls: number;
-    toolCalls: number;
-    tokens: number;
-    costUsd: number;
-  };
-  subAgents: Array<{ agentId: string; toolCalls: number }>;
-}
+const transcriptEntrySchema = z
+  .object({
+    kind: z.string(),
+    atMs: z.number(),
+    text: z.string().nullable().optional(),
+    chars: z.number().optional(),
+    model: z.string().nullable().optional(),
+    tokens: z.number().optional(),
+    costUsd: z.number().optional(),
+    name: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const transcriptDocumentSchema = z.object({
+  agent: z.string(),
+  sessionId: z.string().nullable(),
+  entries: z.array(transcriptEntrySchema),
+  totals: z.object({
+    modelCalls: z.number(),
+    toolCalls: z.number(),
+    tokens: z.number(),
+    costUsd: z.number(),
+  }),
+  subAgents: z.array(
+    z.object({ agentId: z.string(), toolCalls: z.number() }).passthrough(),
+  ),
+});
+
+type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
+type TranscriptDocument = z.infer<typeof transcriptDocumentSchema>;
 
 export const transcriptTraceCommand = async (
   traceId: string,
@@ -55,7 +65,10 @@ export const transcriptTraceCommand = async (
 
     const response = await fetch(
       `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
-      { headers: buildAuthHeaders({ apiKey }) },
+      {
+        headers: buildAuthHeaders({ apiKey }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      },
     );
 
     if (!response.ok) {
@@ -73,9 +86,9 @@ export const transcriptTraceCommand = async (
       process.exit(1);
     }
 
-    doc = (await response.json()) as TranscriptDocument;
+    doc = transcriptDocumentSchema.parse(await response.json());
     spinner.succeed(
-      `${doc.entries.length} transcript entr${doc.entries.length === 1 ? "y" : "ies"} (${doc.agent})`,
+      `${plural(doc.entries.length, "transcript entry", "transcript entries")} (${doc.agent})`,
     );
   } catch (error) {
     events.failed({ error, message: "Trace transcript fetch failed" });
@@ -93,10 +106,13 @@ export const transcriptTraceCommand = async (
   events.completed({
     count: doc.entries.length,
     total: doc.entries.length,
-    message: `Printed ${doc.entries.length} transcript entr${doc.entries.length === 1 ? "y" : "ies"}`,
+    message: `Printed ${plural(doc.entries.length, "transcript entry", "transcript entries")}`,
   });
   await events.flush();
 };
+
+const plural = (count: number, singular: string, pluralForm?: string): string =>
+  `${count} ${count === 1 ? singular : (pluralForm ?? `${singular}s`)}`;
 
 /** Human rendering: one line per entry, economics dimmed, prompts loud. */
 const renderTranscript = (doc: TranscriptDocument): void => {
@@ -107,7 +123,7 @@ const renderTranscript = (doc: TranscriptDocument): void => {
   console.log();
   console.log(
     chalk.gray(
-      `${doc.totals.modelCalls} model calls · ${doc.totals.toolCalls} tool calls · ` +
+      `${plural(doc.totals.modelCalls, "model call")} · ${plural(doc.totals.toolCalls, "tool call")} · ` +
         `${doc.totals.tokens.toLocaleString()} tokens · $${doc.totals.costUsd.toFixed(2)}`,
     ),
   );

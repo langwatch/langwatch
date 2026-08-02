@@ -21,6 +21,17 @@ const PROGRESS_CHUNK = 25;
  */
 const SERVER_PAGE_CAP = 1000;
 
+/**
+ * Page size used when spans are requested. Each coding-agent trace's spans
+ * are joined with a bounded but heavy per-trace log read server-side, so the
+ * CLI asks for smaller pages and lets the cursor walk cover the rest — same
+ * total work, no long single request.
+ */
+const SPANS_PAGE_CAP = 200;
+
+/** Bound each page request so a quiet socket cannot hold the export open forever. */
+const REQUEST_TIMEOUT_MS = 60_000;
+
 interface ExportedTrace {
   trace_id: string;
   input?: { value: string };
@@ -75,6 +86,12 @@ export const exportTracesCommand = async (options: {
     : now;
 
   const limit = options.limit ? parseInt(options.limit, 10) : 1000;
+  if (!Number.isFinite(limit) || limit <= 0) {
+    console.error(
+      chalk.red(`Error: --limit must be a positive number, got "${options.limit}"`),
+    );
+    process.exit(1);
+  }
   const originFilter = parseOriginOption(options.origin);
   const spinner = createSpinner(`Exporting traces (${format})...`).start();
   const events = createCommandEvents({ resource: "trace", verb: "export" });
@@ -92,10 +109,14 @@ export const exportTracesCommand = async (options: {
     // server-side `skipped` rows (traces dropped because they failed to
     // serialize), since the cursor advances past those.
     for (;;) {
-      const pageSize = Math.min(limit - traces.length, SERVER_PAGE_CAP);
+      const pageSize = Math.min(
+        limit - traces.length,
+        options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
+      );
 
       const response = await fetch(`${endpoint}/api/traces/search`, {
         method: "POST",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
           "Content-Type": "application/json",
           ...buildAuthHeaders({ apiKey }),
@@ -137,7 +158,9 @@ export const exportTracesCommand = async (options: {
 
       const data = (await response.json()) as SearchPage;
       const pageTraces = data.traces;
-      traces.push(...pageTraces);
+      // A server page can only be shorter than requested, but truncate anyway
+      // so a misbehaving page can never overshoot the caller's --limit.
+      traces.push(...pageTraces.slice(0, limit - traces.length));
       matched = data.pagination?.totalHits ?? traces.length;
 
       if (traces.length === pageTraces.length) {

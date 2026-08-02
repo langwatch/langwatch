@@ -338,6 +338,30 @@ describe("exportTracesCommand()", () => {
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 			expect(requestBodies()[0]!.pageSize).toBe(50);
 		});
+
+		/** @scenario export ends the walk on a short page without skipped rows */
+		it("stops on a short page whose shortfall is not accounted for by skipped", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
+			);
+
+			await exportTracesCommand({ limit: "3000" });
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(writtenOutput().trim().split("\n")).toHaveLength(990);
+		});
+
+		/** @scenario export rejects a non-numeric limit */
+		it("exits with an error for a non-numeric --limit instead of paging unbounded", async () => {
+			fetchMock.mockResolvedValue(
+				pageResponse({ count: 100, from: 0, scrollId: "s", totalHits: 1000 }),
+			);
+
+			await expect(exportTracesCommand({ limit: "abc" })).rejects.toThrow(
+				ProcessExitError,
+			);
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
 	});
 
 	describe("when --include-spans is provided", () => {
@@ -361,6 +385,17 @@ describe("exportTracesCommand()", () => {
 			const lines = writtenOutput().trim().split("\n");
 			const first = JSON.parse(lines[0]!) as { spans?: unknown[] };
 			expect(first.spans).toEqual([{ span_id: "span_0" }]);
+		});
+
+		/** @scenario export with --include-spans requests smaller pages */
+		it("caps each page at 200 so per-trace span joining stays bounded", async () => {
+			fetchMock.mockResolvedValueOnce(
+				pageResponse({ count: 200, from: 0, totalHits: 200 }),
+			);
+
+			await exportTracesCommand({ includeSpans: true });
+
+			expect(requestBodies()[0]!.pageSize).toBe(200);
 		});
 
 		/** @scenario export without --include-spans keeps the legacy request shape */
@@ -449,7 +484,7 @@ describe("transcriptTraceCommand()", () => {
 			.join("\n");
 		expect(printed).toContain("summarise the repo");
 		expect(printed).toContain("Here is the summary.");
-		expect(printed).toContain("1 model calls");
+		expect(printed).toContain("1 model call ·");
 	});
 
 	it("exits with code 1 when the endpoint answers an error", async () => {

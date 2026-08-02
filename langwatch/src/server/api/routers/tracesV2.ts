@@ -1746,7 +1746,7 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
-      const protections = await getUserProtectionsForProject(ctx as never, {
+      const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
       return readCodingAgentTranscriptWithProtections({

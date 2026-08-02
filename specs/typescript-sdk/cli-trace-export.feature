@@ -38,6 +38,22 @@ Feature: CLI trace export paging and span depth
     Then the CLI makes exactly one search request with pageSize 50
 
   @unit
+  Scenario: export ends the walk on a short page without skipped rows
+    Given a page returns fewer traces than requested and reports no skipped rows
+    When I run "langwatch trace export" with a limit above one page
+    Then the CLI treats the result set as exhausted and stops
+
+  @unit
+  Scenario: export rejects a non-numeric limit
+    When I run "langwatch trace export --limit abc"
+    Then the CLI exits with an error before making any request
+
+  @unit
+  Scenario: export with --include-spans requests smaller pages
+    When I run "langwatch trace export --include-spans"
+    Then each page request asks for at most 200 traces so span joining stays bounded
+
+  @unit
   Scenario: export with --include-spans requests span data and preserves it in the output
     Given the search endpoint returns traces carrying spans
     When I run "langwatch trace export --include-spans"

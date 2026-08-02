@@ -151,11 +151,22 @@ export function mapAttributesToMetadata(
     if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
-  // Clearly named sibling for the OTel log-record count: it counts log
-  // records correlated to the trace, not model/API calls, and the raw
-  // `langwatch.reserved.log_record_count` key above keeps flowing unchanged
-  // because external consumers already parse it. A caller-supplied metadata
-  // key with this name wins (set in the passthrough loop above).
+  addOtelLogRecordCountAlias(metadata, attributes);
+
+  return metadata;
+}
+
+/**
+ * Clearly named sibling for the OTel log-record count: it counts log records
+ * correlated to the trace, not model/API calls, and the raw
+ * `langwatch.reserved.log_record_count` key keeps flowing unchanged because
+ * external consumers already parse it. A caller-supplied metadata key with
+ * this name wins (set by the generic passthrough before this runs).
+ */
+function addOtelLogRecordCountAlias(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): void {
   const logRecordCount = attributes["langwatch.reserved.log_record_count"];
   if (
     logRecordCount !== undefined &&
@@ -163,8 +174,6 @@ export function mapAttributesToMetadata(
   ) {
     metadata.otel_log_record_count = logRecordCount;
   }
-
-  return metadata;
 }
 
 /**
@@ -175,22 +184,26 @@ export function mapAttributesToMetadata(
  * removed because the search/export response is a compatibility surface for
  * BI consumers.
  */
-const RESERVED_TOKEN_METRIC_ATTRIBUTES: Record<string, string> = {
+const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
   cache_read_input_tokens: "langwatch.reserved.cache_read_tokens",
   cache_creation_input_tokens: "langwatch.reserved.cache_creation_tokens",
   cache_creation_5m_input_tokens: "langwatch.reserved.cache_creation_5m_tokens",
   cache_creation_1h_input_tokens: "langwatch.reserved.cache_creation_1h_tokens",
   reasoning_tokens: "langwatch.reserved.reasoning_tokens",
   context_size_tokens: "langwatch.reserved.context_size_tokens",
-};
+} as const satisfies Partial<
+  Record<keyof NonNullable<Trace["metrics"]>, string>
+>;
 
 function tokenMetricsFromAttributes(
   attributes: Record<string, string>,
-): Record<string, number> {
-  const metrics: Record<string, number> = {};
+): Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> {
+  const metrics: Partial<
+    Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>
+  > = {};
   for (const [metricKey, attrKey] of Object.entries(
     RESERVED_TOKEN_METRIC_ATTRIBUTES,
-  )) {
+  ) as Array<[keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]>) {
     const raw = attributes[attrKey];
     if (raw == null || raw === "") continue;
     const value = Number(raw);
