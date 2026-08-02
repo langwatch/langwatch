@@ -100,6 +100,7 @@ Feature: Settings Plans Comparison Page
       | custom data retention         |
       | custom SSO and RBAC           |
       | audit logs                    |
+      | gateway webhooks              |
       | uptime and support SLA        |
       | compliance and legal reviews  |
       | custom terms and DPA          |

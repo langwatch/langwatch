@@ -173,7 +173,7 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License: open-core split
 
-LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules (SSO, SCIM provisioning, audit logs, billing, back-office) live under [`langwatch/ee/`](langwatch/ee/) and are the one part that needs a commercial license in production. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules (SSO, SCIM provisioning, audit logs, gateway webhooks, billing, back-office) live under [`langwatch/ee/`](langwatch/ee/) and are the one part that needs a commercial license in production. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
 See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](LICENSE.md), [`NOTICE`](NOTICE), [`langwatch/ee/LICENSE.md`](langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 

@@ -7,8 +7,8 @@ This license governs the files in this directory and its subdirectories (the
 the repository root `LICENSE.md` and `NOTICE`.
 
 The Enterprise Software implements the enterprise capabilities of LangWatch,
-including single sign-on, SCIM provisioning, audit logging, licensing, billing,
-and back-office tooling. The enterprise capabilities are the surfaces the
+including single sign-on, SCIM provisioning, audit logging, gateway webhooks,
+licensing, billing, and back-office tooling. The enterprise capabilities are the surfaces the
 software enables only for licensed deployments; each verifies a license at
 runtime before it can be used.
 
