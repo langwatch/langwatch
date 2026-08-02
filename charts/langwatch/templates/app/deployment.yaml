@@ -178,6 +178,42 @@ spec:
             {{- if eq .Values.app.email.provider "sendgrid" }}
             {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
             {{- end }}
+            {{- if eq .Values.app.email.provider "ses" }}
+            # USE_AWS_SES is what the mailer checks; credentials come from the
+            # pod's IAM role (IRSA) unless AWS_* are supplied via app.extraEnv.
+            - name: USE_AWS_SES
+              value: "true"
+            - name: AWS_REGION
+              value: {{ .Values.app.email.providers.ses.region | quote }}
+            {{- if .Values.app.email.providers.ses.endpoint }}
+            - name: AWS_SES_ENDPOINT
+              value: {{ .Values.app.email.providers.ses.endpoint | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if eq .Values.app.email.provider "smtp" }}
+            {{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
+            {{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) | nindent 12 }}
+            {{- else }}
+            - name: SMTP_HOST
+              value: {{ .Values.app.email.providers.smtp.host | quote }}
+            {{- if .Values.app.email.providers.smtp.port }}
+            - name: SMTP_PORT
+              value: {{ .Values.app.email.providers.smtp.port | quote }}
+            {{- end }}
+            {{- if .Values.app.email.providers.smtp.secure }}
+            - name: SMTP_SECURE
+              value: {{ .Values.app.email.providers.smtp.secure | quote }}
+            {{- end }}
+            {{- if .Values.app.email.providers.smtp.user }}
+            - name: SMTP_USER
+              value: {{ .Values.app.email.providers.smtp.user | quote }}
+            {{- include "langwatch.secretOrValue" (dict "envName" "SMTP_PASSWORD" "fieldValues" .Values.app.email.providers.smtp.password) | nindent 12 }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if eq .Values.app.email.provider "resend" }}
+            {{- include "langwatch.secretOrValue" (dict "envName" "RESEND_API_KEY" "fieldValues" .Values.app.email.providers.resend.apiKey) | nindent 12 }}
+            {{- end }}
             {{- end }}
 
             # AI Gateway virtual-key pepper (control-plane only).

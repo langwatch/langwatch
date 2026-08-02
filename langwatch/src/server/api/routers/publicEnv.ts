@@ -3,6 +3,7 @@ import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
+import { hasEmailProvider } from "../../mailer/providers";
 import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
@@ -27,8 +28,7 @@ export const publicEnvRouter = publicProcedure
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 
-      HAS_EMAIL_PROVIDER_KEY:
-        !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
+      HAS_EMAIL_PROVIDER_KEY: hasEmailProvider(),
       IS_SAAS: env.IS_SAAS,
       // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
       // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see

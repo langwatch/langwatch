@@ -384,8 +384,11 @@ app:
   email:
     enabled: false
     defaultFrom: ""
-    # Email provider to use. Options: sendgrid (default)
-    # When set to 'sendgrid', enables SendGrid integration
+    # Email provider to use. Options: sendgrid (default), ses, smtp, resend
+    # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
+    # Postmark, Mailgun or any other gateway that speaks SMTP.
+    # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
+    # NO_PROXY through app.extraEnv; the ses and resend providers honour them.
     provider: sendgrid
 
     providers:
@@ -395,6 +398,41 @@ app:
         apiKey:
           value: ""
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.ses AWS SES provider configuration.
+      ## @param app.email.providers.ses.region [string] AWS region for SES.
+      ## @param app.email.providers.ses.endpoint [string] Override the SES endpoint (VPC endpoint or egress relay).
+      ses:
+        region: ""
+        endpoint: ""
+
+      ## @extra app.email.providers.smtp SMTP relay configuration.
+      ## @param app.email.providers.smtp.url.value [string] Full SMTP connection URL. Takes precedence over the discrete settings.
+      ## @param app.email.providers.smtp.host [string] SMTP host, when not using a URL.
+      ## @param app.email.providers.smtp.port [string] SMTP port. Defaults to 587.
+      ## @param app.email.providers.smtp.secure [string] Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.
+      ## @param app.email.providers.smtp.user [string] Username. Omit for an unauthenticated internal relay.
+      smtp:
+        url:
+          value: ""
+          ## @param app.email.providers.smtp.url.secretKeyRef [object] Secret ref for the SMTP URL.
+          secretKeyRef: { name: "", key: "" }
+        host: ""
+        port: ""
+        secure: ""
+        user: ""
+        password:
+          value: ""
+          ## @param app.email.providers.smtp.password.secretKeyRef [object] Secret ref for the SMTP password.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.resend Resend provider configuration.
+      ## @param app.email.providers.resend.apiKey.value [string] Resend API key.
+      resend:
+        apiKey:
+          value: ""
+          ## @param app.email.providers.resend.apiKey.secretKeyRef [object] Secret ref for the Resend API key.
           secretKeyRef: { name: "", key: "" }
 
   # NextAuth.js authentication configuration

@@ -278,6 +278,18 @@ export function createEnvConfig() {
       USE_AWS_SES: z.string().optional(),
       AWS_REGION: z.string().optional(),
       EMAIL_DEFAULT_FROM: z.string().optional(),
+      // Email gateway selection. When unset, the provider is inferred from
+      // whichever credentials are present, so existing deployments are
+      // unaffected. See src/server/mailer/providers/index.ts.
+      EMAIL_PROVIDER: z.string().optional(),
+      AWS_SES_ENDPOINT: z.string().optional(),
+      SMTP_URL: z.string().optional(),
+      SMTP_HOST: z.string().optional(),
+      SMTP_PORT: z.string().optional(),
+      SMTP_USER: z.string().optional(),
+      SMTP_PASSWORD: z.string().optional(),
+      SMTP_SECURE: z.string().optional(),
+      RESEND_API_KEY: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
@@ -498,6 +510,15 @@ export function createEnvConfig() {
       USE_AWS_SES: process.env.USE_AWS_SES,
       AWS_REGION: process.env.AWS_REGION,
       EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
+      EMAIL_PROVIDER: process.env.EMAIL_PROVIDER,
+      AWS_SES_ENDPOINT: process.env.AWS_SES_ENDPOINT,
+      SMTP_URL: process.env.SMTP_URL,
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_PORT: process.env.SMTP_PORT,
+      SMTP_USER: process.env.SMTP_USER,
+      SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+      SMTP_SECURE: process.env.SMTP_SECURE,
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
       S3_KEY_SALT: process.env.S3_KEY_SALT,
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
