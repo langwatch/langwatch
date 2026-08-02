@@ -11,8 +11,8 @@ import {
   projectCodingAgentSessionToRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
-import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
+import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,
@@ -54,6 +54,8 @@ function emptyState() {
     entrypoint: null,
     finalRequestId: null,
     userId: "user-1" as string | null,
+    parentSessionId: null,
+    isFork: false,
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
@@ -88,6 +90,7 @@ function emptyState() {
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: {},
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -97,6 +100,7 @@ function emptyState() {
     errorTypes: {},
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 0,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 0,

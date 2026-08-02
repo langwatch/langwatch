@@ -2,17 +2,19 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the three coding-agent tables (migrations 00051-00054) through
- * their real INSERT/SELECT SQL against ClickHouse. The unit tests cover the
- * query shape and record mapping with a mocked client; this proves the
+ * Round-trips the three coding-agent tables (migrations 00051-00054, 00068)
+ * through their real INSERT/SELECT SQL against ClickHouse. The unit tests cover
+ * the query shape and record mapping with a mocked client; this proves the
  * DDL↔repository column contract — a mismatched column name or type fails a
  * real insert loudly, which no mock can catch — plus the ReplacingMergeTree
  * dedup / last-write-wins semantics ADR-056 relies on. It also covers the
  * ADR-066 additions: the 00053 read-back state columns (sub-agent ids, ordered
  * step start times, previous-call context, converged metric units) that let
- * store.get() reconstruct working state without touching event_log, and the
+ * store.get() reconstruct working state without touching event_log, the
  * 00054 AppliedEventIds watermark that survives cache loss — including the
- * mixed-deploy read of a pre-00054 row whose body omits the column entirely.
+ * mixed-deploy read of a pre-00054 row whose body omits the column entirely —
+ * and the 00068 context-economics columns (reported rate-limit events,
+ * compactions by trigger, spawn lineage).
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -52,6 +54,8 @@ function sessionRow(
     userId: "user-1",
     terminalType: "xterm",
     entrypoint: "cli",
+    parentSessionId: `${tag}-parent`,
+    isFork: true,
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -85,9 +89,10 @@ function sessionRow(
     activeTimeCliSec: 300,
     toolResultBytes: 4096,
     toolInputBytes: 128,
-    compactions: 0,
+    compactions: 3,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: { auto: 2, manual: 1 },
     peakContextTokens: 9000,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -95,6 +100,7 @@ function sessionRow(
     errorTypes: { ShellError: 1 },
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 2,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 3,
@@ -198,6 +204,13 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(read!.sessionKeySource).toBe("provider");
     expect(read!.costUsd).toBeCloseTo(1.25);
     expect(read!.commits).toBe(2);
+
+    // Context-economics columns (migration 00068): the trigger map, the
+    // reported rate-limit counter and the spawn lineage all survive the trip.
+    expect(read!.compactionTriggers).toEqual({ auto: 2, manual: 1 });
+    expect(read!.rateLimitEvents).toBe(2);
+    expect(read!.parentSessionId).toBe(`${tag}-parent`);
+    expect(read!.isFork).toBe(true);
 
     // Read-back columns (migration 00053, ADR-066) survive the trip so
     // store.get() can reconstruct working state without touching event_log.

@@ -30,6 +30,7 @@ export type CodingAgentEvent =
   | "api_error"
   | "api_refusal"
   | "retries_exhausted"
+  | "rate_limit"
   | "tool_result"
   | "tool_decision"
   | "compaction"

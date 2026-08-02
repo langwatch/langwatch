@@ -77,6 +77,7 @@ const CLAUDE = {
     TOOL_DECISION: "tool_decision",
     API_ERROR: "api_error",
     RETRIES_EXHAUSTED: "retries_exhausted",
+    RATE_LIMIT: "rate_limit",
     REFUSAL: "api_refusal",
     COMPACTION: "compaction",
     PERMISSION_MODE: "permission_mode_changed",
@@ -136,6 +137,8 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     entrypoint: null,
     finalRequestId: null,
     userId: null,
+    parentSessionId: null,
+    isFork: false,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -175,6 +178,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: {},
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -184,6 +188,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     errorTypes: {},
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 0,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 0,
@@ -379,6 +384,10 @@ function withIdentity(
       str(attrs["user.id"]) ??
       str(attrs["user.account_uuid"]) ??
       str(attrs["user.account_id"]),
+    // Spawn lineage, for agents that stamp it. Once-set like the rest of the
+    // identity: a session has ONE parent, and a fork stays a fork.
+    parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
+    isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
   };
 }
 
@@ -744,6 +753,12 @@ export function applyLogToCodingAgentSession({
         retryMs: base.retryMs + num(attrs.total_retry_duration_ms),
       };
 
+    case CLAUDE.EVENT.RATE_LIMIT:
+      // The agent SAYING it was throttled, kept apart from `rateLimited`
+      // (inferred from 429 api_errors): this event also fires on warnings and
+      // status updates, so the two counters answer different questions.
+      return { ...base, rateLimitEvents: base.rateLimitEvents + 1 };
+
     case CLAUDE.EVENT.REFUSAL: {
       // A server-side fallback hop already retried on another model, so the user
       // never saw that refusal. Counting it would overstate how often the agent
@@ -768,6 +783,13 @@ export function applyLogToCodingAgentSession({
           base.compactionTokensBefore + num(attrs.pre_tokens),
         compactionTokensAfter:
           base.compactionTokensAfter + num(attrs.post_tokens),
+        // A manual /compact and an auto-compaction tell different stories
+        // about the session; "unknown" is the honest bucket for telemetry
+        // that predates the trigger attribute.
+        compactionTriggers: bump(
+          base.compactionTriggers,
+          str(attrs.trigger) ?? "unknown",
+        ),
       };
 
     case CLAUDE.EVENT.PERMISSION_MODE: {

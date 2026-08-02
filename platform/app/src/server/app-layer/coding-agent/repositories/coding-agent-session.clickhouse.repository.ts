@@ -59,6 +59,8 @@ interface ClickHouseWriteRecord {
   UserId: string;
   TerminalType: string;
   Entrypoint: string;
+  ParentSessionId: string;
+  IsFork: boolean;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -97,6 +99,7 @@ interface ClickHouseWriteRecord {
   Compactions: number;
   CompactionTokensBefore: string;
   CompactionTokensAfter: string;
+  CompactionTriggers: Record<string, number>;
   PeakContextTokens: string;
   CacheRebuildCount: number;
   LargestCacheRebuildTokens: string;
@@ -105,6 +108,7 @@ interface ClickHouseWriteRecord {
   ErrorTypes: Record<string, number>;
   ApiErrors: number;
   RateLimited: number;
+  RateLimitEvents: number;
   RetriesExhausted: number;
   RetryMs: string;
   Attempts: number;
@@ -184,6 +188,8 @@ function toRecord({
     UserId: row.userId,
     TerminalType: row.terminalType,
     Entrypoint: row.entrypoint,
+    ParentSessionId: row.parentSessionId,
+    IsFork: row.isFork,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -224,6 +230,7 @@ function toRecord({
     Compactions: row.compactions,
     CompactionTokensBefore: big(row.compactionTokensBefore),
     CompactionTokensAfter: big(row.compactionTokensAfter),
+    CompactionTriggers: row.compactionTriggers,
     PeakContextTokens: big(row.peakContextTokens),
     CacheRebuildCount: row.cacheRebuildCount,
     LargestCacheRebuildTokens: big(row.largestCacheRebuildTokens),
@@ -232,6 +239,7 @@ function toRecord({
     ErrorTypes: row.errorTypes,
     ApiErrors: row.apiErrors,
     RateLimited: row.rateLimited,
+    RateLimitEvents: row.rateLimitEvents,
     RetriesExhausted: row.retriesExhausted,
     RetryMs: big(row.retryMs),
     Attempts: row.attempts,
@@ -839,6 +847,8 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     userId: String(record.UserId ?? ""),
     terminalType: String(record.TerminalType ?? ""),
     entrypoint: String(record.Entrypoint ?? ""),
+    parentSessionId: String(record.ParentSessionId ?? ""),
+    isFork: Boolean(record.IsFork),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -884,6 +894,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     compactions: asNumber(record.Compactions),
     compactionTokensBefore: asNumber(record.CompactionTokensBefore),
     compactionTokensAfter: asNumber(record.CompactionTokensAfter),
+    compactionTriggers: asNumberMap(record.CompactionTriggers),
     peakContextTokens: asNumber(record.PeakContextTokens),
     cacheRebuildCount: asNumber(record.CacheRebuildCount),
     largestCacheRebuildTokens: asNumber(record.LargestCacheRebuildTokens),
@@ -892,6 +903,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     errorTypes: asNumberMap(record.ErrorTypes),
     apiErrors: asNumber(record.ApiErrors),
     rateLimited: asNumber(record.RateLimited),
+    rateLimitEvents: asNumber(record.RateLimitEvents),
     retriesExhausted: asNumber(record.RetriesExhausted),
     retryMs: asNumber(record.RetryMs),
     attempts: asNumber(record.Attempts),

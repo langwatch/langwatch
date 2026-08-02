@@ -140,6 +140,13 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   refusal: "api_refusal",
   api_retries_exhausted: "retries_exhausted",
   retries_exhausted: "retries_exhausted",
+  // Claude's two rate-limit carriers: `rate_limit_event` fires on a limit
+  // actually engaging, `rate_limit_info` on status/warning updates. Both are
+  // the agent SAYING it was throttled, as opposed to the 429-inferred
+  // `rateLimited` counter, so they land on one canonical fact.
+  rate_limit: "rate_limit",
+  rate_limit_event: "rate_limit",
+  rate_limit_info: "rate_limit",
   tool_result: "tool_result",
   tool_decision: "tool_decision",
   compaction: "compaction",
@@ -260,6 +267,14 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "speed",
   "decision_type",
   "decision_source",
+  // Sub-agent lineage, for agents that stamp it (the claude_code
+  // subagent-spawn vocabulary): who spawned this session, and whether it
+  // FORKED the parent's context instead of starting fresh.
+  "parent_session_id",
+  "parent_agent_id",
+  "is_fork",
+  "depth",
+  "spawn_mode",
   "mcp_server_scope",
   "gen_ai.request.model",
   "mcp_server.name",

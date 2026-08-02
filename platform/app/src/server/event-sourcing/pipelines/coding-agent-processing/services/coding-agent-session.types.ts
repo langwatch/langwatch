@@ -68,6 +68,14 @@ export interface CodingAgentSessionData {
    * them this stays null rather than guessing.
    */
   userId: string | null;
+  /**
+   * Spawn lineage, when the agent stamps it: the session that spawned this
+   * one, and whether this session FORKED the parent's context (inheriting the
+   * whole window, and its cost) rather than starting fresh. Most agents emit
+   * no lineage today, so these honestly stay null/false for them.
+   */
+  parentSessionId: string | null;
+  isFork: boolean;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -146,6 +154,12 @@ export interface CodingAgentSessionData {
   compactionTokensBefore: number;
   compactionTokensAfter: number;
   /**
+   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}` — a session
+   * that keeps auto-compacting is out of headroom, one the user compacts is
+   * being STEERED; "unknown" buckets telemetry predating the attribute.
+   */
+  compactionTriggers: Record<string, number>;
+  /**
    * The biggest single model call's context (`cacheReadTokens +
    * cacheCreationTokens` for that ONE call) — "how big did the context
    * window get", as distinct from `cacheReadTokens`/`cacheCreationTokens`
@@ -178,6 +192,13 @@ export interface CodingAgentSessionData {
   apiErrors: number;
   /** Rate limits (429) — worth telling apart from every other failure. */
   rateLimited: number;
+  /**
+   * Rate-limit EVENTS the agent reported (`rate_limit_event` /
+   * `rate_limit_info`), kept apart from the 429-inferred `rateLimited` above:
+   * the event also fires on warnings and status updates, so the two counters
+   * answer different questions.
+   */
+  rateLimitEvents: number;
   retriesExhausted: number;
   /** Total wall-clock burned on retries. Time paid for nothing. */
   retryMs: number;

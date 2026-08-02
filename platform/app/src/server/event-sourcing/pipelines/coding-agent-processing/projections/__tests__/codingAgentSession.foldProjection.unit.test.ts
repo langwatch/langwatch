@@ -302,6 +302,121 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
   });
 
+  describe("when the agent reports rate-limit events", () => {
+    /** @scenario a reported rate limit is counted apart from an inferred one */
+    it("counts them apart from the 429-inferred counter", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.rate_limit_event" },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.rate_limit_info" },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_error", status_code: "429" },
+          timeMs: 3_500,
+        }),
+        state,
+      );
+
+      // Both reported carriers land on the same counter; the 429-inferred
+      // one answers a different question and is untouched by them.
+      expect(state.rateLimitEvents).toBe(2);
+      expect(state.rateLimited).toBe(1);
+      expect(state.apiErrors).toBe(1);
+    });
+  });
+
+  describe("when compactions arrive with and without a trigger", () => {
+    /** @scenario compactions are told apart by what triggered them */
+    it("tallies the trigger kinds, bucketing the unnamed as unknown", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (const [timeMs, trigger] of [
+        [1_500, "auto"],
+        [2_500, "auto"],
+        [3_500, "manual"],
+      ] as const) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: {
+              "event.name": "claude_code.compaction",
+              pre_tokens: 100_000,
+              post_tokens: 20_000,
+              trigger,
+            },
+            timeMs,
+          }),
+          state,
+        );
+      }
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.compaction",
+            pre_tokens: 90_000,
+            post_tokens: 15_000,
+          },
+          timeMs: 4_500,
+        }),
+        state,
+      );
+
+      expect(state.compactions).toBe(4);
+      expect(state.compactionTriggers).toEqual({
+        auto: 2,
+        manual: 1,
+        unknown: 1,
+      });
+    });
+  });
+
+  describe("when telemetry names the session's parent", () => {
+    /** @scenario a spawned session knows its parent */
+    it("keeps the first parent and the fork flag once set", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.user_prompt",
+            parent_session_id: "parent-1",
+            is_fork: true,
+          },
+        }),
+        state,
+      );
+      // A later record naming a different parent does not move it: a session
+      // has one parent, and a fork stays a fork.
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.user_prompt",
+            parent_session_id: "parent-2",
+            is_fork: false,
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.parentSessionId).toBe("parent-1");
+      expect(state.isFork).toBe(true);
+    });
+  });
+
   describe("when a session sends only metrics", () => {
     /** @scenario a session that sent only metrics still appears */
     it("materializes the session from metric contributions alone", () => {

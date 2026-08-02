@@ -57,6 +57,13 @@ const codingAgentSessionEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
  *
+ *  2026-08-02 — the context-economics columns of migration 00068 joined the
+ *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
+ *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
+ *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows
+ *  stamped earlier decode without them, so the bump refolds each session once
+ *  to backfill the counters from its stored contributions.
+ *
  *  2026-07-28 — the logs-only double-count gate became symmetric: a logs-only
  *  agent's model calls and tool runs no longer fold from BOTH its log events
  *  and the equivalent spans. Rows stamped `2026-07-27` were folded by the
@@ -77,7 +84,7 @@ const codingAgentSessionEvents = [
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
  *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
-export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-02";
 
 /**
  * The stamp rows carried while migrations 00053 and 00054 shipped.
@@ -89,10 +96,14 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
  * decodable — see `CodingAgentSessionStore.getWithApplied` for the second half
  * of the discriminator.
  *
- * Still accepted after the 2026-07-28 bump, deliberately: these rows predate
+ * Still accepted after the 2026-07-28 and 2026-08-02 bumps, deliberately:
+ * these rows predate
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
- * discriminator already covers the shape.
+ * discriminator already covers the shape. (The same trade holds for the 00068
+ * context-economics columns: a pre-stamp row decodes them as zeros, which is
+ * honest for sessions that old, and a replay can backfill them if they ever
+ * matter.)
  *
  * Rejecting them would buy nothing anyway. They also predate Cowork detection,
  * so their contributions were stored labelled `claude_code` and a refold
@@ -370,6 +381,8 @@ export interface CodingAgentSessionRow {
   userId: string;
   terminalType: string;
   entrypoint: string;
+  parentSessionId: string;
+  isFork: boolean;
 
   modelCalls: number;
   toolCalls: number;
@@ -409,6 +422,7 @@ export interface CodingAgentSessionRow {
   compactions: number;
   compactionTokensBefore: number;
   compactionTokensAfter: number;
+  compactionTriggers: Record<string, number>;
   peakContextTokens: number;
   cacheRebuildCount: number;
   largestCacheRebuildTokens: number;
@@ -417,6 +431,7 @@ export interface CodingAgentSessionRow {
   errorTypes: Record<string, number>;
   apiErrors: number;
   rateLimited: number;
+  rateLimitEvents: number;
   retriesExhausted: number;
   retryMs: number;
   attempts: number;
@@ -493,6 +508,8 @@ export function projectCodingAgentSessionToRow({
     userId: state.userId ?? "",
     terminalType: state.terminalType ?? "",
     entrypoint: state.entrypoint ?? "",
+    parentSessionId: state.parentSessionId ?? "",
+    isFork: state.isFork,
 
     modelCalls: state.modelCalls,
     toolCalls: state.toolCalls,
@@ -531,6 +548,7 @@ export function projectCodingAgentSessionToRow({
     compactions: state.compactions,
     compactionTokensBefore: state.compactionTokensBefore,
     compactionTokensAfter: state.compactionTokensAfter,
+    compactionTriggers: state.compactionTriggers,
     peakContextTokens: state.peakContextTokens,
     cacheRebuildCount: state.cacheRebuildCount,
     largestCacheRebuildTokens: state.largestCacheRebuildTokens,
@@ -539,6 +557,7 @@ export function projectCodingAgentSessionToRow({
     errorTypes: state.errorTypes,
     apiErrors: state.apiErrors,
     rateLimited: state.rateLimited,
+    rateLimitEvents: state.rateLimitEvents,
     retriesExhausted: state.retriesExhausted,
     retryMs: state.retryMs,
     attempts: state.attempts,
@@ -637,6 +656,8 @@ export function codingAgentSessionStateFromRow(
     entrypoint: nullIfEmpty(row.entrypoint),
     finalRequestId: nullIfEmpty(row.finalRequestId),
     userId: nullIfEmpty(row.userId),
+    parentSessionId: nullIfEmpty(row.parentSessionId),
+    isFork: row.isFork,
 
     modelCalls: row.modelCalls,
     toolCalls: row.toolCalls,
@@ -681,6 +702,7 @@ export function codingAgentSessionStateFromRow(
     compactions: row.compactions,
     compactionTokensBefore: row.compactionTokensBefore,
     compactionTokensAfter: row.compactionTokensAfter,
+    compactionTriggers: row.compactionTriggers,
     peakContextTokens: row.peakContextTokens,
     cacheRebuildCount: row.cacheRebuildCount,
     largestCacheRebuildTokens: row.largestCacheRebuildTokens,
@@ -690,6 +712,7 @@ export function codingAgentSessionStateFromRow(
     errorTypes: row.errorTypes,
     apiErrors: row.apiErrors,
     rateLimited: row.rateLimited,
+    rateLimitEvents: row.rateLimitEvents,
     retriesExhausted: row.retriesExhausted,
     retryMs: row.retryMs,
     attempts: row.attempts,
