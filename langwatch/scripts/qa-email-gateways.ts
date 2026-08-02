@@ -40,6 +40,19 @@ const check = (label: string, condition: boolean, detail?: string) => {
   }
 };
 
+/** Every address Mailpit saw delivered, across the To and Bcc of each copy. */
+async function collectEnvelopeRecipients(
+  list: { ID: string }[],
+): Promise<Set<string>> {
+  const addresses = new Set<string>();
+  for (const m of list) {
+    const d = await messageDetail(m.ID);
+    for (const r of d.To ?? []) addresses.add(r.Address);
+    for (const r of d.Bcc ?? []) addresses.add(r.Address);
+  }
+  return addresses;
+}
+
 async function scenarioPlainAlert() {
   console.log("\n[1] a real rendered trigger alert email");
   await reset();
@@ -54,7 +67,9 @@ async function scenarioPlainAlert() {
 
   const list = await messages();
   check("exactly one message arrived", list.length === 1, `got ${list.length}`);
-  const detail = await messageDetail(list[0].ID);
+  const first = list[0];
+  if (!first) return;
+  const detail = await messageDetail(first.ID);
   check(
     "subject preserved",
     detail.Subject === "Alerta: transbordo para humano acima do limite",
@@ -78,12 +93,11 @@ async function scenarioPlainAlert() {
     "value missing from body",
   );
 
-  const raw = await rawSource(list[0].ID);
+  const raw = await rawSource(first.ID);
   check(
     "List-Unsubscribe header delivered through SMTP",
     /List-Unsubscribe:/i.test(raw),
   );
-  return list[0].ID;
 }
 
 async function scenarioFullSurface() {
@@ -109,9 +123,11 @@ async function scenarioFullSurface() {
   const list = await messages();
   // Mailpit stores one message per envelope recipient delivery.
   check("message delivered", list.length >= 1, `got ${list.length}`);
+  const first = list[0];
+  if (!first) return;
 
-  const detail = await messageDetail(list[0].ID);
-  const raw = await rawSource(list[0].ID);
+  const detail = await messageDetail(first.ID);
+  const raw = await rawSource(first.ID);
 
   check(
     "attachment present",
@@ -130,15 +146,9 @@ async function scenarioFullSurface() {
     /primary@example\.com/.test(raw) && /second@example\.com/.test(raw),
   );
   // Mailpit reconstructs a Bcc line from the SMTP envelope for developer
-  // visibility, so it cannot show whether we emitted one. scripts/qa-mime-isolate.ts
-  // asserts the wire format directly.
-
-  const envelopeRecipients = new Set<string>();
-  for (const m of list) {
-    const d = await messageDetail(m.ID);
-    for (const r of d.To ?? []) envelopeRecipients.add(r.Address);
-    for (const r of d.Bcc ?? []) envelopeRecipients.add(r.Address);
-  }
+  // visibility, so it cannot show whether we emitted one; the unit tests assert
+  // the rendered wire format directly.
+  const envelopeRecipients = await collectEnvelopeRecipients(list);
   check(
     "blind recipient still received the message",
     JSON.stringify(list).includes("hidden@example.com") ||
@@ -158,7 +168,12 @@ async function scenarioUnicode() {
   });
 
   const list = await messages();
-  const detail = await messageDetail(list[0].ID);
+  const first = list[0];
+  if (!first) {
+    check("message delivered", false, "inbox was empty");
+    return;
+  }
+  const detail = await messageDetail(first.ID);
   check(
     "subject decoded correctly",
     detail.Subject === "Transbordo para humano: atenção à média não prevista",

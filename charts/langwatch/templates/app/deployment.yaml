@@ -183,8 +183,12 @@ spec:
             # pod's IAM role (IRSA) unless AWS_* are supplied via app.extraEnv.
             - name: USE_AWS_SES
               value: "true"
+            {{- /* Emitted only when set: an empty entry would shadow an
+                   AWS_REGION supplied through app.extraEnv / app.extraEnvFrom. */}}
+            {{- if .Values.app.email.providers.ses.region }}
             - name: AWS_REGION
               value: {{ .Values.app.email.providers.ses.region | quote }}
+            {{- end }}
             {{- if .Values.app.email.providers.ses.endpoint }}
             - name: AWS_SES_ENDPOINT
               value: {{ .Values.app.email.providers.ses.endpoint | quote }}
@@ -193,7 +197,7 @@ spec:
             {{- if eq .Values.app.email.provider "smtp" }}
             {{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
             {{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) | nindent 12 }}
-            {{- else }}
+            {{- else if .Values.app.email.providers.smtp.host }}
             - name: SMTP_HOST
               value: {{ .Values.app.email.providers.smtp.host | quote }}
             {{- if .Values.app.email.providers.smtp.port }}

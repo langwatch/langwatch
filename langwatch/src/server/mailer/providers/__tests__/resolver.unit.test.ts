@@ -38,6 +38,7 @@ describe("resolveEmailProvider", () => {
       expect(resolveEmailProvider()?.name).toBe(provider);
     });
 
+    /** @scenario "Operator picks a provider explicitly" */
     it("accepts a name with surrounding whitespace and mixed case", () => {
       setEnv({ EMAIL_PROVIDER: "  SMTP  ", SMTP_URL: "smtp://localhost:1025" });
 
@@ -46,6 +47,7 @@ describe("resolveEmailProvider", () => {
   });
 
   describe("given EMAIL_PROVIDER is set alongside other credentials", () => {
+    /** @scenario "A named provider wins over inferred credentials" */
     it("uses the named provider rather than the inferred one", () => {
       setEnv({
         EMAIL_PROVIDER: "smtp",
@@ -60,12 +62,14 @@ describe("resolveEmailProvider", () => {
   });
 
   describe("given EMAIL_PROVIDER is not set", () => {
+    /** @scenario "Existing AWS deployments keep working without naming a provider" */
     it("infers SES from the legacy AWS settings", () => {
       setEnv({ USE_AWS_SES: "true", AWS_REGION: "eu-central-1" });
 
       expect(resolveEmailProvider()?.name).toBe("ses");
     });
 
+    /** @scenario "Existing deployments keep working without naming a provider" */
     it("infers SendGrid from a lone API key", () => {
       setEnv({ SENDGRID_API_KEY: "SG.test" });
 
@@ -88,12 +92,14 @@ describe("resolveEmailProvider", () => {
       expect(resolveEmailProvider()).toBeNull();
     });
 
+    /** @scenario "No email configuration at all is reported clearly" */
     it("returns null when nothing is configured", () => {
       expect(resolveEmailProvider()).toBeNull();
     });
   });
 
   describe("given EMAIL_PROVIDER names something unsupported", () => {
+    /** @scenario "An unknown provider name is rejected loudly" */
     it("throws an error listing the supported gateways", () => {
       setEnv({ EMAIL_PROVIDER: "carrier-pigeon" });
 
@@ -118,6 +124,7 @@ describe("resolveEmailProvider", () => {
       expect(() => resolveEmailProvider()).toThrow(expected);
     });
 
+    /** @scenario "A named provider missing its credentials is rejected loudly" */
     it("does not silently fall back to another configured gateway", () => {
       setEnv({ EMAIL_PROVIDER: "resend", SENDGRID_API_KEY: "SG.test" });
 
@@ -134,6 +141,7 @@ describe("hasEmailProvider", () => {
   });
 
   describe("given a usable gateway", () => {
+    /** @scenario "Email options appear once any gateway is usable" */
     it("reports email as available", () => {
       setEnv({ EMAIL_PROVIDER: "smtp", SMTP_URL: "smtp://localhost:1025" });
 
@@ -142,12 +150,14 @@ describe("hasEmailProvider", () => {
   });
 
   describe("given no configuration", () => {
+    /** @scenario "Email options stay hidden when no gateway is usable" */
     it("reports email as unavailable", () => {
       expect(hasEmailProvider()).toBe(false);
     });
   });
 
   describe("given a misconfigured gateway", () => {
+    /** @scenario "A misconfigured gateway does not break the interface" */
     it("reports unavailable instead of throwing, so the UI can still render", () => {
       setEnv({ EMAIL_PROVIDER: "carrier-pigeon" });
 

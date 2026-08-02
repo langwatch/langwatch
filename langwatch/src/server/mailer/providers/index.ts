@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
 import { resendProvider } from "./resend";
 import { sendgridProvider } from "./sendgrid";
@@ -9,6 +10,8 @@ import {
   type EmailProviderName,
   type EmailProviderPort,
 } from "./types";
+
+const logger = createLogger("langwatch:mailer:providers");
 
 const providers: Record<EmailProviderName, EmailProviderPort> = {
   ses: sesProvider,
@@ -73,7 +76,10 @@ export const resolveEmailProvider = (): EmailProviderPort | null => {
 export const hasEmailProvider = (): boolean => {
   try {
     return resolveEmailProvider() !== null;
-  } catch {
+  } catch (error) {
+    // Without this the email UI just silently disappears, giving the operator
+    // no signal that their EMAIL_PROVIDER is set but unusable.
+    logger.warn({ error }, "Email provider is configured but unusable");
     return false;
   }
 };

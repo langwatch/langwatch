@@ -52,11 +52,20 @@ export const isProxyBypassed = (targetHost: string): boolean => {
     });
 };
 
-/** Hostname of a URL, or the input unchanged when it is already a bare host. */
+/**
+ * Hostname of a URL, or the input unchanged when it is already a bare host.
+ *
+ * A scheme-less `host:port` parses as a URL whose scheme is `host:` and whose
+ * hostname is empty, so the parsed result is only trusted when it is non-empty.
+ */
 export const hostnameOf = (urlOrHost: string): string => {
   try {
-    return new URL(urlOrHost).hostname;
+    const hostname = new URL(urlOrHost).hostname;
+    if (hostname) return hostname;
   } catch {
-    return urlOrHost.replace(/^[a-z]+:\/\//i, "").split("/")[0] ?? urlOrHost;
+    // Not a URL; fall through to the bare-host handling below.
   }
+  const withoutScheme = urlOrHost.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  const hostPort = withoutScheme.split("/")[0] ?? "";
+  return hostPort.replace(/:\d+$/, "") || urlOrHost;
 };

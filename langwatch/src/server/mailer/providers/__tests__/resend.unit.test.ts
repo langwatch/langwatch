@@ -106,6 +106,7 @@ describe("resendProvider.send", () => {
   });
 
   describe("given the full message surface", () => {
+    /** @scenario "The full message surface survives every gateway" */
     it("maps blind copies, reply-to, headers and base64 attachments", async () => {
       await resendProvider.send(
         {
@@ -158,6 +159,7 @@ describe("resendProvider.send", () => {
   });
 
   describe("given an outbound proxy is configured", () => {
+    /** @scenario "Email egress follows the configured outbound proxy" */
     it("routes the request through a proxy dispatcher", async () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
 
@@ -170,6 +172,7 @@ describe("resendProvider.send", () => {
       expect(sentInit().dispatcher).toBeDefined();
     });
 
+    /** @scenario "Hosts excluded from proxying are contacted directly" */
     it("goes direct when the API host is excluded from proxying", async () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "api.resend.com";

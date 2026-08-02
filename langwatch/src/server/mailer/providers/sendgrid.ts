@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import sgMail from "@sendgrid/mail";
 import { env } from "../../../env.mjs";
-import { sanitizeHeaderValue } from "./mime";
+import { sanitizeHeaders } from "./mime";
 import { type EmailContent, type EmailProviderPort, toArray } from "./types";
 
 const logger = createLogger("langwatch:mailer:sendgrid");
@@ -9,8 +9,10 @@ const logger = createLogger("langwatch:mailer:sendgrid");
 export const sendgridProvider: EmailProviderPort = {
   name: "sendgrid",
   async send(content: EmailContent, defaultFrom: string) {
-    // SendGrid's client is axios-based, which honours HTTPS_PROXY/NO_PROXY
-    // from the environment on its own, so there is no proxy wiring here.
+    // No proxy wiring: SendGrid's axios-based client does not reliably pick up
+    // HTTPS_PROXY, and it exposes no transport seam we can pass an agent
+    // through. Proxied deployments should use ses, resend, or the smtp gateway
+    // pointed at SendGrid's own SMTP relay.
     sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
 
     const bccAddresses = toArray(content.bcc);
@@ -18,15 +20,7 @@ export const sendgridProvider: EmailProviderPort = {
     // Same CRLF/header-injection hardening as the SES raw-MIME path: strip
     // line breaks from custom header names and values before they reach the
     // provider.
-    const sanitizedHeaders =
-      content.headers && Object.keys(content.headers).length > 0
-        ? Object.fromEntries(
-            Object.entries(content.headers).map(([name, value]) => [
-              sanitizeHeaderValue(name),
-              sanitizeHeaderValue(value),
-            ]),
-          )
-        : undefined;
+    const sanitizedHeaders = sanitizeHeaders(content.headers);
 
     const msg = {
       to: content.to,

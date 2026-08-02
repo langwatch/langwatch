@@ -39,15 +39,17 @@ describe("buildSmtpTransportOptions", () => {
     it("uses the URL directly", () => {
       setEnv({ SMTP_URL: "smtps://user:pass@relay.corp:465" });
 
-      expect(buildSmtpTransportOptions()).toBe(
-        "smtps://user:pass@relay.corp:465",
-      );
+      expect(buildSmtpTransportOptions()).toMatchObject({
+        url: "smtps://user:pass@relay.corp:465",
+      });
     });
 
     it("prefers the URL over discrete settings", () => {
       setEnv({ SMTP_URL: "smtp://localhost:1025", SMTP_HOST: "other.host" });
 
-      expect(buildSmtpTransportOptions()).toBe("smtp://localhost:1025");
+      expect(buildSmtpTransportOptions()).toMatchObject({
+        url: "smtp://localhost:1025",
+      });
     });
   });
 
@@ -55,7 +57,7 @@ describe("buildSmtpTransportOptions", () => {
     it("defaults to port 587 with STARTTLS", () => {
       setEnv({ SMTP_HOST: "relay.corp" });
 
-      expect(buildSmtpTransportOptions()).toEqual({
+      expect(buildSmtpTransportOptions()).toMatchObject({
         host: "relay.corp",
         port: 587,
         secure: false,
@@ -131,6 +133,7 @@ describe("smtpProvider.send", () => {
   });
 
   describe("given a plain message", () => {
+    /** @scenario "Every supported gateway can be selected" */
     it("sends the html body with the default sender", async () => {
       await smtpProvider.send(
         { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
@@ -156,6 +159,7 @@ describe("smtpProvider.send", () => {
   });
 
   describe("given the full message surface", () => {
+    /** @scenario "The full message surface survives every gateway" */
     it("maps blind copies, reply-to, custom headers and attachments", async () => {
       await smtpProvider.send(
         {
@@ -221,6 +225,24 @@ describe("smtpProvider.send", () => {
       expect(sentMessage().envelope).toEqual({
         from: "noreply@langwatch.ai",
         to: ["a@example.com", "hidden@example.com", "hidden2@example.com"],
+      });
+    });
+
+    it("builds the envelope from an explicit sender, not the default", async () => {
+      await smtpProvider.send(
+        {
+          to: "a@example.com",
+          bcc: ["hidden@example.com"],
+          from: "alerts@acme.com",
+          subject: "Alert",
+          html: "<p>Alert</p>",
+        },
+        "noreply@langwatch.ai",
+      );
+
+      expect(sentMessage().envelope).toEqual({
+        from: "alerts@acme.com",
+        to: ["a@example.com", "hidden@example.com"],
       });
     });
 

@@ -40,22 +40,29 @@ const setEnv = (values: Record<string, unknown>) => {
   Object.assign(mockEnv, values);
 };
 
-const originalProxyEnv = {
-  HTTPS_PROXY: process.env.HTTPS_PROXY,
-  HTTP_PROXY: process.env.HTTP_PROXY,
-  NO_PROXY: process.env.NO_PROXY,
-};
+// Both cases matter: the resolver reads either, so a suite that clears only
+// the uppercase names would leak the lowercase ones into other test files.
+const PROXY_ENV_KEYS = [
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "NO_PROXY",
+  "https_proxy",
+  "http_proxy",
+  "no_proxy",
+] as const;
+
+const originalProxyEnv = Object.fromEntries(
+  PROXY_ENV_KEYS.map((key) => [key, process.env[key]]),
+);
 
 const clearProxyEnv = () => {
-  for (const key of [
-    "HTTPS_PROXY",
-    "HTTP_PROXY",
-    "NO_PROXY",
-    "https_proxy",
-    "http_proxy",
-    "no_proxy",
-  ]) {
-    delete process.env[key];
+  for (const key of PROXY_ENV_KEYS) delete process.env[key];
+};
+
+const restoreProxyEnv = () => {
+  for (const [key, value] of Object.entries(originalProxyEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
   }
 };
 
@@ -67,10 +74,7 @@ describe("buildSesClientConfig", () => {
   });
 
   afterEach(() => {
-    for (const [key, value] of Object.entries(originalProxyEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
+    restoreProxyEnv();
   });
 
   describe("given no proxy and no endpoint override", () => {
@@ -84,6 +88,7 @@ describe("buildSesClientConfig", () => {
   });
 
   describe("given an outbound proxy", () => {
+    /** @scenario "Email egress follows the configured outbound proxy" */
     it("routes SES traffic through a proxy-aware request handler", () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
 
@@ -130,6 +135,7 @@ describe("buildSesClientConfig", () => {
   });
 
   describe("given the SES host is excluded from proxying", () => {
+    /** @scenario "Hosts excluded from proxying are contacted directly" */
     it("connects directly when the regional host is listed", () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "email.eu-central-1.amazonaws.com";
@@ -169,6 +175,7 @@ describe("buildSesClientConfig", () => {
   });
 
   describe("given a custom SES endpoint", () => {
+    /** @scenario "Operator overrides the SES endpoint" */
     it("targets the override instead of the public regional endpoint", () => {
       setEnv({
         USE_AWS_SES: "true",
@@ -189,6 +196,20 @@ describe("buildSesClientConfig", () => {
         USE_AWS_SES: "true",
         AWS_REGION: "eu-central-1",
         AWS_SES_ENDPOINT: "https://mail-relay.internal.corp",
+      });
+      process.env.HTTPS_PROXY = "http://proxy.corp:8080";
+      process.env.NO_PROXY = "internal.corp";
+
+      buildSesClientConfig();
+
+      expect(httpsProxyAgentMock).not.toHaveBeenCalled();
+    });
+
+    it("evaluates proxy exclusions for an endpoint given without a scheme", () => {
+      setEnv({
+        USE_AWS_SES: "true",
+        AWS_REGION: "eu-central-1",
+        AWS_SES_ENDPOINT: "mail-relay.internal.corp:465",
       });
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "internal.corp";

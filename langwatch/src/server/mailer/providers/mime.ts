@@ -7,6 +7,31 @@ export const sanitizeHeaderParam = (value: string): string =>
   sanitizeHeaderValue(value).replace(/(["\\])/g, "\\$1");
 
 /**
+ * A header name is a token: no colon, whitespace or control characters (RFC
+ * 5322 §3.6.8). Stripping them stops a crafted name from closing the field and
+ * injecting another one, which sanitizing the value alone would not prevent.
+ */
+export const sanitizeHeaderName = (name: string): string =>
+  name.replace(/[^\x21-\x39\x3B-\x7E]/g, "").trim();
+
+/**
+ * Caller-supplied headers, cleaned for wire use. Returns undefined when there
+ * is nothing to send so callers can omit the field entirely.
+ */
+export const sanitizeHeaders = (
+  headers: Record<string, string> | undefined,
+): Record<string, string> | undefined => {
+  if (!headers) return undefined;
+  const entries = Object.entries(headers)
+    .map(
+      ([name, value]) =>
+        [sanitizeHeaderName(name), sanitizeHeaderValue(value)] as const,
+    )
+    .filter(([name]) => name !== "");
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+};
+
+/**
  * RFC 2047-encode a header value as a single UTF-8 base64 encoded-word
  * (`=?UTF-8?B?...?=`) when the text contains non-ASCII characters or is long
  * enough to warrant encoding.  Pure ASCII values that fit on one line are

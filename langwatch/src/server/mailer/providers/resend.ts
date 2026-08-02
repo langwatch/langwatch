@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent } from "undici";
 import { env } from "../../../env.mjs";
-import { sanitizeHeaderValue } from "./mime";
+import { sanitizeHeaders } from "./mime";
 import { hostnameOf, resolveProxyForHost } from "./proxy";
 import {
   type EmailContent,
@@ -14,6 +14,9 @@ const logger = createLogger("langwatch:mailer:resend");
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
+/** Matches the SMTP gateway: a queued notification must not hang on a dead API. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * undici honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY itself once given this
  * dispatcher, so we only need to decide whether a proxy applies at all.
@@ -22,16 +25,6 @@ const proxyDispatcher = (): EnvHttpProxyAgent | undefined =>
   resolveProxyForHost(hostnameOf(RESEND_API_URL))
     ? new EnvHttpProxyAgent()
     : undefined;
-
-const sanitizeHeaders = (headers: EmailContent["headers"]) => {
-  if (!headers || Object.keys(headers).length === 0) return undefined;
-  return Object.fromEntries(
-    Object.entries(headers).map(([name, value]) => [
-      sanitizeHeaderValue(name),
-      sanitizeHeaderValue(value),
-    ]),
-  );
-};
 
 const encodeAttachments = (attachments: EmailContent["attachments"]) => {
   if (!attachments || attachments.length === 0) return undefined;
@@ -86,11 +79,14 @@ export const resendProvider: EmailProviderPort = {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ...(dispatcher ? { dispatcher } : {}),
       } as RequestInit);
 
       if (!response.ok) {
-        const detail = await response.text().catch(() => "");
+        // Truncated: the body is provider-controlled and can echo the request,
+        // so it is a diagnostic hint rather than something to log wholesale.
+        const detail = (await response.text().catch(() => "")).slice(0, 500);
         throw new Error(
           `Resend responded ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`,
         );

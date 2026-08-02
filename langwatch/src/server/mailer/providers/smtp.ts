@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { env } from "../../../env.mjs";
-import { sanitizeHeaderValue } from "./mime";
+import { sanitizeHeaders } from "./mime";
 import {
   type EmailContent,
   EmailProviderConfigurationError,
@@ -15,6 +16,17 @@ export const isSmtpConfigured = (): boolean =>
   Boolean(env.SMTP_URL ?? env.SMTP_HOST);
 
 /**
+ * Nodemailer's own defaults let a send hang for minutes (2m to connect, 10m of
+ * socket inactivity). An unreachable relay is a common misconfiguration, so
+ * fail fast enough that a queued notification does not sit on a dead socket.
+ */
+const SMTP_TIMEOUTS = {
+  connectionTimeout: 15_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 30_000,
+} as const;
+
+/**
  * Transport options from either a single connection URL or the discrete
  * host/port/credential settings. A URL wins when both are present.
  *
@@ -22,8 +34,8 @@ export const isSmtpConfigured = (): boolean =>
  * host reachable directly, so honouring a globally-set HTTPS_PROXY would break
  * deployments that set it for vendor API egress only.
  */
-export const buildSmtpTransportOptions = () => {
-  if (env.SMTP_URL) return env.SMTP_URL;
+export const buildSmtpTransportOptions = (): SMTPTransport.Options => {
+  if (env.SMTP_URL) return { url: env.SMTP_URL, ...SMTP_TIMEOUTS };
 
   const host = env.SMTP_HOST;
   if (!host) {
@@ -33,9 +45,9 @@ export const buildSmtpTransportOptions = () => {
   }
 
   const port = env.SMTP_PORT ? Number(env.SMTP_PORT) : 587;
-  if (Number.isNaN(port)) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new EmailProviderConfigurationError(
-      `SMTP_PORT must be a number, got "${env.SMTP_PORT}".`,
+      `SMTP_PORT must be an integer between 1 and 65535, got "${env.SMTP_PORT}".`,
     );
   }
 
@@ -52,6 +64,7 @@ export const buildSmtpTransportOptions = () => {
     secure,
     // Unauthenticated relays are common inside private networks.
     ...(user ? { auth: { user, pass } } : {}),
+    ...SMTP_TIMEOUTS,
   };
 };
 
@@ -59,21 +72,11 @@ export const smtpProvider: EmailProviderPort = {
   name: "smtp",
   async send(content: EmailContent, defaultFrom: string) {
     logger.info("Sending email using SMTP");
-    const transporter = nodemailer.createTransport(
-      buildSmtpTransportOptions() as never,
-    );
+    const transporter = nodemailer.createTransport(buildSmtpTransportOptions());
 
     const bccAddresses = toArray(content.bcc);
 
-    const sanitizedHeaders =
-      content.headers && Object.keys(content.headers).length > 0
-        ? Object.fromEntries(
-            Object.entries(content.headers).map(([name, value]) => [
-              sanitizeHeaderValue(name),
-              sanitizeHeaderValue(value),
-            ]),
-          )
-        : undefined;
+    const sanitizedHeaders = sanitizeHeaders(content.headers);
 
     const from = content.from ?? defaultFrom;
     const toAddresses = toArray(content.to);

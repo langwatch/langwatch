@@ -43,11 +43,8 @@ vi.mock("@aws-sdk/client-ses", () => {
   return { SESClient, SendEmailCommand, SendRawEmailCommand };
 });
 
-import {
-  buildRawMimeMessage,
-  rfc2047EncodeHeader,
-  sendEmail,
-} from "../emailSender";
+import { sendEmail } from "../emailSender";
+import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime";
 
 // ── helper ────────────────────────────────────────────────────────────────────
 

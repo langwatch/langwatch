@@ -5,9 +5,6 @@ import type { EmailContent } from "./providers/types";
 
 const logger = createLogger("langwatch:mailer:emailSender");
 
-export { buildRawMimeMessage, rfc2047EncodeHeader } from "./providers/mime";
-export type { EmailAttachment, EmailContent } from "./providers/types";
-
 const extractHostname = (baseHost: string): string => {
   // Try to parse as URL first
   try {

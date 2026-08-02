@@ -74,7 +74,7 @@ Feature: Email gateway providers
     Then sending fails with an error saying no email method is available
 
   @unit
-  Scenario: The full message surface survives every gateway
+  Scenario Outline: The full message surface survives every gateway
     Given the email provider is set to "<provider>"
     When the application sends an email with attachments, blind copies, a reply-to address and custom headers
     Then the recipient receives the attachments and custom headers
@@ -110,12 +110,18 @@ Feature: Email gateway providers
   @unit
   Scenario: Email options stay hidden when no gateway is usable
     Given no email provider can be resolved
-    When a user opens the alert configuration
-    Then the email notification option is unavailable
+    When an administrator invites a teammate
+    Then the invitation can only be shared as a link, not sent by email
 
   @unit
   Scenario: Email options appear once any gateway is usable
     Given the email provider is set to "smtp"
     And SMTP connection settings are configured
-    When a user opens the alert configuration
-    Then the email notification option is available
+    When an administrator invites a teammate
+    Then the invitation can be sent by email
+
+  @unit
+  Scenario: A misconfigured gateway does not break the interface
+    Given the email provider is set to a gateway that is missing its credentials
+    When the interface asks whether email is available
+    Then it reports email as unavailable rather than failing to render
