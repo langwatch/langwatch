@@ -11,11 +11,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authClient } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
+import { AuthCard } from "../../components/auth/AuthCard";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -139,28 +140,6 @@ function ForgotPasswordForm() {
           </Card.Body>
         </Card.Root>
       </form>
-    </Container>
-  );
-}
-
-function AuthCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
-      <Card.Root>
-        <Card.Header>
-          <HStack gap={4}>
-            <LogoIcon width={30.69} height={42} />
-            <Heading size="lg" as="h1">
-              {title}
-            </Heading>
-          </HStack>
-        </Card.Header>
-        <Card.Body>
-          <VStack width="full" align="start" gap={4}>
-            {children}
-          </VStack>
-        </Card.Body>
-      </Card.Root>
     </Container>
   );
 }
