@@ -21,8 +21,10 @@ import { coerceToNumber } from "~/utils/coerceToNumber";
  * enrichment rates still rank first: they are a deliberate "price
  * everything my way" policy, more specific than a single span's total.)
  *
- * Every branch runs the same `estimateCost` arithmetic, so a new billable
- * unit is priced identically wherever the rates came from.
+ * Priorities 2 and 4 pass through a total someone else already worked out.
+ * The two that price from rates, 1 and 3, both run the same `estimateCost`
+ * arithmetic, so a new billable unit costs the same whether the rates came
+ * from a customer override or the registry.
  */
 export function computeSpanCost({
   attrs,
