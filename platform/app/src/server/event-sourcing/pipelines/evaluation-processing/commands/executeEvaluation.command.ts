@@ -103,6 +103,13 @@ export interface ExecuteEvaluationCommandDeps {
    * means today's behavior (inputs flow inline; the repository belt-and-braces
    * cap is the only bound).
    */
+  /**
+   * Emergency rollback for the langwatch#6397 settings recovery
+   * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
+   * recovery is ACTIVE — the shipped default. Injected so the command stays
+   * testable without a flag service.
+   */
+  isSettingsRecoveryDisabled?: () => Promise<boolean>;
   offloadInputs?: (args: {
     projectId: string;
     evaluationId: string;
@@ -141,9 +148,16 @@ const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
 export function resolveEvaluatorSettings({
   config,
   parameters,
+  recoveryDisabled = false,
 }: {
   config: Record<string, unknown> | null | undefined;
   parameters: Record<string, unknown> | null | undefined;
+  /**
+   * Operator rollback (`ops_evaluator_settings_recovery_disabled`). Defaults to
+   * false so every caller that does not know about the flag — and the shipped
+   * configuration — gets the recovery.
+   */
+  recoveryDisabled?: boolean;
 }): Record<string, unknown> | null | undefined {
   if (!config) {
     return parameters;
@@ -152,6 +166,10 @@ export function resolveEvaluatorSettings({
   const nested = config.settings;
   if (nested && typeof nested === "object") {
     return nested as Record<string, unknown>;
+  }
+
+  if (recoveryDisabled) {
+    return parameters;
   }
 
   const recovered = Object.fromEntries(
@@ -345,6 +363,7 @@ export class ExecuteEvaluationCommand
     const settings = resolveEvaluatorSettings({
       config: monitor.evaluator?.config as Record<string, unknown> | null,
       parameters: monitor.parameters as Record<string, unknown> | null,
+      recoveryDisabled: (await this.deps.isSettingsRecoveryDisabled?.()) ?? false,
     });
 
     const workflowId =

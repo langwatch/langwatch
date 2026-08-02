@@ -42,8 +42,12 @@ function buildMonitor(overrides: MonitorFixture = {}): MonitorFixture {
   };
 }
 
-function buildDeps(monitor: MonitorFixture): ExecuteEvaluationCommandDeps {
+function buildDeps(
+  monitor: MonitorFixture,
+  isSettingsRecoveryDisabled?: () => Promise<boolean>,
+): ExecuteEvaluationCommandDeps {
   return {
+    ...(isSettingsRecoveryDisabled ? { isSettingsRecoveryDisabled } : {}),
     monitors: {
       getMonitorById: vi.fn().mockResolvedValue(monitor),
     } as unknown as ExecuteEvaluationCommandDeps["monitors"],
@@ -80,8 +84,11 @@ function buildCommand(): Command<ExecuteEvaluationCommandData> {
   } as unknown as Command<ExecuteEvaluationCommandData>;
 }
 
-async function executeWith(monitor: MonitorFixture) {
-  const deps = buildDeps(monitor);
+async function executeWith(
+  monitor: MonitorFixture,
+  isSettingsRecoveryDisabled?: () => Promise<boolean>,
+) {
+  const deps = buildDeps(monitor, isSettingsRecoveryDisabled);
   const command = new ExecuteEvaluationCommand(deps);
   await command.handle(buildCommand());
   const executeForTrace = deps.evaluationExecution
@@ -194,6 +201,40 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
       );
 
       expect(call.settings).not.toHaveProperty("evaluatorType");
+    });
+  });
+
+  describe("given the operator rollback flag", () => {
+    const topLevelConfig = {
+      id: "evaluator_1",
+      type: "evaluator",
+      config: {
+        evaluatorType: "custom/settings-eval",
+        prompt: "the evaluator's own prompt",
+      },
+    };
+
+    /** @scenario The new settings resolution is active in the shipped default configuration */
+    it("recovers the prompt when nothing sets the flag at all", async () => {
+      // No flag dep is passed: this is the SHIPPED default, asserted by OUTCOME
+      // (the prompt reaches the judge), not by reading a flag value. A
+      // flag-state assertion would pass even if production resolved the flag
+      // somewhere else and shipped this fix inert.
+      const call = await executeWith(buildMonitor({ evaluator: topLevelConfig }));
+
+      expect(call.settings).toMatchObject({
+        prompt: "the evaluator's own prompt",
+      });
+    });
+
+    /** @scenario The new settings resolution can be switched off for rollback */
+    it("falls back to the previous behaviour when an operator disables it", async () => {
+      const call = await executeWith(
+        buildMonitor({ evaluator: topLevelConfig }),
+        () => Promise.resolve(true),
+      );
+
+      expect(call.settings).toEqual(MONITOR_PARAMETERS);
     });
   });
 

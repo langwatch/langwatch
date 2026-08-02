@@ -64,13 +64,13 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the stored config is normalised so the online path resolves the user's prompt
     And this holds for the copy and replicate flows, which do not pass through the evaluator service
 
-  @integration @unimplemented
+  @integration
   Scenario: The new settings resolution is active in the shipped default configuration
     Given the application is running in its shipped default configuration
     When the online evaluation pipeline executes a monitor for a trace
     Then the new settings resolution is active
 
-  @integration @unimplemented
+  @integration
   Scenario: The new settings resolution can be switched off for rollback
     Given the settings-resolution change is disabled by its kill switch
     When the online evaluation pipeline executes a monitor for a trace
