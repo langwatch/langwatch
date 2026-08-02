@@ -17,6 +17,23 @@ const logger = createLogger("langwatch:mailer:ses");
 /** Public regional SES endpoint, used to decide proxy applicability. */
 const defaultSesHost = (region: string) => `email.${region}.amazonaws.com`;
 
+/**
+ * A proxy agent owns a socket pool, so building one per send would accumulate
+ * pools and file descriptors under a burst of alerts. They are keyed by proxy
+ * URL and reused; the set of distinct URLs in a process is effectively one.
+ */
+const requestHandlers = new Map<string, NodeHttpHandler>();
+
+const proxyRequestHandler = (proxyUrl: string): NodeHttpHandler => {
+  const cached = requestHandlers.get(proxyUrl);
+  if (cached) return cached;
+
+  const agent = new HttpsProxyAgent(proxyUrl);
+  const handler = new NodeHttpHandler({ httpAgent: agent, httpsAgent: agent });
+  requestHandlers.set(proxyUrl, handler);
+  return handler;
+};
+
 export const buildSesClientConfig = (): SESClientConfig => {
   const region = env.AWS_REGION;
   const config: SESClientConfig = { region };
@@ -34,11 +51,7 @@ export const buildSesClientConfig = (): SESClientConfig => {
     : defaultSesHost(region ?? "");
   const proxyUrl = resolveProxyForHost(targetHost);
   if (proxyUrl) {
-    const agent = new HttpsProxyAgent(proxyUrl);
-    config.requestHandler = new NodeHttpHandler({
-      httpAgent: agent,
-      httpsAgent: agent,
-    });
+    config.requestHandler = proxyRequestHandler(proxyUrl);
   }
 
   return config;

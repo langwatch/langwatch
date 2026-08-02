@@ -100,8 +100,10 @@ describe("buildSesClientConfig", () => {
       expect(config.requestHandler).toBeDefined();
     });
 
+    // A distinct URL per test: agents are cached per proxy URL, so reusing one
+    // would mean no construction to observe here.
     it("uses the proxy agent for both http and https traffic", () => {
-      process.env.HTTPS_PROXY = "http://proxy.corp:8080";
+      process.env.HTTPS_PROXY = "http://both-schemes.corp:8080";
 
       buildSesClientConfig();
 
@@ -111,6 +113,20 @@ describe("buildSesClientConfig", () => {
       };
       expect(options.httpAgent).toBeDefined();
       expect(options.httpsAgent).toBe(options.httpAgent);
+    });
+
+    it("reuses one agent per proxy url, so bursts do not leak socket pools", () => {
+      process.env.HTTPS_PROXY = "http://reused.corp:8080";
+
+      const first = buildSesClientConfig();
+      const second = buildSesClientConfig();
+
+      expect(second.requestHandler).toBe(first.requestHandler);
+      expect(
+        httpsProxyAgentMock.mock.calls.filter(
+          ([url]) => url === "http://reused.corp:8080",
+        ),
+      ).toHaveLength(1);
     });
 
     it("falls back to HTTP_PROXY when HTTPS_PROXY is absent", () => {
@@ -165,7 +181,7 @@ describe("buildSesClientConfig", () => {
     });
 
     it("still proxies hosts that are not excluded", () => {
-      process.env.HTTPS_PROXY = "http://proxy.corp:8080";
+      process.env.HTTPS_PROXY = "http://not-excluded.corp:8080";
       process.env.NO_PROXY = "internal.corp,.example.com";
 
       buildSesClientConfig();

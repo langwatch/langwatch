@@ -20,11 +20,17 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /**
  * undici honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY itself once given this
  * dispatcher, so we only need to decide whether a proxy applies at all.
+ *
+ * The agent owns a connection pool and is created once: building one per send
+ * would accumulate pools and file descriptors under a burst of alerts.
  */
-const proxyDispatcher = (): EnvHttpProxyAgent | undefined =>
-  resolveProxyForHost(hostnameOf(RESEND_API_URL))
-    ? new EnvHttpProxyAgent()
-    : undefined;
+let sharedDispatcher: EnvHttpProxyAgent | undefined;
+
+const proxyDispatcher = (): EnvHttpProxyAgent | undefined => {
+  if (!resolveProxyForHost(hostnameOf(RESEND_API_URL))) return undefined;
+  sharedDispatcher ??= new EnvHttpProxyAgent();
+  return sharedDispatcher;
+};
 
 const encodeAttachments = (attachments: EmailContent["attachments"]) => {
   if (!attachments || attachments.length === 0) return undefined;

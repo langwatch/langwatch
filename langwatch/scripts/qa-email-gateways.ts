@@ -12,6 +12,10 @@ import { sendRenderedTriggerEmail } from "../src/server/mailer/triggerEmail";
 
 const MAILPIT = "http://127.0.0.1:8025";
 
+/** An SMTP URL with any `user:password@` segment removed. */
+const redactUserinfo = (url: string | undefined): string =>
+  url ? url.replace(/\/\/[^@/]*@/, "//<redacted>@") : "(unset)";
+
 const api = async (path: string) => {
   const res = await fetch(`${MAILPIT}${path}`);
   if (!res.ok) throw new Error(`mailpit ${path} -> ${res.status}`);
@@ -183,7 +187,8 @@ async function scenarioUnicode() {
 
 async function main() {
   console.log(`provider: ${process.env.EMAIL_PROVIDER}`);
-  console.log(`smtp:     ${process.env.SMTP_URL}`);
+  // SMTP_URL can carry inline credentials; never print them.
+  console.log(`smtp:     ${redactUserinfo(process.env.SMTP_URL)}`);
 
   await scenarioPlainAlert();
   await scenarioFullSurface();
