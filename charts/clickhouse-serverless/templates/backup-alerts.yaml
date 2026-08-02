@@ -15,7 +15,13 @@ groups:
   - name: {{ $fullname }}-backups
     rules:
     {{- range $target := $mon.targets }}
-    {{- $cronjob := printf "%s-%s" $fullname $target.cronjob }}
+    {{- if and $target.cronjob $target.cronjobName }}
+    {{- fail (printf "backup.monitoring.targets[%s]: set either cronjob (suffix after the release fullname) or cronjobName (exact), not both" $target.name) }}
+    {{- end }}
+    {{- if not (or $target.cronjob $target.cronjobName) }}
+    {{- fail (printf "backup.monitoring.targets[%s]: needs cronjob (suffix after the release fullname) or cronjobName (exact)" $target.name) }}
+    {{- end }}
+    {{- $cronjob := $target.cronjobName | default (printf "%s-%s" $fullname $target.cronjob) }}
     {{- $hours := $target.staleAfterHours | default 26 }}
     {{- $seconds := mulf $hours 3600 | int64 }}
     {{- $sel := printf "namespace=%q, cronjob=%q" $ns $cronjob }}

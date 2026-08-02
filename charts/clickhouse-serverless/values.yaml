@@ -99,6 +99,9 @@ backup:
     #   name           label used in alert text and on the `backup` label
     #   cronjob        CronJob name suffix; the release fullname is prepended,
     #                  so `backup-full` matches `<release>-clickhouse-backup-full`
+    #   cronjobName    exact CronJob name, for a CronJob this chart does not
+    #                  create and whose name does not start with the release
+    #                  fullname. Mutually exclusive with `cronjob`.
     #   staleAfterHours  hours without a successful run before the backup counts
     #                  as broken. Keep it above two scheduling intervals so one
     #                  retried run does not page.

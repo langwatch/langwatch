@@ -34,3 +34,7 @@ backup:
       - name: incremental
         cronjob: backup-incremental
         staleAfterHours: 3
+      # Managed outside this chart, so it is named exactly and gets no prefix.
+      - name: ebs-snapshot
+        cronjobName: acme-ebs-snapshotter
+        staleAfterHours: 26
