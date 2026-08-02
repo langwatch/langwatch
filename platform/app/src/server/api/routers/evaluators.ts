@@ -1,5 +1,4 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { normalizeEvaluatorConfig } from "../../evaluators/evaluatorConfig";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -7,6 +6,7 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { normalizeEvaluatorConfig } from "../../evaluators/evaluatorConfig";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";

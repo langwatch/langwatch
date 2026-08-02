@@ -363,7 +363,8 @@ export class ExecuteEvaluationCommand
     const settings = resolveEvaluatorSettings({
       config: monitor.evaluator?.config as Record<string, unknown> | null,
       parameters: monitor.parameters as Record<string, unknown> | null,
-      recoveryDisabled: (await this.deps.isSettingsRecoveryDisabled?.()) ?? false,
+      recoveryDisabled:
+        (await this.deps.isSettingsRecoveryDisabled?.()) ?? false,
     });
 
     const workflowId =

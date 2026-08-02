@@ -222,7 +222,9 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
       // (the prompt reaches the judge), not by reading a flag value. A
       // flag-state assertion would pass even if production resolved the flag
       // somewhere else and shipped this fix inert.
-      const call = await executeWith(buildMonitor({ evaluator: topLevelConfig }));
+      const call = await executeWith(
+        buildMonitor({ evaluator: topLevelConfig }),
+      );
 
       expect(call.settings).toMatchObject({
         prompt: "the evaluator's own prompt",

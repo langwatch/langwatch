@@ -1,6 +1,6 @@
 import type { Evaluator, Prisma, PrismaClient } from "@prisma/client";
-import { normalizeEvaluatorConfig } from "./evaluatorConfig";
 import { generateEvaluatorSlug } from "../../utils/evaluatorSlug";
+import { normalizeEvaluatorConfig } from "./evaluatorConfig";
 
 /**
  * Input type for creating an evaluator
@@ -142,7 +142,10 @@ export class EvaluatorRepository {
       },
       data:
         input.data && "config" in input.data
-          ? { ...input.data, config: normalizeEvaluatorConfig(input.data.config) }
+          ? {
+              ...input.data,
+              config: normalizeEvaluatorConfig(input.data.config),
+            }
           : input.data,
     });
   }
