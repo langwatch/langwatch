@@ -216,6 +216,22 @@ Feature: An absent evaluator score is never presented or stored as zero
     And that row is not coloured as a failure
 
   # ============================================================================
+  # Enumeration completeness (D7) — sites the original five-site list missed
+  # ============================================================================
+
+  @integration @unimplemented
+  Scenario: An experiment summary with no scored rows shows no score rather than zero
+    Given an experiment summary whose average score is not available
+    When the summary line is rendered
+    Then it shows the not-scored indicator rather than a numeric zero
+
+  @integration @unimplemented
+  Scenario: A not-scored summary card is not coloured as a failure
+    Given an experiment summary card for an evaluation with no numeric score
+    When the card is rendered
+    Then the card is not coloured as a failure
+
+  # ============================================================================
   # Regression and ripple
   # ============================================================================
 
@@ -319,11 +335,17 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           whether that mechanism is what the customer actually hit, and only AC0d's
 #           prevalence number can answer that.
 #
+# AC 18: "The five-site enumeration is completed by grep, not by reasoning"
+#        -> Scenario: An experiment summary with no scored rows shows no score rather than zero
+#           (BatchEvaluationSummary.tsx:298-306 -- guards only !== undefined; else-branch unguarded)
+#        -> Scenario: A not-scored summary card is not coloured as a failure
+#           (BatchEvaluation.tsx:241 -- colour computed OUTSIDE the typeof guard at :245)
+#        -> plus a PR obligation: quote the repo-wide pattern grep and give every hit a disposition.
 # AC 17: "The behavioral contract is committed and actually bound"
 #        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
 #           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
 #
-# Coverage: 18 behavioral ACs -> 26 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
+# Coverage: 19 behavioral ACs -> 28 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
 # half of 0e) carry no scenario by design, each with its reason stated above and its enforcement
 # named elsewhere. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
 # gate is a real reproduction against a customer account, which is why it stays a PR obligation.
