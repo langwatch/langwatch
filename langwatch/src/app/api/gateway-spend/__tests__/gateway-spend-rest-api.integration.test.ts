@@ -522,6 +522,103 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     }
   });
 
+  /** @scenario An over-limit replay queues nothing */
+  it("refuses an over-limit window before queuing a single envelope", async () => {
+    const { WebhookEndpointService } = await import(
+      "@ee/webhooks/webhookEndpoint.service"
+    );
+    const { WebhookEventsService } = await import(
+      "@ee/webhooks/webhookEvents.service"
+    );
+    const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+    process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
+    const endpoints = new WebhookEndpointService({ prisma });
+    const emitted = vi.spyOn(
+      WebhookEventsService.prototype,
+      "getEmittedEvents",
+    );
+    let endpointId = "";
+    const ns3 = `${ns}-flood`;
+    try {
+      const created = await endpoints.create({
+        organizationId: organization.id,
+        url: "http://localhost:9/webhooks/over-limit",
+        enabledEvents: ["gateway.request.completed"],
+        maxBatchDelayMs: 0,
+      });
+      endpointId = created.endpoint.id;
+
+      // A window one envelope past the cap, served synthetically: the case
+      // is about the cap, and seeding ten thousand ledger rows to reach it
+      // would cost minutes for no extra coverage.
+      const overLimit = 10_001;
+      emitted.mockImplementation(async ({ cursor }) =>
+        cursor
+          ? { events: [], nextCursor: null }
+          : {
+              events: Array.from({ length: overLimit }, (_, i) => ({
+                id: `${ns3}-${i}:completed`,
+                type: "gateway.request.completed",
+                created: new Date(baseTime + 600_000).toISOString(),
+                schema_version: "1" as const,
+                data: {
+                  project_id: project.id,
+                  gateway_request_id: `${ns3}-${i}`,
+                },
+              })),
+              nextCursor: null,
+            },
+      );
+
+      const res = await app.request("/api/gateway/v1/spend-events/replay", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: baseTime + 599_000,
+          to: baseTime + 610_000,
+          endpoint_id: endpointId,
+        }),
+      });
+      expect(res.status).toBe(400);
+
+      // Refused means nothing shipped: no stream row holds a buffered
+      // envelope and no send message is waiting to go out. A partial
+      // enqueue here would double-deliver on the caller's retry.
+      // Endpoint streams are keyed at organization scope; the project id
+      // is in the filter too so the check cannot pass by looking in the
+      // wrong place.
+      const streamScope = { in: [organization.id, project.id] };
+      expect(
+        await prisma.processManagerInstance.count({
+          where: {
+            projectId: streamScope,
+            processKey: `endpoint:${endpointId}`,
+          },
+        }),
+      ).toBe(0);
+      expect(
+        await prisma.processManagerOutbox.count({
+          where: {
+            projectId: streamScope,
+            messageKey: { contains: endpointId },
+          },
+        }),
+      ).toBe(0);
+    } finally {
+      emitted.mockRestore();
+      if (previous === undefined) {
+        delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      } else {
+        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = previous;
+      }
+      if (endpointId) {
+        await cleanupTestRows(prisma, [
+          ["webhookEndpoint", { id: endpointId }],
+        ]);
+      }
+    }
+  });
+
   /** @scenario A garbled cursor is refused, not silently reset */
   it("rejects an undecodable cursor with 400", async () => {
     const res = await app.request(

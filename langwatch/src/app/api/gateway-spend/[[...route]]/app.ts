@@ -9,7 +9,10 @@ import {
   type SendBatchPayload,
   type WebhookDeliveryProcessDeps,
 } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import {
+  WebhookEndpointService,
+  type WebhookEndpointView,
+} from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { Organization } from "@prisma/client";
@@ -338,6 +341,53 @@ secured
 
 const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REPLAY_MAX_ENVELOPES = 10_000;
+const REPLAY_PAGE_SIZE = 200;
+
+/**
+ * Walks the window counting only what this endpoint subscribes to, and
+ * refuses the call as soon as the count passes the cap.
+ *
+ * This runs before a single envelope is queued. Replay exists to reach
+ * past a consumer's dedup window, so enqueueing part of a window and then
+ * answering with an error is the worst outcome available: the receiver
+ * takes delivery of envelopes the caller was told never shipped, and the
+ * natural retry mints a fresh replay id and ships them again.
+ */
+async function assertReplayWindowWithinCap({
+  events,
+  endpoint,
+  organizationId,
+  fromMs,
+  toMs,
+}: {
+  events: WebhookEventsService;
+  endpoint: WebhookEndpointView;
+  organizationId: string;
+  fromMs: number;
+  toMs: number;
+}): Promise<void> {
+  let matching = 0;
+  let cursor: string | null = null;
+  do {
+    const page = await events.getEmittedEvents({
+      organizationId,
+      fromMs,
+      toMs,
+      cursor,
+      limit: REPLAY_PAGE_SIZE,
+    });
+    for (const envelope of page.events) {
+      if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
+      matching++;
+      if (matching > REPLAY_MAX_ENVELOPES) {
+        throw new BadRequestError(
+          `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
+        );
+      }
+    }
+    cursor = page.nextCursor;
+  } while (cursor);
+}
 
 const replayBodySchema = z
   .object({
@@ -352,6 +402,60 @@ const replayBodySchema = z
     message: "the replay window is capped at 7 days per call",
   });
 
+/**
+ * Appends every matching envelope in the window to the endpoint's live
+ * delivery stream, and answers how many shipped.
+ */
+async function appendWindowToEndpointStream({
+  events,
+  endpoint,
+  deliveryDeps,
+  organizationId,
+  fromMs,
+  toMs,
+  replayId,
+}: {
+  events: WebhookEventsService;
+  endpoint: WebhookEndpointView;
+  deliveryDeps: WebhookDeliveryProcessDeps;
+  organizationId: string;
+  fromMs: number;
+  toMs: number;
+  replayId: string;
+}): Promise<number> {
+  let replayed = 0;
+  let cursor: string | null = null;
+  do {
+    const page = await events.getEmittedEvents({
+      organizationId,
+      fromMs,
+      toMs,
+      cursor,
+      limit: REPLAY_PAGE_SIZE,
+    });
+    const matching = page.events.filter((envelope) =>
+      eventMatches(endpoint.enabledEvents, envelope.type),
+    );
+    // The preflight cleared this window, but folds landing between the two
+    // passes can still grow it. Ship up to the cap and stop there rather
+    // than error out: the response reports what actually went out.
+    const shippable = matching.slice(0, REPLAY_MAX_ENVELOPES - replayed);
+    for (const envelope of shippable) {
+      await appendReplayToEndpointStream({
+        deps: deliveryDeps,
+        organizationId,
+        projectId: envelope.data.project_id as string,
+        endpoint,
+        envelope: envelope as SendBatchPayload["envelopes"][number],
+        replayId,
+      });
+      replayed++;
+    }
+    cursor = shippable.length < matching.length ? null : page.nextCursor;
+  } while (cursor);
+  return replayed;
+}
+
 const REPLAY_DESCRIPTION =
   "Re-delivers the window's spend envelopes to ONE endpoint through the " +
   "normal delivery path (per-endpoint stream, retry ladder, delivery log), " +
@@ -360,7 +464,8 @@ const REPLAY_DESCRIPTION =
   "downstream billing system's finite dedup window (Metronome 34 days, " +
   "Stripe 24h+): replaying older than that window can double-bill on your " +
   "side, so prefer pull-and-diff for old ranges. The window is capped at 7 " +
-  "days per call.";
+  "days and 10,000 envelopes per call; both caps are checked before any " +
+  "delivery is queued, so a refused replay ships nothing.";
 
 secured
   .access(requires("gatewaySpend:manage"))
@@ -402,36 +507,24 @@ secured
       // One replay identity per call: it salts batch ids and inbox source
       // ids so redelivered envelopes cannot collide with their historical
       // batches; the ENVELOPE ids stay untouched.
+      await assertReplayWindowWithinCap({
+        events,
+        endpoint,
+        organizationId: organization.id,
+        fromMs: body.from,
+        toMs: body.to,
+      });
+
       const replayId = nanoid(10);
-      let replayed = 0;
-      let cursor: string | null = null;
-      do {
-        const page = await events.getEmittedEvents({
-          organizationId: organization.id,
-          fromMs: body.from,
-          toMs: body.to,
-          cursor,
-          limit: 200,
-        });
-        for (const envelope of page.events) {
-          if (!eventMatches(endpoint.enabledEvents, envelope.type)) continue;
-          if (replayed >= REPLAY_MAX_ENVELOPES) {
-            throw new BadRequestError(
-              `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
-            );
-          }
-          await appendReplayToEndpointStream({
-            deps: deliveryDeps,
-            organizationId: organization.id,
-            projectId: envelope.data.project_id as string,
-            endpoint,
-            envelope: envelope as SendBatchPayload["envelopes"][number],
-            replayId,
-          });
-          replayed++;
-        }
-        cursor = page.nextCursor;
-      } while (cursor);
+      const replayed = await appendWindowToEndpointStream({
+        events,
+        endpoint,
+        deliveryDeps,
+        organizationId: organization.id,
+        fromMs: body.from,
+        toMs: body.to,
+        replayId,
+      });
 
       return c.json({
         data: {

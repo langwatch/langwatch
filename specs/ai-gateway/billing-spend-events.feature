@@ -248,6 +248,16 @@ Feature: Billing spend events, one durable record per gateway request
       Then matching envelopes ride the normal delivery stream with unchanged ids
       And an inverted or over-wide window is refused
 
+    @integration
+    Scenario: An over-limit replay queues nothing
+      Given a window holding more envelopes than one replay may carry
+      When the window is replayed to one endpoint
+      Then the call is refused before any envelope is queued
+      And the endpoint has no buffered envelope and no send waiting
+      # Replay reaches past the consumer's dedup window, so shipping part
+      # of a window and then answering with an error double-delivers on
+      # the retry.
+
   Rule: The pull surface serves the ledger, in-flight rows included
 
     @unit
