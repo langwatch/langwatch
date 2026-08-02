@@ -6,7 +6,6 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { normalizeEvaluatorConfig } from "../../evaluators/evaluatorConfig";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
@@ -545,9 +544,7 @@ export const evaluatorsRouter = createTRPCRouter({
             config:
               source.config === null
                 ? Prisma.JsonNull
-                : normalizeEvaluatorConfig(
-                    source.config as Prisma.InputJsonValue,
-                  ),
+                : (source.config as Prisma.InputJsonValue),
           },
         });
         pushedTo++;
@@ -616,9 +613,7 @@ export const evaluatorsRouter = createTRPCRouter({
           config:
             source.config === null
               ? Prisma.JsonNull
-              : normalizeEvaluatorConfig(
-                  source.config as Prisma.InputJsonValue,
-                ),
+              : (source.config as Prisma.InputJsonValue),
         },
       });
 

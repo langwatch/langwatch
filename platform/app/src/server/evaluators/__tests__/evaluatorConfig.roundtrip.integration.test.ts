@@ -22,7 +22,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveEvaluatorSettings } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
-import { normalizeEvaluatorConfig } from "../evaluatorConfig";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const PROJECT_ID = "proj_6397_roundtrip";
@@ -90,35 +89,6 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
       const oldRule = config.settings ?? null;
 
       expect(oldRule).toBeNull();
-    });
-  });
-
-  describe("given a row written through the normaliser", () => {
-    it("stores the nested shape and reads it back intact", async () => {
-      await prisma.evaluator.create({
-        data: {
-          id: "eval_6397_normalised",
-          projectId: PROJECT_ID,
-          name: "normalised tone judge",
-          type: "evaluator",
-          config: normalizeEvaluatorConfig({
-            evaluatorType: "langevals/llm_boolean",
-            prompt: USER_PROMPT,
-          }) as object,
-        },
-      });
-
-      const row = await prisma.evaluator.findFirstOrThrow({
-        where: { id: "eval_6397_normalised", projectId: PROJECT_ID },
-      });
-      const config = row.config as Record<string, unknown>;
-
-      // Stored in the shape the online path reads natively...
-      expect(config.settings).toMatchObject({ prompt: USER_PROMPT });
-      // ...and the resolver agrees after a real jsonb round-trip.
-      expect(
-        resolveEvaluatorSettings({ config, parameters: null }),
-      ).toMatchObject({ prompt: USER_PROMPT });
     });
   });
 });

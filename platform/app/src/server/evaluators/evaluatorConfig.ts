@@ -44,6 +44,17 @@ export function normalizeEvaluatorConfig<T>(config: T): T {
   }
 
   const record = config as Record<string, unknown>;
+
+  // `evaluatorType` is the discriminator for "this config holds built-in
+  // evaluator settings", and it is the same one `createWithDefaults` gates on.
+  // Without it, normalising is actively destructive: a CODE evaluator's config
+  // is `{ code, inputs, outputs }` with no evaluatorType and no settings, so
+  // treating those as stray keys buries the whole shape under `settings` and
+  // the evaluator stops working. Workflow evaluators are likewise
+  // `{ workflowId }`-shaped. Leave anything unrecognised exactly as it is.
+  if (typeof record.evaluatorType !== "string") {
+    return config;
+  }
   const strays = Object.entries(record).filter(
     ([key]) => !CONFIG_METADATA_KEYS.has(key),
   );
