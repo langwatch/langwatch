@@ -95,7 +95,9 @@ let maintenanceLastCheckedMs = 0;
  * (per request) resolves the org's matching ACTIVE endpoints and commits
  * one `sendBatch` message per endpoint with a deterministic key, so each
  * endpoint retries its own Stripe ladder independently and one dead
- * endpoint never blocks another.
+ * endpoint never blocks another. Endpoint streams key at ORGANIZATION
+ * scope, matching what an endpoint is: one buffer and one in-flight
+ * budget per endpoint, fed by every project in the org.
  */
 
 /** Attribution captured at admission; outcome events carry only the
@@ -201,7 +203,6 @@ export type DeliverPayload = z.infer<typeof deliverSchema>;
 
 export const sendBatchSchema = z.object({
   organizationId: z.string(),
-  projectId: z.string(),
   endpointId: z.string(),
   /** Stable batch identity: the X-LangWatch-Event-Id across every retry. */
   batchId: z.string(),
@@ -219,7 +220,6 @@ export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
 
 export const flushEndpointSchema = z.object({
   organizationId: z.string(),
-  projectId: z.string(),
   endpointId: z.string(),
   scheduledFor: z.number().int(),
 });
@@ -346,14 +346,12 @@ function coalescingDeadline(
  */
 function planEndpointBatches({
   organizationId,
-  projectId,
   endpoint,
   pending,
   outstanding,
   now,
 }: {
   organizationId: string;
-  projectId: string;
   endpoint: WebhookEndpointView;
   pending: readonly PendingEnvelope[];
   outstanding: number;
@@ -383,7 +381,6 @@ function planEndpointBatches({
       // only JSON primitives); the cast crosses the JsonValue boundary.
       payload: {
         organizationId,
-        projectId,
         endpointId: endpoint.id,
         batchId,
         envelopes: batch,
@@ -431,7 +428,6 @@ function nextStreamWakeAt({
 async function flushEndpointStream({
   deps,
   organizationId,
-  projectId,
   endpoint,
   append,
   appendSalt,
@@ -439,16 +435,19 @@ async function flushEndpointStream({
 }: {
   deps: WebhookDeliveryProcessDeps;
   organizationId: string;
-  projectId: string;
   endpoint: WebhookEndpointView;
   append?: SendBatchPayload["envelopes"][number];
   appendSalt?: string;
   sourceEventId?: string;
 }): Promise<void> {
   const now = (deps.now ?? Date.now)();
+  // Endpoints belong to the ORGANIZATION, so the stream does too: one row
+  // per endpoint holds one buffer, one outstanding-send count, and
+  // therefore one max_in_flight, no matter how many of the org's projects
+  // feed it. Keying by project would give an endpoint N of each.
   const ref = {
     processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId,
+    projectId: organizationId,
     processKey: `endpoint:${endpoint.id}`,
   };
   const existing = await deps.processStore.findByRef<EndpointStreamState>({
@@ -475,7 +474,6 @@ async function flushEndpointStream({
 
   const { messages, remaining, inFlight } = planEndpointBatches({
     organizationId,
-    projectId,
     endpoint,
     pending,
     outstanding,
@@ -484,7 +482,7 @@ async function flushEndpointStream({
 
   const result = await deps.processStore.commit<EndpointStreamState>({
     ref,
-    tenantId: projectId,
+    tenantId: organizationId,
     sourceEventId: sourceEventId ?? null,
     expectedRevision: existing?.revision ?? 0,
     state: { pending: remaining },
@@ -567,7 +565,6 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
       await flushEndpointStream({
         deps,
         organizationId,
-        projectId: payload.project_id,
         endpoint,
         append: envelope,
         sourceEventId: `deliver:${endpoint.id}:${payload.gateway_request_id}:${payload.status}`,
@@ -590,14 +587,12 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
 export async function appendReplayToEndpointStream({
   deps,
   organizationId,
-  projectId,
   endpoint,
   envelope,
   replayId,
 }: {
   deps: WebhookDeliveryProcessDeps;
   organizationId: string;
-  projectId: string;
   endpoint: WebhookEndpointView;
   envelope: SendBatchPayload["envelopes"][number];
   replayId: string;
@@ -605,7 +600,6 @@ export async function appendReplayToEndpointStream({
   await flushEndpointStream({
     deps,
     organizationId,
-    projectId,
     endpoint,
     append: envelope,
     appendSalt: replayId,
@@ -630,7 +624,6 @@ export function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
     await flushEndpointStream({
       deps,
       organizationId: payload.organizationId,
-      projectId: payload.projectId,
       endpoint,
     });
   };
@@ -716,7 +709,9 @@ async function postWebhookBatch({
       body: JSON.stringify({ batch: payload.envelopes }),
       triggerName: payload.endpointId,
       contextLabel: `Webhook endpoint ${payload.endpointId}`,
-      projectId: payload.projectId,
+      // Endpoints are organization-scoped, so their dispatch cap buckets
+      // per organization rather than per project.
+      projectId: payload.organizationId,
       eventId: payload.batchId,
       signingSecret: secret,
       attempt: context.attempt,
@@ -1074,7 +1069,6 @@ export function webhookDeliveryPM(
           intents: [
             ctx.intents.flushEndpoint(`flush:${ctx.at}`, {
               ...target,
-              projectId: ctx.projectId,
               scheduledFor: ctx.at,
             }),
           ],

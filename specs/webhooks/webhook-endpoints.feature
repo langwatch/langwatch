@@ -210,6 +210,15 @@ Feature: Webhook endpoints, signed outbound event delivery
       And the next flush ships them as one larger batch
 
     @integration
+    Scenario: The in-flight cap is the endpoint's own, across every project
+      Given an endpoint capped at one in-flight send with a slow receiver
+      When a second project in the same organization sends to it
+      Then its envelope waits in the endpoint's one buffer
+      And no second POST opens against the receiver
+      # Endpoints belong to the organization, so a cap kept per project
+      # would let N projects hold N sends open against one receiver.
+
+    @integration
     Scenario: The health report leads with the oldest undelivered age
       Given envelopes buffered and a send riding retries
       When the endpoint's health is read

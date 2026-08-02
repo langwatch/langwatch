@@ -461,10 +461,12 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       // The replayed envelopes ride the REAL delivery stream: send-batch
       // messages exist for the endpoint, and the envelope ids inside are
       // the original type-suffixed ids, unchanged.
+      // Endpoint streams are organization-keyed, so their outbox rows are
+      // too.
       const messages = await prisma.processManagerOutbox.findMany({
         where: {
           processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-          projectId: { in: [project.id] },
+          projectId: { in: [organization.id] },
           messageKey: { startsWith: "send:" },
         },
       });
@@ -505,14 +507,14 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           [
             "processManagerOutbox",
             {
-              projectId: { in: [project.id] },
+              projectId: { in: [organization.id] },
               messageKey: { contains: endpointId },
             },
           ],
           [
             "processManagerInstance",
             {
-              projectId: { in: [project.id] },
+              projectId: { in: [organization.id] },
               processKey: `endpoint:${endpointId}`,
             },
           ],

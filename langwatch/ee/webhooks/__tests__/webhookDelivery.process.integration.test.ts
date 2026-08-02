@@ -97,33 +97,40 @@ function envelopeFor({
   eventType,
   data,
   occurredAt,
+  inProject,
 }: {
   requestId: string;
   eventType: string;
   data: Record<string, unknown>;
   occurredAt: number;
+  inProject?: string;
 }): ProcessEventEnvelope {
+  const projectId = inProject ?? project.id;
   return {
     eventId: `${eventType}:${requestId}`,
     eventType,
     occurredAt,
-    tenantId: project.id,
-    projectId: project.id,
+    tenantId: projectId,
+    projectId,
     processKey: requestId,
     payload: data as ProcessEventEnvelope["payload"],
   };
 }
 
-function admittedEnvelope(requestId: string): ProcessEventEnvelope {
+function admittedEnvelope(
+  requestId: string,
+  inProject?: string,
+): ProcessEventEnvelope {
   return envelopeFor({
     requestId,
+    inProject,
     eventType: GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
     occurredAt: T0,
     data: {
       gateway_request_id: requestId,
       occurred_at: T0,
       organization_id: organization.id,
-      tenantId: project.id,
+      tenantId: inProject ?? project.id,
       virtual_key_id: "vk-test",
       principal_user_id: "",
       end_user_id: "end-user-1",
@@ -139,15 +146,19 @@ function admittedEnvelope(requestId: string): ProcessEventEnvelope {
   });
 }
 
-function confirmedEnvelope(requestId: string): ProcessEventEnvelope {
+function confirmedEnvelope(
+  requestId: string,
+  inProject?: string,
+): ProcessEventEnvelope {
   return envelopeFor({
     requestId,
+    inProject,
     eventType: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
     occurredAt: T0 + 3000,
     data: {
       gateway_request_id: requestId,
       occurred_at: T0 + 3000,
-      tenantId: project.id,
+      tenantId: inProject ?? project.id,
       model: "openai/gpt-5",
       model_provider_id: "provider-1",
       usage: {
@@ -223,13 +234,18 @@ async function drainOutbox(passes = 6): Promise<void> {
   }
 }
 
+/** The endpoint's one stream row, keyed by the organization that owns it. */
+function endpointStreamRef(endpoint: string) {
+  return {
+    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+    projectId: organization.id,
+    processKey: `endpoint:${endpoint}`,
+  };
+}
+
 async function endpointStream(endpoint: string) {
   return store.findByRef<{ pending: Array<{ appendedAtMs: number }> }>({
-    ref: {
-      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-      projectId: project.id,
-      processKey: `endpoint:${endpoint}`,
-    },
+    ref: endpointStreamRef(endpoint),
   });
 }
 
@@ -238,11 +254,7 @@ async function wakeEndpoint(endpoint: string) {
   if (!instance || instance.nextWakeAt === null) return false;
   const result = await service.handleWake({
     wake: {
-      ref: {
-        processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-        projectId: project.id,
-        processKey: `endpoint:${endpoint}`,
-      },
+      ref: endpointStreamRef(endpoint),
       revision: instance.revision,
       wakeAt: instance.nextWakeAt,
     },
@@ -253,11 +265,7 @@ async function wakeEndpoint(endpoint: string) {
 
 async function sendMessagesFor(endpoint: string) {
   const messages = await store.findMessagesByRef({
-    ref: {
-      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-      projectId: project.id,
-      processKey: `endpoint:${endpoint}`,
-    },
+    ref: endpointStreamRef(endpoint),
   });
   return messages.filter((m) => m.intentType === "sendBatch");
 }
@@ -787,6 +795,73 @@ describe("webhook delivery via the transactional inbox", () => {
     }
   });
 
+  /** @scenario The in-flight cap is the endpoint's own, across every project */
+  it("holds the second project's envelope in the same stream when in-flight is capped", async () => {
+    const secondProject = await prisma.project.create({
+      data: {
+        name: "Webhook PM Project Two",
+        slug: `--test-project-${ns}-two`,
+        teamId: team.id,
+        language: "other",
+        framework: "other",
+        apiKey: `test-key-${ns}-two`,
+      },
+    });
+    await endpoints.update({
+      organizationId: organization.id,
+      endpointId,
+      maxBatchSize: 100,
+      maxBatchDelayMs: 0,
+      maxInFlight: 1,
+    });
+    try {
+      sendWebhookMock.mockResolvedValue({
+        status: 503,
+        body: "slow receiver",
+        eventId: "x",
+      });
+      const first = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(first));
+      await consume(confirmedEnvelope(first));
+      await drainOutbox(1);
+      expect((await sendMessagesFor(endpointId))[0]!.status).toBe("pending");
+
+      // A different project in the same organization feeds the SAME
+      // endpoint while its one in-flight slot is busy.
+      const second = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(second, secondProject.id));
+      await consume(confirmedEnvelope(second, secondProject.id));
+      await drainOutbox(1);
+
+      // One send outstanding and the newcomer buffered beside it: the cap
+      // is the endpoint's, not one cap per project pointed at it.
+      expect(await sendMessagesFor(endpointId)).toHaveLength(1);
+      expect((await endpointStream(endpointId))?.state.pending).toHaveLength(1);
+
+      // And there is exactly one stream row: neither project holds one of
+      // its own to buffer or count sends in.
+      for (const projectId of [project.id, secondProject.id]) {
+        expect(
+          await store.findByRef({
+            ref: {
+              processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+              projectId,
+              processKey: `endpoint:${endpointId}`,
+            },
+          }),
+        ).toBeNull();
+      }
+    } finally {
+      await endpoints.update({
+        organizationId: organization.id,
+        endpointId,
+        maxBatchDelayMs: 0,
+        maxInFlight: 4,
+      });
+      await prisma.project.delete({ where: { id: secondProject.id } });
+    }
+  });
+
   /** @scenario The health report leads with the oldest undelivered age */
   it("reports lag from the stalest buffered envelope and counts the DLQ", async () => {
     await endpoints.update({
@@ -804,7 +879,6 @@ describe("webhook delivery via the transactional inbox", () => {
 
       clock += 30_000;
       const healthService = new WebhookHealthService({
-        prisma,
         endpoints,
         processStore: store,
         now: () => clock,
@@ -818,15 +892,11 @@ describe("webhook delivery via the transactional inbox", () => {
       expect(report.dlqDepth).toBe(0);
 
       // Fabricate a dead batch: it counts as DLQ depth.
-      const ref = {
-        processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-        projectId: project.id,
-        processKey: `endpoint:${endpointId}`,
-      };
+      const ref = endpointStreamRef(endpointId);
       const instance = await store.findByRef({ ref });
       await store.commit({
         ref,
-        tenantId: project.id,
+        tenantId: organization.id,
         sourceEventId: null,
         expectedRevision: instance?.revision ?? 0,
         state: instance?.state ?? { pending: [] },
@@ -857,7 +927,7 @@ describe("webhook delivery via the transactional inbox", () => {
       await store.markFailed({
         identity: {
           processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-          projectId: project.id,
+          projectId: organization.id,
           messageKey: "send:fabricated-dead",
         },
         leaseToken: leased.leaseToken,

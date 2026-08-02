@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@prisma/client";
 import type {
   OutboxMessageRecord,
   PersistedProcessInstance,
@@ -19,8 +18,6 @@ import {
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 /** Latency percentile sample cap: enough for a stable p95, bounded read. */
 const LATENCY_SAMPLE_LIMIT = 500;
-/** Per-chunk cap on the concurrent process-stream reads across projects. */
-const STREAM_READ_CONCURRENCY = 8;
 
 export interface WebhookEndpointHealth {
   status: "ACTIVE" | "DISABLED";
@@ -44,7 +41,6 @@ export interface WebhookEndpointHealth {
 }
 
 export interface WebhookHealthDeps {
-  prisma: PrismaClient;
   endpoints: Pick<
     WebhookEndpointService,
     "getStatusSnapshot" | "getDeliveryStats"
@@ -61,8 +57,8 @@ interface StreamBacklog {
   oldestUndeliveredMs: number | null;
 }
 
-/** One project's stream for the endpoint: the coalescing buffer and the
- *  outbox messages it has produced. */
+/** The endpoint's stream: the coalescing buffer and the outbox messages
+ *  it has produced. */
 interface EndpointStreamRead {
   instance: PersistedProcessInstance<EndpointStreamState> | null;
   messages: OutboxMessageRecord[];
@@ -75,9 +71,8 @@ function earlierInstant(a: number | null, b: number | null): number | null {
   return Math.min(a, b);
 }
 
-/** One project's contribution to the backlog: envelopes still coalescing
- *  in the stream buffer, sends still riding outbox retries, and batches
- *  that exhausted the ladder. */
+/** The backlog: envelopes still coalescing in the stream buffer, sends
+ *  still riding outbox retries, and batches that exhausted the ladder. */
 function backlogOfStream(read: EndpointStreamRead): StreamBacklog {
   let dlqDepth = 0;
   let oldestUndeliveredMs: number | null = null;
@@ -110,8 +105,8 @@ function p95Of(latencies: readonly number[]): number | null {
 /**
  * Aggregates one endpoint's delivery health across its three substrates:
  * the endpoint row (streak, status), the delivery log (rates, latency),
- * and the process streams (buffered lag, outbox retries, DLQ). Streams are
- * per project, so the read fans across the organization's projects.
+ * and the process stream (buffered lag, outbox retries, DLQ). The stream
+ * is the endpoint's own, at organization scope, so this is one read.
  */
 export class WebhookHealthService {
   constructor(private readonly deps: WebhookHealthDeps) {}
@@ -127,24 +122,19 @@ export class WebhookHealthService {
     });
     if (!endpoint) throw new WebhookEndpointNotFoundError();
 
-    const [stats, projects] = await Promise.all([
-      this.deps.endpoints.getDeliveryStats({
+    const stats = await this.deps.endpoints.getDeliveryStats({
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+      since: new Date(now - RATE_WINDOW_MS),
+      sampleLimit: LATENCY_SAMPLE_LIMIT,
+    });
+
+    const { dlqDepth, oldestUndeliveredMs } = backlogOfStream(
+      await this.readStream({
         organizationId: params.organizationId,
         endpointId: params.endpointId,
-        since: new Date(now - RATE_WINDOW_MS),
-        sampleLimit: LATENCY_SAMPLE_LIMIT,
       }),
-      this.deps.prisma.project.findMany({
-        where: { team: { organizationId: params.organizationId } },
-        select: { id: true },
-        orderBy: { id: "asc" },
-      }),
-    ]);
-
-    const { dlqDepth, oldestUndeliveredMs } = await this.streamBacklog({
-      endpointId: params.endpointId,
-      projectIds: projects.map((project) => project.id),
-    });
+    );
 
     const { attempted, delivered } = stats;
     return {
@@ -164,47 +154,13 @@ export class WebhookHealthService {
     };
   }
 
-  /**
-   * The endpoint's backlog summed across the organization's projects.
-   * Streams are per project; they are read in bounded chunks so a large
-   * organization costs a few concurrent rounds, not one serial round trip
-   * per project.
-   */
-  private async streamBacklog(params: {
-    endpointId: string;
-    projectIds: string[];
-  }): Promise<StreamBacklog> {
-    const total: StreamBacklog = { dlqDepth: 0, oldestUndeliveredMs: null };
-    for (
-      let i = 0;
-      i < params.projectIds.length;
-      i += STREAM_READ_CONCURRENCY
-    ) {
-      const chunk = params.projectIds.slice(i, i + STREAM_READ_CONCURRENCY);
-      const reads = await Promise.all(
-        chunk.map((projectId) =>
-          this.readStream({ projectId, endpointId: params.endpointId }),
-        ),
-      );
-      for (const read of reads) {
-        const backlog = backlogOfStream(read);
-        total.dlqDepth += backlog.dlqDepth;
-        total.oldestUndeliveredMs = earlierInstant(
-          total.oldestUndeliveredMs,
-          backlog.oldestUndeliveredMs,
-        );
-      }
-    }
-    return total;
-  }
-
   private async readStream(params: {
-    projectId: string;
+    organizationId: string;
     endpointId: string;
   }): Promise<EndpointStreamRead> {
     const ref = {
       processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-      projectId: params.projectId,
+      projectId: params.organizationId,
       processKey: `endpoint:${params.endpointId}`,
     };
     const [instance, messages] = await Promise.all([

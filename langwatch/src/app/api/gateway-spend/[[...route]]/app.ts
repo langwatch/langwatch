@@ -444,7 +444,6 @@ async function appendWindowToEndpointStream({
       await appendReplayToEndpointStream({
         deps: deliveryDeps,
         organizationId,
-        projectId: envelope.data.project_id as string,
         endpoint,
         envelope: envelope as SendBatchPayload["envelopes"][number],
         replayId,

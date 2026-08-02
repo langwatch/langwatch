@@ -27,7 +27,6 @@ patchZodOpenapi();
 
 const endpoints = new WebhookEndpointService({ prisma });
 const health = new WebhookHealthService({
-  prisma,
   endpoints,
   processStore: new PrismaProcessStore(prisma),
 });

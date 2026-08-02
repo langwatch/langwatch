@@ -94,7 +94,6 @@ async function commitEndpointSend(
     intentType: "sendBatch",
     payload: {
       organizationId: payload.organization_id,
-      projectId: payload.project_id,
       endpointId,
       batchId,
       envelopes: [payload.envelope],
