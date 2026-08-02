@@ -339,6 +339,30 @@ describe("cache write TTL pricing through computeSpanCost", () => {
       );
     });
 
+    /**
+     * A rule that prices only cached tokens leaves input and output at zero,
+     * which the enrichment still stamps on the span. Reading those two as
+     * "this model is unpriced" would drop the cache cost it does state.
+     *
+     * @scenario "Each cache write bucket is priced at its own rate"
+     */
+    it("still prices the cache when the override zeroes input and output", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          ...CLAUDE_CALL,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
+          "langwatch.model.inputCostPerToken": 0,
+          "langwatch.model.outputCostPerToken": 0,
+          "langwatch.model.cacheReadCostPerToken": 0.0000005,
+          "langwatch.model.cacheCreation1hCostPerToken": 0.00001,
+        },
+        promptTokens: 2,
+        completionTokens: 210,
+      });
+
+      expect(cost).toBeCloseTo(18443 * 0.0000005 + 17854 * 0.00001, 10);
+    });
+
     /** @scenario "Each cache write bucket is priced at its own rate" */
     it("uses the override's hour-long rate when it sets one", () => {
       const cost = computeSpanCost({

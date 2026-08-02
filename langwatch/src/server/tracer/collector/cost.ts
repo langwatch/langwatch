@@ -45,11 +45,18 @@ export function estimateCost({
   inputCharacters?: number;
   audioSeconds?: number;
 }): number | undefined {
+  // Undefined means "nothing here prices anything", which the caller reads as
+  // an unpriced model rather than a free one. The cache rates count: a rule
+  // that leaves input and output at zero and prices only cached tokens is
+  // priced, and treating it as unpriced would silently drop its cost.
   const hasAnyRate =
     !!llmModelCost?.inputCostPerToken ||
     !!llmModelCost?.outputCostPerToken ||
     !!llmModelCost?.inputCostPerCharacter ||
-    !!llmModelCost?.inputCostPerSecond;
+    !!llmModelCost?.inputCostPerSecond ||
+    !!llmModelCost?.cacheReadCostPerToken ||
+    !!llmModelCost?.cacheCreationCostPerToken ||
+    !!llmModelCost?.cacheCreation1hCostPerToken;
   if (!hasAnyRate) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
