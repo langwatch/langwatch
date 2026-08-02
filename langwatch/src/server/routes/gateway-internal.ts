@@ -1108,6 +1108,22 @@ function toSpendCommandData(
   };
 }
 
+/** The wire fields that identify a rejected record, so the log line can be
+ *  reconciled against the gateway's own. Read defensively: a record is only
+ *  rejected because its payload did not hold up. */
+function rejectedRecordIdentity(
+  record: SpendCommandRecord,
+): Record<string, string | null> {
+  const wireString = (key: string): string | null => {
+    const value = record.payload[key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+  return {
+    gatewayRequestId: wireString("gateway_request_id"),
+    tenantId: wireString("project_id"),
+  };
+}
+
 /** Group the batch by command, reporting unacceptable records by index.
  *  Every reject path logs: a silent per-record drop looks like a healthy
  *  200 from the emitter's side and loses billing records. */
@@ -1125,10 +1141,15 @@ function groupSpendCommands(records: SpendCommandRecord[]): {
     const mapped = toSpendCommandData(record);
     if (!mapped.ok) {
       rejected.push({ index, code: mapped.reject.code });
-      logger.warn(
+      // Error, not warn: the drainer reads a 200 and acks the segment, so this
+      // line is the only trace the record ever existed. It names the request
+      // because "a record was rejected" cannot be reconciled against anything.
+      logger.error(
         {
           command: record.command,
           index,
+          code: mapped.reject.code,
+          ...rejectedRecordIdentity(record),
           ...(mapped.reject.issues ? { issues: mapped.reject.issues } : {}),
         },
         mapped.reject.message,
