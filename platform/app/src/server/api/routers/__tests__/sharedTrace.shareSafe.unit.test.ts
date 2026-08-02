@@ -67,16 +67,30 @@ describe("sharedTrace share-safe gates", () => {
       /** @scenario A viewer without cost:view sees no session spend */
       it("strips every session rollup cost", () => {
         const sessions = [
-          { conversationId: "s-1", totalCost: 4.2, totalTokens: 100 },
-          { conversationId: "s-2", totalCost: 0, totalTokens: 5 },
+          {
+            conversationId: "s-1",
+            totalCost: 4.2,
+            totalTokens: 100,
+            traceCount: 7,
+          },
+          {
+            conversationId: "s-2",
+            totalCost: 0,
+            totalTokens: 5,
+            traceCount: 1,
+          },
         ];
         const out = gateSessionCost({
           sessions,
           protections: anonProtections,
         });
         expect(out.map((session) => session.totalCost)).toEqual([0, 0]);
-        // Everything that is not spend survives the gate untouched.
-        expect(out.map((session) => session.totalTokens)).toEqual([100, 5]);
+        // Spend is the only field the gate touches. Asserting the whole row
+        // rather than one survivor is what catches a rollup column added
+        // later being mangled on its way through.
+        expect(out).toEqual(
+          sessions.map((session) => ({ ...session, totalCost: 0 })),
+        );
       });
     });
   });
