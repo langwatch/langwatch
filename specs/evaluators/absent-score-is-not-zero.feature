@@ -126,7 +126,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the model environment is resolved for the model the user chose
     And it is not resolved from the settings the previous behaviour produced
 
-  @integration @unimplemented
+  @integration
   Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
     Given an existing evaluator whose stored config names a model whose provider is not configured
     When the online evaluation pipeline executes a monitor backed by that evaluator for a trace
