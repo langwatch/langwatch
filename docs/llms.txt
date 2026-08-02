@@ -477,6 +477,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
 - [Members & invites](https://langwatch.ai/docs/ai-governance/members-and-invites.md): Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
 - [Roles & permissions](https://langwatch.ai/docs/ai-governance/roles-and-permissions.md): The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
+- [Audit log](https://langwatch.ai/docs/ai-governance/audit-log.md): Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
 
 ## Dashboards
 

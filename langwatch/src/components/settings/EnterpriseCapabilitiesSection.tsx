@@ -45,7 +45,7 @@ const CAPABILITIES = [
     icon: Users,
     description:
       "Create, update, and deactivate members automatically from your directory, so leavers lose access without a manual step.",
-    docsPath: "/self-hosting/licensing",
+    docsPath: "/platform/scim",
   },
   {
     key: "audit-logs",

@@ -1338,7 +1338,7 @@ SCIM (System for Cross-domain Identity Management) 2.0 allows your identity prov
 
 - Organization Admin permissions in LangWatch
 - An identity provider that supports SCIM 2.0 (Okta, Azure AD, Entra ID, etc.)
-- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/sso-setup-langwatch))
+- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/configuration/sso))
 
 ## Setting Up SCIM
 
@@ -52591,7 +52591,7 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
 <Warning>
-**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out.
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
 The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
 </Warning>
@@ -55208,6 +55208,12 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 - **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox.
 
 Once a license is present, the deployment flips to SSO and the email routes close again, so no password account can be minted on a licensed install.
+
+<Warning>
+**Upgrading an unlicensed deployment that everyone signs in to through SSO.** Those accounts were created by the identity provider and have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure SMTP (see [Third-party integrations](/self-hosting/configuration/third-party-integrations)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
+
+If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery: it needs nothing but the key.
+</Warning>
 
 ## Activating a license
 

@@ -64,6 +64,12 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 
 Once a license is present, the deployment flips to SSO and the email routes close again, so no password account can be minted on a licensed install.
 
+<Warning>
+**Upgrading an unlicensed deployment that everyone signs in to through SSO.** Those accounts were created by the identity provider and have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure SMTP (see [Third-party integrations](/self-hosting/configuration/third-party-integrations)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
+
+If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery: it needs nothing but the key.
+</Warning>
+
 ## Activating a license
 
 <Steps>

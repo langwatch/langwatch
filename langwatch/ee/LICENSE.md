@@ -9,8 +9,13 @@ the repository root `LICENSE.md` and `NOTICE`.
 The Enterprise Software implements the enterprise capabilities of LangWatch,
 including single sign-on, SCIM provisioning, audit logging, licensing, billing,
 and back-office tooling. The enterprise capabilities are the surfaces the
-software enables only for licensed deployments; they verify a license at
-runtime and stay dormant without one.
+software enables only for licensed deployments; each verifies a license at
+runtime before it can be used.
+
+Some of them keep recording in the background on an unlicensed deployment so
+that no history is lost, audit logging in particular. Reading, exporting, or
+otherwise making use of what they record is the enterprise capability, and
+that is what a license is required for.
 
 ## Grants
 
@@ -18,13 +23,17 @@ runtime and stay dormant without one.
    part of a LangWatch distribution, provided the license verification and the
    runtime checks that gate the enterprise capabilities remain intact. You do
    not need a commercial license for this: without one the enterprise
-   capabilities stay dormant, and the rest of LangWatch is yours to use under
+   capabilities cannot be used, and the rest of LangWatch is yours to use under
    its own license.
 
 2. **Enterprise capabilities.** Enabling or using an enterprise capability in
-   production requires a valid LangWatch Enterprise License, available at
-   https://langwatch.ai/pricing or by contacting sales@langwatch.ai. The
-   license key you receive is what the runtime checks verify.
+   production requires a valid LangWatch Enterprise License genuinely issued by
+   LangWatch, available at https://langwatch.ai/pricing or by contacting
+   sales@langwatch.ai. The license key you receive is what the runtime checks
+   verify. A key that passes verification only because the verification key it
+   is checked against was replaced or altered is not a license under this
+   agreement, and using an enterprise capability on that basis is not granted
+   by section 1.
 
 3. **Development, evaluation, and testing.** You may copy, modify, and use the
    Enterprise Software for non-production purposes, including local

@@ -687,7 +687,8 @@
             "pages": [
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions"
+              "ai-governance/roles-and-permissions",
+              "ai-governance/audit-log"
             ]
           },
           {
