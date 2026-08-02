@@ -85,10 +85,12 @@ export const exportTracesCommand = async (options: {
     ? new Date(options.endDate).getTime()
     : now;
 
-  const limit = options.limit ? parseInt(options.limit, 10) : 1000;
-  if (!Number.isFinite(limit) || limit <= 0) {
+  const limit = options.limit ? Number(options.limit) : 1000;
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
     console.error(
-      chalk.red(`Error: --limit must be a positive number, got "${options.limit}"`),
+      chalk.red(
+        `Error: --limit must be a positive whole number, got "${options.limit}"`,
+      ),
     );
     process.exit(1);
   }
@@ -158,8 +160,8 @@ export const exportTracesCommand = async (options: {
 
       const data = (await response.json()) as SearchPage;
       const pageTraces = data.traces;
-      // A server page can only be shorter than requested, but truncate anyway
-      // so a misbehaving page can never overshoot the caller's --limit.
+      // Truncate on write so no page, whatever its size, can push the output
+      // past the caller's --limit.
       traces.push(...pageTraces.slice(0, limit - traces.length));
       matched = data.pagination?.totalHits ?? traces.length;
 
