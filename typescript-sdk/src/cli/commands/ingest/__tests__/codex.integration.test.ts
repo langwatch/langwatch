@@ -95,7 +95,7 @@ describe("ingest codex", () => {
 				const stderr = vi
 					.spyOn(process.stderr, "write")
 					.mockImplementation(() => true);
-				const log = vi.spyOn(console, "log").mockImplementation(() => {});
+				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 				const exit = vi
 					.spyOn(process, "exit")
 					.mockImplementation((() => undefined) as never);
@@ -180,7 +180,7 @@ describe("ingest codex", () => {
 				enableCapture("https://app.langwatch.test/api/otel");
 				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "first");
 				writeRollout("thread-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "second");
-				const log = vi.spyOn(console, "log").mockImplementation(() => {});
+				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
 				await ingestCodexCommand({ all: true, json: true });
 

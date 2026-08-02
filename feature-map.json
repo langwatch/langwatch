@@ -23,14 +23,12 @@
               "cli": [
                 "trace search",
                 "trace get",
-                "trace export",
-                "ingest codex"
+                "trace export"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
-                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
-                "ingest codex": "langwatch ingest codex --since 24"
+                "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
@@ -948,7 +946,7 @@
         {
           "id": "ai-gateway.ingest",
           "name": "Ingestion Sources",
-          "description": "Read-only inspection of OCSF-normalised event ingestion (sources, event tail, health)",
+          "description": "OCSF-normalised event ingestion: inspect sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {
@@ -958,7 +956,8 @@
               "cli": [
                 "ingest list",
                 "ingest tail",
-                "ingest health"
+                "ingest health",
+                "ingest codex"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
