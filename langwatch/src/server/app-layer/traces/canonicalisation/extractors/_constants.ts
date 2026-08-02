@@ -127,12 +127,6 @@ export const ATTR_KEYS = {
   // level when a single call is known to be bundled (e.g. the codex account
   // provider). The span-level value wins over the resource-level default.
   LANGWATCH_COST_NON_BILLABLE: "langwatch.cost.non_billable",
-  // What the provider says a single model call cost, as opposed to what our
-  // token x registry arithmetic estimates it at. Lifted from an agent's own
-  // per-call reporting (Claude Code's `cost_usd`), and summed by the trace
-  // folds into the trace's cost. Distinct from `langwatch.cost.usd`, which a
-  // log-only emitter uses when there is no span to price at all.
-  LANGWATCH_PROVIDER_REPORTED_COST_USD: "langwatch.cost.provider_reported_usd",
   LANGWATCH_TOKENS_ESTIMATED: "langwatch.tokens.estimated",
   LANGWATCH_METRICS: "langwatch.metrics",
   // SDK span timing blob: { started_at, first_token_at, finished_at }

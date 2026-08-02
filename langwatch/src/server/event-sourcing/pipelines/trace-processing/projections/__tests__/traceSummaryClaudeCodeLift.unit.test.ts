@@ -4,17 +4,12 @@
  * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
  *
  * The claude_code model-call triplet (api_request / api_request_body /
- * api_response_body) does NOT lift model / tokens / output through the log
- * fold: Claude Code's own SDK spans carry those (computeSpanCost +
+ * api_response_body) does NOT lift model / cost / tokens / output through the
+ * log fold: Claude Code's own SDK spans carry that (computeSpanCost +
  * accumulateTokens on the SPAN fold), and the coding-agent session pipeline
- * owns the session-grain totals (ADR-056). Re-lifting them here would
- * double-count against the span fold.
- *
- * Cost is the exception, because it is the one figure the agent reports
- * better than we can derive it: `cost_usd` on api_request is what Anthropic
- * charged, where the span fold's number is tokens times a price registry.
- * The reported cost does not add to the estimate, it REPLACES it, so there
- * is nothing to double-count. See `resolveTraceCost` in the fold.
+ * owns the session-grain totals (ADR-056). The "does NOT lift an api_request"
+ * case below pins that the log fold stays a no-op for these, so cost/tokens
+ * can never be double-counted from the log path.
  *
  * The top-level column mirror (langwatch.* lift -> Models /
  * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the
@@ -41,10 +36,7 @@ import {
   applySpanToSummary,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import {
-  createInitState,
-  createTestSpan,
-} from "./fixtures/trace-summary-test.fixtures";
+import { createInitState } from "./fixtures/trace-summary-test.fixtures";
 
 function makeProjection() {
   return new TraceSummaryFoldProjection({
@@ -179,12 +171,10 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
   });
 
   describe("when a converted model-call event reaches the log fold", () => {
-    /** @scenario "The reported cost replaces the estimate for the whole trace" */
-    it("takes the reported cost off an api_request but not its model or tokens", () => {
-      // Cost is the one thing the agent knows better than we can derive:
-      // `cost_usd` is what it was charged, where our own figure is tokens
-      // times a price registry. Tokens and model come off the call's span,
-      // so re-lifting those here WOULD double-count.
+    it("does NOT lift model/cost/tokens off an api_request (no double-count)", () => {
+      // api_request is converted to a span at ingest and never reaches the
+      // log path; if one ever did, the fold must NOT re-lift its cost/tokens
+      // — that would double-count against the span fold's contribution.
       const projection = makeProjection();
       const state = createInitState();
       const after = projection.handleTraceLogRecordReceived(
@@ -203,43 +193,8 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       );
       expect(after.attributes["langwatch.cost.usd"]).toBeUndefined();
       expect(after.attributes["langwatch.model"]).toBeUndefined();
-      expect(after.totalCost).toBe(0.5);
-      expect(after.totalPromptTokenCount).toBe(state.totalPromptTokenCount);
+      expect(after.totalCost).toBe(state.totalCost);
       expect(after.models).toEqual(state.models);
-    });
-
-    /** @scenario "Reported costs across a turn's calls add up" */
-    it("adds up the reported costs of a turn's calls", () => {
-      const projection = makeProjection();
-      const event = (cost: string) =>
-        makeLogEvent(
-          { "event.name": "api_request", "session.id": "s", cost_usd: cost },
-          { body: "claude_code.api_request" },
-        );
-
-      let state = createInitState();
-      for (const cost of ["0.5", "0.25", "0.125"]) {
-        state = projection.handleTraceLogRecordReceived(event(cost), state);
-      }
-
-      expect(state.totalCost).toBe(0.875);
-    });
-
-    /** @scenario "A reported cost of zero does not blank out the estimate" */
-    it("leaves the trace cost alone when the reported cost is zero", () => {
-      const projection = makeProjection();
-      const after = projection.handleTraceLogRecordReceived(
-        makeLogEvent(
-          { "event.name": "api_request", "session.id": "s", cost_usd: "0" },
-          { body: "claude_code.api_request" },
-        ),
-        createInitState(),
-      );
-
-      expect(after.totalCost).toBeNull();
-      expect(
-        after.attributes["langwatch.cost.provider_reported_usd"],
-      ).toBeUndefined();
     });
   });
 
@@ -546,30 +501,8 @@ describe("TraceSummaryFoldProjection cache TTL split sums", () => {
       );
 
       expect(after.attributes["gen_ai.request.reasoning_effort"]).toBe("high");
-      // The same event carries what the call was charged, so both land.
-      expect(after.totalCost).toBe(0.02);
-    });
-
-    /** @scenario "Utility calls report their cost too" */
-    it("takes the cost of a utility call, whose effort must not win the trace", () => {
-      const projection = makeProjection();
-      const after = projection.handleTraceLogRecordReceived(
-        makeLogEvent(
-          {
-            "event.name": "api_request",
-            query_source: "title_generation",
-            effort: "low",
-            cost_usd: "0.004",
-          },
-          { body: "claude_code.api_request" },
-        ),
-        createInitState(),
-      );
-
-      expect(after.totalCost).toBe(0.004);
-      expect(
-        after.attributes["gen_ai.request.reasoning_effort"],
-      ).toBeUndefined();
+      // The api_request lift stays scalar-only: no cost/token double-count.
+      expect(after.totalCost).toBeNull();
     });
   });
 });
@@ -681,140 +614,6 @@ describe("TraceSummaryFoldProjection context size", () => {
       expect(
         state.attributes["langwatch.reserved.context_size_tokens"],
       ).toBeUndefined();
-    });
-  });
-});
-
-/**
- * The customer-visible symptom this covers: a Claude Code trace whose drawer
- * header showed 0.16 USD while the terminal tab's footer showed 0.23 USD for
- * the same 843 tokens. Read-time enrichment already joins the agent's own
- * `cost_usd` onto the span, so the terminal footer was right; the header read
- * a trace total that only ever saw the span-side estimate.
- */
-describe("TraceSummaryFoldProjection provider-reported cost", () => {
-  /**
-   * The real span/log pair from a Claude Code turn: the span carries the
-   * tokens (which price to ~0.1604 against the registry) and the api_request
-   * log carries what Anthropic actually charged.
-   */
-  const CLAUDE_SPAN = () =>
-    createTestSpan({
-      name: "claude_code.llm_request",
-      spanAttributes: {
-        "gen_ai.request.model": "claude-opus-5[1m]",
-        "gen_ai.usage.input_tokens": 732,
-        "gen_ai.usage.output_tokens": 111,
-        "gen_ai.usage.cache_read.input_tokens": 20540,
-        "gen_ai.usage.cache_creation.input_tokens": 22994,
-      },
-    });
-
-  const REPORTED_COST = 0.2312;
-  const ESTIMATED_COST = 0.160417;
-
-  const apiRequestLog = (attrs: Record<string, string> = {}) =>
-    makeLogEvent(
-      {
-        "event.name": "api_request",
-        "session.id": "s",
-        query_source: "repl_main_thread",
-        cost_usd: String(REPORTED_COST),
-        ...attrs,
-      },
-      { body: "claude_code.api_request" },
-    );
-
-  describe("given a span the registry prices and a log the agent priced", () => {
-    /** @scenario "The reported cost replaces the estimate for the whole trace" */
-    it("reports the agent's cost, not the sum of both", () => {
-      const projection = makeProjection();
-      const withSpan = applySpanToSummary({
-        state: createInitState(),
-        span: CLAUDE_SPAN(),
-      });
-      expect(withSpan.totalCost).toBeCloseTo(ESTIMATED_COST, 6);
-
-      const after = projection.handleTraceLogRecordReceived(
-        apiRequestLog(),
-        withSpan,
-      );
-
-      expect(after.totalCost).toBe(REPORTED_COST);
-    });
-
-    /** @scenario "The reported cost replaces the estimate for the whole trace" */
-    it("reports the agent's cost whichever of the two arrived first", () => {
-      const projection = makeProjection();
-      const withLog = projection.handleTraceLogRecordReceived(
-        apiRequestLog(),
-        createInitState(),
-      );
-
-      const after = applySpanToSummary({
-        state: withLog,
-        span: CLAUDE_SPAN(),
-      });
-
-      expect(after.totalCost).toBe(REPORTED_COST);
-    });
-
-    /** @scenario "The reported cost replaces the estimate for the whole trace" */
-    it("keeps the estimate intact underneath, so a later span still adds to it", () => {
-      const projection = makeProjection();
-      const withLog = projection.handleTraceLogRecordReceived(
-        apiRequestLog(),
-        createInitState(),
-      );
-      const withSpans = [CLAUDE_SPAN(), CLAUDE_SPAN()].reduce(
-        (state, span) => applySpanToSummary({ state, span }),
-        withLog,
-      );
-
-      expect(
-        Number(withSpans.attributes["langwatch.reserved.estimated_cost_usd"]),
-      ).toBeCloseTo(ESTIMATED_COST * 2, 5);
-      expect(withSpans.totalCost).toBe(REPORTED_COST);
-    });
-  });
-
-  describe("given a session on a flat subscription", () => {
-    /** @scenario "The bundled split follows the reported cost" */
-    it("bundles the whole reported cost, leaving no billed remainder", () => {
-      const projection = makeProjection();
-      const bundledSpan = CLAUDE_SPAN();
-      bundledSpan.resourceAttributes = {
-        "langwatch.cost.non_billable": "true",
-      };
-      const withSpan = applySpanToSummary({
-        state: createInitState(),
-        span: bundledSpan,
-      });
-
-      const bundledLog = apiRequestLog();
-      bundledLog.data.resourceAttributes = {
-        ...bundledLog.data.resourceAttributes,
-        "langwatch.cost.non_billable": "true",
-      };
-      const after = projection.handleTraceLogRecordReceived(
-        bundledLog,
-        withSpan,
-      );
-
-      expect(after.totalCost).toBe(REPORTED_COST);
-      expect(after.nonBilledCost).toBe(REPORTED_COST);
-    });
-  });
-
-  describe("given a session whose agent reports nothing", () => {
-    /** @scenario "The estimate stands when the agent reports nothing" */
-    it("falls back to the registry estimate", () => {
-      const after = applySpanToSummary({
-        state: createInitState(),
-        span: CLAUDE_SPAN(),
-      });
-
-      expect(after.totalCost).toBeCloseTo(ESTIMATED_COST, 6);
     });
   });
 });
