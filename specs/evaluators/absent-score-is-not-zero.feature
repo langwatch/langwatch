@@ -101,6 +101,13 @@ Feature: An absent evaluator score is never presented or stored as zero
   # and bind nothing regardless.
 
   @integration @unimplemented
+  Scenario: The evaluator's own prompt wins over the monitor's parameters
+    Given a monitor that carries evaluation parameters
+    And its evaluator's saved config also carries a different prompt at the top level
+    When the online evaluation pipeline executes the monitor for a trace
+    Then the settings sent to the judge carry the evaluator's prompt
+
+  @integration @unimplemented
   Scenario: A monitor with no evaluator still falls back to its own parameters
     Given a monitor that carries evaluation parameters and has no evaluator attached
     When the online evaluation pipeline executes the monitor for a trace
@@ -113,11 +120,18 @@ Feature: An absent evaluator score is never presented or stored as zero
   # the model-env ripple.
 
   @integration @unimplemented
-  Scenario: Model environment is resolved from the recovered prompt settings
-    Given a monitor whose evaluator config carries the user's prompt at the top level with no settings key
+  Scenario: Model environment is resolved from the recovered settings
+    Given a monitor whose evaluator config carries the user's prompt and chosen model at the top level with no settings key
     When the online evaluation pipeline executes the monitor for a trace
-    Then the model environment is resolved from the settings that carry the user's prompt
+    Then the model environment is resolved for the model the user chose
     And it is not resolved from the settings the previous behaviour produced
+
+  @integration @unimplemented
+  Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
+    Given an existing evaluator whose stored config names a model whose provider is not configured
+    When the online evaluation pipeline executes a monitor backed by that evaluator for a trace
+    Then the evaluation reports a named configuration failure
+    And it does not throw on every subsequent trace
 
   # ============================================================================
   # Try it out panel (D1) — absent versus zero at the render boundary
@@ -328,6 +342,7 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: The new settings resolution can be switched off for rollback
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
 # AC 0e: "The behaviour this fix INVERTS is named, and its existing assertions are updated"
+#        -> Scenario: The evaluator's own prompt wins over the monitor's parameters
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters
 #           (the half of the old contract that SURVIVES; the half that does not is covered by
 #           "A prompt saved at the top level of config still reaches the judge" above)
@@ -335,6 +350,10 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           new contract rather than deleting it. (An earlier draft also required amending
 #           specs/monitors/monitor-execution-backend.feature -- checked, and it does NOT
 #           contradict the fix, so that obligation was dropped.)
+# AC 0g: "A recovered model key naming an unconfigured provider degrades, not throws"
+#        -> Scenario: A recovered model naming an unconfigured provider degrades rather than erroring
+#           (setupModelEnv throws EvaluatorConfigError; on main it never runs because the config
+#           resolves to {} -- so the rows D6 repairs are exactly the rows that can start erroring)
 # AC 0f: "The settings ripple one hop earlier is checked"
 #        -> Scenario: Model environment is resolved from the recovered prompt settings
 #           (TOP-LEVEL-PROMPT fixture -- the correctly-configured one is forbidden by AC0f as
@@ -366,7 +385,6 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           (cost axis: evaluations-legacy.ts:509 `cost: cost?.amount ?? 0`, cost Float NOT NULL
 #           at schema.prisma:751 -- migrated with the other two, or the scenario is dropped and
 #           the exclusion stated. It previously had a parenthetical and no scenario.)
-#        -> Scenario: Passed and details are stored as absent alongside score
 # AC 8: "An all-zero dataset still shows the score metric"
 #        -> Scenario: An all-zero dataset still shows the score metric
 # AC 9: "The average excludes not-scored rows from numerator and denominator" (+ K === N case)
@@ -409,12 +427,16 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
 #           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
 #
-# Coverage: 32 scenarios across the 22 ACs that carry at least one (0a, 0b, 0c, 0c2, 0e, 0f,
-# 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10b, 11, 12, 12b, 14, 18). Five ACs carry none BY DESIGN, each
-# with its reason stated above and its enforcement named elsewhere: 0d (a one-off production
-# measurement, close-gate), 13 (a typecheck + PR-body disclosure), 15 (bookkeeping, declared
-# non-behavioral by the issue), 16 (16a/16b -- a real reproduction against a customer account,
-# a PR obligation), 17 (a property OF this file; a scenario asserting its own file is bound
-# would be circular). An earlier footer said "19 behavioral ACs", which counted neither
-# correctly nor consistently -- 22 carry scenarios and 5 are exempt, 27 total. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
+# Coverage: every AC in the issue maps to at least one scenario above, EXCEPT the five that
+# carry none by design, each justified inline: 0d (a one-off production measurement; a close
+# gate), 13 (a typecheck + PR-body disclosure), 15 (bookkeeping, declared non-behavioral by
+# the issue), 16 (16a/16b -- a real reproduction against a customer account, a PR obligation),
+# and 17 (a property OF this file; a scenario asserting its own file is bound is circular).
+#
+# ⚠ NO TOTALS ARE STATED HERE ON PURPOSE. Every hardcoded count written into this file or the
+# issue went stale within hours -- 24 -> 28 -> 32 -> 34 scenarios, a "19 behavioral ACs" that
+# was never right, and a "5 exempt / 27 total" that contradicted its own AC16-is-split clause.
+# Derive them instead, and expect the two to agree:
+#   grep -cE '^\s+Scenario( Outline)?:' <this file>
+#   grep -c '^#        -> Scenario' <this file> AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
 # gate is a real reproduction against a customer account, which is why it stays a PR obligation.
