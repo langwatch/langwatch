@@ -550,8 +550,14 @@ function MemberRowActions({
 }) {
   return (
     <Menu.Root>
-      <Menu.Trigger>
-        <MoreVertical size={16} />
+      <Menu.Trigger asChild>
+        <Button
+          size="xs"
+          variant="ghost"
+          aria-label={`Actions for ${member.user.name ?? member.user.email ?? "this member"}`}
+        >
+          <MoreVertical size={16} />
+        </Button>
       </Menu.Trigger>
       <Menu.Content>
         <Menu.Item
