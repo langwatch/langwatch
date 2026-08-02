@@ -116,6 +116,9 @@ const TRACE_METRICS: Record<string, ProjectionValueType> = {
   reasoning_tokens: "number",
   cache_read_input_tokens: "number",
   cache_creation_input_tokens: "number",
+  cache_creation_5m_input_tokens: "number",
+  cache_creation_1h_input_tokens: "number",
+  context_size_tokens: "number",
   total_cost: "number",
   tokens_estimated: "boolean",
 };
