@@ -42,6 +42,7 @@ const MAP_TARGET_TABLE: Record<string, string> = {
   metricDataPointStorage: "metric_data_points",
   metricSeriesCatalog: "metric_series",
   metricTimeRollup: "metric_time_rollups",
+  codingAgentSessionEvents: "coding_agent_session_events",
 };
 
 /** Pipelines with no fold store whose map projections still replay. */
