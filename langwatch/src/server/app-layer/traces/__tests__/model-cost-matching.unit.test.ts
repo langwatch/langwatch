@@ -180,9 +180,10 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.042, 6);
     });
 
-    it("prefers a provider-reported cost over the registry for an on-table model (Claude Code cost_usd)", () => {
-      // Anthropic reports its own cost_usd on every claude turn; for on-table
-      // models it must win over our token×registry estimate.
+    it("prefers an explicit span cost over the registry for an on-table model", () => {
+      // An application that states its own cost through the SDK's metrics.cost
+      // must win over our token x registry estimate, even for a model the
+      // registry knows how to price.
       const result = computeSpanCost({
         attrs: {
           "gen_ai.response.model": "claude-opus-4-7",

@@ -10,17 +10,19 @@ import { coerceToNumber } from "~/utils/coerceToNumber";
 /**
  * Computes per-span cost using a priority cascade:
  * 1. Custom cost rates from enrichment attributes (per-token override policy)
- * 2. Explicit / provider-reported total cost (langwatch.span.cost)
+ * 2. Explicit total cost reported on the span (langwatch.span.cost)
  * 3. Static model registry lookup (with provider subtype + date fallbacks)
  * 4. Guardrail cost extraction
  *
- * An explicit cost is an authoritative figure — the LangWatch SDK's
- * metrics.cost, or a provider's own billed number (e.g. Claude Code's
- * cost_usd) — so it wins over our token×registry ESTIMATE. The registry
- * is the fallback for when nobody told us the cost, not an override of a
- * known-good one. (Per-token enrichment rates still rank first: they are a
- * deliberate "price everything my way" policy, more specific than a single
- * span's total.)
+ * An explicit cost is a figure the instrumented application worked out
+ * itself and handed us through the SDK's metrics.cost, so it wins over our
+ * token x registry ESTIMATE. The registry is the fallback for when nobody
+ * told us the cost, not an override of a known-good one. (Per-token
+ * enrichment rates still rank first: they are a deliberate "price
+ * everything my way" policy, more specific than a single span's total.)
+ *
+ * Every branch runs the same `estimateCost` arithmetic, so a new billable
+ * unit is priced identically wherever the rates came from.
  */
 export function computeSpanCost({
   attrs,
@@ -118,12 +120,12 @@ export function computeSpanCost({
     );
   }
 
-  // Priority 2: Explicit / provider-reported total cost. An authoritative
-  // figure (the SDK's metrics.cost or a provider's own billed number such as
-  // Claude Code's cost_usd) is trusted over the token×registry estimate
-  // below — when the cost is known exactly, don't re-derive an approximation
-  // of it. A zero or absent value falls through to the registry, so this
-  // never suppresses costing for spans that didn't report a cost.
+  // Priority 2: Explicit total cost the application reported for itself,
+  // through the SDK's metrics.cost. It is trusted over the token x registry
+  // estimate below: when a caller states the cost, don't re-derive an
+  // approximation of it. A zero or absent value falls through to the
+  // registry, so this never suppresses costing for spans that didn't
+  // report a cost.
   const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
   if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
