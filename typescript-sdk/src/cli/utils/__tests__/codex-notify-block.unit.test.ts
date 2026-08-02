@@ -465,7 +465,7 @@ describe("given a single-quoted literal string holding an unbalanced bracket", (
 
 describe("given a multi-line string holding brackets above the user's notify", () => {
   describe("when the block is written", () => {
-    /** @scenario "A user's own notify program keeps running" */
+    /** @scenario "A turn-completion program the user already had keeps running" */
     it("reads a basic multi-line string as prose, not as structure", () => {
       fs.writeFileSync(
         configPath,
@@ -496,7 +496,7 @@ describe("given a multi-line string holding brackets above the user's notify", (
       expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
     });
 
-    /** @scenario "A user's own notify program keeps running" */
+    /** @scenario "A turn-completion program the user already had keeps running" */
     it("reads a literal multi-line string as prose too", () => {
       fs.writeFileSync(
         configPath,
@@ -522,7 +522,7 @@ describe("given a multi-line string holding brackets above the user's notify", (
       expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
     });
 
-    /** @scenario "A user's own notify program keeps running" */
+    /** @scenario "A turn-completion program the user already had keeps running" */
     it("ignores a notify assignment that is only text inside a multi-line string", () => {
       fs.writeFileSync(
         configPath,
