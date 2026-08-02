@@ -90,11 +90,11 @@ export const resendProvider: EmailProviderPort = {
       } as RequestInit);
 
       if (!response.ok) {
-        // Truncated: the body is provider-controlled and can echo the request,
-        // so it is a diagnostic hint rather than something to log wholesale.
-        const detail = (await response.text().catch(() => "")).slice(0, 500);
+        // The body is not included: Resend echoes the request on failure, so it
+        // can carry recipient addresses, and this error is logged. The status
+        // is what identifies the failure class.
         throw new Error(
-          `Resend responded ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`,
+          `Resend responded ${response.status} ${response.statusText}`,
         );
       }
 

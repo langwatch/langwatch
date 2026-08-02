@@ -200,7 +200,7 @@ describe("resendProvider.send", () => {
   });
 
   describe("given the API rejects the message", () => {
-    it("surfaces the status and body so the failure is diagnosable", async () => {
+    it("surfaces the status so the failure class is diagnosable", async () => {
       fetchMock.mockResolvedValue({
         ok: false,
         status: 422,
@@ -213,7 +213,25 @@ describe("resendProvider.send", () => {
           { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
           "noreply@langwatch.ai",
         ),
-      ).rejects.toThrow(/422.*domain is not verified/);
+      ).rejects.toThrow(/422 Unprocessable Entity/);
+    });
+
+    it("keeps the response body out of the error, which gets logged", async () => {
+      // Resend echoes the request on failure, so the body can carry recipient
+      // addresses.
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 422,
+        statusText: "Unprocessable Entity",
+        text: async () => '{"to":["private@customer.example"]}',
+      });
+
+      await expect(
+        resendProvider.send(
+          { to: "private@customer.example", subject: "Hi", html: "<p>Hi</p>" },
+          "noreply@langwatch.ai",
+        ),
+      ).rejects.toThrow(/^(?!.*private@customer\.example).*$/s);
     });
   });
 });

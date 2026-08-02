@@ -15,6 +15,7 @@
  */
 import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
+import { isProxyBypassed } from "../src/server/mailer/providers/proxy";
 import { EmailProviderConfigurationError } from "../src/server/mailer/providers/types";
 
 const PROXY_PORT = 8888;
@@ -73,7 +74,11 @@ async function main() {
 
 /** Whether the observed routing matches what the proxy settings asked for. */
 function report(tunnelled: string[]): never {
-  const bypassing = Boolean(process.env.NO_PROXY);
+  // Ask the mailer's own matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
+  // leaves the SES host proxied, and treating that as a bypass would invert the
+  // verdict.
+  const sesHost = `email.${process.env.AWS_REGION ?? ""}.amazonaws.com`;
+  const bypassing = isProxyBypassed(sesHost);
   console.log(
     tunnelled.length > 0
       ? `tunnelled through the proxy: ${tunnelled.join(", ")}`

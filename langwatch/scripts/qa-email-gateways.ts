@@ -172,11 +172,9 @@ async function scenarioUnicode() {
   });
 
   const list = await messages();
+  check("exactly one message arrived", list.length === 1, `got ${list.length}`);
   const first = list[0];
-  if (!first) {
-    check("message delivered", false, "inbox was empty");
-    return;
-  }
+  if (!first) return;
   const detail = await messageDetail(first.ID);
   check(
     "subject decoded correctly",
