@@ -24,10 +24,7 @@ import {
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import {
-  NANO_USD_PER_USD,
-  rateSpendNanoUsd,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   NewOutboxMessage,
@@ -190,6 +187,9 @@ export const deliverSchema = z.object({
   model: z.string(),
   model_provider_id: z.string(),
   usage: spendUsagePayloadSchema.nullable(),
+  /** The price the outcome event carried, in integer nano-USD. A
+   *  settlement priced nothing, so it carries zero. */
+  cost_nano_usd: z.number().int().min(0),
   rate_version: z.string(),
   duration_ms: z.number().int().min(0),
   error: z
@@ -277,19 +277,11 @@ function resolvedModel(payload: DeliverPayload, fallback: string): string {
 }
 
 /** The delivery view as a spend row, so the envelope mapper stays the one
- *  place the external contract is shaped. Rating happens here with the
- *  same deterministic service the fold uses, never by reading the fold's
- *  table: the two consumers of the log stay independent by contract. */
+ *  place the external contract is shaped. The price is the one the outcome
+ *  event carried, never a fresh rating and never a read of the fold's
+ *  table: the log's consumers stay independent AND state the same cost. */
 export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
   const usage = payload.usage ?? EMPTY_USAGE;
-  const rated =
-    payload.status === "settled"
-      ? { costNanoUsd: 0, rateVersion: "" }
-      : rateSpendNanoUsd({
-          model: resolvedModel(payload, "unknown"),
-          usage,
-          rateVersion: payload.rate_version,
-        });
   return {
     ...attributedColumns(payload.attribution),
     tenantId: payload.project_id,
@@ -303,9 +295,9 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     tokensCacheRead: usage.cache_read_input_tokens,
     tokensCacheWrite: usage.cache_creation_input_tokens,
     tokensReasoning: usage.reasoning_tokens,
-    costNanoUsd: rated.costNanoUsd,
-    costUsd: (rated.costNanoUsd / NANO_USD_PER_USD).toFixed(6),
-    rateVersion: rated.rateVersion,
+    costNanoUsd: payload.cost_nano_usd,
+    costUsd: (payload.cost_nano_usd / NANO_USD_PER_USD).toFixed(6),
+    rateVersion: payload.rate_version,
     status: payload.status,
     errorClass: payload.error?.type ?? "",
     httpStatus: payload.error?.http_status ?? 0,
@@ -898,6 +890,7 @@ function deliverPayloadFor(
     model: "",
     model_provider_id: "",
     usage: null,
+    cost_nano_usd: 0,
     rate_version: "",
     duration_ms: 0,
     error: null,
@@ -907,7 +900,7 @@ function deliverPayloadFor(
 }
 
 /** A confirmed request carries the resolved model identity, the usage it
- *  billed, and the rate version it was priced at. */
+ *  billed, and the price with the rate version it was priced at. */
 function confirmedDeliverPayload(
   confirmed: ConfirmSpendCommandData,
   instance: DeliverInstance,
@@ -920,6 +913,7 @@ function confirmedDeliverPayload(
       model: confirmed.model,
       model_provider_id: confirmed.model_provider_id,
       usage: confirmed.usage,
+      cost_nano_usd: confirmed.cost_nano_usd,
       rate_version: confirmed.rate_version,
       duration_ms: confirmed.duration_ms,
     },
@@ -928,7 +922,7 @@ function confirmedDeliverPayload(
 }
 
 /** A failed request carries whatever usage the provider reported before
- *  the error, and no rate version: the deliver executor rates it. */
+ *  the error, priced the same way a confirmation is. */
 function failedDeliverPayload(
   failed: FailSpendCommandData,
   instance: DeliverInstance,
@@ -941,6 +935,8 @@ function failedDeliverPayload(
       model: failed.model,
       model_provider_id: failed.model_provider_id,
       usage: failed.usage,
+      cost_nano_usd: failed.cost_nano_usd,
+      rate_version: failed.rate_version,
       duration_ms: failed.duration_ms,
       error: failed.error,
     },
@@ -949,7 +945,7 @@ function failedDeliverPayload(
 }
 
 /** A settled request is a reservation released without an outcome: no
- *  model, no usage, and nothing to rate, only why it settled. */
+ *  model, no usage, and nothing priced, only why it settled. */
 function settledDeliverPayload(
   settled: SettleSpendCommandData,
   instance: DeliverInstance,

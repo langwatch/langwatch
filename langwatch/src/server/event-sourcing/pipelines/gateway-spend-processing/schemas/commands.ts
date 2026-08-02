@@ -3,12 +3,19 @@ import { z } from "zod";
 /**
  * Command payloads for the gateway_spend_processing pipeline.
  *
- * These shapes are ALSO the wire contract of the internal ingest route the
- * Go gateway posts command batches to, so every field the gateway resolves
- * at admission (attribution, end user, metadata echo, labels) or learns at
- * completion (usage by token class, error taxonomy) is declared here and
- * nowhere else. No cost ever crosses this boundary: quantities travel,
- * rating happens in the fold. No prompt or response content, no PII.
+ * The `*WireSchema` shapes are the contract of the internal ingest route
+ * the Go gateway posts command batches to, so every field the gateway
+ * resolves at admission (attribution, end user, metadata echo, labels) or
+ * learns at completion (usage by token class, error taxonomy) is declared
+ * there and nowhere else. No cost crosses that boundary: quantities
+ * travel, the server prices them.
+ *
+ * The command schemas are what the pipeline appends, and an outcome is
+ * priced exactly once, at the ingest seam that mints the command. The
+ * event then CARRIES the money: the fold, the attributed-user debits, and
+ * the webhook envelope all copy the same `cost_nano_usd`, so no two of
+ * them can disagree about what one request cost no matter when each runs.
+ * No prompt or response content, no PII.
  */
 
 /** Bounds mirror the gateway edge: ids are opaque tokens, metadata is a
@@ -81,7 +88,7 @@ export const admitSpendCommandDataSchema = z.object({
 });
 export type AdmitSpendCommandData = z.infer<typeof admitSpendCommandDataSchema>;
 
-export const confirmSpendCommandDataSchema = z.object({
+export const confirmSpendWireSchema = z.object({
   gateway_request_id: boundedId,
   occurred_at: occurredAtMs,
   tenantId: boundedId,
@@ -91,16 +98,24 @@ export const confirmSpendCommandDataSchema = z.object({
   model: z.string().max(512).default(""),
   model_provider_id: z.string().max(256).default(""),
   usage: spendUsageSchema,
-  /** Rate identity the gateway resolved, if any; empty lets the fold stamp
-   *  the registry version it rated with. */
+  /** Rate identity the gateway resolved, if any; empty lets the ingest
+   *  seam stamp the registry version it priced with. */
   rate_version: z.string().max(128).default(""),
   duration_ms: z.number().int().min(0).default(0),
+});
+
+/** What the ingest seam appends once it has priced the outcome.
+ *  `cost_nano_usd` is that price and `rate_version` the stamp of the
+ *  rating that produced it; every consumer copies the pair. */
+export const confirmSpendCommandDataSchema = confirmSpendWireSchema.extend({
+  cost_nano_usd: z.number().int().min(0),
+  rate_version: z.string().min(1).max(128),
 });
 export type ConfirmSpendCommandData = z.infer<
   typeof confirmSpendCommandDataSchema
 >;
 
-export const failSpendCommandDataSchema = z.object({
+export const failSpendWireSchema = z.object({
   gateway_request_id: boundedId,
   occurred_at: occurredAtMs,
   tenantId: boundedId,
@@ -121,6 +136,13 @@ export const failSpendCommandDataSchema = z.object({
     reasoning_tokens: 0,
   }),
   duration_ms: z.number().int().min(0).default(0),
+});
+
+/** Partial usage still prices, so a failure carries the same priced pair a
+ *  confirmation does. */
+export const failSpendCommandDataSchema = failSpendWireSchema.extend({
+  cost_nano_usd: z.number().int().min(0),
+  rate_version: z.string().min(1).max(128),
 });
 export type FailSpendCommandData = z.infer<typeof failSpendCommandDataSchema>;
 

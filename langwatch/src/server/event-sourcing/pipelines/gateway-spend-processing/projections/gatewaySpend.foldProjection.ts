@@ -18,7 +18,6 @@ import {
   gatewaySpendFailedEventSchema,
   gatewaySpendSettledEventSchema,
 } from "../schemas/events";
-import { rateSpendNanoUsd } from "../services/spend-rating.service";
 
 const gatewaySpendEvents = [
   gatewaySpendAdmittedEventSchema,
@@ -85,10 +84,12 @@ export interface GatewaySpendState {
  *   settled -> confirmed          (late confirmation resolves the unknown)
  *   confirmed never downgrades    (not to failed, not to settled)
  *
- * Rating happens HERE, not in the gateway: `confirmed` carries quantities
- * and the fold prices them through the same registry cascade observability
- * uses, quantized once to integer nano-USD. Replaying the log re-rates,
- * which is what makes a price correction a projection rebuild.
+ * Money is copied, never recomputed: the outcome event carries the
+ * integer nano-USD the ingest seam priced it at, along with the rate
+ * identity that produced the figure, so this ledger, the attributed-user
+ * debits, and the webhook envelope always state the same cost for a
+ * request. Re-pricing is a correction against the log, never a side
+ * effect of whichever consumer happened to run after a catalog deploy.
  */
 export class GatewaySpendFoldProjection
   extends AbstractFoldProjection<
@@ -205,19 +206,14 @@ export class GatewaySpendFoldProjection
     // model/provider win over admitted's requested values when present.
     const model = d.model || state.model;
     const providerKey = d.model_provider_id || state.providerKey;
-    const rated = rateSpendNanoUsd({
-      model,
-      usage: d.usage,
-      rateVersion: d.rate_version,
-    });
     return {
       ...state,
       status: "confirmed",
       model,
       providerKey,
       usage: d.usage,
-      rateVersion: rated.rateVersion,
-      costNanoUsd: rated.costNanoUsd,
+      rateVersion: d.rate_version,
+      costNanoUsd: d.cost_nano_usd,
       durationMs: d.duration_ms,
       // A confirmation resolving a settled request clears the unknown.
       needsReconciliation: false,
@@ -234,10 +230,6 @@ export class GatewaySpendFoldProjection
     if (state.status === "confirmed") return state;
     const model = d.model || state.model;
     const providerKey = d.model_provider_id || state.providerKey;
-    const rated = rateSpendNanoUsd({
-      model,
-      usage: d.usage,
-    });
     return {
       ...state,
       status: "failed",
@@ -248,8 +240,8 @@ export class GatewaySpendFoldProjection
       // Partial usage still prices: tokens consumed before a mid-stream
       // failure are real spend on several providers.
       usage: d.usage,
-      rateVersion: rated.rateVersion,
-      costNanoUsd: rated.costNanoUsd,
+      rateVersion: d.rate_version,
+      costNanoUsd: d.cost_nano_usd,
       durationMs: d.duration_ms,
       needsReconciliation: false,
       settleReason: "",

@@ -65,6 +65,10 @@ const sendWebhookMock = vi.mocked(sendWebhook);
 
 const ns = `webhook-pm-${nanoid(8)}`;
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0);
+/** The prices the ingest seam stamped on the outcome events. The delivery
+ *  path copies them into the envelope; it never prices anything itself. */
+const CONFIRMED_COST_NANO_USD = 4_262_500;
+const FAILED_COST_NANO_USD = 1_086_250;
 
 let organization: Organization;
 let team: Team;
@@ -153,6 +157,7 @@ function confirmedEnvelope(requestId: string): ProcessEventEnvelope {
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
       },
+      cost_nano_usd: CONFIRMED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 3878,
     },
@@ -178,6 +183,8 @@ function failedEnvelope(requestId: string): ProcessEventEnvelope {
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
       },
+      cost_nano_usd: FAILED_COST_NANO_USD,
+      rate_version: "catalog@2026-07-26",
       duration_ms: 1509,
     },
   });
@@ -357,7 +364,7 @@ describe("webhook delivery via the transactional inbox", () => {
     expect(body.batch[0]!.data.end_user_id).toBe("end-user-1");
     expect(body.batch[0]!.data.status).toBe("success");
     const cost = body.batch[0]!.data.cost as { nano_usd: number };
-    expect(cost.nano_usd).toBeGreaterThan(0);
+    expect(cost.nano_usd).toBe(CONFIRMED_COST_NANO_USD);
     expect(Number.isInteger(cost.nano_usd)).toBe(true);
   });
 
@@ -454,7 +461,7 @@ describe("webhook delivery via the transactional inbox", () => {
       expect(settled.data.gateway_request_id).toBe(requestId);
       expect(completed.data.gateway_request_id).toBe(requestId);
       const cost = completed.data.cost as { nano_usd: number };
-      expect(cost.nano_usd).toBeGreaterThan(0);
+      expect(cost.nano_usd).toBe(CONFIRMED_COST_NANO_USD);
     } finally {
       await endpoints.update({
         organizationId: organization.id,

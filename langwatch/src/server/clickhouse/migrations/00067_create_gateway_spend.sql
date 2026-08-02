@@ -11,9 +11,11 @@
 -- (NeedsReconciliation = 1) instead of silently missing. Spans join on
 -- GatewayRequestId for observability; they are not load-bearing for money.
 --
--- Money: integer nano-USD (CostNanoUSD, 1e-9 USD) rated in the fold from
--- integer token quantities + RateVersion. Sums stay in integers; the one
--- further rounding belongs to the customer's invoice.
+-- Money: integer nano-USD (CostNanoUSD, 1e-9 USD) priced once when the
+-- outcome command is appended, from integer token quantities, and carried
+-- on the event with the RateVersion that produced it; the fold copies both.
+-- Sums stay in integers; the one further rounding belongs to the
+-- customer's invoice.
 --
 -- Retention: deliberately EXEMPT from tenant retention. Tenant policies
 -- are customer-shrinkable to weeks and retroactively rewrite

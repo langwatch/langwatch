@@ -15,7 +15,6 @@ import type {
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
 } from "../../schemas/events";
-import { rateSpendNanoUsd } from "../../services/spend-rating.service";
 import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
@@ -24,6 +23,10 @@ import {
 const TENANT = "proj_test";
 const REQUEST = "01K1REQUESTULID";
 const T0 = Date.UTC(2026, 6, 27, 14, 3, 7);
+/** The prices the ingest seam already stamped on the outcome events. The
+ *  fold copies these; it never reaches for a catalog of its own. */
+const CONFIRMED_COST_NANO_USD = 4_262_500;
+const FAILED_COST_NANO_USD = 1_086_250;
 
 const stubStore = {} as FoldProjectionStore<GatewaySpendState>;
 const projection = new GatewaySpendFoldProjection({ store: stubStore });
@@ -85,6 +88,7 @@ const confirmed = () =>
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
       },
+      cost_nano_usd: CONFIRMED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 3878,
     },
@@ -108,6 +112,8 @@ const failed = () =>
         cache_creation_input_tokens: 0,
         reasoning_tokens: 0,
       },
+      cost_nano_usd: FAILED_COST_NANO_USD,
+      rate_version: "catalog@2026-07-26",
       duration_ms: 1509,
     },
     T0 + 1500,
@@ -167,8 +173,8 @@ describe("gatewaySpend fold", () => {
     expect(state.occurredAtMs).toBe(T0);
   });
 
-  /** @scenario Rating happens in the fold as integer nano dollars */
-  it("confirmed rates the quantities to integer nano-USD with the rate identity", () => {
+  /** @scenario The fold records the price the outcome carried */
+  it("confirmed records the event's integer nano-USD and its rate identity", () => {
     const state = projection.handleGatewaySpendConfirmed(
       confirmed(),
       projection.handleGatewaySpendAdmitted(admitted(), initial()),
@@ -176,16 +182,9 @@ describe("gatewaySpend fold", () => {
     expect(state.status).toBe("confirmed");
     expect(state.usage?.input_tokens).toBe(869);
     expect(Number.isInteger(state.costNanoUsd)).toBe(true);
-    expect(state.costNanoUsd).toBeGreaterThan(0);
-    // The fold and the rating service must always agree: same quantities,
-    // same rate identity, same integer.
-    expect(state.costNanoUsd).toBe(
-      rateSpendNanoUsd({
-        model: "openai/gpt-5",
-        usage: confirmed().data.usage,
-        rateVersion: "catalog@2026-07-26",
-      }).costNanoUsd,
-    );
+    // The figure is the event's, verbatim: no catalog read happens here,
+    // so a catalog deploy cannot move a recorded price.
+    expect(state.costNanoUsd).toBe(CONFIRMED_COST_NANO_USD);
     expect(state.rateVersion).toBe("catalog@2026-07-26");
   });
 
@@ -252,8 +251,8 @@ describe("gatewaySpend fold", () => {
     const afterAdmit = projection.handleGatewaySpendAdmitted(admitted(), early);
     expect(afterAdmit.status).toBe("confirmed");
     expect(afterAdmit.organizationId).toBe("org_1");
-    // The resolved identity and the cost rated from it survive the late
-    // admission; only attribution fills in.
+    // The resolved identity and the price the outcome carried survive the
+    // late admission; only attribution fills in.
     expect(afterAdmit.model).toBe(early.model);
     expect(afterAdmit.providerKey).toBe(early.providerKey);
     expect(afterAdmit.costNanoUsd).toBe(early.costNanoUsd);
@@ -273,7 +272,7 @@ describe("gatewaySpend fold", () => {
   });
 
   /** @scenario Partial usage on a failure still prices */
-  it("failed rates the tokens consumed before the failure", () => {
+  it("failed records the price of the tokens consumed before the failure", () => {
     const state = projection.handleGatewaySpendFailed(
       failed(),
       projection.handleGatewaySpendAdmitted(admitted(), initial()),
@@ -281,7 +280,7 @@ describe("gatewaySpend fold", () => {
     expect(state.status).toBe("failed");
     expect(state.errorType).toBe("provider_timeout");
     expect(state.httpStatus).toBe(504);
-    expect(state.costNanoUsd).toBeGreaterThan(0);
+    expect(state.costNanoUsd).toBe(FAILED_COST_NANO_USD);
     expect(Number.isInteger(state.costNanoUsd)).toBe(true);
   });
 });

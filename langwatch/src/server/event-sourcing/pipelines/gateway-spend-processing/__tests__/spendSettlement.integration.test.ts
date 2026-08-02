@@ -387,7 +387,8 @@ describe("settlement on the spend record (real ClickHouse)", () => {
               cache_creation_input_tokens: 0,
               reasoning_tokens: 0,
             },
-            rate_version: "",
+            cost_nano_usd: 2_875_000,
+            rate_version: "catalog@2026-07-26",
             duration_ms: 2_000,
           },
           T0 + GRACE_MS + 5_000,
@@ -406,7 +407,7 @@ describe("settlement on the spend record (real ClickHouse)", () => {
       expect(afterConfirm.rows).toHaveLength(1);
       expect(afterConfirm.rows[0]!.status).toBe("confirmed");
       expect(afterConfirm.rows[0]!.needsReconciliation).toBe(false);
-      expect(afterConfirm.rows[0]!.costNanoUsd).toBeGreaterThan(0);
+      expect(afterConfirm.rows[0]!.costNanoUsd).toBe(2_875_000);
       const completedEnvelope = spendRowToEnvelope(afterConfirm.rows[0]!);
       expect(completedEnvelope.type).toBe("gateway.request.completed");
       expect(completedEnvelope.id).toBe(`${requestId}:completed`);

@@ -141,10 +141,19 @@ Feature: Billing spend events, one durable record per gateway request
       Then the record carries the attribution, the end user id, and the echo verbatim
 
     @unit
-    Scenario: Rating happens in the fold as integer nano dollars
+    Scenario: The fold records the price the outcome carried
       When a confirmed event folds
-      Then the quantities are priced through the registry cascade
-      And the cost is an integer nano-USD value with its rate identity
+      Then the record states the integer nano-USD the event was appended with
+      And the rate identity that produced that figure
+
+    @unit
+    Scenario: The price is fixed when the outcome is recorded and every surface repeats it
+      Given an outcome priced once when its command was appended
+      When the model catalog changes before the other consumers run
+      Then the spend record, the budget debit, and the webhook envelope state the same cost
+      # Three consumers read this event independently and at different
+      # instants, so pricing per consumer would let them disagree about
+      # what one request cost.
 
     @unit
     Scenario: A redelivered event re-sets the same values
@@ -189,7 +198,7 @@ Feature: Billing spend events, one durable record per gateway request
     Scenario: Partial usage on a failure still prices
       Given a failure that consumed tokens before it broke
       When the failed event folds
-      Then the partial usage is rated to integer nano-USD
+      Then the record carries the integer nano-USD its partial usage priced at
 
   Rule: The table is a billing ledger, not observability data
 

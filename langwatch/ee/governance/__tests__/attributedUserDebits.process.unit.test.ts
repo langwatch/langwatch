@@ -86,6 +86,7 @@ describe("attributed-user debits process", () => {
           cache_creation_input_tokens: 0,
           reasoning_tokens: 0,
         },
+        cost_nano_usd: 3_500,
         rate_version: "catalog@2026-07-30",
         duration_ms: 120,
         occurred_at: 1_753_800_000_000,
@@ -101,6 +102,7 @@ describe("attributed-user debits process", () => {
         virtual_key_id: "vk_1",
         end_user_id: "user_9",
         status: "confirmed",
+        cost_nano_usd: 3_500,
         rate_version: "catalog@2026-07-30",
       }),
     );
@@ -122,6 +124,7 @@ describe("attributed-user debits process", () => {
       {
         gateway_request_id: "req_2",
         usage: null,
+        cost_nano_usd: 0,
         rate_version: "",
         model: "gpt-x",
         model_provider_id: "",

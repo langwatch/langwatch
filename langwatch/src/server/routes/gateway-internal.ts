@@ -31,10 +31,12 @@ import {
 import { prisma } from "~/server/db";
 import {
   admitSpendCommandDataSchema,
-  confirmSpendCommandDataSchema,
-  failSpendCommandDataSchema,
+  confirmSpendWireSchema,
+  failSpendWireSchema,
+  type SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import {
   budgetPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
@@ -1006,8 +1008,8 @@ const SPEND_COMMAND_NAMES = [
 
 const SPEND_COMMAND_SCHEMAS = {
   admitSpend: admitSpendCommandDataSchema,
-  confirmSpend: confirmSpendCommandDataSchema,
-  failSpend: failSpendCommandDataSchema,
+  confirmSpend: confirmSpendWireSchema,
+  failSpend: failSpendWireSchema,
 } as const;
 
 interface SpendCommandReject {
@@ -1026,9 +1028,42 @@ function spendPipeline() {
   }
 }
 
+/**
+ * The single seam that prices a gateway outcome. The wire carries
+ * quantities, never money, so the server rates here, once, and the
+ * appended event carries the figure from then on: the fold, the
+ * attributed-user debits, and the webhook envelope all copy it instead of
+ * each pricing the same request at its own instant against a model
+ * catalog that moves under them.
+ *
+ * The gateway always names a model on an outcome (the resolved identity
+ * once dispatch settled it, the requested one before that), which is the
+ * identity the ledger stores for the request.
+ */
+function pricedOutcomeData(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const outcome = data as unknown as {
+    model: string;
+    usage: SpendUsage;
+    rate_version?: string;
+  };
+  const rated = rateSpendNanoUsd({
+    model: outcome.model,
+    usage: outcome.usage,
+    rateVersion: outcome.rate_version,
+  });
+  return {
+    ...data,
+    cost_nano_usd: rated.costNanoUsd,
+    rate_version: rated.rateVersion,
+  };
+}
+
 /** The internal command data one wire record maps to, or why it cannot be
  *  accepted. `project_id` on the wire is the internal `tenantId`; only
- *  admits carry the pod identity the gap detector reads. */
+ *  admits carry the pod identity the gap detector reads, and outcomes are
+ *  priced on the way through. */
 function toSpendCommandData(
   record: SpendCommandRecord,
 ):
@@ -1066,7 +1101,11 @@ function toSpendCommandData(
       },
     };
   }
-  return { ok: true, data: validated.data as Record<string, unknown> };
+  const data = validated.data as Record<string, unknown>;
+  return {
+    ok: true,
+    data: record.command === "admitSpend" ? data : pricedOutcomeData(data),
+  };
 }
 
 /** Group the batch by command, reporting unacceptable records by index.

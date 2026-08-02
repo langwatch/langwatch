@@ -15,10 +15,7 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import {
-  NANO_USD_PER_USD,
-  rateSpendNanoUsd,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   BudgetDebitRow,
@@ -86,6 +83,8 @@ export const writeAttributedDebitsSchema = z.object({
       reasoning_tokens: z.number().int().min(0),
     })
     .nullable(),
+  /** The price the outcome event carried, in integer nano-USD. */
+  cost_nano_usd: z.number().int().min(0),
   rate_version: z.string(),
   status: z.enum(["confirmed", "failed"]),
   duration_ms: z.number().int().min(0),
@@ -125,9 +124,10 @@ async function resolveAttributedTemplates(
 }
 
 /**
- * One ledger debit per matching template, every row priced from the same
- * rated cost. An outcome that carries no usage rates as zero tokens: the
- * row still lands so the per-request insert probe can see it.
+ * One ledger debit per matching template, every row carrying the price the
+ * outcome event was appended with. An outcome that carries no usage debits
+ * zero tokens: the row still lands so the per-request insert probe can see
+ * it.
  */
 function buildAttributedDebitRows(
   payload: WriteAttributedDebitsPayload,
@@ -141,12 +141,7 @@ function buildAttributedDebitRows(
     cache_creation_input_tokens: 0,
     reasoning_tokens: 0,
   };
-  const rated = rateSpendNanoUsd({
-    model: payload.model || "unknown",
-    usage,
-    rateVersion: payload.rate_version,
-  });
-  const amountUsd = (rated.costNanoUsd / NANO_USD_PER_USD).toFixed(6);
+  const amountUsd = (payload.cost_nano_usd / NANO_USD_PER_USD).toFixed(6);
   return templates.map((t) => ({
     tenantId: payload.project_id,
     budgetId: t.budget.id,
@@ -233,8 +228,9 @@ type SpendOutcome =
 
 /**
  * The debit payload for one outcome. A failure still debits whatever
- * tokens the provider billed before erroring, and carries no rate version
- * because nothing priced it.
+ * tokens the provider billed before erroring. The price rides the event,
+ * so a debit always states the figure the spend ledger and the webhook
+ * envelope state for the same request.
  */
 function writeDebitsPayload(
   state: AttributedDebitsState,
@@ -251,8 +247,8 @@ function writeDebitsPayload(
     model: data.model,
     model_provider_id: data.model_provider_id,
     usage: data.usage,
-    rate_version:
-      outcome.status === "confirmed" ? outcome.data.rate_version : "",
+    cost_nano_usd: data.cost_nano_usd,
+    rate_version: data.rate_version,
     status: outcome.status,
     duration_ms: data.duration_ms,
     occurred_at: data.occurred_at,
