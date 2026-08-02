@@ -65,14 +65,30 @@ describe("ClaudeCodeExtractor.applyLog", () => {
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
-  it("does NOT lift the model-call events on the log path", () => {
-    // api_request is folded downstream; this extractor must NOT re-lift
-    // cost/tokens onto the fold (that would double-count). It ignores it.
+  /** @scenario "The reported cost replaces the estimate for the whole trace" */
+  it("lifts what the call was charged, but not the model or tokens its span carries", () => {
+    // Tokens and model come off the call's own span, so re-lifting them here
+    // would double-count. The charged amount has no other source: the span
+    // carries no cost at all, which is why the fold priced it by estimate.
     const ctx = createLogExtractorContext(SCOPE, {
       "event.name": "api_request",
       model: "claude-opus-4-7",
       cost_usd: "0.0875",
       input_tokens: "120",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({ "langwatch.cost.provider_reported_usd": 0.0875 });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/api_request");
+  });
+
+  /** @scenario "A reported cost of zero does not blank out the estimate" */
+  it("lifts nothing when the call reports no cost", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      model: "claude-opus-4-7",
+      cost_usd: "0",
     });
 
     new ClaudeCodeExtractor().applyLog(ctx);
@@ -357,7 +373,10 @@ describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
 
     new ClaudeCodeExtractor().applyLog(ctx);
 
-    expect(ctx.out).toEqual({ "gen_ai.request.reasoning_effort": "high" });
+    expect(ctx.out).toEqual({
+      "gen_ai.request.reasoning_effort": "high",
+      "langwatch.cost.provider_reported_usd": 0.02,
+    });
     expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/api_request");
   });
 
@@ -386,7 +405,21 @@ describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
-  it("stays a no-op when the api_request carries no effort attribute", () => {
+  /** @scenario "Utility calls report their cost too" */
+  it("takes a utility call's cost even though its effort is discarded", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "api_request",
+      query_source: "generate_session_title",
+      effort: "low",
+      cost_usd: "0.004",
+    });
+
+    new ClaudeCodeExtractor().applyLog(ctx);
+
+    expect(ctx.out).toEqual({ "langwatch.cost.provider_reported_usd": 0.004 });
+  });
+
+  it("lifts only the cost when the api_request carries no effort attribute", () => {
     const ctx = createLogExtractorContext(SCOPE, {
       "event.name": "api_request",
       query_source: "repl_main_thread",
@@ -395,7 +428,7 @@ describe("ClaudeCodeExtractor.applyLog api_request reasoning effort", () => {
 
     new ClaudeCodeExtractor().applyLog(ctx);
 
-    expect(ctx.out).toEqual({});
+    expect(ctx.out).toEqual({ "langwatch.cost.provider_reported_usd": 0.01 });
   });
 });
 

@@ -1,4 +1,5 @@
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { ATTR_KEYS as CANONICAL_ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -53,11 +54,16 @@ import {
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
 import { isValidTimestamp } from "./services/span-timing.service";
 import {
+  accumulateLogCost,
   MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
+  RESERVED_ESTIMATED_COST_USD,
+  RESERVED_ESTIMATED_NON_BILLED_COST_USD,
   RESERVED_REASONING_TOKENS,
+  readReservedSum,
+  resolveTraceCost,
 } from "./traceSummary.foldProjection";
 
 /**
@@ -1030,8 +1036,18 @@ export function applySpanToAnalytics({
   const view = asTraceSummaryStateView(state);
 
   const timing = spanTimingService.accumulateTiming({ state: view, span });
+  // The running ESTIMATE is what accumulates span by span; `state.totalCost`
+  // holds the resolved figure, which is the provider's own once it reports
+  // one, so feeding that back in would compound the two sources.
   const tokens = spanCostService.accumulateTokens({
-    state: view,
+    state: {
+      ...view,
+      totalCost: readReservedSum(state.attributes, RESERVED_ESTIMATED_COST_USD),
+      nonBilledCost: readReservedSum(
+        state.attributes,
+        RESERVED_ESTIMATED_NON_BILLED_COST_USD,
+      ),
+    },
     span,
     totalDurationMs: timing.totalDurationMs,
   });
@@ -1054,6 +1070,18 @@ export function applySpanToAnalytics({
   });
 
   accumulateReservedTokenSums(attributes, span);
+
+  // Park the running estimate where the next span picks it up, then let the
+  // provider's own figures win if this trace's agent reported any.
+  if (tokens.totalCost !== null) {
+    attributes[RESERVED_ESTIMATED_COST_USD] = String(tokens.totalCost);
+  }
+  if (tokens.nonBilledCost !== null) {
+    attributes[RESERVED_ESTIMATED_NON_BILLED_COST_USD] = String(
+      tokens.nonBilledCost,
+    );
+  }
+  const resolvedCost = resolveTraceCost(attributes);
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -1080,8 +1108,8 @@ export function applySpanToAnalytics({
     traceNameFromFallback,
     rootMetadataFromFallback,
     rootSpanStartTimeMs,
-    totalCost: tokens.totalCost,
-    nonBilledCost: tokens.nonBilledCost,
+    totalCost: resolvedCost.totalCost,
+    nonBilledCost: resolvedCost.nonBilledCost,
     totalPromptTokenCount: tokens.totalPromptTokenCount,
     totalCompletionTokenCount: tokens.totalCompletionTokenCount,
     timeToFirstTokenMs: tokens.timeToFirstTokenMs,
@@ -1127,25 +1155,27 @@ function applyLogContribution({
     logCount + 1,
   );
   for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+    // The reported cost is a PER-CALL value that accumulates below; leaving
+    // it in the generic last-write-wins merge would leave the trace showing
+    // whichever call landed last.
+    if (key === CANONICAL_ATTR_KEYS.LANGWATCH_PROVIDER_REPORTED_COST_USD) {
+      continue;
+    }
     mergedAttributes[key] = String(value);
   }
 
   let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
   let totalPromptTokenCount = state.totalPromptTokenCount;
   let totalCompletionTokenCount = state.totalCompletionTokenCount;
   const model = contribution.liftedAttributes["langwatch.model"];
   if (typeof model === "string" && model.length > 0) {
     models = mergeModelsMostRecentFirst(models, [model]);
   }
-  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
-  if (Number.isFinite(cost) && cost > 0) {
-    totalCost = (totalCost ?? 0) + cost;
-    if (contribution.nonBillable) {
-      nonBilledCost = (nonBilledCost ?? 0) + cost;
-    }
-  }
+  const { totalCost, nonBilledCost } = accumulateLogCost({
+    attributes: mergedAttributes,
+    liftedAttributes: contribution.liftedAttributes,
+    nonBillable: contribution.nonBillable,
+  });
   const inputTokens = Number(
     contribution.liftedAttributes["langwatch.input_tokens"],
   );

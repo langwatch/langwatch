@@ -129,6 +129,26 @@ export const RESERVED_CACHE_CREATION_1H_TOKENS =
   "langwatch.reserved.cache_creation_1h_tokens";
 
 /**
+ * The two prices a trace can have, kept apart so the fold can prefer one
+ * without losing the other.
+ *
+ * `ESTIMATED` is the running sum of what our token x registry arithmetic makes
+ * of each span. `PROVIDER` is the running sum of what the agent itself says it
+ * was charged, lifted per call off its own reporting (Claude Code's `cost_usd`
+ * on the api_request event). {@link resolveTraceCost} picks between them, and
+ * `totalCost` on the state carries the winner, so every reader of a trace's
+ * cost sees the same number.
+ */
+export const RESERVED_ESTIMATED_COST_USD =
+  "langwatch.reserved.estimated_cost_usd";
+export const RESERVED_ESTIMATED_NON_BILLED_COST_USD =
+  "langwatch.reserved.estimated_non_billed_cost_usd";
+export const RESERVED_PROVIDER_COST_USD =
+  "langwatch.reserved.provider_cost_usd";
+export const RESERVED_PROVIDER_NON_BILLED_COST_USD =
+  "langwatch.reserved.provider_non_billed_cost_usd";
+
+/**
  * The context the trace's first model call already carried, and the start time
  * of the call that set it (bookkeeping, so a later-arriving earlier span can
  * still win). See {@link recordContextSize}.
@@ -166,6 +186,96 @@ function addReservedTokenSum(
   if (delta <= 0) return;
   const prior = Number(attributes[key] ?? "0");
   attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+}
+
+/** Read a reserved running-sum attribute back as a number. */
+export function readReservedSum(
+  attributes: Record<string, string>,
+  key: string,
+): number {
+  const value = Number(attributes[key] ?? "0");
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Costs are money: keep them at six decimals rather than float residue. */
+function roundCost(value: number): number | null {
+  return value > 0 ? Number(value.toFixed(6)) : null;
+}
+
+/**
+ * The trace's cost, preferring what the agent says it was charged over what we
+ * estimate from its tokens.
+ *
+ * An estimate is arithmetic over a price registry; a reported cost is the
+ * price. When an agent reports per call, and Claude Code does on every
+ * api_request event, the sum of those is the trace's cost; the estimate is
+ * only the fallback for traces whose agent tells us nothing.
+ *
+ * This is all-or-nothing per trace on purpose. An agent that reports cost
+ * reports it for every call it makes, so a trace either has reported costs
+ * covering its calls or has none at all; there is no half-covered trace to
+ * reconcile, and reconciling one would mean pairing each log back to its span
+ * inside the fold.
+ *
+ * The bundled split follows the same source, so a subscription-covered session
+ * cannot end up with a reported total priced against an estimated non-billed
+ * portion, which would invent a billed remainder out of the gap between them.
+ */
+export function accumulateLogCost({
+  attributes,
+  liftedAttributes,
+  nonBillable,
+}: {
+  attributes: Record<string, string>;
+  liftedAttributes: Record<string, unknown>;
+  nonBillable: boolean;
+}): { totalCost: number | null; nonBilledCost: number | null } {
+  const add = (estimateKey: string, providerKey: string, value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    addReservedTokenSum(attributes, estimateKey, value);
+    if (nonBillable) addReservedTokenSum(attributes, providerKey, value);
+  };
+
+  // A log-only emitter (Path B) has no span to price, so its cost IS the
+  // estimate for that call.
+  add(
+    RESERVED_ESTIMATED_COST_USD,
+    RESERVED_ESTIMATED_NON_BILLED_COST_USD,
+    Number(liftedAttributes["langwatch.cost.usd"]),
+  );
+  // What the agent itself reports having been charged for one model call,
+  // which also has its own span the span path priced by estimate. The two
+  // never sum: resolveTraceCost picks the reported figure.
+  add(
+    RESERVED_PROVIDER_COST_USD,
+    RESERVED_PROVIDER_NON_BILLED_COST_USD,
+    Number(liftedAttributes[ATTR_KEYS.LANGWATCH_PROVIDER_REPORTED_COST_USD]),
+  );
+
+  return resolveTraceCost(attributes);
+}
+
+export function resolveTraceCost(attributes: Record<string, string>): {
+  totalCost: number | null;
+  nonBilledCost: number | null;
+} {
+  const providerCost = readReservedSum(attributes, RESERVED_PROVIDER_COST_USD);
+  if (providerCost > 0) {
+    return {
+      totalCost: roundCost(providerCost),
+      nonBilledCost: roundCost(
+        readReservedSum(attributes, RESERVED_PROVIDER_NON_BILLED_COST_USD),
+      ),
+    };
+  }
+  return {
+    totalCost: roundCost(
+      readReservedSum(attributes, RESERVED_ESTIMATED_COST_USD),
+    ),
+    nonBilledCost: roundCost(
+      readReservedSum(attributes, RESERVED_ESTIMATED_NON_BILLED_COST_USD),
+    ),
+  };
 }
 
 /**
@@ -215,8 +325,18 @@ export function applySpanToSummary({
   }
 
   const timing = spanTimingService.accumulateTiming({ state, span });
+  // The running ESTIMATE is what accumulates span by span; `state.totalCost`
+  // holds the resolved figure, which is the provider's own once it reports
+  // one, so feeding that back in would compound the two sources.
   const tokens = spanCostService.accumulateTokens({
-    state,
+    state: {
+      ...state,
+      totalCost: readReservedSum(state.attributes, RESERVED_ESTIMATED_COST_USD),
+      nonBilledCost: readReservedSum(
+        state.attributes,
+        RESERVED_ESTIMATED_NON_BILLED_COST_USD,
+      ),
+    },
     span,
     totalDurationMs: timing.totalDurationMs,
   });
@@ -255,6 +375,18 @@ export function applySpanToSummary({
     cacheTokens.reasoningTokens,
   );
   recordContextSize({ attributes, span, cacheTokens });
+
+  // Park the running estimate where the next span picks it up, then let the
+  // provider's own figures win if this trace's agent reported any.
+  if (tokens.totalCost !== null) {
+    attributes[RESERVED_ESTIMATED_COST_USD] = String(tokens.totalCost);
+  }
+  if (tokens.nonBilledCost !== null) {
+    attributes[RESERVED_ESTIMATED_NON_BILLED_COST_USD] = String(
+      tokens.nonBilledCost,
+    );
+  }
+  const resolvedCost = resolveTraceCost(attributes);
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -295,6 +427,7 @@ export function applySpanToSummary({
     rootMetadataFromFallback,
     rootSpanStartTimeMs,
     ...tokens,
+    ...resolvedCost,
     ...status,
     computedInput: io.computedInput,
     computedOutput: io.computedOutput,
@@ -429,7 +562,8 @@ function applyLogContribution({
   for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
     if (
       key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
-      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
+      key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS ||
+      key === ATTR_KEYS.LANGWATCH_PROVIDER_REPORTED_COST_USD
     ) {
       continue;
     }
@@ -437,21 +571,17 @@ function applyLogContribution({
   }
 
   let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
   let totalPromptTokenCount = state.totalPromptTokenCount;
   let totalCompletionTokenCount = state.totalCompletionTokenCount;
   const model = contribution.liftedAttributes["langwatch.model"];
   if (typeof model === "string" && model.length > 0) {
     models = mergeModelsMostRecentFirst(models, [model]);
   }
-  const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
-  if (Number.isFinite(cost) && cost > 0) {
-    totalCost = (totalCost ?? 0) + cost;
-    if (contribution.nonBillable) {
-      nonBilledCost = (nonBilledCost ?? 0) + cost;
-    }
-  }
+  const { totalCost, nonBilledCost } = accumulateLogCost({
+    attributes: mergedAttributes,
+    liftedAttributes: contribution.liftedAttributes,
+    nonBillable: contribution.nonBillable,
+  });
   const inputTokens = Number(
     contribution.liftedAttributes["langwatch.input_tokens"],
   );

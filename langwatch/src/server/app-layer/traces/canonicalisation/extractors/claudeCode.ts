@@ -164,22 +164,39 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   }
 
   /**
-   * The reasoning effort setting rides the `effort` attr of api_request
-   * events (e.g. "low" | "high" | "max", Anthropic's adaptive-thinking
-   * knob). Only conversational turns set the trace-level value: utility
-   * calls (title generation, autosuggest) run at their own effort and must
-   * not override what the user's actual turns ran at. Log lifts merge
+   * The api_request event carries two things worth lifting, on different
+   * gates.
+   *
+   * `cost_usd` is Anthropic's own price for the call, and every call is
+   * billed (a title-generation call costs real money too), so cost lifts
+   * regardless of query source, matching the span side, which prices every
+   * llm_request span it sees.
+   *
+   * The reasoning effort setting (e.g. "low" | "high" | "max", Anthropic's
+   * adaptive-thinking knob) is a trace-level display value, so only
+   * conversational turns set it: utility calls run at their own effort and
+   * must not override what the user's actual turns ran at. Log lifts merge
    * last-write-wins into the trace attributes, so the trace shows the
    * session's most recent conversational effort, same key the codex span
    * path uses and the drawer header pill reads.
    */
   private liftApiRequest(ctx: LogExtractorContext): void {
+    let fired = false;
+
+    const cost = asNumber(ctx.bag.attrs.get("cost_usd"));
+    if (cost !== null && cost > 0) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_PROVIDER_REPORTED_COST_USD, cost);
+      fired = true;
+    }
+
     const querySource = asString(ctx.bag.attrs.get("query_source"));
-    if (!isConversationalQuerySource(querySource)) return;
     const effort = asString(ctx.bag.attrs.get("effort"));
-    if (effort === null) return;
-    ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, effort);
-    ctx.recordRule("claude-code/api_request");
+    if (effort !== null && isConversationalQuerySource(querySource)) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, effort);
+      fired = true;
+    }
+
+    if (fired) ctx.recordRule("claude-code/api_request");
   }
 
   /**
