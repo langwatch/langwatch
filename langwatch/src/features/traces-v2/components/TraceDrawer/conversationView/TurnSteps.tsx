@@ -177,7 +177,7 @@ function StepRow({ step }: { step: Step }) {
       <Box flex={step.arg ? undefined : 1} />
       {step.tokens > 0 && (
         <Text {...CELL} color="fg.subtle" flexShrink={0}>
-          {`${formatTokens(step.tokens)} tok`}
+          {`${formatTokens(step.tokens)} tokens`}
         </Text>
       )}
       {step.costUsd > 0 && (

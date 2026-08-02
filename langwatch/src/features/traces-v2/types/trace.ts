@@ -65,6 +65,8 @@ export interface TraceListItem {
   /** Cache + reasoning token sums (null when the model never reported them).
    *  The Tokens cell shows input+output; these drive the hover breakdown. */
   cacheReadTokens?: number | null;
+  /** Context already carried into the trace's first model call (not a sum). */
+  contextSizeTokens?: number | null;
   cacheCreationTokens?: number | null;
   reasoningTokens?: number | null;
   models: string[];
