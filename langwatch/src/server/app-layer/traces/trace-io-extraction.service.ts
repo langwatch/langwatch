@@ -599,8 +599,15 @@ function normalizeChatPayload(
     }
     // Otherwise: walk every property, normalizing in place.
     const out: Record<string, unknown> = {};
+    const isChatMessage = typeof obj.role === "string";
     for (const [k, v] of Object.entries(obj)) {
-      out[k] = normalizeChatPayload(v, seen);
+      // A chat message's content is user/model text, so a JSON-looking string
+      // must stay text. Structured AI responses commonly use this shape and
+      // are intentionally displayed as JSON in the trace output.
+      out[k] =
+        isChatMessage && k === "content" && typeof v === "string"
+          ? v
+          : normalizeChatPayload(v, seen);
     }
     return out;
   }

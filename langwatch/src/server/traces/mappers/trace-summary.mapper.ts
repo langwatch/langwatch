@@ -151,7 +151,65 @@ export function mapAttributesToMetadata(
     if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
+  addOtelLogRecordCountAlias(metadata, attributes);
+
   return metadata;
+}
+
+/**
+ * Clearly named sibling for the OTel log-record count: it counts log records
+ * correlated to the trace, not model/API calls, and the raw
+ * `langwatch.reserved.log_record_count` key keeps flowing unchanged because
+ * external consumers already parse it. A caller-supplied metadata key with
+ * this name wins (set by the generic passthrough before this runs).
+ */
+function addOtelLogRecordCountAlias(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): void {
+  const logRecordCount = attributes["langwatch.reserved.log_record_count"];
+  if (
+    logRecordCount !== undefined &&
+    metadata.otel_log_record_count === undefined
+  ) {
+    metadata.otel_log_record_count = logRecordCount;
+  }
+}
+
+/**
+ * Reserved token attributes stamped by the trace-summary fold, surfaced as
+ * typed metric fields on the legacy trace shape (and selectable through the
+ * projection DSL's `metrics.*` paths). Additive next to the six legacy metric
+ * fields: an absent attribute adds no key, and nothing existing is renamed or
+ * removed because the search/export response is a compatibility surface for
+ * BI consumers.
+ */
+const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
+  cache_read_input_tokens: "langwatch.reserved.cache_read_tokens",
+  cache_creation_input_tokens: "langwatch.reserved.cache_creation_tokens",
+  cache_creation_5m_input_tokens: "langwatch.reserved.cache_creation_5m_tokens",
+  cache_creation_1h_input_tokens: "langwatch.reserved.cache_creation_1h_tokens",
+  reasoning_tokens: "langwatch.reserved.reasoning_tokens",
+  context_size_tokens: "langwatch.reserved.context_size_tokens",
+} as const satisfies Partial<
+  Record<keyof NonNullable<Trace["metrics"]>, string>
+>;
+
+function tokenMetricsFromAttributes(
+  attributes: Record<string, string>,
+): Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> {
+  const metrics: Partial<
+    Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>
+  > = {};
+  for (const [metricKey, attrKey] of Object.entries(
+    RESERVED_TOKEN_METRIC_ATTRIBUTES,
+  ) as Array<[keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]>) {
+    const raw = attributes[attrKey];
+    if (raw == null || raw === "") continue;
+    const value = Number(raw);
+    if (Number.isFinite(value)) metrics[metricKey] = value;
+  }
+  return metrics;
 }
 
 /**
@@ -546,6 +604,7 @@ export function mapTraceSummaryToTrace(
       completion_tokens: summary.totalCompletionTokenCount,
       total_cost: summary.totalCost,
       tokens_estimated: summary.tokensEstimated,
+      ...tokenMetricsFromAttributes(summary.attributes),
     },
     error: createError(summary.containsErrorStatus, summary.errorMessage),
     events: events.length > 0 ? events : undefined,

@@ -121,8 +121,9 @@ export const searchTracesCommand = async (options: {
 /**
  * Walk the returned traces in chunks, reporting how far along we are.
  *
- * WHAT THIS FRACTION HONESTLY MEANS: the command issues ONE request — the API
- * exposes no cursor the CLI pages through — so this is progress over the traces
+ * WHAT THIS FRACTION HONESTLY MEANS: the command issues ONE request — search
+ * renders a single page (the API does return a scrollId cursor, and `trace
+ * export` is the command that walks it) — so this is progress over the traces
  * already in hand, not over a multi-page fetch. The rows really are being
  * processed, so the bar is not a lie; but it is not the long-running bar that
  * paging would give. Making the fetch page would change what a *disabled* CLI

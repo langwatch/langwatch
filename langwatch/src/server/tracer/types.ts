@@ -678,6 +678,9 @@ export const traceSchema = z.object({
       reasoning_tokens: z.number().optional().nullable(),
       cache_read_input_tokens: z.number().optional().nullable(),
       cache_creation_input_tokens: z.number().optional().nullable(),
+      cache_creation_5m_input_tokens: z.number().optional().nullable(),
+      cache_creation_1h_input_tokens: z.number().optional().nullable(),
+      context_size_tokens: z.number().optional().nullable(),
       total_cost: z.number().optional().nullable(),
       tokens_estimated: z.boolean().optional().nullable(),
     })
