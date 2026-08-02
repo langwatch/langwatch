@@ -8,7 +8,7 @@ keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, bud
 You run a platform whose customers consume LLMs through you, and you bill them for what they use. This cookbook wires that end to end on LangWatch: one virtual key per tenant, caps for the tenant and for each of their end users, signed spend events into your billing ledger, reconciliation, breach handling, and period close. Your product keeps zero metering code of its own.
 
 <Card title="The runnable reference: agent-billing-demo" icon="github" href="https://github.com/langwatch/agent-billing-demo">
-  A tiny open-source agent-platform SaaS implementing every step below, with the webhook receiver, ledger, reconciliation loop, and provisioning in **both TypeScript and Python**. Point your coding agent at that repo as the canonical integration example; every file is written to be copied from.
+  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions a real tenant key and real caps, chat rides the gateway, and the meters on screen are driven by the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point your coding agent at that repo as the canonical integration example; every file is written to be copied from.
 </Card>
 
 ## What you need
