@@ -119,7 +119,7 @@ describe("fallbackName", () => {
     });
   });
 
-  describe("given profiles that each drop the most specific field", () => {
+  describe("when each profile drops the most specific field it has", () => {
     it("respects name > nickname > displayName > login > username > preferred_username > email > 'User'", () => {
       // 8 progressively less specific profiles
       expect(fallbackName({ name: "A", nickname: "B" })).toBe("A");
