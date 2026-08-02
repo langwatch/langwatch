@@ -60,6 +60,12 @@ Feature: An absent evaluator score is never presented or stored as zero
     And this holds for the copy and replicate flows, which do not pass through the evaluator service
 
   @integration @unimplemented
+  Scenario: The new settings resolution can be switched off
+    Given the settings-resolution change is disabled by its kill switch
+    When the online evaluation pipeline executes a monitor for a trace
+    Then the settings sent to the judge are the ones the previous behaviour produced
+
+  @integration @unimplemented
   Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
     Given an existing evaluator whose stored config predates normalisation and has no settings key
     When the online evaluation pipeline executes a monitor backed by that evaluator
@@ -216,7 +222,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     Given an experiment group containing one row scoring zero point eight and one not-scored row
     When the experiment results are displayed
     Then the not-scored row shows the not-scored indicator rather than a numeric score
-    And the not-scored row is not coloured as a failure
+    And the not-scored row is coloured neither as a failure nor as a pass
 
   @integration @unimplemented
   Scenario: A processed row with no pass verdict does not render as a red failure
@@ -224,7 +230,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     And one processed row in that group has no pass verdict
     When the experiment results are displayed
     Then that row shows the not-scored indicator rather than a failure verdict
-    And that row is not coloured as a failure
+    And that row is coloured neither as a failure nor as a pass
 
   # ============================================================================
   # Enumeration completeness (D7) — sites the original five-site list missed
@@ -240,7 +246,7 @@ Feature: An absent evaluator score is never presented or stored as zero
   Scenario: A not-scored summary card is not coloured as a failure
     Given an experiment summary card for an evaluation with no numeric score
     When the card is rendered
-    Then the card is not coloured as a failure
+    Then the card is coloured neither as a failure nor as a pass
 
   @integration @unimplemented
   Scenario: A best score that has not loaded yet is not shown as zero
@@ -291,7 +297,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: A settings-less config never reaches the judge as an empty object
 # AC 0c: "A config shape the online path cannot read cannot be written" (all four writers)
 #        -> Scenario: A config shape the online path cannot read cannot be written
-# AC 0c2: "Evaluators that ALREADY have the bad shape are handled"
+# AC 0c2: "Evaluators that ALREADY have the bad shape are handled", plus its promoted
+#         kill-switch criterion (the disable path asserted in BOTH positions)
+#        -> Scenario: The new settings resolution can be switched off
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
 # AC 0e: "The behaviour this fix INVERTS is named, and its existing assertions are updated"
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters
@@ -305,8 +313,10 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: Model environment resolution is unchanged for a correctly configured evaluator
 # AC 0d: "Prevalence is measured before this issue closes"
 #        -> NO SCENARIO. Deliberate: AC0d is a one-off measurement against a production
-#           database, not a behaviour of this system. It is a release gate recorded on the
-#           issue, and it BLOCKS the D6 scenarios above from shipping. Tracked on #6397.
+#           database, not a behaviour of this system. It is a CLOSE gate: it gates issue closure,
+#           the P0/P1 re-decision, customer comms and AC0c2's backfill scope. It does NOT block
+#           the D6 scenarios above from shipping -- corrected 2026-08-02, an earlier revision
+#           said it did, contradicting the demotion applied in the issue's AC section.
 # AC 1: "An absent score renders exactly N/A, never 0" (per surviving render site)
 #        -> Scenario: An absent score renders as not-scored for a langevals evaluator
 #        -> Scenario: An absent score renders as not-scored for a workflow evaluator
@@ -322,7 +332,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 # AC 6: "A not-scored batch evaluation stores NULL, not 0" (+ genuine zero still 0)
 #        -> Scenario Outline: A not-scored batch evaluation stores no score
 #        -> Scenario: A genuine zero batch evaluation stores zero
-# AC 7: "passed and details get the same treatment in the same migration"
+# AC 7: "passed, details AND cost get the same treatment in the same migration"
+#        (the cost axis -- evaluations-legacy.ts:509 `cost: cost?.amount ?? 0`, cost Float NOT
+#        NULL at schema.prisma:751 -- is migrated with the other two or explicitly excluded)
 #        -> Scenario: Passed and details are stored as absent alongside score
 # AC 8: "An all-zero dataset still shows the score metric"
 #        -> Scenario: An all-zero dataset still shows the score metric
@@ -366,7 +378,7 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
 #           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
 #
-# Coverage: 19 behavioral ACs -> 29 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
+# Coverage: 19 behavioral ACs -> 30 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
 # half of 0e) carry no scenario by design, each with its reason stated above and its enforcement
 # named elsewhere. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
 # gate is a real reproduction against a customer account, which is why it stays a PR obligation.
