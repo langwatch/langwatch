@@ -71,13 +71,18 @@ describe("generateLicenseKey", () => {
       expect(plan.maxMembers).toBe(10);
       expect(plan.canPublish).toBe(true);
 
-      // "all other features are unlimited" — the minted GROWTH license carries
-      // no workspace-structure or experimentation caps at all, so nothing
-      // enforces them (effectively unlimited).
-      const featureCaps = [
+      // "all other features are unlimited". maxProjects and maxWorkflows are
+      // still minted, but at an unlimited value: deployments released before
+      // those fields became optional reject a license without them. See
+      // `buildMintedPlan`. Everything else is simply absent.
+      for (const cap of ["maxProjects", "maxWorkflows"] as const) {
+        expect(plan[cap], `${cap} should be minted as unlimited`).toBe(
+          Number.MAX_SAFE_INTEGER,
+        );
+      }
+
+      const uncappedAndUnminted = [
         "maxTeams",
-        "maxProjects",
-        "maxWorkflows",
         "maxPrompts",
         "maxEvaluators",
         "maxScenarios",
@@ -89,7 +94,7 @@ describe("generateLicenseKey", () => {
         "maxCustomGraphs",
         "maxAutomations",
       ] as const;
-      for (const cap of featureCaps) {
+      for (const cap of uncappedAndUnminted) {
         expect(plan, `${cap} should not be minted`).not.toHaveProperty(cap);
       }
     });

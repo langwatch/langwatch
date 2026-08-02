@@ -1,37 +1,41 @@
-Feature: A license never leaves a self-hosted deployment worse off than no license
+Feature: A license adds capability without taking any away, and seats are what it meters
 
   A self-hosted deployment with no license runs on the open-source baseline,
-  where seats, lite seats and message volume are uncapped. A license sells the
-  Enterprise surface (SSO, SCIM, audit logs) and a support relationship, so
-  activating one must only ever add. It must never lower a limit the deployment
-  already had.
+  where seats, lite seats and message volume are all uncapped. Activating a
+  license must not withdraw a capability the deployment already had, so the
+  license-resolved plan is floored at that baseline.
 
-  Without this floor the platform contradicts itself: an unlicensed deployment
-  invites the whole company, and the moment it pays for Enterprise it drops to
-  the seat count the license happens to encode. Signed licenses are immutable
-  once issued, so the floor is applied when the license is resolved into an
-  active plan rather than at minting time. That also repairs licenses that were
-  already issued, with no re-issuance.
+  Seats are the deliberate exception. A self-hosted Enterprise license is priced
+  per seat, so the seat count in the signed payload is what the customer bought
+  and it binds: a ten-seat license refuses the eleventh member. Flooring seats
+  would make every seat clause in every self-hosted contract unenforceable by
+  the product, because the unlicensed baseline is uncapped and any finite number
+  is therefore lower than it.
+
+  Nothing else on self-hosted is sold by quantity. Message volume is not metered
+  there at all, the data never leaves the customer's own database, and
+  publishing is part of the open-source floor. A license may not withdraw
+  either.
 
   The floor is a self-hosted policy. On Cloud a license is the negotiated
   contract and overrides the Stripe subscription in both directions, so the
   composite provider is deliberately left alone.
 
   As an operator of a self-hosted LangWatch deployment
-  I want activating an Enterprise license to only ever add capability
-  So that paying for LangWatch never costs me seats I already had
+  I want a license to add the Enterprise surface and meter my seats
+  So that I am billed for what I use without losing anything I already had
 
   Background:
     Given a self-hosted deployment
     And an organization "org-123" exists
 
   @unit
-  Scenario: An Enterprise license encoding a finite seat count resolves to the uncapped baseline
+  Scenario: The seat count a license sells is enforced
     Given the organization has a valid Enterprise license
-    And the signed payload encodes 100 members and 50 lite members
+    And the signed payload encodes 10 members and 5 lite members
     When the active plan is resolved
-    Then the plan allows at least as many members as the open-source baseline
-    And the plan allows at least as many lite members as the open-source baseline
+    Then the plan allows 10 members
+    And the plan allows 5 lite members
     And the plan is still identified as Enterprise
 
   @unit
@@ -49,11 +53,10 @@ Feature: A license never leaves a self-hosted deployment worse off than no licen
     Then the plan still allows publishing
 
   @unit
-  Scenario: The floor only raises limits and never lowers them
-    Given the organization has a valid license
-    And the signed payload encodes limits above the open-source baseline
+  Scenario: The seat guard stays armed on a licensed deployment
+    Given the organization has a valid Enterprise license
     When the active plan is resolved
-    Then each limit from the license is preserved
+    Then adding members is still subject to the plan's limits
 
   @unit
   Scenario: Plan identity survives the floor

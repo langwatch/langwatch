@@ -34,27 +34,25 @@ const resolve = (plan: PlanInfo) =>
 
 describe("createSelfHostedPlanProvider", () => {
   describe("given the organization holds an Enterprise license with finite limits", () => {
-    /** @scenario An Enterprise license encoding a finite seat count resolves to the uncapped baseline */
-    it("raises the seat limits to the open-source baseline", async () => {
-      const plan = await resolve(enterpriseLicensePlan());
-
-      expect(plan.maxMembers).toBeGreaterThanOrEqual(UNLIMITED_PLAN.maxMembers);
-      expect(plan.maxMembersLite).toBeGreaterThanOrEqual(
-        UNLIMITED_PLAN.maxMembersLite,
+    /** @scenario The seat count a license sells is enforced */
+    it("keeps the seat counts the license sold, because seats are the meter", async () => {
+      const plan = await resolve(
+        enterpriseLicensePlan({ maxMembers: 10, maxMembersLite: 5 }),
       );
+
+      expect(plan).toMatchObject({ maxMembers: 10, maxMembersLite: 5 });
     });
 
-    /** @scenario A license encoding a finite message volume resolves to the uncapped baseline */
-    it("raises the monthly message volume to the open-source baseline", async () => {
-      const plan = await resolve(enterpriseLicensePlan());
+    /** @scenario The seat guard stays armed on a licensed deployment */
+    it("does not switch off the creation guards that enforce those seats", async () => {
+      const plan = await resolve(enterpriseLicensePlan({ maxMembers: 10 }));
 
-      expect(plan.maxMessagesPerMonth).toBeGreaterThanOrEqual(
-        UNLIMITED_PLAN.maxMessagesPerMonth,
-      );
+      expect(plan.overrideAddingLimitations).toBe(false);
     });
 
     /** @scenario Plan identity survives the floor */
     it("keeps the plan identity and paid status from the license", async () => {
+      // Identity is never floored: the deployment really is on Enterprise.
       const plan = await resolve(enterpriseLicensePlan());
 
       expect(plan).toMatchObject({
@@ -75,23 +73,16 @@ describe("createSelfHostedPlanProvider", () => {
     });
   });
 
-  describe("given the license encodes limits above the open-source baseline", () => {
-    /** @scenario The floor only raises limits and never lowers them */
-    it("preserves every limit the license granted", async () => {
-      const beyondBaseline = Number.MAX_SAFE_INTEGER;
+  describe("given the license encodes a finite message volume", () => {
+    /** @scenario A license encoding a finite message volume resolves to the uncapped baseline */
+    it("raises it to the baseline, since self-hosted volume is never metered", async () => {
       const plan = await resolve(
-        enterpriseLicensePlan({
-          maxMembers: beyondBaseline,
-          maxMembersLite: beyondBaseline,
-          maxMessagesPerMonth: beyondBaseline,
-        }),
+        enterpriseLicensePlan({ maxMessagesPerMonth: 10_000_000 }),
       );
 
-      expect(plan).toMatchObject({
-        maxMembers: beyondBaseline,
-        maxMembersLite: beyondBaseline,
-        maxMessagesPerMonth: beyondBaseline,
-      });
+      expect(plan.maxMessagesPerMonth).toBeGreaterThanOrEqual(
+        UNLIMITED_PLAN.maxMessagesPerMonth,
+      );
     });
   });
 

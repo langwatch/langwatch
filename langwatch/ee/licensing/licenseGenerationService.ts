@@ -1,3 +1,4 @@
+import { buildMintedPlan } from "./mintedPlan";
 import { getPlanTemplate } from "./planTemplates";
 import { encodeLicenseKey, generateLicenseId, signLicense } from "./signing";
 import type { LicenseData } from "./types";
@@ -44,10 +45,9 @@ export function generateLicenseKey({
   const resolvedOrgName = organizationName.trim() || email;
 
   // Licenses encode only the enforced levers (member seats, messages volume)
-  // plus identity. Keys MUST be listed in LicensePlanLimitsSchema field order:
-  // signature verification re-serializes via JSON.stringify after Zod parsing,
-  // which orders keys to schema order, so sign-time order must match.
-  const plan: LicenseData["plan"] = {
+  // plus identity, and the retired fields older deployments still require.
+  // See `buildMintedPlan` for both constraints.
+  const plan: LicenseData["plan"] = buildMintedPlan({
     type: template.type,
     name: template.name,
     maxMembers: seats,
@@ -55,7 +55,7 @@ export function generateLicenseKey({
     maxMessagesPerMonth: template.maxMessagesPerMonth,
     canPublish: template.canPublish,
     usageUnit: template.usageUnit,
-  };
+  });
 
   const licenseData: LicenseData = {
     licenseId: generateLicenseId(),
