@@ -52003,7 +52003,7 @@ When using the Helm chart, you rarely need to set environment variables directly
 |----------|-------------|----------|
 | `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
 | `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key | Yes |
 | `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
 
 <Warning>
@@ -52014,7 +52014,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 
 ### SSO Provider Variables
 
@@ -52035,14 +52035,6 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 | `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
 | `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
 | `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**AWS Cognito:**
-
-| Variable | Description |
-|----------|-------------|
-| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
-| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
-| `COGNITO_ISSUER` | Cognito issuer URL |
 
 **GitHub:**
 
@@ -52610,8 +52602,7 @@ The decision is made once at startup, so a license activated on a running server
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
-| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
@@ -52625,7 +52616,11 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `github`, `gitlab`, `google`, or `okta`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+
+<Note>
+A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
+</Note>
 
 ## Provider Setup
 
@@ -52678,7 +52673,7 @@ Or via environment variables:
 ```yaml
 app:
   nextAuth:
-    provider: azureAd
+    provider: azure-ad
     providers:
       azureAd:
         clientId:
@@ -52689,39 +52684,16 @@ app:
           value: "your-tenant-id"
 ```
 
+<Note>
+The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
+</Note>
+
 | Variable | Value |
 |----------|-------|
-| `NEXTAUTH_PROVIDER` | `azureAd` |
+| `NEXTAUTH_PROVIDER` | `azure-ad` |
 | `AZURE_AD_CLIENT_ID` | Application (client) ID |
 | `AZURE_AD_CLIENT_SECRET` | Client secret value |
 | `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
-
-### AWS Cognito
-
-1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
-2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
-3. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: cognito
-    providers:
-      cognito:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
-        issuer:
-          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | User pool app client ID |
-| `COGNITO_CLIENT_SECRET` | User pool app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
 
 ### GitHub
 
@@ -53356,7 +53328,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 **What it does:**
 - Serves the LangWatch web UI (Next.js)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
-- Handles authentication (NextAuth.js with email or SSO providers)
+- Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
 - Manages the control plane via PostgreSQL (Prisma ORM)
 - Broadcasts real-time updates via Server-Sent Events (SSE)
@@ -54214,7 +54186,7 @@ Next.js server, the single external entry point for all traffic:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
-- **Authentication**: NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
+- **Authentication**: email, Google, GitHub, GitLab, Azure AD, Auth0, Okta
 - **SSE**: pushes real-time updates to connected browser clients
 - **Analytics queries**: reads from ClickHouse
 - **Control plane**: manages users, teams, projects via PostgreSQL
@@ -55216,7 +55188,7 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 
 | Capability | Why it is licensed |
 |---|---|
-| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab, Cognito) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso). |
+| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso). |
 | **RBAC** with custom roles | Fine-grained permissions beyond the built-in roles. |
 | **SCIM** user provisioning | Directory-driven joiner/mover/leaver flows. |
 | **Audit logs** | Tamper-evident record of who did what, exportable to your SIEM. |
@@ -56090,9 +56062,9 @@ This page covers the security features and best practices for self-hosted LangWa
 
 ## Authentication & Authorization
 
-**NextAuth.js** handles user authentication with support for:
+LangWatch handles user authentication with support for:
 - Email/password (default)
-- SSO providers: Azure AD, Okta, Auth0, AWS Cognito, Google, GitHub, GitLab
+- SSO providers: Azure AD, Okta, Auth0, Google, GitHub, GitLab
 
 See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 

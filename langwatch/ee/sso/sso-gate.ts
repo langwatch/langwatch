@@ -7,6 +7,7 @@ import {
   parseLicenseKey,
   verifySignature,
 } from "../licensing/validation";
+import { buildGenericOAuthConfigs, buildSocialProviders } from "./providers";
 import {
   type ISsoLicenseRepository,
   SsoLicenseRepository,
@@ -239,12 +240,49 @@ export async function platformSSOAllowed(): Promise<boolean> {
 }
 
 /**
+ * Did the configured provider actually get wired into BetterAuth?
+ *
+ * Both builders only ever produce an entry for `NEXTAUTH_PROVIDER`, so
+ * "produced nothing" means the deployment named a provider that this build
+ * cannot mount — an id it does not know (`azureAd` for `azure-ad`, or one
+ * that was never implemented), or a known id whose client credentials are
+ * missing.
+ */
+function authProviderIsMounted(): boolean {
+  return (
+    Object.keys(buildSocialProviders(env)).length > 0 ||
+    buildGenericOAuthConfigs(env).length > 0
+  );
+}
+
+/**
  * `resolveAuthProvider()` — `env.NEXTAUTH_PROVIDER`, coerced to `"email"`
  * when the gate denies, so the sign-in page renders the email form and
  * never auto-redirects to a disabled IdP.
+ *
+ * It also coerces when the provider is allowed but nothing was mounted for
+ * it. Returning the configured name there would point the sign-in page at an
+ * IdP BetterAuth never registered, and a licensed deployment has no email
+ * form to fall back to, so a single typo in `NEXTAUTH_PROVIDER` locks every
+ * user out of an install that is paying for SSO. Email mode is the degraded
+ * state, not the broken one: it stays signable-in while the operator reads
+ * the log line and fixes the value.
  */
 export async function resolveAuthProvider(): Promise<string> {
   if (env.NEXTAUTH_PROVIDER === "email") return "email";
+
   const allowed = await platformSSOAllowed();
-  return allowed ? env.NEXTAUTH_PROVIDER : "email";
+  if (!allowed) return "email";
+
+  if (!authProviderIsMounted()) {
+    logger.warn(
+      { provider: env.NEXTAUTH_PROVIDER },
+      "NEXTAUTH_PROVIDER names a provider this deployment cannot mount — " +
+        "starting in email mode; check the provider id against the " +
+        "self-hosting SSO docs and that its client credentials are set",
+    );
+    return "email";
+  }
+
+  return env.NEXTAUTH_PROVIDER;
 }

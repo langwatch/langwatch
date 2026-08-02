@@ -79,6 +79,17 @@ Feature: License-Gated SSO
   # ============================================================================
 
   @unit
+  Scenario: A provider id this build cannot mount falls back to email
+    Given a self-hosted deployment holding a genuine license
+    And the configured identity provider is one this build cannot wire up,
+      either because the name is not one it knows or because its client
+      credentials are missing
+    When a user opens the sign-in page
+    Then the email and password form is offered
+    And the server logs which provider it could not mount
+    And nobody is left without a way to sign in to a licensed deployment
+
+  @unit
   Scenario: An SSO-only deployment recovers by setting the instance license key
     Given a self-hosted deployment where every user signs in only through SSO
     And the deployment has no genuine license stored

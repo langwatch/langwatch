@@ -3,11 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
+// The credentials are here because `resolveAuthProvider` now asks whether the
+// configured provider actually mounted. Without them `auth0` builds nothing,
+// which is precisely the lockout case these tests are not about.
 vi.mock("~/env.mjs", () => ({
   env: {
     IS_SAAS: false,
     NEXTAUTH_PROVIDER: "auth0",
     LANGWATCH_LICENSE_KEY: undefined as string | undefined,
+    AUTH0_CLIENT_ID: "auth0-client",
+    AUTH0_CLIENT_SECRET: "auth0-secret",
+    AUTH0_ISSUER: "https://acme.us.auth0.com/",
+    NEXTAUTH_URL: "https://acme.test",
   },
 }));
 
@@ -47,6 +54,10 @@ const envMock = env as unknown as {
   IS_SAAS: boolean;
   NEXTAUTH_PROVIDER: string;
   LANGWATCH_LICENSE_KEY: string | undefined;
+  AUTH0_CLIENT_ID: string | undefined;
+  AUTH0_CLIENT_SECRET: string | undefined;
+  AUTH0_ISSUER: string | undefined;
+  NEXTAUTH_URL: string | undefined;
 };
 
 const genuineLicense = (
@@ -334,12 +345,25 @@ describe("platformSSOAllowed", () => {
 });
 
 describe("resolveAuthProvider", () => {
+  /** A genuinely licensed self-hosted deployment, so the gate says yes. */
+  const allowTheGate = () => {
+    vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
+    vi.mocked(verifySignature).mockReturnValue(true);
+    vi.mocked(isExpired).mockReturnValue(false);
+    __setSsoLicenseRepositoryForTests(
+      repoWithOrgs([{ id: "org_1", license: "encoded" }]),
+    );
+  };
+
   beforeEach(() => {
     __resetSsoGateForTests();
     vi.resetAllMocks();
     envMock.IS_SAAS = false;
     envMock.NEXTAUTH_PROVIDER = "auth0";
     envMock.LANGWATCH_LICENSE_KEY = undefined;
+    envMock.AUTH0_CLIENT_ID = "auth0-client";
+    envMock.AUTH0_CLIENT_SECRET = "auth0-secret";
+    envMock.AUTH0_ISSUER = "https://acme.us.auth0.com/";
   });
 
   describe("when the deployment is natively configured for email", () => {
@@ -382,16 +406,54 @@ describe("resolveAuthProvider", () => {
 
   describe("when the gate allows", () => {
     it("reports the configured provider", async () => {
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
-      __setSsoLicenseRepositoryForTests(
-        repoWithOrgs([{ id: "org_1", license: "encoded" }]),
-      );
+      allowTheGate();
 
       const provider = await resolveAuthProvider();
 
       expect(provider).toBe("auth0");
+    });
+  });
+
+  /**
+   * The gate saying yes is not the same as the provider being wired. A
+   * licensed deployment has no email form to fall back to, so if the sign-in
+   * page is pointed at a provider BetterAuth never registered there is no way
+   * in at all — the operator has locked themselves out of the thing they are
+   * paying for, with a working license.
+   */
+  describe("when the gate allows but the provider mounted nothing", () => {
+    /** @scenario A provider id this build cannot mount falls back to email */
+    it("coerces an unknown provider id to email rather than locking everyone out", async () => {
+      allowTheGate();
+      // The spelling the self-hosting docs used to advertise. The code wires
+      // `azure-ad`, so this mounts nothing at all.
+      envMock.NEXTAUTH_PROVIDER = "azureAd";
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe("email");
+    });
+
+    /** @scenario A provider id this build cannot mount falls back to email */
+    it("coerces a known provider with missing credentials to email", async () => {
+      allowTheGate();
+      envMock.AUTH0_CLIENT_SECRET = undefined;
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe("email");
+    });
+
+    it("names the provider in the warning, so the operator can see what to fix", async () => {
+      allowTheGate();
+      envMock.NEXTAUTH_PROVIDER = "cognito";
+
+      await resolveAuthProvider();
+
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { provider: "cognito" },
+        expect.stringContaining("cannot mount"),
+      );
     });
   });
 });

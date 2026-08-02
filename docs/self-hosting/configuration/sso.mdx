@@ -17,8 +17,7 @@ The decision is made once at startup, so a license activated on a running server
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
-| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
@@ -32,7 +31,11 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `github`, `gitlab`, `google`, or `okta`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+
+<Note>
+A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
+</Note>
 
 ## Provider Setup
 
@@ -85,7 +88,7 @@ Or via environment variables:
 ```yaml
 app:
   nextAuth:
-    provider: azureAd
+    provider: azure-ad
     providers:
       azureAd:
         clientId:
@@ -96,39 +99,16 @@ app:
           value: "your-tenant-id"
 ```
 
+<Note>
+The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
+</Note>
+
 | Variable | Value |
 |----------|-------|
-| `NEXTAUTH_PROVIDER` | `azureAd` |
+| `NEXTAUTH_PROVIDER` | `azure-ad` |
 | `AZURE_AD_CLIENT_ID` | Application (client) ID |
 | `AZURE_AD_CLIENT_SECRET` | Client secret value |
 | `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
-
-### AWS Cognito
-
-1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
-2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
-3. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: cognito
-    providers:
-      cognito:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
-        issuer:
-          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | User pool app client ID |
-| `COGNITO_CLIENT_SECRET` | User pool app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
 
 ### GitHub
 
