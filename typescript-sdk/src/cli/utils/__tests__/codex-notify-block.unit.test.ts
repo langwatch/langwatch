@@ -431,3 +431,34 @@ describe("given a multi-line nested array sits above the user's notify", () => {
     });
   });
 });
+
+describe("given a single-quoted literal string holding an unbalanced bracket", () => {
+  describe("when the block is written", () => {
+    it("does not let that bracket hide the user's top-level notify", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          // TOML literal strings have no escapes, so this bracket never closes.
+          "shell_path = 'C:\\tools\\dir['",
+          'notify = ["/usr/bin/terminal-notifier"]',
+          "",
+          "[otel]",
+          'environment = "mine"',
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      const live = fs
+        .readFileSync(configPath, "utf8")
+        .split("\n")
+        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+      expect(live).toHaveLength(1);
+      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+    });
+  });
+});

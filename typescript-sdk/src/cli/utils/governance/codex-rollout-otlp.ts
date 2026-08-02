@@ -102,8 +102,9 @@ const RECENT_TURN_WINDOW = 3;
  * Newest first: the per-turn hook is looking for the session that just ended,
  * which is under today's date, and `readdir` order is whatever the filesystem
  * says. The path segments are zero-padded, so a descending name sort is a
- * descending date sort, and the common lookup stops at the first directory
- * instead of walking a long-lived account's whole history on every turn.
+ * descending date sort. A caller that stops on a match (`onFile` returning
+ * true) therefore finds a recent session in the first directory it opens,
+ * rather than after walking a long-lived account's older ones.
  */
 async function walkRolloutFiles(
   root: string,

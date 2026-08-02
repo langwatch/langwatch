@@ -386,24 +386,61 @@ export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
  * Advance a bracket depth across one line, ignoring brackets inside strings and
  * after an unquoted `#`. Multi-line values are the reason this is needed: a
  * line's meaning depends on whether an earlier line left an array open.
+ *
+ * Both TOML string forms are tracked. Literal strings are single-quoted and
+ * have no escape mechanism at all, so `path = 'C:\dir['` is an unbalanced
+ * bracket that must not count — and single-quoted values are the form codex's
+ * own documentation uses for commands.
  */
 function bracketDepthAfterLine(line: string, depth: number): number {
 	let next = depth;
-	let inString = false;
+	let quote: '"' | "'" | null = null;
 	let escaped = false;
 	for (const ch of line) {
-		if (inString) {
+		if (quote !== null) {
+			// Only basic (double-quoted) strings honour backslash escapes.
 			if (escaped) escaped = false;
-			else if (ch === "\\") escaped = true;
-			else if (ch === '"') inString = false;
+			else if (quote === '"' && ch === "\\") escaped = true;
+			else if (ch === quote) quote = null;
 			continue;
 		}
-		if (ch === '"') inString = true;
+		if (ch === '"' || ch === "'") quote = ch;
 		else if (ch === "#") break;
 		else if (ch === "[") next++;
 		else if (ch === "]") next--;
 	}
 	return next;
+}
+
+/**
+ * Whether a line is a table header rather than a continuation of a multi-line
+ * value. A header's brackets close on the same line; `[1, 2],` inside an array
+ * does not, and only the former ends the top level.
+ */
+function isTableHeaderLine(line: string): boolean {
+	if (!/^[ \t]*\[/.test(line)) return false;
+	if (/^[ \t]*notify[ \t]*=/.test(line)) return false;
+	return bracketDepthAfterLine(line, 0) === 0;
+}
+
+/**
+ * Offsets of every live `notify = [` assignment above the file's first table
+ * header — the ones TOML binds to no table, which is what codex reads.
+ */
+function topLevelNotifyOffsets(content: string): number[] {
+	const found: number[] = [];
+	let depth = 0;
+	let offset = 0;
+	for (const line of content.split("\n")) {
+		if (depth === 0) {
+			// Everything past a table header belongs to that table.
+			if (isTableHeaderLine(line)) return found;
+			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) found.push(offset);
+		}
+		depth = bracketDepthAfterLine(line, depth);
+		offset += line.length + 1;
+	}
+	return found;
 }
 
 /**
@@ -418,21 +455,8 @@ function bracketDepthAfterLine(line: string, depth: number): number {
  * codex parsing its config at all.
  */
 function topLevelNotifyMatch(content: string): { index: number } | null {
-	let depth = 0;
-	let offset = 0;
-	for (const line of content.split("\n")) {
-		if (depth === 0) {
-			// A table header ends the top level; everything after it belongs to it.
-			if (/^[ \t]*\[/.test(line) && !/^[ \t]*notify[ \t]*=/.test(line)) {
-				const closed = bracketDepthAfterLine(line, 0) === 0;
-				if (closed) return null;
-			}
-			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) return { index: offset };
-		}
-		depth = bracketDepthAfterLine(line, depth);
-		offset += line.length + 1;
-	}
-	return null;
+	const [first] = topLevelNotifyOffsets(content);
+	return first === undefined ? null : { index: first };
 }
 
 /**
@@ -557,6 +581,18 @@ export function writeCodexNotifyBlock(
 
 	const block = buildCodexNotifyBlock({ ...inputs, chained });
 	const next = body.trim() ? `${block}\n${body.replace(/^\n+/, "")}` : block;
+
+	// Last line of defence. Deciding which `notify` is codex's means reading
+	// TOML with a line scanner, and a config shape it reads wrong would leave
+	// two top-level `notify` keys — a duplicate key, which stops codex starting
+	// at all. Refusing to write beats breaking the user's editor on a shape we
+	// did not anticipate; capture stays off and says so.
+	if (topLevelNotifyOffsets(next).length > 1) {
+		throw new Error(
+			`refusing to write ${filePath}: it already defines a top-level 'notify' this merge cannot safely move`,
+		);
+	}
+
 	if (next === prior) return { action: "unchanged", path: filePath, chained };
 
 	if (!fs.existsSync(filePath)) {
