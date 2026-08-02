@@ -14,6 +14,8 @@ const mockPrisma = {
   team: {
     findUnique: vi.fn(),
     findUniqueOrThrow: vi.fn(),
+    // The personal-team guard runs before the assignment; a shared team here.
+    findFirst: vi.fn().mockResolvedValue(null),
   },
   roleBinding: {
     findFirst: vi.fn(),

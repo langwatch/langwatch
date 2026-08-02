@@ -663,3 +663,334 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     });
   });
 });
+
+describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
+  const codexToolResultLog = ({
+    atMs,
+    callId,
+    toolName,
+    args,
+    output,
+    success = "true",
+  }: {
+    atMs: number;
+    callId: string;
+    toolName: string;
+    args: string;
+    output: string;
+    success?: string;
+  }) =>
+    log(
+      {
+        "event.name": "codex.tool_result",
+        call_id: callId,
+        tool_name: toolName,
+        arguments: args,
+        output,
+        success,
+        duration_ms: "523",
+        model: "gpt-5.6",
+      },
+      atMs,
+    );
+
+  describe("given tool_result log events carrying arguments and output", () => {
+    /** @scenario "A codex session shows its prompt and its tool calls with real input and output" */
+    it("renders each tool call with its name, input, and output", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "check hello.py",
+              "conversation.id": "conv-1",
+            },
+            1_000,
+          ),
+          codexToolResultLog({
+            atMs: 2_000,
+            callId: "call_A",
+            toolName: "exec",
+            args: '{"cmd":"rg -n def hello.py"}',
+            output: "1:def welcome(name):",
+          }),
+        ],
+      });
+
+      const tool = transcript.entries.find((e) => e.kind === "tool");
+      expect(tool).toMatchObject({
+        name: "exec",
+        input: { cmd: "rg -n def hello.py" },
+        output: "1:def welcome(name):",
+        failed: false,
+      });
+      expect(
+        transcript.entries.findIndex((e) => e.kind === "user_prompt"),
+      ).toBeLessThan(transcript.entries.findIndex((e) => e.kind === "tool"));
+    });
+
+    it("marks a failed tool_result as failed", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [
+          codexToolResultLog({
+            atMs: 2_000,
+            callId: "call_B",
+            toolName: "exec_command",
+            args: '{"cmd":"false"}',
+            output: "exit 1",
+            success: "false",
+          }),
+        ],
+      });
+      expect(transcript.entries.find((e) => e.kind === "tool")).toMatchObject({
+        failed: true,
+      });
+    });
+  });
+
+  describe("given a tool span and a tool_result log for the same call id", () => {
+    /** @scenario "A tool the agent ran once is shown once" */
+    it("renders the call once, on the span, filled with the log's content", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "span-exec-1",
+            name: "exec_command",
+            startTimeMs: 2_000,
+            endTimeMs: 2_500,
+            status: "ok",
+            params: { tool_name: "exec_command", call_id: "exec-1" },
+            input: null,
+            output: null,
+          } as unknown as SpanDetail,
+        ],
+        logs: [
+          codexToolResultLog({
+            atMs: 2_400,
+            callId: "exec-1",
+            toolName: "exec_command",
+            args: '{"cmd":"ls"}',
+            output: "hello.py",
+          }),
+        ],
+      });
+
+      const tools = transcript.entries.filter((e) => e.kind === "tool");
+      expect(tools).toHaveLength(1);
+      expect(tools[0]).toMatchObject({
+        spanId: "span-exec-1",
+        input: { cmd: "ls" },
+        output: "hello.py",
+      });
+    });
+  });
+
+  describe("given usage-bearing response spans and no turn rollup (the exec wire)", () => {
+    /** @scenario "Every model call in a codex exec session is shown with its token counts" */
+    it("derives one model call per response span with its token counts", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "hr-1",
+            name: "handle_responses",
+            startTimeMs: 1_000,
+            endTimeMs: 1_900,
+            status: "ok",
+            params: {
+              "gen_ai.usage.input_tokens": "13005",
+              "gen_ai.usage.output_tokens": "10",
+              "gen_ai.usage.cache_read.input_tokens": "12032",
+              "gen_ai.usage.cache_write.input_tokens": "256",
+            },
+          } as unknown as SpanDetail,
+          {
+            spanId: "hr-idle",
+            name: "handle_responses",
+            startTimeMs: 2_000,
+            endTimeMs: 2_100,
+            status: "ok",
+            params: { from: "output_item_done" },
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
+      expect(
+        transcript.entries.find((e) => e.kind === "model_call"),
+      ).toMatchObject({
+        inputTokens: 13_005,
+        outputTokens: 10,
+        cacheReadTokens: 12_032,
+        cacheCreationTokens: 256,
+      });
+    });
+
+    it("does NOT double-count response spans when the turn rollup exists", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            spanId: "turn-1",
+            name: "session_task.turn",
+            startTimeMs: 900,
+            endTimeMs: 2_600,
+            status: "ok",
+            params: { "codex.turn.token_usage.total_tokens": "12902" },
+          } as unknown as SpanDetail,
+          {
+            spanId: "hr-1",
+            name: "handle_responses",
+            startTimeMs: 1_000,
+            endTimeMs: 1_900,
+            status: "ok",
+            params: {
+              "gen_ai.usage.input_tokens": "13005",
+              "gen_ai.usage.output_tokens": "10",
+            },
+          } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      expect(transcript.totals.modelCalls).toBe(1);
+    });
+  });
+});
+
+describe("buildCodingAgentTranscript session system context", () => {
+  // The bare message array is what `buildDisplayInput` hands the transcript
+  // (`JSON.stringify(io.value)`), so that is the shape these pin.
+  const chatInput = JSON.stringify([
+    { role: "system", content: "You are Claude Code. CLAUDE.md says X." },
+    { role: "user", content: "hello" },
+  ]);
+
+  describe("given a claude session whose first model call input carries a system message", () => {
+    /** @scenario "The session's system context is shown once at the top" */
+    it("pins one collapsed system context entry above the first prompt", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          {
+            ...modelSpan({ atMs: 2_000 }),
+            input: chatInput,
+          } as unknown as SpanDetail,
+          {
+            ...modelSpan({ atMs: 5_000 }),
+            spanId: "llm-5000",
+            input: chatInput,
+          } as unknown as SpanDetail,
+        ],
+        logs: [
+          log(
+            {
+              "event.name": "user_prompt",
+              prompt: "hello",
+              "session.id": "sess-1",
+            },
+            1_000,
+          ),
+        ],
+      });
+
+      const systemEntries = transcript.entries.filter(
+        (e) => e.kind === "system_prompt",
+      );
+      expect(systemEntries).toHaveLength(1);
+      expect(systemEntries[0]).toMatchObject({
+        text: "You are Claude Code. CLAUDE.md says X.",
+      });
+      expect(transcript.entries[0]!.kind).toBe("system_prompt");
+    });
+  });
+
+  describe("given model calls without a system message", () => {
+    it("emits no system context entry", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [modelSpan({ atMs: 2_000 })],
+        logs: [],
+      });
+      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(
+        false,
+      );
+    });
+  });
+});
+
+describe("buildCodingAgentTranscript injected session context", () => {
+  describe("given a first user message carrying system-reminder blocks", () => {
+    it("surfaces the injected context, without the user's own words", () => {
+      const input = JSON.stringify([
+        {
+          role: "user",
+          content:
+            "<system-reminder>\n# claudeMd\nContents of CLAUDE.md: always use pnpm.\n</system-reminder>\n\nRead hello.py and explain it",
+        },
+      ]);
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      const system = transcript.entries.find((e) => e.kind === "system_prompt");
+      expect(system).toBeDefined();
+      expect((system as { text: string }).text).toContain("always use pnpm");
+      expect((system as { text: string }).text).not.toContain(
+        "Read hello.py and explain it",
+      );
+    });
+  });
+
+  describe("given both a system turn and system-reminder blocks", () => {
+    // Spelled with the `{type, value}` wrapper (the in-process shape) where
+    // the cases above use the bare array the read path serializes, so both
+    // shapes stay covered.
+    it("shows both, since they carry different halves of the context", () => {
+      const input = JSON.stringify({
+        type: "chat_messages",
+        value: [
+          { role: "system", content: "You are Claude Code." },
+          {
+            role: "user",
+            content:
+              "<system-reminder>MCP tools: grafana</system-reminder>\n\nhi",
+          },
+        ],
+      });
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+
+      const text = (
+        transcript.entries.find((e) => e.kind === "system_prompt") as {
+          text: string;
+        }
+      ).text;
+      expect(text).toContain("You are Claude Code.");
+      expect(text).toContain("MCP tools: grafana");
+    });
+  });
+
+  describe("given a plain conversation with no injected context", () => {
+    it("emits no session context entry", () => {
+      const input = JSON.stringify([
+        { role: "user", content: "just a question" },
+      ]);
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          { ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail,
+        ],
+        logs: [],
+      });
+      expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(
+        false,
+      );
+    });
+  });
+});

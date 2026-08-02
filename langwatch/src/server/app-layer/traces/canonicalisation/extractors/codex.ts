@@ -67,6 +67,17 @@ import type {
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
+/**
+ * codex sets its instrumentation scope to the originator: the interactive TUI
+ * is `codex_cli_rs`, `codex exec` is `codex_exec`. The exec wire has NO
+ * `session_task.turn` rollup, `handle_responses` response spans are its only
+ * usage record, so the redundant-usage skip below must never fire for it.
+ */
+const CODEX_EXEC_SCOPE_NAME = "codex_exec";
+const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
+  CODEX_RUST_SCOPE_NAME,
+  CODEX_EXEC_SCOPE_NAME,
+]);
 const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
@@ -87,6 +98,30 @@ const asNumber = (raw: unknown): number | null => {
 
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
+
+const positiveOrNull = (n: number | null): number | null =>
+  n !== null && n > 0 ? n : null;
+
+/** A canonical key and the codex-spelled value to lift onto it, if reported. */
+type CanonicalLift = readonly [string, string | number | null];
+
+/**
+ * Write every reported lift onto its canonical key, leaving an already-present
+ * key alone. Returns whether anything was written, which is what decides if the
+ * span records the rule.
+ */
+function applyCanonicalLifts(
+  ctx: ExtractorContext,
+  lifts: readonly CanonicalLift[],
+): boolean {
+  let fired = false;
+  for (const [key, value] of lifts) {
+    if (value === null) continue;
+    ctx.setAttrIfAbsent(key, value);
+    fired = true;
+  }
+  return fired;
+}
 
 export class CodexExtractor implements CanonicalAttributesExtractor {
   readonly id = "codex";
@@ -109,7 +144,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // trace summary — that's the log-record path's convention, not the
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
-    if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
+    const scopeName = ctx.span.instrumentationScope?.name ?? "";
+    if (!CODEX_SCOPE_NAMES.has(scopeName)) return;
 
     // codex emits ONE authoritative per-turn rollup span
     // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
@@ -119,7 +155,17 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // totals double. Flag the known-redundant response span so the fold skips
     // its token math — its own per-span detail is left untouched.
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
-      this.markRedundantUsageSpan(ctx);
+      this.liftResponseSpan(ctx);
+      // Typing applies to every usage-bearing response span: it is a model
+      // call on both wires, and the drawer renders an untyped span as a
+      // generic row rather than under the agent turn.
+      this.typeUsageSpanAsModelCall(ctx);
+      // The skip marker does not. `codex exec` emits no turn rollup at all,
+      // so its response spans are the trace's ONLY usage record, and skipping
+      // them there would zero the trace totals.
+      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+        this.markRedundantUsageSpan(ctx);
+      }
       return;
     }
 
@@ -131,90 +177,116 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
-    const inputTokens = asNumber(
-      attrs.take("codex.turn.token_usage.input_tokens"),
-    );
-    const outputTokens = asNumber(
-      attrs.take("codex.turn.token_usage.output_tokens"),
-    );
-    const cacheReadTokens = asNumber(
-      attrs.take("codex.turn.token_usage.cached_input_tokens"),
-    );
-    const reasoningTokens = asNumber(
-      attrs.take("codex.turn.token_usage.reasoning_output_tokens"),
-    );
-    const reasoningEffort = asString(attrs.take("codex.turn.reasoning_effort"));
-    const turnId = asString(attrs.take("turn.id"));
-
-    let fired = false;
-    if (model !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model);
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model);
-      fired = true;
-    }
-    if (inputTokens !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, inputTokens);
-      fired = true;
-    }
-    if (outputTokens !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outputTokens);
-      fired = true;
-    }
-    if (cacheReadTokens !== null) {
-      ctx.setAttrIfAbsent(
+    // codex spells cache creation "cache_write"; the canonical keys follow the
+    // Anthropic-derived semconv names.
+    const lifts: CanonicalLift[] = [
+      [ATTR_KEYS.GEN_AI_REQUEST_MODEL, model],
+      [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, model],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+        asNumber(attrs.take("codex.turn.token_usage.input_tokens")),
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+        asNumber(attrs.take("codex.turn.token_usage.output_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        cacheReadTokens,
-      );
-      fired = true;
-    }
-    if (reasoningTokens !== null) {
-      ctx.setAttrIfAbsent(
+        asNumber(attrs.take("codex.turn.token_usage.cached_input_tokens")),
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        asNumber(attrs.take("codex.turn.token_usage.cache_write_input_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-        reasoningTokens,
-      );
-      fired = true;
-    }
-    if (reasoningEffort !== null) {
-      ctx.setAttrIfAbsent(
+        asNumber(attrs.take("codex.turn.token_usage.reasoning_output_tokens")),
+      ],
+      [
         ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
-        reasoningEffort,
-      );
-      fired = true;
+        asString(attrs.take("codex.turn.reasoning_effort")),
+      ],
+      [ATTR_KEYS.GEN_AI_CONVERSATION_ID, asString(attrs.take("turn.id"))],
+    ];
+
+    if (applyCanonicalLifts(ctx, lifts)) {
+      ctx.recordRule("codex/session_task.turn");
     }
-    if (turnId !== null) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, turnId);
-      fired = true;
-    }
-    if (fired) ctx.recordRule("codex/session_task.turn");
   }
 
   /**
-   * Handles a non-turn `codex_cli_rs` span that carries token usage.
+   * Lifts the codex-namespaced attributes of a non-turn response span
+   * (`handle_responses`) onto canonical keys. The span natively reports
+   * `gen_ai.usage.{input,output,cache_read}` already; what it spells its own
+   * way is the reasoning effort setting (`codex.request.reasoning_effort`),
+   * the reasoning output tokens (`codex.usage.reasoning_output_tokens`), and
+   * cache creation (`gen_ai.usage.cache_write.input_tokens`). Under the TUI
+   * scope these mirror what the turn rollup reports; under `codex_exec`
+   * (no rollup) this span is the only place the trace can learn them.
+   */
+  private liftResponseSpan(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    // A zero token count here means "not reported", not "measured as zero", so
+    // it is dropped rather than lifted as a real reading.
+    const lifts: CanonicalLift[] = [
+      [
+        ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
+        asString(attrs.take("codex.request.reasoning_effort")),
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        positiveOrNull(
+          asNumber(attrs.take("codex.usage.reasoning_output_tokens")),
+        ),
+      ],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        positiveOrNull(
+          asNumber(attrs.get("gen_ai.usage.cache_write.input_tokens")),
+        ),
+      ],
+    ];
+
+    if (applyCanonicalLifts(ctx, lifts)) {
+      ctx.recordRule("codex/handle_responses");
+    }
+  }
+
+  /**
+   * A usage-bearing span is a model call, so it gets `llm` and the drawer
+   * renders it under the agent turn with the model icon instead of as a
+   * generic row. True on both wires, which is why this is separate from the
+   * skip marker below: `codex exec` needs the typing but must not be skipped.
+   *
    * GenAIExtractor runs before this one and lifts native gen_ai.usage.* into
    * `out`, so we look there as well as the still-unconsumed bag.
-   *
-   * Two distinct effects, deliberately decoupled:
-   * - Typing: any usage-bearing span is a model call, so it gets `llm` so the
-   *   drawer renders it under the agent turn with the model icon.
-   * - Skip marker: only KNOWN duplicates of the turn rollup
-   *   (`handle_responses`) get `skip_token_accumulation`. An unrecognised
-   *   usage-bearing span keeps its tokens so a future codex span whose usage is
-   *   NOT folded into the rollup is counted rather than silently dropped.
-   * Nothing is removed from the span itself either way.
+   */
+  private typeUsageSpanAsModelCall(ctx: ExtractorContext): void {
+    if (!this.hasTokenUsage(ctx)) return;
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
+  }
+
+  /**
+   * Only KNOWN duplicates of the turn rollup (`handle_responses`) get
+   * `skip_token_accumulation`. An unrecognised usage-bearing span keeps its
+   * tokens so a future codex span whose usage is NOT folded into the rollup is
+   * counted rather than silently dropped. Nothing is removed from the span
+   * itself either way.
    */
   private markRedundantUsageSpan(ctx: ExtractorContext): void {
-    const hasUsage =
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
-      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
-      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
-      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
-    if (!hasUsage) return;
-
-    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
-
+    if (!this.hasTokenUsage(ctx)) return;
     if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
     ctx.recordRule("codex/skip-redundant-usage");
+  }
+
+  private hasTokenUsage(ctx: ExtractorContext): boolean {
+    return (
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS)
+    );
   }
 
   /**
@@ -275,8 +347,19 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
     const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
+    const reasoningEffort = asString(
+      ctx.bag.attrs.take("model_reasoning_effort"),
+    );
 
     let fired = false;
+    if (reasoningEffort !== null) {
+      // Straight onto the canonical request key: log lifts merge verbatim
+      // into the trace summary attributes, which is exactly where the span
+      // path (SPAN_ATTR_MAPPINGS) puts it and where the drawer header reads
+      // it, so log-only codex wires get the same reasoning-effort pill.
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, reasoningEffort);
+      fired = true;
+    }
     if (model !== null) {
       ctx.setAttr("langwatch.model", model);
       fired = true;
@@ -307,8 +390,13 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
   private liftConversationStarts(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
+    const reasoningEffort = asString(ctx.bag.attrs.take("reasoning_effort"));
 
     let fired = false;
+    if (reasoningEffort !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, reasoningEffort);
+      fired = true;
+    }
     if (model !== null) {
       ctx.setAttr("langwatch.model", model);
       fired = true;

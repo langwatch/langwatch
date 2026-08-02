@@ -5,6 +5,7 @@ import {
   type RoleBinding,
   RoleBindingScopeType,
 } from "@prisma/client";
+import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
   CreateGroupInput,
@@ -252,6 +253,14 @@ export class PrismaGroupRepository implements GroupRepository {
       where: { organizationId, userId: { in: userIds } },
     });
     return count === userIds.length;
+  }
+
+  async anyScopeIsPersonalTeam(
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+  ): Promise<boolean> {
+    // One definition of "this scope reaches a personal workspace", shared with
+    // the role-binding paths.
+    return scopesTouchPersonalTeam(this.prisma, scopes);
   }
 
   async validateScopeInOrganization({

@@ -17,6 +17,7 @@ import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/r
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
+import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
@@ -1261,6 +1262,9 @@ export const organizationRouter = createTRPCRouter({
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+      await assertNoPersonalTeamScope(prisma, [
+        { scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId },
+      ]);
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {

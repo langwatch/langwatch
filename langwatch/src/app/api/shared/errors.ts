@@ -36,6 +36,20 @@ export class UnauthorizedError extends HttpError {
 }
 
 /**
+ * Error for 403 Forbidden responses.
+ *
+ * The caller is authenticated and holds the permission; the request is
+ * refused on its own merits. Use `UnauthorizedError` when the credentials or
+ * the permission are what is missing.
+ */
+export class ForbiddenError extends HttpError {
+  readonly status = 403;
+  constructor(message = "Forbidden") {
+    super(message);
+  }
+}
+
+/**
  * Error for 404 Not Found responses
  */
 export class NotFoundError extends HttpError {

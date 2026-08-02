@@ -110,14 +110,10 @@ export interface ProjectRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null>;
-  teamBelongsToOrganization(params: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<boolean>;
   findActiveTeamInOrganization(params: {
     teamId: string;
     organizationId: string;
-  }): Promise<{ id: string } | null>;
+  }): Promise<{ id: string; isPersonal: boolean } | null>;
   createTeamWithRoleBinding(
     input: CreateTeamWithBindingInput,
   ): Promise<{ id: string }>;
@@ -196,17 +192,10 @@ export class NullProjectRepository implements ProjectRepository {
     return null;
   }
 
-  async teamBelongsToOrganization(_params: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<boolean> {
-    return false;
-  }
-
   async findActiveTeamInOrganization(_params: {
     teamId: string;
     organizationId: string;
-  }): Promise<{ id: string } | null> {
+  }): Promise<{ id: string; isPersonal: boolean } | null> {
     return null;
   }
 
