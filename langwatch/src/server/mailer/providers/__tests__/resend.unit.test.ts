@@ -67,10 +67,10 @@ describe("resendProvider.send", () => {
       setEnv({});
 
       await expect(
-        resendProvider.send(
-          { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-          "noreply@langwatch.ai",
-        ),
+        resendProvider.send({
+          content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+          defaultFrom: "noreply@langwatch.ai",
+        }),
       ).rejects.toThrow(EmailProviderConfigurationError);
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -78,10 +78,10 @@ describe("resendProvider.send", () => {
 
   describe("given a plain message", () => {
     it("posts to the Resend API with bearer auth", async () => {
-      await resendProvider.send(
-        { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "LangWatch <noreply@langwatch.ai>",
-      );
+      await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "LangWatch <noreply@langwatch.ai>",
+      });
 
       expect(fetchMock.mock.calls[0]?.[0]).toBe(
         "https://api.resend.com/emails",
@@ -96,10 +96,10 @@ describe("resendProvider.send", () => {
     });
 
     it("returns the provider message id", async () => {
-      const result = await resendProvider.send(
-        { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "noreply@langwatch.ai",
-      );
+      const result = await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(result).toEqual({ id: "msg_123" });
     });
@@ -108,8 +108,8 @@ describe("resendProvider.send", () => {
   describe("given the full message surface", () => {
     /** @scenario "The full message surface survives every gateway" */
     it("maps blind copies, reply-to, headers and base64 attachments", async () => {
-      await resendProvider.send(
-        {
+      await resendProvider.send({
+        content: {
           to: ["a@example.com"],
           bcc: ["hidden@example.com"],
           replyTo: "support@langwatch.ai",
@@ -124,8 +124,8 @@ describe("resendProvider.send", () => {
             },
           ],
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentPayload()).toMatchObject({
         bcc: ["hidden@example.com"],
@@ -142,15 +142,15 @@ describe("resendProvider.send", () => {
     });
 
     it("strips line breaks from custom headers to block injection", async () => {
-      await resendProvider.send(
-        {
+      await resendProvider.send({
+        content: {
           to: "a@example.com",
           subject: "Alert",
           html: "<p>Alert</p>",
           headers: { "X-Custom": "value\r\nBcc: attacker@evil.com" },
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentPayload().headers["X-Custom"]).toBe(
         "value Bcc: attacker@evil.com",
@@ -163,10 +163,10 @@ describe("resendProvider.send", () => {
     it("routes the request through a proxy dispatcher", async () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
 
-      await resendProvider.send(
-        { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "noreply@langwatch.ai",
-      );
+      await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(envHttpProxyAgentMock).toHaveBeenCalled();
       expect(sentInit().dispatcher).toBeDefined();
@@ -177,10 +177,10 @@ describe("resendProvider.send", () => {
       process.env.HTTPS_PROXY = "http://proxy.corp:8080";
       process.env.NO_PROXY = "api.resend.com";
 
-      await resendProvider.send(
-        { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "noreply@langwatch.ai",
-      );
+      await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(envHttpProxyAgentMock).not.toHaveBeenCalled();
       expect(sentInit().dispatcher).toBeUndefined();
@@ -189,10 +189,10 @@ describe("resendProvider.send", () => {
 
   describe("given no proxy is configured", () => {
     it("sends without a dispatcher", async () => {
-      await resendProvider.send(
-        { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "noreply@langwatch.ai",
-      );
+      await resendProvider.send({
+        content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(envHttpProxyAgentMock).not.toHaveBeenCalled();
       expect(sentInit().dispatcher).toBeUndefined();
@@ -209,10 +209,10 @@ describe("resendProvider.send", () => {
       });
 
       await expect(
-        resendProvider.send(
-          { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
-          "noreply@langwatch.ai",
-        ),
+        resendProvider.send({
+          content: { to: "a@example.com", subject: "Hi", html: "<p>Hi</p>" },
+          defaultFrom: "noreply@langwatch.ai",
+        }),
       ).rejects.toThrow(/422 Unprocessable Entity/);
     });
 
@@ -227,10 +227,14 @@ describe("resendProvider.send", () => {
       });
 
       await expect(
-        resendProvider.send(
-          { to: "private@customer.example", subject: "Hi", html: "<p>Hi</p>" },
-          "noreply@langwatch.ai",
-        ),
+        resendProvider.send({
+          content: {
+            to: "private@customer.example",
+            subject: "Hi",
+            html: "<p>Hi</p>",
+          },
+          defaultFrom: "noreply@langwatch.ai",
+        }),
       ).rejects.toThrow(/^(?!.*private@customer\.example).*$/s);
     });
   });

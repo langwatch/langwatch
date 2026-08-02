@@ -8,7 +8,13 @@ const logger = createLogger("langwatch:mailer:sendgrid");
 
 export const sendgridProvider: EmailProviderPort = {
   name: "sendgrid",
-  async send(content: EmailContent, defaultFrom: string) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }) {
     // No proxy wiring: SendGrid's axios-based client does not reliably pick up
     // HTTPS_PROXY, and it exposes no transport seam we can pass an agent
     // through. Proxied deployments should use ses, resend, or the smtp gateway

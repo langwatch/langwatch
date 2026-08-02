@@ -59,7 +59,13 @@ export const buildSesClientConfig = (): SESClientConfig => {
 
 export const sesProvider: EmailProviderPort = {
   name: "ses",
-  async send(content: EmailContent, defaultFrom: string) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }) {
     logger.info("Sending email using AWS SES");
     const sesClient = new SESClient(buildSesClientConfig());
     const from = content.from ?? defaultFrom;

@@ -37,5 +37,5 @@ export const sendEmail = async (content: EmailContent) => {
     );
   }
 
-  return await provider.send(content, computeDefaultFrom());
+  return await provider.send({ content, defaultFrom: computeDefaultFrom() });
 };

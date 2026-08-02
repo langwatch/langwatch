@@ -135,10 +135,10 @@ describe("smtpProvider.send", () => {
   describe("given a plain message", () => {
     /** @scenario "Every supported gateway can be selected" */
     it("sends the html body with the default sender", async () => {
-      await smtpProvider.send(
-        { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "LangWatch <noreply@langwatch.ai>",
-      );
+      await smtpProvider.send({
+        content: { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "LangWatch <noreply@langwatch.ai>",
+      });
 
       expect(sentMessage()).toMatchObject({
         from: "LangWatch <noreply@langwatch.ai>",
@@ -149,10 +149,10 @@ describe("smtpProvider.send", () => {
     });
 
     it("closes the transport so connections are not leaked", async () => {
-      await smtpProvider.send(
-        { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
-        "noreply@langwatch.ai",
-      );
+      await smtpProvider.send({
+        content: { to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(closeMock).toHaveBeenCalled();
     });
@@ -161,8 +161,8 @@ describe("smtpProvider.send", () => {
   describe("given the full message surface", () => {
     /** @scenario "The full message surface survives every gateway" */
     it("maps blind copies, reply-to, custom headers and attachments", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: ["a@example.com", "b@example.com"],
           bcc: ["hidden@example.com"],
           replyTo: "support@langwatch.ai",
@@ -177,8 +177,8 @@ describe("smtpProvider.send", () => {
             },
           ],
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage()).toMatchObject({
         to: ["a@example.com", "b@example.com"],
@@ -198,29 +198,29 @@ describe("smtpProvider.send", () => {
     // every blind recipient to everyone on the message. Delivery must ride the
     // SMTP envelope instead.
     it("never passes bcc as a message field, which would render a Bcc header", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: "a@example.com",
           bcc: "hidden@example.com",
           subject: "Alert",
           html: "<p>Alert</p>",
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage()).not.toHaveProperty("bcc");
     });
 
     it("delivers blind recipients through the SMTP envelope", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: ["a@example.com"],
           bcc: ["hidden@example.com", "hidden2@example.com"],
           subject: "Alert",
           html: "<p>Alert</p>",
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage().envelope).toEqual({
         from: "noreply@langwatch.ai",
@@ -229,16 +229,16 @@ describe("smtpProvider.send", () => {
     });
 
     it("builds the envelope from an explicit sender, not the default", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: "a@example.com",
           bcc: ["hidden@example.com"],
           from: "alerts@acme.com",
           subject: "Alert",
           html: "<p>Alert</p>",
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage().envelope).toEqual({
         from: "alerts@acme.com",
@@ -247,24 +247,28 @@ describe("smtpProvider.send", () => {
     });
 
     it("leaves the envelope to nodemailer when there are no blind recipients", async () => {
-      await smtpProvider.send(
-        { to: "a@example.com", subject: "Alert", html: "<p>Alert</p>" },
-        "noreply@langwatch.ai",
-      );
+      await smtpProvider.send({
+        content: {
+          to: "a@example.com",
+          subject: "Alert",
+          html: "<p>Alert</p>",
+        },
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage()).not.toHaveProperty("envelope");
     });
 
     it("strips line breaks from custom headers to block injection", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: "a@example.com",
           subject: "Alert",
           html: "<p>Alert</p>",
           headers: { "X-Custom": "value\r\nBcc: attacker@evil.com" },
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage().headers["X-Custom"]).toBe(
         "value Bcc: attacker@evil.com",
@@ -274,15 +278,15 @@ describe("smtpProvider.send", () => {
 
   describe("given an explicit sender", () => {
     it("overrides the default from address", async () => {
-      await smtpProvider.send(
-        {
+      await smtpProvider.send({
+        content: {
           to: "a@example.com",
           from: "alerts@acme.com",
           subject: "Alert",
           html: "<p>Alert</p>",
         },
-        "noreply@langwatch.ai",
-      );
+        defaultFrom: "noreply@langwatch.ai",
+      });
 
       expect(sentMessage().from).toBe("alerts@acme.com");
     });
@@ -293,10 +297,14 @@ describe("smtpProvider.send", () => {
       sendMailMock.mockRejectedValue(new Error("relay refused"));
 
       await expect(
-        smtpProvider.send(
-          { to: "a@example.com", subject: "Alert", html: "<p>Alert</p>" },
-          "noreply@langwatch.ai",
-        ),
+        smtpProvider.send({
+          content: {
+            to: "a@example.com",
+            subject: "Alert",
+            html: "<p>Alert</p>",
+          },
+          defaultFrom: "noreply@langwatch.ai",
+        }),
       ).rejects.toThrow("relay refused");
       expect(closeMock).toHaveBeenCalled();
     });

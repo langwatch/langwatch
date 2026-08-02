@@ -70,7 +70,13 @@ export const buildSmtpTransportOptions = (): SMTPTransport.Options => {
 
 export const smtpProvider: EmailProviderPort = {
   name: "smtp",
-  async send(content: EmailContent, defaultFrom: string) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }) {
     logger.info("Sending email using SMTP");
     const transporter = nodemailer.createTransport(buildSmtpTransportOptions());
 

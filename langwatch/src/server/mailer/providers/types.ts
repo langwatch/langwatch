@@ -40,7 +40,13 @@ export type EmailProviderName = (typeof EMAIL_PROVIDER_NAMES)[number];
  */
 export interface EmailProviderPort {
   name: EmailProviderName;
-  send(content: EmailContent, defaultFrom: string): Promise<unknown>;
+  send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }): Promise<unknown>;
 }
 
 /**
