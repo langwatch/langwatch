@@ -7,6 +7,7 @@ import {
   ReceiptText,
   Route,
   Shield,
+  Webhook,
   Zap,
 } from "lucide-react";
 import type { PropsWithChildren } from "react";
@@ -78,6 +79,12 @@ export default function AiGatewayLayout({
           href: "/settings/gateway/billing-events",
           includePath: "/settings/gateway/billing-events",
           icon: <ReceiptText size={14} />,
+        },
+        {
+          label: "Webhooks",
+          href: "/settings/gateway/webhooks",
+          includePath: "/settings/gateway/webhooks",
+          icon: <Webhook size={14} />,
         },
         {
           label: "Routing Policies",

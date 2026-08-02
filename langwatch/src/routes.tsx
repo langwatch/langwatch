@@ -361,8 +361,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/gateway/billing-events")),
       },
       {
-        path: "/settings/webhooks",
-        ...page(() => import("./pages/settings/webhooks")),
+        path: "/settings/gateway/webhooks",
+        ...page(() => import("./pages/settings/gateway/webhooks")),
       },
     ],
   },

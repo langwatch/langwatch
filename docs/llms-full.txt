@@ -35487,7 +35487,7 @@ An endpoint belongs to your **organization** and carries:
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **Settings > Webhooks** (`/settings/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
 
 ```
 POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage

@@ -23,9 +23,10 @@ import {
   Webhook,
 } from "lucide-react";
 import { useState } from "react";
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import SettingsLayout from "~/components/SettingsLayout";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
 import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
@@ -350,14 +351,12 @@ function WebhookEndpointsPanel({
       <HStack width="full" justify="space-between">
         <Heading size="lg">Webhooks</Heading>
         {actions.canManage && (
-          <Button
-            colorPalette="orange"
-            size="sm"
+          <PageLayout.HeaderButton
             onClick={actions.dialogs.openCreate}
             data-testid="webhook-new"
           >
             <Plus size={14} /> New endpoint
-          </Button>
+          </PageLayout.HeaderButton>
         )}
       </HStack>
 
@@ -555,29 +554,29 @@ export default function WebhooksSettingsPage() {
 
   if (isPlanLoading) {
     return (
-      <SettingsLayout>
+      <AiGatewayLayout>
         <VStack align="center" justify="center" width="full" height="200px">
           <Spinner />
         </VStack>
-      </SettingsLayout>
+      </AiGatewayLayout>
     );
   }
 
   if (!webhooksEnabled) {
     return (
-      <SettingsLayout>
+      <AiGatewayLayout>
         <WebhooksUpsell />
-      </SettingsLayout>
+      </AiGatewayLayout>
     );
   }
 
   return (
-    <SettingsLayout>
+    <AiGatewayLayout>
       <WebhooksManager
         organizationId={organization?.id ?? ""}
         enabled={!!organization}
         canManage={hasPermission("webhookEndpoints:manage")}
       />
-    </SettingsLayout>
+    </AiGatewayLayout>
   );
 }

@@ -938,7 +938,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/webhooks",
+              "ui": "/settings/gateway/webhooks",
               "mcp": null,
               "skill": null,
               "docs": null

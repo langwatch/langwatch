@@ -1,7 +1,7 @@
 Feature: Webhook settings and the billing events ledger
   The operator screens over the webhook platform and the spend-events
-  table. Org Settings > Webhooks edits endpoint subscriptions from the
-  event registry and keeps signing secrets one-shot; the gateway area's
+  table. AI Gateway > Webhooks edits endpoint subscriptions from the
+  event registry and keeps signing secrets one-shot; the sibling
   Billing Events page renders the per-request ledger newest-first with
   keyset pagination. Both talk to session tRPC routers that mirror the
   REST surface's RBAC scopes and enterprise plan gate.
