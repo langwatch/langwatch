@@ -1,9 +1,11 @@
 import type React from "react";
 import {
   SESSIONS_MAX_PAGE_SIZE,
+  type SessionGroupsResult,
   useSessionGroups,
 } from "../../hooks/useSessionGroups";
 import { useTraceList } from "../../hooks/useTraceList";
+import type { PageCursor } from "../../stores/filterStore";
 import {
   getEffectiveLens,
   rowKindForGrouping,
@@ -14,6 +16,37 @@ import { EmptyFilterState } from "./EmptyFilterState";
 import { GroupLensBody } from "./GroupLensBody";
 import { TraceLensBody } from "./TraceLensBody";
 import { TraceTableLayout } from "./TraceTableLayout";
+
+/**
+ * What the table shell (totals copy, pagination, empty state) reads, from
+ * whichever data source the active lens paginates: the sessions lens walks
+ * its own server-grouped rows, every other lens walks the traces.
+ */
+interface TableShell {
+  totalHits: number;
+  nextCursor: PageCursor | null;
+  visibleCount: number;
+  isLoading: boolean;
+  isFetching: boolean;
+  isTransitioning: boolean;
+  itemNoun: string;
+  maxPageSize?: number;
+}
+
+const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
+  totalHits: sessions.totalHits,
+  nextCursor: sessions.nextCursor,
+  visibleCount: sessions.groups.length,
+  isLoading: sessions.isLoading,
+  isFetching: sessions.isFetching,
+  isTransitioning: sessions.isPreviousData,
+  itemNoun: "sessions",
+  maxPageSize: SESSIONS_MAX_PAGE_SIZE,
+});
+
+const tracesShell = (
+  list: Omit<TableShell, "itemNoun" | "maxPageSize">,
+): TableShell => ({ ...list, itemNoun: "traces" });
 
 export const TraceTable: React.FC = () => {
   const {
@@ -34,35 +67,39 @@ export const TraceTable: React.FC = () => {
   if (!activeLens) return <EmptyFilterState />;
 
   const rowKind = rowKindForGrouping(activeLens.grouping);
-  const isSessionsLens = rowKind === "conversation";
+  const shell =
+    rowKind === "conversation"
+      ? sessionsShell(sessions)
+      : tracesShell({
+          totalHits,
+          nextCursor,
+          visibleCount: traces.length,
+          isLoading,
+          isFetching,
+          isTransitioning: isPreviousData,
+        });
 
   // Gate EmptyFilterState on true emptiness: only render it when no fetch is
   // in flight and the data is settled (not showing previous-key stale rows).
   // This prevents flashing EmptyFilterState during transitional fetches where
-  // `keepPreviousData` may hold the empty result from a prior key. The
-  // sessions lens gates on its own query for the same reason.
-  const isEmpty = isSessionsLens
-    ? !sessions.isFetching &&
-      !sessions.isPreviousData &&
-      sessions.groups.length === 0 &&
-      sessions.totalHits === 0
-    : !isFetching && !isPreviousData && traces.length === 0 && totalHits === 0;
+  // `keepPreviousData` may hold the empty result from a prior key.
+  const isEmpty =
+    !shell.isFetching &&
+    !shell.isTransitioning &&
+    shell.visibleCount === 0 &&
+    shell.totalHits === 0;
   if (isEmpty) return <EmptyFilterState />;
 
   return (
     <TraceTableLayout
-      totalHits={isSessionsLens ? sessions.totalHits : totalHits}
-      nextCursor={isSessionsLens ? sessions.nextCursor : nextCursor}
-      visibleCount={isSessionsLens ? sessions.groups.length : traces.length}
-      isLoading={isSessionsLens ? sessions.isLoading : isLoading}
-      isTransitioning={
-        isSessionsLens ? sessions.isPreviousData : isPreviousData
-      }
-      isEmpty={
-        isSessionsLens ? sessions.groups.length === 0 : traces.length === 0
-      }
-      itemNoun={isSessionsLens ? "sessions" : "traces"}
-      maxPageSize={isSessionsLens ? SESSIONS_MAX_PAGE_SIZE : undefined}
+      totalHits={shell.totalHits}
+      nextCursor={shell.nextCursor}
+      visibleCount={shell.visibleCount}
+      isLoading={shell.isLoading}
+      isTransitioning={shell.isTransitioning}
+      isEmpty={shell.visibleCount === 0}
+      itemNoun={shell.itemNoun}
+      maxPageSize={shell.maxPageSize}
     >
       {rowKind === "conversation" && (
         <ConversationLensBody

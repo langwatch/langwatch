@@ -34,6 +34,32 @@ interface PaginationProps {
   maxPageSize?: number;
 }
 
+const PageSizeSelector: React.FC<{
+  options: readonly number[];
+  selected: number;
+  onSelect: (size: number) => void;
+}> = ({ options, selected, onSelect }) => (
+  <Flex align="center" gap={0.5}>
+    <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
+      Rows
+    </Text>
+    {options.map((size) => (
+      <Button
+        key={size}
+        variant="ghost"
+        size="2xs"
+        color={selected === size ? "fg" : "fg.subtle"}
+        fontWeight={selected === size ? "semibold" : "normal"}
+        onClick={() => onSelect(size)}
+        paddingX={1.5}
+        minWidth="auto"
+      >
+        {size}
+      </Button>
+    ))}
+  </Flex>
+);
+
 export const Pagination: React.FC<PaginationProps> = ({
   totalHits,
   nextCursor = null,
@@ -99,25 +125,11 @@ export const Pagination: React.FC<PaginationProps> = ({
         <Skeleton height="14px" width="240px" borderRadius="sm" />
       ) : (
         <>
-          <Flex align="center" gap={0.5}>
-            <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
-              Rows
-            </Text>
-            {sizeOptions.map((size) => (
-              <Button
-                key={size}
-                variant="ghost"
-                size="2xs"
-                color={effectivePageSize === size ? "fg" : "fg.subtle"}
-                fontWeight={effectivePageSize === size ? "semibold" : "normal"}
-                onClick={() => setPageSize(size)}
-                paddingX={1.5}
-                minWidth="auto"
-              >
-                {size}
-              </Button>
-            ))}
-          </Flex>
+          <PageSizeSelector
+            options={sizeOptions}
+            selected={effectivePageSize}
+            onSelect={setPageSize}
+          />
           <Text textStyle="xs" color="fg.subtle">
             {totalHits.toLocaleString()} {itemNoun} · showing {rangeStart}–
             {rangeEnd}

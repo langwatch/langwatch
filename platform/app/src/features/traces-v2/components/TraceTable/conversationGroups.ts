@@ -36,6 +36,25 @@ export interface ConversationGroup {
   compactions?: number | null;
 }
 
+/** Evaluation outcomes summed across one conversation's traces. */
+function tallyEvaluations(traces: TraceListItem[]): {
+  totalEvals: number;
+  evalsPassedCount: number;
+  evalsFailedCount: number;
+} {
+  let totalEvals = 0;
+  let evalsPassedCount = 0;
+  let evalsFailedCount = 0;
+  for (const t of traces) {
+    for (const ev of t.evaluations) {
+      totalEvals++;
+      if (ev.passed === true) evalsPassedCount++;
+      else if (ev.passed === false) evalsFailedCount++;
+    }
+  }
+  return { totalEvals, evalsPassedCount, evalsFailedCount };
+}
+
 export function groupTracesByConversation(
   traces: TraceListItem[],
 ): ConversationGroup[] {
@@ -76,18 +95,10 @@ export function groupTracesByConversation(
     let totalSpans = 0;
     let errorCount = 0;
     let totalEvents = 0;
-    let totalEvals = 0;
-    let evalsPassedCount = 0;
-    let evalsFailedCount = 0;
     for (const t of sorted) {
       totalSpans += t.spanCount;
       if (t.status === "error") errorCount++;
       totalEvents += t.events.length;
-      totalEvals += t.evaluations.length;
-      for (const ev of t.evaluations) {
-        if (ev.passed === true) evalsPassedCount++;
-        else if (ev.passed === false) evalsFailedCount++;
-      }
     }
 
     const lastOutput =
@@ -103,9 +114,7 @@ export function groupTracesByConversation(
       totalSpans,
       errorCount,
       totalEvents,
-      totalEvals,
-      evalsPassedCount,
-      evalsFailedCount,
+      ...tallyEvaluations(sorted),
       worstStatus,
       latestTimestamp: lastTrace.timestamp,
       earliestTimestamp: firstTrace.timestamp,

@@ -1208,12 +1208,12 @@ export function initializeDefaultApp(options?: {
   // enriches session rows with these pre-folded counters, so both reads
   // share the one service instance.
   const codingAgentSessions = traced(
-    new CodingAgentSessionService(
-      repositories.codingAgentSession,
-      repositories.codingAgentTraceSession,
-      repositories.sessionMetricSeries,
-      repositories.codingAgentSessionEvents,
-    ),
+    new CodingAgentSessionService({
+      sessions: repositories.codingAgentSession,
+      traceSessions: repositories.codingAgentTraceSession,
+      metricSeries: repositories.sessionMetricSeries,
+      sessionEvents: repositories.codingAgentSessionEvents,
+    }),
     "CodingAgentSessionService",
   );
 
@@ -1439,12 +1439,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   );
 
   const testBroadcast = new BroadcastService(null);
-  const testCodingAgentSessions = new CodingAgentSessionService(
-    new NullCodingAgentSessionRepository(),
-    new NullCodingAgentTraceSessionRepository(),
-    new NullSessionMetricSeriesRepository(),
-    new NullCodingAgentSessionEventsRepository(),
-  );
+  const testCodingAgentSessions = new CodingAgentSessionService({
+    sessions: new NullCodingAgentSessionRepository(),
+    traceSessions: new NullCodingAgentTraceSessionRepository(),
+    metricSeries: new NullSessionMetricSeriesRepository(),
+    sessionEvents: new NullCodingAgentSessionEventsRepository(),
+  });
   return new App({
     config,
     broadcast: testBroadcast,

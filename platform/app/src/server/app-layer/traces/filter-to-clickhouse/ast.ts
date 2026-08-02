@@ -102,42 +102,61 @@ export function extractFreeTextTerms(queryText: string): string[] {
   }
 
   const terms: string[] = [];
-  const walk = (node: LiqeQuery, negated: boolean): void => {
-    switch (node.type) {
-      case "Tag": {
-        const tag = node as TagToken;
-        if (negated || tag.field.type !== "ImplicitField") return;
-        if (
-          tag.expression.type !== "LiteralExpression" &&
-          tag.expression.type !== "RegexExpression"
-        ) {
-          return;
-        }
-        const value = extractStringValue(tag);
-        if (value.length > 0) terms.push(value);
-        return;
-      }
-      case "LogicalExpression": {
-        const logExpr = node as LogicalExpressionToken;
-        walk(logExpr.left, negated);
-        walk(logExpr.right, negated);
-        return;
-      }
-      case "UnaryOperator": {
-        const unary = node as UnaryOperatorToken;
-        const isNeg = unary.operator === "NOT" || unary.operator === "-";
-        walk(unary.operand, negated !== isNeg);
-        return;
-      }
-      case "ParenthesizedExpression":
-        walk((node as ParenthesizedExpressionToken).expression, negated);
-        return;
-      default:
-        return;
-    }
-  };
-  walk(ast, false);
+  collectFreeTextTerms(ast, false, terms);
   return terms;
+}
+
+/**
+ * Walk the query, pushing every positively-asserted bare word onto `terms`.
+ * A negated branch contributes nothing: excluding a word cannot also be a
+ * search for it.
+ */
+function collectFreeTextTerms(
+  node: LiqeQuery,
+  negated: boolean,
+  terms: string[],
+): void {
+  switch (node.type) {
+    case "Tag": {
+      const value = freeTextTermOf(node as TagToken, negated);
+      if (value !== null) terms.push(value);
+      return;
+    }
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      collectFreeTextTerms(logExpr.left, negated, terms);
+      collectFreeTextTerms(logExpr.right, negated, terms);
+      return;
+    }
+    case "UnaryOperator": {
+      const unary = node as UnaryOperatorToken;
+      const isNeg = unary.operator === "NOT" || unary.operator === "-";
+      collectFreeTextTerms(unary.operand, negated !== isNeg, terms);
+      return;
+    }
+    case "ParenthesizedExpression":
+      collectFreeTextTerms(
+        (node as ParenthesizedExpressionToken).expression,
+        negated,
+        terms,
+      );
+      return;
+    default:
+      return;
+  }
+}
+
+/** The bare search word this tag carries, or null when it is not one. */
+function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
+  if (negated || tag.field.type !== "ImplicitField") return null;
+  if (
+    tag.expression.type !== "LiteralExpression" &&
+    tag.expression.type !== "RegexExpression"
+  ) {
+    return null;
+  }
+  const value = extractStringValue(tag);
+  return value.length > 0 ? value : null;
 }
 
 function translateNode(

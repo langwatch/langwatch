@@ -32,6 +32,32 @@ export interface TraceListQueryResult {
  * the real tRPC query like normal. We don't import any other onboarding
  * internals — `useSamplePreview` is the entire integration seam.
  */
+/** The `tracesV2.list` input for the current filter, sort and page state. */
+function traceListQueryInput(args: {
+  projectId: string;
+  timeRange: { from: number; to: number; label?: string | null };
+  sort: { columnId: string; direction: "asc" | "desc" };
+  page: number;
+  pageSize: number;
+  traceCursor: TraceListCursor | undefined;
+  queryText: string;
+}) {
+  const cursor = args.page > 1 ? args.traceCursor : undefined;
+  return {
+    projectId: args.projectId,
+    timeRange: {
+      from: args.timeRange.from,
+      to: args.timeRange.to,
+      live: !!args.timeRange.label,
+    },
+    sort: { columnId: args.sort.columnId, direction: args.sort.direction },
+    page: args.page,
+    pageSize: args.pageSize,
+    ...(cursor ? { cursor } : {}),
+    query: args.queryText || undefined,
+  };
+}
+
 export function useTraceListQuery(): TraceListQueryResult {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
@@ -66,19 +92,15 @@ export function useTraceListQuery(): TraceListQueryResult {
   // saves a roundtrip per page nav for users who're going to see
   // fixtures anyway.
   const query = api.tracesV2.list.useQuery(
-    {
+    traceListQueryInput({
       projectId: project?.id ?? "",
-      timeRange: {
-        from: timeRange.from,
-        to: timeRange.to,
-        live: !!timeRange.label,
-      },
-      sort: { columnId: sort.columnId, direction: sort.direction },
+      timeRange,
+      sort,
       page: effectivePage,
       pageSize,
-      ...(effectivePage > 1 && traceCursor ? { cursor: traceCursor } : {}),
-      query: queryText || undefined,
-    },
+      traceCursor,
+      queryText,
+    }),
     {
       enabled:
         !!project?.id &&

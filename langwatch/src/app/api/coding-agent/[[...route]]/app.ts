@@ -130,37 +130,35 @@ secured.access(requires("traces:view")).get(
     const project = c.get("project");
     const sessionId = c.req.param("sessionId");
 
-    const limitRaw = Number(c.req.query("limit") ?? DEFAULT_PAGE);
-    const limit =
-      Number.isSafeInteger(limitRaw) && limitRaw > 0
-        ? Math.min(limitRaw, MAX_PAGE)
-        : DEFAULT_PAGE;
-
-    const kindsRaw = c.req.query("kinds");
-    const kinds = kindsRaw
-      ? kindsRaw
-          .split(",")
-          .map((kind) => kind.trim())
-          .filter((kind) => kind.length > 0)
-      : undefined;
-
-    const fromRaw = c.req.query("from");
-    const toRaw = c.req.query("to");
-    const fromMs = fromRaw ? Number(fromRaw) : undefined;
-    const toMs = toRaw ? Number(toRaw) : undefined;
-    const occurredAt =
-      Number.isFinite(fromMs) && Number.isFinite(toMs)
-        ? { fromMs: fromMs!, toMs: toMs! }
-        : undefined;
-
-    const cursor = decodeCursor(c.req.query("cursor"));
+    const query = eventsQuerySchema.safeParse({
+      limit: c.req.query("limit"),
+      kinds: c.req.query("kinds"),
+      from: c.req.query("from"),
+      to: c.req.query("to"),
+      cursor: c.req.query("cursor"),
+    });
+    if (!query.success) {
+      return c.json(
+        { error: `Invalid query: ${query.error.issues[0]?.message}` },
+        400,
+      );
+    }
+    const { limit, kinds, from, to, cursor } = query.data;
+    // Both bounds or neither: half a window would silently widen the read
+    // past what the caller asked for.
+    if ((from === undefined) !== (to === undefined)) {
+      return c.json({ error: "from and to must be supplied together" }, 400);
+    }
 
     const { events, nextCursor } =
       await getApp().codingAgents.sessions.getSessionEvents({
         projectId: project.id,
         sessionId,
         kinds,
-        occurredAt,
+        occurredAt:
+          from !== undefined && to !== undefined
+            ? { fromMs: from, toMs: to }
+            : undefined,
         cursor,
         limit,
       });
@@ -172,26 +170,62 @@ secured.access(requires("traces:view")).get(
   },
 );
 
+/**
+ * Query parsing that REFUSES what it cannot honour. Every field here was once
+ * a silent fallback, and each one lied in its own way: an unparseable cursor
+ * restarted the walk at page 1, so a client following `nextCursor` looped
+ * forever, and a malformed bound dropped the window and answered over a wider
+ * range than was asked for.
+ */
+const eventsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(MAX_PAGE).default(DEFAULT_PAGE),
+  kinds: z
+    .string()
+    .optional()
+    .transform((raw) =>
+      raw
+        ? raw
+            .split(",")
+            .map((kind) => kind.trim())
+            .filter((kind) => kind.length > 0)
+        : undefined,
+    ),
+  from: z.coerce.number().finite().optional(),
+  to: z.coerce.number().finite().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      if (raw === undefined) return undefined;
+      const decoded = decodeCursor(raw);
+      if (!decoded) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "cursor is not decodable",
+        });
+        return z.NEVER;
+      }
+      return decoded;
+    }),
+});
+
 function encodeCursor(cursor: SessionEventsCursor): string {
   return Buffer.from(
     JSON.stringify({ t: cursor.timeUnixMs, r: cursor.recordId }),
   ).toString("base64url");
 }
 
-function decodeCursor(
-  raw: string | undefined,
-): SessionEventsCursor | undefined {
-  if (!raw) return undefined;
+function decodeCursor(raw: string): SessionEventsCursor | null {
   try {
     const parsed = JSON.parse(
       Buffer.from(raw, "base64url").toString("utf8"),
     ) as { t?: unknown; r?: unknown };
     if (typeof parsed.t !== "number" || typeof parsed.r !== "string") {
-      return undefined;
+      return null;
     }
     return { timeUnixMs: parsed.t, recordId: parsed.r };
   } catch {
-    return undefined;
+    return null;
   }
 }
 

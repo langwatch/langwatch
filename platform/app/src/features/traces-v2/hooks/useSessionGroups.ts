@@ -32,6 +32,50 @@ export interface SessionGroupsResult {
  */
 export const SESSIONS_MAX_PAGE_SIZE = 100;
 
+/**
+ * The `tracesV2.sessions` input for the current lens state. Sorts the server
+ * does not understand are dropped rather than sent, so the read falls back to
+ * its default order instead of erroring.
+ */
+function sessionsQueryInput(args: {
+  projectId: string;
+  timeRange: { from: number; to: number; label?: string | null };
+  sort: { columnId: string; direction: "asc" | "desc" };
+  page: number;
+  pageSize: number;
+  sessionCursor: string | undefined;
+  queryText: string;
+}) {
+  const serverSort = SERVER_SORTABLE.has(args.sort.columnId)
+    ? { columnId: args.sort.columnId, direction: args.sort.direction }
+    : undefined;
+  const cursor = args.page > 1 ? args.sessionCursor : undefined;
+  return {
+    projectId: args.projectId,
+    timeRange: {
+      from: args.timeRange.from,
+      to: args.timeRange.to,
+      live: !!args.timeRange.label,
+    },
+    ...(serverSort ? { sort: serverSort } : {}),
+    pageSize: Math.min(args.pageSize, SESSIONS_MAX_PAGE_SIZE),
+    ...(cursor ? { cursor } : {}),
+    query: args.queryText || undefined,
+  };
+}
+
+/** Fixture-backed groups: nothing is in flight, so every query flag is settled. */
+const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
+  groups,
+  totalHits: groups.length,
+  nextCursor: null,
+  isLoading: false,
+  isFetching: false,
+  isPreviousData: false,
+  isError: false,
+  error: null,
+});
+
 /** Sort dimensions `tracesV2.sessions` understands (see SessionGroupsService). */
 const SERVER_SORTABLE = new Set([
   "started",
@@ -76,23 +120,16 @@ export function useSessionGroups(): SessionGroupsResult {
     if (isActive && page > 1 && sessionCursor === undefined) setPage(1);
   }, [isActive, page, sessionCursor, setPage]);
 
-  const serverSort = SERVER_SORTABLE.has(sort.columnId)
-    ? { columnId: sort.columnId, direction: sort.direction }
-    : undefined;
-
   const query = api.tracesV2.sessions.useQuery(
-    {
+    sessionsQueryInput({
       projectId: project?.id ?? "",
-      timeRange: {
-        from: timeRange.from,
-        to: timeRange.to,
-        live: !!timeRange.label,
-      },
-      ...(serverSort ? { sort: serverSort } : {}),
-      pageSize: Math.min(pageSize, SESSIONS_MAX_PAGE_SIZE),
-      ...(page > 1 && sessionCursor ? { cursor: sessionCursor } : {}),
-      query: queryText || undefined,
-    },
+      timeRange,
+      sort,
+      page,
+      pageSize,
+      sessionCursor,
+      queryText,
+    }),
     {
       enabled:
         isActive &&
@@ -117,18 +154,7 @@ export function useSessionGroups(): SessionGroupsResult {
     });
   }, [samplePreview, sort]);
 
-  if (samplePreview) {
-    return {
-      groups: sampleGroups,
-      totalHits: sampleGroups.length,
-      nextCursor: null,
-      isLoading: false,
-      isFetching: false,
-      isPreviousData: false,
-      isError: false,
-      error: null,
-    };
-  }
+  if (samplePreview) return settledResult(sampleGroups);
 
   return {
     groups,

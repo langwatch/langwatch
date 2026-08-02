@@ -46,13 +46,25 @@ export interface CodingAgentUsageTotals {
  * counters, bounded sets, and the ids (`traceIds`, `sessionId`,
  * `finalRequestId`) that reach the heavy data where it already lives.
  */
+export interface CodingAgentSessionServiceDeps {
+  sessions: CodingAgentSessionRepository;
+  traceSessions: CodingAgentTraceSessionRepository;
+  metricSeries: SessionMetricSeriesRepository;
+  sessionEvents: CodingAgentSessionEventsRepository;
+}
+
 export class CodingAgentSessionService {
-  constructor(
-    private readonly sessions: CodingAgentSessionRepository,
-    private readonly traceSessions: CodingAgentTraceSessionRepository,
-    private readonly metricSeries: SessionMetricSeriesRepository,
-    private readonly sessionEvents: CodingAgentSessionEventsRepository,
-  ) {}
+  private readonly sessions: CodingAgentSessionRepository;
+  private readonly traceSessions: CodingAgentTraceSessionRepository;
+  private readonly metricSeries: SessionMetricSeriesRepository;
+  private readonly sessionEvents: CodingAgentSessionEventsRepository;
+
+  constructor(deps: CodingAgentSessionServiceDeps) {
+    this.sessions = deps.sessions;
+    this.traceSessions = deps.traceSessions;
+    this.metricSeries = deps.metricSeries;
+    this.sessionEvents = deps.sessionEvents;
+  }
 
   /**
    * One session's event sequence (model calls, compactions, rate limits,

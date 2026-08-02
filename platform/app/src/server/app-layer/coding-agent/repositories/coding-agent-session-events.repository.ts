@@ -166,6 +166,59 @@ interface ClickHouseReadRow {
   TotalTokens: string;
 }
 
+/** One row's columns, written verbatim: the table carries typed scalars only. */
+function toWriteRecord(
+  record: CodingAgentSessionEventRecord,
+  writtenAt: Date,
+  retentionDays?: number,
+): ClickHouseWriteRecord {
+  return {
+    TenantId: record.tenantId,
+    SessionId: record.sessionId,
+    TimeUnixMs: new Date(record.timeUnixMs),
+    RecordId: record.recordId,
+    EventKind: record.eventKind,
+    Agent: record.agent,
+    SessionKeySource: record.sessionKeySource,
+    TraceId: record.traceId,
+    SpanId: record.spanId,
+    PromptId: record.promptId,
+    QuerySource: record.querySource,
+    AgentType: record.agentType,
+    EventSequence: record.eventSequence,
+    RequestId: record.requestId,
+    Model: record.model,
+    InputTokens: record.inputTokens,
+    OutputTokens: record.outputTokens,
+    CacheReadTokens: record.cacheReadTokens,
+    CacheCreationTokens: record.cacheCreationTokens,
+    CostUsd: record.costUsd,
+    DurationMs: record.durationMs,
+    TtftMs: record.ttftMs,
+    Attempt: record.attempt,
+    Speed: record.speed,
+    StopReason: record.stopReason,
+    PreTokens: record.preTokens,
+    PostTokens: record.postTokens,
+    CompactionTrigger: record.compactionTrigger,
+    PrecomputeReuse: record.precomputeReuse,
+    StatusCode: record.statusCode,
+    ErrorType: record.errorType,
+    RateLimitKind: record.rateLimitKind,
+    RetryDurationMs: record.retryDurationMs,
+    ToolName: record.toolName,
+    Success: record.success,
+    Decision: record.decision,
+    DecisionSource: record.decisionSource,
+    ToolInputBytes: record.toolInputBytes,
+    ToolResultBytes: record.toolResultBytes,
+    PromptChars: record.promptChars,
+    TotalTokens: record.totalTokens,
+    UpdatedAt: writtenAt,
+    _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+  };
+}
+
 export class CodingAgentSessionEventsClickHouseRepository
   implements CodingAgentSessionEventsRepository
 {
@@ -196,51 +249,9 @@ export class CodingAgentSessionEventsClickHouseRepository
     }
 
     const now = new Date();
-    const values: ClickHouseWriteRecord[] = records.map((record) => ({
-      TenantId: record.tenantId,
-      SessionId: record.sessionId,
-      TimeUnixMs: new Date(record.timeUnixMs),
-      RecordId: record.recordId,
-      EventKind: record.eventKind,
-      Agent: record.agent,
-      SessionKeySource: record.sessionKeySource,
-      TraceId: record.traceId,
-      SpanId: record.spanId,
-      PromptId: record.promptId,
-      QuerySource: record.querySource,
-      AgentType: record.agentType,
-      EventSequence: record.eventSequence,
-      RequestId: record.requestId,
-      Model: record.model,
-      InputTokens: record.inputTokens,
-      OutputTokens: record.outputTokens,
-      CacheReadTokens: record.cacheReadTokens,
-      CacheCreationTokens: record.cacheCreationTokens,
-      CostUsd: record.costUsd,
-      DurationMs: record.durationMs,
-      TtftMs: record.ttftMs,
-      Attempt: record.attempt,
-      Speed: record.speed,
-      StopReason: record.stopReason,
-      PreTokens: record.preTokens,
-      PostTokens: record.postTokens,
-      CompactionTrigger: record.compactionTrigger,
-      PrecomputeReuse: record.precomputeReuse,
-      StatusCode: record.statusCode,
-      ErrorType: record.errorType,
-      RateLimitKind: record.rateLimitKind,
-      RetryDurationMs: record.retryDurationMs,
-      ToolName: record.toolName,
-      Success: record.success,
-      Decision: record.decision,
-      DecisionSource: record.decisionSource,
-      ToolInputBytes: record.toolInputBytes,
-      ToolResultBytes: record.toolResultBytes,
-      PromptChars: record.promptChars,
-      TotalTokens: record.totalTokens,
-      UpdatedAt: now,
-      _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-    }));
+    const values: ClickHouseWriteRecord[] = records.map((record) =>
+      toWriteRecord(record, now, retentionDays),
+    );
 
     const client = await this.resolveClient(tenantId);
     try {

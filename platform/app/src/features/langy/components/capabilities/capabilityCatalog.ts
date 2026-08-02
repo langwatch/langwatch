@@ -148,8 +148,8 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "trace", plural: "traces" },
   },
   session: {
-    // A coding-agent session is read from the traces surface, where the
-    // sessions lens lists it; its events are keyed by the session id.
+    // Deep-links to the traces surface, which is where a session is opened.
+    // `id-ref` because a session result is addressed by its session id.
     surface: "traces",
     digestStrategy: "id-ref",
     noun: { singular: "session", plural: "sessions" },

@@ -155,12 +155,12 @@ function makeService({
     ensure: async () => {},
     findTotalsBySessionIds: async () => totals,
   };
-  return new CodingAgentSessionService(
+  return new CodingAgentSessionService({
     sessions,
     traceSessions,
     metricSeries,
-    new NullCodingAgentSessionEventsRepository(),
-  );
+    sessionEvents: new NullCodingAgentSessionEventsRepository(),
+  });
 }
 
 describe("CodingAgentSessionService", () => {
@@ -201,12 +201,18 @@ describe("CodingAgentSessionService", () => {
           findBySessionIdWithApplied: async () => null,
           findManyRecent: async () => [],
         };
-        const service = new CodingAgentSessionService(
+        const service = new CodingAgentSessionService({
           sessions,
-          { ensure: async () => {}, findByTraceId: async () => null },
-          { ensure: async () => {}, findTotalsBySessionIds: async () => [] },
-          new NullCodingAgentSessionEventsRepository(),
-        );
+          traceSessions: {
+            ensure: async () => {},
+            findByTraceId: async () => null,
+          },
+          metricSeries: {
+            ensure: async () => {},
+            findTotalsBySessionIds: async () => [],
+          },
+          sessionEvents: new NullCodingAgentSessionEventsRepository(),
+        });
 
         const session = await service.getBySessionId({
           projectId: PROJECT,
