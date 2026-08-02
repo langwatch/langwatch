@@ -22,8 +22,14 @@ const logger = createLogger("langwatch:sso:gate");
  * || anyOrgHasSignedLicense()`. "Signed" means `verifySignature()` passes —
  * expiry is deliberately ignored (Decision 1, v6: "once a customer, never
  * blocked"). Never use `validateLicense()` (strict expiry) or the
- * denormalized `licenseExpiresAt` column for this gate; those stay reserved
- * for plan-limit enforcement (`ee/licensing/licenseHandler.ts`).
+ * denormalized `licenseExpiresAt` column for this gate.
+ *
+ * Self-hosted plan limits answer the same way, and for the same reason: a
+ * license we signed keeps metering the seats it sold after its term ends
+ * (`LicenseHandler.getSelfHostedPlan`, expired-license-enforcement.feature).
+ * `validateLicense` is for activation, where the term genuinely has to be
+ * current, and for the Cloud override leg, where a lapsed license steps aside
+ * so the Stripe subscription underneath takes over.
  *
  * The gate is decided once per process (Decision 3, "startup semantics"):
  * the underlying computation is memoized, but ONLY on successful resolution
