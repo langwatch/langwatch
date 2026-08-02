@@ -101,13 +101,18 @@ export const isGateDependentPath = (url: string): boolean => {
 };
 
 /**
- * ADR-027 gate site #2 — true for any request refused while the platform SSO
- * gate denies: the initiation paths, plus ANY callback path (pathname-PREFIX
- * match via `includes`, since callbacks carry `?code=&state=` and a provider
- * segment, e.g. `/callback/auth0`, `/oauth2/callback/okta`). This is the only
- * interception point that sees the legacy `/api/auth/callback/auth0|okta`
- * rewrite (`redirectURI` pinned in index.ts), so a path-prefix middleware on
- * `/oauth2/*` alone would miss it entirely.
+ * ADR-027 gate site #2: true for any request refused while the platform SSO
+ * gate denies, meaning the initiation paths plus ANY callback path.
+ *
+ * The callback test is a substring match on the normalized pathname, not an
+ * anchored one, because the segment can sit anywhere: `/callback/auth0` and
+ * `/oauth2/callback/okta` both have to match. Normalizing first is what makes
+ * a bare substring safe here, since it strips the query (callbacks carry
+ * `?code=&state=`) and guarantees a provider segment follows.
+ *
+ * This is the only interception point that sees the legacy
+ * `/api/auth/callback/auth0|okta` rewrite (`redirectURI` pinned in index.ts),
+ * so a path-prefix middleware on `/oauth2/*` alone would miss it entirely.
  */
 export const isGatedSsoPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);

@@ -16543,7 +16543,7 @@ first: the SDK directories are MIT even though they sit outside `langwatch/ee/`.
 
 The header is a single SPDX line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary only need to flip one line. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
 
-The directory is what the license follows. The SPDX header records it per file, and files that predate the convention do not carry one yet.
+The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
 ## Local dev, QA license generation
 
