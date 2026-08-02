@@ -99,6 +99,7 @@ async function executeWith(
 
 describe("ExecuteEvaluationCommand settings resolution", () => {
   describe("given a monitor linked to an evaluator with config.settings", () => {
+    /** @scenario A prompt saved under config.settings reaches the judge */
     it("passes evaluator.config.settings, taking precedence over monitor.parameters", async () => {
       const call = await executeWith(
         buildMonitor({
@@ -119,6 +120,7 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
   });
 
   describe("given a legacy monitor with no linked evaluator", () => {
+    /** @scenario A monitor with no evaluator still falls back to its own parameters */
     it("falls back to monitor.parameters", async () => {
       const call = await executeWith(buildMonitor({ evaluator: null }));
 
@@ -235,6 +237,59 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
       );
 
       expect(call.settings).toEqual(MONITOR_PARAMETERS);
+    });
+  });
+
+  describe("given a settings-less config and no monitor parameters", () => {
+    /** @scenario A settings-less config never reaches the judge as an empty object */
+    it("recovers the evaluator's own settings rather than sending an empty object", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          parameters: null,
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              prompt: "Score this answer for factual accuracy.",
+            },
+          },
+        }),
+      );
+
+      // The failure this guards is the judge silently applying its OWN default
+      // prompt, which is what scored every trace 0. Assert the prompt is present
+      // — "the payload is not {}" would pass on a fix that merges defaults while
+      // still losing the prompt.
+      expect(call.settings).toMatchObject({
+        prompt: "Score this answer for factual accuracy.",
+      });
+    });
+  });
+
+  describe("given an evaluator row stored before normalisation existed", () => {
+    /** @scenario An evaluator already stored in the unreadable shape still resolves its prompt */
+    it("resolves its prompt at read time, without needing a migration", async () => {
+      // Write-time normalisation cannot help this row: it was written before the
+      // normaliser existed. Read-time recovery is what covers the customer's
+      // actual evaluator.
+      const call = await executeWith(
+        buildMonitor({
+          parameters: null,
+          evaluator: {
+            id: "evaluator_legacy",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              prompt: "a prompt saved long before the settings key existed",
+            },
+          },
+        }),
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "a prompt saved long before the settings key existed",
+      });
     });
   });
 

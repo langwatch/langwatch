@@ -323,6 +323,36 @@ describe("EvaluationExecutionService", () => {
       });
     });
 
+    describe("given settings recovered from a top-level config", () => {
+      // AC0f for langwatch#6397 — the ripple one hop before the judge.
+      //
+      // The fixture MUST carry a `model` key. evaluation-execution.factories.ts
+      // engages exactly two settings-driven branches, `"model" in settings` and
+      // `"embeddings_model" in settings`; it never reads `prompt`. A
+      // prompt-only fixture resolves an identical env before and after the fix,
+      // so the ripple is unobservable and the test cannot fail.
+      const RECOVERED = {
+        prompt: "Score this answer for factual accuracy.",
+        model: "openai/gpt-5-mini",
+      };
+
+      /** @scenario Model environment is resolved from the recovered settings */
+      it("resolves the model environment from the settings that carry the prompt", async () => {
+        const { service, mockModelEnvResolver } = createTestService();
+
+        await service.executeForTrace({
+          ...defaultParams,
+          settings: { ...RECOVERED },
+        });
+
+        expect(mockModelEnvResolver.resolveForEvaluator).toHaveBeenCalledWith(
+          expect.objectContaining({
+            settings: expect.objectContaining({ model: "openai/gpt-5-mini" }),
+          }),
+        );
+      });
+    });
+
     describe("given a correctly-configured evaluator — the 99% regression case", () => {
       // AC12b for langwatch#6397. The D6 change alters settings resolution on the
       // hottest path in the product; this pins that a monitor whose config was

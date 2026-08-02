@@ -35,7 +35,7 @@ Feature: An absent evaluator score is never presented or stored as zero
   # Settings resolution on the online path (D6) — the reported defect
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: A prompt saved under config.settings reaches the judge
     Given a monitor backed by a custom LLM-judge evaluator
     And the evaluator's saved config carries the user's prompt nested under settings
@@ -49,7 +49,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the online evaluation pipeline executes the monitor for a trace
     Then the settings sent to the judge carry the user's prompt
 
-  @integration @unimplemented
+  @integration
   Scenario: A settings-less config never reaches the judge as an empty object
     Given a monitor whose evaluator config has no settings key
     And the monitor carries no fallback parameters
@@ -76,7 +76,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the online evaluation pipeline executes a monitor for a trace
     Then the settings sent to the judge are the ones the previous behaviour produced
 
-  @integration @unimplemented
+  @integration
   Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
     Given an existing evaluator whose stored config predates normalisation and has no settings key
     When the online evaluation pipeline executes a monitor backed by that evaluator
@@ -107,7 +107,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the online evaluation pipeline executes the monitor for a trace
     Then the settings sent to the judge carry the evaluator's prompt
 
-  @integration @unimplemented
+  @integration
   Scenario: A monitor with no evaluator still falls back to its own parameters
     Given a monitor that carries evaluation parameters and has no evaluator attached
     When the online evaluation pipeline executes the monitor for a trace
@@ -119,7 +119,7 @@ Feature: An absent evaluator score is never presented or stored as zero
   # fixture whose resolved settings value changes, so it is the only one that can catch
   # the model-env ripple.
 
-  @integration @unimplemented
+  @integration
   Scenario: Model environment is resolved from the recovered settings
     Given a monitor whose evaluator config carries the user's prompt and chosen model at the top level with no settings key
     When the online evaluation pipeline executes the monitor for a trace
