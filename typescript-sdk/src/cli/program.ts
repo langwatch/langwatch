@@ -15,7 +15,7 @@
  * `index.ts` — this was a move, not a rewrite.
  */
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -559,13 +559,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--since <hours>", "how far back to look for sessions (default: 24)")
     .option("--all", "recover every session on disk, not just recent ones")
     .option("--json", "emit machine-readable JSON")
-    .option(
-      "--chain <argv>",
-      "internal: JSON argv of a turn-completion program to run after this one",
+    // Codex passes these; a human never does, so they stay out of the help.
+    .addOption(
+      new Option(
+        "--chain <argv>",
+        "JSON argv of a turn-completion program to run after this one",
+      ).hideHelp(),
     )
-    .option(
-      "--notify <payload>",
-      "internal: codex ran this after a completed turn and appended the turn payload",
+    .addOption(
+      new Option(
+        "--notify <payload>",
+        "the turn payload codex appends after a completed turn",
+      ).hideHelp(),
     )
     .action(
       async (options: {

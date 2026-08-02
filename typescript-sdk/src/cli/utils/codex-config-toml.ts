@@ -288,6 +288,15 @@ const NOTIFY_END = "# <<< langwatch codex notify end <<<";
 const DISPLACED_NOTE =
 	"# langwatch moved this notify into the block at the top of the file, which still runs it:";
 
+/**
+ * Bracket the displaced assignment so removal restores exactly the lines it
+ * commented out. Without an explicit end, "the comments after the note" is the
+ * only available boundary, and that silently annexes whatever the user wrote
+ * below their own notify.
+ */
+const DISPLACED_BEGIN = "# >>> langwatch displaced notify begin >>>";
+const DISPLACED_END = "# <<< langwatch displaced notify end <<<";
+
 export interface CodexNotifyBlockInputs {
 	/**
 	 * The harvest argv up to but NOT including the trailing `--notify`: program
@@ -374,18 +383,34 @@ export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
 }
 
 /**
- * The value of a top-level `notify` key in `content`, or null when absent.
- * Returns the raw matched text alongside the parsed argv so a caller can
- * comment out the exact lines it occupied.
+ * The value of codex's own top-level `notify` key in `content`, or null when
+ * absent. Returns the raw matched text alongside the parsed argv so a caller
+ * can move the exact lines it occupied.
+ *
+ * "Top-level" is enforced, not assumed. TOML binds a bare key to the table
+ * above it, so `[integrations.slack]` followed by `notify = [...]` is
+ * `integrations.slack.notify` and has nothing to do with codex — displacing it
+ * would rewrite unrelated config and run someone else's program on every turn.
  *
  * Only single-line and simple multi-line array forms are recognised, which is
  * every form codex's own docs show. Anything else is left alone rather than
  * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
  */
+/**
+ * The first `notify = [` assignment that sits above every `[section]` header,
+ * or null when the only ones found belong to a table.
+ */
+function topLevelNotifyMatch(content: string): { index: number } | null {
+	const firstSection = /^[ \t]*\[/m.exec(content);
+	const limit = firstSection ? firstSection.index : content.length;
+	const match = /^[ \t]*notify[ \t]*=[ \t]*\[/m.exec(content.slice(0, limit));
+	return match ? { index: match.index } : null;
+}
+
 function findNotifyAssignment(
 	content: string,
 ): { raw: string; argv: string[] } | null {
-	const start = /^[ \t]*notify[ \t]*=[ \t]*\[/m.exec(content);
+	const start = topLevelNotifyMatch(content);
 	if (!start) return null;
 	const openIndex = content.indexOf("[", start.index);
 	let depth = 0;
@@ -479,10 +504,12 @@ export function writeCodexNotifyBlock(
 	const body = existing
 		? withoutOurs.replace(
 				existing.raw,
-				`${DISPLACED_NOTE}\n${existing.raw
-					.split("\n")
-					.map((line) => `# ${line}`)
-					.join("\n")}`,
+				[
+					DISPLACED_BEGIN,
+					DISPLACED_NOTE,
+					...existing.raw.split("\n").map((line) => `# ${line}`),
+					DISPLACED_END,
+				].join("\n"),
 			)
 		: withoutOurs;
 
@@ -514,11 +541,17 @@ export function removeCodexNotifyBlock(
 	}
 	const stripped = stripMarkerBlock(content, NOTIFY_BEGIN, NOTIFY_END);
 	if (stripped === null) return false;
+	// Restore only what sits between the displaced markers. Matching "the run of
+	// comment lines after the note" instead would swallow whatever the user had
+	// written below their own notify and uncomment it, turning their prose into
+	// bare TOML that codex then refuses to parse.
 	const restored = stripped.replace(
-		new RegExp(`${escapeRe(DISPLACED_NOTE)}\\n((?:[ \\t]*#[^\\n]*\\n?)+)`, "m"),
+		new RegExp(
+			`${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
+			"m",
+		),
 		(_match, commented: string) =>
 			`${commented
-				.replace(/\n$/, "")
 				.split("\n")
 				.map((line) => line.replace(/^[ \t]*# ?/, ""))
 				.join("\n")}\n`,

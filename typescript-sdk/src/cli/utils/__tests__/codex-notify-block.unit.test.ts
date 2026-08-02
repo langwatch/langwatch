@@ -348,3 +348,50 @@ describe("codexNotifyCommand", () => {
 		});
 	});
 });
+
+describe("given a user comment sits below their own notify", () => {
+  describe("when capture is installed and then turned off", () => {
+    it("gives back the comment as a comment, not as bare TOML codex would reject", () => {
+      const original = 'notify = ["/usr/bin/terminal-notifier"]';
+      const comment = "# keep this: it pages me at night";
+      fs.writeFileSync(configPath, [original, comment, ""].join("\n"));
+
+      writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
+      removeCodexNotifyBlock(configPath);
+
+      const content = fs.readFileSync(configPath, "utf8");
+      expect(content).toContain(comment);
+      expect(content).toContain(original);
+      // The user's line must still be a comment; uncommented it is invalid TOML.
+      expect(content).not.toMatch(/^keep this/m);
+    });
+  });
+});
+
+describe("given a notify key that belongs to another table", () => {
+  describe("when the block is written", () => {
+    it("leaves it alone, since it is not the program codex runs", () => {
+      fs.writeFileSync(
+        configPath,
+        [
+          'model = "gpt-5-mini"',
+          "",
+          "[integrations.slack]",
+          'notify = ["/usr/bin/slack-hook"]',
+          "",
+        ].join("\n"),
+      );
+
+      const result = writeCodexNotifyBlock(
+        { command: HARVEST },
+        { filePath: configPath },
+      );
+
+      const content = fs.readFileSync(configPath, "utf8");
+      expect(result.chained).toBeNull();
+      expect(content).toContain('notify = ["/usr/bin/slack-hook"]');
+      expect(content).not.toContain("slack-hook\", \"--chain");
+      expect(tableOwning(content, "notify")).toBeNull();
+    });
+  });
+});

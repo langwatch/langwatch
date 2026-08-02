@@ -1019,7 +1019,7 @@ function recoveredCodexTurn({
     startTimeMs: atMs,
     endTimeMs: atMs + 900,
     status: "ok",
-    params: { "gen_ai.request.model": "gpt-5.6-sol" },
+    params: { "gen_ai.request.model": "gpt-5-mini" },
     input: JSON.stringify({ type: "chat_messages", value: messages }),
     output,
   } as unknown as SpanDetail;
@@ -1186,6 +1186,98 @@ describe("given a recovered codex turn whose first user message is the agent's o
       expect(context?.kind === "system_prompt" && context.text).toContain(
         "recommended_plugins",
       );
+    });
+  });
+});
+
+describe("given the two recovered turns arrive newest-first", () => {
+  describe("when the session transcript is derived", () => {
+    /**
+     * Spans arrive in whatever order their exporter batched them, and the
+     * replay takes the tail past the previous turn, so an out-of-order pair
+     * would silently drop the earlier turn's prompt entirely.
+     *
+     * @scenario "A multi-turn session shows each prompt once"
+     */
+    it("still shows each prompt exactly once, in the order they were asked", () => {
+      const first = [
+        { role: "system", content: "You are codex." },
+        { role: "user", content: "first question" },
+      ];
+      const turnOne = recoveredCodexTurn({
+        atMs: 1_000,
+        messages: first,
+        output: "first answer",
+        spanId: "codex-io-1",
+      });
+      const turnTwo = recoveredCodexTurn({
+        atMs: 2_000,
+        messages: [
+          ...first,
+          { role: "assistant", content: "first answer" },
+          { role: "user", content: "second question" },
+        ],
+        output: "second answer",
+        spanId: "codex-io-2",
+      });
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [turnTwo, turnOne],
+        logs: [],
+      });
+
+      const texts = transcript.entries.flatMap((e) =>
+        e.kind === "user_prompt" || e.kind === "assistant_message"
+          ? [e.text]
+          : [],
+      );
+      expect(texts.filter((t) => t === "first question")).toHaveLength(1);
+      expect(texts.filter((t) => t === "second question")).toHaveLength(1);
+      expect(texts.filter((t) => t === "first answer")).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a recovered reply longer than the producer writes to the span", () => {
+  describe("when the next turn replays", () => {
+    it("does not render that reply a second time just because it was truncated", () => {
+      const longReply = `${"x".repeat(5_000)} tail`;
+      const truncatedOnSpan = `${longReply.slice(0, 4_000)}…[truncated]`;
+      const first = [
+        { role: "system", content: "You are codex." },
+        { role: "user", content: "ask" },
+      ];
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: first,
+            output: truncatedOnSpan,
+            spanId: "codex-io-1",
+          }),
+          recoveredCodexTurn({
+            atMs: 2_000,
+            messages: [
+              ...first,
+              { role: "assistant", content: longReply },
+              { role: "user", content: "again" },
+            ],
+            output: "second answer",
+            spanId: "codex-io-2",
+          }),
+        ],
+        logs: [],
+      });
+
+      const replies = transcript.entries.filter(
+        (e) => e.kind === "assistant_message",
+      );
+      expect(
+        replies.filter(
+          (r) => r.kind === "assistant_message" && r.text === longReply,
+        ),
+      ).toHaveLength(0);
     });
   });
 });

@@ -154,6 +154,9 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
 				"Run `langwatch codex` once to set it up, then re-run this command.\n",
 		);
 		process.exit(1);
+		// `process.exit` is typed `never`, but a test that stubs it is not, and
+		// without this the function runs on and reports a result it never got.
+		return;
 	}
 
 	const hours = options.since
@@ -162,6 +165,7 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
 	if (!options.all && (!Number.isFinite(hours) || hours <= 0)) {
 		process.stderr.write(`Invalid --since: ${options.since}\n`);
 		process.exit(1);
+		return;
 	}
 	const nowMs = Date.now();
 	const sinceMs = options.all ? 0 : nowMs - hours * 60 * 60 * 1000;
@@ -172,6 +176,7 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
 	} catch (err) {
 		process.stderr.write(`Error: ${(err as Error).message}\n`);
 		process.exit(1);
+		return;
 	}
 
 	if (options.json) {

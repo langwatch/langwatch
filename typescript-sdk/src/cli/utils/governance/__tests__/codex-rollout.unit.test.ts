@@ -199,8 +199,8 @@ describe("parseCodexRollout", () => {
                 id: "ctco_019f",
                 call_id: "call_U9GU",
                 output: [
-                  { type: "input_text", text: "Script completed\\nOutput:\\n" },
-                  { type: "input_text", text: "hi\\n" },
+                  { type: "input_text", text: "Script completed\nOutput:\n" },
+                  { type: "input_text", text: "hi\n" },
                 ],
               },
             },
@@ -245,8 +245,8 @@ describe("parseCodexRollout", () => {
                 type: "custom_tool_call_output",
                 call_id: "call_1",
                 output: [
-                  { type: "input_text", text: "Output:\\n" },
-                  { type: "input_text", text: "mango-auto-hook\\n" },
+                  { type: "input_text", text: "Output:\n" },
+                  { type: "input_text", text: "mango-auto-hook\n" },
                 ],
               },
             },

@@ -86,6 +86,44 @@ export function buildCodexIOExportRequest(
 }
 
 /**
+ * How many of a session's most recent completed turns the per-turn hook
+ * re-sends. One would do for correctness; a few give a turn whose POST failed
+ * a chance to land on the next turn without making the upload grow with the
+ * session.
+ */
+const RECENT_TURN_WINDOW = 3;
+
+/**
+ * Walk codex's `YYYY/MM/DD` session tree, handing every rollout file to
+ * `onFile`. The depth bound encodes that layout, so it lives here once rather
+ * than in each caller, where a layout change would be fixed in one and missed
+ * in the other.
+ */
+async function walkRolloutFiles(
+  root: string,
+  onFile: (path: string, name: string) => Promise<boolean | void> | boolean,
+): Promise<void> {
+  async function walk(dir: string, depth: number): Promise<boolean> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    for (const e of entries) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (depth < 3 && (await walk(full, depth + 1))) return true;
+      } else if (e.isFile() && (await onFile(full, e.name))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  await walk(root, 0);
+}
+
+/**
  * Where codex keeps its session transcripts. Honours `CODEX_HOME` the same way
  * codex itself does: with it set, codex writes transcripts under
  * `$CODEX_HOME/sessions`, and a harvest hard-coded to the home directory would
@@ -110,44 +148,32 @@ export async function findRolloutForThread(
 ): Promise<string | null> {
   if (!/^[A-Za-z0-9_-]+$/.test(threadId)) return null;
   const suffix = `-${threadId}.jsonl`;
-  async function walk(dir: string, depth: number): Promise<string | null> {
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return null;
-    }
-    for (const e of entries) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) {
-        if (depth < 3) {
-          const found = await walk(full, depth + 1);
-          if (found) return found;
-        }
-      } else if (e.isFile() && e.name.endsWith(suffix)) {
-        return full;
-      }
-    }
-    return null;
-  }
-  return walk(sessionsRoot, 0);
+  let found: string | null = null;
+  await walkRolloutFiles(sessionsRoot, (full, name) => {
+    if (!name.endsWith(suffix)) return false;
+    found = full;
+    return true;
+  });
+  return found;
 }
 
 /**
  * Recover and emit the turns of ONE codex session, named by the thread id its
  * turn-completion payload reported. Returns the number of turns emitted.
  *
- * Re-reading the whole transcript on every turn (rather than only the turn that
- * just finished) is deliberate: the emitted span id is derived from the turn's
- * trace id, so an already-recorded turn is dropped receiver-side as a duplicate
- * rather than appearing twice, and a turn whose POST failed earlier gets a free
- * retry on the next turn.
+ * Only the last {@link RECENT_TURN_WINDOW} completed turns are posted, not the
+ * whole transcript. The hook fires once per turn in a fresh process, so posting
+ * everything each time would upload N(N+1)/2 spans over a session of N turns,
+ * each carrying the whole accumulated history — quadratic in turns to record
+ * work that is linear. The small window still gives a turn whose POST failed
+ * a free retry on the next turn, which is the only reason to re-send at all.
  *
- * That dedup is by span id alone, so the FIRST version of a turn to arrive is
- * the one kept — a later re-post cannot correct it. Harmless here only because
- * a turn is never emitted until it has a reply, so what we send is already
- * final. Worth knowing before making the emitted content depend on anything
- * that keeps changing after the turn ends.
+ * Receiver-side dedup is by span id, derived from the turn's trace id, so a
+ * re-sent turn is dropped rather than duplicated. That dedup keeps the FIRST
+ * version to arrive — a later re-post cannot correct it. Harmless here only
+ * because a turn is never emitted until it has a reply, so what we send is
+ * already final. Worth knowing before making the emitted content depend on
+ * anything that keeps changing after the turn ends.
  */
 export async function harvestCodexThread(args: {
   threadId: string;
@@ -160,12 +186,13 @@ export async function harvestCodexThread(args: {
   const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const file = await findRolloutForThread(args.threadId, root);
   if (!file) return 0;
-  let turns: CodexTurnIO[];
+  let parsed: CodexTurnIO[];
   try {
-    turns = parseCodexRollout(await readFile(file, "utf8"));
+    parsed = parseCodexRollout(await readFile(file, "utf8"));
   } catch {
     return 0;
   }
+  const turns = parsed.slice(-RECENT_TURN_WINDOW);
   if (turns.length === 0) return 0;
   await postCodexTurns({
     turns,
@@ -187,33 +214,16 @@ export async function findRecentRollouts(
   sessionsRoot = defaultCodexSessionsRoot(),
 ): Promise<string[]> {
   const out: string[] = [];
-  async function walk(dir: string, depth: number): Promise<void> {
-    let entries;
+  await walkRolloutFiles(sessionsRoot, async (full, name) => {
+    if (!name.startsWith("rollout-") || !name.endsWith(".jsonl")) return false;
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      const s = await stat(full);
+      if (s.mtimeMs >= sinceMs) out.push(full);
     } catch {
-      return;
+      /* skip unreadable */
     }
-    for (const e of entries) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) {
-        // Year/month/day nesting is 3 deep; don't descend forever.
-        if (depth < 3) await walk(full, depth + 1);
-      } else if (
-        e.isFile() &&
-        e.name.startsWith("rollout-") &&
-        e.name.endsWith(".jsonl")
-      ) {
-        try {
-          const s = await stat(full);
-          if (s.mtimeMs >= sinceMs) out.push(full);
-        } catch {
-          /* skip unreadable */
-        }
-      }
-    }
-  }
-  await walk(sessionsRoot, 0);
+    return false;
+  });
   return out;
 }
 

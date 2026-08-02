@@ -331,17 +331,24 @@ function collectSpanEntries(
     (span) => span.name === "session_task.turn",
   );
 
+  // Codex's conversation is recovered from its session transcript and sent
+  // back on the same trace, since its own telemetry carries no content. Each
+  // recovered turn re-sends the whole history, so replaying them means taking
+  // the tail past the previous turn — which only means anything in turn order.
+  // Spans arrive in whatever order their exporter batched them (this function's
+  // caller sorts by time only afterwards), so they are ordered here first.
+  const recovered = spans
+    .filter((span) => span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME)
+    .sort((a, b) => a.startTimeMs - b.startTimeMs);
+  for (const span of recovered) {
+    collectRecoveredCodexTurn(span, acc);
+  }
+
   for (const span of spans) {
-    // Codex's conversation is recovered from its session transcript and sent
-    // back on the same trace, since its own telemetry carries no content. That
-    // span is the only place this session's prompts, tool calls and replies
-    // exist; it deliberately does NOT count as a model call, because codex's
-    // own token-bearing spans already did that and counting both would double
-    // every call in the totals.
-    if (span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME) {
-      collectRecoveredCodexTurn(span, acc);
-      continue;
-    }
+    // Already replayed above, in turn order. It deliberately does NOT count as
+    // a model call: codex's own token-bearing spans already did, and counting
+    // both would double every call in the totals.
+    if (span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME) continue;
     const isCodexResponseCall =
       !hasCodexTurnRollup &&
       span.name === "handle_responses" &&
@@ -526,10 +533,13 @@ function replayAssistantMessage({
     acc.entries.push(entry);
   }
 
-  // The previous turn's reply opens this turn's input; it was already
-  // emitted off that turn's own output.
+  // The previous turn's reply opens this turn's input; it was already emitted
+  // off that turn's own output. Compared on a prefix rather than in full: the
+  // producer caps what it writes to the span output but pushes the uncapped
+  // text into the history, so a long reply is two different strings here and
+  // an equality check would render it twice.
   if (content === null || content.length === 0) return;
-  if (content === acc.lastRecoveredReply) return;
+  if (isSameRecoveredReply(content, acc.lastRecoveredReply)) return;
   acc.entries.push({
     kind: "assistant_message",
     atMs: span.startTimeMs,
@@ -1112,6 +1122,35 @@ function parsedChatMessages(
 }
 
 /**
+ * Longest message still considered for the injected-envelope test. Codex's
+ * plugin and environment listing is a few KB; anything far past that is a human
+ * pasting something, and is treated as their words.
+ */
+const MAX_INJECTED_CONTEXT_CHARS = 64_000;
+
+/**
+ * How much of a reply has to match for it to count as one already emitted. The
+ * producer truncates the span output but not the copy it threads into the next
+ * turn's history, so the two agree only on a prefix.
+ */
+const RECOVERED_REPLY_MATCH_CHARS = 200;
+
+function isSameRecoveredReply(
+  candidate: string,
+  previous: string | null,
+): boolean {
+  if (previous === null) return false;
+  if (candidate === previous) return true;
+  const width = Math.min(
+    RECOVERED_REPLY_MATCH_CHARS,
+    candidate.length,
+    previous.length,
+  );
+  if (width < RECOVERED_REPLY_MATCH_CHARS) return false;
+  return candidate.slice(0, width) === previous.slice(0, width);
+}
+
+/**
  * Whether a "user" message is entirely context the agent injected, rather than
  * anything the human typed. Codex opens a session by sending its plugin
  * inventory and environment description as a user message; rendered as a
@@ -1124,8 +1163,16 @@ function parsedChatMessages(
  * prompt, so prose remains and it is treated as a prompt, as before.
  */
 function isInjectedContextOnly(content: string): boolean {
-  if (content.trim().length === 0) return false;
-  const stripped = content
+  const trimmed = content.trim();
+  // Cheap disqualifiers first. The strip below uses a backreference with a lazy
+  // body, so every `<` with no matching close tag costs a scan to end-of-string
+  // — and the inputs here are prompts, which routinely paste diffs, JSX and
+  // shell heredocs full of unmatched `<`. An injected envelope always opens
+  // with its tag and is never the size of a pasted file, so both checks fall
+  // out of what the shape actually is rather than being arbitrary limits.
+  if (!trimmed.startsWith("<")) return false;
+  if (trimmed.length > MAX_INJECTED_CONTEXT_CHARS) return false;
+  const stripped = trimmed
     .replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "")
     .trim();
   return stripped.length === 0;
