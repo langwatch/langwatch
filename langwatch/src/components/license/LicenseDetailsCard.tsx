@@ -22,6 +22,69 @@ interface LicenseDetailsCardProps {
   isRemoving: boolean;
 }
 
+/**
+ * The one word that tells an admin where they stand. A lapsed license is orange
+ * rather than red: it still meters the seats it sold and every capability keeps
+ * working, so it asks for attention rather than reporting a breakage.
+ */
+function LicenseStateBadge({
+  isValid,
+  isExpired,
+  plan,
+}: {
+  isValid: boolean;
+  isExpired: boolean;
+  plan: string;
+}) {
+  const { label, colorPalette } = isValid
+    ? { label: plan, colorPalette: "green" }
+    : isExpired
+      ? { label: "Expired", colorPalette: "orange" }
+      : { label: "Invalid", colorPalette: "red" };
+
+  return (
+    <Badge colorPalette={colorPalette} fontSize="sm" paddingX={2} paddingY={1}>
+      {label}
+    </Badge>
+  );
+}
+
+/**
+ * What a lapse actually changed, which is almost nothing. Naming the seat count
+ * here is the point: it is the number that keeps binding, and the only thing
+ * renewal buys back is room above it.
+ */
+function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
+  return (
+    <Box
+      backgroundColor="orange.50"
+      padding={3}
+      borderRadius="md"
+      width="full"
+      _dark={{ backgroundColor: "orange.950" }}
+    >
+      <Text fontSize="sm" color="orange.700" _dark={{ color: "orange.200" }}>
+        Your license reached its end date. Nothing was switched off: everyone
+        keeps their access and your {maxMembers}{" "}
+        {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay
+        as they are. Renew to add members again.
+      </Text>
+    </Box>
+  );
+}
+
+/** A license whose signature does not check out. Its numbers mean nothing. */
+function InvalidLicenseNotice() {
+  return (
+    <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
+      <Text fontSize="sm" color="red.600">
+        Your license is invalid. Please contact support or upload a valid
+        license.
+      </Text>
+    </Box>
+  );
+}
+
 export function LicenseDetailsCard({
   status,
   onRemove,
@@ -83,14 +146,11 @@ export function LicenseDetailsCard({
     <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
       <VStack align="start" gap={4}>
         <HStack>
-          <Badge
-            colorPalette={isValid ? "green" : isExpired ? "orange" : "red"}
-            fontSize="sm"
-            paddingX={2}
-            paddingY={1}
-          >
-            {isValid ? status.plan : isExpired ? "Expired" : "Invalid"}
-          </Badge>
+          <LicenseStateBadge
+            isValid={isValid}
+            isExpired={isExpired}
+            plan={status.plan}
+          />
         </HStack>
 
         <VStack align="start" gap={2} width="full">
@@ -135,40 +195,9 @@ export function LicenseDetailsCard({
           </HStack>
         </VStack>
 
-        {isExpired && (
-          <Box
-            backgroundColor="orange.50"
-            padding={3}
-            borderRadius="md"
-            width="full"
-            _dark={{ backgroundColor: "orange.950" }}
-          >
-            <Text
-              fontSize="sm"
-              color="orange.700"
-              _dark={{ color: "orange.200" }}
-            >
-              Your license reached its end date. Nothing was switched off:
-              everyone keeps their access and your {status.maxMembers}{" "}
-              {status.maxMembers === 1 ? "seat" : "seats"} and enterprise
-              capabilities stay as they are. Renew to add members again.
-            </Text>
-          </Box>
-        )}
+        {isExpired && <LapsedLicenseNotice maxMembers={status.maxMembers} />}
 
-        {!isValid && !isExpired && (
-          <Box
-            backgroundColor="red.50"
-            padding={3}
-            borderRadius="md"
-            width="full"
-          >
-            <Text fontSize="sm" color="red.600">
-              Your license is invalid. Please contact support or upload a valid
-              license.
-            </Text>
-          </Box>
-        )}
+        {!isValid && !isExpired && <InvalidLicenseNotice />}
 
         <HStack>
           <Button
