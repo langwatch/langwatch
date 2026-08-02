@@ -598,5 +598,22 @@ describe("given a comment inside the user's notify array", () => {
 			expect(live).toHaveLength(1);
 			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
 		});
+
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("keeps a hash inside a quoted element as part of the path", () => {
+			// Only a `#` outside a string opens a comment. Reading this one as
+			// one would truncate the path and run a program that is not there.
+			fs.writeFileSync(
+				configPath,
+				['notify = ["/opt/tools/notify#2/run.sh"]', ""].join("\n"),
+			);
+
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
+
+			expect(result.chained).toEqual(["/opt/tools/notify#2/run.sh"]);
+		});
 	});
 });
