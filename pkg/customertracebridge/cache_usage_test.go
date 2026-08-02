@@ -101,3 +101,37 @@ func TestEmitter_NoCacheActivity_RecordsNoCacheTokens(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, int64(100), input, "input_tokens is the full prompt when there is no cache activity")
 }
+
+// Anthropic prices a cache write by how long the entry lives, and states the
+// split in its own response body. The span has to carry it or the control
+// plane prices every write short-lived and comes out under the bill.
+//
+// @scenario "A cache write bought for an hour is recorded as such on the span"
+func TestEmitter_HourLongCacheWrite_RecordsTheLifetime(t *testing.T) {
+	span := recordSpanForUsage(t, domain.Usage{
+		PromptTokens:          36299,
+		CompletionTokens:      210,
+		TotalTokens:           36509,
+		CacheReadTokens:       18443,
+		CacheCreationTokens:   17854,
+		CacheCreation1hTokens: 17854,
+	})
+
+	oneHour, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
+	require.True(t, ok, "span must carry gen_ai.usage.cache_creation_1h.input_tokens")
+	assert.Equal(t, int64(17854), oneHour)
+}
+
+// @scenario "A cache write whose lifetime the provider did not state is left unqualified"
+func TestEmitter_UnstatedCacheWriteLifetime_RecordsNoHourLongAttr(t *testing.T) {
+	span := recordSpanForUsage(t, domain.Usage{
+		PromptTokens:        36299,
+		CompletionTokens:    210,
+		TotalTokens:         36509,
+		CacheReadTokens:     18443,
+		CacheCreationTokens: 17854,
+	})
+
+	_, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
+	assert.False(t, ok, "no hour-long attr when the provider did not state the split")
+}

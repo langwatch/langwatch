@@ -54,6 +54,29 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     Then the span records no cache-read or cache-write tokens
     And the input-token count is the full prompt
 
+  # A cache write is priced by how long its entry lives: Anthropic charges twice
+  # the input rate for an hour-long entry against 1.25 times for a five-minute
+  # one, and states which is which only in its own `usage.cache_creation`
+  # breakdown. The Anthropic-native lanes read that breakdown off the provider's
+  # body and put it on the span. Every other lane goes through a normalized usage
+  # struct carrying one flat cache-write count, so its writes stay priced
+  # short-lived; that is a known gap, and the session totals a coding agent
+  # reports for itself are where it would show.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A cache write bought for an hour is recorded as such on the span
+    Given an Anthropic-bound request whose response states its writes bought an hour-long entry
+    When the gateway completes the request
+    Then the span records how many tokens were written to an hour-long cache
+    And they are recorded alongside, not instead of, the total written
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A cache write whose lifetime the provider did not state is left unqualified
+    Given a response that reports cache writes without saying how long they live
+    When the gateway completes the request
+    Then the span records no hour-long cache write count
+    And those writes are priced short-lived, as they were before
+
   # ==========================================================================
   # Making caching happen: provider defaults, no configuration required
   # ==========================================================================

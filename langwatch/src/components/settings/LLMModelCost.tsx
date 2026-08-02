@@ -18,6 +18,36 @@ import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { PageLayout } from "../ui/layouts/PageLayout";
 
+/**
+ * One per-token rate, rendered at full precision. Rates run to nine decimal
+ * places, so the default number formatting would round several of them to
+ * zero. Green marks a rate the project set itself rather than inherited from
+ * the catalog.
+ */
+function RateCell({
+  rate,
+  isCustom,
+}: {
+  rate: number | undefined;
+  isCustom: boolean;
+}) {
+  return (
+    <Table.Cell padding={0}>
+      <Text
+        justifyContent="space-between"
+        paddingX={4}
+        marginX={2}
+        color={isCustom ? "green.500" : undefined}
+      >
+        {rate?.toLocaleString("fullwide", {
+          useGrouping: false,
+          maximumSignificantDigits: 20,
+        })}
+      </Text>
+    </Table.Cell>
+  );
+}
+
 export function LLMModelCost(props: { projectId?: string }) {
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
@@ -123,74 +153,20 @@ export function LLMModelCost(props: { projectId?: string }) {
                     </Code>
                   </HStack>
                 </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.inputCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.outputCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.cacheReadCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.cacheCreationCostPerToken?.toLocaleString("fullwide", {
-                      useGrouping: false,
-                      maximumSignificantDigits: 20,
-                    })}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell padding={0}>
-                  <Text
-                    justifyContent="space-between"
-                    paddingX={4}
-                    marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
-                  >
-                    {row.cacheCreation1hCostPerToken?.toLocaleString(
-                      "fullwide",
-                      {
-                        useGrouping: false,
-                        maximumSignificantDigits: 20,
-                      },
-                    )}
-                  </Text>
-                </Table.Cell>
+                <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
+                <RateCell
+                  rate={row.cacheReadCostPerToken}
+                  isCustom={!!row.id}
+                />
+                <RateCell
+                  rate={row.cacheCreationCostPerToken}
+                  isCustom={!!row.id}
+                />
+                <RateCell
+                  rate={row.cacheCreation1hCostPerToken}
+                  isCustom={!!row.id}
+                />
                 <Table.Cell padding={1}>
                   <ActionsMenu
                     id={row.id}

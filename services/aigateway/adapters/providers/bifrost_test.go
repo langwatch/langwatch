@@ -380,6 +380,67 @@ func TestParseAnthropicPassthroughUsage_MessageStartCarriesPromptAndCacheTokens(
 	}
 }
 
+// Anthropic bills an hour-long cache entry at twice the input rate and a
+// five-minute one at 1.25x, and states which is which only in its own
+// `usage.cache_creation` breakdown. Reading the flat total alone prices an
+// hour-long write about a third under the bill.
+func TestParseAnthropicPassthroughUsage_MessageStartCarriesCacheWriteLifetime(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreationTokens != 17854 {
+		t.Fatalf("CacheCreationTokens: want 17854, got %d", u.CacheCreationTokens)
+	}
+	if u.CacheCreation1hTokens != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// A request that never asked for the extended TTL gets no breakdown at all,
+// and its writes must price short-lived rather than guess.
+func TestParseAnthropicPassthroughUsage_NoBreakdownLeavesLifetimeUnknown(t *testing.T) {
+	body := []byte("event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_x","type":"message",` +
+		`"role":"assistant","content":[],"model":"claude-opus-5","stop_reason":null,` +
+		`"usage":{"input_tokens":2,"cache_creation_input_tokens":17854,` +
+		`"cache_read_input_tokens":18443,"output_tokens":1}}}` + "\n\n")
+	u, ok := parseAnthropicPassthroughUsage(body)
+	if !ok {
+		t.Fatalf("expected message_start usage to parse")
+	}
+	if u.CacheCreation1hTokens != 0 {
+		t.Fatalf("CacheCreation1hTokens: want 0, got %d", u.CacheCreation1hTokens)
+	}
+}
+
+// The non-streaming /v1/messages lane returns the provider's body verbatim
+// but takes its usage from Bifrost's normalized struct, which has one flat
+// cache-write count. The lifetime has to come back off those same bytes.
+func TestAnthropicCacheCreation1h_ReadsTheBreakdownOffTheResponseBody(t *testing.T) {
+	body := []byte(`{"id":"msg_x","type":"message","role":"assistant","content":[],` +
+		`"model":"claude-opus-5","usage":{"input_tokens":2,` +
+		`"cache_creation_input_tokens":17854,"cache_read_input_tokens":18443,` +
+		`"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":17854},` +
+		`"output_tokens":210}}`)
+	if got := anthropicCacheCreation1h(body); got != 17854 {
+		t.Fatalf("CacheCreation1hTokens: want 17854, got %d", got)
+	}
+	if got := anthropicCacheCreation1h(nil); got != 0 {
+		t.Fatalf("empty body: want 0, got %d", got)
+	}
+	if got := anthropicCacheCreation1h([]byte(`{"usage":{"input_tokens":2}}`)); got != 0 {
+		t.Fatalf("no breakdown: want 0, got %d", got)
+	}
+}
+
 func TestParseAnthropicPassthroughUsage_MessageDeltaUpdatesCompletionTokens(t *testing.T) {
 	body := []byte("event: message_delta\n" +
 		`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},` +

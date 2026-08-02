@@ -27,10 +27,19 @@ type Usage struct {
 	PromptTokens        int
 	CompletionTokens    int
 	TotalTokens         int
-	CacheReadTokens     int    // tokens read from the prompt cache (priced at the cache-read rate)
-	CacheCreationTokens int    // tokens written to the prompt cache (priced at the cache-write rate)
-	CostMicroUSD        int64  // cost in microdollars (1/1_000_000 USD)
-	Model               string // resolved model name from the request
+	CacheReadTokens     int // tokens read from the prompt cache (priced at the cache-read rate)
+	CacheCreationTokens int // tokens written to the prompt cache (priced at the cache-write rate)
+	// CacheCreation1hTokens is the portion of CacheCreationTokens that bought
+	// an hour-long cache entry rather than a five-minute one. Anthropic bills
+	// the hour at twice the input rate against the five minutes' 1.25x, so a
+	// write priced without this comes out about a third under the bill. Only
+	// the Anthropic-native lanes can report it: the provider states the split
+	// in its own response body, and the normalized usage struct every other
+	// lane goes through has one flat cache-write count. Zero means unknown,
+	// and the whole write prices short-lived, exactly as before.
+	CacheCreation1hTokens int
+	CostMicroUSD          int64  // cost in microdollars (1/1_000_000 USD)
+	Model                 string // resolved model name from the request
 
 	// Audio measures. TTS is priced by input characters and STT by audio
 	// duration on providers that do not report token usage (ElevenLabs,

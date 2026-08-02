@@ -18,7 +18,10 @@ const (
 	AttrGenAIUsageIn          = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"
 	AttrGenAIUsageCacheCreate = "gen_ai.usage.cache_creation.input_tokens"
-	AttrGenAIConversationID   = "gen_ai.conversation.id"
+	// The portion of the writes above that bought an hour-long cache entry,
+	// billed above the short-lived rate. Absent when the provider did not say.
+	AttrGenAIUsageCacheCreate1h = "gen_ai.usage.cache_creation_1h.input_tokens"
+	AttrGenAIConversationID     = "gen_ai.conversation.id"
 
 	// Audio usage measures (no upstream semconv exists yet for either):
 	// characters synthesized by a TTS call and seconds of audio transcribed

@@ -411,7 +411,9 @@ describe("TraceService — multi-trace read enrichment", () => {
       );
 
       expect(result.groups[0]?.[0]?.spans?.[0]?.input).toEqual(enrichedInput);
-      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(
+        STORED_COST,
+      );
       expect(result.groups[1]?.[0]?.spans?.[0]?.input ?? null).toBeNull();
       expect(getLogs).toHaveBeenCalledTimes(1);
     });

@@ -125,6 +125,9 @@ func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	if usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheCreate, usage.CacheCreationTokens))
 	}
+	if usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheCreate1h, usage.CacheCreation1hTokens))
+	}
 	if usage.CostMicroUSD > 0 {
 		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(usage.CostMicroUSD)/1_000_000))
 	}

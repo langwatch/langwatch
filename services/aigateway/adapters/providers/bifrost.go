@@ -301,10 +301,15 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// shape.
 	if req.Type == domain.RequestTypeMessages {
 		if rawBody, ok := rawResponseBytes(resp); ok {
+			usage := extractUsage(resp)
+			// The normalized usage struct has one flat cache-write count, so
+			// the write's lifetime is only in the provider's own body. Read it
+			// back off the bytes we are about to return.
+			usage.CacheCreation1hTokens = anthropicCacheCreation1h(rawBody)
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: http.StatusOK,
-				Usage:      extractUsage(resp),
+				Usage:      usage,
 			}, nil
 		}
 	}
@@ -1725,6 +1730,9 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				if u.CacheCreationTokens > 0 {
 					it.usage.CacheCreationTokens = u.CacheCreationTokens
 				}
+				if u.CacheCreation1hTokens > 0 {
+					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
+				}
 				// Prefer the parser's reported total when non-zero —
 				// Gemini's `totalTokenCount` can exceed prompt+completion
 				// (reasoning / thinking tokens). Anthropic doesn't report
@@ -1784,6 +1792,17 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 	}, true
 }
 
+// anthropicCacheCreation1h reads how many of a response's cache writes bought
+// an hour-long entry, from Anthropic's own `usage.cache_creation` breakdown.
+// Zero when the field is absent, which is what a request that did not ask for
+// the extended TTL looks like, and prices the writes short-lived.
+func anthropicCacheCreation1h(body []byte) int {
+	if len(body) == 0 {
+		return 0
+	}
+	return int(gjson.GetBytes(body, "usage.cache_creation.ephemeral_1h_input_tokens").Int())
+}
+
 // parseAnthropicPassthroughUsage extracts Anthropic's usage block from a
 // raw /v1/messages SSE chunk. Anthropic's streaming protocol emits
 // usage data twice:
@@ -1791,6 +1810,8 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 //	event: message_start
 //	data: {"type":"message_start","message":{"usage":{"input_tokens":N,
 //	       "cache_creation_input_tokens":N,"cache_read_input_tokens":N,
+//	       "cache_creation":{"ephemeral_5m_input_tokens":N,
+//	                         "ephemeral_1h_input_tokens":N},
 //	       "output_tokens":1, ...}}}
 //
 //	event: message_delta
@@ -1830,6 +1851,10 @@ func parseAnthropicPassthroughUsage(body []byte) (domain.Usage, bool) {
 				usage.CompletionTokens = int(m.Get("output_tokens").Int())
 				usage.CacheReadTokens = int(m.Get("cache_read_input_tokens").Int())
 				usage.CacheCreationTokens = int(m.Get("cache_creation_input_tokens").Int())
+				// How long those writes live, which decides their rate.
+				// Present only when the request asked for the extended
+				// TTL; absent leaves it zero and they price short-lived.
+				usage.CacheCreation1hTokens = int(m.Get("cache_creation.ephemeral_1h_input_tokens").Int())
 				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 				matched = true
 			}
