@@ -7,6 +7,7 @@ import { getLicenseHandler } from "~/server/subscriptionHandler";
 import type { LicenseData } from "../../../../ee/licensing";
 import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
 import { licenseValidationError } from "../../../../ee/licensing/errors";
+import { buildMintedPlan } from "../../../../ee/licensing/mintedPlan";
 import {
   encodeLicenseKey,
   generateLicenseId,
@@ -152,10 +153,7 @@ export const licenseRouter = createTRPCRouter({
         email,
         issuedAt: new Date().toISOString(),
         expiresAt: expiresAt.toISOString(),
-        // Keys in LicensePlanLimitsSchema order — signature verification
-        // re-serializes the Zod-parsed payload, which orders keys to schema
-        // order, so sign-time order must match.
-        plan: {
+        plan: buildMintedPlan({
           type: planTypeValue,
           name: planName,
           maxMembers: plan.maxMembers,
@@ -163,7 +161,7 @@ export const licenseRouter = createTRPCRouter({
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
           canPublish: plan.canPublish,
           usageUnit: plan.usageUnit,
-        },
+        }),
       };
 
       try {
