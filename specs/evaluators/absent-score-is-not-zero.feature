@@ -57,7 +57,15 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the judge either receives the user's prompt or the run fails with a named error
     And the judge is never asked to evaluate using its own default prompt
 
-  @integration
+  # ⚠ NOT SHIPPED. AC0c took its read-time branch: write-side normalisation was
+  # implemented, broke code evaluators (config is `{code, inputs, outputs}` with no
+  # evaluatorType, so the shape got buried under `settings`) and collided with three
+  # tests asserting `config` is stored VERBATIM -- an existing write contract. The
+  # AC sanctions relying on read-time resolution, which covers every writer
+  # regardless of layer, and that is what ships. A bad shape can still be WRITTEN;
+  # it is recovered on read. Parked rather than deleted so the gap stays visible.
+
+  @integration @unimplemented
   Scenario: A config shape the online path cannot read cannot be written
     Given a custom LLM-judge evaluator is saved with its prompt at the top level of config
     When the evaluator is written through any of the supported creation and update paths
@@ -175,8 +183,9 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: A prompt saved at the top level of config still reaches the judge
 # AC 0b: a settings-less config never reaches the judge as {}
 #        -> Scenario: A settings-less config never reaches the judge as an empty object
-# AC 0c: an unreadable config shape cannot be written (all four writers; two bypass the service)
-#        -> Scenario: A config shape the online path cannot read cannot be written
+# AC 0c: an unreadable config shape cannot be written -- ⚠ TOOK THE READ-TIME BRANCH,
+#        write-side normalisation is NOT shipped (see the note above the scenario)
+#        -> Scenario: A config shape the online path cannot read cannot be written [@unimplemented]
 # AC 0c2: already-bad rows are handled, + the kill switch pinned ON by default
 #        -> Scenario: The new settings resolution is active in the shipped default configuration
 #        -> Scenario: The new settings resolution can be switched off for rollback
