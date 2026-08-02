@@ -5,6 +5,10 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  PERSONAL_TEAM_ARCHIVE_REFUSAL,
+  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+} from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -220,12 +224,32 @@ export const teamRouter = createTRPCRouter({
       // Always fetch team to get organizationId (needed for RoleBinding writes)
       const teamRecord = await prisma.team.findUnique({
         where: { id: input.teamId },
-        select: { organizationId: true },
+        select: { organizationId: true, isPersonal: true, ownerUserId: true },
       });
       if (!teamRecord) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
       }
       const { organizationId } = teamRecord;
+
+      // A personal team is single-member by definition: its owner holds the
+      // one ADMIN binding PersonalWorkspaceService provisions, and plan-limit
+      // counting exempts the team on that basis. Members and roles are
+      // therefore not editable here. Only submissions that keep the
+      // provisioned membership (or touch none at all, e.g. a rename) go
+      // through; everything else needs a shared team.
+      if (teamRecord.isPersonal) {
+        const keepsProvisionedMembership =
+          input.members.length === 0 ||
+          (input.members.length === 1 &&
+            input.members[0]!.userId === teamRecord.ownerUserId &&
+            input.members[0]!.role === TeamUserRole.ADMIN);
+        if (!keepsProvisionedMembership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+          });
+        }
+      }
       await assertUsersInOrganization(
         prisma,
         organizationId,
@@ -536,6 +560,29 @@ export const teamRouter = createTRPCRouter({
     .use(checkTeamPermission("team:delete"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      // Archiving a personal team is unrecoverable. The partial unique index
+      // `Team_organizationId_ownerUserId_personal_key` covers every personal
+      // team of an (organization, user) pair regardless of archivedAt, while
+      // PersonalWorkspaceService looks its workspace up with `archivedAt:
+      // null`. An archived personal team therefore stays invisible to the
+      // service but keeps holding the index slot, so the next ensure() cannot
+      // find the workspace, cannot create a replacement, and the user is left
+      // without a personal workspace in that organization for good.
+      const team = await prisma.team.findUnique({
+        where: { id: input.teamId },
+        select: { isPersonal: true },
+      });
+      if (!team) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      }
+      if (team.isPersonal) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: PERSONAL_TEAM_ARCHIVE_REFUSAL,
+        });
+      }
+
       await prisma.team.update({
         where: { id: input.teamId },
         data: { archivedAt: new Date() },

@@ -19,6 +19,8 @@ const groupMembershipFindMany = vi.fn();
 const prisma = {
   organizationUser: { count: organizationUserCount },
   group: { findFirst: groupFindFirst },
+  // The personal-team guard runs on every binding write; a shared team here.
+  team: { findFirst: vi.fn().mockResolvedValue(null) },
   roleBinding: {
     create: bindingCreate,
     findMany: bindingFindMany,

@@ -14,6 +14,18 @@ export class TeamSlugConflictError extends Error {
   name = "TeamSlugConflictError" as const;
 }
 
+export class PersonalTeamProtectedError extends Error {
+  name = "PersonalTeamProtectedError" as const;
+}
+
+/** The refusal a personal team gives to anything that would archive it. */
+export const PERSONAL_TEAM_ARCHIVE_REFUSAL =
+  "Personal workspace teams cannot be archived. They are provisioned per member and disappear with the member's access to the organization.";
+
+/** The refusal a personal team gives to anything that would change who is on it. */
+export const PERSONAL_TEAM_MEMBERSHIP_REFUSAL =
+  "Personal workspace teams have exactly one member: their owner. Create a shared team to collaborate with others.";
+
 export class TeamRestService {
   constructor(readonly repo: TeamRepository) {}
 
@@ -85,6 +97,21 @@ export class TeamRestService {
     id: string;
     organizationId: string;
   }): Promise<Team> {
+    // Archiving a personal team is unrecoverable. The partial unique index
+    // `Team_organizationId_ownerUserId_personal_key` covers archived rows,
+    // while PersonalWorkspaceService looks its workspace up with
+    // `archivedAt: null`. The archived team keeps holding the index slot, so
+    // the next ensure() can neither find the workspace nor create a
+    // replacement, and the owner has none in this organization ever again.
+    const existing = await this.repo.findById(id);
+    if (
+      existing &&
+      existing.organizationId === organizationId &&
+      existing.isPersonal
+    ) {
+      throw new PersonalTeamProtectedError(PERSONAL_TEAM_ARCHIVE_REFUSAL);
+    }
+
     const team = await this.repo.archive({ id, organizationId });
     if (!team) throw new TeamNotFoundError("Team not found");
     return team;

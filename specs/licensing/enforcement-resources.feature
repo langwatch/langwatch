@@ -217,6 +217,80 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I view the organization usage
     Then the reported team count is 1
 
+  # A personal team is exempt from the allowance because it holds one member,
+  # its owner. Letting it take a second member would turn the exemption into a
+  # way of running a team the allowance never sees.
+
+  @integration
+  Scenario: Adding a member to a personal team is refused
+    Given the organization has 1 personal team
+    When I add another member to the personal team
+    Then the request fails with FORBIDDEN
+    And the personal team still has exactly its owner
+    And the reported team count is unchanged
+
+  @integration
+  Scenario: Renaming a personal team is still allowed
+    Given the organization has 1 personal team
+    When I rename the personal team
+    Then the team is renamed successfully
+
+  # A personal workspace stays one person's however the organization is
+  # administered, and whether access is given to a person or to a group.
+
+  @integration
+  Scenario: Giving someone else access to a personal workspace is refused
+    Given the organization has 1 personal team
+    And another member of the organization
+    When I give that member access to the personal workspace
+    Then the request fails with FORBIDDEN
+    And the personal workspace is still only its owner's
+
+  @integration
+  Scenario: Giving a group access to a personal workspace is refused
+    Given the organization has 1 personal team
+    And a group in the organization
+    When I give that group access to the personal workspace
+    Then the request fails with FORBIDDEN
+    And the personal workspace is still only its owner's
+
+  @integration
+  Scenario: Taking the owner's access to their own workspace away is refused
+    Given the organization has 1 personal team
+    When I remove the owner from their personal workspace
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
+  @integration
+  Scenario: Changing the owner's role on their own workspace is refused
+    Given the organization has 1 personal team
+    When I change the owner's role on their personal workspace
+    Then the request fails with FORBIDDEN
+    And the personal workspace is still only its owner's
+
+  # Archiving a personal team cannot be undone by the owner: the uniqueness of
+  # a personal team per (organization, owner) covers archived rows too, while
+  # the workspace lookup skips them. The archived team keeps the slot, so
+  # provisioning can neither find the workspace nor create a replacement.
+
+  @integration
+  Scenario: Archiving a personal team is refused
+    Given the organization has 1 personal team
+    When I archive the personal team
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
+  # Archiving a project frees its slot. A team that the whole product treats
+  # as gone but the allowance still charges for leaves a customer at the limit
+  # with nothing on screen to explain it.
+
+  @integration
+  Scenario: Archived teams do not count toward the team limit
+    Given the organization has 1 team
+    And the organization has 1 archived team
+    When I view the organization usage
+    Then the reported team count is 1
+
   # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================
