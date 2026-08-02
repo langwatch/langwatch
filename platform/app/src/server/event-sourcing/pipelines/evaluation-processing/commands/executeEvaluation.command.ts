@@ -117,6 +117,51 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
+ * Keys that live alongside an evaluator's settings inside `config` but are
+ * metadata about the evaluator rather than input to the judge.
+ */
+const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
+
+/**
+ * Resolves the settings sent to the judge for an online (monitor-driven) evaluation.
+ *
+ * Nothing guarantees `config.settings` exists: `EvaluatorService.create`/`.update` are raw
+ * passthroughs, and the copy/replicate tRPC flows write `config` straight through Prisma, so an
+ * evaluator can be stored with its prompt at the TOP LEVEL of `config`. The previous rule
+ * (`config.settings ?? parameters`) silently dropped that prompt and forwarded `monitor.parameters`
+ * — empty for newer monitors, per `schema.prisma`'s "new monitors may have empty" — at which point
+ * langevals applies its own strict default prompt and scores the trace 0. That is langwatch#6397:
+ * the customer saw 0 on every trace while the same prompt passed in the playground, because the
+ * playground posts the prompt from the form and never has to read it back.
+ *
+ * Precedence is deliberate: the evaluator's own config wins over `monitor.parameters`. The reverse
+ * ordering satisfies every other acceptance criterion identically while leaving the bug live for
+ * any monitor with populated `parameters`.
+ */
+export function resolveEvaluatorSettings({
+  config,
+  parameters,
+}: {
+  config: Record<string, unknown> | null | undefined;
+  parameters: Record<string, unknown> | null | undefined;
+}): Record<string, unknown> | null | undefined {
+  if (!config) {
+    return parameters;
+  }
+
+  const nested = config.settings;
+  if (nested && typeof nested === "object") {
+    return nested as Record<string, unknown>;
+  }
+
+  const recovered = Object.fromEntries(
+    Object.entries(config).filter(([key]) => !CONFIG_METADATA_KEYS.has(key)),
+  );
+
+  return Object.keys(recovered).length > 0 ? recovered : parameters;
+}
+
+/**
  * Command handler for executing evaluations.
  *
  * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
@@ -297,10 +342,10 @@ export class ExecuteEvaluationCommand
     }
 
     // 4. Run evaluation via app-layer service
-    const settings = monitor.evaluator?.config
-      ? ((monitor.evaluator.config as Record<string, any>).settings ??
-        monitor.parameters)
-      : monitor.parameters;
+    const settings = resolveEvaluatorSettings({
+      config: monitor.evaluator?.config as Record<string, unknown> | null,
+      parameters: monitor.parameters as Record<string, unknown> | null,
+    });
 
     const workflowId =
       monitor.evaluator?.type === "workflow"

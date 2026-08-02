@@ -135,6 +135,68 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
     });
   });
 
+  describe("given a config whose settings sit at the top level with no settings key", () => {
+    /** @scenario A prompt saved at the top level of config still reaches the judge */
+    it("recovers them instead of falling through to monitor.parameters", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              prompt: "Score this answer for factual accuracy.",
+              model: "gpt-5-mini",
+            },
+          },
+        }),
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "Score this answer for factual accuracy.",
+        model: "gpt-5-mini",
+      });
+    });
+
+    /** @scenario The evaluator's own prompt wins over the monitor's parameters */
+    it("prefers the evaluator's recovered config over monitor.parameters", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          parameters: { prompt: "the stale monitor prompt", temperature: 0.5 },
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              prompt: "the evaluator's own prompt",
+            },
+          },
+        }),
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "the evaluator's own prompt",
+      });
+    });
+
+    it("does not leak evaluatorType into the settings sent to the judge", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              prompt: "Score this.",
+            },
+          },
+        }),
+      );
+
+      expect(call.settings).not.toHaveProperty("evaluatorType");
+    });
+  });
+
   describe("given a workflow evaluator", () => {
     it("resolves workflowId from the evaluator record", async () => {
       const call = await executeWith(

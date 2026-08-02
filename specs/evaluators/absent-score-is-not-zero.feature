@@ -42,7 +42,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     When the online evaluation pipeline executes the monitor for a trace
     Then the settings sent to the judge carry the user's prompt
 
-  @integration @unimplemented
+  @integration
   Scenario: A prompt saved at the top level of config still reaches the judge
     Given a monitor backed by a custom LLM-judge evaluator
     And the evaluator's saved config carries the user's prompt at the top level with no settings key
@@ -100,7 +100,7 @@ Feature: An absent evaluator score is never presented or stored as zero
   # evaluator.config.settings (what this fix enforces). Both are @unimplemented
   # and bind nothing regardless.
 
-  @integration @unimplemented
+  @integration
   Scenario: The evaluator's own prompt wins over the monitor's parameters
     Given a monitor that carries evaluation parameters
     And its evaluator's saved config also carries a different prompt at the top level
