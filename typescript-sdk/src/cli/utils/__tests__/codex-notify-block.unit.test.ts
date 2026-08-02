@@ -350,200 +350,253 @@ describe("codexNotifyCommand", () => {
 });
 
 describe("given a user comment sits below their own notify", () => {
-  describe("when capture is installed and then turned off", () => {
-    it("gives back the comment as a comment, not as bare TOML codex would reject", () => {
-      const original = 'notify = ["/usr/bin/terminal-notifier"]';
-      const comment = "# keep this: it pages me at night";
-      fs.writeFileSync(configPath, [original, comment, ""].join("\n"));
+	describe("when capture is installed and then turned off", () => {
+		it("gives back the comment as a comment, not as bare TOML codex would reject", () => {
+			const original = 'notify = ["/usr/bin/terminal-notifier"]';
+			const comment = "# keep this: it pages me at night";
+			fs.writeFileSync(configPath, [original, comment, ""].join("\n"));
 
-      writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
-      removeCodexNotifyBlock(configPath);
+			writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
+			removeCodexNotifyBlock(configPath);
 
-      const content = fs.readFileSync(configPath, "utf8");
-      expect(content).toContain(comment);
-      expect(content).toContain(original);
-      // The user's line must still be a comment; uncommented it is invalid TOML.
-      expect(content).not.toMatch(/^keep this/m);
-    });
-  });
+			const content = fs.readFileSync(configPath, "utf8");
+			expect(content).toContain(comment);
+			expect(content).toContain(original);
+			// The user's line must still be a comment; uncommented it is invalid TOML.
+			expect(content).not.toMatch(/^keep this/m);
+		});
+	});
 });
 
 describe("given a notify key that belongs to another table", () => {
-  describe("when the block is written", () => {
-    it("leaves it alone, since it is not the program codex runs", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          'model = "gpt-5-mini"',
-          "",
-          "[integrations.slack]",
-          'notify = ["/usr/bin/slack-hook"]',
-          "",
-        ].join("\n"),
-      );
+	describe("when the block is written", () => {
+		it("leaves it alone, since it is not the program codex runs", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					'model = "gpt-5-mini"',
+					"",
+					"[integrations.slack]",
+					'notify = ["/usr/bin/slack-hook"]',
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      const content = fs.readFileSync(configPath, "utf8");
-      expect(result.chained).toBeNull();
-      expect(content).toContain('notify = ["/usr/bin/slack-hook"]');
-      expect(content).not.toContain("slack-hook\", \"--chain");
-      expect(tableOwning(content, "notify")).toBeNull();
-    });
-  });
+			const content = fs.readFileSync(configPath, "utf8");
+			expect(result.chained).toBeNull();
+			expect(content).toContain('notify = ["/usr/bin/slack-hook"]');
+			expect(content).not.toContain('slack-hook", "--chain');
+			expect(tableOwning(content, "notify")).toBeNull();
+		});
+	});
 });
 
 describe("given a multi-line nested array sits above the user's notify", () => {
-  describe("when the block is written", () => {
-    it("still finds the top-level notify, rather than adding a second one", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          "matrix = [",
-          "  [1, 2],",
-          "  [3, 4],",
-          "]",
-          'notify = ["/usr/bin/terminal-notifier"]',
-          "",
-          "[otel]",
-          'environment = "mine"',
-          "",
-        ].join("\n"),
-      );
+	describe("when the block is written", () => {
+		it("still finds the top-level notify, rather than adding a second one", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					"matrix = [",
+					"  [1, 2],",
+					"  [3, 4],",
+					"]",
+					'notify = ["/usr/bin/terminal-notifier"]',
+					"",
+					"[otel]",
+					'environment = "mine"',
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      const content = fs.readFileSync(configPath, "utf8");
-      // A second live `notify` is a duplicate key, and codex then refuses to
-      // parse its config at all.
-      const live = content
-        .split("\n")
-        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
-      expect(live).toHaveLength(1);
-      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
-      expect(content).toContain("matrix = [");
-    });
-  });
+			const content = fs.readFileSync(configPath, "utf8");
+			// A second live `notify` is a duplicate key, and codex then refuses to
+			// parse its config at all.
+			const live = content
+				.split("\n")
+				.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+			expect(live).toHaveLength(1);
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+			expect(content).toContain("matrix = [");
+		});
+	});
 });
 
 describe("given a single-quoted literal string holding an unbalanced bracket", () => {
-  describe("when the block is written", () => {
-    it("does not let that bracket hide the user's top-level notify", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          // TOML literal strings have no escapes, so this bracket never closes.
-          "shell_path = 'C:\\tools\\dir['",
-          'notify = ["/usr/bin/terminal-notifier"]',
-          "",
-          "[otel]",
-          'environment = "mine"',
-          "",
-        ].join("\n"),
-      );
+	describe("when the block is written", () => {
+		it("does not let that bracket hide the user's top-level notify", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					// TOML literal strings have no escapes, so this bracket never closes.
+					"shell_path = 'C:\\tools\\dir['",
+					'notify = ["/usr/bin/terminal-notifier"]',
+					"",
+					"[otel]",
+					'environment = "mine"',
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      const live = fs
-        .readFileSync(configPath, "utf8")
-        .split("\n")
-        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
-      expect(live).toHaveLength(1);
-      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
-    });
-  });
+			const live = fs
+				.readFileSync(configPath, "utf8")
+				.split("\n")
+				.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+			expect(live).toHaveLength(1);
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+		});
+	});
 });
 
 describe("given a multi-line string holding brackets above the user's notify", () => {
-  describe("when the block is written", () => {
-    /** @scenario "A turn-completion program the user already had keeps running" */
-    it("reads a basic multi-line string as prose, not as structure", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          // Between its triple quotes this is prose: the bracket opens nothing
-          // and the `#` starts no comment.
-          'instructions = """',
-          "Use [brackets for grouping, and # for a heading.",
-          '"""',
-          'notify = ["/usr/bin/terminal-notifier"]',
-          "",
-          "[otel]",
-          'environment = "mine"',
-          "",
-        ].join("\n"),
-      );
+	describe("when the block is written", () => {
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("reads a basic multi-line string as prose, not as structure", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					// Between its triple quotes this is prose: the bracket opens nothing
+					// and the `#` starts no comment.
+					'instructions = """',
+					"Use [brackets for grouping, and # for a heading.",
+					'"""',
+					'notify = ["/usr/bin/terminal-notifier"]',
+					"",
+					"[otel]",
+					'environment = "mine"',
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      const live = fs
-        .readFileSync(configPath, "utf8")
-        .split("\n")
-        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
-      expect(live).toHaveLength(1);
-      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
-    });
+			const live = fs
+				.readFileSync(configPath, "utf8")
+				.split("\n")
+				.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+			expect(live).toHaveLength(1);
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+		});
 
-    /** @scenario "A turn-completion program the user already had keeps running" */
-    it("reads a literal multi-line string as prose too", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          "instructions = '''",
-          "Backslashes \\ and [brackets stay literal in here.",
-          "'''",
-          "notify = ['/usr/bin/terminal-notifier']",
-          "",
-        ].join("\n"),
-      );
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("reads a literal multi-line string as prose too", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					"instructions = '''",
+					"Backslashes \\ and [brackets stay literal in here.",
+					"'''",
+					"notify = ['/usr/bin/terminal-notifier']",
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      const live = fs
-        .readFileSync(configPath, "utf8")
-        .split("\n")
-        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
-      expect(live).toHaveLength(1);
-      expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
-    });
+			const live = fs
+				.readFileSync(configPath, "utf8")
+				.split("\n")
+				.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+			expect(live).toHaveLength(1);
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+		});
 
-    /** @scenario "A turn-completion program the user already had keeps running" */
-    it("ignores a notify assignment that is only text inside a multi-line string", () => {
-      fs.writeFileSync(
-        configPath,
-        [
-          'instructions = """',
-          "To wire notifications yourself, write:",
-          'notify = ["/usr/bin/my-notifier"]',
-          '"""',
-          "",
-        ].join("\n"),
-      );
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("ignores a notify assignment that is only text inside a multi-line string", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					'instructions = """',
+					"To wire notifications yourself, write:",
+					'notify = ["/usr/bin/my-notifier"]',
+					'"""',
+					"",
+				].join("\n"),
+			);
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
 
-      // The documented example is not a live key, so nothing was displaced.
-      expect(result.chained).toBeNull();
-      const contents = fs.readFileSync(configPath, "utf8");
-      expect(contents).toContain('notify = ["/usr/bin/my-notifier"]');
-    });
-  });
+			// The documented example is not a live key, so nothing was displaced.
+			expect(result.chained).toBeNull();
+			const contents = fs.readFileSync(configPath, "utf8");
+			expect(contents).toContain('notify = ["/usr/bin/my-notifier"]');
+		});
+	});
+});
+
+describe("given a comment inside the user's notify array", () => {
+	describe("when the block is written", () => {
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("chains the live element and not the one the user commented out", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					"notify = [",
+					'  # "/usr/bin/retired-notifier",',
+					'  "/usr/bin/terminal-notifier",',
+					"]",
+					"",
+				].join("\n"),
+			);
+
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
+
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+		});
+
+		/** @scenario "A turn-completion program the user already had keeps running" */
+		it("displaces the assignment even when the comment holds a lone apostrophe", () => {
+			fs.writeFileSync(
+				configPath,
+				[
+					"notify = [",
+					"  # the other one didn't survive the last upgrade",
+					'  "/usr/bin/terminal-notifier",',
+					"]",
+					"",
+				].join("\n"),
+			);
+
+			const result = writeCodexNotifyBlock(
+				{ command: HARVEST },
+				{ filePath: configPath },
+			);
+
+			// A second live `notify` is a duplicate top-level key, which stops
+			// codex from reading its own config at all.
+			const live = fs
+				.readFileSync(configPath, "utf8")
+				.split("\n")
+				.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+			expect(live).toHaveLength(1);
+			expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+		});
+	});
 });

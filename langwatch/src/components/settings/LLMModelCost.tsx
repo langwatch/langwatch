@@ -21,8 +21,8 @@ import { PageLayout } from "../ui/layouts/PageLayout";
 /**
  * One per-token rate, rendered at full precision. Rates run to nine decimal
  * places, so the default number formatting would round several of them to
- * zero. Green marks a rate the project set itself rather than inherited from
- * the catalog.
+ * zero. Green marks a rate that comes from a stored cost rule, at whatever
+ * scope, rather than from the model catalog.
  */
 function RateCell({
   rate,

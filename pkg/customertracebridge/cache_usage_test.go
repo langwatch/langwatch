@@ -108,18 +108,26 @@ func TestEmitter_NoCacheActivity_RecordsNoCacheTokens(t *testing.T) {
 //
 // @scenario "A cache write bought for an hour is recorded as such on the span"
 func TestEmitter_HourLongCacheWrite_RecordsTheLifetime(t *testing.T) {
+	// The hour-long count is a PORTION of the writes, so the two differ here.
+	// Equal values would let an emitter that wrote the total into the hour-long
+	// attr pass, which is the mistake most worth catching: it would price
+	// short-lived writes at twice the input rate.
 	span := recordSpanForUsage(t, domain.Usage{
 		PromptTokens:          36299,
 		CompletionTokens:      210,
 		TotalTokens:           36509,
 		CacheReadTokens:       18443,
 		CacheCreationTokens:   17854,
-		CacheCreation1hTokens: 17854,
+		CacheCreation1hTokens: 12000,
 	})
 
 	oneHour, ok := findIntAttr(span, AttrGenAIUsageCacheCreate1h)
 	require.True(t, ok, "span must carry gen_ai.usage.cache_creation_1h.input_tokens")
-	assert.Equal(t, int64(17854), oneHour)
+	assert.Equal(t, int64(12000), oneHour)
+
+	writes, ok := findIntAttr(span, AttrGenAIUsageCacheCreate)
+	require.True(t, ok, "span must still carry the total write count")
+	assert.Equal(t, int64(17854), writes)
 }
 
 // @scenario "A cache write whose lifetime the provider did not state is left unqualified"

@@ -86,10 +86,13 @@ export function computeSpanCost({
   if (numInputRate !== null || numOutputRate !== null) {
     // Same arithmetic as every other priority, so a cache TTL split (or any
     // future billable unit) is priced identically whether the rates came from
-    // a customer override or the registry. `estimateCost` returns undefined
-    // only when it sees no rate at all, which cannot happen here: this branch
-    // is gated on one being present. A deliberate all-zero override still
-    // returns 0 and stops here rather than falling through to the registry.
+    // a customer override or the registry.
+    //
+    // The `?? 0` is load-bearing, not defensive filler. This branch is gated on
+    // a rate being PRESENT, while `estimateCost` gates on one being NON-ZERO,
+    // so a deliberate all-zero override reaches it and comes back undefined.
+    // Coercing that to 0 is what makes such an override price at zero and stop
+    // here, instead of falling through to the registry it meant to replace.
     return (
       estimateCost({
         llmModelCost: {

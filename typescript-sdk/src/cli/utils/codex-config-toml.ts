@@ -534,6 +534,11 @@ function findNotifyAssignment(
 	let depth = 0;
 	let quote: '"' | "'" | null = null;
 	let escaped = false;
+	// The array's own text, minus its comments. A `#` run holds prose, and its
+	// quotes are not elements: reading them would chain a program the user
+	// deliberately commented out, and a lone apostrophe in the prose would open
+	// a string that never closes, losing the assignment entirely.
+	let elements = "";
 	for (let i = openIndex; i < content.length; i++) {
 		const ch = content[i];
 		if (quote !== null) {
@@ -542,16 +547,30 @@ function findNotifyAssignment(
 			if (escaped) escaped = false;
 			else if (quote === '"' && ch === "\\") escaped = true;
 			else if (ch === quote) quote = null;
+			elements += ch;
 			continue;
 		}
+		if (ch === "#") {
+			const lineEnd = content.indexOf("\n", i);
+			// A comment with no line after it cannot be followed by the `]` that
+			// would close the array, so the assignment is unterminated.
+			if (lineEnd === -1) return null;
+			elements += "\n";
+			i = lineEnd;
+			continue;
+		}
+		elements += ch;
 		if (ch === '"' || ch === "'") quote = ch;
 		else if (ch === "[") depth++;
 		else if (ch === "]") {
 			depth--;
 			if (depth === 0) {
+				// `raw` stays the verbatim source span: the caller moves exactly
+				// the lines the assignment occupied, comments included.
 				const raw = content.slice(start.index, i + 1);
-				const argv = Array.from(raw.matchAll(TOML_ARRAY_ELEMENT)).map((m) =>
-					m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
+				const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map(
+					(m) =>
+						m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
 				);
 				return { raw, argv };
 			}

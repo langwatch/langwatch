@@ -221,33 +221,35 @@ describe("llmModelCosts — scope-aware RBAC", () => {
   });
 
   describe("given a rule that prices hour-long cache writes on their own", () => {
-    /** @scenario "A custom model cost can set its own hour-long cache write rate" */
-    it("stores the rate and reads it back through the project's cost list", async () => {
-      const manager = await seedUser(ORG_A, ["project:manage"], {
-        scopeType: PROJECT,
-        scopeId: PROJECT_A,
-      });
+    describe("when it is created and the project's costs are listed", () => {
+      /** @scenario "A custom model cost can set its own hour-long cache write rate" */
+      it("stores the rate and reads it back through the project's cost list", async () => {
+        const manager = await seedUser(ORG_A, ["project:manage"], {
+          scopeType: PROJECT,
+          scopeId: PROJECT_A,
+        });
 
-      const created = await manager.llmModelCost.createOrUpdate({
-        projectId: PROJECT_A,
-        scopeType: "PROJECT",
-        scopeId: PROJECT_A,
-        model: "claude-opus-5",
-        regex: "^claude-opus-5$",
-        inputCostPerToken: 0.000005,
-        outputCostPerToken: 0.000025,
-        cacheCreationCostPerToken: 0.00000625,
-        cacheCreation1hCostPerToken: 0.00001,
-      });
+        const created = await manager.llmModelCost.createOrUpdate({
+          projectId: PROJECT_A,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_A,
+          model: "claude-opus-5",
+          regex: "^claude-opus-5$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000025,
+          cacheCreationCostPerToken: 0.00000625,
+          cacheCreation1hCostPerToken: 0.00001,
+        });
 
-      expect(created.cacheCreation1hCostPerToken).toBe(0.00001);
+        expect(created.cacheCreation1hCostPerToken).toBe(0.00001);
 
-      const listed = await manager.llmModelCost.getAllForProject({
-        projectId: PROJECT_A,
+        const listed = await manager.llmModelCost.getAllForProject({
+          projectId: PROJECT_A,
+        });
+        const rule = listed.find((entry) => entry.id === created.id);
+        expect(rule?.cacheCreation1hCostPerToken).toBe(0.00001);
+        expect(rule?.cacheCreationCostPerToken).toBe(0.00000625);
       });
-      const rule = listed.find((entry) => entry.id === created.id);
-      expect(rule?.cacheCreation1hCostPerToken).toBe(0.00001);
-      expect(rule?.cacheCreationCostPerToken).toBe(0.00000625);
     });
   });
 });
