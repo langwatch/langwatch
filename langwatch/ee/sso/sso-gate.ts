@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
@@ -5,7 +6,7 @@ import {
   isExpired,
   parseLicenseKey,
   verifySignature,
-} from "../../../ee/licensing/validation";
+} from "../licensing/validation";
 import {
   type ISsoLicenseRepository,
   SsoLicenseRepository,

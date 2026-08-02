@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -7,8 +8,8 @@ import {
   type User,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { UserService } from "../users/user.service";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,

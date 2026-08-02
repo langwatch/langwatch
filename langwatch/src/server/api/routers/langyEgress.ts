@@ -26,13 +26,13 @@
  * and the explicit refusal keeps it that way if that ever changes.
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
 import { checkProjectPermission } from "~/server/api/rbac";
 import {
   LangyCredentialService,
   langyEgressAllowlistSchema,
 } from "~/server/app-layer/langy/LangyCredentialService";
-import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 

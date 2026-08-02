@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describe, expect, it } from "vitest";
 import {
   isCredentialMutationPath,

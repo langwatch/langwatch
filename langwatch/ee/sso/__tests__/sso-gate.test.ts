@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -22,7 +23,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-vi.mock("../../../../ee/licensing/validation", () => ({
+vi.mock("../../licensing/validation", () => ({
   parseLicenseKey: vi.fn(),
   verifySignature: vi.fn(),
   isExpired: vi.fn(),
@@ -33,7 +34,7 @@ import {
   isExpired,
   parseLicenseKey,
   verifySignature,
-} from "../../../../ee/licensing/validation";
+} from "../../licensing/validation";
 import {
   __resetSsoGateForTests,
   __setSsoLicenseRepositoryForTests,

@@ -23,7 +23,7 @@ vi.mock("ai", () => ({
 }));
 
 // Mock the audit log to avoid database writes
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

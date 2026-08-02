@@ -68,7 +68,7 @@ Facts verified against `main` (2026-07-02) — two of which invalidate v2/v3 pre
 | Gated email paths (block on gate-ALLOW, SSO-capable only) | `/sign-in/email`, `/sign-up/email` | Decision 4 BLOCKER fix — preserves `main`'s no-password-account guarantee on licensed Auth0/Okta installs |
 | Credential-mutation paths (block in ALL states, SSO-capable) | `/set-password`, `/change-password`, `/change-email`, `/send-verification-email`, `/verify-email` | Existing block (`index.ts:546-576`), keyed off configured mode |
 | Password-reset pair (block on gate-ALLOW only) | `/request-password-reset`, `/reset-password` | v6: open in denied mode so stranded OAuth-born users self-recover (Decision 4); inbox-proof, and better-auth reset creates the credential account |
-| Gate module | `langwatch/src/server/sso/sso-gate.ts` | Single source of truth for the gate + `resolveAuthProvider()` |
+| Gate module | `langwatch/ee/sso/sso-gate.ts` | Single source of truth for the gate + `resolveAuthProvider()` |
 
 ## Invariants
 
@@ -90,7 +90,7 @@ Facts verified against `main` (2026-07-02) — two of which invalidate v2/v3 pre
 No database migration. No license payload schema change. One env var, one new module, three call-site edits:
 
 ```ts
-// langwatch/src/server/sso/sso-gate.ts  (new — single source of truth)
+// langwatch/ee/sso/sso-gate.ts  (new — single source of truth)
 export async function platformSSOAllowed(): Promise<boolean>;
 //   IS_SAAS || hasSignedInstanceLicense(env.LANGWATCH_LICENSE_KEY) || anyOrgHasSignedLicense()
 //   "signed" = verifySignature() passes; expiry deliberately ignored (Decision 1)
@@ -149,6 +149,7 @@ Explicitly **not** gate sites: per-org *license* checks (Decision 7 — but note
 
 **Neutral**
 - The gate's DB read (`anyOrgHasSignedLicense`) runs once per process — index on `license IS NOT NULL`, then `verifySignature()` per candidate row. Do **not** optimize into a `licenseExpiresAt` filter: that column is unverified, and expiry doesn't gate SSO anyway (Decision 1).
+- The SSO implementation, not just its gate, lives under `langwatch/ee/` (`ee/sso/`: the identity-provider builders, the path predicates, the domain matching, and `sso-gate.ts` itself), with `src/server/better-auth/index.ts` as the Apache-licensed assembly point. The gate alone under `ee/` would have covered nothing a fork keeps running: stripping the gate call removes the only EE code on the path. With the federation wiring itself EE-licensed, a distribution that bypasses the gate is running Enterprise code in production unlicensed, which is what `ee/LICENSE.md` now spells out (grant conditioned on the license checks staying intact).
 - The Helm chart plumbs `LANGWATCH_LICENSE_KEY` and `LANGWATCH_LICENSE_PUBLIC_KEY` through `app.license` (inline value or `secretKeyRef`), in `sharedEnv` rather than the app Deployment: plan resolution runs in the workers too, and a worker reading a different entitlement than the app would enforce different limits on the same organization.
 - The before-hook asks the gate only for the three path classes whose outcome it can change (the reset pair, the email-auth pair, the SSO-initiation/callback set). Session reads, sign-out and the rest of the route table return before the gate is consulted, so a slow licensing store cannot hold up an already-authenticated user. The condition is derived from the branches it guards, so the two cannot drift.
 - The gate's store scan carries a 5s ceiling. A store that is slow rather than broken would otherwise hold the first SSO request open with no deadline anywhere downstream; timing out lands on the same evict-and-retry path a hard DB error takes, so recovery still needs no restart.

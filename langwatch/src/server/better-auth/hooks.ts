@@ -1,3 +1,5 @@
+import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -13,8 +15,6 @@ import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
 import { captureException } from "../../utils/posthogErrorCapture";
-import { platformSSOAllowed } from "../sso/sso-gate";
-import { extractEmailDomain, isSsoProviderMatch } from "./sso";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 

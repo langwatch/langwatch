@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Pure path predicates for the ADR-027 license-gated SSO decision, extracted
- * from `src/server/better-auth/index.ts` for cohesion and unit testing
- * (same pattern as `originGate.ts`). These answer only *which BetterAuth
- * endpoint is this?* — the license half of the decision lives in
- * `src/server/sso/sso-gate.ts` (`platformSSOAllowed`), and the before-hook
- * composes the two.
+ * Pure path predicates for the ADR-027 license-gated SSO decision. These
+ * answer only *which BetterAuth endpoint is this?* — the license half of the
+ * decision lives in `ee/sso/sso-gate.ts` (`platformSSOAllowed`), and the
+ * before-hook in `src/server/better-auth/index.ts` composes the two.
  *
  * All matching is done on the NORMALIZED pathname (query stripped, trailing
  * slashes removed): the router (rou3) resolves `/sign-up/email/` to the same

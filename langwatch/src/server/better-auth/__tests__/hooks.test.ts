@@ -23,11 +23,11 @@ vi.mock("~/server/posthog", () => ({
 // test in this file (written before the gate existed) keeps its original
 // behavior; the denied-mode guard itself is exercised below via
 // `mockResolvedValueOnce(false)`.
-vi.mock("../../sso/sso-gate", () => ({
+vi.mock("@ee/sso/sso-gate", () => ({
   platformSSOAllowed: vi.fn().mockResolvedValue(true),
 }));
 
-import { platformSSOAllowed } from "../../sso/sso-gate";
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 
 import {
   afterAccountCreate,

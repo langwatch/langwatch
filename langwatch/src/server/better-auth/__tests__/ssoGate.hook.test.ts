@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // file exercises only the `before`-hook's routing logic, no DB.
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
-// The gate itself is unit-tested in `src/server/sso/__tests__/sso-gate.test.ts`.
+// The gate itself is unit-tested in `ee/sso/__tests__/sso-gate.test.ts`.
 // This file tests ONLY the hook's orchestration: which paths get refused in
 // which gate state, per ADR-027 Decision 4 / Constants table.
-vi.mock("../../sso/sso-gate", () => ({
+vi.mock("@ee/sso/sso-gate", () => ({
   platformSSOAllowed: vi.fn(),
 }));
 
@@ -33,8 +33,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { env } from "~/env.mjs";
-import { platformSSOAllowed } from "../../sso/sso-gate";
 import { auth } from "../index";
 
 const envMock = env as unknown as { NEXTAUTH_PROVIDER: string };

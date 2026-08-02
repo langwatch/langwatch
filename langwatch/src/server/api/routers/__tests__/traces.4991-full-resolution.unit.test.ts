@@ -61,7 +61,7 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
 // assertion and leaves a pending socket that keeps the vitest worker alive.
 // Stub the audit function itself, matching translate/apiKey.myBindings/
 // workflows.generateCommitMessage in this directory.
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

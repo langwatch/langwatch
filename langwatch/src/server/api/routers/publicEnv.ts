@@ -1,9 +1,8 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
+import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum";
 import { z } from "zod";
-
 import { env } from "../../../env.mjs";
-import { resolveAuthProvider } from "../../sso/sso-gate";
 import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 

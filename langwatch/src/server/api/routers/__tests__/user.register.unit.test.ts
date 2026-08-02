@@ -37,7 +37,7 @@ vi.mock("~/server/rateLimit", () => ({
 // validation error that masks the assertion. Shard-order dependent: on its own
 // this file passes, batched with a test that initializes the app singleton it
 // does not.
-vi.mock("~/server/auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -48,7 +48,7 @@ vi.mock("~/utils/getClientIp", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
-vi.mock("~/server/sso/sso-gate", () => ({
+vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
 

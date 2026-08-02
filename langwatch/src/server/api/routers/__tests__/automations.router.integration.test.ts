@@ -79,7 +79,7 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 

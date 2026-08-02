@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Tests for the OAuth profile name fallback logic in src/server/better-auth/index.ts.
  *
@@ -24,7 +25,7 @@ vi.mock("../hooks", () => ({
   afterSessionCreate: vi.fn(),
 }));
 
-import { fallbackName } from "../index";
+import { fallbackName } from "../providers";
 
 describe("fallbackName", () => {
   describe("when profile.name is set", () => {

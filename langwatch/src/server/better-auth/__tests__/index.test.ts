@@ -144,9 +144,8 @@ describe("better-auth config", () => {
       // The env-driven provider selection lives in pure builders so we can
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
-      const { buildGenericOAuthConfigs, isEmailPasswordEnabled } = await import(
-        "../index"
-      );
+      const { isEmailPasswordEnabled } = await import("../index");
+      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const e = {
         NEXTAUTH_PROVIDER: "auth0",
         IS_SAAS: true,
@@ -195,7 +194,7 @@ describe("better-auth config", () => {
   describe("when NEXTAUTH_PROVIDER selects google", () => {
     /** @scenario Google mode */
     it("includes google in the socialProviders map", async () => {
-      const { buildSocialProviders } = await import("../index");
+      const { buildSocialProviders } = await import("@ee/sso/providers");
       const socialProviders = buildSocialProviders({
         NEXTAUTH_PROVIDER: "google",
         GOOGLE_CLIENT_ID: "google-client-id",
@@ -269,7 +268,7 @@ describe("better-auth config", () => {
         },
       ],
     ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
-      const { buildSocialProviders } = await import("../index");
+      const { buildSocialProviders } = await import("@ee/sso/providers");
       const providers = buildSocialProviders({
         ...noSocialEnv,
         NEXTAUTH_PROVIDER: provider,
@@ -281,7 +280,7 @@ describe("better-auth config", () => {
     });
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
-      const { buildGenericOAuthConfigs } = await import("../index");
+      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const configs = buildGenericOAuthConfigs({
         NEXTAUTH_PROVIDER: "auth0",
         AUTH0_CLIENT_ID: "id",

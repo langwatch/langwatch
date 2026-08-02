@@ -1,6 +1,6 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLog } from "../../../auditLog";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
 
@@ -57,7 +57,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 // Mock the audit log to avoid database writes
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

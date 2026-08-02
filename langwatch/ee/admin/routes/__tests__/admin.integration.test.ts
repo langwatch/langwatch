@@ -31,7 +31,7 @@ vi.mock("~/server/better-auth", () => ({
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
-vi.mock("~/server/auditLog", () => ({ auditLog: vi.fn() }));
+vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
 
 vi.mock("~/server/users/user.service", () => ({
   UserService: { create: () => ({}) },

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * See specs/licensing/sso-license-gating.feature — "A new federating route
  * cannot appear without being classified".

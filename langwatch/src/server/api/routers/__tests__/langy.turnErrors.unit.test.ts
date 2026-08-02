@@ -33,7 +33,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ langy: { turns: { startConversationTurn } } }),
 }));
 
-vi.mock("~/server/auditLog", () => ({ auditLog }));
+vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 
 vi.mock("~/server/posthog", () => ({ trackServerEvent: vi.fn() }));
 

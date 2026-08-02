@@ -7,6 +7,8 @@
  * - src/pages/api/auth/logout.ts    (explicit cookie-clearing logout)
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
+
+import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
@@ -16,7 +18,6 @@ import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
-import { resolveAuthProvider } from "~/server/sso/sso-gate";
 
 const secured = createServiceApp({ basePath: "/api" });
 

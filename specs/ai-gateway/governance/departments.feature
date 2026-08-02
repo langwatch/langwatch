@@ -33,7 +33,7 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     - langwatch/ee/governance/services/department/                  (attribution + service)
     - langwatch/ee/governance/routers/departments.ts                (tRPC)
     - langwatch/ee/governance/services/activity-monitor/            (bird-eye rollup)
-    - langwatch/src/server/scim/scim.service.ts                     (SCIM auto-assignment)
+    - langwatch/ee/scim/scim.service.ts                     (SCIM auto-assignment)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"

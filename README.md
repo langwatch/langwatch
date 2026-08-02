@@ -171,13 +171,11 @@ Contributions are what make the open-source community such an amazing place to l
 
 Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## ✍️ License — open-core split
+## ✍️ License: open-core split
 
-LangWatch is Apache 2.0. The exception is `langwatch/ee/`, which holds the licensing, billing, back-office and SaaS modules and needs a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules (SSO, SCIM provisioning, audit logs, billing, back-office) live under [`langwatch/ee/`](/langwatch/ee/) and are the one part that needs a commercial license in production. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
-Self-hosting without a license is uncapped: unlimited members, teams, projects, and everything you create. An Enterprise license adds the enterprise surface, SSO, SCIM provisioning and audit logs, to that same deployment and the same build. It buys those capabilities and a support relationship, not permission to run the software. See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing).
-
-See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
+See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 

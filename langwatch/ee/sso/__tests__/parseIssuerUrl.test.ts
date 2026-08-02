@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Regression test for iter-22 bug 18: malformed `AUTH0_ISSUER` /
  * `OKTA_ISSUER` (no scheme) was crashing the server at boot with a
@@ -7,7 +8,7 @@
  * clear error message for genuinely unparseable input.
  */
 import { describe, expect, it } from "vitest";
-import { parseIssuerUrl } from "../index";
+import { parseIssuerUrl } from "../providers";
 
 describe("parseIssuerUrl", () => {
   describe("when given a URL with https scheme", () => {

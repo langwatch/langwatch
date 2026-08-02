@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  *
@@ -7,12 +8,12 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DepartmentService } from "../../../../ee/governance/services/department/department.service";
-import { prisma } from "../../db";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { DepartmentService } from "../../governance/services/department/department.service";
 import { ScimService } from "../scim.service";
 import type { ScimCreateUserRequest, ScimPatchRequest } from "../scim.types";
 import { SCIM_ENTERPRISE_USER_SCHEMA } from "../scim.types";

@@ -4,6 +4,7 @@ import { PersonalUsageService } from "@ee/governance/services/personalUsage.serv
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
+import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
@@ -25,7 +26,6 @@ import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmai
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import { resolveAuthProvider } from "~/server/sso/sso-gate";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
