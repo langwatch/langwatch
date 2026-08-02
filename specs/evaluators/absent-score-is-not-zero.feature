@@ -66,6 +66,24 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the settings sent to the judge carry the user's prompt
     And the evaluator does not begin failing on every trace
 
+  # ⚠ The two scenarios below invert behaviour that is currently asserted as
+  # correct, by a passing unit test AND by two scenarios in
+  # specs/monitors/monitor-execution-backend.feature. The fallback split is the
+  # whole point: no evaluator at all still falls back to the monitor's
+  # parameters; an evaluator whose config merely lacks a settings key must not.
+
+  @integration @unimplemented
+  Scenario: A monitor with no evaluator still falls back to its own parameters
+    Given a monitor that carries evaluation parameters and has no evaluator attached
+    When the online evaluation pipeline executes the monitor for a trace
+    Then the settings sent to the judge are the monitor's own parameters
+
+  @integration @unimplemented
+  Scenario: Model environment resolution is unchanged for a correctly configured evaluator
+    Given a monitor whose evaluator config already carries the user's prompt nested under settings
+    When the online evaluation pipeline executes the monitor for a trace
+    Then the model environment resolved for that evaluator is unchanged by this fix
+
   # ============================================================================
   # Try it out panel (D1) — absent versus zero at the render boundary
   # ============================================================================
@@ -242,6 +260,14 @@ Feature: An absent evaluator score is never presented or stored as zero
 #        -> Scenario: A config shape the online path cannot read cannot be written
 # AC 0c2: "Evaluators that ALREADY have the bad shape are handled"
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
+# AC 0e: "The behaviour this fix INVERTS is named, and its existing assertions are updated"
+#        -> Scenario: A monitor with no evaluator still falls back to its own parameters
+#           (the half of the old contract that SURVIVES; the half that does not is covered by
+#           "A prompt saved at the top level of config still reaches the judge" above)
+#        -> plus a PR obligation: update executeEvaluation.settings-resolution.unit.test.ts and
+#           amend specs/monitors/monitor-execution-backend.feature in the same change.
+# AC 0f: "The settings ripple one hop earlier is checked"
+#        -> Scenario: Model environment resolution is unchanged for a correctly configured evaluator
 # AC 0d: "Prevalence is measured before this issue closes"
 #        -> NO SCENARIO. Deliberate: AC0d is a one-off measurement against a production
 #           database, not a behaviour of this system. It is a release gate recorded on the
@@ -293,5 +319,11 @@ Feature: An absent evaluator score is never presented or stored as zero
 #           whether that mechanism is what the customer actually hit, and only AC0d's
 #           prevalence number can answer that.
 #
-# Coverage: 16 behavioral ACs -> 24 scenarios. Five ACs (0d, 13, 15, 16) carry no scenario
-# by design, each with its reason stated above and its enforcement named elsewhere.
+# AC 17: "The behavioral contract is committed and actually bound"
+#        -> NO SCENARIO. Deliberate: AC17 is a property OF this file, and a scenario asserting
+#           its own file is bound would be circular. Enforced by `pnpm check:feature-parity`.
+#
+# Coverage: 18 behavioral ACs -> 26 scenarios. Six ACs (0d, 13, 15, 16, 17, and the PR-obligation
+# half of 0e) carry no scenario by design, each with its reason stated above and its enforcement
+# named elsewhere. AC16 is now split 16a/16b; neither half is assertable by this suite -- 16b's
+# gate is a real reproduction against a customer account, which is why it stays a PR obligation.
