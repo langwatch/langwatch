@@ -2,7 +2,14 @@ import type { TraceListItem, TraceStatus } from "../../types/trace";
 
 export interface ConversationGroup {
   conversationId: string;
+  /**
+   * The turn rows shown when the session is expanded. Server-grouped session
+   * rows start empty and lazily fill on expand; `traceCount` below carries
+   * the TRUE total either way, so never read `traces.length` for totals.
+   */
   traces: TraceListItem[];
+  /** True number of traces in the session across the whole time range. */
+  traceCount: number;
   totalDuration: number;
   totalCost: number;
   totalTokens: number;
@@ -19,6 +26,14 @@ export interface ConversationGroup {
   lastOutput: string;
   primaryModel: string;
   serviceName: string;
+  /**
+   * Server-rollup extras (specs/traces-v2/sessions-lens.feature). Absent on
+   * page-local groups built client-side (sample preview) and on skeletons.
+   */
+  contextSizeTokens?: number | null;
+  /** Pre-folded coding-agent counters; null when the session has no coding-agent row. */
+  modelCalls?: number | null;
+  compactions?: number | null;
 }
 
 export function groupTracesByConversation(
@@ -81,6 +96,7 @@ export function groupTracesByConversation(
     result.push({
       conversationId: id,
       traces: sorted,
+      traceCount: sorted.length,
       totalDuration: sorted.reduce((s, t) => s + t.durationMs, 0),
       totalCost: sorted.reduce((s, t) => s + t.totalCost, 0),
       totalTokens: sorted.reduce((s, t) => s + t.totalTokens, 0),
@@ -111,7 +127,7 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
   cost: (g) => g.totalCost,
   tokens: (g) => g.totalTokens,
   duration: (g) => g.totalDuration,
-  turns: (g) => g.traces.length,
+  turns: (g) => g.traceCount,
   started: (g) => g.earliestTimestamp,
   lastTurn: (g) => g.latestTimestamp,
 };
@@ -119,15 +135,12 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
 /**
  * Order conversation groups by the active lens sort, using the per-group
  * aggregates. The conversation table renders with `manualSorting`, so the
- * order it shows is whatever we return here — without this, groups always
- * fell back to latest-first regardless of the lens (e.g. "Expensive
- * Conversations" didn't actually lead with the costliest, and "Longest
- * Conversations" / "Token-Heavy Conversations" couldn't sort at all, since
- * turn-count and group-total tokens aren't trace-level sort columns).
+ * order it shows is whatever we return here.
  *
- * Note: grouping is page-local — this orders the conversations within the
- * fetched page, not globally across all data. See
- * specs/traces-v2/lens-preset-groups.feature
+ * Only the onboarding sample-preview path still comes through here: real
+ * data uses the server-side session rollup, which sorts and paginates in
+ * ClickHouse (specs/traces-v2/sessions-lens.feature). Sample preview groups
+ * the fixture page client-side, so it keeps needing a local sort.
  */
 export function sortConversationGroups({
   groups,

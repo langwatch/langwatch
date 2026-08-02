@@ -132,13 +132,13 @@ import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.s
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
 import {
-  CodingAgentTraceSessionClickHouseRepository,
-  NullCodingAgentTraceSessionRepository,
-} from "./coding-agent/repositories/coding-agent-trace-session.repository";
-import {
   CodingAgentSessionEventsClickHouseRepository,
   NullCodingAgentSessionEventsRepository,
 } from "./coding-agent/repositories/coding-agent-session-events.repository";
+import {
+  CodingAgentTraceSessionClickHouseRepository,
+  NullCodingAgentTraceSessionRepository,
+} from "./coding-agent/repositories/coding-agent-trace-session.repository";
 import {
   NullSessionMetricSeriesRepository,
   SessionMetricSeriesClickHouseRepository,
@@ -261,6 +261,8 @@ import { LogRequestCollectionService } from "./traces/log-request-collection.ser
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
+import { SessionGroupsClickHouseRepository } from "./traces/repositories/session-groups.clickhouse.repository";
+import { NullSessionGroupsRepository } from "./traces/repositories/session-groups.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
@@ -271,6 +273,7 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
+import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
@@ -709,7 +712,9 @@ export function initializeDefaultApp(options?: {
       ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
       : new NullSessionMetricSeriesRepository(),
     codingAgentSessionEvents: clickhouseEnabled
-      ? new CodingAgentSessionEventsClickHouseRepository(resolveClickHouseClient)
+      ? new CodingAgentSessionEventsClickHouseRepository(
+          resolveClickHouseClient,
+        )
       : new NullCodingAgentSessionEventsRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
@@ -1199,9 +1204,33 @@ export function initializeDefaultApp(options?: {
     "MetricRequestCollectionService",
   );
 
+  // Hoisted out of the `codingAgents` bag below: the Sessions lens rollup
+  // enriches session rows with these pre-folded counters, so both reads
+  // share the one service instance.
+  const codingAgentSessions = traced(
+    new CodingAgentSessionService(
+      repositories.codingAgentSession,
+      repositories.codingAgentTraceSession,
+      repositories.sessionMetricSeries,
+      repositories.codingAgentSessionEvents,
+    ),
+    "CodingAgentSessionService",
+  );
+
+  const sessionGroups = traced(
+    new SessionGroupsService(
+      clickhouseEnabled
+        ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
+        : new NullSessionGroupsRepository(),
+      codingAgentSessions,
+    ),
+    "SessionGroupsService",
+  );
+
   const traces = {
     summary: traceSummary,
     list: traceList,
+    sessionGroups,
     spans: spanStorage,
     logRecords: logRecordStorage,
     collection: traceCollection,
@@ -1317,15 +1346,7 @@ export function initializeDefaultApp(options?: {
       topics,
     },
     codingAgents: {
-      sessions: traced(
-        new CodingAgentSessionService(
-          repositories.codingAgentSession,
-          repositories.codingAgentTraceSession,
-          repositories.sessionMetricSeries,
-          repositories.codingAgentSessionEvents,
-        ),
-        "CodingAgentSessionService",
-      ),
+      sessions: codingAgentSessions,
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1418,6 +1439,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   );
 
   const testBroadcast = new BroadcastService(null);
+  const testCodingAgentSessions = new CodingAgentSessionService(
+    new NullCodingAgentSessionRepository(),
+    new NullCodingAgentTraceSessionRepository(),
+    new NullSessionMetricSeriesRepository(),
+    new NullCodingAgentSessionEventsRepository(),
+  );
   return new App({
     config,
     broadcast: testBroadcast,
@@ -1442,6 +1469,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
             new TopicService(new NullTopicRepository()),
           ),
           "TraceListService",
+        ),
+        sessionGroups: traced(
+          new SessionGroupsService(
+            new NullSessionGroupsRepository(),
+            testCodingAgentSessions,
+          ),
+          "SessionGroupsService",
         ),
         spans: traced(
           new SpanStorageService(new NullSpanStorageRepository()),
@@ -1534,12 +1568,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
     codingAgents: {
-      sessions: new CodingAgentSessionService(
-        new NullCodingAgentSessionRepository(),
-        new NullCodingAgentTraceSessionRepository(),
-        new NullSessionMetricSeriesRepository(),
-        new NullCodingAgentSessionEventsRepository(),
-      ),
+      sessions: testCodingAgentSessions,
     },
     langy: {
       conversations: LangyConversationService.create(

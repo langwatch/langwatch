@@ -62,9 +62,9 @@ function emptyContent({
   }
   if (activeLensId === "conversations") {
     return {
-      title: "No conversations to show",
+      title: "No sessions to show",
       description:
-        "Conversations group traces that share a thread. Tag spans with a thread_id to surface them here.",
+        "Sessions group traces that share a conversation ID. Tag spans with a thread_id or session ID to surface them here.",
     };
   }
   if (hasFilters) {

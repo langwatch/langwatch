@@ -335,15 +335,21 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
+    // Id kept as "conversations" so existing dismissals / selected-lens
+    // persistence keyed by it survive the rename to "Sessions". Rows come
+    // from the server-side session rollup with true totals per session, plus
+    // context size and last activity (specs/traces-v2/sessions-lens.feature).
     id: "conversations",
-    name: "Conversations",
+    name: "Sessions",
     isBuiltIn: true,
     columns: [
       "conversation",
       "turns",
+      "lastTurn",
       "duration",
       "cost",
       "tokens",
+      "contextSize",
       "model",
       "service",
       "status",
@@ -413,9 +419,10 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Heaviest token conversations — tokens roll up per thread.
+    // Heaviest token sessions: tokens roll up per session, server-side.
+    // Id predates the Sessions rename.
     id: "token-heavy-conversations",
-    name: "Token-Heavy Conversations",
+    name: "Token-Heavy Sessions",
     isBuiltIn: true,
     columns: [
       "conversation",
@@ -432,11 +439,11 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Conversations with the most turns. Sorts by turn count, which is a
-    // per-conversation aggregate (group-sorted client-side; see
-    // sortConversationGroups in conversationGroups.ts).
+    // Sessions with the most traces. Sorts by the per-session trace count,
+    // a rollup dimension the sessions read orders by server-side. Id
+    // predates the Sessions rename.
     id: "longest-conversations",
-    name: "Longest Conversations",
+    name: "Longest Sessions",
     isBuiltIn: true,
     columns: [
       "conversation",
@@ -472,9 +479,10 @@ const builtInLenses: LensConfig[] = [
     filterText: "",
   },
   {
-    // Costliest conversations — cost rolls up per thread.
+    // Costliest sessions: cost rolls up per session, server-side. Id
+    // predates the Sessions rename.
     id: "expensive-conversations",
-    name: "Expensive Conversations",
+    name: "Expensive Sessions",
     isBuiltIn: true,
     columns: [
       "conversation",

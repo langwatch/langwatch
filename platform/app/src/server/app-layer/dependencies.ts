@@ -52,6 +52,7 @@ import type { TopicClusteringStatusService } from "./topic-clustering/topic-clus
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { SessionGroupsService } from "./traces/session-groups.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
@@ -85,6 +86,8 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     list: TraceListService;
+    /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */
+    sessionGroups: SessionGroupsService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     collection: TraceRequestCollectionService;

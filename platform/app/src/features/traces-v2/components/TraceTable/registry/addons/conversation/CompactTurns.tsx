@@ -233,6 +233,16 @@ function turnCellContent({
       return <MonoCell>{formatCost(trace.totalCost)}</MonoCell>;
     case "tokens":
       return <MonoCell>{formatTokens(trace.totalTokens)}</MonoCell>;
+    case "contextSize":
+      return trace.contextSizeTokens ? (
+        <MonoCell>{formatTokens(trace.contextSizeTokens)}</MonoCell>
+      ) : (
+        dash
+      );
+    // Session-level coding-agent counters have no per-turn meaning.
+    case "modelCalls":
+    case "compactions":
+      return dash;
     case "model":
       return (
         <MonoCell truncate whiteSpace={undefined}>

@@ -26,7 +26,10 @@ import {
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  extractFreeTextTerms,
+  translateFilterToClickHouse,
+} from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -1120,6 +1123,52 @@ export const tracesV2Router = createTRPCRouter({
       return {
         ...page,
         items: page.items.map((it) => redactV2Content(it, protections)),
+      };
+    }),
+
+  /**
+   * The Sessions lens read (specs/traces-v2/sessions-lens.feature): one row
+   * per `gen_ai.conversation.id` with TRUE rollups computed in ClickHouse
+   * over every trace of the session in range, unlike the client grouping it
+   * replaces, which could only sum the fetched page. The free-text query
+   * ALSO matches session transcript content in `log_records`, so searching
+   * "#6418" finds the session whose transcript mentions it.
+   */
+  sessions: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        timeRange: timeRangeSchema,
+        sort: sortSchema.optional(),
+        pageSize: z.number().int().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+        query: z.string().nullish(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }) => {
+      const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const result = await app.traces.sessionGroups.getSessionGroups({
+        tenantId: input.projectId,
+        timeRange: input.timeRange,
+        sort: input.sort,
+        pageSize: input.pageSize,
+        cursor: input.cursor,
+        filterWhere: buildFilterWhere(input),
+        contentTerms: extractFreeTextTerms(input.query ?? ""),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
+      });
+      return {
+        ...result,
+        // Previews are captured content, same viewer gating as the list.
+        sessions: result.sessions.map((session) =>
+          redactV2Content(session, protections),
+        ),
       };
     }),
 

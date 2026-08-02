@@ -41,14 +41,26 @@ export function useTraceListQuery(): TraceListQueryResult {
   const setPage = useFilterStore((s) => s.setPage);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
+  const grouping = useViewStore((s) => s.grouping);
   const samplePreview = useSamplePreview();
+
+  // The sessions lens paginates with its own opaque string cursors through
+  // the SAME shared page number (see useSessionGroups). While it is active,
+  // this hook pins itself to the first batch and leaves the page state
+  // alone, otherwise the two hooks would fight over `page`, each resetting
+  // the other's cursor space.
+  const ownsPagination = grouping !== "by-conversation";
+  const traceCursor =
+    pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
+  const effectivePage = ownsPagination ? page : 1;
 
   // Offset page numbers cannot be restored honestly after a reload because a
   // keyset cursor is intentionally opaque session state. Old `#?page=N` links
   // therefore fall back to the first batch instead of issuing an offset read.
+  // A string cursor left behind by the sessions lens is equally unusable here.
   useEffect(() => {
-    if (page > 1 && pageCursor === undefined) setPage(1);
-  }, [page, pageCursor, setPage]);
+    if (ownsPagination && page > 1 && traceCursor === undefined) setPage(1);
+  }, [ownsPagination, page, traceCursor, setPage]);
 
   // Skip the tRPC request entirely while sample preview is active —
   // saves a roundtrip per page nav for users who're going to see
@@ -62,16 +74,16 @@ export function useTraceListQuery(): TraceListQueryResult {
         live: !!timeRange.label,
       },
       sort: { columnId: sort.columnId, direction: sort.direction },
-      page,
+      page: effectivePage,
       pageSize,
-      ...(page > 1 && pageCursor ? { cursor: pageCursor } : {}),
+      ...(effectivePage > 1 && traceCursor ? { cursor: traceCursor } : {}),
       query: queryText || undefined,
     },
     {
       enabled:
         !!project?.id &&
         samplePreview === null &&
-        (page === 1 || pageCursor !== undefined),
+        (effectivePage === 1 || traceCursor !== undefined),
       staleTime: 60_000,
       keepPreviousData: true,
     },

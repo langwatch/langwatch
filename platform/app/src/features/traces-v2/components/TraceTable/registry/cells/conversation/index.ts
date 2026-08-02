@@ -4,10 +4,13 @@ import { ConversationSelectCell } from "../SelectCells";
 import { ConversationCell } from "./ConversationCell";
 import { LastTurnCell } from "./LastTurnCell";
 import {
+  CompactionsCell,
   CostCell,
   DurationCell,
+  ModelCallsCell,
   ModelCell,
   ServiceCell,
+  SessionContextSizeCell,
   StatusCell,
   TokensCell,
 } from "./SimpleCells";
@@ -23,6 +26,9 @@ export const conversationCells: Record<string, CellDef<ConversationGroup>> = {
   [DurationCell.id]: DurationCell,
   [CostCell.id]: CostCell,
   [TokensCell.id]: TokensCell,
+  [SessionContextSizeCell.id]: SessionContextSizeCell,
+  [ModelCallsCell.id]: ModelCallsCell,
+  [CompactionsCell.id]: CompactionsCell,
   [ModelCell.id]: ModelCell,
   [ServiceCell.id]: ServiceCell,
   [StatusCell.id]: StatusCell,

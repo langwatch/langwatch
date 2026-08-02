@@ -28,6 +28,21 @@ vi.mock("../../../hooks/useTraceList", () => ({
   useTraceList: () => mockTraceListResult,
 }));
 
+// The sessions hook only matters for the by-conversation grouping; these
+// tests pin the flat grouping's gating, so an inert result is enough.
+vi.mock("../../../hooks/useSessionGroups", () => ({
+  useSessionGroups: () => ({
+    groups: [],
+    totalHits: 0,
+    nextCursor: null,
+    isLoading: false,
+    isFetching: false,
+    isPreviousData: false,
+    isError: false,
+    error: null,
+  }),
+}));
+
 // ─── viewStore mock — returns activeLens so TraceTable doesn't bail early ────
 
 vi.mock("../../../stores/viewStore", () => ({

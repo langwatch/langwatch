@@ -45,6 +45,7 @@ export function buildConversationPlaceholderRows(
   return Array.from({ length: count }, (_, i) => ({
     conversationId: `__skeleton_conv_${i}`,
     traces: [],
+    traceCount: 0,
     totalDuration: 0,
     totalCost: 0,
     totalTokens: 0,

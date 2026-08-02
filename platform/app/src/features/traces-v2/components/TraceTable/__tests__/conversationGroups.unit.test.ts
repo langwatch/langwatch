@@ -24,6 +24,7 @@ function makeGroup(
   return {
     conversationId: id,
     traces: Array.from({ length: turns ?? 1 }, () => stubTrace),
+    traceCount: turns ?? 1,
     totalDuration: 0,
     totalCost: 0,
     totalTokens: 0,
@@ -102,8 +103,7 @@ describe("sortConversationGroups", () => {
         groups: scrambled,
         sort: { columnId, direction },
       });
-      // Default is `started` desc → earliestTimestamp desc = high, mid, low.
-      // Previously `started` had no accessor and fell back to latest-first.
+      // Default is `lastTurn` desc → latestTimestamp desc = high, mid, low.
       expect(ids(sorted)).toEqual(["high", "mid", "low"]);
     });
   });

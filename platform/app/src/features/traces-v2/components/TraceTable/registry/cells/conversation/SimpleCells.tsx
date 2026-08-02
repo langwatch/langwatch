@@ -1,5 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { TraceStatus } from "../../../../../types/trace";
+import { formatTokens } from "../../../../../utils/formatters";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
@@ -66,3 +68,76 @@ export const StatusCell: CellDef<ConversationGroup> = {
     </HStack>
   ),
 };
+
+const CONTEXT_SIZE_EXPLANATION =
+  "Largest context carried into a model call across the session.";
+
+/**
+ * Peak context size for the session: the coding-agent fold's peak when the
+ * session has one, otherwise the largest per-trace context-size attribute
+ * the rollup saw. Dash when never reported.
+ */
+export const SessionContextSizeCell: CellDef<ConversationGroup> = {
+  id: "contextSize",
+  label: "Context Size",
+  render: ({ row }) => {
+    const tokens = row.contextSizeTokens ?? 0;
+    if (tokens <= 0) return <MonoCell>{dash}</MonoCell>;
+    return (
+      <Tooltip
+        content={CONTEXT_SIZE_EXPLANATION}
+        positioning={{ placement: "top" }}
+      >
+        <MonoCell>{formatTokens(tokens)}</MonoCell>
+      </Tooltip>
+    );
+  },
+  renderComfortable: ({ row }) => {
+    const tokens = row.contextSizeTokens ?? 0;
+    return (
+      <Text textStyle="xs" color="fg.muted" textAlign="right">
+        {tokens > 0 ? formatTokens(tokens) : dash}
+      </Text>
+    );
+  },
+};
+
+/**
+ * Coding-agent enrichment counters. Null (dash) for ordinary conversations:
+ * these only exist when the session's conversation id matches a pre-folded
+ * coding-agent session row.
+ */
+function createCodingAgentCountCell(
+  id: string,
+  label: string,
+  read: (row: ConversationGroup) => number | null | undefined,
+): CellDef<ConversationGroup> {
+  return {
+    id,
+    label,
+    render: ({ row }) => {
+      const value = read(row);
+      return <MonoCell>{value == null ? dash : value}</MonoCell>;
+    },
+    renderComfortable: ({ row }) => {
+      const value = read(row);
+      return (
+        <Text textStyle="xs" color="fg.muted" textAlign="right">
+          {value == null ? dash : value}
+        </Text>
+      );
+    },
+  };
+}
+
+export const ModelCallsCell = createCodingAgentCountCell(
+  "modelCalls",
+  "Model Calls",
+  (row) => row.modelCalls,
+);
+
+export const CompactionsCell = createCodingAgentCountCell(
+  "compactions",
+  "Compactions",
+  (row) => row.compactions,
+);

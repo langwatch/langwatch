@@ -7,15 +7,12 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useConversationTurns } from "../../hooks/useConversationTurns";
 import { useFilterStore } from "../../stores/filterStore";
 import type { LensConfig } from "../../stores/viewStore";
-import type { TraceListItem } from "../../types/trace";
+import { mapTraceListPayload } from "../../utils/mapTraceListPayload";
 import { buildConversationColumns } from "./columns";
-import {
-  type ConversationGroup,
-  groupTracesByConversation,
-  sortConversationGroups,
-} from "./conversationGroups";
+import type { ConversationGroup } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
 import {
   EXPANDED_BG,
@@ -30,36 +27,51 @@ import { VirtualSpacer } from "./VirtualSpacer";
 const CONVERSATION_MIN_WIDTH = "880px";
 
 // Stable reference so RegistryRow's prop memo doesn't re-render every row
-// each parent render. The expanded conversation's header row shares this
+// each parent render. The expanded session's header row shares this
 // recessed surface with its turn rows.
 const EXPANDED_ROW_BG = { surface: EXPANDED_BG, firstCell: EXPANDED_BG_CSS };
 
 interface ConversationLensBodyProps {
-  traces: TraceListItem[];
+  /**
+   * Server-grouped session rows (specs/traces-v2/sessions-lens.feature):
+   * every total is the TRUE rollup over the whole time range, already in
+   * lens sort order. Rows arrive without turn traces; the expanded row's
+   * turns load lazily below.
+   */
+  groups: ConversationGroup[];
   lens: LensConfig;
   isLoading?: boolean;
 }
 
 export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
-  traces,
+  groups: realGroups,
   lens,
   isLoading = false,
 }) => {
-  // Group order follows the lens sort via the per-group aggregates — the
-  // table uses manualSorting, so the order we pass in is the order shown.
-  const realGroups = useMemo(
-    () =>
-      sortConversationGroups({
-        groups: groupTracesByConversation(traces),
-        sort: lens.sort,
-      }),
-    [traces, lens.sort],
-  );
   const pageSize = useFilterStore((s) => s.pageSize);
-  const groups = useMemo(
-    () => (isLoading ? buildConversationPlaceholderRows(pageSize) : realGroups),
-    [isLoading, pageSize, realGroups],
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  // Turn rows for the one expanded session, fetched on demand: the session
+  // rollup is a GROUP BY, so the row itself carries no per-trace data. Same
+  // conversation-scoped query the drawer's Conversation tab uses.
+  const expandedTurnsQuery = useConversationTurns(
+    isLoading ? null : expandedKey,
   );
+  const expandedTurns = useMemo(
+    () => mapTraceListPayload(expandedTurnsQuery.data),
+    [expandedTurnsQuery.data],
+  );
+
+  const groups = useMemo(() => {
+    if (isLoading) return buildConversationPlaceholderRows(pageSize);
+    if (expandedKey === null || expandedTurns.length === 0) return realGroups;
+    return realGroups.map((group) =>
+      group.conversationId === expandedKey
+        ? { ...group, traces: expandedTurns }
+        : group,
+    );
+  }, [isLoading, pageSize, realGroups, expandedKey, expandedTurns]);
+
   const columns = useMemo(
     () => [
       conversationSelectColumnDef,
@@ -70,15 +82,15 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   const [sorting, setSorting] = useState<SortingState>([
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
-  // Keep the header sort indicators in sync with the lens sort — `realGroups`
-  // is re-sorted from `lens.sort`, so without this the indicators would drift
-  // out of sync with the rendered group order when the lens changes.
+  // Keep the header sort indicators in sync with the lens sort: rows come
+  // from the server already ordered by it, so without this the indicators
+  // would drift out of sync with the rendered group order when the lens
+  // changes.
   useEffect(() => {
     setSorting([
       { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
     ]);
   }, [lens.sort.columnId, lens.sort.direction]);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const table = useReactTable({
     data: groups,
@@ -100,7 +112,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   });
   const virtualItems = virtualizer.getVirtualItems();
 
-  if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
+  if (!isLoading && groups.length === 0) return <NoSessionsMessage />;
 
   const toggleExpanded = (id: string) =>
     setExpandedKey((prev) => (prev === id ? null : id));
@@ -143,13 +155,13 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   );
 };
 
-const NoConversationsMessage: React.FC = () => (
+const NoSessionsMessage: React.FC = () => (
   <Flex align="center" justify="center" padding={8} direction="column" gap={2}>
     <Text color="fg.muted" textStyle="sm">
-      No conversations found.
+      No sessions found.
     </Text>
     <Text textStyle="xs" color="fg.subtle">
-      Conversations appear when traces include a conversation ID.
+      Sessions appear when traces include a conversation ID.
     </Text>
   </Flex>
 );

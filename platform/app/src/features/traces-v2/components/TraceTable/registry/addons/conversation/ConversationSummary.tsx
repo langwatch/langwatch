@@ -13,8 +13,10 @@ interface SummaryProps {
 }
 
 function endTimestamp(group: ConversationGroup): number {
-  const lastTrace = group.traces[group.traces.length - 1]!;
-  return group.latestTimestamp + lastTrace.durationMs;
+  // Server-grouped session rows carry no turn rows until expansion loads
+  // them, so the last turn's duration is a best-effort refinement only.
+  const lastTrace = group.traces[group.traces.length - 1];
+  return group.latestTimestamp + (lastTrace?.durationMs ?? 0);
 }
 
 function pluralise(count: number, singular: string, plural: string): string {
@@ -25,7 +27,9 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} flexWrap="wrap" textStyle="xs" color="fg.subtle">
-      <Text>{group.traces.length} turns</Text>
+      <Text>
+        {group.traceCount} {pluralise(group.traceCount, "trace", "traces")}
+      </Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
@@ -45,7 +49,7 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
       {group.totalTokens > 0 && (
         <>
           <Separator />
-          <Text>{formatTokens(group.totalTokens)} tok</Text>
+          <Text>{formatTokens(group.totalTokens)} tokens</Text>
         </>
       )}
       {group.errorCount > 0 && (
@@ -72,7 +76,9 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} textStyle="xs" color="fg.subtle">
-      <Text>{group.traces.length} turns</Text>
+      <Text>
+        {group.traceCount} {pluralise(group.traceCount, "trace", "traces")}
+      </Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>
       {group.primaryModel && (
@@ -103,7 +109,7 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
       {group.totalTokens > 0 && (
         <>
           <Separator />
-          <Text>{formatTokens(group.totalTokens)} tok</Text>
+          <Text>{formatTokens(group.totalTokens)} tokens</Text>
         </>
       )}
       {group.errorCount > 0 && (

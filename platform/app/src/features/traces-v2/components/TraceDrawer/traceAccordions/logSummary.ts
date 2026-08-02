@@ -43,6 +43,8 @@ function describe(
     }
     case "api_refusal":
       return "The model refused this request";
+    case "rate_limit":
+      return "Rate limited by the provider";
     case "retries_exhausted":
       return `Gave up after retrying${attrs.total_attempts ? ` (${attrs.total_attempts} attempts)` : ""}`;
     case "tool_result":
@@ -120,6 +122,7 @@ export function logEventTone(log: TraceLogRecordDto): LogEventTone {
     case "retries_exhausted":
       return "danger";
     case "api_refusal":
+    case "rate_limit":
       return "warning";
     default:
       return "neutral";

@@ -69,7 +69,9 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
       it("drops the cursors — conversation rows cannot order by Spans either", () => {
         view().setGrouping("by-conversation");
 
-        expect(view().sort.columnId).toBe("started");
+        // The sessions grouping reconciles unsupported sorts to its default,
+        // last activity descending.
+        expect(view().sort.columnId).toBe("lastTurn");
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });

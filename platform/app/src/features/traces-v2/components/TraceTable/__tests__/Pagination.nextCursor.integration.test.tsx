@@ -21,13 +21,21 @@ import { Pagination } from "../Pagination";
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_TO_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 
-function renderPagination(nextCursor: {
-  sortValue: number;
-  traceId: string;
-}): void {
+function renderPagination(
+  nextCursor: {
+    sortValue: number;
+    traceId: string;
+  },
+  props: { visibleCount?: number; maxPageSize?: number } = {},
+): void {
   render(
     <ChakraProvider value={defaultSystem}>
-      <Pagination totalHits={500} nextCursor={nextCursor} visibleCount={50} />
+      <Pagination
+        totalHits={500}
+        nextCursor={nextCursor}
+        visibleCount={props.visibleCount ?? 50}
+        maxPageSize={props.maxPageSize}
+      />
     </ChakraProvider>,
   );
 }
@@ -60,6 +68,28 @@ describe("Pagination Next", () => {
           pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
         });
       });
+    });
+  });
+
+  describe("given a lens whose data source caps the page size below the shared preference", () => {
+    /** @scenario A larger persisted page size clamps to the sessions cap */
+    it("counts the range by the clamped size and offers no sizes beyond the cap", () => {
+      useFilterStore.setState({
+        page: 2,
+        pageSize: 250,
+        pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
+      });
+      renderPagination(CURSOR_TO_PAGE_3, {
+        visibleCount: 100,
+        maxPageSize: 100,
+      });
+
+      // Page 2 of a 100-row data source starts at row 101, whatever the
+      // shared preference says.
+      expect(screen.getByText(/showing 101–200/)).toBeDefined();
+      expect(screen.queryByRole("button", { name: "250" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "1000" })).toBeNull();
+      expect(screen.getByRole("button", { name: "100" })).toBeDefined();
     });
   });
 

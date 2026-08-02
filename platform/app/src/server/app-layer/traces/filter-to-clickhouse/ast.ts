@@ -82,6 +82,64 @@ export function translateFilterToClickHouse(
   return { sql, params: ctx.params };
 }
 
+/**
+ * The positive free-text terms of a query: every non-negated implicit-field
+ * value ("#6418", a quoted phrase), skipping structured `field:value` tags.
+ * The Sessions lens matches these against session transcript content in
+ * `log_records`, ON TOP of the trace-level translation above, so a term that
+ * only ever appeared in a transcript still finds its session. Returns [] for
+ * empty or unparsable input (the translator throws on those first anyway).
+ */
+export function extractFreeTextTerms(queryText: string): string[] {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return [];
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return [];
+  }
+
+  const terms: string[] = [];
+  const walk = (node: LiqeQuery, negated: boolean): void => {
+    switch (node.type) {
+      case "Tag": {
+        const tag = node as TagToken;
+        if (negated || tag.field.type !== "ImplicitField") return;
+        if (
+          tag.expression.type !== "LiteralExpression" &&
+          tag.expression.type !== "RegexExpression"
+        ) {
+          return;
+        }
+        const value = extractStringValue(tag);
+        if (value.length > 0) terms.push(value);
+        return;
+      }
+      case "LogicalExpression": {
+        const logExpr = node as LogicalExpressionToken;
+        walk(logExpr.left, negated);
+        walk(logExpr.right, negated);
+        return;
+      }
+      case "UnaryOperator": {
+        const unary = node as UnaryOperatorToken;
+        const isNeg = unary.operator === "NOT" || unary.operator === "-";
+        walk(unary.operand, negated !== isNeg);
+        return;
+      }
+      case "ParenthesizedExpression":
+        walk((node as ParenthesizedExpressionToken).expression, negated);
+        return;
+      default:
+        return;
+    }
+  };
+  walk(ast, false);
+  return terms;
+}
+
 function translateNode(
   node: LiqeQuery,
   negated: boolean,

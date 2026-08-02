@@ -109,19 +109,27 @@ const TRACE_CAPABILITY: LensCapability = {
   defaultSort: { columnId: "time", direction: "desc" },
 };
 
+// The Sessions grouping (user-facing name; column/addon ids and the
+// persisted "by-conversation" mode key predate the rename and stay stable
+// so saved lens state keeps parsing). Rows come from the server-side
+// session rollup: every total sums ALL traces of the session in range,
+// not the fetched page (specs/traces-v2/sessions-lens.feature).
 const CONVERSATION_CAPABILITY: LensCapability = {
   // Sections mirror the trace-grouping shape so the Columns dropdown
   // can render the same "Standard" section header on every grouping —
   // without this the dropdown falls back to "Other" for any column
   // missing a section, which reads as broken next to the dialog version.
   columns: [
-    { id: "conversation", label: "Conversation", section: "Standard" },
-    { id: "turns", label: "Turns", section: "Standard" },
+    { id: "conversation", label: "Session", section: "Standard" },
+    { id: "turns", label: "Traces", section: "Standard" },
     { id: "started", label: "Started", section: "Standard" },
-    { id: "lastTurn", label: "Last Turn", section: "Standard" },
+    { id: "lastTurn", label: "Last Activity", section: "Standard" },
     { id: "duration", label: "Duration", section: "Standard" },
     { id: "cost", label: "Cost", section: "Standard" },
     { id: "tokens", label: "Tokens", section: "Standard" },
+    { id: "contextSize", label: "Context Size", section: "Standard" },
+    { id: "modelCalls", label: "Model Calls", section: "Standard" },
+    { id: "compactions", label: "Compactions", section: "Standard" },
     { id: "model", label: "Model", section: "Standard" },
     { id: "service", label: "Service", section: "Standard" },
     { id: "status", label: "Status", section: "Standard" },
@@ -129,14 +137,16 @@ const CONVERSATION_CAPABILITY: LensCapability = {
   defaultColumns: [
     "conversation",
     "turns",
+    "lastTurn",
     "duration",
     "cost",
     "tokens",
+    "contextSize",
     "model",
     "service",
     "status",
   ],
-  addons: [{ id: "conversation-turns", label: "Conversation turns" }],
+  addons: [{ id: "conversation-turns", label: "Session turns" }],
   sortableColumnIds: [
     "started",
     "lastTurn",
@@ -145,7 +155,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     "tokens",
     "turns",
   ],
-  defaultSort: { columnId: "started", direction: "desc" },
+  defaultSort: { columnId: "lastTurn", direction: "desc" },
 };
 
 function makeGroupCapability(label: string): LensCapability {
@@ -175,7 +185,8 @@ export const LENS_CAPABILITIES: Record<GroupingMode, LensCapability> = {
 
 export const GROUPING_LABELS: Record<GroupingMode, string> = {
   flat: "Flat",
-  "by-conversation": "By Conversation",
+  // Persisted mode key stays "by-conversation"; only the label says Session.
+  "by-conversation": "By Session",
   "by-service": "By Service",
   "by-user": "By User",
   "by-model": "By Model",

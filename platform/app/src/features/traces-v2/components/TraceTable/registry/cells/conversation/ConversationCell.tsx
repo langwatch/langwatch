@@ -86,8 +86,8 @@ const ConversationIdLabel: React.FC<{
   return (
     <chakra.button
       type="button"
-      aria-label="Filter to this conversation"
-      title="Show all traces in this conversation"
+      aria-label="Filter to this session"
+      title="Show all traces in this session"
       onClick={filterToConversation}
       cursor="pointer"
       flexShrink={0}
@@ -108,7 +108,7 @@ const ConversationIdLabel: React.FC<{
 
 export const ConversationCell: CellDef<ConversationGroup> = {
   id: "conversation",
-  label: "Conversation",
+  label: "Session",
   render: ({ row, isExpanded, actions }) => {
     const io = conversationIO(row);
     return (
