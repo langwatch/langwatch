@@ -23,11 +23,15 @@ Feature: PlanProvider License Integration
     Then the active plan is the Open Source plan
     And seats are uncapped
 
-  Scenario: An expired license leaves the deployment on the Open Source plan
-    Given the organization has an expired license
+  # A license past its end date is still one we signed, so its seat count keeps
+  # binding rather than dissolving into the uncapped baseline. See
+  # expired-license-enforcement.feature.
+
+  Scenario: An expired license keeps the seats it sold
+    Given the organization has an expired license for 5 members
     When I call planProvider.getActivePlan
-    Then the active plan is the Open Source plan
-    And seats are uncapped
+    Then the active plan is the one the license names
+    And seats are capped at 5
 
   Scenario: An unreadable license leaves the deployment on the Open Source plan
     Given the organization has a tampered license

@@ -28,29 +28,33 @@ export function isCorruptedLicense(
 }
 
 /**
- * Determines if a license has expired based on its expiresAt date.
- * Returns true only when:
- * - License exists (hasLicense: true)
- * - License has metadata with expiresAt
- * - The expiresAt date is in the past
+ * Whether the license is one LangWatch signed whose term has simply ended.
  *
- * Returns false for:
- * - No license
- * - Corrupted license (no metadata)
- * - Invalid license with future expiresAt (signature issues, not expired)
+ * The server answers this, because it is the only side that checked the
+ * signature. Comparing `expiresAt` here would call a forged license expired
+ * whenever its payload claimed a past date, and a forged license means nothing
+ * at all.
  */
 export function isLicenseExpired(status: LicenseStatus | undefined): boolean {
-  if (!status) return false;
-  if (!status.hasLicense) return false;
+  if (!status?.hasLicense) return false;
 
-  // Check if we have metadata with expiresAt
-  if (!hasLicenseMetadata(status)) return false;
+  return "expired" in status && status.expired;
+}
 
-  // Parse and compare the expiration date
-  const expiresAt = new Date(status.expiresAt);
-  if (isNaN(expiresAt.getTime())) return false;
+/**
+ * Whether the stored license binds the seat count it names.
+ *
+ * True for a valid license and for one whose term ended, since a license we
+ * signed keeps metering what it sold. False for a license we did not sign and
+ * for no license at all, where the deployment runs on the uncapped open-source
+ * baseline and being over a seat count is not a thing that can happen.
+ */
+export function licenseMetersSeats(
+  status: LicenseStatus | undefined,
+): status is LicenseStatusWithMetadata {
+  if (!status?.hasLicense) return false;
 
-  return expiresAt.getTime() < Date.now();
+  return status.valid || isLicenseExpired(status);
 }
 
 /**

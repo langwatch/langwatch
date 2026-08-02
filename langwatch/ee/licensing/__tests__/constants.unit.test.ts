@@ -69,9 +69,9 @@ describe("CONTACT_SALES_URL", () => {
 });
 
 describe("FREE_PLAN", () => {
-  /** @scenario FREE_PLAN has correct limits for expired/invalid licenses */
+  /** @scenario FREE_PLAN has the Cloud free-tier limits */
   /** @scenario PlanInfo defaults maxMembers to 1 when not specified */
-  it("has the expected fallback limits for expired/invalid licenses", () => {
+  it("has the Cloud free-tier limits", () => {
     expect(FREE_PLAN.type).toBe("FREE");
     expect(FREE_PLAN.name).toBe("Free");
     expect(FREE_PLAN.free).toBe(true);

@@ -5,7 +5,10 @@ import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
 import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
 import { LicenseLoadError } from "./license/LicenseLoadError";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
-import { normalizeKeyForActivation } from "./license/licenseStatusUtils";
+import {
+  licenseMetersSeats,
+  normalizeKeyForActivation,
+} from "./license/licenseStatusUtils";
 import { NoLicenseCard } from "./license/NoLicenseCard";
 import { OverSeatsCallout } from "./license/OverSeatsCallout";
 import { useLicenseActions } from "./license/useLicenseActions";
@@ -91,10 +94,7 @@ export function LicenseStatus({
 
   return (
     <VStack align="start" gap={0} width="full">
-      {/* Only a valid license caps seats. An expired or unreadable one drops
-          the deployment back to the uncapped baseline, where being "over" is
-          not a thing that can happen. */}
-      {status.valid && (
+      {licenseMetersSeats(status) && (
         <OverSeatsCallout
           currentMembers={status.currentMembers}
           maxMembers={status.maxMembers}
