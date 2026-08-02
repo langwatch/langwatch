@@ -50,6 +50,15 @@ export function computeSpanCost({
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]) ??
       0,
   );
+  // The portion of the writes above that bought an hour-long cache entry, which
+  // bills higher than a short-lived one. Only emitters that know the split
+  // report it; without it every write prices short-lived, as before.
+  const cacheCreation1hTokens = Math.max(
+    0,
+    coerceToNumber(
+      attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
+    ) ?? 0,
+  );
 
   // Audio usage: TTS spans carry the characters synthesized, STT spans the
   // seconds transcribed. These are the billable units for audio models that
@@ -73,20 +82,39 @@ export function computeSpanCost({
     attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
   );
   if (numInputRate !== null || numOutputRate !== null) {
-    const inputRate = numInputRate ?? 0;
-    const cacheReadRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
-      ) ?? inputRate;
-    const cacheCreationRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
-      ) ?? inputRate;
+    // Same arithmetic as every other priority, so a cache TTL split (or any
+    // future billable unit) is priced identically whether the rates came from
+    // a customer override or the registry. `estimateCost` returns undefined
+    // only when it sees no rate at all, which cannot happen here: this branch
+    // is gated on one being present. A deliberate all-zero override still
+    // returns 0 and stops here rather than falling through to the registry.
     return (
-      inputTokens * inputRate +
-      outputTokens * (numOutputRate ?? 0) +
-      cacheReadTokens * cacheReadRate +
-      cacheCreationTokens * cacheCreationRate
+      estimateCost({
+        llmModelCost: {
+          projectId: "",
+          model: "",
+          regex: "",
+          inputCostPerToken: numInputRate ?? 0,
+          outputCostPerToken: numOutputRate ?? 0,
+          cacheReadCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
+            ) ?? undefined,
+          cacheCreationCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
+            ) ?? undefined,
+          cacheCreation1hCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN],
+            ) ?? undefined,
+        },
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
+        cacheCreation1hTokens,
+      }) ?? 0
     );
   }
 
@@ -115,6 +143,7 @@ export function computeSpanCost({
       outputTokens > 0 ||
       cacheReadTokens > 0 ||
       cacheCreationTokens > 0 ||
+      cacheCreation1hTokens > 0 ||
       inputCharacters > 0 ||
       audioSeconds > 0)
   ) {
@@ -129,6 +158,7 @@ export function computeSpanCost({
         outputTokens,
         cacheReadTokens,
         cacheCreationTokens,
+        cacheCreation1hTokens,
         inputCharacters,
         audioSeconds,
       });

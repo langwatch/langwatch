@@ -267,3 +267,97 @@ describe("computeSpanCost", () => {
     });
   });
 });
+
+/**
+ * The figures here are a real Claude Code call, taken from its own api_request
+ * event: 2 fresh input tokens, 210 output, 18443 read from the cache and 17854
+ * written to it, on claude-opus-5, which the agent reported costing
+ * 0.1930215 USD. Pricing the writes as hour-long reproduces that number
+ * exactly; pricing them short-lived lands about a third low.
+ */
+describe("cache write TTL pricing through computeSpanCost", () => {
+  const CLAUDE_CALL = {
+    "gen_ai.request.model": "claude-opus-5",
+    "gen_ai.usage.input_tokens": 2,
+    "gen_ai.usage.output_tokens": 210,
+    "gen_ai.usage.cache_read.input_tokens": 18443,
+    "gen_ai.usage.cache_creation.input_tokens": 17854,
+  };
+  const REPORTED_BY_ANTHROPIC = 0.1930215;
+
+  describe("given a span saying its cache entry lives an hour", () => {
+    /** @scenario "Each cache write bucket is priced at its own rate" */
+    it("reproduces the cost the provider reported for the call", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          ...CLAUDE_CALL,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
+        },
+        promptTokens: 2,
+        completionTokens: 210,
+      });
+
+      expect(cost).toBeCloseTo(REPORTED_BY_ANTHROPIC, 10);
+    });
+  });
+
+  describe("given the same span without the cache lifetime", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("prices the writes short-lived, below what the provider charged", () => {
+      const cost = computeSpanCost({
+        attrs: CLAUDE_CALL,
+        promptTokens: 2,
+        completionTokens: 210,
+      });
+
+      expect(cost).toBeLessThan(REPORTED_BY_ANTHROPIC);
+      expect(cost).toBeCloseTo(
+        2 * 0.000005 + 210 * 0.000025 + 18443 * 0.0000005 + 17854 * 0.00000625,
+        10,
+      );
+    });
+  });
+
+  describe("given a project overriding the rates itself", () => {
+    /** @scenario "A model with no hour-long rate prices every write the same" */
+    it("prices hour-long writes at the override's own cache write rate", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          ...CLAUDE_CALL,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
+          "langwatch.model.inputCostPerToken": 0.000001,
+          "langwatch.model.outputCostPerToken": 0.000002,
+          "langwatch.model.cacheCreationCostPerToken": 0.000003,
+        },
+        promptTokens: 2,
+        completionTokens: 210,
+      });
+
+      expect(cost).toBeCloseTo(
+        2 * 0.000001 + 210 * 0.000002 + 18443 * 0.000001 + 17854 * 0.000003,
+        10,
+      );
+    });
+
+    /** @scenario "Each cache write bucket is priced at its own rate" */
+    it("uses the override's hour-long rate when it sets one", () => {
+      const cost = computeSpanCost({
+        attrs: {
+          ...CLAUDE_CALL,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
+          "langwatch.model.inputCostPerToken": 0.000001,
+          "langwatch.model.outputCostPerToken": 0.000002,
+          "langwatch.model.cacheCreationCostPerToken": 0.000003,
+          "langwatch.model.cacheCreation1hCostPerToken": 0.000004,
+        },
+        promptTokens: 2,
+        completionTokens: 210,
+      });
+
+      expect(cost).toBeCloseTo(
+        2 * 0.000001 + 210 * 0.000002 + 18443 * 0.000001 + 17854 * 0.000004,
+        10,
+      );
+    });
+  });
+});
