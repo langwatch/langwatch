@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { normalizeEvaluatorConfig } from "../../evaluators/evaluatorConfig";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -544,7 +545,9 @@ export const evaluatorsRouter = createTRPCRouter({
             config:
               source.config === null
                 ? Prisma.JsonNull
-                : (source.config as Prisma.InputJsonValue),
+                : normalizeEvaluatorConfig(
+                    source.config as Prisma.InputJsonValue,
+                  ),
           },
         });
         pushedTo++;
@@ -613,7 +616,9 @@ export const evaluatorsRouter = createTRPCRouter({
           config:
             source.config === null
               ? Prisma.JsonNull
-              : (source.config as Prisma.InputJsonValue),
+              : normalizeEvaluatorConfig(
+                  source.config as Prisma.InputJsonValue,
+                ),
         },
       });
 

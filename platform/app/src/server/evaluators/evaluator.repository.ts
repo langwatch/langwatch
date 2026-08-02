@@ -1,4 +1,5 @@
 import type { Evaluator, Prisma, PrismaClient } from "@prisma/client";
+import { normalizeEvaluatorConfig } from "./evaluatorConfig";
 import { generateEvaluatorSlug } from "../../utils/evaluatorSlug";
 
 /**
@@ -106,6 +107,7 @@ export class EvaluatorRepository {
         return await this.prisma.evaluator.create({
           data: {
             ...input,
+            config: normalizeEvaluatorConfig(input.config),
             slug,
           },
         });
@@ -138,7 +140,10 @@ export class EvaluatorRepository {
         id: input.id,
         projectId: input.projectId,
       },
-      data: input.data,
+      data:
+        input.data && "config" in input.data
+          ? { ...input.data, config: normalizeEvaluatorConfig(input.data.config) }
+          : input.data,
     });
   }
 

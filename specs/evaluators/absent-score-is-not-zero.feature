@@ -57,7 +57,7 @@ Feature: An absent evaluator score is never presented or stored as zero
     Then the judge either receives the user's prompt or the run fails with a named error
     And the judge is never asked to evaluate using its own default prompt
 
-  @integration @unimplemented
+  @integration
   Scenario: A config shape the online path cannot read cannot be written
     Given a custom LLM-judge evaluator is saved with its prompt at the top level of config
     When the evaluator is written through any of the supported creation and update paths
