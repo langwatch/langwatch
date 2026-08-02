@@ -57,3 +57,10 @@ Feature: Prompt-cache writes are priced by how long they live
     And a call wrote tokens to an hour-long cache
     When the call is priced
     Then those tokens cost that one rate
+
+  @unit
+  Scenario: A read never swaps in a cost only that read can see
+    Given a coding agent reported its own cost for a call it made
+    When the call is opened in the trace drawer
+    Then the cost shown is the one computed from the call's tokens
+    And it is the same figure the analytics graphs and the alerts count
