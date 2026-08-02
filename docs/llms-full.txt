@@ -55252,9 +55252,11 @@ The SSO decision is made once at startup. Plan entitlements apply immediately, b
 
 ## Expiry
 
-An expired license keeps SSO working. Losing company-wide login the morning a renewal slips is a worse outcome than serving an ex-customer for a few days, so the SSO gate accepts any genuinely issued license regardless of its expiry date, and logs a renewal reminder instead.
+Nothing is switched off on the day a license reaches its end date. Nobody is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
 
-Plan entitlements do follow expiry. An expired or unreadable license drops the deployment back to the uncapped open-source baseline, never to something more restrictive than never having held a license at all.
+The seat count keeps binding. A license we issued is a record of what was bought, so an expired one still covers the seats it sold: an organization holding more members than that is asked to disable the ones who no longer need access, and adding a new member is refused until the license is renewed. Everyone who already has a seat is unaffected.
+
+A license we did not issue is a different thing. Its numbers cannot be trusted, so an unreadable or altered key leaves the deployment on the uncapped open-source baseline, exactly as if it had never held a license.
 
 ## Frequently asked
 
