@@ -1860,6 +1860,24 @@ Every LangWatch error, from the gateway data plane and from the management API a
 
 This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SDK (which parses a superset), expect. Existing client code raises its usual typed exceptions unchanged.
 
+## Two planes, one envelope, one difference
+
+`type`, `code`, `message` and `meta` mean the same thing on both LangWatch surfaces, and a client that reads only those four works against either. The surfaces are:
+
+- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/v1/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
+- The **data plane**: the OpenAI-compatible chat surface the gateway serves. Your application's model calls go here.
+
+They differ in exactly two ways, both consequences of the data plane being OpenAI-wire-shaped on purpose:
+
+| | Control plane | Data plane |
+|---|---|---|
+| Validation detail | `error.meta.reasons` | `error.reasons` |
+| `402 budget_exceeded` | never | this is the only place it is raised |
+
+Read the reason chain from the plane you called. Nothing else about the envelope moves, and the data plane's extra `tips`, `docs_url` and `fault` fields are additive on both.
+
+<Note>`402 budget_exceeded` is a data-plane refusal because a budget stops **traffic**, not administration. Creating or editing a budget over the control plane is never refused for being over cap.</Note>
+
 ### Fields
 
 | Field | Always present | What it is |
@@ -1867,10 +1885,10 @@ This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SD
 | `type` | yes | The coarse discriminant provider SDKs branch on. On the gateway data plane it carries the same value as `code` (the table below is the enum). On the management API it is the status class: `bad_request`, `unauthenticated`, `permission_denied`, `not_found`, `conflict`, `precondition_failed`, `unprocessable_entity`, `rate_limited`, `internal_error`. |
 | `code` | yes | The specific, stable machine name for what happened. **This is the field to branch on**, on either plane. |
 | `message` | yes | One sentence for a human. Wording is not stable; never parse it. |
-| `meta` | no | Structured detail the sentence deliberately leaves out, so a client never has to scrape prose. Keys are `lower_snake_case` (for example `budget_id`, `budget_scope`, `scope_kind`). Omitted entirely when there is nothing to add. |
+| `meta` | no | Structured detail the sentence deliberately leaves out, so a client never has to scrape prose. Keys are `lower_snake_case` (for example `budget_id`, `budget_scope`, `scope_type`). Omitted entirely when there is nothing to add. On the data-plane `402`, `meta.budget_scope` is the offending budget's `scope_type`: it keeps the `budget_` prefix because it sits in a self-consistent family alongside `budget_id`, `budget_window` and `budget_provider`. |
 | `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them when filing support tickets. |
 
-Validation failures put the offending fields under `meta`: `meta.target` names the part of the request that failed (`json`, `query`, `param`), `meta.fields` lists the offending paths, and `meta.reasons` carries one `{ code, message, meta }` entry per violation with `meta.field`, `meta.type` and, where the schema knows them, `meta.expected` and `meta.received`.
+Validation failures put the offending fields under `meta`: `meta.target` names the part of the request that failed (`json`, `query`, `param`) and `meta.fields` lists the offending paths. The per-violation chain carries one `{ code, message, meta }` entry each, with `meta.field`, `meta.type` and, where the schema knows them, `meta.expected` and `meta.received`. That chain lives at **`error.meta.reasons` on the control plane** and at **`error.reasons` on the data plane**, as above.
 
 The gateway data plane adds three fields on the errors it can offer a next step for, most notably the `402 budget_exceeded`:
 
@@ -1888,7 +1906,7 @@ A client that reads only `type`, `code`, `message` and `meta` works unchanged ag
 
 Errors (like successes) always carry:
 
-- `X-LangWatch-Request-Id: grq_<ULID>`, use this when filing support tickets.
+- `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
 
 ## Type enum

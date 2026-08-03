@@ -159,7 +159,7 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
         // and the scope KIND in `meta`; the sentence is copy and the ids it
         // used to carry belonged to another tenant's records.
         code: "gateway_scope_org_mismatch",
-        meta: { scope_kind: "user" },
+        meta: { scope_type: "user" },
       });
 
       const persisted = await prisma.gatewayBudget.findFirst({

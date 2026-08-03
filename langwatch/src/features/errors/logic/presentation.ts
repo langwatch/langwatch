@@ -1251,9 +1251,9 @@ const presentations = {
     // confirm the existence of.
     title: "That scope isn't in this organization",
     describe: (error) => {
-      const kind = str(error, "scope_kind", "");
-      return kind
-        ? `Pick a ${kind} that belongs to this organization.`
+      const scopeType = str(error, "scope_type", "");
+      return scopeType
+        ? `Pick a ${scopeType} that belongs to this organization.`
         : "Pick a scope that belongs to this organization.";
     },
   },

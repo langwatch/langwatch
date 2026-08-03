@@ -78,19 +78,23 @@ export class GatewayBudgetNotFoundError extends HandledError {
  *
  * A cross-tenant guard, not a typo check: the scope id is request-supplied, so
  * without it a caller could put a budget or a key on another tenant's team.
- * That is why `meta` carries the KIND of scope and never the id — the id names
+ * That is why `meta` carries the TYPE of scope and never the id — the id names
  * another tenant's record, and the sentence it used to sit in
  * (`scope_org_mismatch: team tm_… is not in organization org_…`) shipped both
  * that id and ours to whoever asked.
+ *
+ * The key is `scope_type`, the same name the budget wire and the webhook
+ * payloads already give this field, so a consumer reads one spelling
+ * everywhere on the control plane.
  */
 export class GatewayScopeOrgMismatchError extends HandledError {
   declare readonly code: "gateway_scope_org_mismatch";
 
-  constructor(scopeKind: string) {
+  constructor(scopeType: string) {
     super(
       "gateway_scope_org_mismatch",
       "That scope does not belong to this organization",
-      { meta: { scope_kind: scopeKind }, httpStatus: 400, fault: "customer" },
+      { meta: { scope_type: scopeType }, httpStatus: 400, fault: "customer" },
     );
     this.name = "GatewayScopeOrgMismatchError";
   }
