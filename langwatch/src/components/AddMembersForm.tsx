@@ -24,6 +24,7 @@ import {
 } from "react-hook-form";
 import { Checkbox } from "~/components/ui/checkbox";
 import { api } from "~/utils/api";
+import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
@@ -254,12 +255,14 @@ export function AddMembersForm({
                       >
                         Lite Member
                       </Text>
-                      <FieldInfoTooltip
-                        description={LITE_MEMBER_EXPLANATION}
-                        docHref={SEAT_TYPES_DOC_PATH}
-                        docLabel="How seats are counted"
-                        testId="lite-member-info"
-                      />
+                      <InfoWithoutSelecting>
+                        <FieldInfoTooltip
+                          description={LITE_MEMBER_EXPLANATION}
+                          docHref={SEAT_TYPES_DOC_PATH}
+                          docLabel="How seats are counted"
+                          testId="lite-member-info"
+                        />
+                      </InfoWithoutSelecting>
                     </HStack>
                     <Text fontSize="xs" color="fg.muted">
                       {LITE_MEMBER_SHORT_DESCRIPTION}

@@ -33,7 +33,9 @@ Paid plans meter seats, and there are two kinds. Which one a person occupies fol
 - A **full seat** is someone who can change things.
 - A **lite seat** is someone who can only look at what the team produces.
 
-ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat, unless you assign it a custom role granting anything beyond viewing, in which case that person can change things and counts as a full seat from then on.
+ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
+
+Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
 
 ### What a lite member can do
 
@@ -49,7 +51,7 @@ They can open the projects they are invited to and read what the team produces t
 | Their own team | |
 | The names of the project's secrets, never their values | |
 
-Annotations are the exception: a lite member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
+Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
 
 These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
 

@@ -15,7 +15,7 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | `otel_generic` source type + `thirty_days` retention are available on the Apache 2.0 floor; multi-source + extended retention require Enterprise. |
 | [Anomaly Rules](/ai-governance/anomaly-rules) | Enterprise | Admin-curated detection rules + dispatch (Slack, PagerDuty, SIEM). |
 | [Compliance architecture](/ai-governance/compliance-architecture) | Enterprise | OCSF, SIEM export, multi-class retention, tamper-evidence (post-GA follow-up). |
-| Gateway webhooks | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. The surface platforms meter and rebill their own customers on. |
+| Gateway webhooks | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. This is the surface platforms meter and rebill their own customers on. |
 
 In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out source-type dropdowns to `otel_generic` and retention to `thirty_days` for non-enterprise users.
 
@@ -29,11 +29,14 @@ The repository tree is split 1:1 by license, so the directory a file lives in is
 | Inside `langwatch/ee/` | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
 | Everything else | Apache 2.0 | `Apache-2.0` |
 
-The client SDKs are MIT so that integrating LangWatch never puts a copyleft or
-notice obligation on your own application. The rows are read most-specific
+The client SDKs are MIT so that integrating LangWatch never puts a copyleft
+obligation on your own application. MIT still asks you to retain its copyright
+and permission notice when you redistribute the SDK or a substantial portion of
+it, which is the usual third-party-notices entry rather than a constraint on how
+you license your own code. The rows are read most-specific
 first: the SDK directories are MIT even though they sit outside `langwatch/ee/`.
 
-The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary only need to flip one line. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
+The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
 
 The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 

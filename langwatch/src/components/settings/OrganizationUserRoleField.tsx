@@ -3,6 +3,7 @@ import { OrganizationUserRole } from "@prisma/client";
 import { useMemo } from "react";
 import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
 import { Select } from "../ui/select";
+import { InfoWithoutSelecting } from "./InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
@@ -72,12 +73,14 @@ export function OrganizationUserRoleField({
                   <HStack gap={0}>
                     <Text>{option.label}</Text>
                     {option.value === OrganizationUserRole.EXTERNAL && (
-                      <FieldInfoTooltip
-                        description={LITE_MEMBER_EXPLANATION}
-                        docHref={SEAT_TYPES_DOC_PATH}
-                        docLabel="How seats are counted"
-                        testId="lite-member-info"
-                      />
+                      <InfoWithoutSelecting>
+                        <FieldInfoTooltip
+                          description={LITE_MEMBER_EXPLANATION}
+                          docHref={SEAT_TYPES_DOC_PATH}
+                          docLabel="How seats are counted"
+                          testId="lite-member-info"
+                        />
+                      </InfoWithoutSelecting>
                     )}
                   </HStack>
                   <Text color="fg.muted" fontSize="13px">

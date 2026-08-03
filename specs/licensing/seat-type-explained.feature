@@ -27,6 +27,14 @@ Feature: Admins can tell a full seat from a lite seat before they buy one
       When I change an existing member's organization role
       Then the lite member option carries the same explanation as the invite form
 
+  Rule: reading the explanation is not choosing
+
+    @integration
+    Scenario: Reading the explanation does not choose the seat
+      When I open the explanation next to the lite member option
+      Then the member's seat type is unchanged
+      And the explanation is on screen
+
   Rule: the explanation matches how seats are actually counted
 
     @unit

@@ -74,6 +74,39 @@ describe("the seat-type choice", () => {
     });
   });
 
+  describe("when an admin only wants to read the explanation", () => {
+    /** @scenario Reading the explanation does not choose the seat */
+    it("does not switch the member to a lite seat on the way", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <OrganizationUserRoleField value="MEMBER" onChange={onChange} />
+        </ChakraProvider>,
+      );
+
+      await user.click(screen.getByRole("combobox"));
+      await user.click(await screen.findByTestId("lite-member-info"));
+
+      // A select option commits on pointer-down, so an unguarded (i) inside one
+      // answers "what is a lite member?" by making them one.
+      expect(onChange).not.toHaveBeenCalled();
+      expect(await screen.findByText(LITE_MEMBER_EXPLANATION)).toBeDefined();
+    });
+
+    /** @scenario Reading the explanation does not choose the seat */
+    it("does not tick the lite member box on the invite form", async () => {
+      const user = userEvent.setup();
+      renderInviteForm();
+
+      const checkbox = () => screen.getByRole("checkbox") as HTMLInputElement;
+      const before = checkbox().checked;
+      await user.click(screen.getByTestId("lite-member-info"));
+
+      expect(checkbox().checked).toBe(before);
+    });
+  });
+
   describe("when an admin changes an existing member's role", () => {
     /** @scenario The role picker explains the same thing as the invite form */
     it("carries the same explanation the invite form shows", async () => {
