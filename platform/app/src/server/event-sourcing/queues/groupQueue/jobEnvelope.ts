@@ -210,6 +210,23 @@ export interface EnvelopeHeader {
   ref?: BlobRef;
   /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
+  /**
+   * Serialized payload size in bytes, BEFORE compression and before any offload
+   * to the blob store — the size the payload has once it is back in a worker's
+   * hands (ADR-066 pillar 2).
+   *
+   * It exists because the stored value's own length answers a different
+   * question. A body over {@link INLINE_CEILING_BYTES} leaves only a reference
+   * behind, and a body over {@link COMPRESSION_THRESHOLD_BYTES} is stored
+   * compressed, so `#value` can be two or three orders of magnitude under the
+   * bytes a coalesced batch will actually hold in memory and append downstream.
+   * The drain's byte budget reads this field, so its bound survives offload.
+   *
+   * In the header, never the body: the body is content-addressed and hashing it
+   * with a size field would be harmless but redundant, while the header is what
+   * both the Lua drain and the ops dashboard can read without blob I/O.
+   */
+  s?: number;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
   t?: string;
@@ -533,6 +550,10 @@ export async function encodeJobEnvelope({
     });
     const payloadBytes = bytes.length;
     assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
+    // Recorded on every envelope, not just offloaded ones: an inline body over
+    // COMPRESSION_THRESHOLD_BYTES is stored compressed, so `#value` understates
+    // it too. See EnvelopeHeader.s.
+    header.s = payloadBytes;
 
     if (payloadBytes > INLINE_CEILING_BYTES) {
       const compression = writeCompression();
@@ -593,6 +614,7 @@ export async function encodeJobEnvelope({
     );
   }
   const header = routingHeader(jobData, 1);
+  header.s = jsonBytes;
   if (blobs && jsonBytes > BLOB_OFFLOAD_THRESHOLD_BYTES) {
     const id = randomUUID();
     await blobs.put({ id, data: await compress(json, writeCompression()) });
@@ -731,6 +753,32 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
   } catch {
     return { pipelineName: null, jobType: null, jobName: null };
   }
+}
+
+/**
+ * How many bytes this job costs a coalesced batch: the header's recorded
+ * payload size when the value carries one, the stored length otherwise.
+ *
+ * The fallback is the honest answer for the values that have no `s` — legacy
+ * bare JSON, and envelopes written before this field existed — because for them
+ * the stored length IS the payload, modulo inline compression. It is also the
+ * conservative direction only for uncompressed values; a pre-`s` envelope with a
+ * blob body still under-reports. Those drain under the count bound alone, same
+ * as before, and age out as the fleet cycles.
+ *
+ * Never throws: a value this cannot read is worth its stored length, not an
+ * exception on the drain path.
+ */
+export function readJobPayloadBytes(value: string): number {
+  try {
+    if (isEnvelope(value)) {
+      const { header } = splitEnvelope(value);
+      if (typeof header.s === "number" && header.s >= 0) return header.s;
+    }
+  } catch {
+    // Fall through: an unreadable envelope still occupies its stored bytes.
+  }
+  return Buffer.byteLength(value, "utf8");
 }
 
 /**

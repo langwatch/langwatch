@@ -414,6 +414,33 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
+// What a staged job will weigh once a worker holds it, which is NOT its stored
+// length: a body over the inline ceiling lives in the blob store and leaves a
+// ~200-byte reference behind, and a body over the compression threshold is
+// stored compressed. The encoder records the pre-compression, pre-offload
+// payload size in the envelope header (`s`), so the drain's byte budget can be
+// about the batch a worker will actually assemble rather than about Redis
+// occupancy. Mirrors the TS `readJobPayloadBytes`, including the fallback:
+// legacy bare JSON and pre-`s` envelopes are worth their stored length.
+const PAYLOAD_SIZE_HELPER_LUA = `
+local function gqPayloadSize(value)
+  local prefix = string.sub(value, 1, 4)
+  if prefix == "GQ1|" or prefix == "GQ2|" then
+    local barIdx = string.find(value, "|", 5, true)
+    if barIdx then
+      local headerLen = tonumber(string.sub(value, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" and type(header["s"]) == "number" and header["s"] >= 0 then
+          return header["s"]
+        end
+      end
+    end
+  end
+  return #value
+end
+`;
+
 // Lua side of the GQ2 blob-lease lifecycle for staging. A genuine stage takes
 // its lease in the same eval as the staged value becomes visible. A squash
 // transfers the displaced lease atomically with that replacement. Releases
@@ -1118,16 +1145,21 @@ return results
  *     coalesced batch stays inside the downstream append/flush budget. A job
  *     too large to fit is LEFT in staging (it becomes its own later dispatch),
  *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
- *     the pre-ADR-066 behaviour). Sizes are the stored envelope's `#value`,
- *     which is the append-shaped quantity — for the small inline appends this
- *     targets it equals the payload size.
+ *     the pre-ADR-066 behaviour). Sizes are the envelope header's recorded
+ *     payload size (`s`), falling back to the stored `#value` for values that
+ *     carry none — see `gqPayloadSize`. `#value` alone is NOT the append-shaped
+ *     quantity: a compressed or offloaded body stores a fraction of what the
+ *     batch then holds in memory, which let a 256-wide batch of megabyte
+ *     payloads pass a 4 MiB budget untouched.
  *
  * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
  * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
  * NOT mark anything active and does NOT re-score ready — the caller's active
  * job remains the one that frees the group on COMPLETE.
  */
-const DRAIN_GROUP_LUA = `
+const DRAIN_GROUP_LUA =
+  PAYLOAD_SIZE_HELPER_LUA +
+  `
 local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -1157,7 +1189,12 @@ while i < #entries do
   local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
   local size = 0
   if jobDataJson then
-    size = #jobDataJson
+    -- Only pay the header parse when the budget can actually bind.
+    if maxBytes > 0 then
+      size = gqPayloadSize(jobDataJson)
+    else
+      size = #jobDataJson
+    end
   end
 
   -- Byte bound: stop before the first job that would overflow the budget.

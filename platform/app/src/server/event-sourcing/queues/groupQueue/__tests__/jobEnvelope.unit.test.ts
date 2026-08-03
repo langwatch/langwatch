@@ -11,6 +11,7 @@ import {
   PayloadTooLargeError,
   readEnvelopeLease,
   readEnvelopeRetirement,
+  readJobPayloadBytes,
   readJobRoutingMeta,
 } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -406,6 +407,57 @@ describe("jobEnvelope", () => {
         await expect(
           decodeJobEnvelope({ value: encoded, tieredBlobs: bombStore }),
         ).rejects.toThrow();
+      });
+    });
+
+    // ADR-066 pillar 2: what a coalesced batch will weigh cannot be read off the
+    // stored value once a body is compressed or offloaded, so the encoder
+    // records it in the header and the drain's byte budget reads it there.
+    describe("when the recorded payload size is read back", () => {
+      it("reports the pre-offload payload size for an offloaded body", async () => {
+        const { tieredBlobs } = makeTiered();
+        const jobData = {
+          __jobName: "spanReceived",
+          bulk: "z".repeat(64 * 1024),
+        };
+
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        // The stored value is a small reference; the payload is not.
+        expect(Buffer.byteLength(encoded)).toBeLessThan(1024);
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(64 * 1024);
+      });
+
+      it("reports the uncompressed payload size for a compressed inline body", async () => {
+        const { tieredBlobs } = makeTiered();
+        // Over the compression threshold, under the inline ceiling: stays in the
+        // envelope, but stored far smaller than it will be in a worker's hands.
+        const jobData = { __jobName: "tiny", bulk: "z".repeat(3 * 1024) };
+
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(
+          Buffer.byteLength(encoded),
+        );
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(3 * 1024);
+      });
+
+      it("falls back to the stored length for legacy bare JSON", () => {
+        const value = JSON.stringify({ hello: "world" });
+
+        expect(readJobPayloadBytes(value)).toBe(Buffer.byteLength(value));
+      });
+
+      it("falls back to the stored length for a corrupt value", () => {
+        expect(readJobPayloadBytes("GQ2|not-a-length|{}")).toBe(19);
       });
     });
 

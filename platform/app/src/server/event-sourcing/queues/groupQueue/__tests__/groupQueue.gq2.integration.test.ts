@@ -75,16 +75,25 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
     processFn,
     consumerEnabled,
     objectStore = new InMemoryObjectStore(),
+    processBatch,
+    coalesceMaxBatch,
+    coalesceMaxBytes,
   }: {
     processFn: (payload: TestPayload) => Promise<void>;
     consumerEnabled: boolean;
     objectStore?: ObjectStore;
+    processBatch?: (payloads: TestPayload[]) => Promise<void>;
+    coalesceMaxBatch?: (payload: TestPayload) => number | undefined;
+    coalesceMaxBytes?: (payload: TestPayload) => number | undefined;
   }): { queue: GroupQueueProcessor<TestPayload>; name: string } {
     const name = `{test/gq2/${crypto.randomUUID().slice(0, 8)}}`;
     const definition: EventSourcedQueueDefinition<TestPayload> = {
       name,
       groupKey: (p) => p.groupId,
       process: processFn,
+      ...(processBatch ? { processBatch } : {}),
+      ...(coalesceMaxBatch ? { coalesceMaxBatch } : {}),
+      ...(coalesceMaxBytes ? { coalesceMaxBytes } : {}),
     };
     const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
       consumerEnabled,
@@ -100,6 +109,60 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
 
   const blobKeys = (name: string) => redis.keys(`${name}:gq:blob:*`);
   const leaseKeys = (name: string) => redis.keys(`${name}:gq:blobleases:*`);
+
+  // The regression this guards (ADR-066 pillar 2): the drain's byte budget used
+  // to measure the STORED value, which for an offloaded body is a ~250-byte
+  // reference. A burst of megabyte payloads therefore folded whole no matter
+  // what budget was set — the exact backlog the coalescing was built for was the
+  // one where the byte bound stopped existing.
+  describe("given a burst of jobs whose payloads are all offloaded", () => {
+    describe("when a byte budget smaller than the burst is set", () => {
+      it("bounds the batch by payload bytes, not by the reference's stored size", async () => {
+        const batches: TestPayload[][] = [];
+        const singles: TestPayload[] = [];
+        const { queue } = createQueue({
+          processFn: async (p) => {
+            singles.push(p);
+          },
+          processBatch: async (ps) => {
+            batches.push(ps);
+          },
+          consumerEnabled: true,
+          // Count alone would fold all six; the budget fits two 8 KiB payloads.
+          coalesceMaxBatch: () => 50,
+          coalesceMaxBytes: () => 20 * 1024,
+        });
+        await queue.waitUntilReady();
+
+        await queue.sendBatch(
+          Array.from({ length: 6 }, (_, i) => ({
+            id: `j${i}`,
+            groupId: TENANT_GROUP,
+            value: OFFLOADED_VALUE,
+          })),
+        );
+
+        await vi.waitFor(
+          () => {
+            const total =
+              batches.reduce((n, b) => n + b.length, 0) + singles.length;
+            expect(total).toBe(6);
+          },
+          { timeout: 30000, interval: 50 },
+        );
+
+        // Six references sum to ~1.5 KiB, so the old accounting put the whole
+        // burst inside a 20 KiB budget. Six 8 KiB payloads do not fit.
+        const maxBatch =
+          batches.length > 0 ? Math.max(...batches.map((b) => b.length)) : 0;
+        expect(maxBatch).toBeLessThanOrEqual(2);
+        // Every payload was still resolved in full, and delivered exactly once.
+        const all = [...batches.flat(), ...singles];
+        expect(new Set(all.map((p) => p.id)).size).toBe(6);
+        expect(all.every((p) => p.value === OFFLOADED_VALUE)).toBe(true);
+      });
+    });
+  });
 
   describe("given a job whose payload exceeds the inline ceiling", () => {
     describe("when it is processed to completion", () => {

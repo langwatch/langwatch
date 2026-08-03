@@ -5202,6 +5202,94 @@ describe("GroupStagingScripts.drainGroupReady", () => {
 
       expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2", "j3"]);
     });
+
+    // The case the stored-length budget was blind to: a body over the inline
+    // ceiling lives in the blob store, so the staged value is a ~100-byte
+    // reference no matter how large the payload is. Without the header's
+    // recorded size a 256-wide drain of megabyte payloads sails through a 4 MiB
+    // budget.
+    describe("when the bodies were offloaded to the blob store", () => {
+      /** A GQ2 envelope whose body is a blob reference, declaring `s` bytes of payload. */
+      const offloadedEnvelope = (payloadBytes: number) => {
+        const header = JSON.stringify({
+          v: 2,
+          e: "redis",
+          ref: { tier: "redis", projectId: "project-a", hash: "abc123" },
+          h: "holder-1",
+          s: payloadBytes,
+        });
+        return `GQ2|${Buffer.byteLength(header)}|${header}`;
+      };
+
+      async function stageThreeOffloadedJobs(payloadBytes: number) {
+        for (const [index, dispatchAfterMs] of [100, 200, 300].entries()) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `j${index + 1}`,
+              dispatchAfterMs,
+              jobDataJson: offloadedEnvelope(payloadBytes),
+            }),
+          );
+        }
+      }
+
+      it("budgets on the declared payload size, not the reference's stored length", async () => {
+        await stageThreeOffloadedJobs(1024 * 1024);
+
+        // Every staged value is a few hundred bytes; every payload is 1 MiB.
+        const drained = await scripts.drainGroupReady({
+          groupId: "group-a",
+          nowMs: 10_000,
+          maxJobs: 10,
+          maxBytes: 2 * 1024 * 1024,
+          initialBytes: 0,
+        });
+
+        expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+        expect(await inspectGroupJobs("group-a")).toEqual(["j3", "300"]);
+      });
+
+      it("drains no siblings when one declared payload already fills the budget", async () => {
+        await stageThreeOffloadedJobs(4 * 1024 * 1024);
+
+        const drained = await scripts.drainGroupReady({
+          groupId: "group-a",
+          nowMs: 10_000,
+          maxJobs: 10,
+          maxBytes: 4 * 1024 * 1024,
+          initialBytes: 4 * 1024 * 1024,
+        });
+
+        expect(drained).toEqual([]);
+        expect(await inspectTotalPending()).toBe("3");
+      });
+
+      it("falls back to the stored length for an envelope that declares no size", async () => {
+        // Pre-`s` envelopes are still in flight during a rollout. They keep the
+        // old behaviour — bounded by count — rather than being read as zero-cost.
+        const header = JSON.stringify({ v: 2, e: "j" });
+        const value = `GQ2|${Buffer.byteLength(header)}|${header}{"p":"${"x".repeat(60)}"}`;
+        for (const [index, dispatchAfterMs] of [100, 200].entries()) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `j${index + 1}`,
+              dispatchAfterMs,
+              jobDataJson: value,
+            }),
+          );
+        }
+
+        const drained = await scripts.drainGroupReady({
+          groupId: "group-a",
+          nowMs: 10_000,
+          maxJobs: 10,
+          maxBytes: Buffer.byteLength(value) + 1,
+          initialBytes: 0,
+        });
+
+        expect(drained.map((d) => d.stagedJobId)).toEqual(["j1"]);
+      });
+    });
   });
 });
 
