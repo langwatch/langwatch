@@ -427,4 +427,143 @@ describe("gatewayBudgetSync reactor", () => {
       });
     });
   });
+
+  describe("BUDGET_UPDATED change-event dedupe", () => {
+    /**
+     * The change event is what makes the gateway drop its cached bundles and
+     * re-read spend. Deduping it is safe only where nothing enforces on the
+     * number it refreshes, so these pin the two halves of that split.
+     */
+    function dedupeDeps({
+      onBreach,
+      shouldEmit,
+    }: {
+      onBreach: "BLOCK" | "WARN";
+      shouldEmit: (params: { projectId: string }) => Promise<boolean>;
+    }) {
+      const budget = {
+        id: "budget-1",
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+        window: "MONTH",
+        onBreach,
+      } as GatewayBudget;
+
+      const { deps } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [budget],
+      );
+
+      const create = vi.fn().mockResolvedValue({ revision: 1n });
+      (deps.prisma as any).gatewayChangeEvent = { create };
+
+      return {
+        deps: { ...deps, changeEventDedupe: { shouldEmit } },
+        create,
+      };
+    }
+
+    const gatewayFold = () =>
+      ctx(
+        createFoldState({
+          "langwatch.virtual_key_id": "vk-1",
+          "langwatch.gateway_request_id": "req-1",
+        }),
+      );
+
+    describe("given a budget that blocks on breach", () => {
+      describe("when a debit lands inside an already-claimed window", () => {
+        /** @scenario "A blocking budget's spend update is never held back" */
+        it("emits anyway — an enforcement decision is never held back", async () => {
+          const shouldEmit = vi.fn().mockResolvedValue(false);
+          const { deps, create } = dedupeDeps({
+            onBreach: "BLOCK",
+            shouldEmit,
+          });
+
+          await createGatewayBudgetSyncReactor(deps).handle(
+            event,
+            gatewayFold(),
+          );
+
+          expect(create).toHaveBeenCalledTimes(1);
+          // Not even asked: the dedupe is not on the blocking path at all,
+          // so its window can never become the dominant term in how fast a
+          // block decision propagates.
+          expect(shouldEmit).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given a budget that only warns on breach", () => {
+      describe("when the window is already claimed", () => {
+        /** @scenario "Repeat updates for a warn-only budget collapse into one" */
+        it("suppresses the redundant emission", async () => {
+          const shouldEmit = vi.fn().mockResolvedValue(false);
+          const { deps, create } = dedupeDeps({ onBreach: "WARN", shouldEmit });
+
+          await createGatewayBudgetSyncReactor(deps).handle(
+            event,
+            gatewayFold(),
+          );
+
+          expect(shouldEmit).toHaveBeenCalledWith({ projectId: "project-1" });
+          expect(create).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "Repeat updates for a warn-only budget collapse into one" */
+        it("still writes the debit row — only the invalidation is deduped", async () => {
+          const shouldEmit = vi.fn().mockResolvedValue(false);
+          const { deps } = dedupeDeps({ onBreach: "WARN", shouldEmit });
+          const insertDebit = deps.budgetCHRepository.insertDebit as ReturnType<
+            typeof vi.fn
+          >;
+
+          await createGatewayBudgetSyncReactor(deps).handle(
+            event,
+            gatewayFold(),
+          );
+
+          expect(insertDebit).toHaveBeenCalledTimes(1);
+        });
+      });
+
+      describe("when the window is free", () => {
+        it("emits the change event", async () => {
+          const shouldEmit = vi.fn().mockResolvedValue(true);
+          const { deps, create } = dedupeDeps({ onBreach: "WARN", shouldEmit });
+
+          await createGatewayBudgetSyncReactor(deps).handle(
+            event,
+            gatewayFold(),
+          );
+
+          expect(create).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("given no dedupe service is wired", () => {
+      describe("when a debit lands", () => {
+        it("emits every time, as it did before the dedupe existed", async () => {
+          const shouldEmit = vi.fn(async () => true);
+          const { deps, create } = dedupeDeps({ onBreach: "WARN", shouldEmit });
+          const { changeEventDedupe: _omitted, ...withoutDedupe } = deps;
+
+          await createGatewayBudgetSyncReactor(withoutDedupe).handle(
+            event,
+            gatewayFold(),
+          );
+
+          expect(create).toHaveBeenCalledTimes(1);
+          expect(shouldEmit).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
 });

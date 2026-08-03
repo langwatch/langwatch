@@ -262,6 +262,37 @@ Feature: AI Gateway — Budgets
     And the response carries a budget warning
 
   # ============================================================================
+  # Keeping the gateway's cached spend fresh
+  # ============================================================================
+  #
+  # After each gateway request the platform tells the gateway to drop the spend
+  # figures it has cached, so the next request re-reads them. Every request
+  # doing that costs every other key in the project a cache miss, and the
+  # notices are interchangeable — one of them refreshes everything the rest
+  # would have. So they are collapsed to one per project per short window.
+  #
+  # Collapsing them is only safe where nothing is being enforced on the number.
+  # A budget that blocks decides whether the next request is refused, so its
+  # notice is never held back; a budget that only warns is advisory, and a
+  # slightly later warning costs nothing anyone acts on.
+
+  @unit
+  Scenario: A blocking budget's spend update is never held back
+    Given a project whose budget refuses requests once it is exceeded
+    And the project already sent a spend update moments ago
+    When another request records spend against that budget
+    Then the gateway is told immediately that the spend changed
+    And how fast a refusal takes effect is unchanged
+
+  @unit
+  Scenario: Repeat updates for a warn-only budget collapse into one
+    Given a project whose budget only warns when it is exceeded
+    And the project already sent a spend update moments ago
+    When another request records spend against that budget
+    Then no second update is sent for it
+    And the spend itself is still recorded in full
+
+  # ============================================================================
   # Provider-filtered budgets
   # ============================================================================
   #

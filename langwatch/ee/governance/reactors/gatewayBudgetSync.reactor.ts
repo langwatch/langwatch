@@ -16,6 +16,7 @@ import type {
   ApplicableScopes,
   GatewayBudgetRepository,
 } from "~/server/gateway/budget.repository";
+import type { BudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { budgetAppliesToProvider } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -52,6 +53,11 @@ export interface GatewayBudgetSyncReactorDeps {
   prisma: PrismaClient;
   budgetRepository: GatewayBudgetRepository;
   budgetCHRepository: GatewayBudgetClickHouseRepository;
+  /**
+   * Gates redundant BUDGET_UPDATED emissions. Optional: without it every
+   * fold emits, which is what this reactor did before the dedupe existed.
+   */
+  changeEventDedupe?: BudgetChangeEventDedupeService;
 }
 
 /** The VK a gateway trace debits against, as this reactor needs it. */
@@ -277,39 +283,75 @@ function buildDebitRows({
 }
 
 /**
+ * Whether a debit against these budgets can change an enforcement decision.
+ *
+ * A BLOCK budget's spend feeds the gateway's pre-request precheck, so its
+ * change event has to reach the gateway promptly or an over-limit key keeps
+ * being served from a cached bundle. A WARN budget's spend only drives
+ * advisory signal, where the same delay costs freshness and nothing else.
+ *
+ * That asymmetry is the whole basis for deduping one and not the other:
+ * they are not the same currency, and a single window cannot price both.
+ */
+function affectsEnforcementDecision(
+  budgets: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
+): boolean {
+  return budgets.some(({ budget }) => budget.onBreach === "BLOCK");
+}
+
+/**
  * EC4 — emit a BUDGET_UPDATED change event so the gateway's /changes
  * subscriber (services/aigateway/adapters/authresolver) evicts cached
  * bundles for this project and the next request re-resolves with fresh
  * spend. Without this, Bundle.Config.Budget.SpentMicroUSD stays frozen at
  * populateConfig time and the on-breach=block precheck never fires until
- * the JWT TTL (~15min) rolls.
+ * the JWT TTL rolls.
  *
- * v2 TODO: dedupe — emit at most once per (projectId, budgetId) per ~10s
- * window to avoid every gateway request triggering an L1 sweep + cold-miss
- * on every other VK in the project. At single-tenant scale the
- * unconditional emit is correct, just noisier than ideal.
+ * Every gateway request used to emit one of these, and each emission evicts
+ * every bundle in the project — an L1 sweep plus a cold miss for every other
+ * virtual key in it. The emissions are redundant with each other because the
+ * event carries no spend figure: it asks for an eviction, and the
+ * re-materialise it provokes reads current spend for every budget. One
+ * eviction per window achieves what N did.
+ *
+ * The dedupe is skipped entirely when any applicable budget blocks on breach,
+ * so an emission that could change an enforcement decision is never held
+ * back. This is why the window cannot become the dominant term in
+ * block-decision propagation: it is not on that path at all.
+ *
+ * Known limit, deliberate: this is a leading-edge window with no trailing
+ * flush. If advisory traffic stops mid-window, the last debit's refresh waits
+ * for the next debit or the bundle TTL. That is acceptable for a signal
+ * nothing enforces on, and it cannot happen on the blocking path.
  *
  * Best-effort: the CH ledger row already landed, so a failure here leaves
  * the gateway's cache staler than it could be rather than corrupting state.
  */
 async function emitBudgetUpdatedChangeEvent({
   prisma,
+  changeEventDedupe,
   project,
   projectId,
   vk,
   gatewayRequestId,
-  budgetIds,
+  budgets,
   amountUsd,
 }: {
   prisma: PrismaClient;
+  changeEventDedupe?: BudgetChangeEventDedupeService;
   project: GatewayFoldProject;
   projectId: string;
   vk: GatewayVirtualKey;
   gatewayRequestId: string;
-  budgetIds: string[];
+  budgets: Awaited<ReturnType<typeof resolveApplicableBudgets>>;
   amountUsd: string;
 }): Promise<void> {
   try {
+    if (changeEventDedupe && !affectsEnforcementDecision(budgets)) {
+      const emit = await changeEventDedupe.shouldEmit({ projectId });
+      if (!emit) return;
+    }
+
     const changeEvents = new ChangeEventRepository(prisma);
     await changeEvents.append({
       organizationId: project.organizationId,
@@ -318,7 +360,7 @@ async function emitBudgetUpdatedChangeEvent({
       payload: {
         gatewayRequestId,
         virtualKeyId: vk.id,
-        budgetIds,
+        budgetIds: budgets.map((r) => r.budget.id),
         amountUsd,
       },
     });
@@ -399,11 +441,12 @@ async function foldGatewayTraceIntoLedger({
 
   await emitBudgetUpdatedChangeEvent({
     prisma: deps.prisma,
+    changeEventDedupe: deps.changeEventDedupe,
     project,
     projectId,
     vk,
     gatewayRequestId,
-    budgetIds: budgets.map((r) => r.budget.id),
+    budgets,
     amountUsd,
   });
 }

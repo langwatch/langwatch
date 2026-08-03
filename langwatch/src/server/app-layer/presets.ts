@@ -31,6 +31,7 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -750,6 +751,7 @@ export function initializeDefaultApp(options?: {
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        changeEventDedupe: createBudgetChangeEventDedupeService(redis),
       }
     : undefined;
 
