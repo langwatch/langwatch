@@ -17,7 +17,10 @@ import type {
 import { Prisma } from "@prisma/client";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type {
+  BudgetBucketBoundary,
+  GatewayBudgetClickHouseRepository,
+} from "./budget.clickhouse.repository";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -39,8 +42,22 @@ import {
 
 const logger = createLogger("langwatch:gateway:budget-service");
 
+/**
+ * A budget row plus the per-person standing that only a fanned-out budget
+ * has. An ATTRIBUTED_USER template is one allowance per end user, so its
+ * honest headline is not one total but how many people the template saw
+ * this period and how many of them are over their own cap. Every other
+ * scope leaves both fields absent.
+ */
+export type GatewayBudgetWithSeats = GatewayBudget & {
+  /** Distinct end users with spend against this template this period. */
+  endUsersSeen?: number;
+  /** How many of those are at or over the per-person limit. */
+  endUsersOver?: number;
+};
+
 export type BudgetListWithHealth = {
-  budgets: GatewayBudget[];
+  budgets: GatewayBudgetWithSeats[];
   /**
    * False when spend could not be totalled. Consumers must say so rather
    * than render the untotalled figure as if it were real spend.
@@ -145,7 +162,7 @@ export type BudgetLedgerLine = {
 };
 
 export type BudgetDetail = {
-  budget: GatewayBudget;
+  budget: GatewayBudgetWithSeats;
   scopeTarget: BudgetScopeTarget;
   recentLedger: Array<{
     id: string;
@@ -229,7 +246,7 @@ export class GatewayBudgetService {
     );
   }
 
-  async list(organizationId: string): Promise<GatewayBudget[]> {
+  async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {
     const budgets = await this.prisma.gatewayBudget.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
@@ -237,7 +254,7 @@ export class GatewayBudgetService {
     return await this.applyClickHouseSpend(budgets, organizationId);
   }
 
-  async listForProject(projectId: string): Promise<GatewayBudget[]> {
+  async listForProject(projectId: string): Promise<GatewayBudgetWithSeats[]> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: { team: true },
@@ -276,7 +293,7 @@ export class GatewayBudgetService {
   private async applyClickHouseSpend(
     budgets: GatewayBudget[],
     organizationId: string,
-  ): Promise<GatewayBudget[]> {
+  ): Promise<GatewayBudgetWithSeats[]> {
     const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(
       budgets,
       organizationId,
@@ -297,7 +314,7 @@ export class GatewayBudgetService {
   private async applyClickHouseSpendWithHealth(
     budgets: GatewayBudget[],
     organizationId: string,
-  ): Promise<{ budgets: GatewayBudget[]; spendAvailable: boolean }> {
+  ): Promise<{ budgets: GatewayBudgetWithSeats[]; spendAvailable: boolean }> {
     if (budgets.length === 0) return { budgets, spendAvailable: true };
     if (!this.chRepo) return { budgets, spendAvailable: false };
 
@@ -310,12 +327,28 @@ export class GatewayBudgetService {
     if (projects.length === 0) return { budgets, spendAvailable: true };
 
     const tenantIds = projects.map((p) => p.id);
+    // One instant for every read below, so the per-person breakdown cannot
+    // land in a later period than the totals it sits beside.
+    const now = new Date();
+    const boundariesByBudget = await this.bucketBoundaries(
+      budgets,
+      organizationId,
+    );
+
     let spends;
+    let seats: Map<string, { seen: number; over: number }>;
     try {
       spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
         tenantIds,
         budgets,
+        now,
       );
+      seats = await this.seatStandings({
+        budgets,
+        tenantIds,
+        boundariesByBudget,
+        now,
+      });
     } catch (error) {
       logger.error(
         { organizationId, budgetCount: budgets.length, error },
@@ -329,10 +362,76 @@ export class GatewayBudgetService {
       spendAvailable: true,
       budgets: budgets.map((b) => {
         const ch = spendByBudget.get(b.id);
-        if (ch === undefined) return b;
-        return { ...b, spentUsd: new Prisma.Decimal(ch) };
+        const seat = seats.get(b.id);
+        const withSeats: GatewayBudgetWithSeats = seat
+          ? { ...b, endUsersSeen: seat.seen, endUsersOver: seat.over }
+          : b;
+        if (ch === undefined) return withSeats;
+        return { ...withSeats, spentUsd: new Prisma.Decimal(ch) };
       }),
     };
+  }
+
+  /**
+   * Per-bucket period boundaries for every per-person template in the set,
+   * batch-loaded so the spend read stays one round-trip per template.
+   */
+  private async bucketBoundaries(
+    budgets: GatewayBudget[],
+    organizationId: string,
+  ): Promise<Map<string, BudgetBucketBoundary[]>> {
+    const templateIds = budgets
+      .filter((b) => b.scopeType === "ATTRIBUTED_USER")
+      .map((b) => b.id);
+    const byBudget = new Map<string, BudgetBucketBoundary[]>();
+    if (templateIds.length === 0) return byBudget;
+
+    const rows = await this.prisma.gatewayBudgetBucketBoundary.findMany({
+      where: { organizationId, budgetId: { in: templateIds } },
+      select: { budgetId: true, bucketScopeId: true, periodStartedAt: true },
+    });
+    for (const row of rows) {
+      const list = byBudget.get(row.budgetId) ?? [];
+      list.push({
+        bucketScopeId: row.bucketScopeId,
+        periodStartedAt: row.periodStartedAt,
+      });
+      byBudget.set(row.budgetId, list);
+    }
+    return byBudget;
+  }
+
+  /**
+   * How many people each per-person template is watching and how many of
+   * them are over their own cap. Over-cap is `>=` because that is the
+   * comparator the gateway refuses a request on, so a seat the list calls
+   * over is a seat that is actually being stopped.
+   */
+  private async seatStandings(args: {
+    budgets: GatewayBudget[];
+    tenantIds: string[];
+    boundariesByBudget: Map<string, BudgetBucketBoundary[]>;
+    now: Date;
+  }): Promise<Map<string, { seen: number; over: number }>> {
+    const out = new Map<string, { seen: number; over: number }>();
+    if (!this.chRepo) return out;
+
+    for (const budget of args.budgets) {
+      if (budget.scopeType !== "ATTRIBUTED_USER") continue;
+      const buckets = await this.chRepo.getBucketSpendBreakdownForBudget({
+        budget,
+        tenantIds: args.tenantIds,
+        boundaries: args.boundariesByBudget.get(budget.id) ?? [],
+        now: args.now,
+      });
+      const limitUsd = Number.parseFloat(budget.limitUsd.toString());
+      out.set(budget.id, {
+        seen: buckets.length,
+        over: buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd)
+          .length,
+      });
+    }
+    return out;
   }
 
   /**
@@ -385,7 +484,10 @@ export class GatewayBudgetService {
     return { budgets, spendAvailable, scopeReach };
   }
 
-  async get(id: string, organizationId: string): Promise<GatewayBudget | null> {
+  async get(
+    id: string,
+    organizationId: string,
+  ): Promise<GatewayBudgetWithSeats | null> {
     const budget = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId },
     });

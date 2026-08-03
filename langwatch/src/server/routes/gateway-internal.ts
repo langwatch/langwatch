@@ -38,7 +38,7 @@ import {
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import {
-  budgetPeriodFloorMs,
+  bucketPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -882,29 +882,6 @@ function budgetClickHouseRepository(): GatewayBudgetClickHouseRepository {
   });
 }
 
-/** The floor the bucket's spend read starts at: the later of the budget
- *  template's own period floor and the bucket boundary row's period start,
- *  whichever of the two exist. */
-async function bucketPeriodFloorMs(params: {
-  budget: GatewayBudget;
-  bucketScopeId: string;
-}): Promise<number | undefined> {
-  const boundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
-    where: {
-      budgetId_bucketScopeId: {
-        budgetId: params.budget.id,
-        bucketScopeId: params.bucketScopeId,
-      },
-    },
-    select: { periodStartedAt: true },
-  });
-  const candidates = [
-    budgetPeriodFloorMs(params.budget),
-    boundary?.periodStartedAt.getTime(),
-  ].filter((n): n is number => typeof n === "number");
-  return candidates.length > 0 ? Math.max(...candidates) : undefined;
-}
-
 /** Spend in one budget bucket, in micro USD. An organization with no
  *  projects has nothing to read, so it reports zero. */
 async function bucketSpentMicroUsd(params: {
@@ -974,10 +951,14 @@ secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
     budget,
     attributedUserBucketScopeId(budget.scopeId, endUserId),
   );
+  const boundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
+    where: { budgetId_bucketScopeId: { budgetId: budget.id, bucketScopeId } },
+    select: { periodStartedAt: true },
+  });
   const spentMicroUsd = await bucketSpentMicroUsd({
     budget,
     bucketScopeId,
-    periodFloorMs: await bucketPeriodFloorMs({ budget, bucketScopeId }),
+    periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),
   });
   return c.json({ spent_micro_usd: spentMicroUsd, bucket: bucketScopeId });
 });

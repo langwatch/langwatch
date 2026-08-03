@@ -27,7 +27,7 @@ import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseCli
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
-  budgetPeriodFloorMs,
+  bucketPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import {
@@ -170,17 +170,13 @@ async function applicableEndUserCaps(params: {
   const targets = templates.map((t) => {
     const bucketScopeId = bucketFor(t);
     const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
-    const floors = [
-      budgetPeriodFloorMs(t),
-      bucketBoundary?.periodStartedAt.getTime(),
-    ].filter((n): n is number => typeof n === "number");
     return {
       budgetId: t.id,
       scope: t.scopeType,
       scopeId: bucketScopeId,
       window: t.window,
       match: "exact" as const,
-      periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
+      periodFloorMs: bucketPeriodFloorMs(t, bucketBoundary?.periodStartedAt),
     };
   });
   const spends = await budgetCH.getSpendForTargetsAcrossTenants(

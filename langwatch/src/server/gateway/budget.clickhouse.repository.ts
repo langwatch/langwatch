@@ -182,6 +182,81 @@ export type LedgerEventRow = {
 /** Raw shape of a per-bucket spend row, in the ledger's column casing. */
 type BucketSpendRow = { ScopeId: string; SpentUSD: string };
 
+type ClickHouseClientFor = Awaited<ReturnType<ClickHouseClientResolver>>;
+
+/**
+ * Everything the two per-bucket reads share: the bound parameters, the
+ * predicate that selects one budget's buckets, and the per-bucket floors
+ * for buckets whose own boundary has moved. Built once so the rollup path
+ * and the raw-ledger path cannot drift apart on which buckets they mean.
+ */
+type BucketQueryShape = {
+  params: Record<string, string | number | string[]>;
+  tenantIds: string[];
+  tenantPlaceholders: string;
+  bucketFilter: string;
+  /** One `ScopeId = x AND OccurredAt >= floor` term per moved boundary. */
+  movedBoundaryPredicates: string[];
+  movedBoundaryBuckets: string[];
+  /** The template's own floor, or undefined while it sits on the calendar. */
+  budgetFloorMs: number | undefined;
+};
+
+function bucketQueryShape(args: {
+  budget: GatewayBudget;
+  tenantIds: string[];
+  boundaries: BudgetBucketBoundary[];
+  now: Date;
+}): BucketQueryShape {
+  const { budget, tenantIds, boundaries, now } = args;
+  const params: Record<string, string | number | string[]> = {
+    scope: scopeToClickHouse(budget.scopeType),
+    window: windowToClickHouse(budget.window),
+    prefix: `${budget.scopeId}:`,
+    sep: PROVIDER_BUCKET_SEPARATOR,
+  };
+  for (let i = 0; i < tenantIds.length; i++) {
+    params[`tenant${i}`] = tenantIds[i]!;
+  }
+
+  // A provider-filtered template writes only buckets carrying its own
+  // suffix and an unfiltered one only buckets carrying none, so neither
+  // ever reports the other's spend as its own.
+  let providerGuard: string;
+  if (budget.providerKey) {
+    params.providerSuffix = `${PROVIDER_BUCKET_SEPARATOR}${budget.providerKey}`;
+    providerGuard = "endsWith(ScopeId, {providerSuffix:String})";
+  } else {
+    providerGuard = "position(ScopeId, {sep:String}) = 0";
+  }
+
+  // A bucket whose boundary moved reads from that boundary, or from the
+  // template's own floor when the template was reset more recently.
+  const movedBoundaryPredicates = boundaries.map((b, i) => {
+    params[`fbucket${i}`] = b.bucketScopeId;
+    params[`ffloor${i}`] =
+      bucketPeriodFloorMs(budget, b.periodStartedAt, now) ??
+      b.periodStartedAt.getTime();
+    return `(ScopeId = {fbucket${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))`;
+  });
+  params.flooredBuckets = boundaries.map((b) => b.bucketScopeId);
+
+  const budgetFloorMs = budgetPeriodFloorMs(budget, now);
+  if (budgetFloorMs !== undefined) params.budgetFloor = budgetFloorMs;
+
+  return {
+    params,
+    tenantIds,
+    tenantPlaceholders: tenantIds
+      .map((_, i) => `{tenant${i}:String}`)
+      .join(","),
+    bucketFilter: `startsWith(ScopeId, {prefix:String}) AND ${providerGuard}`,
+    movedBoundaryPredicates,
+    movedBoundaryBuckets: boundaries.map((b) => b.bucketScopeId),
+    budgetFloorMs,
+  };
+}
+
 export class GatewayBudgetClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -627,132 +702,22 @@ export class GatewayBudgetClickHouseRepository {
    * anchor, and it stops an anchor from swallowing the buckets of another
    * anchor whose id merely begins with the same characters.
    */
-  async getBucketSpendBreakdownForBudget(
-    budget: GatewayBudget,
-    tenantIds: string[],
-    boundaries: BudgetBucketBoundary[],
-    now: Date = new Date(),
-  ): Promise<BucketSpend[]> {
+  async getBucketSpendBreakdownForBudget(args: {
+    budget: GatewayBudget;
+    tenantIds: string[];
+    boundaries: BudgetBucketBoundary[];
+    now?: Date;
+  }): Promise<BucketSpend[]> {
+    const { budget, tenantIds, boundaries } = args;
+    const now = args.now ?? new Date();
     if (tenantIds.length === 0) return [];
 
-    const params: Record<string, string | number | string[]> = {
-      scope: scopeToClickHouse(budget.scopeType),
-      window: windowToClickHouse(budget.window),
-      prefix: `${budget.scopeId}:`,
-      sep: PROVIDER_BUCKET_SEPARATOR,
-    };
-    for (let i = 0; i < tenantIds.length; i++) {
-      params[`tenant${i}`] = tenantIds[i]!;
-    }
-    const tenantPlaceholders = tenantIds
-      .map((_, i) => `{tenant${i}:String}`)
-      .join(",");
-
-    // A provider-filtered template writes only buckets carrying its own
-    // suffix and an unfiltered one only buckets carrying none, so neither
-    // ever reports the other's spend as its own.
-    let providerGuard: string;
-    if (budget.providerKey) {
-      params.providerSuffix = `${PROVIDER_BUCKET_SEPARATOR}${budget.providerKey}`;
-      providerGuard = "endsWith(ScopeId, {providerSuffix:String})";
-    } else {
-      providerGuard = "position(ScopeId, {sep:String}) = 0";
-    }
-    const bucketFilter = `startsWith(ScopeId, {prefix:String}) AND ${providerGuard}`;
-
-    // A bucket whose boundary moved reads from that boundary, or from the
-    // template's own floor when the template was reset more recently.
-    const flooredBuckets = boundaries.map((b, i) => {
-      params[`fbucket${i}`] = b.bucketScopeId;
-      params[`ffloor${i}`] =
-        bucketPeriodFloorMs(budget, b.periodStartedAt, now) ??
-        b.periodStartedAt.getTime();
-      return `(ScopeId = {fbucket${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))`;
-    });
-
-    const budgetFloorMs = budgetPeriodFloorMs(budget, now);
+    const shape = bucketQueryShape({ budget, tenantIds, boundaries, now });
     const client = await this.resolveClient(tenantIds[0]!);
-    const spentByBucket = new Map<string, string>();
-
-    if (budgetFloorMs === undefined) {
-      // The rollup pre-aggregates a whole calendar period per bucket, which
-      // is exactly the question when no boundary has moved.
-      try {
-        const result = await client.query({
-          query: `
-            SELECT
-              ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
-            FROM ${TOTALS_TABLE}
-            WHERE TenantId IN (${tenantPlaceholders})
-              AND Scope = {scope:String}
-              AND Window = {window:String}
-              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
-              AND ${bucketFilter}
-            GROUP BY ScopeId
-          `,
-          query_params: {
-            ...params,
-            periodStart: currentPeriodStart(budget.window, now).getTime(),
-          },
-          format: "JSONEachRow",
-        });
-        for (const row of (await result.json()) as BucketSpendRow[]) {
-          spentByBucket.set(row.ScopeId, row.SpentUSD);
-        }
-      } catch (error) {
-        logger.error(
-          { tenantIds, budgetId: budget.id, error },
-          "failed to read gateway budget bucket spend from the rollup",
-        );
-        throw error;
-      }
-      // Buckets with a moved boundary are unanswerable from a rollup keyed
-      // by calendar period, so they are re-read from the raw ledger and
-      // overwrite what the rollup said. One that no longer has a row after
-      // its floor drops out of the result entirely, because a bucket with
-      // nothing in the current period is not a person the template saw.
-      if (flooredBuckets.length > 0) {
-        for (const bucket of boundaries) {
-          spentByBucket.delete(bucket.bucketScopeId);
-        }
-        for (const row of await this.readFlooredBucketSpend({
-          client,
-          tenantPlaceholders,
-          bucketFilter,
-          floorPredicate: `(${flooredBuckets.join(" OR ")})`,
-          params,
-          budgetId: budget.id,
-          tenantIds,
-        })) {
-          spentByBucket.set(row.ScopeId, row.SpentUSD);
-        }
-      }
-    } else {
-      // A MANUAL window, or a template reset mid-period, moves the floor
-      // inside the rollup's bucket, so the whole read goes to the raw
-      // ledger. Buckets with their own boundary keep it; the rest read
-      // from the template's floor.
-      params.budgetFloor = budgetFloorMs;
-      const defaultFloor =
-        "OccurredAt >= fromUnixTimestamp64Milli({budgetFloor:Int64})";
-      const floorPredicate =
-        flooredBuckets.length > 0
-          ? `(${flooredBuckets.join(" OR ")} OR (ScopeId NOT IN {flooredBuckets:Array(String)} AND ${defaultFloor}))`
-          : defaultFloor;
-      params.flooredBuckets = boundaries.map((b) => b.bucketScopeId);
-      for (const row of await this.readFlooredBucketSpend({
-        client,
-        tenantPlaceholders,
-        bucketFilter,
-        floorPredicate,
-        params,
-        budgetId: budget.id,
-        tenantIds,
-      })) {
-        spentByBucket.set(row.ScopeId, row.SpentUSD);
-      }
-    }
+    const spentByBucket =
+      shape.budgetFloorMs === undefined
+        ? await this.rollupBucketSpend({ client, shape, budget, now })
+        : await this.flooredBucketSpend({ client, shape, budget });
 
     return [...spentByBucket.entries()]
       .map(([scopeId, raw]) => ({
@@ -763,41 +728,136 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
+   * Bucket spend for a budget still on its calendar boundary. The rollup
+   * pre-aggregates one row per bucket per period, which is exactly the
+   * question being asked.
+   *
+   * Buckets whose own boundary moved are unanswerable there, so they are
+   * re-read from the raw ledger and overwrite what the rollup said. One
+   * with nothing left after its floor drops out entirely: a bucket with no
+   * spend in the current period is not a person the template saw.
+   */
+  private async rollupBucketSpend(args: {
+    client: ClickHouseClientFor;
+    shape: BucketQueryShape;
+    budget: GatewayBudget;
+    now: Date;
+  }): Promise<Map<string, string>> {
+    const { client, shape, budget, now } = args;
+    const spentByBucket = new Map<string, string>();
+    try {
+      const result = await client.query({
+        query: `
+          SELECT
+            ScopeId,
+            toString(sumMerge(SpendUSD)) AS SpentUSD
+          FROM ${TOTALS_TABLE}
+          WHERE TenantId IN (${shape.tenantPlaceholders})
+            AND Scope = {scope:String}
+            AND Window = {window:String}
+            AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
+            AND ${shape.bucketFilter}
+          GROUP BY ScopeId
+        `,
+        query_params: {
+          ...shape.params,
+          periodStart: currentPeriodStart(budget.window, now).getTime(),
+        },
+        format: "JSONEachRow",
+      });
+      for (const row of (await result.json()) as BucketSpendRow[]) {
+        spentByBucket.set(row.ScopeId, row.SpentUSD);
+      }
+    } catch (error) {
+      logger.error(
+        { tenantIds: shape.tenantIds, budgetId: budget.id, error },
+        "failed to read gateway budget bucket spend from the rollup",
+      );
+      throw error;
+    }
+
+    if (shape.movedBoundaryPredicates.length === 0) return spentByBucket;
+
+    for (const bucketScopeId of shape.movedBoundaryBuckets) {
+      spentByBucket.delete(bucketScopeId);
+    }
+    for (const row of await this.readFlooredBucketSpend({
+      client,
+      shape,
+      budgetId: budget.id,
+      floorPredicate: `(${shape.movedBoundaryPredicates.join(" OR ")})`,
+    })) {
+      spentByBucket.set(row.ScopeId, row.SpentUSD);
+    }
+    return spentByBucket;
+  }
+
+  /**
+   * Bucket spend for a budget whose own boundary moved: a MANUAL window, or
+   * a template reset mid-period. The floor now sits inside the rollup's
+   * calendar bucket, which cannot answer it, so the whole read goes to the
+   * raw ledger. Buckets with a boundary of their own keep it; every other
+   * bucket reads from the template's floor.
+   */
+  private async flooredBucketSpend(args: {
+    client: ClickHouseClientFor;
+    shape: BucketQueryShape;
+    budget: GatewayBudget;
+  }): Promise<Map<string, string>> {
+    const { client, shape, budget } = args;
+    const templateFloor =
+      "OccurredAt >= fromUnixTimestamp64Milli({budgetFloor:Int64})";
+    const floorPredicate =
+      shape.movedBoundaryPredicates.length > 0
+        ? `(${shape.movedBoundaryPredicates.join(" OR ")} OR (ScopeId NOT IN {flooredBuckets:Array(String)} AND ${templateFloor}))`
+        : templateFloor;
+
+    const spentByBucket = new Map<string, string>();
+    for (const row of await this.readFlooredBucketSpend({
+      client,
+      shape,
+      budgetId: budget.id,
+      floorPredicate,
+    })) {
+      spentByBucket.set(row.ScopeId, row.SpentUSD);
+    }
+    return spentByBucket;
+  }
+
+  /**
    * Per-bucket spend straight off the ledger, bounded by whatever floor
    * predicate the caller built. `FINAL` collapses a replayed request to the
    * one row the ReplacingMergeTree will eventually keep.
    */
   private async readFlooredBucketSpend(args: {
-    client: Awaited<ReturnType<ClickHouseClientResolver>>;
-    tenantPlaceholders: string;
-    bucketFilter: string;
+    client: ClickHouseClientFor;
+    shape: BucketQueryShape;
     floorPredicate: string;
-    params: Record<string, string | number | string[]>;
     budgetId: string;
-    tenantIds: string[];
   }): Promise<BucketSpendRow[]> {
+    const { client, shape } = args;
     try {
-      const result = await args.client.query({
+      const result = await client.query({
         query: `
           SELECT
             ScopeId,
             toString(sum(AmountUSD)) AS SpentUSD
           FROM ${EVENTS_TABLE} FINAL
-          WHERE TenantId IN (${args.tenantPlaceholders})
+          WHERE TenantId IN (${shape.tenantPlaceholders})
             AND Scope = {scope:String}
             AND Window = {window:String}
             AND Status = 'success'
-            AND ${args.bucketFilter}
+            AND ${shape.bucketFilter}
             AND ${args.floorPredicate}
           GROUP BY ScopeId
         `,
-        query_params: args.params,
+        query_params: shape.params,
         format: "JSONEachRow",
       });
       return (await result.json()) as BucketSpendRow[];
     } catch (error) {
       logger.error(
-        { tenantIds: args.tenantIds, budgetId: args.budgetId, error },
+        { tenantIds: shape.tenantIds, budgetId: args.budgetId, error },
         "failed to read boundary-floored gateway budget bucket spend",
       );
       throw error;
