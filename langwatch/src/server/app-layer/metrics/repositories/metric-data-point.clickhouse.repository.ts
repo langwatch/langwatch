@@ -37,6 +37,71 @@ const logger = createLogger(
 
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
+/**
+ * How many index seeks one rollup query may fold together. High enough that a
+ * full coalesced chunk costs a handful of round trips instead of hundreds, low
+ * enough that no single statement grows unbounded with the chunk.
+ */
+const SEEKS_PER_QUERY = 64;
+
+function chunked<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function groupBySeries(
+  points: readonly CanonicalMetricDataPoint[],
+): Map<string, CanonicalMetricDataPoint[]> {
+  const bySeries = new Map<string, CanonicalMetricDataPoint[]>();
+  for (const point of points) {
+    const existing = bySeries.get(point.seriesId);
+    if (existing) existing.push(point);
+    else bySeries.set(point.seriesId, [point]);
+  }
+  return bySeries;
+}
+
+/**
+ * Which rollup buckets a chunk moved, per series, decided without another read.
+ *
+ * A chunk point's true successor is the smallest stored point after it. Every
+ * chunk point is already stored by the time this runs, and the seek returned
+ * the smallest stored point after each one, so the true successor is somewhere
+ * in the union of the two and no stored point can sit between them. Taking the
+ * minimum of that union — which is all `affectedRollupBuckets` does — therefore
+ * lands on exactly the row a per-point neighbour query would have returned,
+ * whatever order the chunk arrived in.
+ */
+function affectedBucketsBySeries({
+  bySeries,
+  successorsBySeries,
+}: {
+  bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+  successorsBySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+}): Map<string, Set<number>> {
+  const affectedBySeries = new Map<string, Set<number>>();
+  for (const [seriesId, seriesPoints] of bySeries) {
+    const candidates = [
+      ...seriesPoints,
+      ...(successorsBySeries.get(seriesId) ?? []),
+    ];
+    const affected = new Set<number>();
+    for (const point of seriesPoints) {
+      for (const bucket of affectedRollupBuckets({
+        points: candidates,
+        insertedPoint: point,
+      })) {
+        affected.add(bucket);
+      }
+    }
+    if (affected.size > 0) affectedBySeries.set(seriesId, affected);
+  }
+  return affectedBySeries;
+}
+
 export class MetricDataPointClickHouseRepository
   implements MetricDataPointRepository
 {
@@ -156,10 +221,16 @@ export class MetricDataPointClickHouseRepository
   }
 
   /**
-   * Recomputes a chunk's rollups per series rather than per point: the
-   * authoritative fetch and the row write are what cost round trips, and every
-   * point of a series shares them. Ensuring the raw points up front also makes
-   * the result independent of the order the chunk happens to arrive in.
+   * Recomputes a chunk's rollups with a fixed number of reads rather than one
+   * per point. Both reads a rollup needs — the successor that decides which
+   * buckets moved, and the authoritative points inside them — are index seeks,
+   * so the round trip, not the scan, is what a chunk pays for. Folding every
+   * seek in the chunk into a handful of statements makes the cost track the
+   * number of affected buckets instead of the number of points.
+   *
+   * Ensuring the raw points up front also makes the result independent of the
+   * order the chunk happens to arrive in: every decision below is taken
+   * against stored rows, never against the chunk's own sequence.
    */
   async recomputeAffectedRollupsMany({
     points,
@@ -170,17 +241,26 @@ export class MetricDataPointClickHouseRepository
     // raw-before-derived invariant true even if this projection wins the race.
     await this.ensureDataPoints({ points, retentionDays });
 
-    const bySeries = new Map<string, CanonicalMetricDataPoint[]>();
-    for (const point of points) {
-      bySeries.set(point.seriesId, [
-        ...(bySeries.get(point.seriesId) ?? []),
-        point,
-      ]);
-    }
+    const bySeries = groupBySeries(points);
+    const affectedBySeries = affectedBucketsBySeries({
+      bySeries,
+      successorsBySeries: groupBySeries(await this.successorsOf(points)),
+    });
+
+    const authoritative = await this.pointsForAffectedBuckets({
+      affectedBySeries,
+      tenantId: points[0]!.tenantId,
+      organizationId: points[0]!.organizationId,
+    });
 
     const rows: MetricRollupRow[] = [];
-    for (const seriesPoints of bySeries.values()) {
-      rows.push(...(await this.rollupRowsForSeries(seriesPoints)));
+    for (const [seriesId, affected] of affectedBySeries) {
+      rows.push(
+        ...buildMetricRollups({
+          points: authoritative.get(seriesId) ?? [],
+          affectedBuckets: affected,
+        }),
+      );
     }
     if (rows.length === 0) return;
 
@@ -190,26 +270,6 @@ export class MetricDataPointClickHouseRepository
       values: rows.map((row) => rollupRow({ row, retentionDays })),
       format: "JSONEachRow",
       clickhouse_settings: INSERT_SETTINGS,
-    });
-  }
-
-  private async rollupRowsForSeries(
-    points: CanonicalMetricDataPoint[],
-  ): Promise<MetricRollupRow[]> {
-    const affected = new Set<number>();
-    for (const point of points) {
-      const neighbors = await this.immediateNeighbors(point);
-      for (const bucket of affectedRollupBuckets({
-        points: neighbors,
-        insertedPoint: point,
-      })) {
-        affected.add(bucket);
-      }
-    }
-    const authoritative = await this.pointsForBuckets(points[0]!, affected);
-    return buildMetricRollups({
-      points: authoritative,
-      affectedBuckets: affected,
     });
   }
 
@@ -308,94 +368,125 @@ export class MetricDataPointClickHouseRepository
     });
   }
 
-  private async immediateNeighbors(
-    point: CanonicalMetricDataPoint,
+  /**
+   * The stored point immediately after each of `points` within its own series.
+   * That successor is the only neighbour able to pull a second bucket into the
+   * affected set, so it is the only one worth a read — an earlier revision also
+   * fetched each point's predecessor and then discarded it.
+   *
+   * ORDER BY leads with TimeUnixMs to match the table's sort key
+   * (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId). TimeUnixMs is
+   * derived from TimeUnixNano, so the row order is unchanged — but
+   * optimize_read_in_order is syntactic and cannot infer that, so ordering on
+   * TimeUnixNano alone made ClickHouse materialise and sort every point in
+   * the series (each carrying a ZSTD CanonicalPayload) to return one row.
+   * TimeUnixMs is table-qualified throughout: RAW_SELECT aliases
+   * toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
+   * resolves to that alias (epoch millis), never matching a DateTime64
+   * bound — the same pitfall log-record-storage documents.
+   */
+  private async successorsOf(
+    points: CanonicalMetricDataPoint[],
   ): Promise<CanonicalMetricDataPoint[]> {
-    const client = await this.resolveClient(point.tenantId);
-    // ORDER BY leads with TimeUnixMs to match the table's sort key
-    // (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId). TimeUnixMs is
-    // derived from TimeUnixNano, so the row order is unchanged — but
-    // optimize_read_in_order is syntactic and cannot infer that, so ordering on
-    // TimeUnixNano alone made ClickHouse materialise and sort every point in
-    // the series (each carrying a ZSTD CanonicalPayload) to return one row.
-    // TimeUnixMs is table-qualified throughout: RAW_SELECT aliases
-    // toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
-    // resolves to that alias (epoch millis), never matching a DateTime64
-    // bound — the same pitfall log-record-storage documents.
-    const result = await client.query({
-      query: `
-        (SELECT ${RAW_SELECT}
-         FROM metric_data_points FINAL
-         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-           AND (metric_data_points.TimeUnixMs < {time:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano < {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId < {pointId:String}))))
-         ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)
-        UNION ALL
-        (SELECT ${RAW_SELECT}
-         FROM metric_data_points FINAL
-         WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-           AND (metric_data_points.TimeUnixMs > {time:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time:DateTime64(3)} AND (TimeUnixNano > {timeNano:UInt64} OR (TimeUnixNano = {timeNano:UInt64} AND PointId >= {pointId:String}))))
-         ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 2)
-      `,
-      query_params: {
-        tenantId: point.tenantId,
-        seriesId: point.seriesId,
-        time: new Date(point.timeUnixMs),
-        timeNano: point.timeUnixNano,
-        pointId: point.pointId,
-      },
-      format: "JSONEachRow",
-    });
-    return (await result.json<RawMetricRow>()).map((row) =>
-      fromRaw({ row, organizationId: point.organizationId }),
-    );
+    const tenantId = points[0]!.tenantId;
+    const client = await this.resolveClient(tenantId);
+    const found: CanonicalMetricDataPoint[] = [];
+
+    for (const chunk of chunked(points, SEEKS_PER_QUERY)) {
+      const params: Record<string, unknown> = { tenantId };
+      const selects = chunk.map((point, index) => {
+        params[`series${index}`] = point.seriesId;
+        params[`time${index}`] = new Date(point.timeUnixMs);
+        params[`nano${index}`] = point.timeUnixNano;
+        params[`point${index}`] = point.pointId;
+        return `(SELECT ${RAW_SELECT}
+          FROM metric_data_points FINAL
+          WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
+            AND (metric_data_points.TimeUnixMs > {time${index}:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time${index}:DateTime64(3)} AND (TimeUnixNano > {nano${index}:UInt64} OR (TimeUnixNano = {nano${index}:UInt64} AND PointId > {point${index}:String}))))
+          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 1)`;
+      });
+      const result = await client.query({
+        query: selects.join("\n UNION ALL\n"),
+        query_params: params,
+        format: "JSONEachRow",
+      });
+      for (const row of await result.json<RawMetricRow>()) {
+        found.push(fromRaw({ row, organizationId: points[0]!.organizationId }));
+      }
+    }
+    return found;
   }
 
   /**
    * Every point in the affected buckets, each preceded by the sample the fold
-   * differences it against. Buckets are fetched as their own narrow ranges
-   * rather than one span: a late point and a distant next sample would
-   * otherwise scan every partition between them only to discard the rows.
+   * differences it against, grouped by series. Buckets are fetched as their own
+   * narrow ranges rather than one span: a late point and a distant next sample
+   * would otherwise scan every partition between them only to discard the rows.
    */
-  private async pointsForBuckets(
-    point: CanonicalMetricDataPoint,
-    buckets: ReadonlySet<number>,
-  ): Promise<CanonicalMetricDataPoint[]> {
-    const starts = [...buckets].sort((a, b) => a - b);
-    if (starts.length === 0) return [];
-    const params: Record<string, unknown> = {
-      tenantId: point.tenantId,
-      seriesId: point.seriesId,
-    };
-    const selects = starts.flatMap((start, index) => {
-      params[`from${index}`] = new Date(start);
-      params[`to${index}`] = new Date(start + METRIC_ROLLUP_INTERVAL_MS);
-      return [
-        `(SELECT ${RAW_SELECT}
-          FROM metric_data_points FINAL
-          WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-            AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
-          ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
-        `(SELECT ${RAW_SELECT}
-          FROM metric_data_points FINAL
-          WHERE TenantId = {tenantId:String} AND SeriesId = {seriesId:String}
-            AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
-            AND metric_data_points.TimeUnixMs < {to${index}:DateTime64(3)}
-          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
-      ];
-    });
-    const client = await this.resolveClient(point.tenantId);
-    const result = await client.query({
-      query: selects.join("\n UNION ALL\n"),
-      query_params: params,
-      format: "JSONEachRow",
-    });
+  private async pointsForAffectedBuckets({
+    affectedBySeries,
+    tenantId,
+    organizationId,
+  }: {
+    affectedBySeries: ReadonlyMap<string, ReadonlySet<number>>;
+    tenantId: string;
+    organizationId: string;
+  }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
+    const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
+      [...buckets]
+        .sort((a, b) => a - b)
+        .map((start) => ({ seriesId, start }) as const),
+    );
+    const found = new Map<string, CanonicalMetricDataPoint[]>();
+    if (seeks.length === 0) return found;
+
+    const client = await this.resolveClient(tenantId);
     // A bucket's predecessor may itself sit in an earlier affected bucket, so
     // the ranges overlap by design; the fold needs each point exactly once.
+    // Identity is (series, point) because one query now spans many series, and
+    // a point id is only ever unique within its own.
     const unique = new Map<string, CanonicalMetricDataPoint>();
-    for (const row of await result.json<RawMetricRow>()) {
-      const parsed = fromRaw({ row, organizationId: point.organizationId });
-      unique.set(parsed.pointId, parsed);
+
+    // Each seek contributes two statements, so half the budget keeps a single
+    // query's statement count at the same ceiling the successor seeks use.
+    for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
+      const params: Record<string, unknown> = { tenantId };
+      const selects = chunk.flatMap(({ seriesId, start }, index) => {
+        params[`series${index}`] = seriesId;
+        params[`from${index}`] = new Date(start);
+        params[`to${index}`] = new Date(start + METRIC_ROLLUP_INTERVAL_MS);
+        return [
+          `(SELECT ${RAW_SELECT}
+            FROM metric_data_points FINAL
+            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
+              AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
+            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
+          `(SELECT ${RAW_SELECT}
+            FROM metric_data_points FINAL
+            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
+              AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
+              AND metric_data_points.TimeUnixMs < {to${index}:DateTime64(3)}
+            ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
+        ];
+      });
+      const result = await client.query({
+        query: selects.join("\n UNION ALL\n"),
+        query_params: params,
+        format: "JSONEachRow",
+      });
+      for (const row of await result.json<RawMetricRow>()) {
+        unique.set(
+          `${row.SeriesId}\u0000${row.PointId}`,
+          fromRaw({ row, organizationId }),
+        );
+      }
     }
-    return [...unique.values()];
+
+    for (const point of unique.values()) {
+      const existing = found.get(point.seriesId);
+      if (existing) existing.push(point);
+      else found.set(point.seriesId, [point]);
+    }
+    return found;
   }
 }
