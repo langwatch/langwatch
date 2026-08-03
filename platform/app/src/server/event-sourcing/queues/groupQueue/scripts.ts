@@ -420,8 +420,11 @@ end
 // stored compressed. The encoder records the pre-compression, pre-offload
 // payload size in the envelope header (`s`), so the drain's byte budget can be
 // about the batch a worker will actually assemble rather than about Redis
-// occupancy. Mirrors the TS `readJobPayloadBytes`, including the fallback:
-// legacy bare JSON and pre-`s` envelopes are worth their stored length.
+// occupancy. Mirrors the TS `readJobPayloadBytes` in `jobEnvelope.ts`,
+// including the fallback: legacy bare JSON and pre-`s` envelopes are worth
+// their stored length. The two are one budget read from two ends, so an
+// envelope-format change — new prefix, renamed header field, different
+// length-prefix encoding — has to land in both or they silently disagree.
 const PAYLOAD_SIZE_HELPER_LUA = `
 local function gqPayloadSize(value)
   local prefix = string.sub(value, 1, 4)

@@ -768,6 +768,12 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
  *
  * Never throws: a value this cannot read is worth its stored length, not an
  * exception on the drain path.
+ *
+ * Has a Lua twin: `gqPayloadSize` in `scripts.ts` reads the same `s` field with
+ * the same fallback, because the drain spends the byte budget inside Redis
+ * while this sets its starting point. An envelope-format change — new prefix,
+ * renamed header field, different length-prefix encoding — has to land in both
+ * or the two ends of one budget silently disagree.
  */
 export function readJobPayloadBytes(value: string): number {
   try {
