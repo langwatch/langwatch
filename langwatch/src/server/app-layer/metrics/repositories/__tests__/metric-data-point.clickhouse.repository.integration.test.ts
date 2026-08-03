@@ -271,7 +271,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
   // is live rather than incidental.
   const values = [10, 15, 18, 26, 31, 4, 9, 14, 22, 27, 33, 40];
   // Shared, because the read-counting block below compares its own rollups
-  // against this series rather than writing a second copy of them.
+  // against this series rather than writing a second copy of them. Seeded in
+  // THIS describe's beforeAll so a filtered run of either child block still
+  // finds the rollups it compares against.
   const chunkSeriesId = "d".repeat(64);
 
   function samples(seriesId: string): CanonicalMetricDataPoint[] {
@@ -290,6 +292,12 @@ describe("given a cumulative series long enough to span several rollup buckets",
     );
   }
 
+  beforeAll(async () => {
+    await repo.recomputeAffectedRollupsMany({
+      points: samples(chunkSeriesId),
+    });
+  }, 60_000);
+
   describe("when one series folds as a chunk and an identical one folds a point at a time", () => {
     // Both series use the same timestamps, so the fixture derives the same
     // point ids for both. That is deliberate: a point id is only unique within
@@ -297,9 +305,6 @@ describe("given a cumulative series long enough to span several rollup buckets",
     const perPointSeriesId = "e".repeat(64);
 
     beforeAll(async () => {
-      await repo.recomputeAffectedRollupsMany({
-        points: samples(chunkSeriesId),
-      });
       // Reverse order on purpose: every sample is late relative to the one
       // before it, which is the arrival pattern a chunk collapses.
       for (const single of [...samples(perPointSeriesId)].reverse()) {

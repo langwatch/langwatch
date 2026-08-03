@@ -1290,8 +1290,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   // Carried into handleExhaustedRetries as the group's stored
                   // error so /ops shows WHY it was blocked (a run of failures),
                   // not just the last job's error.
+                  // The handler error rides along as `cause` so the blocked
+                  // record can persist the throwing location — the quarantine
+                  // wrapper's own stack starts in queue control flow and names
+                  // nothing an investigator can use.
                   quarantineError = new Error(
                     `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
+                    { cause: error },
                   );
                   gqGroupsPoisonParkedTotal.inc({
                     queue_name: this.queueName,
@@ -1797,6 +1802,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       groupId,
     });
 
+    // The quarantine breaker wraps the handler error to explain WHY the group
+    // is blocked; the wrapper's stack is queue control flow. The persisted
+    // stack must be the handler's — that is the only place the throwing
+    // location survives once the job stops retrying.
+    const handlerError =
+      lastError?.cause instanceof Error ? lastError.cause : lastError;
+
     // Atomically: block the group, re-stage the job, update ready score, store error
     await this.scripts.restageAndBlock({
       groupId,
@@ -1804,7 +1816,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       score,
       jobDataJson,
       errorMessage: lastError?.message,
-      errorStack: lastError?.stack,
+      errorStack: handlerError?.stack,
     });
 
     gqGroupsBlockedTotal.inc(routingLabels);
@@ -1817,6 +1829,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         stagedJobId,
         restagedAs: newStagedJobId,
         error: lastError,
+        // Explicit rather than relying on the serializer to walk the cause
+        // chain: when the quarantine breaker wrapped the handler error, this
+        // is the stack that names the throwing line.
+        handlerStack:
+          handlerError === lastError ? undefined : handlerError?.stack,
       },
       "Group blocked after exhausted retries, job re-staged",
     );

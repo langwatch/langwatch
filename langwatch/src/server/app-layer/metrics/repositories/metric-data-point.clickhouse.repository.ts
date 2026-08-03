@@ -264,6 +264,7 @@ export class MetricDataPointClickHouseRepository
       affectedBySeries,
       tenantId: points[0]!.tenantId,
       organizationId: points[0]!.organizationId,
+      retentionDays,
     });
 
     const rows: MetricRollupRow[] = [];
@@ -435,15 +436,23 @@ export class MetricDataPointClickHouseRepository
    * differences it against, grouped by series. Buckets are fetched as their own
    * narrow ranges rather than one span: a late point and a distant next sample
    * would otherwise scan every partition between them only to discard the rows.
+   *
+   * The predecessor seek is bounded below by the series' retention window: a
+   * predecessor older than that is expired (or about to be), and the fold
+   * already treats an absent predecessor as a reset/gap. Without the bound a
+   * sparse series pays a reverse scan across every partition — including
+   * S3-tiered cold storage — hunting for a row that no longer matters.
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
     tenantId,
     organizationId,
+    retentionDays,
   }: {
     affectedBySeries: ReadonlyMap<string, ReadonlySet<number>>;
     tenantId: string;
     organizationId: string;
+    retentionDays: number;
   }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
       [...buckets]
@@ -468,11 +477,15 @@ export class MetricDataPointClickHouseRepository
         params[`series${index}`] = seriesId;
         params[`from${index}`] = new Date(start);
         params[`to${index}`] = new Date(start + METRIC_ROLLUP_INTERVAL_MS);
+        params[`cutoff${index}`] = new Date(
+          start - retentionDays * 24 * 60 * 60 * 1000,
+        );
         return [
           `(SELECT ${RAW_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
+              AND metric_data_points.TimeUnixMs >= {cutoff${index}:DateTime64(3)}
             ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
           `(SELECT ${RAW_SELECT}
             FROM metric_data_points FINAL

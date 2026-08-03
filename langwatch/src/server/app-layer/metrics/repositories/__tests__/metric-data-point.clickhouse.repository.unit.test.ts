@@ -304,9 +304,8 @@ describe("MetricDataPointClickHouseRepository", () => {
         "metric_data_points.TimeUnixMs > {time0:DateTime64(3)}",
       );
       expect(successorSeeks).toContain(
-        "ORDER BY metric_data_points.TimeUnixMs",
+        "ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC",
       );
-      expect(successorSeeks).not.toContain("DESC");
     });
   });
 

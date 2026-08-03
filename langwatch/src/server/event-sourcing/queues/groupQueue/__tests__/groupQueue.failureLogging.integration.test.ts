@@ -191,5 +191,54 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
     });
+
+    describe("given the failure-streak breaker quarantines a group", () => {
+      describe("when the stored blocked record is written", () => {
+        it("persists the handler's stack, not the quarantine wrapper's", async () => {
+          const previous =
+            process.env.LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD;
+          process.env.LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD = "1";
+          try {
+            function streakingHandlerForStackAssertion(): never {
+              throw new Error("recurring handler failure");
+            }
+            // Threshold is read at construction, so the env var must be set
+            // before createQueue.
+            const queue = createQueue(async () => {
+              streakingHandlerForStackAssertion();
+            });
+            const name = (queue as unknown as { queueName: string }).queueName;
+            await queue.waitUntilReady();
+
+            await queue.send({ id: "job-1", groupId: "g1" });
+
+            // First failure re-stages with backoff (streak 1); the second
+            // crosses the threshold and quarantines the group.
+            await vi.waitFor(
+              async () => {
+                expect(await redis.sismember(`${name}:gq:blocked`, "g1")).toBe(
+                  1,
+                );
+              },
+              { timeout: 10_000, interval: 100 },
+            );
+
+            const stored = await redis.hgetall(`${name}:gq:group:g1:error`);
+            expect(stored.message).toContain("Poison guard");
+            // The wrapper explains WHY the group blocked; the persisted stack
+            // must still name the handler's throwing line — that is the whole
+            // diagnostic value of the record.
+            expect(stored.stack).toContain("streakingHandlerForStackAssertion");
+          } finally {
+            if (previous === undefined) {
+              delete process.env.LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD;
+            } else {
+              process.env.LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD =
+                previous;
+            }
+          }
+        });
+      });
+    });
   },
 );
