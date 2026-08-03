@@ -68,6 +68,18 @@ class FakeRedis {
     return this.strings.get(key) ?? null;
   }
 
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    const existing = this.sets.get(key) ?? [];
+    let added = 0;
+    for (const member of members) {
+      if (existing.includes(member)) continue;
+      existing.push(member);
+      added += 1;
+    }
+    this.sets.set(key, existing);
+    return added;
+  }
+
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zscan signature
   async zscan(
     key: string,
@@ -538,6 +550,33 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         const result = await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(result?.groundTruth).toBe(6);
+      });
+    });
+  });
+
+  describe("given a group known only to the lifecycle indexes", () => {
+    beforeEach(() => {
+      // No pending-index entry: staged before the index existed, or by a pod on
+      // the previous release during a rollout.
+      redis.seedGroup({
+        groupId: "tenant-a/legacy",
+        jobCount: 4,
+        index: `${PREFIX}ready`,
+        indexType: "zset",
+      });
+      redis.strings.set(COUNTER_KEY, "0");
+    });
+
+    describe("when reconcile runs", () => {
+      it("counts it and adopts it into the pending index", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result?.groundTruth).toBe(4);
+        // Adopted on first sight, so later passes no longer depend on reading the
+        // lifecycle indexes in sequence to find it.
+        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain(
+          "tenant-a/legacy",
+        );
       });
     });
   });

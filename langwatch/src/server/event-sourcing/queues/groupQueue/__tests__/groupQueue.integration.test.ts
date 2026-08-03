@@ -122,19 +122,24 @@ describe.skipIf(!hasTestcontainers)(
             await queue.send({ id, groupId: "pending-group", value: id });
           }
 
-          await vi.waitFor(
-            async () => {
-              expect(
-                await redis.sismember(
-                  `${queueName}:gq:pending-groups`,
-                  "pending-group",
-                ),
-              ).toBe(1);
-            },
-            { timeout: 5000, interval: 50 },
-          );
-
-          releaseFirst?.();
+          try {
+            await vi.waitFor(
+              async () => {
+                expect(
+                  await redis.sismember(
+                    `${queueName}:gq:pending-groups`,
+                    "pending-group",
+                  ),
+                ).toBe(1);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+          } finally {
+            // Unblock the processor even when the assertion fails, so teardown
+            // closes a queue that is idle rather than waiting out its shutdown
+            // timeout and charging the delay to whichever test runs next.
+            releaseFirst?.();
+          }
         });
       });
 

@@ -112,3 +112,15 @@ Feature: GroupQueue pending counter ground-truth reconcile
     And the marker changes hands before the write lands
     When the pass goes to write its result
     Then nothing is published
+
+  # Until a group is in the pending index it is found by reading the lifecycle
+  # indexes in sequence, which is the read a moving group can slip through.
+  # Adopting it on first sight bounds that exposure at "until first seen" rather
+  # than "until the group drains", which matters through a rolling deploy where
+  # pods on the previous release are still staging jobs.
+  @integration
+  Scenario: A group known only to the lifecycle indexes is adopted into the pending index
+    Given a group holding jobs that the pending index does not list
+    When the reconcile runs
+    Then its jobs are counted
+    And it is added to the pending index for later passes

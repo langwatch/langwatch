@@ -351,6 +351,37 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     });
   });
 
+  describe("given a group the pending index has not learned about yet", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group known only to the lifecycle indexes is adopted into the pending index" */
+      it("counts it and adopts it, so later passes read it from the index", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        await redis.del(markerKey);
+
+        // The shape left by a pod on the previous release, or by anything staged
+        // before the index existed: jobs and lifecycle membership, no index entry.
+        await redis.zadd(
+          `${queueName}:gq:group:legacy-group:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+        );
+        await redis.zadd(`${queueName}:gq:ready`, 1, "legacy-group");
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        expect(await redis.exists(indexKey)).toBe(0);
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(2);
+        // Adopted, so it no longer depends on the sequential lifecycle read.
+        expect(await redis.sismember(indexKey, "legacy-group")).toBe(1);
+      });
+    });
+  });
+
   describe("given another instance holds the single-flight marker", () => {
     describe("when a reconcile is declined", () => {
       /** @scenario A declined reconcile leaves the holder's marker untouched */

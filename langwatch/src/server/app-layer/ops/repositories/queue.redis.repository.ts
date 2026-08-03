@@ -1754,12 +1754,16 @@ export class QueueRedisRepository implements QueueRepository {
    * (see PENDING_INDEX_HELPER_LUA). It is read as a single index, so no group can
    * slip between two reads the way it can between the lifecycle indexes.
    *
-   * The lifecycle indexes are still read, and are now additive only. They cover
-   * groups staged before this index existed, which would otherwise stay invisible
-   * until something next wrote to them. A surplus id costs nothing — its ZCARD is
-   * 0 — so folding them in can only help, and their own read-ordering race can no
-   * longer undercount now that correctness rests on `pending-groups`. They can be
-   * dropped once no queue predates the index.
+   * The lifecycle indexes are still read, and cover the groups the index does not
+   * yet know about: everything staged before it existed, and everything staged by
+   * a pod on the previous release while a rollout is in progress. Those groups are
+   * still exposed to the sequential-read race the index exists to remove, so any
+   * id found there is written into the index as it is read. One observation is
+   * enough — from then on the group is counted from the index and is immune,
+   * which bounds the exposure at "until first seen" rather than "until drained".
+   *
+   * The legs can be dropped once no queue predates the index and no pod predates
+   * the writers.
    *
    * Returns null when the pass lost its single-flight marker partway.
    */
@@ -1779,11 +1783,19 @@ export class QueueRedisRepository implements QueueRepository {
     });
     if (!heldThroughTenants) return null;
 
-    // TODO(cleanup): the three lifecycle legs below are additive only and exist
-    // solely to cover groups staged before the pending index did. Removable once
-    // no queue predates it — the index alone is what makes the count correct.
-    const legs: { key: string; type: "zset" | "set" }[] = [
-      { key: pendingGroupsKey(prefix), type: "set" },
+    const indexed = await this.collectIndexMembers({
+      key: pendingGroupsKey(prefix),
+      type: "set",
+      into: groupIds,
+      refreshLease,
+    });
+    if (!indexed) return null;
+    const alreadyIndexed = new Set(groupIds);
+
+    // TODO(cleanup): the lifecycle legs below exist only for groups the index has
+    // not learned about yet. Removable once no queue predates the index and no pod
+    // predates the writers.
+    const legacyLegs: { key: string; type: "zset" | "set" }[] = [
       { key: `${prefix}ready`, type: "zset" },
       { key: `${prefix}blocked`, type: "set" },
       ...Array.from(parkedTenants, (tenantId) => ({
@@ -1792,7 +1804,7 @@ export class QueueRedisRepository implements QueueRepository {
       })),
     ];
 
-    for (const leg of legs) {
+    for (const leg of legacyLegs) {
       const held = await this.collectIndexMembers({
         key: leg.key,
         type: leg.type,
@@ -1802,7 +1814,53 @@ export class QueueRedisRepository implements QueueRepository {
       if (!held) return null;
     }
 
+    await this.backfillPendingIndex({
+      prefix,
+      groupIds: Array.from(groupIds).filter((id) => !alreadyIndexed.has(id)),
+    });
+
     return groupIds;
+  }
+
+  /**
+   * Adopt groups the lifecycle indexes know about but the pending index does not.
+   *
+   * Until a group is in the index it is counted by reading the lifecycle indexes
+   * in sequence, and a group moving between them mid-read can be missed. Writing
+   * it in on first sight closes that for every later pass, so a group staged
+   * before the index existed — or by a pod on the previous release mid-rollout —
+   * is exposed for at most the passes before something first observes it.
+   *
+   * Best-effort: adding is what makes later passes safe, and failing to add only
+   * leaves the group where it already was. Over-inclusion is harmless, and the
+   * prune removes anything that turns out to be empty.
+   */
+  private async backfillPendingIndex(params: {
+    prefix: string;
+    groupIds: string[];
+  }): Promise<void> {
+    if (params.groupIds.length === 0) return;
+    const indexKey = pendingGroupsKey(params.prefix);
+    try {
+      for (
+        let offset = 0;
+        offset < params.groupIds.length;
+        offset += PENDING_RECONCILE_ZCARD_BATCH
+      ) {
+        await this.redis.sadd(
+          indexKey,
+          ...params.groupIds.slice(
+            offset,
+            offset + PENDING_RECONCILE_ZCARD_BATCH,
+          ),
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        { error: err },
+        "Failed to adopt lifecycle-index groups into the pending index",
+      );
+    }
   }
 
   /**
