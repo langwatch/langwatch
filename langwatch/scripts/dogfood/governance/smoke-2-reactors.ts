@@ -9,7 +9,7 @@
  * complexity that's tangential to reactor evidence) and instead POST a
  * synthetic OTLP-shaped trace to /api/otel/v1/traces carrying the
  * ingestion-source markers both reactors gate on. The OTLP path is the
- * production path — the REST collector doesn't accumulate generic
+ * production path. The REST collector doesn't accumulate generic
  * attributes into the fold state, so the reactors only fire on OTLP-fed
  * traces. This script proves the full pipeline (collector → fold →
  * reactors → ClickHouse) end-to-end.
@@ -29,8 +29,8 @@
  *   pnpm tsx scripts/dogfood/governance/smoke-2-reactors.ts
  *
  * Exit code:
- *   0 — both reactors landed at least one row tied to the synthetic trace
- *   1 — any reactor missing evidence after timeout
+ *   0: both reactors landed at least one row tied to the synthetic trace
+ *   1: any reactor missing evidence after timeout
  */
 
 import { createClient } from "@clickhouse/client";

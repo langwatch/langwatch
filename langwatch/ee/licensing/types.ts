@@ -28,7 +28,7 @@ export const LicensePlanLimitsSchema = z.object({
   maxCustomGraphs: z.number().optional(),
   maxAutomations: z.number().optional(),
   canPublish: z.boolean(),
-  // Webhook endpoints platform — optional so licenses signed before the
+  // Webhook endpoints platform: optional so licenses signed before the
   // feature existed keep validating; absent means false.
   webhookEndpointsEnabled: z.boolean().optional(),
   // Usage counting mode - optional for backward compatibility with existing signed licenses

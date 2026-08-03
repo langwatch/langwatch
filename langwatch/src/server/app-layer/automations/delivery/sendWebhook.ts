@@ -179,7 +179,7 @@ export interface WebhookSendInput {
   eventId?: string;
   /** Per-destination signing secret. When present the request carries
    *  `X-LangWatch-Signature: t=<unix>,v1=<hmac-sha256(secret, "<t>.<body>")>`
-   *  (5-minute receiver tolerance documented) — the signing ADR-040
+   *  (5-minute receiver tolerance documented). This is the signing ADR-040
    *  specified; any channel that stores a secret inherits it. */
   signingSecret?: string;
   /** 1-based delivery attempt, sent as `X-LangWatch-Delivery-Attempt` so

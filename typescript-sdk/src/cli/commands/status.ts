@@ -541,7 +541,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         const standing =
           overCap !== undefined
             ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
-            : `at ${budget.utilizationPct}% — $${budget.spentUsd} of $${budget.limitUsd}`;
+            : `at ${budget.utilizationPct}%, $${budget.spentUsd} of $${budget.limitUsd}`;
         const line = `    ⚠ budget "${budget.name}" (${budget.window.toLowerCase()}, ${budget.scope.toLowerCase()}) ${standing}${budget.onBreach === "BLOCK" ? ", blocks on breach" : ""}`;
         console.log(
           (breached ? chalk.red(line) : chalk.yellow(line)) +

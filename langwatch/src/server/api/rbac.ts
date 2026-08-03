@@ -474,7 +474,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // vk-scope-rbac.feature.
     "virtualKeys:manage",
     "virtualKeys:viewOtherPersonal",
-    // Webhook platform — admin-only by default (endpoints carry signing
+    // Webhook platform: admin-only by default (endpoints carry signing
     // secrets and stream org-wide events out). Custom roles can delegate
     // webhookEndpoints:view for read-only delivery-log access.
     "webhookEndpoints:view",

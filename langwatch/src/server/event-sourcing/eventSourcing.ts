@@ -411,7 +411,7 @@ export class EventSourcing {
   /**
    * The identifying fields of a job payload, for a log line that has to name
    * WHICH record is at risk. Commands carry their aggregate id under the
-   * pipeline's own key, events carry the framework's — take whichever is
+   * pipeline's own key, events carry the framework's. Take whichever is
    * present and nothing else, because the rest of the payload is business
    * data and can hold an end user's identity.
    */
@@ -444,7 +444,7 @@ export class EventSourcing {
    * workers.
    *
    * Throwing puts the job back with the queue's normal bounded retry, so a
-   * worker that does have the pipeline picks it up — which is the whole
+   * worker that does have the pipeline picks it up, which is the whole
    * behaviour a rolling deploy needs. A pipeline that is genuinely retired
    * gets an explicit tombstone at the send boundary (see the ADR-052 legacy
    * matcher below); this generic path never decides on its own that a record

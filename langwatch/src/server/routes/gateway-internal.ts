@@ -660,12 +660,12 @@ secured.access(gatewayPolicy()).get("/changes", async (c) => {
   });
 });
 
-// §4.5 — `/budget/debit` is removed. Cost recording rides the spend
+// §4.5: `/budget/debit` is removed. Cost recording rides the spend
 // commands the gateway posts below: the debits process manager
 // (langwatch/ee/governance/process-manager/gatewayDebits.process.ts) joins
 // each request's admission to its outcome and writes the ClickHouse
 // `gateway_budget_ledger_events` table, once per applicable budget. Single
-// source of truth, no PG dual-write — see the migration
+// source of truth, no PG dual-write. See the migration
 // 00017_create_gateway_budget_ledger.sql for the CH schema.
 
 /**

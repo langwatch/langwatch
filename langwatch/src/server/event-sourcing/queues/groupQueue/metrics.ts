@@ -290,7 +290,7 @@ export const gqJobsDroppedTotal = new Counter({
  * A dispatched job whose routing metadata names a pipeline this worker does
  * not have registered, so it could not be handed to a handler.
  *
- * The body decoded fine and the payload is intact — what is missing is the
+ * The body decoded fine and the payload is intact. What is missing is the
  * pipeline, in THIS process. That makes it a provisioning signal, not a data
  * signal, and the normal cause is a fleet running two builds at once: during a
  * rolling deploy the old workers still poll the same queue, so every job for a

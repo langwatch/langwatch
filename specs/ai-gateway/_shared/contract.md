@@ -377,7 +377,7 @@ other client did either. It is deleted. The service method behind it,
 that do need a projective answer: the CLI budget pre-check
 (`GET /api/auth/cli/budget/status`) and the personal-budget screens.
 
-### 4.5 Budget debit — derived from spend commands (no dedicated endpoint)
+### 4.5 Budget debit: derived from spend commands (no dedicated endpoint)
 
 There is no `POST /api/internal/gateway/budget/debit`. Spend is derived from
 the spend commands the gateway emits for every request (§4.9), and the
@@ -736,9 +736,9 @@ Scoping rules follow the existing project/team/org hierarchy already in LangWatc
 Each lane's feature file elaborates the contract with testable scenarios. Keep these in sync:
 
 - `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
-- `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, spend-command ClickHouse debits (idempotent by `gateway_request_id`), timezone-aware resets.
+- `specs/ai-gateway/budgets.feature`: hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, spend-command ClickHouse debits (idempotent by `gateway_request_id`), timezone-aware resets.
 - `specs/ai-gateway/gateway-provider-settings.feature` — ModelProvider IS the single source of truth (no separate `GatewayProviderCredential` binding); gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) live on the ModelProvider Advanced (Gateway) tab and must not leak into the legacy litellm path.
-- `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → spend-command debits → per-tenant OTel emit).
+- `specs/ai-gateway/epic.feature`: cross-cutting E2E scenarios (end-to-end request through gateway → fallback → spend-command debits → per-tenant OTel emit).
 - `specs/ai-gateway/` (pending, Lane A): `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature`.
 
 When a spec and this contract disagree, **the contract wins** and the spec is amended (after consensus in #langwatch-ai-gateway).

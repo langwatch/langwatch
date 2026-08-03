@@ -149,7 +149,7 @@ Feature: AI Gateway — Budgets
     Then the request is blocked because vk-block breaches, even though project is only warn
 
   # ============================================================================
-  # Ledger — spend-command debits in ClickHouse
+  # Ledger: spend-command debits in ClickHouse
   # ============================================================================
 
   @integration @unimplemented

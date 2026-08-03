@@ -4,7 +4,7 @@
  * The case that matters is a fleet mid-rollout: old and new workers poll one
  * queue, so a command for a newly added pipeline lands on a worker that has
  * never heard of it. Acknowledging it there destroys the record, and for a
- * spend command that is a charge the ledger never sees — the ingest route has
+ * spend command that is a charge the ledger never sees: the ingest route has
  * already answered 200 and the gateway has already deleted its spool segment,
  * so nothing upstream can notice or resend.
  *
