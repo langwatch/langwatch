@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
 import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
 import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
@@ -219,5 +220,93 @@ describe("MetricDataPointClickHouseRepository", () => {
         projectedEventEquivalentUsage: 3,
       },
     ]);
+  });
+
+  describe("when a coalesced chunk is folded into rollups", () => {
+    // A bucket-aligned base keeps every generated point inside one 30s bucket,
+    // so the affected-bucket read stays at a single seek and the successor
+    // seeks are the only thing the chunk size moves.
+    const base =
+      Math.floor(1_700_000_000_000 / METRIC_ROLLUP_INTERVAL_MS) *
+      METRIC_ROLLUP_INTERVAL_MS;
+
+    function chunkOf(count: number): CanonicalMetricDataPoint[] {
+      return Array.from({ length: count }, (_, index) => {
+        const timeUnixMs = base + index;
+        return {
+          ...dataPoint(),
+          pointId: String(index).padStart(64, "0"),
+          timeUnixMs,
+          timeUnixNano: String(BigInt(timeUnixMs) * 1_000_000n),
+        };
+      });
+    }
+
+    function reader() {
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async () => ({ json: async () => [] }));
+      const insert = vi.fn(async () => {});
+      return { query, client: { query, insert } as never };
+    }
+
+    it("reads once for the successors and once for the affected bucket", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(12) });
+
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the reads flat as the chunk grows within the seek budget", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(64) });
+
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it("splits the successor seeks once the chunk outgrows the budget", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      // 130 points need three statements of successor seeks; the single
+      // affected bucket still needs one. Reading per point would be 131.
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(130) });
+
+      expect(query).toHaveBeenCalledTimes(4);
+    });
+
+    it("asks for each point's own successor rather than its predecessor", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
+
+      const successorSeeks = query.mock.calls[0]![0].query;
+      // The bound is what encodes "successor" — an ascending order with a `<`
+      // bound would still read backwards, so pin the direction of both.
+      expect(successorSeeks).toContain(
+        "metric_data_points.TimeUnixMs > {time0:DateTime64(3)}",
+      );
+      expect(successorSeeks).toContain(
+        "ORDER BY metric_data_points.TimeUnixMs",
+      );
+      expect(successorSeeks).not.toContain("DESC");
+    });
   });
 });
