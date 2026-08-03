@@ -19,7 +19,10 @@ import {
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
+import {
+  CURRENT_ROLLUP_REBUILD_MIGRATION,
+  replayGooseMigrationUp,
+} from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -413,12 +416,16 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       });
 
       // The decision as a pre-upgrade deployment would compute it, then
-      // the upgrade under test: pin the truncation to UTC and rebuild the
-      // rollup from the ledger.
+      // the upgrade under test: the CURRENT rollup rebuild, which pins the
+      // truncation to UTC, keys the aggregate by budget, and re-derives
+      // every row from the ledger. Replaying the newest rebuild rather than
+      // the one that first fixed the timezone is what keeps this scenario
+      // honest as the rollup evolves: the claim is that spend folded by any
+      // older view still enforces after the upgrade a deployment runs.
       preRebuildDecision = await decidePreProject();
       await replayGooseMigrationUp({
         client,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
     }, 120_000);
 
@@ -430,7 +437,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
       const client = await getClickHouseClientForProject(PRE_PROJECT_ID);
       await replayGooseMigrationUp({
         client: client!,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
     }, 120_000);
 

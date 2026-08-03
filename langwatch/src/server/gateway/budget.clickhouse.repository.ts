@@ -17,10 +17,20 @@
  *     rows but collapse to one, filing the spend under whichever bucket
  *     won. Single-writer ownership is what keeps bucket filing correct.
  *   - gateway_budget_scope_totals       — AggregatingMergeTree rollup per
- *                                         (scope, scope_id, window, period_start)
+ *                                         (scope, scope_id, window,
+ *                                          period_start, budget_id)
  *   - gateway_budget_scope_totals_mv    — MV feeding the rollup from events
  *
+ * The rollup carries the budget because the ledger does. One request that
+ * resolves a hard cap and a soft cap on the same virtual key writes two
+ * rows under the same scope, scope id and window, each the request's true
+ * cost. An aggregate that dropped the budget from its key would fold both
+ * into one bucket and report every budget sharing that bucket at N times
+ * what it actually spent. Every read here names its budget for the same
+ * reason; see `bucketMatchSql`.
+ *
  * See: migration 00017_create_gateway_budget_ledger.sql
+ * See: migration 00069_gateway_budget_scope_totals_budget_grain.sql
  * See: specs/ai-gateway/_shared/contract.md §4.5
  */
 
@@ -183,7 +193,12 @@ export type LedgerEventRow = {
 type BucketSpendRow = { ScopeId: string; SpentUSD: string };
 
 /** Raw shape of a rollup total row, in the rollup's column casing. */
-type RollupScopeRow = { Scope: string; ScopeId: string; SpentUSD: string };
+type RollupScopeRow = {
+  BudgetId: string;
+  Scope: string;
+  ScopeId: string;
+  SpentUSD: string;
+};
 
 type ClickHouseClientFor = Awaited<ReturnType<ClickHouseClientResolver>>;
 
@@ -227,6 +242,7 @@ function bucketQueryShape(args: {
 }): BucketQueryShape {
   const { budget, tenantIds, boundaries, now } = args;
   const params: Record<string, string | number | string[]> = {
+    budgetId: budget.id,
     scope: scopeToClickHouse(budget.scopeType),
     window: windowToClickHouse(budget.window),
     prefix: `${budget.scopeId}:`,
@@ -263,7 +279,11 @@ function bucketQueryShape(args: {
     params,
     tenantIds,
     tenantPlaceholders: tenantPlaceholders(tenantIds),
-    bucketFilter: `startsWith(ScopeId, {prefix:String}) AND ${providerGuard}`,
+    // BudgetId first: a bucket is identified by its scope key, but a scope
+    // key does not identify a budget. Two templates anchored on the same
+    // key write into the same bucket ids, and without this the read would
+    // sum both templates' rows into each one's breakdown.
+    bucketFilter: `BudgetId = {budgetId:String} AND startsWith(ScopeId, {prefix:String}) AND ${providerGuard}`,
     movedBoundaryPredicates,
     movedBoundaryBuckets: boundaries.map((b) => b.bucketScopeId),
     budgetFloorMs,
@@ -271,18 +291,30 @@ function bucketQueryShape(args: {
 }
 
 /**
- * The SQL that says a row belongs to one target: a single bucket, or every
- * bucket under the anchor carrying the target's provider suffix. An
- * unfiltered target matches only buckets carrying no suffix at all, so it
- * never absorbs a provider-filtered sibling's spend.
+ * The SQL that says a row belongs to one target: the target's own budget,
+ * in a single bucket or in every bucket under the anchor carrying the
+ * target's provider suffix. An unfiltered target matches only buckets
+ * carrying no suffix at all, so it never absorbs a provider-filtered
+ * sibling's spend.
+ *
+ * `BudgetId` is not redundant with the bucket. The ledger writes one row
+ * per (budget, request), so a request that resolves a hard cap and a soft
+ * cap on the same virtual key writes two rows carrying the same cost under
+ * the same scope, scope id and window. Matching on the bucket alone sums
+ * both of them into each budget, reporting every budget at N times its
+ * true spend for N budgets sharing the bucket.
  */
 function bucketMatchSql(
   target: BudgetSpendTarget,
+  budgetIdParam: string,
   scopeIdParam: string,
   suffixParam: string,
 ): string {
-  if (target.match !== "prefix") return `ScopeId = {${scopeIdParam}:String}`;
-  const anchored = `startsWith(ScopeId, {${scopeIdParam}:String})`;
+  const budget = `BudgetId = {${budgetIdParam}:String}`;
+  if (target.match !== "prefix") {
+    return `${budget} AND ScopeId = {${scopeIdParam}:String}`;
+  }
+  const anchored = `${budget} AND startsWith(ScopeId, {${scopeIdParam}:String})`;
   return target.bucketSuffix
     ? `${anchored} AND endsWith(ScopeId, {${suffixParam}:String})`
     : `${anchored} AND position(ScopeId, {sep:String}) = 0`;
@@ -302,6 +334,7 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
     sep: PROVIDER_BUCKET_SEPARATOR,
   };
   const sums = targets.map((t, i) => {
+    params[`fbudgetId${i}`] = t.budgetId;
     params[`fscope${i}`] = scopeToClickHouse(t.scope);
     params[`fscopeId${i}`] = t.scopeId;
     params[`fwindow${i}`] = windowToClickHouse(t.window);
@@ -309,7 +342,12 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
     if (t.match === "prefix" && t.bucketSuffix) {
       params[`fsuffix${i}`] = t.bucketSuffix;
     }
-    const bucket = bucketMatchSql(t, `fscopeId${i}`, `fsuffix${i}`);
+    const bucket = bucketMatchSql(
+      t,
+      `fbudgetId${i}`,
+      `fscopeId${i}`,
+      `fsuffix${i}`,
+    );
     return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
   });
   return { sql: sums.join(",\n              "), params };
@@ -328,10 +366,16 @@ function rollupScopeFilter(targets: BudgetSpendTarget[]): {
     sep: PROVIDER_BUCKET_SEPARATOR,
   };
   const terms = targets.map((t, i) => {
+    params[`budgetId${i}`] = t.budgetId;
     params[`scope${i}`] = scopeToClickHouse(t.scope);
     params[`scopeId${i}`] = t.scopeId;
     if (t.bucketSuffix) params[`suffix${i}`] = t.bucketSuffix;
-    const bucket = bucketMatchSql(t, `scopeId${i}`, `suffix${i}`);
+    const bucket = bucketMatchSql(
+      t,
+      `budgetId${i}`,
+      `scopeId${i}`,
+      `suffix${i}`,
+    );
     return `(Scope = {scope${i}:String} AND ${bucket})`;
   });
   return { sql: terms.join(" OR "), params };
@@ -361,6 +405,7 @@ function rollupRowMatchesTarget(
   target: BudgetSpendTarget,
   scope: string,
 ): boolean {
+  if (row.BudgetId !== target.budgetId) return false;
   if (row.Scope !== scope) return false;
   if (target.match !== "prefix") return row.ScopeId === target.scopeId;
   if (!row.ScopeId.startsWith(target.scopeId)) return false;
@@ -721,6 +766,7 @@ export class GatewayBudgetClickHouseRepository {
       const result = await client.query({
         query: `
             SELECT
+              BudgetId,
               Scope,
               ScopeId,
               toString(sumMerge(SpendUSD)) AS SpentUSD
@@ -729,7 +775,7 @@ export class GatewayBudgetClickHouseRepository {
               AND Window = {window:String}
               AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
               AND (${scopeFilter.sql})
-            GROUP BY Scope, ScopeId
+            GROUP BY BudgetId, Scope, ScopeId
           `,
         query_params: {
           ...tenantParams(tenantIds),

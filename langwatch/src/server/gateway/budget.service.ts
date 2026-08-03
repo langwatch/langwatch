@@ -22,6 +22,7 @@ import type {
   BudgetBucketBoundary,
   GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs } from "./budget.clickhouse.repository";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -1294,6 +1295,11 @@ export class GatewayBudgetService {
               scopeId: r.bucketScopeId,
               window: r.budget.window,
               match: "exact" as const,
+              // The same floor the materialiser bakes into the bundle. A
+              // MANUAL window has no calendar period to fall back on, so
+              // without it this read totals the budget's whole lifetime and
+              // decides against a number the gateway never enforces on.
+              periodFloorMs: budgetPeriodFloorMs(r.budget),
             })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));

@@ -36,10 +36,19 @@ Feature: AI Gateway — Budgets
   applicable budget to gateway_budget_ledger_events in ClickHouse. It is the
   sole writer. An AggregatingMergeTree materialised view
   (gateway_budget_scope_totals) rolls up spend per (scope, scope_id, window,
-  period_start), which is what enforcement reads. There is no debit
-  endpoint: the spend command itself is the debit signal, and a request the
-  gateway refused is a record too. Idempotency is guaranteed by the
-  ReplacingMergeTree ORDER BY (TenantId, BudgetId, GatewayRequestId).
+  period_start, budget_id), which is what enforcement reads. There is no
+  debit endpoint: the spend command itself is the debit signal, and a
+  request the gateway refused is a record too. Idempotency is guaranteed by
+  the ReplacingMergeTree ORDER BY (TenantId, BudgetId, GatewayRequestId).
+
+  The budget belongs in that rollup key because it belongs in the ledger's.
+  Several budgets can apply to the same key, and provisioning one usually
+  means provisioning two: a hard cap that blocks and a soft cap that warns
+  earlier. Each gets its own ledger row for the same request, carrying the
+  same cost, so a total that identified a budget's rows by scope alone would
+  charge every budget for every sibling's row. Each budget reports and
+  enforces on what the requests actually cost, however many budgets share
+  its scope.
 
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
@@ -82,6 +91,57 @@ Feature: AI Gateway — Budgets
     Then the gateway rejects the request with 402
     And the error envelope is { error: { type: "budget_exceeded", code: "budget.project.exceeded", ... } }
     And no upstream provider is called
+
+  # ----------------------------------------------------------------------------
+  # Several budgets on one scope
+  # ----------------------------------------------------------------------------
+
+  @integration
+  Scenario: Two budgets on one key each report the request's own cost
+    Given virtual key "prod-key" has a daily hard cap and a daily soft cap
+    And one request costing $0.001 has been served on that key
+    Then the hard cap reports $0.001 spent
+    And the soft cap reports $0.001 spent
+
+  @integration
+  Scenario: The budget list shows a shared key's budgets undoubled
+    Given virtual key "prod-key" has a daily hard cap and a daily soft cap
+    And one request costing $0.001 has been served on that key
+    When I open the "AI Gateway → Budgets" section
+    Then both budgets show $0.001 spent
+
+  @integration
+  Scenario: A hard cap sharing a key does not block at half its limit
+    Given virtual key "prod-key" has a hard cap of $0.0015 and a soft cap beside it
+    And one request costing $0.001 has been served on that key
+    When a gateway request is estimated to cost $0.0001
+    Then the gateway admits the request
+    And no budget is reported as breached
+
+  @integration
+  Scenario: A third budget on a shared key does not inflate the others
+    Given virtual key "prod-key" has three daily budgets
+    And one request costing $0.001 has been served on that key
+    Then each of the three reports $0.001 spent
+
+  @integration
+  Scenario: Sibling budgets on different windows total independently
+    Given virtual key "prod-key" has a daily budget and a monthly budget
+    And two requests costing $0.001 each have been served on that key
+    Then the daily budget reports $0.002 spent
+    And the monthly budget reports $0.002 spent
+
+  @integration
+  Scenario: Manual-window budgets sharing a key each report once
+    Given virtual key "prod-key" has two manual-window budgets
+    And one request costing $0.001 has been served on that key
+    Then each budget reports $0.001 spent
+
+  @integration
+  Scenario: Two per-seat templates on one key each see the seat's own spend
+    Given virtual key "prod-key" has two per-seat allowances anchored on it
+    And one request costing $0.001 has been served for end user "seat-holder@acme.test"
+    Then each template reports $0.001 against that seat
 
   @integration
   Scenario: Soft budget emits warning header but allows the call
