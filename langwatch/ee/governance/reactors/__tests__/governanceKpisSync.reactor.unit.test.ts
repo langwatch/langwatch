@@ -300,6 +300,39 @@ describe("governanceKpisSync reactor", () => {
     });
   });
 
+  describe("pre-enqueue gate", () => {
+    describe("when the trace carries no governance origin", () => {
+      it("declines before a job is packed", () => {
+        const { deps } = mockDeps();
+        const reactor = createGovernanceKpisSyncReactor(deps);
+
+        expect(reactor.shouldReact).toBeDefined();
+        expect(reactor.shouldReact!(event, ctx(createFoldState({})))).toBe(
+          false,
+        );
+        expect(
+          reactor.shouldReact!(
+            event,
+            ctx(createFoldState({ "langwatch.origin.kind": "gateway" })),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the trace came from an ingestion source", () => {
+      it("accepts the event", () => {
+        const { deps } = mockDeps();
+        const reactor = createGovernanceKpisSyncReactor(deps);
+        const state = createFoldState({
+          "langwatch.origin.kind": "ingestion_source",
+          "langwatch.ingestion_source.id": "is-1",
+        });
+
+        expect(reactor.shouldReact!(event, ctx(state))).toBe(true);
+      });
+    });
+  });
+
   describe("dedup contract", () => {
     it("declares a per-(tenant, trace) job-id for BullMQ debounce", () => {
       const { deps } = mockDeps();

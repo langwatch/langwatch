@@ -31,10 +31,9 @@ export const GOVERNANCE_OCSF_EVENTS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
 
 import {
   GOVERNANCE_ATTR,
-  GOVERNANCE_ORIGIN_KIND_VALUE,
+  isGovernanceOriginTrace,
 } from "../services/governanceAttributeKeys";
 
-const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
 const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
@@ -43,7 +42,6 @@ const ATTR_ENDUSER_ID = "enduser.id";
 const ATTR_GEN_AI_REQUEST_MODEL = "gen_ai.request.model";
 const ATTR_TOOL_NAME = "tool.name";
 const ATTR_ANOMALY_ALERT_ID = GOVERNANCE_ATTR.ANOMALY_ALERT_ID;
-const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
 export interface GovernanceOcsfEventsSyncReactorDeps {
   governanceOcsfEventsRepository: GovernanceOcsfEventsClickHouseRepository;
@@ -60,8 +58,8 @@ export interface GovernanceOcsfEventsSyncReactorDeps {
  * Registered on the trace_processing pipeline downstream of the
  * traceSummary fold. Reads governance origin attributes + actor
  * identity + target model off the fold state. Traces without
- * `langwatch.origin.kind = "ingestion_source"` are skipped — not
- * governance traffic.
+ * `langwatch.origin.kind = "ingestion_source"` are not governance
+ * traffic and are declined before a job is enqueued.
  *
  * Severity is INFO by default; elevated to MEDIUM (warning tier)
  * when `langwatch.governance.anomaly_alert_id` is set per the spec.
@@ -73,6 +71,13 @@ export function createGovernanceOcsfEventsSyncReactor(
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "governanceOcsfEventsSync",
+    // Pre-enqueue (ADR-026). See governanceKpisSync for the reasoning: the
+    // origin check is pure, reads the payload the handler would receive, and
+    // rejects the bulk of trace traffic before a job is packed. Kept in
+    // `handle` too — inline mode, fail-open dispatch, and jobs queued before
+    // this gate existed all still reach the handler.
+    shouldReact: (_event, context) =>
+      isGovernanceOriginTrace(context.foldState.attributes),
     options: {
       makeJobId: (payload) =>
         `governance-ocsf-events-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
@@ -85,8 +90,7 @@ export function createGovernanceOcsfEventsSyncReactor(
     ): Promise<void> {
       const { tenantId, foldState } = context;
 
-      const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
-      if (originKind !== ORIGIN_KIND_VALUE) {
+      if (!isGovernanceOriginTrace(foldState.attributes)) {
         return;
       }
 

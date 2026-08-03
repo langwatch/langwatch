@@ -32,6 +32,22 @@ const logger = createLogger(
  */
 export const GATEWAY_BUDGET_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
 
+const ATTR_VIRTUAL_KEY_ID = "langwatch.virtual_key_id";
+const ATTR_GATEWAY_REQUEST_ID = "langwatch.gateway_request_id";
+
+/**
+ * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * (fail-open path): only traces the gateway produced carry both a virtual
+ * key and a gateway request id, and only those can debit a budget. The
+ * budget resolution itself is stateful and stays in handle.
+ */
+function isGatewayTrace(foldState: TraceSummaryData): boolean {
+  const attributes = foldState.attributes ?? {};
+  return Boolean(
+    attributes[ATTR_VIRTUAL_KEY_ID] && attributes[ATTR_GATEWAY_REQUEST_ID],
+  );
+}
+
 export interface GatewayBudgetSyncReactorDeps {
   prisma: PrismaClient;
   budgetRepository: GatewayBudgetRepository;
@@ -45,7 +61,8 @@ export interface GatewayBudgetSyncReactorDeps {
  * Reads `langwatch.virtual_key_id` + `langwatch.gateway_request_id` off
  * the fold state attributes — stamped by the gateway's customer trace
  * bridge (services/aigateway/adapters/customertracebridge/emitter.go).
- * Traces without those attributes are skipped (not gateway traffic).
+ * Traces without those attributes are not gateway traffic and are
+ * declined before a job is enqueued.
  *
  * Cost + tokens are taken from the fold state (post cost-enrichment
  * service) so this reactor trusts the authoritative platform-side
@@ -58,6 +75,15 @@ export function createGatewayBudgetSyncReactor(
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "gatewayBudgetSync",
+    // Pre-enqueue (ADR-026). The attribute check is pure and reads the exact
+    // payload the handler receives, so deciding here is equivalent to the
+    // early-return below — except a non-gateway trace never pays a serialize
+    // + queue round-trip for a job that would immediately no-op. Every trace
+    // in a project fans this reactor out; gateway traffic is a slice of it.
+    // Kept in `handle` too: the queue is not the only caller (inline mode), a
+    // fail-open `shouldReact` may dispatch anyway, and a job queued before
+    // this gate existed still reaches the handler.
+    shouldReact: (_event, context) => isGatewayTrace(context.foldState),
     options: {
       // Dedup per (tenant, trace) — one gateway trace = one debit burst.
       // Structural idempotency in the CH ReplacingMergeTree
@@ -74,13 +100,12 @@ export function createGatewayBudgetSyncReactor(
     ): Promise<void> {
       const { tenantId: projectId, foldState } = context;
 
-      const virtualKeyId = foldState.attributes["langwatch.virtual_key_id"];
-      const gatewayRequestId =
-        foldState.attributes["langwatch.gateway_request_id"];
-
-      if (!virtualKeyId || !gatewayRequestId) {
+      if (!isGatewayTrace(foldState)) {
         return;
       }
+
+      const virtualKeyId = foldState.attributes[ATTR_VIRTUAL_KEY_ID]!;
+      const gatewayRequestId = foldState.attributes[ATTR_GATEWAY_REQUEST_ID]!;
 
       try {
         const vk = await deps.prisma.virtualKey.findUnique({
