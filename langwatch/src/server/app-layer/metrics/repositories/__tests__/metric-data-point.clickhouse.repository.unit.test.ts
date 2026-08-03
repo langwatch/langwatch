@@ -243,7 +243,9 @@ describe("MetricDataPointClickHouseRepository", () => {
     }
 
     function reader() {
-      const query = vi.fn(async () => ({ json: async () => [] }));
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async () => ({ json: async () => [] }));
       const insert = vi.fn(async () => {});
       return { query, client: { query, insert } as never };
     }
@@ -295,8 +297,10 @@ describe("MetricDataPointClickHouseRepository", () => {
 
       await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
 
-      const successorSeeks = query.mock.calls[0]![0].query as string;
-      expect(successorSeeks).toContain("ORDER BY metric_data_points.TimeUnixMs");
+      const successorSeeks = query.mock.calls[0]![0].query;
+      expect(successorSeeks).toContain(
+        "ORDER BY metric_data_points.TimeUnixMs",
+      );
       expect(successorSeeks).not.toContain("DESC");
     });
   });

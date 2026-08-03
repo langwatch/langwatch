@@ -64,6 +64,44 @@ function groupBySeries(
   return bySeries;
 }
 
+/**
+ * Which rollup buckets a chunk moved, per series, decided without another read.
+ *
+ * A chunk point's true successor is the smallest stored point after it. Every
+ * chunk point is already stored by the time this runs, and the seek returned
+ * the smallest stored point after each one, so the true successor is somewhere
+ * in the union of the two and no stored point can sit between them. Taking the
+ * minimum of that union — which is all `affectedRollupBuckets` does — therefore
+ * lands on exactly the row a per-point neighbour query would have returned,
+ * whatever order the chunk arrived in.
+ */
+function affectedBucketsBySeries({
+  bySeries,
+  successorsBySeries,
+}: {
+  bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+  successorsBySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+}): Map<string, Set<number>> {
+  const affectedBySeries = new Map<string, Set<number>>();
+  for (const [seriesId, seriesPoints] of bySeries) {
+    const candidates = [
+      ...seriesPoints,
+      ...(successorsBySeries.get(seriesId) ?? []),
+    ];
+    const affected = new Set<number>();
+    for (const point of seriesPoints) {
+      for (const bucket of affectedRollupBuckets({
+        points: candidates,
+        insertedPoint: point,
+      })) {
+        affected.add(bucket);
+      }
+    }
+    if (affected.size > 0) affectedBySeries.set(seriesId, affected);
+  }
+  return affectedBySeries;
+}
+
 export class MetricDataPointClickHouseRepository
   implements MetricDataPointRepository
 {
@@ -204,31 +242,10 @@ export class MetricDataPointClickHouseRepository
     await this.ensureDataPoints({ points, retentionDays });
 
     const bySeries = groupBySeries(points);
-    const successorsBySeries = groupBySeries(await this.successorsOf(points));
-
-    const affectedBySeries = new Map<string, Set<number>>();
-    for (const [seriesId, seriesPoints] of bySeries) {
-      // A chunk point's true successor is the smallest stored point after it.
-      // Every chunk point is stored by now, and the seek returned the smallest
-      // stored point after each one, so the successor is somewhere in this
-      // union and no stored point can sit between the two. Taking the minimum
-      // of the union therefore lands on exactly the row a per-point neighbour
-      // query would have returned.
-      const candidates = [
-        ...seriesPoints,
-        ...(successorsBySeries.get(seriesId) ?? []),
-      ];
-      const affected = new Set<number>();
-      for (const point of seriesPoints) {
-        for (const bucket of affectedRollupBuckets({
-          points: candidates,
-          insertedPoint: point,
-        })) {
-          affected.add(bucket);
-        }
-      }
-      if (affected.size > 0) affectedBySeries.set(seriesId, affected);
-    }
+    const affectedBySeries = affectedBucketsBySeries({
+      bySeries,
+      successorsBySeries: groupBySeries(await this.successorsOf(points)),
+    });
 
     const authoritative = await this.pointsForAffectedBuckets({
       affectedBySeries,
