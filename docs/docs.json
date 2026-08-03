@@ -249,6 +249,7 @@
             "group": "Help",
             "pages": [
               "pricing",
+              "pricing/billable-events",
               "support",
               "status"
             ]
@@ -696,7 +697,8 @@
             "pages": [
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions"
+              "ai-governance/roles-and-permissions",
+              "ai-governance/audit-log"
             ]
           },
           {
@@ -811,6 +813,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/licensing",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -1327,7 +1330,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785752565",
+      "source": "/ci/cache/busted/1785762702",
       "destination": "/"
     },
     {

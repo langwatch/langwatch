@@ -59,7 +59,7 @@ vi.mock("~/server/app-layer", () => ({
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled },
 }));
-vi.mock("~/server/auditLog", () => ({ auditLog: vi.fn() }));
+vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
 
 import { langyGithubRouter } from "../langyGithub";
 

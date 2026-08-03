@@ -1,10 +1,10 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError } from "@langwatch/handled-error";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { auditLog } from "~/server/auditLog";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { skipPermissionCheck } from "../rbac";
 

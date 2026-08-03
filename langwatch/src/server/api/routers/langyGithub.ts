@@ -18,6 +18,7 @@
  * URL can't live behind tRPC). Issue #4747.
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -25,7 +26,6 @@ import {
   type PermissionMiddleware,
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
-import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { enforceLangyAccess } from "./langyAccessMiddleware";
 

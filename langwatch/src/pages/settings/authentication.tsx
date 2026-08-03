@@ -2,6 +2,7 @@ import { Heading, Text, VStack } from "@chakra-ui/react";
 
 import { SignInMethodsSection } from "../../components/me/SignInMethodsSection";
 import SettingsLayout from "../../components/SettingsLayout";
+import { EnterpriseCapabilitiesSection } from "../../components/settings/EnterpriseCapabilitiesSection";
 import { useSession } from "../../utils/auth-client";
 
 /**
@@ -11,8 +12,10 @@ import { useSession } from "../../utils/auth-client";
  *
  * One-SSO-per-org is the typical enterprise shape; the rendered surface
  * collapses to a status display in that case (see SignInMethodsSection).
- * Org-wide SSO provisioning UI lives elsewhere (today: env vars / IdP
- * metadata), not on this page.
+ * Org-wide SSO is still provisioned through env vars / IdP metadata rather
+ * than here, so on self-hosted this page also carries the discovery surface
+ * for it (see EnterpriseCapabilitiesSection): otherwise an operator has no
+ * in-product route to the setup guide at all.
  */
 export default function AuthenticationSettings() {
   const { data: session } = useSession();
@@ -28,6 +31,8 @@ export default function AuthenticationSettings() {
         </VStack>
 
         <SignInMethodsSection />
+
+        <EnterpriseCapabilitiesSection />
       </VStack>
     </SettingsLayout>
   );

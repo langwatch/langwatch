@@ -19,7 +19,7 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/server/auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 

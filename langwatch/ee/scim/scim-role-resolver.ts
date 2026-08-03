@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { TeamUserRole } from "@prisma/client";
 
 /**

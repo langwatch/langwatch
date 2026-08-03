@@ -33,6 +33,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
@@ -49,7 +50,6 @@ import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfigu
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
-import { auditLog } from "../auditLog";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");

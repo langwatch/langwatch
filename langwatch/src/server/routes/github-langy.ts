@@ -23,6 +23,7 @@
  * Spec: specs/langy/langy-github-install.feature.
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { env } from "~/env.mjs";
@@ -49,7 +50,6 @@ import {
 } from "~/server/app-layer/langy/githubOauthState";
 import { LangyGithubInstallationConflictError } from "~/server/app-layer/langy/langy-github-installations.service";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
-import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 

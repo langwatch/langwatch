@@ -75,6 +75,7 @@ describe("resolveCurrentComparisonPlan()", () => {
   });
 
   describe("when activePlan is an enterprise plan", () => {
+    /** @scenario A licensed deployment is still shown the tier its license names */
     it('returns "enterprise" when type is "ENTERPRISE"', () => {
       expect(resolveCurrentComparisonPlan({ type: "ENTERPRISE" })).toBe(
         "enterprise",
@@ -85,6 +86,24 @@ describe("resolveCurrentComparisonPlan()", () => {
       expect(resolveCurrentComparisonPlan({ type: "enterprise" })).toBe(
         "enterprise",
       );
+    });
+  });
+
+  describe("when the deployment is self-hosted without a license", () => {
+    /** @scenario An unlicensed deployment is not shown the Cloud free tier as its plan */
+    it("marks no Cloud tier as current, despite the plan being flagged free", () => {
+      // The open-source baseline is flagged `free` but is not the Cloud Free
+      // tier and is not capped like one. Marking that column current would
+      // present its two-seat, fifty-thousand-event numbers as the deployment's.
+      expect(
+        resolveCurrentComparisonPlan({ type: "OPEN_SOURCE", free: true }),
+      ).toBeNull();
+    });
+
+    it("is not fooled by casing", () => {
+      expect(
+        resolveCurrentComparisonPlan({ type: "open_source", free: true }),
+      ).toBeNull();
     });
   });
 

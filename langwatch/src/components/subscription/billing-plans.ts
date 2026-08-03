@@ -79,6 +79,7 @@ export const ENTERPRISE_PLAN_FEATURES = [
   "Custom data retention",
   "Custom SSO / RBAC",
   "Audit logs",
+  "Gateway webhooks for metering and rebilling",
   "Uptime & Support SLA",
   "Compliance and legal reviews",
   "Custom terms and DPA",

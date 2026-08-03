@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Hono routes for SCIM v2 endpoints.
  *
@@ -10,19 +11,20 @@
  * - GET              /api/scim/v2/Schemas
  * - GET              /api/scim/v2/ServiceProviderConfig
  */
-import type { Context } from "hono";
-import { createServiceApp, internalSecret } from "~/server/api/security";
-import { prisma } from "~/server/db";
-import { ScimService } from "~/server/scim/scim.service";
+
+import { ScimService } from "@ee/scim/scim.service";
 import {
   isScimError,
   scimCreateGroupRequestSchema,
   scimCreateUserRequestSchema,
   scimPatchRequestSchema,
   scimReplaceGroupRequestSchema,
-} from "~/server/scim/scim.types";
-import { ScimGroupService } from "~/server/scim/scim-group.service";
-import { ScimTokenService } from "~/server/scim/scim-token.service";
+} from "@ee/scim/scim.types";
+import { ScimGroupService } from "@ee/scim/scim-group.service";
+import { ScimTokenService } from "@ee/scim/scim-token.service";
+import type { Context } from "hono";
+import { createServiceApp, internalSecret } from "~/server/api/security";
+import { prisma } from "~/server/db";
 
 const secured = createServiceApp({ basePath: "/api/scim/v2" });
 

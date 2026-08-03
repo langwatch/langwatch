@@ -46,6 +46,23 @@ describe("<PlansComparisonPage/>", () => {
       expect(screen.getByTestId("plan-column-enterprise")).toBeInTheDocument();
       expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument();
     });
+
+    /** @scenario 'Plan usage lines link to the list of billable events' */
+    it("points the event-counting question at the public docs in a new tab", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const link = screen.getByTestId("billable-events-docs-link");
+      expect(link).toHaveTextContent(/what counts as an event/i);
+      expect(link).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/pricing/billable-events",
+      );
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
   });
 
   describe("when organization is on the Free plan", () => {

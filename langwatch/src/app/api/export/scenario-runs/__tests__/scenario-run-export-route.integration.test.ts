@@ -33,7 +33,7 @@ const hasProjectPermission = vi.hoisted(() => vi.fn());
 const auditLog = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("~/server/auth", () => ({ getServerAuthSession }));
-vi.mock("~/server/auditLog", () => ({ auditLog }));
+vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 // Only the permission check is replaced: the rest of the module is the
 // permission catalogue the secured-app builder reads at import time, and a bare
 // factory would blank it out.

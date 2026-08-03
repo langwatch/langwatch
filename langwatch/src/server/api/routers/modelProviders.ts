@@ -1,3 +1,4 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -6,7 +7,6 @@ import {
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
-import { auditLog } from "../../auditLog";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
 import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";

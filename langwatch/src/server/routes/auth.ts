@@ -7,6 +7,8 @@
  * - src/pages/api/auth/logout.ts    (explicit cookie-clearing logout)
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
+
+import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
@@ -135,8 +137,11 @@ const logoutHandler = async (c: Context) => {
   }
 
   if (method === "GET") {
+    // Resolved provider, not raw env: on a denied (unlicensed) deployment
+    // the platform gate coerces the deployment to email mode (ADR-027), so
+    // logout must not bounce the user through the IdP.
     if (
-      env.NEXTAUTH_PROVIDER === "auth0" &&
+      (await resolveAuthProvider()) === "auth0" &&
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {

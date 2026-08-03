@@ -23,7 +23,7 @@ vi.mock("~/server/filters/filter.service", () => ({
   },
 }));
 
-vi.mock("../../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

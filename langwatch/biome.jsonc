@@ -218,6 +218,29 @@
 			}
 		},
 		{
+			// The SCIM implementation moved from src/server/scim to ee/scim so
+			// the Enterprise license covers it (#4830). Its complexity findings
+			// predate the move and were already tolerated at the old path via
+			// the repo-wide baseline; the relocation must not force a rewrite
+			// of a working provisioning flow, so the same tolerance follows the
+			// files to their licensed home. New ee/scim code still gets the
+			// rules via fresh files.
+			"includes": [
+				"ee/scim/routes.ts",
+				"ee/scim/scim-group.service.ts",
+				"ee/scim/scim.service.ts",
+				"ee/scim/webhooks.ts"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// e2e/ and scripts/dogfood/ are throwaway operator scripts — browser
 			// QA walkthroughs and seed/demo tooling — not product code. They are
 			// full of best-effort `catch {}` around actions allowed to fail, and

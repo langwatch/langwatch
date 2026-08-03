@@ -258,6 +258,9 @@ export function createEnvConfig() {
         .int()
         .positive()
         .default(180_000_000),
+      // ADR-027: instance-level license, bootstraps + recovers SSO on
+      // self-hosted deployments without requiring an in-DB org license.
+      LANGWATCH_LICENSE_KEY: z.string().optional(),
       // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
       // Counts dispatches (one digest of N traces = 1), not traces or
       // recipients. Only ever bites immediate-cadence triggers; digest
@@ -489,6 +492,7 @@ export function createEnvConfig() {
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,

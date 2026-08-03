@@ -1,6 +1,6 @@
+import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ScimTokenService } from "~/server/scim/scim-token.service";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 

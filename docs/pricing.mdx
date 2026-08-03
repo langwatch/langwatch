@@ -23,6 +23,8 @@ A **billable event** is either:
 
 Both contribute to your event count for the billing period. There are no separate charges per feature on top of this — evaluations, monitoring, and simulations all run against the same event stream.
 
+For the complete list, including exactly how many events an experiment sweep or a scenario run produces and what is never billed, see [What counts as a billable event](/pricing/billable-events).
+
 ### What's included
 
 Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more — a longer retention window or higher volume — you can [extend retention](#extending-retention) with an Enterprise plan or a self-hosted license.
@@ -40,11 +42,11 @@ Retention controls how long your events are kept before they're automatically re
 
 ### Extending retention
 
-Going beyond your plan's default window — keeping events longer, or storing a higher volume — is a licensed capability. It's available on **Enterprise plans**, or when you **self-host with a license**; it isn't a self-serve toggle on the standard Cloud tiers.
+The windows above are LangWatch Cloud plans. Going beyond your plan's default window, keeping events longer or storing a higher volume, is available on **Enterprise plans**; it isn't a self-serve toggle on the standard Cloud tiers.
 
-On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use. Self-hosted deployments with a license configure retention directly in the platform.
+On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use.
 
-This keeps the model predictable: your base plan covers normal usage at its default window, and longer or higher-volume retention is unlocked through an Enterprise agreement or a self-hosted license.
+Self-hosted deployments are different: the data sits in your own database, so there is no window we impose and no volume we meter. Retention is yours to configure, with or without a license. What a license adds there is multi-class retention, a separate policy per data category. See [Editions and licensing](/self-hosting/licensing).
 
 <Note>
   To extend retention beyond your plan default, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the [self-hosting docs](/self-hosting/overview) to configure retention with a license.
@@ -65,12 +67,18 @@ This keeps the model predictable: your base plan covers normal usage at its defa
     Run LangWatch locally on your own machine. All features are available from our [open-source repository](https://github.com/langwatch/langwatch), so you can build with sensitive data without it leaving your environment.
   </Accordion>
 
+  <Accordion title="What is the difference between a full member and a lite member?">
+    Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
+
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
+  </Accordion>
+
   <Accordion title="What counts as a billable event?">
-    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period.
+    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including what is never billed and how retries are deduplicated.
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    Each plan includes a default retention window (see the table above). Extending it — a longer window or a higher volume of stored events — is available on **Enterprise plans** or when you **self-host with a license**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up.
+    On LangWatch Cloud each plan includes a default retention window (see the table above), and extending it, a longer window or a higher volume of stored events, is available on **Enterprise plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted, the data is in your own database: retention is yours to configure with or without a license, and a license adds multi-class retention policies per data category.
   </Accordion>
 
   <Accordion title="Are webhooks and the billing events API included in my plan?">
@@ -78,7 +86,7 @@ This keeps the model predictable: your base plan covers normal usage at its defa
   </Accordion>
 
   <Accordion title="Can I self-host or run a hybrid setup?">
-    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free. If you require enterprise features such as SSO, RBAC, SCIM, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai).
+    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free, with unlimited users, projects, and events on your own hardware. If you require enterprise features such as SSO, RBAC, SCIM, gateway webhooks, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai). See [Editions and licensing](/self-hosting/licensing) for what a license unlocks.
   </Accordion>
 
   <Accordion title="Where is my data stored?">
