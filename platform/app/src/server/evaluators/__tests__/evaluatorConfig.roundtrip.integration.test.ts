@@ -29,7 +29,10 @@ const PROJECT_ID = "proj_6397_roundtrip";
 const USER_PROMPT = "Is the response empathetic and polite in tone?";
 
 describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
-  let prisma: PrismaClient;
+  // Optional: vitest runs `afterAll` even when `beforeAll` threw, so a teardown
+  // that dereferences this unconditionally replaces the real setup error with a
+  // "cannot read property of undefined" and hides why the suite failed.
+  let prisma: PrismaClient | undefined;
 
   beforeAll(async () => {
     prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
@@ -37,6 +40,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
   });
 
   afterAll(async () => {
+    if (!prisma) return;
     await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
     await prisma.$disconnect();
   });
@@ -45,7 +49,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
     it("recovers the user's prompt at read time, with no migration", async () => {
       // Raw SQL on purpose: this bypasses the repository, so the row lands in
       // exactly the broken shape the customer's evaluator is already in.
-      await prisma.$executeRawUnsafe(
+      await prisma!.$executeRawUnsafe(
         `INSERT INTO "Evaluator" (id, "projectId", name, type, config, "createdAt", "updatedAt")
          VALUES ($1, $2, $3, $4, $5::jsonb, now(), now())`,
         "eval_6397_legacy",
@@ -59,7 +63,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
         }),
       );
 
-      const row = await prisma.evaluator.findFirstOrThrow({
+      const row = await prisma!.evaluator.findFirstOrThrow({
         where: { id: "eval_6397_legacy", projectId: PROJECT_ID },
       });
 

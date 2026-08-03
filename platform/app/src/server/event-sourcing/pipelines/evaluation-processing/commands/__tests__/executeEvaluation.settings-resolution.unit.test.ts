@@ -107,323 +107,348 @@ async function executeWith(
 
 describe("ExecuteEvaluationCommand settings resolution", () => {
   describe("given a monitor linked to an evaluator with config.settings", () => {
-    /** @scenario A prompt saved under config.settings reaches the judge */
-    it("passes evaluator.config.settings, taking precedence over monitor.parameters", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              settings: EVALUATOR_SETTINGS,
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario A prompt saved under config.settings reaches the judge */
+      it("passes evaluator.config.settings, taking precedence over monitor.parameters", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                settings: EVALUATOR_SETTINGS,
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.settings).toEqual(EVALUATOR_SETTINGS);
-      expect(call.settings).not.toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).toEqual(EVALUATOR_SETTINGS);
+        expect(call.settings).not.toEqual(MONITOR_PARAMETERS);
+      });
     });
   });
 
   describe("given a legacy monitor with no linked evaluator", () => {
-    /** @scenario A monitor with no evaluator still falls back to its own parameters */
-    it("falls back to monitor.parameters", async () => {
-      const call = await executeWith(buildMonitor({ evaluator: null }));
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario A monitor with no evaluator still falls back to its own parameters */
+      it("falls back to monitor.parameters", async () => {
+        const call = await executeWith(buildMonitor({ evaluator: null }));
 
-      expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+      });
     });
   });
 
   describe("given an evaluator whose config has no settings key and nothing to recover", () => {
-    it("falls back to monitor.parameters", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: { evaluatorType: "custom/settings-eval" },
-          },
-        }),
-      );
+    describe("when the online pipeline executes it for a trace", () => {
+      it("falls back to monitor.parameters", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: { evaluatorType: "custom/settings-eval" },
+            },
+          }),
+        );
 
-      expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+      });
     });
   });
 
   describe("given a config whose settings sit at the top level with no settings key", () => {
-    /** @scenario A prompt saved at the top level of config still reaches the judge */
-    it("recovers them instead of falling through to monitor.parameters", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              prompt: "Score this answer for factual accuracy.",
-              model: "gpt-5-mini",
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario A prompt saved at the top level of config still reaches the judge */
+      it("recovers them instead of falling through to monitor.parameters", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                prompt: "Score this answer for factual accuracy.",
+                model: "gpt-5-mini",
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.settings).toMatchObject({
-        prompt: "Score this answer for factual accuracy.",
-        model: "gpt-5-mini",
+        expect(call.settings).toMatchObject({
+          prompt: "Score this answer for factual accuracy.",
+          model: "gpt-5-mini",
+        });
       });
-    });
 
-    /** @scenario The evaluator's own prompt wins over the monitor's parameters */
-    it("prefers the evaluator's recovered config over monitor.parameters", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          parameters: { prompt: "the stale monitor prompt", temperature: 0.5 },
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              prompt: "the evaluator's own prompt",
+      /** @scenario The evaluator's own prompt wins over the monitor's parameters */
+      it("prefers the evaluator's recovered config over monitor.parameters", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            parameters: {
+              prompt: "the stale monitor prompt",
+              temperature: 0.5,
             },
-          },
-        }),
-      );
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                prompt: "the evaluator's own prompt",
+              },
+            },
+          }),
+        );
 
-      expect(call.settings).toMatchObject({
-        prompt: "the evaluator's own prompt",
+        expect(call.settings).toMatchObject({
+          prompt: "the evaluator's own prompt",
+        });
       });
-    });
 
-    it("does not leak evaluatorType into the settings sent to the judge", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              prompt: "Score this.",
+      it("does not leak evaluatorType into the settings sent to the judge", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                prompt: "Score this.",
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.settings).not.toHaveProperty("evaluatorType");
+        expect(call.settings).not.toHaveProperty("evaluatorType");
+      });
     });
   });
 
   describe("given the operator rollback flag", () => {
-    const topLevelConfig = {
-      id: "evaluator_1",
-      type: "evaluator",
-      config: {
-        evaluatorType: "custom/settings-eval",
-        prompt: "the evaluator's own prompt",
-      },
-    };
+    describe("when the online pipeline executes it for a trace", () => {
+      const topLevelConfig = {
+        id: "evaluator_1",
+        type: "evaluator",
+        config: {
+          evaluatorType: "custom/settings-eval",
+          prompt: "the evaluator's own prompt",
+        },
+      };
 
-    /** @scenario The new settings resolution is active in the shipped default configuration */
-    it("recovers the prompt when nothing sets the flag at all", async () => {
-      // No flag dep is passed: this is the SHIPPED default, asserted by OUTCOME
-      // (the prompt reaches the judge), not by reading a flag value. A
-      // flag-state assertion would pass even if production resolved the flag
-      // somewhere else and shipped this fix inert.
-      const call = await executeWith(
-        buildMonitor({ evaluator: topLevelConfig }),
-      );
+      /** @scenario The new settings resolution is active in the shipped default configuration */
+      it("recovers the prompt when nothing sets the flag at all", async () => {
+        // No flag dep is passed: this is the SHIPPED default, asserted by OUTCOME
+        // (the prompt reaches the judge), not by reading a flag value. A
+        // flag-state assertion would pass even if production resolved the flag
+        // somewhere else and shipped this fix inert.
+        const call = await executeWith(
+          buildMonitor({ evaluator: topLevelConfig }),
+        );
 
-      expect(call.settings).toMatchObject({
-        prompt: "the evaluator's own prompt",
+        expect(call.settings).toMatchObject({
+          prompt: "the evaluator's own prompt",
+        });
       });
-    });
 
-    /** @scenario The new settings resolution can be switched off for rollback */
-    it("falls back to the previous behaviour when an operator disables it", async () => {
-      const call = await executeWith(
-        buildMonitor({ evaluator: topLevelConfig }),
-        () => Promise.resolve(true),
-      );
+      /** @scenario The new settings resolution can be switched off for rollback */
+      it("falls back to the previous behaviour when an operator disables it", async () => {
+        const call = await executeWith(
+          buildMonitor({ evaluator: topLevelConfig }),
+          () => Promise.resolve(true),
+        );
 
-      expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+      });
     });
   });
 
   describe("given an EMPTY settings key alongside a top-level prompt", () => {
-    // `{}` is truthy and an object, so a presence-only check hands the judge an
-    // empty payload — the exact input that scored every trace 0. The shape is
-    // reachable from the customer's own UI: the evaluator editor loads
-    // `settings: config?.settings ?? {}` and saves it back, so the P1 reporter
-    // opening their evaluator to CONFIRM the fix would re-break the row.
-    /** @scenario An empty settings key does not shadow a recoverable prompt */
-    it("recovers the top-level prompt instead of sending the empty object", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          parameters: null,
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              settings: {},
-              prompt: "the prompt the editor round-trip would have buried",
+    describe("when the online pipeline executes it for a trace", () => {
+      // `{}` is truthy and an object, so a presence-only check hands the judge an
+      // empty payload — the exact input that scored every trace 0. The shape is
+      // reachable from the customer's own UI: the evaluator editor loads
+      // `settings: config?.settings ?? {}` and saves it back, so the P1 reporter
+      // opening their evaluator to CONFIRM the fix would re-break the row.
+      /** @scenario An empty settings key does not shadow a recoverable prompt */
+      it("recovers the top-level prompt instead of sending the empty object", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            parameters: null,
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                settings: {},
+                prompt: "the prompt the editor round-trip would have buried",
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.settings).toMatchObject({
-        prompt: "the prompt the editor round-trip would have buried",
+        expect(call.settings).toMatchObject({
+          prompt: "the prompt the editor round-trip would have buried",
+        });
+        expect(call.settings).not.toEqual({});
       });
-      expect(call.settings).not.toEqual({});
-    });
 
-    it("falls back to monitor.parameters when there is nothing to recover", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: { evaluatorType: "custom/settings-eval", settings: {} },
-          },
-        }),
-      );
+      it("falls back to monitor.parameters when there is nothing to recover", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: { evaluatorType: "custom/settings-eval", settings: {} },
+            },
+          }),
+        );
 
-      // Not `{}` — an empty payload is never a legitimate thing to send.
-      expect(call.settings).toEqual(MONITOR_PARAMETERS);
+        // Not `{}` — an empty payload is never a legitimate thing to send.
+        expect(call.settings).toEqual(MONITOR_PARAMETERS);
+      });
     });
   });
 
   describe("given the rollback flag cannot be read", () => {
-    const topLevelConfig = {
-      id: "evaluator_1",
-      type: "evaluator",
-      config: {
-        evaluatorType: "custom/settings-eval",
-        prompt: "the evaluator's own prompt",
-      },
-    };
-
-    // The flag is resolved BEFORE handle()'s try block, so an unguarded failure
-    // escapes the handler entirely — no skipped and no error event for the
-    // trace. A safety valve would become a new way for every evaluation to
-    // fail. `executeWith` asserts the judge was reached exactly once, so these
-    // go red on a throw as well as on a wrong fallback.
-
-    /** @scenario The rollback flag failing to answer leaves recovery active */
-    it("stays on the shipped behaviour when the lookup rejects", async () => {
-      const call = await executeWith(
-        buildMonitor({ evaluator: topLevelConfig }),
-        () => Promise.reject(new Error("flag service unreachable")),
-      );
-
-      expect(call.settings).toMatchObject({
-        prompt: "the evaluator's own prompt",
-      });
-    });
-
-    it("stays on the shipped behaviour when the lookup throws synchronously", async () => {
-      const call = await executeWith(
-        buildMonitor({ evaluator: topLevelConfig }),
-        () => {
-          throw new Error("flag client misconfigured");
+    describe("when the online pipeline executes it for a trace", () => {
+      const topLevelConfig = {
+        id: "evaluator_1",
+        type: "evaluator",
+        config: {
+          evaluatorType: "custom/settings-eval",
+          prompt: "the evaluator's own prompt",
         },
-      );
+      };
 
-      expect(call.settings).toMatchObject({
-        prompt: "the evaluator's own prompt",
+      // The flag is resolved BEFORE handle()'s try block, so an unguarded failure
+      // escapes the handler entirely — no skipped and no error event for the
+      // trace. A safety valve would become a new way for every evaluation to
+      // fail. `executeWith` asserts the judge was reached exactly once, so these
+      // go red on a throw as well as on a wrong fallback.
+
+      /** @scenario The rollback flag failing to answer leaves recovery active */
+      it("stays on the shipped behaviour when the lookup rejects", async () => {
+        const call = await executeWith(
+          buildMonitor({ evaluator: topLevelConfig }),
+          () => Promise.reject(new Error("flag service unreachable")),
+        );
+
+        expect(call.settings).toMatchObject({
+          prompt: "the evaluator's own prompt",
+        });
+      });
+
+      it("stays on the shipped behaviour when the lookup throws synchronously", async () => {
+        const call = await executeWith(
+          buildMonitor({ evaluator: topLevelConfig }),
+          () => {
+            throw new Error("flag client misconfigured");
+          },
+        );
+
+        expect(call.settings).toMatchObject({
+          prompt: "the evaluator's own prompt",
+        });
       });
     });
   });
 
   describe("given a settings-less config and no monitor parameters", () => {
-    /** @scenario A settings-less config never reaches the judge as an empty object */
-    it("recovers the evaluator's own settings rather than sending an empty object", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          parameters: null,
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              prompt: "Score this answer for factual accuracy.",
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario A settings-less config never reaches the judge as an empty object */
+      it("recovers the evaluator's own settings rather than sending an empty object", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            parameters: null,
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                prompt: "Score this answer for factual accuracy.",
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      // The failure this guards is the judge silently applying its OWN default
-      // prompt, which is what scored every trace 0. Assert the prompt is present
-      // — "the payload is not {}" would pass on a fix that merges defaults while
-      // still losing the prompt.
-      expect(call.settings).toMatchObject({
-        prompt: "Score this answer for factual accuracy.",
+        // The failure this guards is the judge silently applying its OWN default
+        // prompt, which is what scored every trace 0. Assert the prompt is present
+        // — "the payload is not {}" would pass on a fix that merges defaults while
+        // still losing the prompt.
+        expect(call.settings).toMatchObject({
+          prompt: "Score this answer for factual accuracy.",
+        });
       });
     });
   });
 
   describe("given an evaluator row stored before normalisation existed", () => {
-    /** @scenario An evaluator already stored in the unreadable shape still resolves its prompt */
-    it("resolves its prompt at read time, without needing a migration", async () => {
-      // Write-time normalisation cannot help this row: it was written before the
-      // normaliser existed. Read-time recovery is what covers the customer's
-      // actual evaluator.
-      const call = await executeWith(
-        buildMonitor({
-          parameters: null,
-          evaluator: {
-            id: "evaluator_legacy",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              prompt: "a prompt saved long before the settings key existed",
+    describe("when the online pipeline executes it for a trace", () => {
+      /** @scenario An evaluator already stored in the unreadable shape still resolves its prompt */
+      it("resolves its prompt at read time, without needing a migration", async () => {
+        // Write-time normalisation cannot help this row: it was written before the
+        // normaliser existed. Read-time recovery is what covers the customer's
+        // actual evaluator.
+        const call = await executeWith(
+          buildMonitor({
+            parameters: null,
+            evaluator: {
+              id: "evaluator_legacy",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                prompt: "a prompt saved long before the settings key existed",
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.settings).toMatchObject({
-        prompt: "a prompt saved long before the settings key existed",
+        expect(call.settings).toMatchObject({
+          prompt: "a prompt saved long before the settings key existed",
+        });
       });
     });
   });
 
   describe("given a workflow evaluator", () => {
-    it("resolves workflowId from the evaluator record", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          checkType: "workflow",
-          evaluator: {
-            id: "evaluator_wf",
-            type: "workflow",
-            config: {},
-            workflowId: "workflow_123",
-          },
-        }),
-      );
+    describe("when the online pipeline executes it for a trace", () => {
+      it("resolves workflowId from the evaluator record", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            checkType: "workflow",
+            evaluator: {
+              id: "evaluator_wf",
+              type: "workflow",
+              config: {},
+              workflowId: "workflow_123",
+            },
+          }),
+        );
 
-      expect(call.workflowId).toBe("workflow_123");
+        expect(call.workflowId).toBe("workflow_123");
+      });
     });
   });
 
   describe("given a non-workflow evaluator", () => {
-    it("passes no workflowId", async () => {
-      const call = await executeWith(
-        buildMonitor({
-          evaluator: {
-            id: "evaluator_1",
-            type: "evaluator",
-            config: {
-              evaluatorType: "custom/settings-eval",
-              settings: EVALUATOR_SETTINGS,
+    describe("when the online pipeline executes it for a trace", () => {
+      it("passes no workflowId", async () => {
+        const call = await executeWith(
+          buildMonitor({
+            evaluator: {
+              id: "evaluator_1",
+              type: "evaluator",
+              config: {
+                evaluatorType: "custom/settings-eval",
+                settings: EVALUATOR_SETTINGS,
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
 
-      expect(call.workflowId).toBeUndefined();
+        expect(call.workflowId).toBeUndefined();
+      });
     });
   });
 });

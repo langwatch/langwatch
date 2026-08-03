@@ -377,7 +377,7 @@ describe("EvaluationExecutionService", () => {
       const USER_SETTINGS = {
         prompt: "Score this answer for factual accuracy.",
         model: "openai/gpt-5-mini",
-      };
+      } as const;
 
       /** @scenario A correctly configured evaluator's settings reach the judge unchanged */
       it("forwards the user's settings to the judge unchanged", async () => {
