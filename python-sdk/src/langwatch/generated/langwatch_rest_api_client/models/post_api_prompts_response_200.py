@@ -14,10 +14,8 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_response_200_inputs_item import PostApiPromptsResponse200InputsItem
     from ..models.post_api_prompts_response_200_messages_item import PostApiPromptsResponse200MessagesItem
     from ..models.post_api_prompts_response_200_outputs_item import PostApiPromptsResponse200OutputsItem
-    from ..models.post_api_prompts_response_200_parameters import PostApiPromptsResponse200Parameters
     from ..models.post_api_prompts_response_200_prompting_technique import PostApiPromptsResponse200PromptingTechnique
     from ..models.post_api_prompts_response_200_response_format import PostApiPromptsResponse200ResponseFormat
-    from ..models.post_api_prompts_response_200_tags_item import PostApiPromptsResponse200TagsItem
 
 
 T = TypeVar("T", bound="PostApiPromptsResponse200")
@@ -42,8 +40,6 @@ class PostApiPromptsResponse200:
         inputs (list[PostApiPromptsResponse200InputsItem]):
         outputs (list[PostApiPromptsResponse200OutputsItem]):
         model (str):
-        tags (list[PostApiPromptsResponse200TagsItem]):
-        parameters (PostApiPromptsResponse200Parameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
         temperature (float | Unset):
@@ -68,8 +64,6 @@ class PostApiPromptsResponse200:
     inputs: list[PostApiPromptsResponse200InputsItem]
     outputs: list[PostApiPromptsResponse200OutputsItem]
     model: str
-    tags: list[PostApiPromptsResponse200TagsItem]
-    parameters: PostApiPromptsResponse200Parameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
     temperature: float | Unset = UNSET
@@ -120,13 +114,6 @@ class PostApiPromptsResponse200:
 
         model = self.model
 
-        tags = []
-        for tags_item_data in self.tags:
-            tags_item = tags_item_data.to_dict()
-            tags.append(tags_item)
-
-        parameters = self.parameters.to_dict()
-
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
             author_id = UNSET
@@ -174,8 +161,6 @@ class PostApiPromptsResponse200:
                 "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
-                "tags": tags,
-                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
@@ -201,12 +186,10 @@ class PostApiPromptsResponse200:
         from ..models.post_api_prompts_response_200_inputs_item import PostApiPromptsResponse200InputsItem
         from ..models.post_api_prompts_response_200_messages_item import PostApiPromptsResponse200MessagesItem
         from ..models.post_api_prompts_response_200_outputs_item import PostApiPromptsResponse200OutputsItem
-        from ..models.post_api_prompts_response_200_parameters import PostApiPromptsResponse200Parameters
         from ..models.post_api_prompts_response_200_prompting_technique import (
             PostApiPromptsResponse200PromptingTechnique,
         )
         from ..models.post_api_prompts_response_200_response_format import PostApiPromptsResponse200ResponseFormat
-        from ..models.post_api_prompts_response_200_tags_item import PostApiPromptsResponse200TagsItem
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -258,15 +241,6 @@ class PostApiPromptsResponse200:
             outputs.append(outputs_item)
 
         model = d.pop("model")
-
-        tags = []
-        _tags = d.pop("tags")
-        for tags_item_data in _tags:
-            tags_item = PostApiPromptsResponse200TagsItem.from_dict(tags_item_data)
-
-            tags.append(tags_item)
-
-        parameters = PostApiPromptsResponse200Parameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -327,8 +301,6 @@ class PostApiPromptsResponse200:
             inputs=inputs,
             outputs=outputs,
             model=model,
-            tags=tags,
-            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
             temperature=temperature,

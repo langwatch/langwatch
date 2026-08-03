@@ -40,7 +40,6 @@ class PatchApiTriggersByIdResponse200:
             PatchApiTriggersByIdResponse200AlertTypeType2Type1 | PatchApiTriggersByIdResponse200AlertTypeType3Type1):
         created_at (str):
         updated_at (str):
-        platform_url (str):
     """
 
     id: str
@@ -58,7 +57,6 @@ class PatchApiTriggersByIdResponse200:
     )
     created_at: str
     updated_at: str
-    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -91,8 +89,6 @@ class PatchApiTriggersByIdResponse200:
 
         updated_at = self.updated_at
 
-        platform_url = self.platform_url
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -107,7 +103,6 @@ class PatchApiTriggersByIdResponse200:
                 "alertType": alert_type,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
-                "platformUrl": platform_url,
             }
         )
 
@@ -188,8 +183,6 @@ class PatchApiTriggersByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
-        platform_url = d.pop("platformUrl")
-
         patch_api_triggers_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -201,7 +194,6 @@ class PatchApiTriggersByIdResponse200:
             alert_type=alert_type,
             created_at=created_at,
             updated_at=updated_at,
-            platform_url=platform_url,
         )
 
         patch_api_triggers_by_id_response_200.additional_properties = d

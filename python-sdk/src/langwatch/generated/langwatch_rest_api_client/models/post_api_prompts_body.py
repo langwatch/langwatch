@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
     from ..models.post_api_prompts_body_messages_item import PostApiPromptsBodyMessagesItem
     from ..models.post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
-    from ..models.post_api_prompts_body_parameters import PostApiPromptsBodyParameters
 
 
 T = TypeVar("T", bound="PostApiPromptsBody")
@@ -36,7 +35,7 @@ class PostApiPromptsBody:
         outputs (list[PostApiPromptsBodyOutputsItem] | Unset):
         schema_version (PostApiPromptsBodySchemaVersion | Unset):
         tags (list[str] | Unset):
-        parameters (PostApiPromptsBodyParameters | Unset):
+        parameters (dict[str, Any] | Unset):
     """
 
     handle: str
@@ -52,7 +51,7 @@ class PostApiPromptsBody:
     outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET
     schema_version: PostApiPromptsBodySchemaVersion | Unset = UNSET
     tags: list[str] | Unset = UNSET
-    parameters: PostApiPromptsBodyParameters | Unset = UNSET
+    parameters: dict[str, Any] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -102,9 +101,7 @@ class PostApiPromptsBody:
         if not isinstance(self.tags, Unset):
             tags = self.tags
 
-        parameters: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.parameters, Unset):
-            parameters = self.parameters.to_dict()
+        parameters = self.parameters
 
         field_dict: dict[str, Any] = {}
 
@@ -147,7 +144,6 @@ class PostApiPromptsBody:
         from ..models.post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
         from ..models.post_api_prompts_body_messages_item import PostApiPromptsBodyMessagesItem
         from ..models.post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
-        from ..models.post_api_prompts_body_parameters import PostApiPromptsBodyParameters
 
         d = dict(src_dict)
         handle = d.pop("handle")
@@ -207,12 +203,7 @@ class PostApiPromptsBody:
 
         tags = cast(list[str], d.pop("tags", UNSET))
 
-        _parameters = d.pop("parameters", UNSET)
-        parameters: PostApiPromptsBodyParameters | Unset
-        if isinstance(_parameters, Unset):
-            parameters = UNSET
-        else:
-            parameters = PostApiPromptsBodyParameters.from_dict(_parameters)
+        parameters = cast(dict[str, Any], d.pop("parameters", UNSET))
 
         post_api_prompts_body = cls(
             handle=handle,

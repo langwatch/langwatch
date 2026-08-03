@@ -18,7 +18,6 @@ class PostApiScenariosResponse201:
         situation (str):
         criteria (list[str]):
         labels (list[str]):
-        platform_url (str):
     """
 
     id: str
@@ -26,7 +25,6 @@ class PostApiScenariosResponse201:
     situation: str
     criteria: list[str]
     labels: list[str]
-    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,8 +38,6 @@ class PostApiScenariosResponse201:
 
         labels = self.labels
 
-        platform_url = self.platform_url
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -51,7 +47,6 @@ class PostApiScenariosResponse201:
                 "situation": situation,
                 "criteria": criteria,
                 "labels": labels,
-                "platformUrl": platform_url,
             }
         )
 
@@ -70,15 +65,12 @@ class PostApiScenariosResponse201:
 
         labels = cast(list[str], d.pop("labels"))
 
-        platform_url = d.pop("platformUrl")
-
         post_api_scenarios_response_201 = cls(
             id=id,
             name=name,
             situation=situation,
             criteria=criteria,
             labels=labels,
-            platform_url=platform_url,
         )
 
         post_api_scenarios_response_201.additional_properties = d

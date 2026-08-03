@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ..models.put_api_prompts_by_id_body_inputs_item import PutApiPromptsByIdBodyInputsItem
     from ..models.put_api_prompts_by_id_body_messages_item import PutApiPromptsByIdBodyMessagesItem
     from ..models.put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
-    from ..models.put_api_prompts_by_id_body_parameters import PutApiPromptsByIdBodyParameters
 
 
 T = TypeVar("T", bound="PutApiPromptsByIdBody")
@@ -34,9 +33,9 @@ class PutApiPromptsByIdBody:
         outputs (list[PutApiPromptsByIdBodyOutputsItem] | Unset):
         schema_version (PutApiPromptsByIdBodySchemaVersion | Unset):
         tags (list[str] | Unset):
-        parameters (PutApiPromptsByIdBodyParameters | Unset):
         scope (PutApiPromptsByIdBodyScope | Unset):
         handle (str | Unset):
+        parameters (dict[str, Any] | Unset):
     """
 
     commit_message: str
@@ -50,9 +49,9 @@ class PutApiPromptsByIdBody:
     outputs: list[PutApiPromptsByIdBodyOutputsItem] | Unset = UNSET
     schema_version: PutApiPromptsByIdBodySchemaVersion | Unset = UNSET
     tags: list[str] | Unset = UNSET
-    parameters: PutApiPromptsByIdBodyParameters | Unset = UNSET
     scope: PutApiPromptsByIdBodyScope | Unset = UNSET
     handle: str | Unset = UNSET
+    parameters: dict[str, Any] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         commit_message = self.commit_message
@@ -96,15 +95,13 @@ class PutApiPromptsByIdBody:
         if not isinstance(self.tags, Unset):
             tags = self.tags
 
-        parameters: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.parameters, Unset):
-            parameters = self.parameters.to_dict()
-
         scope: str | Unset = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
 
         handle = self.handle
+
+        parameters = self.parameters
 
         field_dict: dict[str, Any] = {}
 
@@ -133,12 +130,12 @@ class PutApiPromptsByIdBody:
             field_dict["schemaVersion"] = schema_version
         if tags is not UNSET:
             field_dict["tags"] = tags
-        if parameters is not UNSET:
-            field_dict["parameters"] = parameters
         if scope is not UNSET:
             field_dict["scope"] = scope
         if handle is not UNSET:
             field_dict["handle"] = handle
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
 
         return field_dict
 
@@ -147,7 +144,6 @@ class PutApiPromptsByIdBody:
         from ..models.put_api_prompts_by_id_body_inputs_item import PutApiPromptsByIdBodyInputsItem
         from ..models.put_api_prompts_by_id_body_messages_item import PutApiPromptsByIdBodyMessagesItem
         from ..models.put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
-        from ..models.put_api_prompts_by_id_body_parameters import PutApiPromptsByIdBodyParameters
 
         d = dict(src_dict)
         commit_message = d.pop("commitMessage")
@@ -198,13 +194,6 @@ class PutApiPromptsByIdBody:
 
         tags = cast(list[str], d.pop("tags", UNSET))
 
-        _parameters = d.pop("parameters", UNSET)
-        parameters: PutApiPromptsByIdBodyParameters | Unset
-        if isinstance(_parameters, Unset):
-            parameters = UNSET
-        else:
-            parameters = PutApiPromptsByIdBodyParameters.from_dict(_parameters)
-
         _scope = d.pop("scope", UNSET)
         scope: PutApiPromptsByIdBodyScope | Unset
         if isinstance(_scope, Unset):
@@ -213,6 +202,8 @@ class PutApiPromptsByIdBody:
             scope = PutApiPromptsByIdBodyScope(_scope)
 
         handle = d.pop("handle", UNSET)
+
+        parameters = cast(dict[str, Any], d.pop("parameters", UNSET))
 
         put_api_prompts_by_id_body = cls(
             commit_message=commit_message,
@@ -226,9 +217,9 @@ class PutApiPromptsByIdBody:
             outputs=outputs,
             schema_version=schema_version,
             tags=tags,
-            parameters=parameters,
             scope=scope,
             handle=handle,
+            parameters=parameters,
         )
 
         return put_api_prompts_by_id_body

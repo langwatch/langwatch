@@ -164,12 +164,6 @@ if TYPE_CHECKING:
     from ..models.post_api_traces_search_body_filters_traces_error_type_2 import (
         PostApiTracesSearchBodyFiltersTracesErrorType2,
     )
-    from ..models.post_api_traces_search_body_filters_traces_name_type_1 import (
-        PostApiTracesSearchBodyFiltersTracesNameType1,
-    )
-    from ..models.post_api_traces_search_body_filters_traces_name_type_2 import (
-        PostApiTracesSearchBodyFiltersTracesNameType2,
-    )
     from ..models.post_api_traces_search_body_filters_traces_origin_type_1 import (
         PostApiTracesSearchBodyFiltersTracesOriginType1,
     )
@@ -207,8 +201,6 @@ class PostApiTracesSearchBodyFilters:
             PostApiTracesSearchBodyFiltersTracesOriginType2 | Unset):
         traces_error (list[str] | PostApiTracesSearchBodyFiltersTracesErrorType1 |
             PostApiTracesSearchBodyFiltersTracesErrorType2 | Unset):
-        traces_name (list[str] | PostApiTracesSearchBodyFiltersTracesNameType1 |
-            PostApiTracesSearchBodyFiltersTracesNameType2 | Unset):
         spans_type (list[str] | PostApiTracesSearchBodyFiltersSpansTypeType1 |
             PostApiTracesSearchBodyFiltersSpansTypeType2 | Unset):
         spans_model (list[str] | PostApiTracesSearchBodyFiltersSpansModelType1 |
@@ -311,12 +303,6 @@ class PostApiTracesSearchBodyFilters:
         list[str]
         | PostApiTracesSearchBodyFiltersTracesErrorType1
         | PostApiTracesSearchBodyFiltersTracesErrorType2
-        | Unset
-    ) = UNSET
-    traces_name: (
-        list[str]
-        | PostApiTracesSearchBodyFiltersTracesNameType1
-        | PostApiTracesSearchBodyFiltersTracesNameType2
         | Unset
     ) = UNSET
     spans_type: (
@@ -492,9 +478,6 @@ class PostApiTracesSearchBodyFilters:
         from ..models.post_api_traces_search_body_filters_traces_error_type_1 import (
             PostApiTracesSearchBodyFiltersTracesErrorType1,
         )
-        from ..models.post_api_traces_search_body_filters_traces_name_type_1 import (
-            PostApiTracesSearchBodyFiltersTracesNameType1,
-        )
         from ..models.post_api_traces_search_body_filters_traces_origin_type_1 import (
             PostApiTracesSearchBodyFiltersTracesOriginType1,
         )
@@ -619,17 +602,6 @@ class PostApiTracesSearchBodyFilters:
             traces_error = self.traces_error.to_dict()
         else:
             traces_error = self.traces_error.to_dict()
-
-        traces_name: dict[str, Any] | list[str] | Unset
-        if isinstance(self.traces_name, Unset):
-            traces_name = UNSET
-        elif isinstance(self.traces_name, list):
-            traces_name = self.traces_name
-
-        elif isinstance(self.traces_name, PostApiTracesSearchBodyFiltersTracesNameType1):
-            traces_name = self.traces_name.to_dict()
-        else:
-            traces_name = self.traces_name.to_dict()
 
         spans_type: dict[str, Any] | list[str] | Unset
         if isinstance(self.spans_type, Unset):
@@ -841,8 +813,6 @@ class PostApiTracesSearchBodyFilters:
             field_dict["traces.origin"] = traces_origin
         if traces_error is not UNSET:
             field_dict["traces.error"] = traces_error
-        if traces_name is not UNSET:
-            field_dict["traces.name"] = traces_name
         if spans_type is not UNSET:
             field_dict["spans.type"] = spans_type
         if spans_model is not UNSET:
@@ -1035,12 +1005,6 @@ class PostApiTracesSearchBodyFilters:
         )
         from ..models.post_api_traces_search_body_filters_traces_error_type_2 import (
             PostApiTracesSearchBodyFiltersTracesErrorType2,
-        )
-        from ..models.post_api_traces_search_body_filters_traces_name_type_1 import (
-            PostApiTracesSearchBodyFiltersTracesNameType1,
-        )
-        from ..models.post_api_traces_search_body_filters_traces_name_type_2 import (
-            PostApiTracesSearchBodyFiltersTracesNameType2,
         )
         from ..models.post_api_traces_search_body_filters_traces_origin_type_1 import (
             PostApiTracesSearchBodyFiltersTracesOriginType1,
@@ -1424,40 +1388,6 @@ class PostApiTracesSearchBodyFilters:
             return traces_error_type_2
 
         traces_error = _parse_traces_error(d.pop("traces.error", UNSET))
-
-        def _parse_traces_name(
-            data: object,
-        ) -> (
-            list[str]
-            | PostApiTracesSearchBodyFiltersTracesNameType1
-            | PostApiTracesSearchBodyFiltersTracesNameType2
-            | Unset
-        ):
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                traces_name_type_0 = cast(list[str], data)
-
-                return traces_name_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                traces_name_type_1 = PostApiTracesSearchBodyFiltersTracesNameType1.from_dict(data)
-
-                return traces_name_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            traces_name_type_2 = PostApiTracesSearchBodyFiltersTracesNameType2.from_dict(data)
-
-            return traces_name_type_2
-
-        traces_name = _parse_traces_name(d.pop("traces.name", UNSET))
 
         def _parse_spans_type(
             data: object,
@@ -2047,7 +1977,6 @@ class PostApiTracesSearchBodyFilters:
             metadata_prompt_ids=metadata_prompt_ids,
             traces_origin=traces_origin,
             traces_error=traces_error,
-            traces_name=traces_name,
             spans_type=spans_type,
             spans_model=spans_model,
             evaluations_evaluator_id=evaluations_evaluator_id,

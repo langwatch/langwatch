@@ -38,7 +38,6 @@ class GetApiTriggersByIdResponse200:
             GetApiTriggersByIdResponse200AlertTypeType3Type1 | None):
         created_at (str):
         updated_at (str):
-        platform_url (str):
     """
 
     id: str
@@ -56,7 +55,6 @@ class GetApiTriggersByIdResponse200:
     )
     created_at: str
     updated_at: str
-    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -89,8 +87,6 @@ class GetApiTriggersByIdResponse200:
 
         updated_at = self.updated_at
 
-        platform_url = self.platform_url
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -105,7 +101,6 @@ class GetApiTriggersByIdResponse200:
                 "alertType": alert_type,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
-                "platformUrl": platform_url,
             }
         )
 
@@ -184,8 +179,6 @@ class GetApiTriggersByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
-        platform_url = d.pop("platformUrl")
-
         get_api_triggers_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -197,7 +190,6 @@ class GetApiTriggersByIdResponse200:
             alert_type=alert_type,
             created_at=created_at,
             updated_at=updated_at,
-            platform_url=platform_url,
         )
 
         get_api_triggers_by_id_response_200.additional_properties = d

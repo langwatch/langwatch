@@ -26,7 +26,7 @@ class GetApiTraceIdResponse200EvaluationsItem:
     Attributes:
         evaluation_id (str | Unset):  Example: check_VCagriZHNWICSOM09dXjM.
         name (str | Unset):  Example: Ragas Answer Relevancy.
-        type_ (str | Unset):  Example: ragas/response_relevancy.
+        type_ (str | Unset):  Example: ragas/answer_relevancy.
         trace_id (str | Unset):  Example: trace_BKZL_X0TKSD4oa1aBJTc_.
         project_id (str | Unset):  Example: KAXYxPR8MUgTcP8CF193y.
         status (str | Unset):  Example: error.

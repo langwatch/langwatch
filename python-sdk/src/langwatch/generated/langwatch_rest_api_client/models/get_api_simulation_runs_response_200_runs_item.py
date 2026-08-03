@@ -35,7 +35,6 @@ class GetApiSimulationRunsResponse200RunsItem:
         timestamp (float):
         updated_at (float):
         duration_in_ms (float):
-        platform_url (str):
         total_cost (float | Unset):
     """
 
@@ -50,7 +49,6 @@ class GetApiSimulationRunsResponse200RunsItem:
     timestamp: float
     updated_at: float
     duration_in_ms: float
-    platform_url: str
     total_cost: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -90,8 +88,6 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         duration_in_ms = self.duration_in_ms
 
-        platform_url = self.platform_url
-
         total_cost = self.total_cost
 
         field_dict: dict[str, Any] = {}
@@ -109,7 +105,6 @@ class GetApiSimulationRunsResponse200RunsItem:
                 "timestamp": timestamp,
                 "updatedAt": updated_at,
                 "durationInMs": duration_in_ms,
-                "platformUrl": platform_url,
             }
         )
         if total_cost is not UNSET:
@@ -177,8 +172,6 @@ class GetApiSimulationRunsResponse200RunsItem:
 
         duration_in_ms = d.pop("durationInMs")
 
-        platform_url = d.pop("platformUrl")
-
         total_cost = d.pop("totalCost", UNSET)
 
         get_api_simulation_runs_response_200_runs_item = cls(
@@ -193,7 +186,6 @@ class GetApiSimulationRunsResponse200RunsItem:
             timestamp=timestamp,
             updated_at=updated_at,
             duration_in_ms=duration_in_ms,
-            platform_url=platform_url,
             total_cost=total_cost,
         )
 

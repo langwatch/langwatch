@@ -10,7 +10,6 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_sync_body_config_data import PostApiPromptsByIdSyncBodyConfigData
-    from ..models.post_api_prompts_by_id_sync_body_parameters import PostApiPromptsByIdSyncBodyParameters
 
 
 T = TypeVar("T", bound="PostApiPromptsByIdSyncBody")
@@ -21,23 +20,17 @@ class PostApiPromptsByIdSyncBody:
     """
     Attributes:
         config_data (PostApiPromptsByIdSyncBodyConfigData):
-        parameters (PostApiPromptsByIdSyncBodyParameters | Unset):
         local_version (float | Unset):
         commit_message (str | Unset):
     """
 
     config_data: PostApiPromptsByIdSyncBodyConfigData
-    parameters: PostApiPromptsByIdSyncBodyParameters | Unset = UNSET
     local_version: float | Unset = UNSET
     commit_message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         config_data = self.config_data.to_dict()
-
-        parameters: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.parameters, Unset):
-            parameters = self.parameters.to_dict()
 
         local_version = self.local_version
 
@@ -50,8 +43,6 @@ class PostApiPromptsByIdSyncBody:
                 "configData": config_data,
             }
         )
-        if parameters is not UNSET:
-            field_dict["parameters"] = parameters
         if local_version is not UNSET:
             field_dict["localVersion"] = local_version
         if commit_message is not UNSET:
@@ -62,17 +53,9 @@ class PostApiPromptsByIdSyncBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_prompts_by_id_sync_body_config_data import PostApiPromptsByIdSyncBodyConfigData
-        from ..models.post_api_prompts_by_id_sync_body_parameters import PostApiPromptsByIdSyncBodyParameters
 
         d = dict(src_dict)
         config_data = PostApiPromptsByIdSyncBodyConfigData.from_dict(d.pop("configData"))
-
-        _parameters = d.pop("parameters", UNSET)
-        parameters: PostApiPromptsByIdSyncBodyParameters | Unset
-        if isinstance(_parameters, Unset):
-            parameters = UNSET
-        else:
-            parameters = PostApiPromptsByIdSyncBodyParameters.from_dict(_parameters)
 
         local_version = d.pop("localVersion", UNSET)
 
@@ -80,7 +63,6 @@ class PostApiPromptsByIdSyncBody:
 
         post_api_prompts_by_id_sync_body = cls(
             config_data=config_data,
-            parameters=parameters,
             local_version=local_version,
             commit_message=commit_message,
         )

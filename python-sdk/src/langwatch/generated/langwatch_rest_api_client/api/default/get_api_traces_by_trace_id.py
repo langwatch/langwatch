@@ -11,7 +11,6 @@ from ...models.get_api_traces_by_trace_id_response_200 import GetApiTracesByTrac
 from ...models.get_api_traces_by_trace_id_response_400 import GetApiTracesByTraceIdResponse400
 from ...models.get_api_traces_by_trace_id_response_401 import GetApiTracesByTraceIdResponse401
 from ...models.get_api_traces_by_trace_id_response_404 import GetApiTracesByTraceIdResponse404
-from ...models.get_api_traces_by_trace_id_response_409 import GetApiTracesByTraceIdResponse409
 from ...models.get_api_traces_by_trace_id_response_422 import GetApiTracesByTraceIdResponse422
 from ...models.get_api_traces_by_trace_id_response_500 import GetApiTracesByTraceIdResponse500
 from ...types import UNSET, Response, Unset, safe_http_status
@@ -58,7 +57,6 @@ def _parse_response(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
     | None
@@ -83,11 +81,6 @@ def _parse_response(
 
         return response_404
 
-    if response.status_code == 409:
-        response_409 = GetApiTracesByTraceIdResponse409.from_dict(response.json())
-
-        return response_409
-
     if response.status_code == 422:
         response_422 = GetApiTracesByTraceIdResponse422.from_dict(response.json())
 
@@ -111,7 +104,6 @@ def _build_response(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
 ]:
@@ -137,11 +129,10 @@ def sync_detailed(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
 ]:
-    """Get a single trace by ID.
+    """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
@@ -153,7 +144,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse409 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
+        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -180,12 +171,11 @@ def sync(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
     | None
 ):
-    """Get a single trace by ID.
+    """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
@@ -197,7 +187,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse409 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
+        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
     """
 
     return sync_detailed(
@@ -219,11 +209,10 @@ async def asyncio_detailed(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
 ]:
-    """Get a single trace by ID.
+    """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
@@ -235,7 +224,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse409 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
+        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -260,12 +249,11 @@ async def asyncio(
     | GetApiTracesByTraceIdResponse400
     | GetApiTracesByTraceIdResponse401
     | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse409
     | GetApiTracesByTraceIdResponse422
     | GetApiTracesByTraceIdResponse500
     | None
 ):
-    """Get a single trace by ID.
+    """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
@@ -277,7 +265,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse409 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
+        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
     """
 
     return (

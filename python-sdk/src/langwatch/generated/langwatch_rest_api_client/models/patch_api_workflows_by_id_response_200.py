@@ -21,7 +21,6 @@ class PatchApiWorkflowsByIdResponse200:
         is_component (bool):
         created_at (str):
         updated_at (str):
-        platform_url (str):
     """
 
     id: str
@@ -32,7 +31,6 @@ class PatchApiWorkflowsByIdResponse200:
     is_component: bool
     created_at: str
     updated_at: str
-    platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -54,8 +52,6 @@ class PatchApiWorkflowsByIdResponse200:
 
         updated_at = self.updated_at
 
-        platform_url = self.platform_url
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -68,7 +64,6 @@ class PatchApiWorkflowsByIdResponse200:
                 "isComponent": is_component,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
-                "platformUrl": platform_url,
             }
         )
 
@@ -103,8 +98,6 @@ class PatchApiWorkflowsByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
-        platform_url = d.pop("platformUrl")
-
         patch_api_workflows_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -114,7 +107,6 @@ class PatchApiWorkflowsByIdResponse200:
             is_component=is_component,
             created_at=created_at,
             updated_at=updated_at,
-            platform_url=platform_url,
         )
 
         patch_api_workflows_by_id_response_200.additional_properties = d

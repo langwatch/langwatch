@@ -17,22 +17,16 @@ class PostApiTracesSearchResponse200Pagination:
     Attributes:
         total_hits (float):
         scroll_id (str | Unset):
-        skipped (float | Unset): Number of traces dropped from this page because they failed to serialize. Present only
-            when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching
-            the end of the result set.
     """
 
     total_hits: float
     scroll_id: str | Unset = UNSET
-    skipped: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         total_hits = self.total_hits
 
         scroll_id = self.scroll_id
-
-        skipped = self.skipped
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -43,8 +37,6 @@ class PostApiTracesSearchResponse200Pagination:
         )
         if scroll_id is not UNSET:
             field_dict["scrollId"] = scroll_id
-        if skipped is not UNSET:
-            field_dict["skipped"] = skipped
 
         return field_dict
 
@@ -55,12 +47,9 @@ class PostApiTracesSearchResponse200Pagination:
 
         scroll_id = d.pop("scrollId", UNSET)
 
-        skipped = d.pop("skipped", UNSET)
-
         post_api_traces_search_response_200_pagination = cls(
             total_hits=total_hits,
             scroll_id=scroll_id,
-            skipped=skipped,
         )
 
         post_api_traces_search_response_200_pagination.additional_properties = d
