@@ -30,6 +30,7 @@ import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { toBudgetDto } from "~/server/gateway/budget.dto";
 import {
@@ -280,6 +281,25 @@ const pageQuerySchema = z.object({
     .max(PAGE_LIMIT_MAX)
     .optional()
     .default(PAGE_LIMIT_DEFAULT),
+});
+
+const budgetListQuerySchema = pageQuerySchema.extend({
+  scope_type: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated subset of the scope types, lowercase, e.g. `virtual_key,principal`.",
+    ),
+});
+
+const resetBudgetQuerySchema = z.object({
+  end_user_id: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Resets ONE end-user bucket on an attributed-user template, leaving the template period untouched.",
+    ),
 });
 
 /** The (createdAt, id) sort key a cursor names, or a 400-worthy null. */
@@ -732,13 +752,10 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
       },
     },
   }),
+  zValidator("query", pageQuerySchema),
   async (c) => {
     const project = c.get("project");
-    const page = pageQuerySchema.safeParse({
-      cursor: c.req.query("cursor"),
-      limit: c.req.query("limit"),
-    });
-    if (!page.success) return validationErrorResponse(c, page.error);
+    const page = { data: c.req.valid("query") };
     const cursor = createdAtIdCursor(page.data.cursor);
     if (cursor === null) return invalidCursor(c);
 
@@ -803,10 +820,10 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       },
     },
   }),
+  zValidator("json", createVirtualKeySchema),
   async (c) => {
     const project = c.get("project");
-    const body = createVirtualKeySchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
     const scopes = scopesFromWire(body.data.scopes, project.id);
@@ -937,16 +954,11 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       },
     },
   }),
+  zValidator("query", vkSpendWindowSchema),
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const windowParse = vkSpendWindowSchema.safeParse({
-      from: c.req.query("from"),
-      to: c.req.query("to"),
-    });
-    if (!windowParse.success) {
-      return validationErrorResponse(c, windowParse.error);
-    }
+    const windowParse = { data: c.req.valid("query") };
     const now = new Date();
     const fromDate =
       windowParse.data.from !== undefined
@@ -1034,11 +1046,11 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
       },
     },
   }),
+  zValidator("json", updateVirtualKeySchema),
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const body = updateVirtualKeySchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
@@ -1125,6 +1137,22 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
   "/virtual-keys/:id/disable",
   describeRoute({
     summary: "Disable virtual key",
+    // Declared by hand rather than through zValidator because the body is
+    // optional here: requiring `{}` to send no operator note would be a worse
+    // contract than documenting the shape directly.
+    requestBody: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              reason: { type: "string", maxLength: 500, description: "Operator note, audit-logged and shown in the key's detail view." },
+            },
+          },
+        },
+      },
+    },
     description:
       "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
     tags: ["Virtual Keys"],
@@ -1349,17 +1377,14 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       },
     },
   }),
+  zValidator("query", budgetListQuerySchema),
   async (c) => {
     const project = c.get("project");
-    const page = pageQuerySchema.safeParse({
-      cursor: c.req.query("cursor"),
-      limit: c.req.query("limit"),
-    });
-    if (!page.success) return validationErrorResponse(c, page.error);
+    const page = { data: c.req.valid("query") };
     const cursor = createdAtIdCursor(page.data.cursor);
     if (cursor === null) return invalidCursor(c);
 
-    const rawFilter = c.req.query("scope_type");
+    const rawFilter = page.data.scope_type;
     let scopeTypes: Set<z.infer<typeof budgetScopeTypeSchema>> | null = null;
     if (rawFilter !== undefined) {
       // Strict: the filter takes the same lowercase values the rows carry.
@@ -1491,10 +1516,10 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       },
     },
   }),
+  zValidator("json", createBudgetSchema),
   async (c) => {
     const project = c.get("project");
-    const body = createBudgetSchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
@@ -1541,11 +1566,11 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
       },
     },
   }),
+  zValidator("json", updateBudgetSchema),
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const body = updateBudgetSchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
@@ -1612,6 +1637,22 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
   "/budgets/:id/reset",
   describeRoute({
     summary: "Reset budget period",
+    // Declared by hand rather than through zValidator because the body is
+    // optional here: requiring `{}` to send no operator note would be a worse
+    // contract than documenting the shape directly.
+    requestBody: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              reason: { type: "string", maxLength: 500, description: "Free-text operator note, audit-logged with the reset." },
+            },
+          },
+        },
+      },
+    },
     description:
       "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
     tags: ["Budgets"],
@@ -1627,10 +1668,16 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
       },
     },
   }),
+  zValidator("query", resetBudgetQuerySchema),
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const endUserId = c.req.query("end_user_id") ?? null;
+    const endUserId = c.req.valid("query").end_user_id ?? null;
+    // The body is OPTIONAL on this route and on /disable: a reset with no
+    // operator note is the common case, and requiring `{}` to send nothing
+    // would be a worse contract than documenting the body by hand. Both keep
+    // manual parsing for that reason, and declare their `requestBody` in
+    // describeRoute so the spec still shows it.
     const body = resetBudgetSchema.safeParse(
       await c.req.json().catch(() => ({})),
     );
@@ -1738,13 +1785,10 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
       },
     },
   }),
+  zValidator("query", pageQuerySchema),
   async (c) => {
     const project = c.get("project");
-    const page = pageQuerySchema.safeParse({
-      cursor: c.req.query("cursor"),
-      limit: c.req.query("limit"),
-    });
-    if (!page.success) return validationErrorResponse(c, page.error);
+    const page = { data: c.req.valid("query") };
     const cursor = cacheRuleCursor(page.data.cursor);
     if (cursor === null) return invalidCursor(c);
 
@@ -1827,10 +1871,10 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
       },
     },
   }),
+  zValidator("json", createCacheRuleSchema),
   async (c) => {
     const project = c.get("project");
-    const body = createCacheRuleSchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);
@@ -1871,11 +1915,11 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
       },
     },
   }),
+  zValidator("json", updateCacheRuleSchema),
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const body = updateCacheRuleSchema.safeParse(await c.req.json());
-    if (!body.success) return validationErrorResponse(c, body.error);
+    const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
     const service = GatewayCacheRuleService.create(prisma);

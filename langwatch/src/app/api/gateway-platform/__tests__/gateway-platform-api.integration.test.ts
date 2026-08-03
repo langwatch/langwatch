@@ -775,7 +775,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("validation_error");
-      expect(body.error.message).toContain("limit_usd");
+      // The offending field is structured, in meta, rather than something a
+      // caller has to scrape out of the sentence.
+      expect(body.error.meta.target).toBe("json");
+      expect(JSON.stringify(body.error.meta)).toContain("limit_usd");
     });
   });
 

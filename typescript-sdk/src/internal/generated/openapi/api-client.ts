@@ -1206,7 +1206,7 @@ export interface paths {
         };
         /**
          * List virtual keys
-         * @description Returns every virtual key visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Ordered by creation time.
+         * @description Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.
          */
         get: operations["getApiGatewayV1Virtual-keys"];
         put?: never;
@@ -1251,7 +1251,7 @@ export interface paths {
         };
         /**
          * Read a virtual key's spend
-         * @description Aggregate spend and request count for one key over a window (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
+         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
         get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
         put?: never;
@@ -1313,7 +1313,7 @@ export interface paths {
         put?: never;
         /**
          * Enable virtual key
-         * @description Reverses disable: the key returns to ACTIVE exactly as it was, including any rotation grace that was running. Idempotent.
+         * @description Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.
          */
         post: operations["postApiGatewayV1Virtual-keysByIdEnable"];
         delete?: never;
@@ -1375,13 +1375,13 @@ export interface paths {
         };
         /**
          * List budgets
-         * @description Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.
+         * @description Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.
          */
         get: operations["getApiGatewayV1Budgets"];
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -1397,7 +1397,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get budget
+         * @description One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend.
+         */
+        get: operations["getApiGatewayV1BudgetsById"];
         put?: never;
         post?: never;
         /**
@@ -1425,7 +1429,7 @@ export interface paths {
         put?: never;
         /**
          * Reset budget period
-         * @description Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on MANUAL windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.
+         * @description Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.
          */
         post: operations["postApiGatewayV1BudgetsByIdReset"];
         delete?: never;
@@ -1467,7 +1471,7 @@ export interface paths {
         };
         /**
          * List cache-control rules
-         * @description Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.
+         * @description Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.
          */
         get: operations["getApiGatewayV1Cache-rules"];
         put?: never;
@@ -2403,7 +2407,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. */
+        /** @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. */
         get: operations["getApiGatewayV1Spend-summaries"];
         put?: never;
         post?: never;
@@ -5360,7 +5364,10 @@ export interface operations {
     };
     "getApiGatewayV1Virtual-keys": {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5380,19 +5387,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -5400,6 +5408,8 @@ export interface operations {
                             last_used_at: string | null;
                             revoked_at: string | null;
                         }[];
+                        /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
+                        next_cursor: string | null;
                     };
                 };
             };
@@ -5410,8 +5420,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5422,20 +5440,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5446,8 +5480,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5460,7 +5502,112 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string;
+                    principal_user_id?: string | null;
+                    scopes?: {
+                        /** @enum {string} */
+                        scope_type: "organization" | "team" | "project";
+                        scope_id: string;
+                    }[];
+                    trace_project_id?: string | null;
+                    routing_policy_id?: string | null;
+                    /** @enum {string} */
+                    routing_mode?: "none" | "fallback_all" | "policy";
+                    budget?: {
+                        limit_usd: number | string;
+                        /** @enum {string} */
+                        window: "day" | "week" | "month";
+                        /** @enum {string} */
+                        on_breach?: "block" | "warn";
+                        name?: string;
+                    } | null;
+                    config?: {
+                        /** @default null */
+                        modelsAllowed?: string[] | null;
+                        /** @default null */
+                        providersAllowed?: string[] | null;
+                        /**
+                         * @default {
+                         *       "mode": "respect",
+                         *       "ttlS": 3600
+                         *     }
+                         */
+                        cache?: {
+                            /**
+                             * @default respect
+                             * @enum {string}
+                             */
+                            mode?: "respect" | "force" | "disable";
+                            /** @default 3600 */
+                            ttlS?: number;
+                        };
+                        /**
+                         * @default {
+                         *       "on": [
+                         *         "5xx",
+                         *         "timeout",
+                         *         "rate_limit_exceeded"
+                         *       ],
+                         *       "timeoutMs": 30000,
+                         *       "maxAttempts": 3
+                         *     }
+                         */
+                        fallback?: {
+                            /**
+                             * @default [
+                             *       "5xx",
+                             *       "timeout",
+                             *       "rate_limit_exceeded"
+                             *     ]
+                             */
+                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
+                            /** @default 30000 */
+                            timeoutMs?: number;
+                            /** @default 3 */
+                            maxAttempts?: number;
+                        };
+                        /** @default [] */
+                        guardrailAttachments?: {
+                            /** @enum {string} */
+                            direction: "pre" | "post" | "stream_chunk";
+                            /** @default [] */
+                            guardrailIds?: string[];
+                        }[];
+                        /**
+                         * @default {
+                         *       "rpm": null,
+                         *       "tpm": null,
+                         *       "rpd": null
+                         *     }
+                         */
+                        rateLimits?: {
+                            /** @default null */
+                            rpm?: number | null;
+                            /** @default null */
+                            tpm?: number | null;
+                            /** @default null */
+                            rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "tags": []
+                         *     }
+                         */
+                        metadata?: {
+                            label?: string;
+                            /** @default [] */
+                            tags?: string[];
+                        };
+                    };
+                    /** @constant */
+                    purpose?: "user";
+                };
+            };
+        };
         responses: {
             /** @description Virtual key created */
             201: {
@@ -5475,19 +5622,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -5513,6 +5661,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -5524,8 +5674,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5543,19 +5701,9 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
                     };
                 };
             };
@@ -5566,8 +5714,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5597,19 +5753,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -5627,8 +5784,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5639,8 +5804,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5658,19 +5851,9 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
                     };
                 };
             };
@@ -5681,8 +5864,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5697,7 +5888,109 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    scopes?: {
+                        /** @enum {string} */
+                        scope_type: "organization" | "team" | "project";
+                        scope_id: string;
+                    }[];
+                    trace_project_id?: string | null;
+                    routing_policy_id?: string | null;
+                    /** @enum {string} */
+                    routing_mode?: "none" | "fallback_all" | "policy";
+                    budget?: {
+                        limit_usd: number | string;
+                        /** @enum {string} */
+                        window: "day" | "week" | "month";
+                        /** @enum {string} */
+                        on_breach?: "block" | "warn";
+                        name?: string;
+                    } | null;
+                    config?: {
+                        /** @default null */
+                        modelsAllowed?: string[] | null;
+                        /** @default null */
+                        providersAllowed?: string[] | null;
+                        /**
+                         * @default {
+                         *       "mode": "respect",
+                         *       "ttlS": 3600
+                         *     }
+                         */
+                        cache?: {
+                            /**
+                             * @default respect
+                             * @enum {string}
+                             */
+                            mode?: "respect" | "force" | "disable";
+                            /** @default 3600 */
+                            ttlS?: number;
+                        };
+                        /**
+                         * @default {
+                         *       "on": [
+                         *         "5xx",
+                         *         "timeout",
+                         *         "rate_limit_exceeded"
+                         *       ],
+                         *       "timeoutMs": 30000,
+                         *       "maxAttempts": 3
+                         *     }
+                         */
+                        fallback?: {
+                            /**
+                             * @default [
+                             *       "5xx",
+                             *       "timeout",
+                             *       "rate_limit_exceeded"
+                             *     ]
+                             */
+                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
+                            /** @default 30000 */
+                            timeoutMs?: number;
+                            /** @default 3 */
+                            maxAttempts?: number;
+                        };
+                        /** @default [] */
+                        guardrailAttachments?: {
+                            /** @enum {string} */
+                            direction: "pre" | "post" | "stream_chunk";
+                            /** @default [] */
+                            guardrailIds?: string[];
+                        }[];
+                        /**
+                         * @default {
+                         *       "rpm": null,
+                         *       "tpm": null,
+                         *       "rpd": null
+                         *     }
+                         */
+                        rateLimits?: {
+                            /** @default null */
+                            rpm?: number | null;
+                            /** @default null */
+                            tpm?: number | null;
+                            /** @default null */
+                            rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "tags": []
+                         *     }
+                         */
+                        metadata?: {
+                            label?: string;
+                            /** @default [] */
+                            tags?: string[];
+                        };
+                    };
+                };
+            };
+        };
         responses: {
             /** @description Updated */
             200: {
@@ -5712,19 +6005,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -5749,6 +6043,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -5760,20 +6056,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5784,8 +6096,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5793,7 +6113,10 @@ export interface operations {
     };
     "getApiGatewayV1Virtual-keysByIdSpend": {
         parameters: {
-            query?: never;
+            query?: {
+                from?: number;
+                to?: number;
+            };
             header?: never;
             path: {
                 id: string;
@@ -5813,8 +6136,8 @@ export interface operations {
                         spent_usd: string;
                         requests: number;
                         window: {
-                            from: string;
-                            to: string;
+                            from: number;
+                            to: number;
                         };
                     };
                 };
@@ -5826,8 +6149,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5838,8 +6169,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5857,6 +6216,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -5875,19 +6236,9 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
                     };
                 };
             };
@@ -5898,8 +6249,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5929,19 +6288,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -5960,8 +6320,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5972,20 +6340,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -5996,8 +6380,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6012,7 +6404,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Operator note, audit-logged and shown in the key's detail view. */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description Disabled */
             200: {
@@ -6027,19 +6426,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -6057,8 +6457,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6069,20 +6477,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6093,8 +6517,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6124,19 +6556,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -6154,8 +6587,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6166,20 +6607,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6190,8 +6647,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6221,19 +6686,20 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            status: "active" | "revoked";
+                            status: "active" | "disabled" | "revoked";
                             /** @enum {string} */
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
                             scopes: {
-                                scope_type: string;
+                                /** @enum {string} */
+                                scope_type: "organization" | "team" | "project";
                                 scope_id: string;
                             }[];
                             routing_policy_id: string | null;
                             /** @enum {string} */
-                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+                            routing_mode: "none" | "fallback_all" | "policy";
                             config?: unknown;
                             revision: string;
                             created_at: string;
@@ -6251,8 +6717,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6263,20 +6737,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6287,8 +6777,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6303,30 +6801,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Provider bindings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            model_provider_id: string;
-                            model_provider_name: string;
-                            slot: string;
-                            rate_limit_rpm: number | null;
-                            rate_limit_tpm: number | null;
-                            rate_limit_rpd: number | null;
-                            rotation_policy: string;
-                            fallback_priority_global: number | null;
-                            health_status: string;
-                            disabled_at: string | null;
-                            created_at: string;
-                        }[];
-                    };
-                };
-            };
             /** @description Bad Request */
             400: {
                 headers: {
@@ -6334,8 +6808,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6346,20 +6828,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Gone. Gateway provider bindings folded into ModelProvider in iter 110. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6370,8 +6888,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6386,19 +6912,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Binding created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                        };
-                    };
-                };
-            };
             /** @description Bad Request */
             400: {
                 headers: {
@@ -6406,8 +6919,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6418,20 +6939,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Gone. Gateway provider bindings folded into ModelProvider in iter 110. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6442,8 +6999,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6451,7 +7016,11 @@ export interface operations {
     };
     getApiGatewayV1Budgets: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+                limit?: number;
+                scope_type?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6469,15 +7038,18 @@ export interface operations {
                             id: string;
                             organization_id: string;
                             /** @enum {string} */
-                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER";
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
                             scope_id: string;
                             name: string;
                             description: string | null;
-                            window: string;
                             /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
                             limit_usd: string;
-                            spent_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
                             current_period_started_at: string;
@@ -6490,6 +7062,8 @@ export interface operations {
                             end_users_over?: number;
                         }[];
                         spend_available: boolean;
+                        /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
+                        next_cursor: string | null;
                     };
                 };
             };
@@ -6507,6 +7081,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -6518,20 +7094,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6542,8 +7134,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6556,7 +7156,51 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    scope: {
+                        /** @constant */
+                        kind: "organization";
+                        organization_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "team";
+                        team_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "project";
+                        project_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "virtual_key";
+                        virtual_key_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "principal";
+                        principal_user_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "group";
+                        group_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "attributed_user";
+                        anchor_virtual_key_id?: string;
+                        anchor_project_id?: string;
+                    };
+                    name: string;
+                    description?: string;
+                    /** @enum {string} */
+                    window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                    limit_usd: number | string;
+                    /** @enum {string} */
+                    on_breach?: "block" | "warn";
+                    timezone?: string | null;
+                    provider_key?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description Budget created */
             201: {
@@ -6569,15 +7213,18 @@ export interface operations {
                             id: string;
                             organization_id: string;
                             /** @enum {string} */
-                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER";
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
                             scope_id: string;
                             name: string;
                             description: string | null;
-                            window: string;
                             /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
                             limit_usd: string;
-                            spent_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
                             current_period_started_at: string;
@@ -6606,6 +7253,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -6617,20 +7266,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6641,8 +7306,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiGatewayV1BudgetsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The budget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        budget: {
+                            id: string;
+                            organization_id: string;
+                            /** @enum {string} */
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
+                            scope_id: string;
+                            name: string;
+                            description: string | null;
+                            /** @enum {string} */
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
+                            limit_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
+                            timezone: string | null;
+                            provider_key: string | null;
+                            current_period_started_at: string;
+                            resets_at: string;
+                            last_reset_at: string | null;
+                            archived_at: string | null;
+                            created_at: string;
+                            member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
+                        };
+                        spend_available: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6670,15 +7494,18 @@ export interface operations {
                             id: string;
                             organization_id: string;
                             /** @enum {string} */
-                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER";
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
                             scope_id: string;
                             name: string;
                             description: string | null;
-                            window: string;
                             /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
                             limit_usd: string;
-                            spent_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
                             current_period_started_at: string;
@@ -6700,8 +7527,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6712,20 +7547,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6736,8 +7587,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6752,7 +7611,18 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    limit_usd?: number | string;
+                    /** @enum {string} */
+                    on_breach?: "block" | "warn";
+                    timezone?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description Updated */
             200: {
@@ -6765,15 +7635,18 @@ export interface operations {
                             id: string;
                             organization_id: string;
                             /** @enum {string} */
-                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER";
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
                             scope_id: string;
                             name: string;
                             description: string | null;
-                            window: string;
                             /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
                             limit_usd: string;
-                            spent_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
                             current_period_started_at: string;
@@ -6795,8 +7668,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6807,20 +7688,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6831,8 +7728,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6840,14 +7745,23 @@ export interface operations {
     };
     postApiGatewayV1BudgetsByIdReset: {
         parameters: {
-            query?: never;
+            query?: {
+                end_user_id?: string;
+            };
             header?: never;
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Free-text operator note, audit-logged with the reset. */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description Reset */
             200: {
@@ -6860,15 +7774,18 @@ export interface operations {
                             id: string;
                             organization_id: string;
                             /** @enum {string} */
-                            scope_type: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" | "ATTRIBUTED_USER";
+                            scope_type: "organization" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user";
                             scope_id: string;
                             name: string;
                             description: string | null;
-                            window: string;
                             /** @enum {string} */
-                            on_breach: "BLOCK" | "WARN";
+                            window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+                            /** @enum {string} */
+                            on_breach: "block" | "warn";
                             limit_usd: string;
-                            spent_usd: string;
+                            limit_nano_usd: number | null;
+                            spent_usd: string | null;
+                            spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
                             current_period_started_at: string;
@@ -6890,8 +7807,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6902,20 +7827,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6926,8 +7867,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6944,20 +7893,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Disabled */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                            disabled_at: string | null;
-                        };
-                    };
-                };
-            };
             /** @description Bad Request */
             400: {
                 headers: {
@@ -6965,8 +7900,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -6977,20 +7920,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Gone. Gateway provider bindings folded into ModelProvider in iter 110. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7001,8 +7980,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7019,19 +8006,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        provider_credential: {
-                            id: string;
-                        };
-                    };
-                };
-            };
             /** @description Bad Request */
             400: {
                 headers: {
@@ -7039,8 +8013,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7051,20 +8033,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Gone. Gateway provider bindings folded into ModelProvider in iter 110. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7075,8 +8093,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7084,7 +8110,10 @@ export interface operations {
     };
     "getApiGatewayV1Cache-rules": {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7115,11 +8144,13 @@ export interface operations {
                                 salt?: string;
                             };
                             /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            mode_enum: "respect" | "force" | "disable";
                             archived_at: string | null;
                             created_at: string;
                             updated_at: string;
                         }[];
+                        /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
+                        next_cursor: string | null;
                     };
                 };
             };
@@ -7130,8 +8161,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7142,20 +8181,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7166,8 +8221,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7180,7 +8243,32 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string | null;
+                    priority?: number;
+                    enabled?: boolean;
+                    matchers: {
+                        vk_id?: string;
+                        vk_tags?: string[];
+                        vk_prefix?: string;
+                        principal_id?: string;
+                        model?: string;
+                        request_metadata?: {
+                            [key: string]: string;
+                        };
+                    };
+                    action: {
+                        /** @enum {string} */
+                        mode: "respect" | "force" | "disable";
+                        ttl?: number;
+                        salt?: string;
+                    };
+                };
+            };
+        };
         responses: {
             /** @description Created */
             201: {
@@ -7206,7 +8294,7 @@ export interface operations {
                                 salt?: string;
                             };
                             /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            mode_enum: "respect" | "force" | "disable";
                             archived_at: string | null;
                             created_at: string;
                             updated_at: string;
@@ -7228,6 +8316,8 @@ export interface operations {
                             meta?: {
                                 [key: string]: unknown;
                             };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -7239,20 +8329,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7263,8 +8369,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7305,7 +8419,7 @@ export interface operations {
                                 salt?: string;
                             };
                             /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            mode_enum: "respect" | "force" | "disable";
                             archived_at: string | null;
                             created_at: string;
                             updated_at: string;
@@ -7320,8 +8434,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7332,20 +8454,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7356,8 +8494,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7398,7 +8544,7 @@ export interface operations {
                                 salt?: string;
                             };
                             /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            mode_enum: "respect" | "force" | "disable";
                             archived_at: string | null;
                             created_at: string;
                             updated_at: string;
@@ -7413,8 +8559,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7425,20 +8579,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7449,8 +8619,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7465,7 +8643,32 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    priority?: number;
+                    enabled?: boolean;
+                    matchers?: {
+                        vk_id?: string;
+                        vk_tags?: string[];
+                        vk_prefix?: string;
+                        principal_id?: string;
+                        model?: string;
+                        request_metadata?: {
+                            [key: string]: string;
+                        };
+                    };
+                    action?: {
+                        /** @enum {string} */
+                        mode: "respect" | "force" | "disable";
+                        ttl?: number;
+                        salt?: string;
+                    };
+                };
+            };
+        };
         responses: {
             /** @description Updated */
             200: {
@@ -7491,7 +8694,7 @@ export interface operations {
                                 salt?: string;
                             };
                             /** @enum {string} */
-                            mode_enum: "RESPECT" | "FORCE" | "DISABLE";
+                            mode_enum: "respect" | "force" | "disable";
                             archived_at: string | null;
                             created_at: string;
                             updated_at: string;
@@ -7506,8 +8709,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7518,20 +8729,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -7542,8 +8769,16 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
@@ -15489,14 +16724,124 @@ export interface operations {
                 from: number;
                 to: number;
                 project_id?: string;
+                cursor?: string;
                 limit?: number;
+                virtual_key_id?: string;
             };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Per-key spend rollups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            key: string;
+                            event_count: number;
+                            settled_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                            };
+                            cost: {
+                                total_usd: string;
+                                nano_usd: number;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
     };
     "getApiGatewayV1Spend-events": {
         parameters: {
@@ -15516,7 +16861,136 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description One page of billing envelopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            type: string;
+                            created: string;
+                            schema_version: string;
+                            data: {
+                                event_id: string;
+                                event_type: string;
+                                gateway_request_id: string;
+                                occurred_at: string;
+                                usage: {
+                                    input_tokens: number;
+                                    output_tokens: number;
+                                    cache_read_input_tokens: number;
+                                    cache_creation_input_tokens: number;
+                                    reasoning_tokens: number;
+                                } | null;
+                                cost: {
+                                    total_usd: string;
+                                    nano_usd: number;
+                                } | null;
+                                status: string;
+                                needs_reconciliation: boolean | null;
+                                settle_reason: string | null;
+                                error: {
+                                    class: string;
+                                    http_status: number | null;
+                                } | null;
+                                duration_ms: number | null;
+                                labels: string[];
+                                metadata: {
+                                    [key: string]: unknown;
+                                };
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
     };
     "getApiGatewayV1End-usersByIdSpend": {
         parameters: {
@@ -15533,7 +17007,126 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Spend and standing for one end user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            end_user_id: string;
+                            window: string;
+                            from: string;
+                            to: string;
+                            cost: {
+                                total_usd: string;
+                                nano_usd: number;
+                            };
+                            request_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                            };
+                            caps: {
+                                budget_id: string;
+                                anchor_id: string;
+                                window: string;
+                                /** @enum {string} */
+                                on_breach: "block" | "warn";
+                                limit_usd: string;
+                                spent_usd: string;
+                                period_started_at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
     };
     "postApiGatewayV1Spend-eventsReplay": {
         parameters: {
@@ -15551,7 +17144,107 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Replay accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            endpoint_id: string;
+                            replay_id: string;
+                            replayed: number;
+                            window: {
+                                from: string;
+                                to: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
     };
     getApiWorkflows: {
         parameters: {

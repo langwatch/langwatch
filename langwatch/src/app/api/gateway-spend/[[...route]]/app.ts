@@ -18,6 +18,7 @@ import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
@@ -41,6 +42,7 @@ import {
 } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   END_USER_SPEND_DESCRIPTION,
@@ -205,6 +207,111 @@ async function applicableEndUserCaps(params: {
   });
 }
 
+// ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
+// These mirror the shapes the handlers below return. Without them the
+// generated spec documents these routes with `responses: {}`, so a caller
+// reading the spec learns the route exists and nothing about what it answers.
+
+const usageSchema = z.object({
+  input_tokens: z.number().int(),
+  output_tokens: z.number().int(),
+  cache_read_input_tokens: z.number().int(),
+  cache_creation_input_tokens: z.number().int(),
+  reasoning_tokens: z.number().int(),
+});
+
+/** Money is published twice: a display string and the canonical integer. */
+const costSchema = z.object({
+  total_usd: z.string(),
+  nano_usd: z.number().int(),
+});
+
+/** Null when the walk is exhausted. A full page does NOT imply more. */
+const nextCursorSchema = z.string().nullable();
+
+const spendSummaryRowSchema = z.object({
+  key: z.string(),
+  event_count: z.number().int(),
+  settled_count: z.number().int(),
+  usage: usageSchema,
+  cost: costSchema,
+});
+
+/**
+ * One billing envelope, the SAME shape the signed webhooks deliver, so a
+ * reconciliation pull and a webhook receiver parse with one reader.
+ */
+const spendEventEnvelopeSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  created: z.string(),
+  schema_version: z.string(),
+  data: z
+    .object({
+      event_id: z.string(),
+      event_type: z.string(),
+      /** The join key across the settled/completed pair. */
+      gateway_request_id: z.string(),
+      occurred_at: z.string(),
+      // Null on rows whose quantities are not known yet (admitted) or no
+      // longer authoritative (settled).
+      usage: usageSchema.nullable(),
+      cost: costSchema.nullable(),
+      status: z.string(),
+      needs_reconciliation: z.boolean().nullable(),
+      settle_reason: z.string().nullable(),
+      error: z
+        .object({
+          class: z.string(),
+          http_status: z.number().int().nullable(),
+        })
+        .nullable(),
+      duration_ms: z.number().int().nullable(),
+      labels: z.array(z.string()),
+      metadata: z.record(z.string(), z.unknown()),
+    })
+    .passthrough(),
+});
+
+const endUserCapSchema = z.object({
+  budget_id: z.string(),
+  anchor_id: z.string(),
+  window: z.string(),
+  on_breach: z.enum(["block", "warn"]),
+  limit_usd: z.string(),
+  spent_usd: z.string(),
+  period_started_at: z.string(),
+});
+
+const endUserSpendSchema = z.object({
+  end_user_id: z.string(),
+  window: z.string(),
+  from: z.string(),
+  to: z.string(),
+  cost: costSchema,
+  request_count: z.number().int(),
+  usage: usageSchema,
+  caps: z.array(endUserCapSchema),
+});
+
+const replayResultSchema = z.object({
+  endpoint_id: z.string(),
+  replay_id: z.string(),
+  replayed: z.number().int(),
+  window: z.object({ from: z.string(), to: z.string() }),
+});
+
+/** One documented 200, in this family's canonical envelope for errors. */
+function okResponse(description: string, schema: z.ZodTypeAny) {
+  return {
+    ...canonicalBaseResponses,
+    200: {
+      description,
+      content: { "application/json": { schema: resolver(schema) } },
+    },
+  };
+}
+
 const secured = createOrgApp({
   basePath: "/api/gateway/v1",
   errorEnvelope: "canonical",
@@ -226,6 +333,13 @@ secured.access(requires("gatewaySpend:view")).get(
   "/spend-summaries",
   requireBillingPlan,
   describeRoute({
+    responses: okResponse(
+      "Per-key spend rollups",
+      z.object({
+        data: z.array(spendSummaryRowSchema),
+        next_cursor: nextCursorSchema,
+      }),
+    ),
     description:
       "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
   }),
@@ -270,91 +384,99 @@ secured.access(requires("gatewaySpend:view")).get(
   },
 );
 
-secured
-  .access(requires("gatewaySpend:view"))
-  .get(
-    "/spend-events",
-    requireBillingPlan,
-    describeRoute({ description: SPEND_EVENTS_PULL_DESCRIPTION }),
-    zValidator("query", spendEventsQuerySchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const query = c.req.valid("query");
-      // A present-but-garbled cursor is a caller bug: refusing beats
-      // silently restarting the walk, which would re-serve the whole range.
-      if (
-        query.cursor !== undefined &&
-        !decodeSpendEventsCursor(query.cursor)
-      ) {
-        throw new BadRequestError("Invalid cursor.");
-      }
-      const tenantIds = await orgTenantIds(organization.id, query.project_id);
-      const page = await spendEvents.walkSpendEvents({
-        tenantIds,
-        fromMs: query.from,
-        toMs: query.to,
-        cursor: query.cursor ?? null,
-        limit: query.limit,
-        virtualKeyId: query.virtual_key_id,
-        endUserId: query.end_user_id,
-        model: query.model,
-        status: query.status,
-      });
-      return c.json({
-        data: page.rows.map(spendRowToEnvelope),
-        next_cursor: page.nextCursor,
-      });
-    },
-  );
+secured.access(requires("gatewaySpend:view")).get(
+  "/spend-events",
+  requireBillingPlan,
+  describeRoute({
+    description: SPEND_EVENTS_PULL_DESCRIPTION,
+    responses: okResponse(
+      "One page of billing envelopes",
+      z.object({
+        data: z.array(spendEventEnvelopeSchema),
+        next_cursor: nextCursorSchema,
+      }),
+    ),
+  }),
+  zValidator("query", spendEventsQuerySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const query = c.req.valid("query");
+    // A present-but-garbled cursor is a caller bug: refusing beats
+    // silently restarting the walk, which would re-serve the whole range.
+    if (query.cursor !== undefined && !decodeSpendEventsCursor(query.cursor)) {
+      throw new BadRequestError("Invalid cursor.");
+    }
+    const tenantIds = await orgTenantIds(organization.id, query.project_id);
+    const page = await spendEvents.walkSpendEvents({
+      tenantIds,
+      fromMs: query.from,
+      toMs: query.to,
+      cursor: query.cursor ?? null,
+      limit: query.limit,
+      virtualKeyId: query.virtual_key_id,
+      endUserId: query.end_user_id,
+      model: query.model,
+      status: query.status,
+    });
+    return c.json({
+      data: page.rows.map(spendRowToEnvelope),
+      next_cursor: page.nextCursor,
+    });
+  },
+);
 
-secured
-  .access(requires("gatewaySpend:view"))
-  .get(
-    "/end-users/:id/spend",
-    requireBillingPlan,
-    describeRoute({ description: END_USER_SPEND_DESCRIPTION }),
-    zValidator("query", endUserSpendQuerySchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const endUserId = c.req.param("id");
-      const query = c.req.valid("query");
-      const now = Date.now();
-      const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
-      const toMs = query.to ?? now;
-      const tenantIds = await orgTenantIds(organization.id);
-      const rollup = await spendEvents.readEndUserSpend({
-        tenantIds,
-        endUserId,
-        fromMs,
-        toMs,
-        virtualKeyId: query.virtual_key_id,
-      });
-      const caps = await applicableEndUserCaps({
-        organizationId: organization.id,
-        endUserId,
-        tenantIds,
-        virtualKeyId: query.virtual_key_id,
-      });
-      return c.json({
-        data: {
-          end_user_id: endUserId,
-          window: query.window,
-          from: new Date(fromMs).toISOString(),
-          to: new Date(toMs).toISOString(),
-          cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
-          request_count: rollup.requestCount,
-          usage: {
-            input_tokens: rollup.tokensInput,
-            output_tokens: rollup.tokensOutput,
-            cache_read_input_tokens: rollup.tokensCacheRead,
-            cache_creation_input_tokens: rollup.tokensCacheWrite,
-            reasoning_tokens: rollup.tokensReasoning,
-          },
-          caps,
+secured.access(requires("gatewaySpend:view")).get(
+  "/end-users/:id/spend",
+  requireBillingPlan,
+  describeRoute({
+    description: END_USER_SPEND_DESCRIPTION,
+    responses: okResponse(
+      "Spend and standing for one end user",
+      z.object({ data: endUserSpendSchema }),
+    ),
+  }),
+  zValidator("query", endUserSpendQuerySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const endUserId = c.req.param("id");
+    const query = c.req.valid("query");
+    const now = Date.now();
+    const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
+    const toMs = query.to ?? now;
+    const tenantIds = await orgTenantIds(organization.id);
+    const rollup = await spendEvents.readEndUserSpend({
+      tenantIds,
+      endUserId,
+      fromMs,
+      toMs,
+      virtualKeyId: query.virtual_key_id,
+    });
+    const caps = await applicableEndUserCaps({
+      organizationId: organization.id,
+      endUserId,
+      tenantIds,
+      virtualKeyId: query.virtual_key_id,
+    });
+    return c.json({
+      data: {
+        end_user_id: endUserId,
+        window: query.window,
+        from: new Date(fromMs).toISOString(),
+        to: new Date(toMs).toISOString(),
+        cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
+        request_count: rollup.requestCount,
+        usage: {
+          input_tokens: rollup.tokensInput,
+          output_tokens: rollup.tokensOutput,
+          cache_read_input_tokens: rollup.tokensCacheRead,
+          cache_creation_input_tokens: rollup.tokensCacheWrite,
+          reasoning_tokens: rollup.tokensReasoning,
         },
-      });
-    },
-  );
+        caps,
+      },
+    });
+  },
+);
 
 const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REPLAY_MAX_ENVELOPES = 10_000;
@@ -483,77 +605,81 @@ const REPLAY_DESCRIPTION =
   "days and 10,000 envelopes per call; both caps are checked before any " +
   "delivery is queued, so a refused replay ships nothing.";
 
-secured
-  .access(requires("gatewaySpend:manage"))
-  .post(
-    "/spend-events/replay",
-    requireBillingPlan,
-    describeRoute({ description: REPLAY_DESCRIPTION }),
-    zValidator("json", replayBodySchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const body = c.req.valid("json");
+secured.access(requires("gatewaySpend:manage")).post(
+  "/spend-events/replay",
+  requireBillingPlan,
+  describeRoute({
+    description: REPLAY_DESCRIPTION,
+    responses: okResponse(
+      "Replay accepted",
+      z.object({ data: replayResultSchema }),
+    ),
+  }),
+  zValidator("json", replayBodySchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const body = c.req.valid("json");
 
-      const endpoints = new WebhookEndpointService({ prisma });
-      const endpoint = await endpoints.getDeliverable({
-        organizationId: organization.id,
-        endpointId: body.endpoint_id,
-      });
-      if (!endpoint) {
-        throw new BadRequestError(
-          "unknown or inactive endpoint for this organization",
-        );
-      }
+    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoint = await endpoints.getDeliverable({
+      organizationId: organization.id,
+      endpointId: body.endpoint_id,
+    });
+    if (!endpoint) {
+      throw new BadRequestError(
+        "unknown or inactive endpoint for this organization",
+      );
+    }
 
-      const events = new WebhookEventsService({
-        prisma,
-        repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) throw new Error("ClickHouse is not configured");
-          return client;
-        }),
-      });
-      const deliveryDeps: WebhookDeliveryProcessDeps = {
-        processStore: new PrismaProcessStore(prisma),
-        endpoints,
-        getPlan: (organizationId) =>
-          getApp().planProvider.getActivePlan({ organizationId }),
-      };
+    const events = new WebhookEventsService({
+      prisma,
+      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) throw new Error("ClickHouse is not configured");
+        return client;
+      }),
+    });
+    const deliveryDeps: WebhookDeliveryProcessDeps = {
+      processStore: new PrismaProcessStore(prisma),
+      endpoints,
+      getPlan: (organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }),
+    };
 
-      // One replay identity per call: it salts batch ids and inbox source
-      // ids so redelivered envelopes cannot collide with their historical
-      // batches; the ENVELOPE ids stay untouched.
-      await assertReplayWindowWithinCap({
-        events,
-        endpoint,
-        organizationId: organization.id,
-        fromMs: body.from,
-        toMs: body.to,
-      });
+    // One replay identity per call: it salts batch ids and inbox source
+    // ids so redelivered envelopes cannot collide with their historical
+    // batches; the ENVELOPE ids stay untouched.
+    await assertReplayWindowWithinCap({
+      events,
+      endpoint,
+      organizationId: organization.id,
+      fromMs: body.from,
+      toMs: body.to,
+    });
 
-      const replayId = nanoid(10);
-      const replayed = await appendWindowToEndpointStream({
-        events,
-        endpoint,
-        deliveryDeps,
-        organizationId: organization.id,
-        fromMs: body.from,
-        toMs: body.to,
-        replayId,
-      });
+    const replayId = nanoid(10);
+    const replayed = await appendWindowToEndpointStream({
+      events,
+      endpoint,
+      deliveryDeps,
+      organizationId: organization.id,
+      fromMs: body.from,
+      toMs: body.to,
+      replayId,
+    });
 
-      return c.json({
-        data: {
-          endpoint_id: endpoint.id,
-          replay_id: replayId,
-          replayed,
-          window: {
-            from: new Date(body.from).toISOString(),
-            to: new Date(body.to).toISOString(),
-          },
+    return c.json({
+      data: {
+        endpoint_id: endpoint.id,
+        replay_id: replayId,
+        replayed,
+        window: {
+          from: new Date(body.from).toISOString(),
+          to: new Date(body.to).toISOString(),
         },
-      });
-    },
-  );
+      },
+    });
+  },
+);
 
 export const app = secured.hono;
