@@ -86,6 +86,34 @@ Feature: Worker liveness probe endpoint
       When a caller requests "/not-a-real-path"
       Then the response status is 404
 
+  Rule: Liveness answers even while the main event loop is saturated
+
+    # A worker saturated with legitimate queue catch-up can pin the Node event
+    # loop for over a minute; when /healthz shared that loop, Kubernetes
+    # killed exactly the busiest pods and requeued their in-flight work
+    # (2026-08-03 incident). Liveness is served from a dedicated thread that
+    # judges the main loop by a shared heartbeat instead.
+
+    @unit
+    Scenario: A busy-but-alive main loop still passes liveness
+      Given the main loop's heartbeat is fresher than the stall budget
+      When the kubelet requests "/healthz"
+      Then the response status is 200
+
+    @unit
+    Scenario: A main loop stalled past the budget fails liveness
+      Given the main loop's heartbeat is older than the stall budget
+      When the kubelet requests "/healthz"
+      Then the response status is 503
+      # A genuinely wedged worker is still restarted — the budget separates
+      # "saturated for a minute" from "dead".
+
+    @unit
+    Scenario: Metrics proxy through to the main thread with a timeout
+      Given the liveness thread is serving the metrics port
+      When a caller requests "/metrics" and the main thread replies
+      Then the reply is served with the main thread's status and body
+
   Rule: The chart probes the liveness endpoint, not the metrics endpoint
 
     @e2e @unimplemented

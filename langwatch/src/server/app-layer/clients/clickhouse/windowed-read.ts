@@ -12,6 +12,20 @@ import { incrementWindowedReadCount } from "~/server/clickhouse/metrics";
 export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 /**
+ * Lookback for the recent-first probe that partition-hint RESOLVERS run
+ * before falling back to an unbounded seek.
+ *
+ * The resolvers (`resolveScheduledAtMs`, `resolveTraceOccurredAtMs`) exist to
+ * find the partition-key value that lets the heavy read prune — but without a
+ * bound of their own they walk every weekly partition's index, including
+ * S3-tiered cold ones (measured 0.7–1.2s per call on the worker job paths,
+ * which only ever resolve minutes-old aggregates). 35 days ≈ five weekly
+ * partitions, comfortably on local disk, while the unbounded fallback keeps
+ * old aggregates correct.
+ */
+export const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
+
+/**
  * The time predicate for one windowed read attempt. A `null` fragment (never a
  * `WindowFragment`) means an unbounded read — no time predicate, the wide scan.
  */

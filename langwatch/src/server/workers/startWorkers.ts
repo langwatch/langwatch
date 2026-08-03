@@ -1,3 +1,4 @@
+import { Worker } from "node:worker_threads";
 import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
@@ -198,8 +199,75 @@ export function createWorkerMetricsHandler(
 // In that in-process mode this listener is skipped entirely; the web server
 // serves the same shared registry at /metrics.
 //
-// The same listener serves the unauthenticated liveness path the chart's
-// probes call.
+/**
+ * How often the main event loop stamps its heartbeat, and how stale that
+ * stamp may get before the liveness thread reports the process dead.
+ *
+ * The 2026-08-03 incident: a worker saturated with queue catch-up pins the
+ * event loop for 60–90s of legitimate work, `/healthz` (served on that same
+ * loop) misses even a 10s×6 probe budget, and Kubernetes kills exactly the
+ * busiest pods — requeueing their in-flight jobs and deepening the backlog.
+ * Serving liveness from a worker thread with a loop heartbeat separates the
+ * two questions: "is the process alive" (thread answers instantly, always)
+ * and "is the main loop moving" (heartbeat age, judged against a budget far
+ * beyond any legitimate saturation but well short of "restart never comes").
+ */
+export const WORKER_HEARTBEAT_INTERVAL_MS = 1_000;
+export const WORKER_HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
+const METRICS_PROXY_TIMEOUT_MS = 10_000;
+
+/**
+ * Source for the liveness thread, evaluated via `new Worker(src, {eval:true})`
+ * so it survives every bundler/runtime (no file to resolve). Plain CommonJS,
+ * Node built-ins only. It owns the metrics port: `/healthz` is answered
+ * in-thread from the shared heartbeat; anything else is proxied to the main
+ * thread over `parentPort` (metrics bodies come from the prom-client registry,
+ * which lives there) with a timeout so a stalled loop fails the scrape, never
+ * the probe.
+ */
+export const LIVENESS_THREAD_SOURCE = `
+const http = require("node:http");
+const { parentPort, workerData } = require("node:worker_threads");
+const heartbeat = new Float64Array(workerData.heartbeat);
+const pending = new Map();
+let nextId = 1;
+parentPort.on("message", (msg) => {
+  const entry = pending.get(msg.id);
+  if (!entry) return;
+  pending.delete(msg.id);
+  clearTimeout(entry.timer);
+  entry.res.writeHead(msg.status, msg.headers ?? {}).end(msg.body ?? "");
+});
+const server = http.createServer((req, res) => {
+  if (req.url === workerData.livenessPath) {
+    const stalledMs = Date.now() - heartbeat[0];
+    if (stalledMs > workerData.stallBudgetMs) {
+      res.writeHead(503, { "Content-Type": "text/plain" })
+        .end("main loop stalled " + Math.round(stalledMs / 1000) + "s");
+    } else {
+      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+    }
+    return;
+  }
+  const id = nextId++;
+  const timer = setTimeout(() => {
+    pending.delete(id);
+    res.writeHead(503).end();
+  }, workerData.proxyTimeoutMs);
+  pending.set(id, { res, timer });
+  parentPort.postMessage({
+    id,
+    url: req.url,
+    authorization: req.headers.authorization ?? null,
+  });
+});
+server.listen(workerData.port, () => parentPort.postMessage({ listening: true }));
+`;
+
+// The metrics port is bound by the liveness thread (LIVENESS_THREAD_SOURCE)
+// so `/healthz` keeps answering while the main loop is saturated. If the
+// thread cannot start, fall back to the old in-loop server rather than boot
+// with no probe target at all.
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
@@ -207,20 +275,111 @@ async function bootMetricsServer(
     "~/server/metrics"
   );
   const metricsPort = getWorkerMetricsPort();
-  const metricsServer = http.createServer(
-    createWorkerMetricsHandler(isMetricsAuthorized),
-  );
-  await new Promise<void>((resolve, reject) => {
-    metricsServer.once("error", reject);
-    metricsServer.listen(metricsPort, () => {
-      metricsServer.removeListener("error", reject);
-      logger.info(`worker metrics server listening on port ${metricsPort}`);
-      resolve();
+
+  const heartbeat = new Float64Array(new SharedArrayBuffer(8));
+  heartbeat[0] = Date.now();
+  const heartbeatTimer = setInterval(() => {
+    heartbeat[0] = Date.now();
+  }, WORKER_HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref();
+
+  try {
+    const thread = new Worker(LIVENESS_THREAD_SOURCE, {
+      eval: true,
+      workerData: {
+        port: metricsPort,
+        livenessPath: WORKER_LIVENESS_PATH,
+        heartbeat: heartbeat.buffer,
+        stallBudgetMs: WORKER_HEARTBEAT_STALL_BUDGET_MS,
+        proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
+      },
     });
-  });
-  shutdownHandles.push(
-    () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
-  );
+    await new Promise<void>((resolve, reject) => {
+      thread.once("error", reject);
+      thread.on("message", (msg: { listening?: boolean; id?: number }) => {
+        if (msg.listening) {
+          thread.removeListener("error", reject);
+          resolve();
+          return;
+        }
+        if (msg.id === undefined) return;
+        void respondToLivenessThread(
+          thread,
+          msg as { id: number; url: string; authorization: string | null },
+          isMetricsAuthorized,
+        );
+      });
+    });
+    logger.info(
+      `worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
+    );
+    shutdownHandles.push(async () => {
+      clearInterval(heartbeatTimer);
+      await thread.terminate();
+    });
+  } catch (error) {
+    logger.warn(
+      { error },
+      "liveness thread failed to start; serving metrics/liveness on the main loop",
+    );
+    const metricsServer = http.createServer(
+      createWorkerMetricsHandler(isMetricsAuthorized),
+    );
+    await new Promise<void>((resolve, reject) => {
+      metricsServer.once("error", reject);
+      metricsServer.listen(metricsPort, () => {
+        metricsServer.removeListener("error", reject);
+        logger.info(`worker metrics server listening on port ${metricsPort}`);
+        resolve();
+      });
+    });
+    shutdownHandles.push(
+      () =>
+        new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+    );
+  }
+}
+
+/**
+ * Main-thread side of the liveness thread's proxy: only `/metrics` exists,
+ * with the same bearer gate and fail-closed auth semantics as the in-loop
+ * handler.
+ */
+async function respondToLivenessThread(
+  thread: Worker,
+  msg: { id: number; url: string; authorization: string | null },
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): Promise<void> {
+  const reply = (
+    status: number,
+    headers?: Record<string, string>,
+    body?: string,
+  ) => thread.postMessage({ id: msg.id, status, headers, body });
+  if (msg.url !== "/metrics") {
+    reply(404);
+    return;
+  }
+  try {
+    const fakeReq = {
+      headers: { authorization: msg.authorization ?? undefined },
+    } as IncomingMessage;
+    if (!isMetricsAuthorized(fakeReq)) {
+      reply(401);
+      return;
+    }
+  } catch (error) {
+    // Fail closed when METRICS_API_KEY is unset in production.
+    logger.error({ error }, "worker metrics auth misconfigured");
+    reply(500);
+    return;
+  }
+  try {
+    const metrics = await register.metrics();
+    reply(200, { "Content-Type": register.contentType }, metrics);
+  } catch (error) {
+    logger.error({ error }, "error getting worker metrics");
+    reply(500);
+  }
 }
 
 /**

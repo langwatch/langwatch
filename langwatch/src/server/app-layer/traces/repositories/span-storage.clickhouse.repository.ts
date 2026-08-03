@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
+  RESOLVER_RECENT_WINDOW_MS,
   type WindowFragment,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
@@ -1236,19 +1237,47 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * `trace_summaries` at all (orphan / not-yet-projected), where the read keeps
    * its previous unbounded behaviour.
    */
+  /**
+   * Two-phase probe: without an OccurredAt predicate this seek walks every
+   * weekly partition's index on `trace_summaries` — including S3-tiered cold
+   * ones — even though the worker job paths only ever resolve minutes-old
+   * traces (measured 0.9s avg during the 2026-08-03 saturation). The recent
+   * window keeps the hot path on local-disk partitions; a miss (old trace)
+   * pays the unbounded fallback and stays correct.
+   */
   private async resolveTraceOccurredAtMs(
     tenantId: string,
     traceId: string,
   ): Promise<number | undefined> {
+    const recent = await this.queryTraceOccurredAtMs(tenantId, traceId, {
+      sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
+    });
+    if (recent !== undefined) return recent;
+    return this.queryTraceOccurredAtMs(tenantId, traceId, {});
+  }
+
+  private async queryTraceOccurredAtMs(
+    tenantId: string,
+    traceId: string,
+    { sinceMs }: { sinceMs?: number },
+  ): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
+    const windowPredicate =
+      sinceMs !== undefined
+        ? "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})"
+        : "";
     const result = await client.query({
       query: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
+          ${windowPredicate}
       `,
-      query_params: { tenantId, traceId },
+      query_params:
+        sinceMs !== undefined
+          ? { tenantId, traceId, sinceMs }
+          : { tenantId, traceId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{

@@ -1,0 +1,130 @@
+/**
+ * @vitest-environment node
+ *
+ * Boots the real liveness thread (LIVENESS_THREAD_SOURCE, eval'd exactly as
+ * production does) against a shared heartbeat and asserts the property the
+ * 2026-08-03 incident demands: `/healthz` answers from the thread using the
+ * heartbeat's age — a saturated-but-alive main loop stays 200, a loop stalled
+ * past the budget goes 503 — and non-liveness paths proxy to the parent.
+ */
+import http from "node:http";
+import { Worker } from "node:worker_threads";
+import { afterEach, describe, expect, it } from "vitest";
+import { LIVENESS_THREAD_SOURCE, WORKER_LIVENESS_PATH } from "../startWorkers";
+
+const STALL_BUDGET_MS = 5 * 60 * 1000;
+
+async function getFreePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const srv = http.createServer();
+    srv.listen(0, () => {
+      const { port } = srv.address() as { port: number };
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+function fetchStatus(
+  port: number,
+  path: string,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    http
+      .get({ port, path, timeout: 2_000 }, (res) => {
+        let body = "";
+        res.on("data", (c: Buffer) => (body += c.toString()));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      })
+      .on("error", reject);
+  });
+}
+
+describe("worker liveness thread", () => {
+  let thread: Worker | undefined;
+
+  afterEach(async () => {
+    await thread?.terminate();
+    thread = undefined;
+  });
+
+  async function bootThread(heartbeat: Float64Array): Promise<number> {
+    const port = await getFreePort();
+    thread = new Worker(LIVENESS_THREAD_SOURCE, {
+      eval: true,
+      workerData: {
+        port,
+        livenessPath: WORKER_LIVENESS_PATH,
+        heartbeat: heartbeat.buffer,
+        stallBudgetMs: STALL_BUDGET_MS,
+        proxyTimeoutMs: 500,
+      },
+    });
+    await new Promise<void>((resolve, reject) => {
+      thread!.once("error", reject);
+      thread!.on("message", (msg: { listening?: boolean }) => {
+        if (msg.listening) resolve();
+      });
+    });
+    return port;
+  }
+
+  describe("when the main loop heartbeat is fresh", () => {
+    /** @scenario A busy-but-alive main loop still passes liveness */
+    it("answers 200 on the liveness path", async () => {
+      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = Date.now();
+      const port = await bootThread(heartbeat);
+
+      const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
+      expect(res.status).toBe(200);
+      expect(res.body).toBe("ok");
+    });
+  });
+
+  describe("when the heartbeat is stalled past the budget", () => {
+    /** @scenario A main loop stalled past the budget fails liveness */
+    it("answers 503 so a genuinely dead main loop still gets restarted", async () => {
+      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = Date.now() - STALL_BUDGET_MS - 60_000;
+      const port = await bootThread(heartbeat);
+
+      const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
+      expect(res.status).toBe(503);
+      expect(res.body).toContain("stalled");
+    });
+  });
+
+  describe("when a non-liveness path is requested", () => {
+    /** @scenario Metrics proxy through to the main thread with a timeout */
+    it("proxies to the parent and serves its reply", async () => {
+      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = Date.now();
+      const port = await bootThread(heartbeat);
+      thread!.on(
+        "message",
+        (msg: { id?: number; url?: string; authorization?: string | null }) => {
+          if (msg.id === undefined) return;
+          thread!.postMessage({
+            id: msg.id,
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+            body: `proxied:${msg.url}`,
+          });
+        },
+      );
+
+      const res = await fetchStatus(port, "/metrics");
+      expect(res.status).toBe(200);
+      expect(res.body).toBe("proxied:/metrics");
+    });
+
+    it("answers 503 when the parent never replies (stalled main loop)", async () => {
+      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = Date.now();
+      const port = await bootThread(heartbeat);
+
+      const res = await fetchStatus(port, "/metrics");
+      expect(res.status).toBe(503);
+    });
+  });
+});
