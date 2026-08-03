@@ -192,7 +192,7 @@ describe("TraceDetails tab state", () => {
   });
 
   describe("when a draft is typed on the Thread tab and the user leaves and returns", () => {
-    it("still has the typed draft", async () => {
+    it("preserves the typed draft", async () => {
       renderTraceDetails();
 
       await userEvent.type(draftInput(), TYPED_DRAFT);
@@ -208,7 +208,7 @@ describe("TraceDetails tab state", () => {
   });
 
   describe("when the user leaves and returns to the Thread tab", () => {
-    it("keeps the Thread panel mounted rather than remounting it", async () => {
+    it("reuses the Thread panel DOM node rather than remounting it", async () => {
       renderTraceDetails();
 
       const beforeSwitch = draftInput();
@@ -224,8 +224,8 @@ describe("TraceDetails tab state", () => {
     });
   });
 
-  describe("when a tab has never been opened", () => {
-    it("does not mount its panel", () => {
+  describe("given the User Events tab has never been opened", () => {
+    it("leaves the User Events panel unmounted", () => {
       renderTraceDetails();
 
       // lazyMount's own half of the contract, and the reason #5588 touched
@@ -236,12 +236,14 @@ describe("TraceDetails tab state", () => {
       expect(screen.queryByText(EVENTS_PANEL_BODY)).toBeNull();
     });
 
-    it("mounts its panel once it has been opened", async () => {
-      renderTraceDetails();
+    describe("when the user opens the User Events tab", () => {
+      it("mounts the User Events panel", async () => {
+        renderTraceDetails();
 
-      await switchTo(/User Events/);
+        await switchTo(/User Events/);
 
-      expect(screen.getByText(EVENTS_PANEL_BODY)).toBeInTheDocument();
+        expect(screen.getByText(EVENTS_PANEL_BODY)).toBeInTheDocument();
+      });
     });
   });
 });

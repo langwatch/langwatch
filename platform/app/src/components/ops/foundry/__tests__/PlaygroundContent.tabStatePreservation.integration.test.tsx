@@ -75,7 +75,7 @@ describe("PlaygroundContent tab state", () => {
   });
 
   describe("when an uncommitted attribute key is typed and the user leaves and returns to the Editor tab", () => {
-    it("still has the typed key in the input", async () => {
+    it("preserves the typed key in the input", async () => {
       renderPlaygroundWithSelectedSpan();
 
       await userEvent.type(newAttributeKeyInput(), NEW_ATTRIBUTE_KEY);
@@ -91,7 +91,7 @@ describe("PlaygroundContent tab state", () => {
   });
 
   describe("when the user leaves and returns to the Editor tab", () => {
-    it("keeps the Editor panel mounted rather than remounting it", async () => {
+    it("reuses the Editor panel DOM node rather than remounting it", async () => {
       renderPlaygroundWithSelectedSpan();
 
       const beforeSwitch = newAttributeKeyInput();
@@ -108,14 +108,26 @@ describe("PlaygroundContent tab state", () => {
     });
   });
 
-  describe("when a tab has never been opened", () => {
-    it("does not mount its panel", () => {
+  describe("given the Graph tab has never been opened", () => {
+    it("leaves the Graph panel unmounted", () => {
       renderPlaygroundWithSelectedSpan();
 
       // lazyMount's own half of the contract: the Graph tab pulls in
       // @xyflow/react, and the JSON tab a Monaco editor, so mounting them
       // before they are asked for is what #5588 set out to stop.
       expect(screen.queryByTestId("rf__wrapper")).toBeNull();
+    });
+
+    describe("when the user opens the Graph tab", () => {
+      it("mounts the Graph panel", async () => {
+        renderPlaygroundWithSelectedSpan();
+
+        await switchTo("Graph");
+
+        // Pairs with the assertion above: without it, a Graph view that never
+        // renders at all would read as lazyMount working.
+        expect(await screen.findByTestId("rf__wrapper")).toBeInTheDocument();
+      });
     });
   });
 });
