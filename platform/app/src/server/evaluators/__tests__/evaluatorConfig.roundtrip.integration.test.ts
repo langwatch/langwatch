@@ -21,7 +21,8 @@
 
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveEvaluatorSettings } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { resolveEvaluatorSettingsWithSource } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const PROJECT_ID = "proj_6397_roundtrip";
@@ -32,17 +33,11 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "Evaluator" WHERE "projectId" = $1`,
-      PROJECT_ID,
-    );
+    await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
   });
 
   afterAll(async () => {
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "Evaluator" WHERE "projectId" = $1`,
-      PROJECT_ID,
-    );
+    await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
     await prisma.$disconnect();
   });
 
@@ -68,7 +63,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
         where: { id: "eval_6397_legacy", projectId: PROJECT_ID },
       });
 
-      const settings = resolveEvaluatorSettings({
+      const { settings } = resolveEvaluatorSettingsWithSource({
         config: row.config as Record<string, unknown>,
         parameters: null,
       });
@@ -80,18 +75,6 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
         prompt: USER_PROMPT,
         model: "openai/gpt-5-mini",
       });
-    });
-
-    it("would have sent nothing under the old rule, which is the bug", async () => {
-      const row = await prisma.evaluator.findFirstOrThrow({
-        where: { id: "eval_6397_legacy", projectId: PROJECT_ID },
-      });
-      const config = row.config as Record<string, unknown>;
-
-      // The pre-fix expression, verbatim: config.settings ?? monitor.parameters.
-      const oldRule = config.settings ?? null;
-
-      expect(oldRule).toBeNull();
     });
   });
 });

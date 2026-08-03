@@ -857,6 +857,20 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // Emergency operator rollback for the langwatch#6397 settings recovery.
+      // Without this line the flag is inert: the command defaults an absent
+      // resolver to "not disabled", so /ops/feature-flags would report the
+      // switch as available while flipping it changed nothing. The command
+      // catches a rejection here and stays on the shipped default (recovery
+      // ACTIVE) — an unreadable kill switch must not fail evaluations.
+      isSettingsRecoveryDisabled: () =>
+        featureFlagService.isEnabled(
+          "ops_evaluator_settings_recovery_disabled",
+          {
+            distinctId: "evaluator-settings-recovery",
+            defaultValue: false,
+          },
+        ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag

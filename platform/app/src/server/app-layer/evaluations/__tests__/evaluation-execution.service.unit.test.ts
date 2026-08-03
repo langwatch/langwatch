@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import { resolveEvaluatorSettingsWithSource } from "~/server/event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
@@ -331,10 +332,20 @@ describe("EvaluationExecutionService", () => {
       // `"embeddings_model" in settings`; it never reads `prompt`. A
       // prompt-only fixture resolves an identical env before and after the fix,
       // so the ripple is unobservable and the test cannot fail.
-      const RECOVERED = {
-        prompt: "Score this answer for factual accuracy.",
-        model: "openai/gpt-5-mini",
-      };
+      // DERIVED, not hand-written. A literal here keeps this test green with the
+      // entire D6 recovery reverted — it would only prove the service reads a
+      // `model` key it was handed. The bound scenario says the ONLINE PIPELINE
+      // resolves the model env from the RECOVERED settings, so the resolver has
+      // to sit in the path: revert it and `settings` collapses to the (absent)
+      // monitor parameters, the model key disappears, and this goes red.
+      const { settings: RECOVERED } = resolveEvaluatorSettingsWithSource({
+        config: {
+          evaluatorType: "custom/settings-eval",
+          prompt: "Score this answer for factual accuracy.",
+          model: "openai/gpt-5-mini",
+        },
+        parameters: null,
+      });
 
       /** @scenario Model environment is resolved from the recovered settings */
       it("resolves the model environment from the settings that carry the prompt", async () => {

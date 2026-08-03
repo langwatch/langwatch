@@ -108,19 +108,29 @@ describe("ExecuteEvaluationCommand prevalence reporting", () => {
         expect(reports[0]?.[0]).toMatchObject({
           evaluatorId: "monitor_1",
           traceId: "trace_1",
-          recoveredKeys: ["prompt"],
+          recoveredKeyCount: 1,
+          recoveredPrompt: true,
         });
       });
 
-      it("names the recovered keys without carrying the prompt text", async () => {
+      it("carries neither the prompt text nor customer-controlled key names", async () => {
+        // `config` is written through `z.record(z.unknown())` with no schema for
+        // the `evaluator` type, so a key NAME is as customer-controlled as a
+        // value. This fixture puts customer content in both positions; a
+        // prevalence counter that echoes either turns a measurement into a leak.
+        const CUSTOMER_KEY = "contact-alex@example.com";
         const reports = await execute({
           evaluatorType: "custom/settings-eval",
           prompt: USER_PROMPT,
+          [CUSTOMER_KEY]: "arbitrary",
         });
 
-        // Settings carry customer content. A prevalence counter that ships the
-        // prompt into the log store turns a measurement into a data leak.
-        expect(JSON.stringify(reports[0])).not.toContain(USER_PROMPT);
+        expect(reports).toHaveLength(1);
+        const serialized = JSON.stringify(reports[0]);
+        expect(serialized).not.toContain(USER_PROMPT);
+        expect(serialized).not.toContain(CUSTOMER_KEY);
+        // Still counted — the report stays useful for AC0d.
+        expect(reports[0]?.[0]).toMatchObject({ recoveredKeyCount: 2 });
       });
     });
   });

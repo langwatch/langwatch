@@ -7,11 +7,16 @@
  * specs/monitors/monitor-execution-backend.feature):
  *
  *   1. evaluator.config.settings takes precedence over monitor.parameters
- *   2. monitor.parameters is the fallback when the monitor has no evaluator
- *   3. monitor.parameters is the fallback when the config lacks a settings key
- *   4. workflowId resolves from the evaluator record for workflow evaluators
+ *   2. monitor.parameters is the fallback when the monitor has NO evaluator
+ *   3. a top-level prompt is recovered rather than dropped (langwatch#6397)
+ *   4. an EMPTY settings key does not shadow a recoverable prompt
+ *   5. the operator rollback flag, including when it cannot be read
+ *   6. workflowId resolves from the evaluator record for workflow evaluators
  *
- * All deps injected via constructor — zero vi.mock calls, no DBs.
+ * All deps injected via constructor — zero vi.mock calls, no DBs. That property
+ * is why AC0d's prevalence-LOG coverage lives in the sibling
+ * executeEvaluation.prevalence-report.unit.test.ts instead of here: observing
+ * the log needs a module mock, and this file is the one that stays mock-free.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -42,10 +47,13 @@ function buildMonitor(overrides: MonitorFixture = {}): MonitorFixture {
   };
 }
 
-function buildDeps(
-  monitor: MonitorFixture,
-  isSettingsRecoveryDisabled?: () => Promise<boolean>,
-): ExecuteEvaluationCommandDeps {
+function buildDeps({
+  monitor,
+  isSettingsRecoveryDisabled,
+}: {
+  monitor: MonitorFixture;
+  isSettingsRecoveryDisabled?: () => Promise<boolean>;
+}): ExecuteEvaluationCommandDeps {
   return {
     ...(isSettingsRecoveryDisabled ? { isSettingsRecoveryDisabled } : {}),
     monitors: {
@@ -88,7 +96,7 @@ async function executeWith(
   monitor: MonitorFixture,
   isSettingsRecoveryDisabled?: () => Promise<boolean>,
 ) {
-  const deps = buildDeps(monitor, isSettingsRecoveryDisabled);
+  const deps = buildDeps({ monitor, isSettingsRecoveryDisabled });
   const command = new ExecuteEvaluationCommand(deps);
   await command.handle(buildCommand());
   const executeForTrace = deps.evaluationExecution
@@ -128,7 +136,7 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
     });
   });
 
-  describe("given an evaluator whose config has no settings key", () => {
+  describe("given an evaluator whose config has no settings key and nothing to recover", () => {
     it("falls back to monitor.parameters", async () => {
       const call = await executeWith(
         buildMonitor({
@@ -238,6 +246,51 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
         () => Promise.resolve(true),
       );
 
+      expect(call.settings).toEqual(MONITOR_PARAMETERS);
+    });
+  });
+
+  describe("given an EMPTY settings key alongside a top-level prompt", () => {
+    // `{}` is truthy and an object, so a presence-only check hands the judge an
+    // empty payload — the exact input that scored every trace 0. The shape is
+    // reachable from the customer's own UI: the evaluator editor loads
+    // `settings: config?.settings ?? {}` and saves it back, so the P1 reporter
+    // opening their evaluator to CONFIRM the fix would re-break the row.
+    /** @scenario An empty settings key does not shadow a recoverable prompt */
+    it("recovers the top-level prompt instead of sending the empty object", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          parameters: null,
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: {
+              evaluatorType: "custom/settings-eval",
+              settings: {},
+              prompt: "the prompt the editor round-trip would have buried",
+            },
+          },
+        }),
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "the prompt the editor round-trip would have buried",
+      });
+      expect(call.settings).not.toEqual({});
+    });
+
+    it("falls back to monitor.parameters when there is nothing to recover", async () => {
+      const call = await executeWith(
+        buildMonitor({
+          evaluator: {
+            id: "evaluator_1",
+            type: "evaluator",
+            config: { evaluatorType: "custom/settings-eval", settings: {} },
+          },
+        }),
+      );
+
+      // Not `{}` — an empty payload is never a legitimate thing to send.
       expect(call.settings).toEqual(MONITOR_PARAMETERS);
     });
   });

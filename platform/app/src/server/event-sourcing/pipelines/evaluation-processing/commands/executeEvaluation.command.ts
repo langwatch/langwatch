@@ -96,6 +96,14 @@ export interface ExecuteEvaluationCommandDeps {
     projectId: string,
   ) => Promise<Record<string, string> | null>;
   /**
+   * Emergency rollback for the langwatch#6397 settings recovery
+   * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
+   * recovery is ACTIVE — the shipped default. Injected so the command stays
+   * testable without a flag service. Wired in `pipelineRegistry.ts`; leaving it
+   * unwired makes the operator switch inert rather than failing loudly.
+   */
+  isSettingsRecoveryDisabled?: () => Promise<boolean>;
+  /**
    * Offloads oversized evaluator inputs to durable object storage before the
    * event is built, so `event_log.EventPayload` and the fold stay bounded
    * (ADR-040). Returns the inputs unchanged (inline) or a stored-object
@@ -103,13 +111,6 @@ export interface ExecuteEvaluationCommandDeps {
    * means today's behavior (inputs flow inline; the repository belt-and-braces
    * cap is the only bound).
    */
-  /**
-   * Emergency rollback for the langwatch#6397 settings recovery
-   * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
-   * recovery is ACTIVE — the shipped default. Injected so the command stays
-   * testable without a flag service.
-   */
-  isSettingsRecoveryDisabled?: () => Promise<boolean>;
   offloadInputs?: (args: {
     projectId: string;
     evaluationId: string;
@@ -179,8 +180,20 @@ export function resolveEvaluatorSettingsWithSource({
     return { settings: parameters, source: "monitor-parameters" };
   }
 
+  // An EMPTY `settings` is not a usable payload — it is the exact thing that
+  // scored every trace 0, since langevals substitutes its own strict default
+  // prompt for `{}`. It must not shadow a recoverable top-level prompt, and the
+  // shape is reachable from the customer's own UI: the evaluator editor loads
+  // `settings: config?.settings ?? {}` and saves that back, so the P1 reporter
+  // opening their evaluator to confirm the fix would otherwise re-break the row
+  // permanently. Emptiness is tested the same way here as on the recovery
+  // branch below — one rule, not two.
   const nested = config.settings;
-  if (nested && typeof nested === "object") {
+  if (
+    nested &&
+    typeof nested === "object" &&
+    Object.keys(nested as Record<string, unknown>).length > 0
+  ) {
     return {
       settings: nested as Record<string, unknown>,
       source: "config-settings",
@@ -198,13 +211,6 @@ export function resolveEvaluatorSettingsWithSource({
   return Object.keys(recovered).length > 0
     ? { settings: recovered, source: "top-level-recovery" }
     : { settings: parameters, source: "monitor-parameters" };
-}
-
-/** Settings-only view of {@link resolveEvaluatorSettingsWithSource}. */
-export function resolveEvaluatorSettings(
-  args: Parameters<typeof resolveEvaluatorSettingsWithSource>[0],
-): Record<string, unknown> | null | undefined {
-  return resolveEvaluatorSettingsWithSource(args).settings;
 }
 
 /**
@@ -263,12 +269,16 @@ export class ExecuteEvaluationCommand
    * would become a new way for every evaluation to fail. Catches synchronous
    * throws as well as rejections, since `deps` is injected.
    */
-  private async isSettingsRecoveryDisabled(): Promise<boolean> {
+  private async readSettingsRecoveryFlag(): Promise<boolean> {
     try {
       return (await this.deps.isSettingsRecoveryDisabled?.()) ?? false;
     } catch (error) {
+      // Message only. The pino error serializer for...in-copies every enumerable
+      // property off a thrown error, so an HTTP or DB client error would print
+      // its request config / connection detail in cleartext. Same idiom as
+      // featureFlagStore.postgres.ts.
       logger.warn(
-        { error },
+        { error: error instanceof Error ? error.message : String(error) },
         "Settings-recovery rollback flag could not be read — leaving recovery active",
       );
       return false;
@@ -414,15 +424,26 @@ export class ExecuteEvaluationCommand
       resolveEvaluatorSettingsWithSource({
         config: monitor.evaluator?.config as Record<string, unknown> | null,
         parameters: monitor.parameters as Record<string, unknown> | null,
-        recoveryDisabled: await this.isSettingsRecoveryDisabled(),
+        recoveryDisabled: await this.readSettingsRecoveryFlag(),
       });
 
     // AC0d wants the PREVALENCE of configs in the losing shape, and a prod SQL
-    // read was never available. This is the same number from the running system:
-    // one line per affected evaluation, countable by `settingsSource`. Emitted at
-    // info so it survives production log levels — volume is bounded by the defect
-    // being measured, and it goes silent once no such config is left. Keys only,
-    // never values: settings carry customer prompts.
+    // read was never available. This is the same number from the running system.
+    // Emitted at info so it survives production log levels.
+    //
+    // NO KEY NAMES. `config` is written through `z.record(z.unknown())` — the
+    // evaluator router validates nothing for the `evaluator` type, and the
+    // copy/replicate flows validate nothing at all — so top-level key NAMES are
+    // customer-controlled strings, not a fixed vocabulary. Echoing them into the
+    // shared log pipeline would be an exfiltration path for whatever a
+    // misconfigured integration wrote as a key. A count plus "did the prompt
+    // come back" answers AC0d without inspecting customer content at all.
+    //
+    // Volume, stated honestly: this fires once per affected EVALUATION, not once
+    // per affected evaluator, and write-side normalisation was NOT shipped (see
+    // the spec), so nothing converts these rows — it does not decay on its own.
+    // If it proves noisy, the operator lever is the rollback flag, which stops
+    // the recovery and the reporting together.
     if (settingsSource === "top-level-recovery") {
       logger.info(
         {
@@ -431,7 +452,8 @@ export class ExecuteEvaluationCommand
           // values of this pair ARE the prevalence count.
           evaluatorId: data.evaluatorId,
           traceId: data.traceId,
-          recoveredKeys: Object.keys(settings ?? {}),
+          recoveredKeyCount: Object.keys(settings ?? {}).length,
+          recoveredPrompt: Object.hasOwn(settings ?? {}, "prompt"),
         },
         "Recovered evaluator settings from the top level of config — langwatch#6397 affected config",
       );

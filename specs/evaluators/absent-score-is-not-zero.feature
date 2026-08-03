@@ -84,9 +84,24 @@ Feature: An absent evaluator score is never presented as zero
     When the online evaluation pipeline executes a monitor for a trace
     Then the settings sent to the judge are the ones the previous behaviour produced
 
+  # ⚠ An empty settings key is NOT a usable payload — `{}` is exactly what made
+  # langevals substitute its own default prompt and score every trace 0. The shape
+  # is reachable from the customer's own UI, so the reporter opening the evaluator
+  # to confirm the fix is the most likely way to re-break their own row.
+
+  @integration
+  Scenario: An empty settings key does not shadow a recoverable prompt
+    Given a monitor whose evaluator config has an empty settings key and the user's prompt at the top level
+    When the online evaluation pipeline executes the monitor for a trace
+    Then the settings sent to the judge carry the user's prompt
+    And the judge is never sent an empty settings payload
+
   # ⚠ The flag is read BEFORE the handler's error-handling boundary, so an
   # unguarded failure escapes with no skipped and no error event for the trace —
   # the rollback switch would become a new way for every evaluation to fail.
+  # Its registry entry being correct is NOT the same as it being wired: the
+  # command defaults an absent resolver to "not disabled", so an unwired switch
+  # is inert and every registry-level test still passes.
 
   @integration
   Scenario: The rollback flag failing to answer leaves recovery active
@@ -105,7 +120,7 @@ Feature: An absent evaluator score is never presented as zero
     Given a monitor whose evaluator config carries the user's prompt with no settings key
     When the online evaluation pipeline executes the monitor for a trace
     Then the affected configuration is reported for counting
-    And the report names the recovered keys without carrying the prompt text
+    And the report carries neither the prompt text nor customer-controlled key names
 
   @integration
   Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
@@ -213,6 +228,7 @@ Feature: An absent evaluator score is never presented as zero
 #        -> Scenario: The new settings resolution is active in the shipped default configuration
 #        -> Scenario: The new settings resolution can be switched off for rollback
 #        -> Scenario: The rollback flag failing to answer leaves recovery active
+#        -> Scenario: An empty settings key does not shadow a recoverable prompt
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
 # AC 0d: prevalence measured. Still a CLOSE gate, not a ship gate. The one-off prod
 #        SQL read stays credential-gated, so the online path reports each affected
