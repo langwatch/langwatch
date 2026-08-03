@@ -114,4 +114,4 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
       And span attributes include `gen_ai.usage.cache_read.input_tokens`
       And span attributes include `gen_ai.usage.cache_creation.input_tokens`
       And the proprietary `langwatch.usage.cache_*_tokens` attrs are ABSENT (dropped in iter 42 per "OTEL semconv all the way")
-      And the cost calculation in budget/debit uses the discounted cache_read rate (10% of list)
+      And the spend rating at ingest prices cache_read tokens at the discounted rate (10% of list)

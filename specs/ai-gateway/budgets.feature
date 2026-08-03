@@ -2,10 +2,10 @@ Feature: AI Gateway — Budgets
 
   # Four scenarios below are bound to budget.service.unit.test.ts. The
   # remaining @unimplemented scenarios are split between two unbindable
-  # categories: (1) gateway data-plane behaviour (HTTP 402 on debit,
-  # /budget/check materialised view, ClickHouse ledger reactor, monthly
-  # window reset, timezone handling) — implemented in Go and out of
-  # scope for the TS parity check; and (2) UI page-level rendering
+  # categories: (1) gateway data-plane behaviour (HTTP 402 at admission,
+  # enforcement bucket-spend reads, monthly window reset, timezone
+  # handling), implemented in Go and out of scope for the TS parity
+  # check; and (2) UI page-level rendering
   # (budget detail drawer, banners, list columns, audit history) — needs
   # component-test fixtures against the Gateway settings pages. All
   # aspirational pending those harnesses.
@@ -181,13 +181,13 @@ Feature: AI Gateway — Budgets
       budget-check gating, never for the ledger
 
   @integration @unimplemented
-  Scenario: /budget/check reads from the CH materialised view
+  Scenario: Enforcement spend reads the ClickHouse scope-totals rollup
     Given project "gateway-demo" has a monthly budget with limit $100
     And 42.00 USD of spend has been attributed to this project this month
-    When the gateway calls POST /api/internal/gateway/budget/check
-    Then the response is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
+    When the control plane serves the gateway an enforcement spend figure
+    Then the figure is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
       bounded to the current month's PeriodStart
-    And the response returns { spent_usd: "42.00", remaining_usd: "58.00" }
+    And it reports 42.00 spent against the 100.00 limit
     And no Postgres gatewayBudgetLedger row is read
 
   # ============================================================================
@@ -435,7 +435,7 @@ Feature: AI Gateway — Budgets
   Scenario: Monthly budget resets at month start
     Given project has limit $100 for window "month" with last reset on 2026-04-01T00:00Z
     When the wall clock crosses 2026-05-01T00:00Z
-    Then the ledger's "spent_usd" for this budget is set to 0
+    Then no ledger row is mutated: the month's PeriodStart advances, and the new period reads zero spend
     And the next_reset_at is advanced to 2026-06-01T00:00Z
     And a "budget.window.reset" event is recorded
 
