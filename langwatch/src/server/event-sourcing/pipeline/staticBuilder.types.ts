@@ -40,7 +40,7 @@ export interface KillSwitchOptions {
  * for these fields lives in a single place; both interfaces extend it rather
  * than hand-syncing two copies.
  */
-export interface CommandSerializationOptions {
+export interface CommandSerializationOptions<Payload = any> {
   /**
    * Serialize this command with every other command that enables the option
    * for the same tenant and aggregate. This keeps command handling, event
@@ -55,8 +55,13 @@ export interface CommandSerializationOptions {
    * fold into a single multi-row insert. Leave unset (or ≤ 1) for a low-fan-in
    * producer where one aggregate appends at most one event per human action:
    * those append immediately, with the per-job path unchanged.
+   *
+   * Pass a resolver when the bound depends on the individual payload. The
+   * drain's byte budget weighs each job by its QUEUED size, so a payload that
+   * expands after dequeue — one carrying a reference whose content is fetched
+   * during handling — is invisible to that budget and must cap itself at 1.
    */
-  coalesceMaxBatch?: number;
+  coalesceMaxBatch?: number | ((payload: Payload) => number);
   /**
    * Optional byte cap for a coalesced batch (ADR-066 pillar 2). The drain stops
    * before a job that would push the batch past this size, keeping one insert
@@ -71,7 +76,7 @@ export interface CommandSerializationOptions {
  * Options for configuring a command handler in a static pipeline definition.
  */
 export interface CommandHandlerOptions<Payload = any>
-  extends CommandSerializationOptions {
+  extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;

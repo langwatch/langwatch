@@ -47,13 +47,36 @@ export interface JobRegistryEntry {
   /**
    * Max number of same-group jobs to coalesce into one `processBatch` call
    * (including the dispatched job). Defaults to 1 (no coalescing).
+   *
+   * A resolver form is available for producers whose foldability depends on the
+   * individual job — a payload that will expand far beyond its queued size
+   * returns 1 and is processed on its own, because the drain's byte budget
+   * measures the QUEUED bytes and cannot see that expansion.
    */
-  coalesceMaxBatch?: number;
+  coalesceMaxBatch?: number | ((payload: any) => number);
   /**
    * Optional byte cap for a coalesced batch (ADR-066 pillar 2). Resolved by the
    * global queue per job; undefined falls back to the GroupQueue default.
    */
   coalesceMaxBytes?: number;
+}
+
+/**
+ * How many same-group jobs this entry may fold in alongside the given one.
+ *
+ * A constant answers for every job; a resolver is asked about this one, which is
+ * how a producer excludes the payloads it cannot safely fold. Absent means 1 —
+ * no coalescing, the per-job path.
+ */
+export function resolveCoalesceMaxBatch(
+  entry: Pick<JobRegistryEntry, "coalesceMaxBatch">,
+  payload: Record<string, unknown>,
+): number {
+  const bound = entry.coalesceMaxBatch;
+  if (typeof bound === "function") {
+    return bound(payload);
+  }
+  return bound ?? 1;
 }
 
 interface QueuedEventConsumerDefinition<E extends Event> {
@@ -588,6 +611,10 @@ export class QueueManager<EventType extends Event = Event> {
         },
       });
       const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
+      // A resolver decides per payload, so whether it coalesces is only known at
+      // dispatch — its presence is the opt-in. A plain number opts in above 1.
+      const coalescesAppends =
+        typeof coalesceMaxBatch === "function" || (coalesceMaxBatch ?? 1) > 1;
 
       // ADR-066 pillar 2 visibility: a producer whose jobs funnel into a shared
       // queue group and does NOT coalesce can still flood the event log one tiny
@@ -600,7 +627,7 @@ export class QueueManager<EventType extends Event = Event> {
       const isGroupedProducer =
         Boolean(cmdEntry.options.serializeByAggregate) ||
         Boolean(cmdEntry.getGroupKey);
-      if (isGroupedProducer && !(coalesceMaxBatch && coalesceMaxBatch > 1)) {
+      if (isGroupedProducer && !coalescesAppends) {
         this.logger.info(
           { pipeline: this.pipelineName, command: cmdName },
           "grouped command producer registered without append coalescing",
@@ -635,15 +662,14 @@ export class QueueManager<EventType extends Event = Event> {
         // aggregate's queued same-command jobs into one multi-row insert. The
         // GroupQueue only drains same-`__jobName` siblings, so every payload
         // here is this command type. Left undefined otherwise (per-job path).
-        processBatch:
-          coalesceMaxBatch && coalesceMaxBatch > 1
-            ? async (payloads: any[]) => {
-                await processCommandBatch({
-                  ...commandProcessParams,
-                  payloads,
-                });
-              }
-            : undefined,
+        processBatch: coalescesAppends
+          ? async (payloads: any[]) => {
+              await processCommandBatch({
+                ...commandProcessParams,
+                payloads,
+              });
+            }
+          : undefined,
         coalesceMaxBatch,
         coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
         delay: cmdEntry.options.delay,

@@ -9,6 +9,7 @@ import {
   type TraceProcessingPipelineDeps,
 } from "../pipeline";
 import type { RecordSpanCommandData } from "../schemas/commands";
+import { buildTraceDeps } from "./support/traceProcessingFixtures";
 
 // The blobStore registration branch eagerly constructs `new RecordSpanCommand`,
 // whose default-dependency path does `require("~/server/db")` (an alias vitest's
@@ -45,33 +46,6 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  * trace-summary fold keyed per trace. `build()` only stores references, so no
  * store / reactor is ever invoked.
  */
-
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
-
-function buildTraceDeps(
-  overrides: Partial<TraceProcessingPipelineDeps> = {},
-): TraceProcessingPipelineDeps {
-  const store = {} as any;
-  return {
-    spanAppendStore: store,
-    traceSummaryStore: store,
-    traceAnalyticsStore: store,
-    traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
-    automations: {
-      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
-      graphActivityHandler: vi.fn().mockResolvedValue(undefined),
-    },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    ...overrides,
-  };
-}
 
 const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
 
