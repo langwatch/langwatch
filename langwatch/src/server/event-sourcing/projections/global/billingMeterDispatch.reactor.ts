@@ -7,19 +7,15 @@ import {
 import type { Event } from "../../domain/types";
 import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { throttledPerWindow } from "../../reactors/throttleWindow";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 
 /** Number of days at the start of a new month to also check the previous month. */
 const GRACE_PERIOD_DAYS = 3;
 
-/** How long a project's events are held before one dispatch is sent. */
-export const BILLING_METER_DISPATCH_WINDOW_MS = 30_000;
-
 /**
- * How long a project stays suppressed after dispatching. Sized to the
- * downstream command's own dedup window so the two agree on the rate.
+ * How long a project's dedup key lives. Sized to the downstream command's own
+ * dedup window so the two agree on the rate.
  */
 export const BILLING_METER_DISPATCH_SUPPRESS_MS = 300_000;
 
@@ -70,24 +66,21 @@ export function createBillingMeterDispatchReactor(deps: {
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
-      // The only reactor here that may keep suppressing after it fires. The
-      // handler reads nothing from the event it was handed — it resolves the
-      // org and the current billing month from the clock — so every trigger
-      // in the window is genuinely the same work, and discarding the later
-      // ones cannot strand any state. That makes the per-project suppression
-      // this reactor always documented finally take effect: without it the
-      // dedup key is dropped the moment the job dispatches and the very next
-      // event re-triggers.
+      // Deliberately fires immediately, unlike the other level-triggered
+      // reactors. `handle` decides which billing months to report by reading
+      // the WALL CLOCK at the moment it runs, not the event it was given, so
+      // holding a trigger moves the decision as well as the work. A trigger
+      // arriving in the last seconds of the third grace day would run on the
+      // fourth and silently drop the previous month's dispatch — a missed
+      // report rather than a late one, since the next grace window covers a
+      // different month.
       //
-      // The lane above and the window here are the two halves of one
-      // behaviour: the lane lets a project's concurrent traces share a dedup
-      // key at all, the window gives that key long enough to collapse them.
-      ...throttledPerWindow({
-        makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
-        windowMs: BILLING_METER_DISPATCH_WINDOW_MS,
-        dedupTtlMs: BILLING_METER_DISPATCH_SUPPRESS_MS,
-        shouldSurviveDispatch: true,
-      }),
+      // A window here is safe once the month and grace decision come from the
+      // triggering event instead of the clock. Until then this reactor relies
+      // on the per-project lane above, which collapses a project's concurrent
+      // traces without deferring anything.
+      makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
+      ttl: BILLING_METER_DISPATCH_SUPPRESS_MS,
     },
 
     async handle(event, context) {

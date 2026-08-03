@@ -17,7 +17,13 @@ export interface TraceUpdateBroadcastReactorDeps {
   hasRedis?: boolean;
 }
 
-/** Mirrors the listener-side debounce so the two windows do not stack. */
+/**
+ * Sized to match the debounce the listener already applies, so neither side
+ * dominates. The two are sequential, not shared: this window can hold a
+ * broadcast for up to 2s and the listener can then debounce it for up to 2s
+ * more, so a watching user sees at most ~4s between a span landing and the
+ * view reacting. That is the number to weigh before widening either one.
+ */
 export const TRACE_UPDATE_BROADCAST_WINDOW_MS = 2_000;
 
 /**
@@ -36,12 +42,13 @@ export function createTraceUpdateBroadcastReactor(
       runIn: ["worker"],
       // Without Redis, worker-to-web pub/sub bridge is unavailable
       disabled: deps.hasRedis === false,
-      // Deliberately short. Nothing polls behind this while the live stream is
-      // connected, so the window is the whole latency a watching user sees;
-      // it matches the debounce the listener already applies, which puts the
-      // collapsing on the side that can drop the work instead of the side that
-      // has already paid to deliver it. Level-triggered, so shouldSurviveDispatch
-      // stays off and the final update always arrives.
+      // Deliberately short. Nothing polls behind this while the live stream
+      // is connected, so this window plus the listener's own debounce is the
+      // whole latency a watching user sees — see the constant for the
+      // combined figure. Collapsing here rather than only in the listener
+      // puts it on the side that can skip the work instead of the side that
+      // has already paid to deliver it. Level-triggered, so
+      // shouldSurviveDispatch stays off and the final update always arrives.
       ...throttledPerWindow({
         makeJobId: (payload) =>
           `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,

@@ -328,10 +328,9 @@ describe("billingMeterDispatchReactor", () => {
   });
 
   describe("options", () => {
-    it("configures runIn, makeJobId, and its suppression window", async () => {
+    it("configures runIn, makeJobId, and an immediate per-project dedup", async () => {
       const {
         BILLING_METER_DISPATCH_SUPPRESS_MS,
-        BILLING_METER_DISPATCH_WINDOW_MS,
         createBillingMeterDispatchReactor,
       } = await import("../billingMeterDispatch.reactor");
 
@@ -340,10 +339,10 @@ describe("billingMeterDispatchReactor", () => {
       });
 
       expect(reactor.options?.runIn).toEqual(["worker"]);
-      expect(reactor.options?.delay).toBe(BILLING_METER_DISPATCH_WINDOW_MS);
-      expect(reactor.options?.deduplication?.ttlMs).toBe(
-        BILLING_METER_DISPATCH_SUPPRESS_MS,
-      );
+      // No delay: the handler derives its billing month from the clock, so
+      // holding a trigger would move the decision along with the work.
+      expect(reactor.options?.delay ?? 0).toBe(0);
+      expect(reactor.options?.ttl).toBe(BILLING_METER_DISPATCH_SUPPRESS_MS);
 
       const payload = { event: makeEvent("proj-1"), foldState: {} };
       expect(reactor.options?.makeJobId?.(payload)).toBe(

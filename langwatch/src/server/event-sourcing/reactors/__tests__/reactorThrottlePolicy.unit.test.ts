@@ -68,16 +68,6 @@ const windowed = [
       anyDeps,
     ) as unknown as AnyReactor,
   },
-  {
-    name: "billingMeterDispatch",
-    // Suppression outlives the window here, sized to the downstream command's
-    // own dedup so the two agree on the rate.
-    windowMs: 30_000,
-    dedupTtlMs: 300_000,
-    reactor: createBillingMeterDispatchReactor({
-      getDispatch: () => async () => {},
-    }) as unknown as AnyReactor,
-  },
 ] as const satisfies readonly {
   name: string;
   windowMs: number;
@@ -119,24 +109,8 @@ describe("reactor throttle policy", () => {
     // These rebuild their output from the fold's running state, or notify a
     // client that the state moved. Dropping the LAST event of an aggregate
     // would leave the previous partial write as the final answer.
-    const levelTriggered = windowed.filter(
-      ({ name }) => name !== "billingMeterDispatch",
-    );
-
-    it.each(levelTriggered)("lets $name re-trigger after it fires", ({
-      reactor,
-    }) => {
+    it.each(windowed)("lets $name re-trigger after it fires", ({ reactor }) => {
       expect(reactor.options?.deduplication?.shouldSurviveDispatch).toBe(false);
-    });
-  });
-
-  describe("given work that reads nothing from its triggering event", () => {
-    it("keeps billingMeterDispatch suppressed for the rest of its window", () => {
-      const reactor = createBillingMeterDispatchReactor({
-        getDispatch: () => async () => {},
-      });
-
-      expect(reactor.options?.deduplication?.shouldSurviveDispatch).toBe(true);
     });
   });
 
@@ -153,6 +127,16 @@ describe("reactor throttle policy", () => {
       const reactor = createSpanStorageBroadcastReactor({
         broadcast: anyDeps,
         hasRedis: true,
+      });
+
+      expect(reactor.options?.delay ?? 0).toBe(0);
+    });
+
+    it("leaves billingMeterDispatch firing immediately, because its handler reads the clock rather than the event", () => {
+      // Holding a trigger moves the billing-month and grace-period decision
+      // with it, so a delay can turn a late report into a missing one.
+      const reactor = createBillingMeterDispatchReactor({
+        getDispatch: () => async () => {},
       });
 
       expect(reactor.options?.delay ?? 0).toBe(0);
