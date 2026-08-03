@@ -24,7 +24,15 @@ export const METRIC_MAP_COALESCE_MAX_BATCH = 256;
  * insert each, which floods the log with small parts. Folding a shard's queued
  * points into a single multi-row insert keeps the producer off the per-item
  * write path. Matches {@link METRIC_MAP_COALESCE_MAX_BATCH} so both stages of
- * this pipeline fold at the same width; the drain's byte bound backs it up.
+ * this pipeline fold at the same width.
+ *
+ * The count is the only bound you can rely on here. The drain's byte budget
+ * sums the *stored* size of each staged job, so it does not see a body the
+ * envelope offloaded to the blob store — a batch of points near
+ * {@link MAX_CANONICAL_METRIC_PAYLOAD_BYTES} is bounded by this count, not by
+ * bytes, whenever envelope writes are on. Pre-existing and shared with the map
+ * stage above; making the budget payload-aware is a groupQueue change that has
+ * to cover both.
  */
 export const METRIC_COMMAND_COALESCE_MAX_BATCH = 256;
 export const MAX_CANONICAL_METRIC_PAYLOAD_BYTES = 256 * 1024;
