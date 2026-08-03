@@ -15,6 +15,7 @@ import type {
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@prisma/client";
+import { keysetAfter } from "./wirePagination";
 
 export type VirtualKeyWithScopes = VirtualKey & {
   scopes: VirtualKeyScope[];
@@ -149,6 +150,47 @@ export class VirtualKeyRepository {
    * `findByHashedSecret`, which stay unfiltered. Same posture as
    * HIDDEN_SYSTEM_KEY_NAMES on the API-key listings.
    */
+  /**
+   * One page of an organization's keys, newest first, keyed on (createdAt, id).
+   *
+   * The ROUTE still filters the page by the caller's visibility, so a page can
+   * come back shorter than `limit`; `next_cursor` is computed from the rows
+   * this query returned, so nothing is skipped, only unevenly distributed.
+   */
+  async findPageInOrganization(args: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Date; id: string } | null;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return this.prisma.virtualKey.findMany({
+      where: {
+        organizationId: args.organizationId,
+        purpose: "USER",
+        ...(args.cursor
+          ? {
+              OR: keysetAfter([
+                {
+                  name: "createdAt",
+                  value: args.cursor.createdAt,
+                  direction: "desc",
+                },
+                { name: "id", value: args.cursor.id, direction: "desc" },
+              ]),
+            }
+          : {}),
+      },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: args.limit,
+    });
+  }
+
   async findAllInOrganization(
     organizationId: string,
     tx?: Prisma.TransactionClient,

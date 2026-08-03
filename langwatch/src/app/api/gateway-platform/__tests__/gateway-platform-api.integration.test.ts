@@ -149,6 +149,51 @@ async function createVk(
   return { status: res.status, body: await res.json() };
 }
 
+type Page = { data: Array<{ id: string }>; next_cursor: string | null };
+
+function pageUrl(path: string, limit: number, cursor: string | null): string {
+  const sep = path.includes("?") ? "&" : "?";
+  const at = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+  return `${path}${sep}limit=${limit}${at}`;
+}
+
+async function fetchPage(url: string): Promise<Page> {
+  const res = await app.request(url, { headers: legacyAuth() });
+  if (res.status !== 200) {
+    throw new Error(`${url} answered ${res.status}`);
+  }
+  return (await res.json()) as Page;
+}
+
+/**
+ * Every page of `path`, walked to exhaustion at `limit` rows a page.
+ *
+ * Throws rather than asserts, so the assertions all live in the `it` that
+ * called it and a failure names the walk that produced it. The page cap means
+ * a cursor that fails to advance fails the test instead of hanging the suite.
+ */
+async function pagesOf(path: string, limit: number): Promise<Page[]> {
+  const pages: Page[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await fetchPage(pageUrl(path, limit, cursor));
+    pages.push(page);
+    cursor = page.next_cursor;
+  } while (cursor !== null && pages.length < 50);
+  if (cursor !== null) {
+    throw new Error(`walk of ${path} never exhausted its cursor`);
+  }
+  return pages;
+}
+
+function idsOf(pages: Page[]): string[] {
+  return pages.flatMap((page) => page.data.map((row) => row.id));
+}
+
+async function walkAll(path: string, limit: number): Promise<string[]> {
+  return idsOf(await pagesOf(path, limit));
+}
+
 async function insertGatewayTrace(args: {
   tenantId: string;
   traceId: string;
@@ -1370,6 +1415,101 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       expect(deleteRes.status).toBe(200);
       expect((await deleteRes.json()).budget.archived_at).not.toBeNull();
+    });
+  });
+
+  // ── Pagination ────────────────────────────────────────────────────────
+
+  describe("cursor pagination on the unbounded lists", () => {
+    /** @scenario An unbounded list is walked by cursor without loss or repeats */
+    it("pages budgets without skipping or repeating a row", async () => {
+      for (let i = 0; i < 5; i++) {
+        const res = await post(
+          "/api/gateway/v1/budgets",
+          {
+            scope: { kind: "project", project_id: PROJECT_ID },
+            name: `paged-${i}-${suffix}`,
+            window: "month",
+            limit_usd: 5,
+          },
+          legacyAuth(),
+        );
+        expect(res.status).toBe(201);
+      }
+
+      const oneShot = await app.request("/api/gateway/v1/budgets?limit=200", {
+        headers: legacyAuth(),
+      });
+      const all = (await oneShot.json()).data.map((b: any) => b.id);
+      expect(all.length).toBeGreaterThanOrEqual(5);
+
+      // Two rows at a time must reconstruct the single-page list exactly.
+      const walked = await walkAll("/api/gateway/v1/budgets", 2);
+      expect(walked).toEqual(all);
+      expect(new Set(walked).size).toBe(walked.length);
+    });
+
+    /** @scenario A filtered list pages on rows returned, not rows examined */
+    it("applies the scope_type filter in the query, not to the page", async () => {
+      const walked = await walkAll(
+        "/api/gateway/v1/budgets?scope_type=project",
+        2,
+      );
+      expect(walked.length).toBeGreaterThan(0);
+      expect(new Set(walked).size).toBe(walked.length);
+    });
+
+    /** @scenario Every unbounded list takes the same page controls */
+    it("pages virtual keys and cache rules the same way", async () => {
+      const created = await post(
+        "/api/gateway/v1/cache-rules",
+        {
+          name: `paged-rule-${suffix}`,
+          matchers: { model: "gpt-5-mini" },
+          action: { mode: "force", ttl: 60 },
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+
+      for (const path of [
+        "/api/gateway/v1/virtual-keys",
+        "/api/gateway/v1/cache-rules",
+      ]) {
+        const walked = await walkAll(path, 2);
+        expect(new Set(walked).size).toBe(walked.length);
+        const oneShot = await app.request(`${path}?limit=200`, {
+          headers: legacyAuth(),
+        });
+        const body = await oneShot.json();
+        expect(body.next_cursor).toBeNull();
+        expect(walked).toEqual(body.data.map((r: any) => r.id));
+      }
+    });
+
+    /** @scenario A cursor this surface did not issue is refused */
+    it("refuses a garbled cursor instead of restarting the walk", async () => {
+      for (const path of [
+        "/api/gateway/v1/budgets",
+        "/api/gateway/v1/virtual-keys",
+        "/api/gateway/v1/cache-rules",
+      ]) {
+        const res = await app.request(`${path}?cursor=not-a-real-cursor`, {
+          headers: legacyAuth(),
+        });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+          error: { type: "bad_request", code: "invalid_cursor" },
+        });
+      }
+    });
+
+    /** @scenario The page size is capped */
+    it("refuses a limit above the cap", async () => {
+      const res = await app.request("/api/gateway/v1/budgets?limit=500", {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(400);
     });
   });
 

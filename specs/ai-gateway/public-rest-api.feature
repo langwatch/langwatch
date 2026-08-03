@@ -271,6 +271,38 @@ Feature: Public REST API — /api/gateway/v1/*
     # webhooks already published lowercase, and this surface was the outlier.
 
   @integration @rest
+  Scenario: An unbounded list is walked by cursor without loss or repeats
+    # /budgets, /virtual-keys and /cache-rules returned every row, so a big
+    # organization's first call was its slowest, and nothing bounded it.
+    Given more budgets than fit in one page
+    When I follow `next_cursor` two rows at a time until it comes back null
+    Then the ids I collected are exactly the single-page list, in the same order
+    And no id appears twice
+
+  @integration @rest
+  Scenario: A filtered list pages on rows returned, not rows examined
+    When I page `?scope_type=project`
+    Then `limit` counts the rows served, because the filter is in the query
+    # Filtering a page after reading it would make a request for 50 group
+    # budgets come back with a handful and no way to tell that from the end.
+
+  @integration @rest
+  Scenario: Every unbounded list takes the same page controls
+    Then /virtual-keys and /cache-rules page by the same `limit` and `cursor`
+    And a walk of each reconstructs its single-page list exactly
+
+  @integration @rest
+  Scenario: A cursor this surface did not issue is refused
+    When I send a `cursor` this endpoint never minted
+    Then the response status is 400 with code "invalid_cursor"
+    # Silently restarting the walk would re-serve everything the caller has.
+
+  @integration @rest
+  Scenario: The page size is capped
+    When I send `?limit=500`
+    Then the response status is 400
+
+  @integration @rest
   Scenario: The spend window is epoch milliseconds, like every spend endpoint
     # This route took ISO-8601 while every other spend endpoint took epoch-ms,
     # so one reconciliation script had to hold two time formats for the same

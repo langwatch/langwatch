@@ -1,4 +1,8 @@
 import { scopedApiKey } from "@/internal/credentialContext";
+import {
+  CURSOR_WALK_PAGE_SIZE,
+  collectCursorPages,
+} from "@/client-sdk/services/_shared/collect-cursor-pages";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -32,7 +36,16 @@ export interface GatewayBudget {
    * standing instead of `spent_usd`.
    */
   limit_usd: string;
-  spent_usd: string;
+  /** Canonical integer limit, nano-USD. Null past the safe integer range. */
+  limit_nano_usd: number | null;
+  /**
+   * Display value. NULL when `spend_available` is false: spend could not be
+   * totalled, so there is no figure, and the API sends null rather than a
+   * stale one a caller could mistake for real money.
+   */
+  spent_usd: string | null;
+  /** Canonical integer spend, nano-USD. Null whenever `spent_usd` is. */
+  spent_nano_usd: number | null;
   timezone: string | null;
   /** ModelProvider id the budget counts; null counts every provider. */
   provider_key: string | null;
@@ -53,9 +66,16 @@ export interface GatewayBudgetList {
   budgets: GatewayBudget[];
   /**
    * False when spend could not be totalled — render "unavailable" rather
-   * than trusting `spent_usd` as real spend.
+   * than trusting `spent_usd` as real spend. Across a whole walk this is
+   * false when ANY page could not total spend.
    */
   spend_available: boolean;
+  /**
+   * Pass back as `cursor` for the next page. Null means the walk is
+   * exhausted; a FULL page does not by itself mean there is more. Always
+   * null from `list()`, which walks to exhaustion before returning.
+   */
+  next_cursor: string | null;
 }
 
 export type CreateGatewayBudgetScope =
@@ -154,20 +174,78 @@ export class GatewayBudgetsApiService {
   }
 
   /**
-   * Every non-archived budget in the organization across all six scope
+   * ONE page of non-archived budgets, exactly as the wire serves it. Pass
+   * `next_cursor` back as `cursor` for the next page, verbatim: a cursor this
+   * endpoint did not issue answers 400 rather than restarting the walk.
+   *
+   * `limit` is the page size (server default 50, capped at 200). Prefer
+   * `list()` unless you mean to page deliberately: a full page is not a
+   * promise of more, and a null `next_cursor` is the only end of the walk.
+   */
+  async listPage(options?: {
+    scopeTypes?: BudgetScopeKind[];
+    cursor?: string;
+    limit?: number;
+  }): Promise<GatewayBudgetList> {
+    const params = new URLSearchParams();
+    if (options?.scopeTypes?.length) {
+      params.set("scope_type", options.scopeTypes.join(","));
+    }
+    if (options?.cursor) params.set("cursor", options.cursor);
+    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    const query = params.toString() !== "" ? `?${params.toString()}` : "";
+    const { data, spend_available, next_cursor } = await this.request<{
+      data: GatewayBudget[];
+      spend_available: boolean;
+      next_cursor?: string | null;
+    }>("list gateway budgets", `/api/gateway/v1/budgets${query}`);
+    return {
+      budgets: data,
+      spend_available,
+      next_cursor: next_cursor ?? null,
+    };
+  }
+
+  /**
+   * Every non-archived budget in the organization across all seven scope
    * types, optionally filtered by `scopeTypes`.
+   *
+   * The endpoint pages; this follows `next_cursor` until it comes back null,
+   * so the result is the complete listing and its own `next_cursor` is always
+   * null. Callers that count, total, or decide an all-clear on this list need
+   * that completeness for correctness, not just for display.
+   *
+   * `limit` sizes each request in the walk, it does NOT cap what comes back.
+   * `cursor` resumes an interrupted walk. Take a single page with
+   * `listPage()`.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
+    cursor?: string;
+    limit?: number;
   }): Promise<GatewayBudgetList> {
-    const filter = options?.scopeTypes?.length
-      ? `?scope_type=${options.scopeTypes.join(",")}`
-      : "";
-    const { data, spend_available } = await this.request<{
-      data: GatewayBudget[];
-      spend_available: boolean;
-    }>("list gateway budgets", `/api/gateway/v1/budgets${filter}`);
-    return { budgets: data, spend_available };
+    const pages = await collectCursorPages<GatewayBudgetList>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new GatewayBudgetsApiError(
+          `Failed to list gateway budgets: ${reason}.`,
+          "list gateway budgets",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          scopeTypes: options?.scopeTypes,
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    return {
+      budgets: pages.flatMap((page) => page.budgets),
+      // One page that could not total spend makes the whole listing's spend
+      // unreal, so the set's honest answer is the pessimistic one.
+      spend_available: pages.every((page) => page.spend_available),
+      next_cursor: null,
+    };
   }
 
   async create(input: CreateGatewayBudgetInput): Promise<GatewayBudget> {

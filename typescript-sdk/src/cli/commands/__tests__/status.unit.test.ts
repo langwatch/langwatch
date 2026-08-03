@@ -100,6 +100,30 @@ const mockGatewayFetch = ({
     return { ok: true, status: 200, json: async () => [{ id: "1" }] };
   }) as unknown as typeof fetch;
 
+/**
+ * The budgets endpoint pages by cursor, serving one page per request. The scan
+ * has to walk it: the at-risk list is a decision, not a display, so a breached
+ * budget sitting behind the first page would turn into a green tick.
+ */
+const mockPagedGatewayFetch = (pages: unknown[][]) =>
+  vi.fn().mockImplementation(async (input: unknown) => {
+    const url = String(input);
+    if (url.includes("/api/gateway/v1/budgets")) {
+      const cursor = new URL(url).searchParams.get("cursor");
+      const index = cursor === null ? 0 : Number(cursor);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: pages[index] ?? [],
+          spend_available: true,
+          next_cursor: index + 1 < pages.length ? String(index + 1) : null,
+        }),
+      };
+    }
+    return { ok: true, status: 200, json: async () => [{ id: "1" }] };
+  }) as unknown as typeof fetch;
+
 /** Routing mocks where every resource + attention section succeeds clean:
  * zero errored traces, no experiments, no budgets. */
 const mockAllSuccess = (): void => {
@@ -624,6 +648,33 @@ describe("statusCommand", () => {
       });
     });
 
+    describe("when spend could not be totalled", () => {
+      it("treats null spend as unreadable, not as zero spent", async () => {
+        mockAllSuccess();
+        // The API sends null rather than a stale figure when spend_available
+        // is false. `Number(null)` is 0, which is finite, so a null used to
+        // score the budget at 0% and drop it out of the at-risk list looking
+        // perfectly healthy.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "untotalled",
+              spent_usd: null,
+              spent_nano_usd: null,
+              on_breach: "block",
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain("could not check gateway budgets");
+        expect(out).toContain("untotalled");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+    });
+
     describe("when budgets live on the once-invisible scope dimensions", () => {
       it("scores a virtual-key-scoped budget like any other", async () => {
         mockAllSuccess();
@@ -694,6 +745,24 @@ describe("statusCommand", () => {
         expect(out).toContain('budget "seat cap"');
         expect(out).toContain("3 of 10 over cap, $1.00/person");
         expect(out).not.toContain("at 0%");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+
+      it("finds a breached budget the first page of the walk did not carry", async () => {
+        mockAllSuccess();
+        // Reading page one and stopping would print "nothing needs your
+        // attention" while a block budget refuses every request.
+        global.fetch = mockPagedGatewayFetch([
+          [budgetFixture({ name: "quiet", spent_usd: "1" })],
+          [budgetFixture({ name: "quieter", spent_usd: "2" })],
+          [budgetFixture({ name: "breached", limit_usd: "100", spent_usd: "150" })],
+        ]);
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain('budget "breached"');
+        expect(out).toContain("at 150%");
         expect(out).not.toContain("nothing needs your attention");
       });
 

@@ -202,6 +202,15 @@ export class VirtualKeyService {
     return this.repository.findAllInOrganization(organizationId);
   }
 
+  /** One page of the organization's keys, newest first. */
+  async getPage(args: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Date; id: string } | null;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return this.repository.findPageInOrganization(args);
+  }
+
   async getAllForScope(scope: ScopeInput): Promise<VirtualKeyWithScopes[]> {
     return this.repository.findAllForScope(scope);
   }

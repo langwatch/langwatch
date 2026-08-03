@@ -105,7 +105,8 @@ export interface BudgetAtRisk {
   scope: string;
   window: string;
   utilizationPct: number;
-  spentUsd: string;
+  /** Absent when spend could not be totalled; such rows land in `unreadable`. */
+  spentUsd: string | null;
   limitUsd: string;
   onBreach: string;
   /** `attributed_user` rows only: end users with spend this period, and how many
@@ -298,8 +299,13 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       .filter((budget) => budget.archived_at === null)
       .flatMap((budget): BudgetAtRisk[] => {
         const limit = Number(budget.limit_usd);
-        const spent = Number(budget.spent_usd);
-        // Neither "at risk" nor "fine" — we cannot say which, so say that.
+        // `spent_usd` is null when spend could not be totalled. `Number(null)`
+        // is 0, which passes the finite check and scores the budget at 0%, so
+        // an unreadable budget would drop out of the at-risk list looking
+        // healthy. Absent spend is unreadable, not zero spend.
+        const spent =
+          budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
+        // Neither "at risk" nor "fine" - we cannot say which, so say that.
         if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
           unreadable.push(budget.name);
           return [];

@@ -36,6 +36,7 @@ import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
+import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   chRepoOrUndefined,
@@ -71,6 +72,12 @@ import {
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import {
+  decodePageCursor,
+  nextPageCursor,
+  PAGE_LIMIT_DEFAULT,
+  PAGE_LIMIT_MAX,
+} from "~/server/gateway/wirePagination";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 import { requestTraceIds } from "../../shared/canonical-error";
@@ -247,7 +254,67 @@ async function orgIdForProject(projectId: string): Promise<string> {
   return team.team.organizationId;
 }
 
+/** The paging half of every list response, in the /spend-events shape. */
+const nextCursorSchema = z
+  .string()
+  .nullable()
+  .describe(
+    "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.",
+  );
+
 // ── Request wire schemas ────────────────────────────────────────────────
+
+/**
+ * The page controls every unbounded list takes, matching /spend-events.
+ *
+ * `cursor` is opaque and passed back verbatim. A present-but-garbled cursor is
+ * a 400 rather than a silent restart from the first row, which would re-serve
+ * everything the caller already has.
+ */
+const pageQuerySchema = z.object({
+  cursor: z.string().max(500).optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(PAGE_LIMIT_MAX)
+    .optional()
+    .default(PAGE_LIMIT_DEFAULT),
+});
+
+/** The (createdAt, id) sort key a cursor names, or a 400-worthy null. */
+function createdAtIdCursor(
+  encoded: string | undefined,
+): { createdAt: Date; id: string } | null | undefined {
+  if (encoded === undefined) return undefined;
+  const parts = decodePageCursor(encoded, 2);
+  if (!parts) return null;
+  const createdAt = new Date(Number(parts[0]));
+  return Number.isNaN(createdAt.getTime())
+    ? null
+    : { createdAt, id: String(parts[1]) };
+}
+
+/** The (priority, createdAt, id) sort key a cache-rule cursor names. */
+function cacheRuleCursor(
+  encoded: string | undefined,
+): CacheRuleCursor | null | undefined {
+  if (encoded === undefined) return undefined;
+  const parts = decodePageCursor(encoded, 3);
+  if (!parts) return null;
+  const priority = Number(parts[0]);
+  const createdAt = new Date(Number(parts[1]));
+  return Number.isNaN(priority) || Number.isNaN(createdAt.getTime())
+    ? null
+    : { priority, createdAt, id: String(parts[2]) };
+}
+
+const invalidCursor = (c: GatewayContext) =>
+  errorResponse(c, {
+    status: 400,
+    code: "invalid_cursor",
+    message: "`cursor` is not a cursor this endpoint issued.",
+  });
 
 const scopeWireSchema = z.object({
   scope_type: vkScopeTypeSchema,
@@ -646,7 +713,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
   describeRoute({
     summary: "List virtual keys",
     description:
-      "Returns every virtual key visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Ordered by creation time.",
+      "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -654,7 +721,12 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
         description: "Visible virtual keys",
         content: {
           "application/json": {
-            schema: resolver(z.object({ data: z.array(virtualKeyDtoSchema) })),
+            schema: resolver(
+              z.object({
+                data: z.array(virtualKeyDtoSchema),
+                next_cursor: nextCursorSchema,
+              }),
+            ),
           },
         },
       },
@@ -662,13 +734,36 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
   }),
   async (c) => {
     const project = c.get("project");
+    const page = pageQuerySchema.safeParse({
+      cursor: c.req.query("cursor"),
+      limit: c.req.query("limit"),
+    });
+    if (!page.success) return validationErrorResponse(c, page.error);
+    const cursor = createdAtIdCursor(page.data.cursor);
+    if (cursor === null) return invalidCursor(c);
+
     const organizationId = await orgIdForProject(project.id);
     const service = VirtualKeyService.create(prisma);
     const membership = membershipForApiCaller(project);
-    const rows = (await service.getAll(organizationId)).filter((vk) =>
-      isVisibleToMembership(membership, vk.scopes),
-    );
-    return c.json({ data: rows.map(toVkDto) });
+    const rows = await service.getPage({
+      organizationId,
+      limit: page.data.limit,
+      cursor: cursor ?? null,
+    });
+    // Visibility is applied to the page, not to the query, because
+    // `isVisibleToMembership` is the shared implementation the tRPC list uses
+    // and a second copy of it in SQL is exactly the drift this app avoids. The
+    // cursor therefore advances over rows READ, so a page can be shorter than
+    // `limit` without meaning the walk is done.
+    return c.json({
+      data: rows
+        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
+        .map(toVkDto),
+      next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [
+        vk.createdAt.getTime(),
+        vk.id,
+      ]),
+    });
   },
 );
 
@@ -1228,7 +1323,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   describeRoute({
     summary: "List budgets",
     description:
-      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
+      "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1240,6 +1335,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
               z.object({
                 data: z.array(budgetDtoSchema),
                 spend_available: z.boolean(),
+                next_cursor: nextCursorSchema,
               }),
             ),
           },
@@ -1255,6 +1351,14 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   }),
   async (c) => {
     const project = c.get("project");
+    const page = pageQuerySchema.safeParse({
+      cursor: c.req.query("cursor"),
+      limit: c.req.query("limit"),
+    });
+    if (!page.success) return validationErrorResponse(c, page.error);
+    const cursor = createdAtIdCursor(page.data.cursor);
+    if (cursor === null) return invalidCursor(c);
+
     const rawFilter = c.req.query("scope_type");
     let scopeTypes: Set<z.infer<typeof budgetScopeTypeSchema>> | null = null;
     if (rawFilter !== undefined) {
@@ -1282,17 +1386,27 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     }
     const organizationId = await orgIdForProject(project.id);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
-    const { budgets, spendAvailable } =
-      await service.listWithHealth(organizationId);
-    const rows = scopeTypes
-      ? budgets.filter((b) => scopeTypes.has(toWireEnum(b.scopeType)))
-      : budgets;
+    const { budgets: rows, spendAvailable } = await service.listPageWithHealth({
+      organizationId,
+      limit: page.data.limit,
+      cursor: cursor ?? null,
+      // Pushed into the query, so `limit` counts rows RETURNED. Filtering the
+      // page instead would make a request for 50 group budgets come back with
+      // a handful and no way to tell that from the end of the walk.
+      scopeTypes: scopeTypes
+        ? Array.from(scopeTypes, (t) => toStoredEnum(t))
+        : undefined,
+    });
     const memberCounts = await groupMemberCounts(rows);
     return c.json({
       spend_available: spendAvailable,
       data: rows.map((b) =>
         toBudgetDto(b, memberCounts.get(b.scopeId), spendAvailable),
       ),
+      next_cursor: nextPageCursor(rows, page.data.limit, (b) => [
+        b.createdAt.getTime(),
+        b.id,
+      ]),
     });
   },
 );
@@ -1605,7 +1719,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
   describeRoute({
     summary: "List cache-control rules",
     description:
-      "Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.",
+      "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.",
     tags: ["Cache Rules"],
     responses: {
       ...canonicalBaseResponses,
@@ -1613,7 +1727,12 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
         description: "Cache rules for the organisation",
         content: {
           "application/json": {
-            schema: resolver(z.object({ data: z.array(cacheRuleDtoSchema) })),
+            schema: resolver(
+              z.object({
+                data: z.array(cacheRuleDtoSchema),
+                next_cursor: nextCursorSchema,
+              }),
+            ),
           },
         },
       },
@@ -1621,10 +1740,29 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
   }),
   async (c) => {
     const project = c.get("project");
+    const page = pageQuerySchema.safeParse({
+      cursor: c.req.query("cursor"),
+      limit: c.req.query("limit"),
+    });
+    if (!page.success) return validationErrorResponse(c, page.error);
+    const cursor = cacheRuleCursor(page.data.cursor);
+    if (cursor === null) return invalidCursor(c);
+
     const organizationId = await orgIdForProject(project.id);
     const service = GatewayCacheRuleService.create(prisma);
-    const rows = await service.list(organizationId);
-    return c.json({ data: rows.map(toCacheRuleDto) });
+    const rows = await service.listPage({
+      organizationId,
+      limit: page.data.limit,
+      cursor: cursor ?? null,
+    });
+    return c.json({
+      data: rows.map(toCacheRuleDto),
+      next_cursor: nextPageCursor(rows, page.data.limit, (r) => [
+        r.priority,
+        r.createdAt.getTime(),
+        r.id,
+      ]),
+    });
   },
 );
 

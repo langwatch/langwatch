@@ -26,9 +26,14 @@ Self-hosted: replace the base with your control plane's DNS.
 
 ```
 GET /virtual-keys
+GET /virtual-keys?limit=100&cursor=<next_cursor>
 ```
 
-Returns every key visible to your credential: keys scoped to your project, its team, or the whole organization.
+Returns the keys visible to your credential: keys scoped to your project, its team, or the whole organization, newest first.
+
+All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
+
+Visibility is applied to each page after it is read, so a page of virtual keys can hold fewer rows than `limit` while the walk still has more to give.
 
 Response:
 
@@ -188,9 +193,12 @@ Idempotent: revoking an already-revoked VK returns `200` with the same status. R
 ```
 GET /budgets
 GET /budgets?scope_type=virtual_key,principal
+GET /budgets?limit=100&cursor=<next_cursor>
 ```
 
-Returns every non-archived budget in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+Returns the non-archived budgets in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), newest first, with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter, applied in the query, so `limit` counts the rows you get back.
+
+All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
 
 Response:
 
@@ -299,7 +307,9 @@ Organization-scoped overrides that modulate cache behaviour for requests routed 
 GET /cache-rules
 ```
 
-Requires `gatewayCacheRules:view`. Returns rules sorted priority DESC, excluding archived.
+Requires `gatewayCacheRules:view`. Returns rules sorted priority descending then oldest first, excluding archived.
+
+All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
 
 ```json
 {

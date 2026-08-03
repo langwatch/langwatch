@@ -11,6 +11,7 @@
 import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
+  GatewayBudgetScopeType,
   GatewayBudgetWindow,
   PrismaClient,
 } from "@prisma/client";
@@ -39,6 +40,7 @@ import {
   GatewayScopeOrgMismatchError,
   VirtualKeyNotFoundError,
 } from "./errors";
+import { keysetAfter } from "./wirePagination";
 
 const logger = createLogger("langwatch:gateway:budget-service");
 
@@ -445,6 +447,45 @@ export class GatewayBudgetService {
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
     return await this.decorateWithHealth(rows, organizationId);
+  }
+
+  /**
+   * One page of the organization's budgets, newest first, keyed on
+   * (createdAt, id).
+   *
+   * The scope-type filter is pushed into the query rather than applied to the
+   * page afterwards: filtering a page would make `limit` mean "rows examined"
+   * instead of "rows returned", and a caller asking for 50 group budgets would
+   * get a handful per page with no way to tell that from the end of the walk.
+   */
+  async listPageWithHealth(args: {
+    organizationId: string;
+    limit: number;
+    cursor: { createdAt: Date; id: string } | null;
+    scopeTypes?: GatewayBudgetScopeType[];
+  }): Promise<BudgetListWithHealth> {
+    const rows = await this.prisma.gatewayBudget.findMany({
+      where: {
+        organizationId: args.organizationId,
+        archivedAt: null,
+        ...(args.scopeTypes ? { scopeType: { in: args.scopeTypes } } : {}),
+        ...(args.cursor
+          ? {
+              OR: keysetAfter([
+                {
+                  name: "createdAt",
+                  value: args.cursor.createdAt,
+                  direction: "desc",
+                },
+                { name: "id", value: args.cursor.id, direction: "desc" },
+              ]),
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: args.limit,
+    });
+    return await this.decorateWithHealth(rows, args.organizationId);
   }
 
   /** As listWithHealth, for the budgets that apply to one project. */

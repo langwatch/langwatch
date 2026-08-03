@@ -134,6 +134,7 @@ export {
   type VirtualKeyRoutingMode,
   type VirtualKeyBudgetInput,
   type VirtualKeyWithSecret,
+  type VirtualKeyPage,
   type VirtualKeySpendSummary,
   type CreateVirtualKeyInput,
   type UpdateVirtualKeyInput,

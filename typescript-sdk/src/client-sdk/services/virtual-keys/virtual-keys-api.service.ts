@@ -1,4 +1,8 @@
 import { scopedApiKey } from "@/internal/credentialContext";
+import {
+  CURSOR_WALK_PAGE_SIZE,
+  collectCursorPages,
+} from "@/client-sdk/services/_shared/collect-cursor-pages";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -92,6 +96,18 @@ export interface VirtualKeyWithSecret {
   secret: string;
 }
 
+/** One page of the virtual-key listing, exactly as the wire serves it. */
+export interface VirtualKeyPage {
+  data: VirtualKey[];
+  /**
+   * Pass back as `cursor` for the next page. Null means the walk is
+   * exhausted. Neither page length tells you anything here: visibility is
+   * applied to each page AFTER it is read, so a page can hold fewer rows
+   * than `limit` with more still to come.
+   */
+  next_cursor: string | null;
+}
+
 /** Aggregate spend for one key over a window, from the cost path. */
 export interface VirtualKeySpendSummary {
   virtual_key_id: string;
@@ -161,12 +177,62 @@ export class VirtualKeysApiService {
     return (await response.json()) as T;
   }
 
-  async list(): Promise<VirtualKey[]> {
-    const { data } = await this.request<{ data: VirtualKey[] }>(
-      "list virtual keys",
-      "/api/gateway/v1/virtual-keys",
-    );
-    return data;
+  /**
+   * ONE page of the virtual keys visible to the caller, newest first. Pass
+   * `next_cursor` back as `cursor` for the next page, verbatim: a cursor this
+   * endpoint did not issue answers 400 rather than restarting the walk.
+   *
+   * `limit` is the page size (server default 50, capped at 200), and it caps
+   * the rows READ, not the rows returned: the visibility filter runs on the
+   * page afterwards. Prefer `list()` unless you mean to page deliberately.
+   */
+  async listPage(options?: {
+    cursor?: string;
+    limit?: number;
+  }): Promise<VirtualKeyPage> {
+    const params = new URLSearchParams();
+    if (options?.cursor) params.set("cursor", options.cursor);
+    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    const query = params.toString() !== "" ? `?${params.toString()}` : "";
+    const { data, next_cursor } = await this.request<{
+      data: VirtualKey[];
+      next_cursor?: string | null;
+    }>("list virtual keys", `/api/gateway/v1/virtual-keys${query}`);
+    return { data, next_cursor: next_cursor ?? null };
+  }
+
+  /**
+   * Every virtual key visible to the caller: keys scoped to this project, to
+   * its team, or to the whole organization.
+   *
+   * The endpoint pages; this follows `next_cursor` until it comes back null.
+   * Stopping on a short page would be wrong here specifically, because the
+   * server filters each page for visibility after reading it, so a page can
+   * hold fewer rows than the limit with more still to come.
+   *
+   * `limit` sizes each request in the walk, it does NOT cap what comes back.
+   * `cursor` resumes an interrupted walk. Take a single page with
+   * `listPage()`.
+   */
+  async list(options?: {
+    cursor?: string;
+    limit?: number;
+  }): Promise<VirtualKey[]> {
+    const pages = await collectCursorPages<VirtualKeyPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new VirtualKeysApiError(
+          `Failed to list virtual keys: ${reason}.`,
+          "list virtual keys",
+        ),
+      fetchPage: (cursor) =>
+        this.listPage({
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    return pages.flatMap((page) => page.data);
   }
 
   async get(id: string): Promise<VirtualKey> {
