@@ -859,12 +859,13 @@ export class VirtualKeyService {
   }
 
   /**
-   * Every key must resolve a project for its traces and costs to land in.
-   * Budget spend is accrued from the trace fold, so a key whose traces
-   * land nowhere accrues nothing against ANY budget, the org-wide cap
-   * included; it spends invisibly by construction. Project-owned and
-   * personal keys resolve a project structurally, and org/team-owned keys
-   * resolve the organization's governance project when one exists. What is
+   * Every key must resolve a project for its traces to land in. Debits no
+   * longer depend on it (they ride the gateway's spend commands), but a
+   * key whose traces land nowhere is invisible in every usage view, and
+   * per-key spend is read from the trace path rather than the ledger.
+   * Project-owned and personal keys resolve a project structurally, and
+   * org/team-owned keys resolve the organization's governance project when
+   * one exists. What is
    * refused is the remaining shape: ownership above a project in an org
    * with no governance project, which is exactly the shape that used to
    * drop traces on the floor.

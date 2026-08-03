@@ -5,8 +5,8 @@
  * window a budget can be created with.
  *
  * Real ClickHouse, no mocks. A debit goes in through the same repository the
- * trace fold uses, and comes back out through the same repository the budgets
- * UI, /budget/check, and the gateway config bundle all read from.
+ * debits process uses, and comes back out through the same repository the
+ * budgets UI, /budget/check, and the gateway config bundle all read from.
  *
  * This is the regression guard for issue #6141. The rollup only returns a row
  * when the period the reader asks for is exactly the period the materialised

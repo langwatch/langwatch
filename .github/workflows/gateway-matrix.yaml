@@ -18,8 +18,8 @@ name: gateway-matrix
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
 #   - langwatch/src/server/gateway/  (control plane)
-#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
-#     reactors/gatewayBudgetSync.reactor.ts
+#   - langwatch/ee/governance/process-manager/gatewayDebits.process.ts
+#     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
@@ -49,7 +49,7 @@ on:
       - 'go.mod'
       - 'go.sum'
       - 'langwatch/src/server/gateway/**'
-      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
+      - 'langwatch/ee/governance/process-manager/gatewayDebits.process.ts'
       - 'langwatch/src/server/routes/gateway-internal.ts'
       - 'charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'

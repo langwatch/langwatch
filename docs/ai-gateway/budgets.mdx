@@ -119,18 +119,20 @@ The UI surfaces this as "Warning thresholds" on a single budget row; each thresh
 
 ## Debit model
 
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id so gateway retries and trace replays never double-bill.
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
 
 Debit flow:
 
-1. Gateway streams the response to the client.
-2. When the response closes, the gateway captures the provider's token counts and emits an OTel span carrying `gen_ai.usage.*` plus `langwatch.virtual_key_id` and `langwatch.gateway_request_id`.
-3. The gateway also posts a post-response debit event to the control plane for the primary ledger path.
-4. The control plane recomputes USD cost from `tokens × pricing catalog` (the gateway-side cost is authoritative only when it short-circuits without a provider call, e.g. `blocked_by_guardrail`) and writes a ledger row in a transaction that also increments `spent_usd` on every affected scope (org, team, project, VK, principal).
-5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
+1. The gateway admits the request before any budget or guardrail gating runs, recording who it belongs to. Admission is a local, non-blocking write to a bounded on-disk spool, so the request path never waits on the control plane.
+2. The gateway streams the response. When it closes, the gateway records the provider's token counts as a confirmation, or the failure with its error class. Both go to the same spool.
+3. A background drainer ships spooled batches to the control plane, which prices each outcome once from `tokens × pricing catalog` and appends the priced command to the spend pipeline.
+4. The debits process manager joins the admission to the outcome, resolves every applicable budget (org, team, project, VK, principal, group, per-person) and writes one ledger row per budget to `gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view. It is the only writer of that ledger.
+5. The same debit emits a change event, so the gateway drops its cached bundle for that project and the next request enforces against fresh spend.
+
+Because admission happens before gating, a request the gateway refused is a record rather than a silence. Those rows land with the reason (`PROVIDER_ERROR`, or `BLOCKED_BY_GUARDRAIL` for a guardrail refusal) and show in a budget's activity list, but they do **not** count toward a cap: only successful requests accrue enforcement spend. A platform failure should be visible to you without charging your customer for it.
 
 <Note>
-The ClickHouse path is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. Both write paths run in parallel today; the Postgres write path retires in a follow-up. Customer-visible behaviour is unchanged, a $1 budget still blocks at $1 of spend during and after the cutover.
+The ClickHouse ledger is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. A $1 budget blocks at $1 of spend on either.
 </Note>
 
 ## Pre-request check

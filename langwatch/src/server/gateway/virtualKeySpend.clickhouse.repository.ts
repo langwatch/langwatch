@@ -2,8 +2,8 @@
  * Per-virtual-key spend, read from the cost path rather than the budget
  * ledger.
  *
- * The budget ledger is written by the trace fold ONLY for keys that have at
- * least one applicable budget, and it writes one row per applicable budget.
+ * The budget ledger holds rows ONLY for keys that have at least one
+ * applicable budget, and one row per applicable budget.
  * Reading spend from it therefore reports $0.00 for every key nobody has
  * capped, and multiplies spend by the number of budgets for every key
  * somebody has capped twice. Neither is a number to put in front of a

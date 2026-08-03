@@ -94,40 +94,40 @@ Feature: Per-end-user budgets by attribution
   @unit
   Scenario: Attributed debits ride the spend pipeline, not the trace fold
     Given an admitted request carrying an end-user id and a confirmed outcome
-    When the attributed-debits process consumes the pair
+    When the gateway-debits process consumes the pair
     Then it freezes one write-debits intent joining who with how much
-    And a request without an end-user id never commits an intent
-
-  @integration
-  Scenario: Two debit writers on one request never suppress each other
-    Given the trace reactor wrote this request's non-template debit rows
-    When the attributed writer inserts the same request's template rows
-    Then both writers' rows exist in the ledger
-    And replaying the attributed writer inserts nothing new
-    # The whole-request probe would make two writers mutually exclusive;
-    # the template writer probes per budget instead.
+    And the intent carries the team and principal the ingest seam resolved
 
   @unit
-  Scenario: The trace fold never debits an attributed-user template
-    Given a key carrying both a per-seat template and a key cap
-    When the trace fold writes that request's debit rows
-    Then it writes the key cap's row and no template row
-    # The fold has no end user, so a template row could only name the
-    # bare anchor. The ledger keys rows by request and budget with no
-    # bucket in the key, so an anchor row takes the per-user row's slot
-    # and the seat cap stops seeing the spend it is meant to stop.
+  Scenario: One writer owns every scope a request debits
+    Given a request admitted without an end-user id
+    When its outcome is consumed
+    Then it still commits one debit intent for its remaining scopes
+    # An anonymous request owes its organization, team, project, key,
+    # principal and group caps. Only the per-seat templates need an end
+    # user, and without one they simply do not resolve.
+
+  @integration
+  Scenario: One request's rows for two budgets never suppress each other
+    Given a request whose per-seat template and key cap resolve different buckets
+    When the writer inserts that request's rows for both
+    Then both budgets' rows exist in the ledger
+    And replaying the same request inserts nothing new
+    # The ledger keys rows by request and budget with no bucket in the
+    # key. A whole-request probe would let the second budget's row skip
+    # silently, so the writer probes per budget instead.
 
   @unit
   Scenario: An outcome that outruns its admission still debits
     Given a confirmed outcome consumed before its admit event
-    When the admission arrives naming the end user
-    Then the debit intent is committed then, against the per-user bucket
-    And an admission naming nobody drops the outcome loudly instead
+    When the admission arrives
+    Then the debit intent is committed then, carrying that attribution
+    And an admission naming no end user still debits every other scope
 
   @integration
-  Scenario: A debit that would land in another writer's bucket is never quiet
+  Scenario: A debit that would land in a different bucket is never quiet
     Given a row already on this request for the same budget
-    When a second writer inserts that budget against a different bucket
+    When that budget is inserted again against a different bucket
     Then the suppressed debit is reported at error with its request id
 
   # ────────────────────────────────────────────────────────────────────────────

@@ -1,10 +1,11 @@
 // Package budget implements budget precheck on the gateway hot path.
 //
-// Debits are NOT sent from the gateway. Cost is captured on the OTel span
-// emitted by the trace bridge; the control plane's trace-fold reactor
-// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
-// gatewayBudgetSync.reactor.ts) writes ClickHouse ledger rows from the
-// span attributes. Single source of truth, no PG dual-write.
+// Debits are NOT sent from the gateway hot path. The gateway emits spend
+// commands for every request through its spool, and the control plane's
+// debits process manager
+// (langwatch/ee/governance/process-manager/gatewayDebits.process.ts) writes
+// the ClickHouse ledger rows from them. Single source of truth, no PG
+// dual-write.
 package budget
 
 import (

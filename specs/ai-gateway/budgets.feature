@@ -149,25 +149,24 @@ Feature: AI Gateway — Budgets
     Then the request is blocked because vk-block breaches, even though project is only warn
 
   # ============================================================================
-  # Ledger — trace-driven fold in ClickHouse
+  # Ledger — spend-command debits in ClickHouse
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Gateway trace lands one row per applicable budget in ClickHouse
+  Scenario: A gateway request lands one row per applicable budget in ClickHouse
     Given a gateway request is completed with gateway_request_id "grq_01H..."
-    And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
-      gen_ai.usage.output_tokens, and a resolved gen_ai.request.model
+    And its confirm command carries the token quantities by class and the resolved model
     And the project has three applicable budgets: org-monthly, team-monthly, project-daily
-    When the trace lands in ClickHouse and the gatewayBudgetSync reactor runs
+    When the debits process consumes the admission and the outcome
     Then gateway_budget_ledger_events has three rows keyed by
       (TenantId, BudgetId, GatewayRequestId)
-    And each row's AmountUSD equals the enriched cost for the span
+    And each row's AmountUSD equals the price the outcome event carried
     And gateway_budget_scope_totals reflects the increment under the matching PeriodStart
 
   @integration @unimplemented
-  Scenario: Trace replay does not double-count spend (idempotency by gateway_request_id)
-    Given a trace with gateway_request_id "grq_01H..." has already produced a debit row
-    When the same trace is re-ingested (OTel replay, retry, or dev replay tooling)
+  Scenario: Redelivery does not double-count spend (idempotency by gateway_request_id)
+    Given a request with gateway_request_id "grq_01H..." has already produced a debit row
+    When its commands are redelivered (spool retry, drainer replay, or backfill)
     Then gateway_budget_ledger_events collapses the duplicate via ReplacingMergeTree
     And gateway_budget_scope_totals does NOT double-count the spend
 
@@ -176,7 +175,7 @@ Feature: AI Gateway — Budgets
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
     And the control plane's pricing catalog has per-token costs for the resolved model
-    When the span is enriched and the reactor writes to gateway_budget_ledger_events
+    When the ingest seam prices the outcome and the debits process writes the rows
     Then AmountUSD is derived from provider tokens × unit cost
     And the gateway's pre-request cost estimate is used only for pre-flight
       budget-check gating, never for the ledger
@@ -184,7 +183,7 @@ Feature: AI Gateway — Budgets
   @integration @unimplemented
   Scenario: /budget/check reads from the CH materialised view
     Given project "gateway-demo" has a monthly budget with limit $100
-    And 42.00 USD of spend has been attributed to this project this month via traces
+    And 42.00 USD of spend has been attributed to this project this month
     When the gateway calls POST /api/internal/gateway/budget/check
     Then the response is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
       bounded to the current month's PeriodStart
@@ -195,8 +194,8 @@ Feature: AI Gateway — Budgets
   # Spend must read back for every window offered
   # ============================================================================
   #
-  # Spend is written to the ledger by the trace fold and read back from the
-  # pre-aggregated rollup. The two sides bucket spend into periods, and they
+  # Spend is written to the ledger by the debits process and read back from
+  # the pre-aggregated rollup. The two sides bucket spend into periods, and they
   # only ever agree if they compute the start of the period the same way. When
   # they disagree the write lands in a bucket the read never looks at, so a
   # budget accrues nothing forever, blocks nothing, and warns about nothing,

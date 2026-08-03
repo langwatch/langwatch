@@ -32,17 +32,16 @@ export const SPAN_ATTR_MAPPINGS = [
   ],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
-  // services/aigateway/adapters/customertracebridge/emitter.go so the
-  // downstream gatewayBudgetSync reactor can tell which VK / request fold
-  // into which budget. Without this allowlist entry the keys are dropped
-  // at accumulation time, the reactor early-returns, and CH
-  // gateway_budget_ledger_events stays empty.
+  // services/aigateway/adapters/customertracebridge/emitter.go. They are
+  // what joins a trace back to the key and the request that produced it,
+  // which is the read the gateway usage views and per-key spend serve.
+  // Budget debits do not come from here: they ride the gateway's own spend
+  // commands, which carry attribution the trace never sees.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
   // The provider the request was actually dispatched to (a ModelProvider
-  // row id). Provider-filtered budgets ("$50/month, OpenAI only") can only
-  // accrue their own spend if the fold knows which vendor served the call;
-  // without this key they never accrue at all.
+  // row id), so usage views can break spend down by the vendor that served
+  // the call.
   ["langwatch.model_provider_id", "langwatch.model_provider_id"],
   // Governance ingest markers — stamped on every span by the
   // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).

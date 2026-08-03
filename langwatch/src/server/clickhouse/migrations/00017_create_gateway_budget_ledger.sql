@@ -13,20 +13,19 @@
 -- per-VK trend, ops dashboards) will read from this CH table instead, using
 -- the pre-aggregated gateway_budget_scope_totals ReplacingMergeTree below.
 --
--- Write path (next iter): BudgetOutbox.Flush dual-writes to PG and CH during
--- the shadow-migrate window, then cutover PG to a 24h-retained hot buffer.
--- Idempotency is preserved via (BudgetId, GatewayRequestId) uniqueness —
--- the ORDER BY + ReplacingMergeTree dedup collapses replays safely.
+-- Write path: the debits process manager on the gateway-spend pipeline is
+-- the only writer. Idempotency is preserved via (BudgetId,
+-- GatewayRequestId) uniqueness — the ORDER BY + ReplacingMergeTree dedup
+-- collapses replays safely.
 --
 -- That identity means "one debit per budget per request", and it is only
 -- sound while exactly ONE writer owns a budget's row for a given request.
 -- A budget may own many buckets: GROUP fans out one per member and
 -- ATTRIBUTED_USER one per end user. A single request resolves exactly one
 -- of them, which is what keeps the key correct. Two writers disagreeing
--- about the bucket for the same request do NOT produce two rows, they
--- collapse to one and file the spend under whichever bucket won, so the
--- ownership split in budget.clickhouse.repository.ts is load-bearing, not
--- a convention.
+-- about the bucket for the same request would NOT produce two rows, they
+-- would collapse to one and file the spend under whichever bucket won,
+-- which is why there is exactly one.
 -- ============================================================================
 
 -- +goose StatementBegin

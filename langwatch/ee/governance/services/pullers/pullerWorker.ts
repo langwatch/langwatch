@@ -201,7 +201,7 @@ export async function runIngestionPull(params: {
   // shape for pull-mode: each audit-log entry is a single event, not
   // a multi-span trace.
   //
-  // TenantId convention: every governance write path (the trace fold
+  // TenantId convention: every governance write path (the trace fold's
   // reactor, the OCSF export service) keys on the org's hidden
   // internal_governance Project ID. Pull events MUST follow the same
   // convention or they're invisible to SIEM export reads. Resolve

@@ -250,7 +250,7 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * Why the full label set and not just `{queue_name, reason}`: a bare queue label
  * pages oncall with "event-sourcing/jobs dropped 100" and cannot say WHICH
  * pipeline lost WHAT. The difference between a dropped UI broadcast and a dropped
- * `governanceOcsfEventsSync` (OCSF audit) or `gatewayBudgetSync` (billing) event
+ * `governanceOcsfEventsSync` (OCSF audit) event
  * is the difference between a shrug and a compliance incident. Labels are read
  * off the envelope header via `readJobRoutingMeta`, which survives a body we
  * cannot decode.

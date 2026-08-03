@@ -3,9 +3,9 @@
  *
  * Attributed-user templates, the MANUAL window, and period resets against
  * real Postgres + real ClickHouse: the boundary semantics that make
- * "reset" a boundary move instead of a counter wipe, and the two-writer
- * ledger discipline that lets template debits coexist with the trace
- * reactor's rows on the same request.
+ * "reset" a boundary move instead of a counter wipe, and the per-budget
+ * ledger discipline that lets one request's template row and key-cap row
+ * coexist.
  *
  * Spec: specs/ai-gateway/end-user-attribution.feature
  *       specs/ai-gateway/gateway-budget-targeting.feature
@@ -145,8 +145,8 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     await stopTestContainers();
   });
 
-  /** @scenario Two debit writers on one request never suppress each other */
-  it("template rows and reactor rows coexist on one request, and replays stay silent", async () => {
+  /** @scenario One request's rows for two budgets never suppress each other */
+  it("a template row and a key-cap row coexist on one request, and replays stay silent", async () => {
     const template = await service.create({
       organizationId: ORG_ID,
       scope: { kind: "ATTRIBUTED_USER", anchorVirtualKeyId: VK_ID },
@@ -166,8 +166,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     const requestId = `req-${suffix}-shared`;
     const bucket = attributedUserBucketScopeId(VK_ID, "user-1");
 
-    // The trace reactor lands its (non-template) rows first, with the
-    // whole-request probe.
+    // The key cap's row lands first.
     await chRepo.insertDebit([
       debitRow({
         budgetId: other.id,
@@ -177,7 +176,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         gatewayRequestId: requestId,
       }),
     ]);
-    // The template writer inserts the SAME request's template rows.
+    // The same request's template row, against its own bucket.
     await chRepo.insertDebitsForBudgets([
       debitRow({
         budgetId: template.id,
@@ -186,7 +185,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
         gatewayRequestId: requestId,
       }),
     ]);
-    // Replay of the template writer inserts nothing new.
+    // A replay of the same row inserts nothing new.
     await chRepo.insertDebitsForBudgets([
       debitRow({
         budgetId: template.id,
@@ -221,7 +220,7 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     expect(Number.parseFloat(byId.get(other.id)!)).toBeCloseTo(10, 3);
   });
 
-  /** @scenario A debit that would land in another writer's bucket is never quiet */
+  /** @scenario A debit that would land in a different bucket is never quiet */
   it("reports a suppressed debit naming a different bucket, and stays silent on a replay", async () => {
     const template = await service.create({
       organizationId: ORG_ID,

@@ -143,6 +143,7 @@ describe("gateway debits process", () => {
     );
   });
 
+  /** @scenario One writer owns every scope a request debits */
   it("debits a request that named no end user", () => {
     // The seat templates simply do not resolve; the organization, team,
     // project, key and principal caps are all still owed this request.

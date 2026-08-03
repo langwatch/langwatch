@@ -463,7 +463,7 @@ export class GatewayBudgetService {
   /**
    * Resolve the projectId that the ClickHouse client should be scoped to
    * when reading ledger events for `budget`. Tenant resolution mirrors the
-   * trace-fold reactor's logic: the events table is sharded on
+   * debits process: the events table is sharded on
    * `TenantId = projectId` so only org/team/project/VK-scoped budgets
    * have a meaningful tenant; principal-scoped budgets cross projects
    * and we return null (no ledger lookup).
@@ -1059,8 +1059,8 @@ export class GatewayBudgetService {
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const projected = new Prisma.Decimal(input.projectedCostUsd.toString());
 
-    // Same resolver the bundle and the trace fold use, so what enforces
-    // here is exactly what the key was told applies to it.
+    // Same resolver the bundle and the debits process use, so what
+    // enforces here is exactly what the key was told applies to it.
     const resolved = (
       await resolveApplicableBudgets(this.prisma, {
         organizationId: input.organizationId,
@@ -1072,7 +1072,7 @@ export class GatewayBudgetService {
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
     const applicable = resolved.map((r) => r.budget);
 
-    // Prefer ClickHouse spend (trace-fold ledger) when the repo is wired,
+    // Prefer ClickHouse spend (the debit ledger) when the repo is wired,
     // fall back to the PG `spentUsd` column for deploys without CH. The
     // CH rollup is keyed by (budget, current period) so it self-resets at
     // period boundaries — no `shouldResetBudget` branch needed on that
@@ -1206,7 +1206,7 @@ function resolveProjectFromScope(scope: BudgetScope): string | null {
 // Builds a blockedBy line for a breached budget. `effectiveSpent` is the
 // CH-rollup-derived figure — the authoritative post-cutover spend.
 // `b.spentUsd` (the legacy Prisma column) stopped being maintained when
-// the outbox/debit path was replaced by the trace-fold pipeline, so
+// the outbox/debit path was replaced by the ClickHouse ledger, so
 // reading it here would report stale numbers even though the BLOCK
 // decision itself is correct. UI + error messages downstream show
 // this spent_usd to the user, so it must match what `scopes[]` reports.

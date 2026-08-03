@@ -3,7 +3,7 @@
  * or draft key.
  *
  * Every surface that needs "what budgets apply here" reads this: the
- * config materialiser baking the bundle, the trace-fold reactor deciding
+ * config materialiser baking the bundle, the debits process deciding
  * where to attribute spend, the pre-request `budget.check`, and the VK
  * drawer's "already applies" list. They used to hand-mirror the same OR
  * list in three places, which is exactly how a scope silently stops being

@@ -1,12 +1,11 @@
 /**
- * Trace-driven budget ledger in ClickHouse.
+ * The gateway budget ledger in ClickHouse.
  *
  * Replaces the old PG `GatewayBudgetLedger.create` + `GatewayBudget.spentUsd`
- * counter path. The gateway no longer POSTs debits — instead, the trace it
- * emits (carrying `langwatch.virtual_key_id`, `langwatch.gateway_request_id`,
- * token counts, enriched cost) is the source of truth. The
- * `gatewayBudgetSync` reactor in the trace-processing pipeline calls
- * `insertDebit` on this repo once per applicable budget.
+ * counter path. The gateway does not POST debits: it emits spend commands
+ * for every request, and the debits process manager on the gateway-spend
+ * pipeline calls `insertDebitsForBudgets` here once per applicable budget.
+ * It is the only writer of these tables.
  *
  * Tables:
  *   - gateway_budget_ledger_events      — ReplacingMergeTree, idempotent by
@@ -177,24 +176,22 @@ export class GatewayBudgetClickHouseRepository {
    * (TenantId, GatewayRequestId) already exists in the ledger. The ledger
    * ORDER BY is `(TenantId, BudgetId, GatewayRequestId)` so this query
    * hits the index and is sub-millisecond. All rows in a single insertDebit
-   * call share the same gateway_request_id (one reactor fire = one VK
-   * trace = one batch covering every applicable budget) so a single
-   * existence probe covers the whole batch.
-   */
-  /**
+   * call share the same gateway_request_id (one debit = one request = one
+   * batch covering every applicable budget) so a single existence probe
+   * covers the whole batch.
+   *
    * Probe-then-insert is not atomic, and that is survivable here for
    * structural reasons, not luck. The rollup MV aggregates at INSERT time
    * (a duplicate row double-counts it forever; the ReplacingMergeTree only
    * collapses the raw rows), so what actually prevents doubles:
    *
-   *   1. One writer per (budget, request) pair: the trace reactor owns
-   *      non-template budgets, the attributed-debits process owns
-   *      templates. The two never write the same pair, so cross-writer
-   *      interleaving cannot double any bucket.
-   *   2. Within a writer, execution is serialized per aggregate (reactor
-   *      GroupQueue / process-manager streams are per-aggregate FIFO), so
-   *      two fires for the same request never run concurrently; retries
-   *      run after the failed attempt.
+   *   1. One writer, full stop: the debits process manager on the
+   *      gateway-spend pipeline is the only thing that writes this ledger,
+   *      so no two writers can claim the same (budget, request) pair.
+   *   2. Within that writer, execution is serialized per aggregate
+   *      (process-manager streams are per-aggregate FIFO), so two fires for
+   *      the same request never run concurrently; retries run after the
+   *      failed attempt.
    *   3. Inserts wait for durability (wait_for_async_insert: 1), so a
    *      retry's probe sees the rows a crashed-after-insert attempt wrote.
    *
@@ -280,15 +277,13 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
-   * Debit insert for a writer that owns specific BUDGETS on a request,
-   * next to another writer owning the request's other budgets. The
-   * whole-request probe insertDebit uses would make two independent
-   * writers mutually exclusive (whoever lands second sees the request id
-   * present and skips); this probes per (BudgetId, GatewayRequestId), so
-   * replays of THIS writer dedup while the other writer's rows never
-   * suppress it. The probe-then-insert race analysis on insertDebit
-   * applies verbatim; the ownership split there is what makes the two
-   * probes composable.
+   * The debit insert the writer uses. One request resolves several budgets
+   * and each lands its own row, so the probe is per (BudgetId,
+   * GatewayRequestId) rather than the whole-request one insertDebit takes:
+   * a whole-request probe would see the first budget's row and silently
+   * skip every other budget the same request owes. Per budget, a replay
+   * still dedups. The probe-then-insert race analysis on insertDebit
+   * applies verbatim.
    */
   async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -320,8 +315,8 @@ export class GatewayBudgetClickHouseRepository {
     // replay stays idempotent. When the row that already sits there names
     // a DIFFERENT bucket, the suppression is not a replay: the ledger keys
     // rows by (TenantId, BudgetId, GatewayRequestId) with no bucket in the
-    // key, so two writers disagreeing about the bucket silently drop one
-    // side's spend from whichever bucket enforcement reads. Never quiet.
+    // key, so a disagreement about the bucket silently drops one side's
+    // spend from whichever bucket enforcement reads. Never quiet.
     for (const row of rows) {
       const seenScopeId = existing.get(row.budgetId);
       if (seenScopeId === undefined || seenScopeId === row.scopeId) continue;
@@ -333,7 +328,7 @@ export class GatewayBudgetClickHouseRepository {
           scope: row.scope,
           droppedScopeId: row.scopeId,
           existingScopeId: seenScopeId,
-          reason: "another writer already claimed this budget on the request",
+          reason: "this budget was already claimed on the request",
         },
         "dropping a budget debit that would land in a different bucket",
       );
@@ -615,67 +610,6 @@ export class GatewayBudgetClickHouseRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: { tenantId, budgetId, limit },
-      format: "JSONEachRow",
-    });
-    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
-      occurredAtMs: string;
-      status: string;
-    };
-    const rows = (await result.json()) as Row[];
-    return rows.map(toLedgerEventRow);
-  }
-
-  /**
-   * Ledger events for a set of virtual keys within a time window.
-   * Used by the project-wide gateway usage page (post-cutover replacement
-   * for `prisma.gatewayBudgetLedger.findMany` in usage.service.ts:summary).
-   *
-   * Note: a single completion that triggers N applicable budgets produces
-   * N ledger rows (one per budget). This matches the pre-cutover PG
-   * semantics — callers that want per-request semantics need to dedup
-   * by `id` (GatewayRequestId) themselves.
-   */
-  async eventsForVirtualKeys(
-    tenantId: string,
-    virtualKeyIds: string[],
-    fromDate: Date,
-    toDate: Date,
-  ): Promise<LedgerEventRow[]> {
-    if (virtualKeyIds.length === 0) return [];
-    const client = await this.resolveClient(tenantId);
-    const params: Record<string, string | number> = {
-      tenantId,
-      from: fromDate.getTime(),
-      to: toDate.getTime(),
-    };
-    const placeholders = virtualKeyIds
-      .map((id, i) => {
-        params[`vk${i}`] = id;
-        return `{vk${i}:String}`;
-      })
-      .join(",");
-    const result = await client.query({
-      query: `
-        SELECT
-          GatewayRequestId AS id,
-          BudgetId AS budgetId,
-          VirtualKeyId AS virtualKeyId,
-          toString(AmountUSD) AS amountUsd,
-          Model AS model,
-          ProviderSlot AS providerSlot,
-          TokensInput AS tokensInput,
-          TokensOutput AS tokensOutput,
-          DurationMS AS durationMs,
-          Status AS status,
-          toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
-        FROM ${EVENTS_TABLE}
-        WHERE TenantId = {tenantId:String}
-          AND VirtualKeyId IN (${placeholders})
-          AND OccurredAt >= fromUnixTimestamp64Milli({from:Int64})
-          AND OccurredAt <  fromUnixTimestamp64Milli({to:Int64})
-        ORDER BY OccurredAt DESC
-      `,
-      query_params: params,
       format: "JSONEachRow",
     });
     type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {

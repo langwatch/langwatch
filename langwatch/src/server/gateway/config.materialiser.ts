@@ -404,8 +404,8 @@ export class GatewayConfigMaterialiser {
    * (single-project-scope VK or governance fallback); PRINCIPAL and
    * per-member GROUP only when the key carries a principal. The scope
    * semantics live in the shared resolver, which the request-time check
-   * and the trace fold also call, so the bundle can never disagree with
-   * what they pick.
+   * and the debits process also call, so the bundle can never disagree
+   * with what they pick.
    */
   private async applicableBudgets(
     vk: VirtualKey,

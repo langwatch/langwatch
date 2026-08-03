@@ -368,36 +368,59 @@ Consumers can read EITHER the `decision`/`warnings`/`block_reason`/`blocked_by` 
 
 Timeout and fail-open: gateway uses a 200 ms deadline on this call. On timeout or 5xx, the gateway falls back to its tier-1 cached decision (allow-through if cache said allow). Configurable via `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS`.
 
-### 4.5 Budget debit — derived from traces (no dedicated endpoint)
+### 4.5 Budget debit — derived from spend commands (no dedicated endpoint)
 
 There is no `POST /api/internal/gateway/budget/debit`. Spend is derived from
-the OTel trace the gateway already emits for every request. The flow:
+the spend commands the gateway emits for every request (§4.9), and the
+debits process manager on the `gateway_spend_processing` pipeline is the
+only writer of the ledger. The flow:
 
-1. Gateway emits one span per request, carrying `langwatch.virtual_key_id`,
-   `langwatch.gateway_request_id`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
-   `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`,
-   `gen_ai.usage.cache_creation.input_tokens`, and `langwatch.status`.
-2. The trace-processing pipeline's `OtlpSpanCostEnrichmentService` computes
-   cost from the pricing catalog (matching on `gen_ai.request.model` +
-   per-project custom costs) and stamps it onto the span.
-3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
-   applicable budgets (VK, project, team, org, principal and group
-   scopes), and writes one row per applicable budget to the ClickHouse table
-   `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
-   Each row stamps `ProviderKey`, the provider the request was dispatched
-   to, read from `langwatch.model_provider_id` on the span. A budget with a
-   provider filter is only debited when that provider matches; a dispatch
-   with no reported provider debits unfiltered budgets only, because
-   attributing it to a named provider would be a guess.
+1. The gateway admits every request before any gating runs, then confirms or
+   fails it, emitting those commands through its local spool. Admission
+   carries attribution and the end user; the outcome carries token
+   quantities by class, the resolved model and provider, and, on a failure,
+   the gateway's own taxonomy token.
+2. The ingest route prices the outcome once, in integer nano-USD, and joins
+   the admission to the attribution the gateway cannot see: the key's
+   principal and the tenant project's team. The appended event carries both
+   the price and the attribution from then on, so no consumer re-rates or
+   re-resolves identity.
+3. The debits process manager joins one request's admission to its outcome,
+   resolves the applicable budgets (org, team, project, VK, principal, group
+   and attributed-user scopes) and writes one row per applicable budget to
+   the ClickHouse table `gateway_budget_ledger_events`, keyed by
+   `(TenantId, BudgetId, GatewayRequestId)`. Each row stamps `ProviderKey`,
+   the provider the request was dispatched to, read from the command's
+   `model_provider_id`. A budget with a provider filter is only debited when
+   that provider matches; a dispatch with no reported provider debits
+   unfiltered budgets only, because attributing it to a named provider would
+   be a guess.
 4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
    aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
 5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
    materialised view, window-bounded by the current `PeriodStart`.
 
+**Only successful rows accrue enforcement spend.** A failed request still
+writes its rows, under `PROVIDER_ERROR` or, for the gateway's own guardrail
+refusal, `BLOCKED_BY_GUARDRAIL`. Both the rollup view and the floored read
+filter on `Status='success'`, so those rows are visibility only: they show
+in a budget's activity list and never move a cap. This is deliberate. A
+provider that errored after billing some tokens is a cost the operator
+should see, but capping a customer on an attempt the platform failed to
+serve would be the platform charging for its own outage.
+
+A request that moved no money AND burned no tokens writes nothing at all.
+Budget and guardrail refusals are the bulk of those, and a rejection storm
+must not amplify into ledger writes that would sum to zero. Zero cost alone
+is not the test: an unpriced model confirms at $0 with real tokens, and
+those rows are written so the activity list still shows the request.
+
 Idempotency is structural: ReplacingMergeTree's ORDER BY
-`(TenantId, BudgetId, GatewayRequestId)` collapses any re-ingestion of the
-same trace (OTel replay, retry, manual backfill). No separate dedup table
-or 24h window is required.
+`(TenantId, BudgetId, GatewayRequestId)` collapses any redelivery of the
+same command (spool retry, drainer replay, manual backfill). No separate
+dedup table or 24h window is required. The key holds no bucket, so it is
+only sound while exactly one writer owns a budget's row for a given
+request, which is why there is exactly one.
 
 The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
 for rollback safety but no code writes to it. `GatewayBudget` (the budget
@@ -428,14 +451,21 @@ no ClickHouse spend repository is wired (the same detection `check()` uses to
 pick ClickHouse over the Postgres fallback). The other scope types keep
 working on the fallback because their bucket is the budget row itself.
 
-**Every key must resolve a trace project.** Spend accrual is fed by the trace
-fold above, so a key whose traces land nowhere accrues nothing against ANY
-budget, org-wide caps included. VK create/update refuse org/team-owned keys
+**Every key must resolve a trace project.** This is an observability rule,
+not a spend one: debits ride the commands above and no longer depend on a
+trace landing anywhere. VK create/update still refuse org/team-owned keys
 with no resolvable trace project (`trace_project_required`); project-owned and
 personal keys resolve one structurally, and org/team keys resolve the org's
 governance project when it exists. A null `project_id` can still appear in
 bundles for keys that predate the rule; the gateway skips span export for
 those, which is exactly the hole the refusal stops new keys from entering.
+
+**The ledger's `TenantId` is the key's own project**, the one carried on the
+auth JWT, not the project its traces are exported to. The two differ for
+org- and team-owned keys, whose traces fall back to the organization's
+governance project. Enforcement is unaffected: every spend read spans all of
+the organization's projects, so a bucket totals the same wherever its rows
+landed.
 
 **What key spend is read from.** Per-key spend shown to users (the keys
 table's "Spent this month" column and the Usage tab) is NOT read from this

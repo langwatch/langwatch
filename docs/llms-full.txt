@@ -3150,18 +3150,20 @@ The UI surfaces this as "Warning thresholds" on a single budget row; each thresh
 
 ## Debit model
 
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id so gateway retries and trace replays never double-bill.
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
 
 Debit flow:
 
-1. Gateway streams the response to the client.
-2. When the response closes, the gateway captures the provider's token counts and emits an OTel span carrying `gen_ai.usage.*` plus `langwatch.virtual_key_id` and `langwatch.gateway_request_id`.
-3. The gateway also posts a post-response debit event to the control plane for the primary ledger path.
-4. The control plane recomputes USD cost from `tokens × pricing catalog` (the gateway-side cost is authoritative only when it short-circuits without a provider call, e.g. `blocked_by_guardrail`) and writes a ledger row in a transaction that also increments `spent_usd` on every affected scope (org, team, project, VK, principal).
-5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
+1. The gateway admits the request before any budget or guardrail gating runs, recording who it belongs to. Admission is a local, non-blocking write to a bounded on-disk spool, so the request path never waits on the control plane.
+2. The gateway streams the response. When it closes, the gateway records the provider's token counts as a confirmation, or the failure with its error class. Both go to the same spool.
+3. A background drainer ships spooled batches to the control plane, which prices each outcome once from `tokens × pricing catalog` and appends the priced command to the spend pipeline.
+4. The debits process manager joins the admission to the outcome, resolves every applicable budget (org, team, project, VK, principal, group, per-person) and writes one ledger row per budget to `gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view. It is the only writer of that ledger.
+5. The same debit emits a change event, so the gateway drops its cached bundle for that project and the next request enforces against fresh spend.
+
+Because admission happens before gating, a request the gateway refused is a record rather than a silence. Those rows land with the reason (`PROVIDER_ERROR`, or `BLOCKED_BY_GUARDRAIL` for a guardrail refusal) and show in a budget's activity list, but they do **not** count toward a cap: only successful requests accrue enforcement spend. A platform failure should be visible to you without charging your customer for it.
 
 <Note>
-The ClickHouse path is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. Both write paths run in parallel today; the Postgres write path retires in a follow-up. Customer-visible behaviour is unchanged, a $1 budget still blocks at $1 of spend during and after the cutover.
+The ClickHouse ledger is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. A $1 budget blocks at $1 of spend on either.
 </Note>
 
 ## Pre-request check
@@ -4492,7 +4494,7 @@ Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
 
 Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
 
-Spend is debited after the response completes, using the token counts the provider reported, via the trace-fold reactor, replays of the same `gateway_request_id` collapse so gateway retries never double-bill.
+Spend is debited after the response completes, using the token counts the provider reported, from the spend commands the gateway emits for every request. Redeliveries of the same `gateway_request_id` collapse, so a retry never double-bills.
 
 See [Budgets](/ai-gateway/budgets).
 
@@ -5348,7 +5350,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     {
       "type": "timeseries",
       "title": "Budget blocks by scope",
-      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's trace-fold reactor writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
+      "description": "The gateway does not debit budgets: cost rides the spend commands and the control plane writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
       "targets": [{
@@ -6537,20 +6539,20 @@ go tool pprof http://localhost:6060/debug/pprof/allocs
 
 **Symptom:** Budget scopes never approach their limit even though traffic is flowing, or `gateway_budget_blocks_total{scope}` stays flat on a scope you expect to be capped.
 
-The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
+The gateway does not send debits on the request path. It records every request on a local spool and a background drainer ships those spend commands to the control plane, which prices them and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
 
 ```
-gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
-  -> trace-fold reactor -> ClickHouse ledger -> bundle snapshot -> gateway precheck
+gateway request -> spend command -> local spool -> drainer -> control-plane ingest
+  -> debits process -> ClickHouse ledger -> bundle snapshot -> gateway precheck
 ```
 
 **Diagnose, in order:**
 
 | Check | How | If it fails |
 |---|---|---|
-| Spans leaving the gateway | `sum(rate(gateway_http_requests_total[5m]))` against your collector's received-spans counter | OTLP export is broken; see [Observability](/ai-gateway/observability) |
+| Commands leaving the gateway | `sum(rate(gateway_spend_spool_appended_total[5m]))` against `gateway_spend_spool_dropped_total` | A rising drop counter is billing loss; see [Observability](/ai-gateway/observability) |
 | Workers running | `kubectl -n langwatch get deploy langwatch-workers` | `workers.enabled: false` means the ledger is never written and hard caps never fire |
-| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | Reactor is stalled or the span carried no cost attrs |
+| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | The drainer is backed off, or the outbox that writes debits is stalled |
 | Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend |
 
 **Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.
@@ -11847,7 +11849,7 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 Two control-plane components must be running for the gateway to function fully:
 
 - **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+- **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
