@@ -534,7 +534,36 @@ local function gqReclaimDiscardedNew(keyPrefix, value)
 end
 `;
 
+/**
+ * Set of groups that may hold a pending job, written atomically with every
+ * insert into a `group:<id>:jobs` zset.
+ *
+ * The reconcile counts jobs by asking which groups to look at. Asking the
+ * lifecycle indexes (`ready`, `blocked`, `parked:<tenant>`) cannot answer that
+ * safely: they have to be read one after another, and a group moving between
+ * them mid-read — from one not yet visited into one already visited — is in none
+ * of the reads even though it never stopped holding jobs. Transitions go both
+ * ways, so no scan order avoids it.
+ *
+ * This index is keyed on the property actually being counted, "has jobs", which
+ * no lifecycle transition changes. A group is added in the same atomic script
+ * that adds its job, so any group holding a job for the whole of a pass is in
+ * the index for the whole of that pass, whatever it does between states.
+ *
+ * Membership is deliberately a SUPERSET. Over-inclusion is free — a group that
+ * has since drained contributes ZCARD 0 — so removal can be lazy, which is what
+ * lets the `:jobs` safety-net TTL expire a group without corrupting the index.
+ * The reconcile prunes what it observes empty, under a check that re-reads the
+ * zset atomically so a group that gained a job in the meantime is never dropped.
+ */
+export const PENDING_INDEX_HELPER_LUA = `
+local function gqMarkPending(keyPrefix, groupId)
+  redis.call("SADD", keyPrefix .. "pending-groups", groupId)
+end
+`;
+
 const STAGE_LUA =
+  PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -602,6 +631,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       local orphanedValue = jobDataJson
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+        gqMarkPending(parkKeyPrefixOf(readyKey), groupId)
       end
       if shouldReplace == 1 then
         orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
@@ -636,6 +666,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
 end
 
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+gqMarkPending(parkKeyPrefixOf(readyKey), groupId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
 if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == parkTenantOf(groupId) then
@@ -669,6 +700,7 @@ return {1, ""}
 `;
 
 const STAGE_BATCH_LUA =
+  PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -731,6 +763,7 @@ for i = 1, count do
         orphanedValue = jobDataJson
         if shouldExtend == 1 then
           redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+          gqMarkPending(keyPrefix, groupId)
         end
         if shouldReplace == 1 then
           orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
@@ -765,6 +798,7 @@ for i = 1, count do
     -- the same payload twice in one batch — updates in place and must not
     -- inflate newStagedCount, which feeds the total-pending INCRBY below.
     local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+    gqMarkPending(keyPrefix, groupId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
     local stagedLease = gqParseLease(jobDataJson)
     if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
@@ -1292,6 +1326,7 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA =
+  PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   `
@@ -1323,6 +1358,7 @@ redis.call("SADD", blockedKey, groupId)
 -- 2. Re-stage the failed job under the id it was dispatched under (ADR-080).
 --    Its member was ZREMed at claim time, so this insert lands on an absent one.
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
+gqMarkPending(keyPrefix, groupId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
 if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
@@ -1373,6 +1409,7 @@ return 1
 `;
 
 const RETRY_RESTAGE_LUA =
+  PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -1420,6 +1457,7 @@ end
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
+gqMarkPending(keyPrefix, groupId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
 if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
@@ -2345,4 +2383,12 @@ export class GroupStagingScripts {
   getKeyPrefix(): string {
     return this.keyPrefix;
   }
+}
+
+/**
+ * Key of the pending-groups index, from a queue's key prefix (`<name>:gq:`).
+ * Mirrors what `gqMarkPending` builds; see PENDING_INDEX_HELPER_LUA.
+ */
+export function pendingGroupsKey(keyPrefix: string): string {
+  return `${keyPrefix}pending-groups`;
 }

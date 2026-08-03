@@ -68,12 +68,14 @@ export function runBlobCleanup(deps: BlobCleanupDeps) {
         "Blob cleanup sweep reclaimed unreferenced blobs",
       );
     }
-    // A sweep that never finishes the keyspace looks exactly like a healthy one
-    // in the totals, so it gets its own line rather than a field nobody filters.
+    // Partial coverage looks exactly like full coverage in the totals, so it
+    // gets its own line rather than a field nobody filters. The next tick
+    // resumes from this one's cursor, so this is progress reporting on a
+    // keyspace bigger than one tick's ceiling, not a failure.
     if (report.totals.truncated) {
-      logger.warn(
+      logger.info(
         { scanned: report.totals.scanned },
-        "Blob cleanup hit its per-queue scan ceiling; keyspace not fully covered this tick",
+        "Blob cleanup hit its per-queue scan ceiling; resuming from this cursor next tick",
       );
     }
 
