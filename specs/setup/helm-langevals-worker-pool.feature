@@ -32,9 +32,9 @@ Feature: The evaluations service sizes its worker pool to the container, not the
   # These scenarios are verified by rendering the chart, because the helper does
   # real arithmetic on a Kubernetes CPU quantity. Asserting that the template
   # contains "ceil" would pass just as happily if it said "floor" — only a
-  # render shows the number that lands in the pod. The checker does not scan
-  # .sh files, so these carry @e2e and the feature is deny-listed rather than
-  # reported as bound; an "all bound ✓" here would not be true.
+  # render shows the number that lands in the pod. Each one binds to a test
+  # function in charts/langwatch/tests/langevals-sizing.sh, which the parity
+  # checker discovers through its shell-test root.
 
   Rule: The worker count follows the container's CPU allowance
 

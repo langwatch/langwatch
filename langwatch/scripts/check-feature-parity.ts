@@ -83,8 +83,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
  * bats, not vitest — without this scan path, scenarios that describe
  * shell behavior would have no way to satisfy parity and would be stuck
  * on `@unimplemented` forever. Bats bindings use the same `@scenario`
- * token, expressed as a hash-comment directly above an `@test "..." {`
- * line.
+ * token, expressed as a hash-comment above an `@test "..." {` line —
+ * blank lines and further comments may sit between the two.
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
   "scripts/__tests__",
@@ -101,7 +101,8 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
  * which is the vacuous check rendering exists to replace.
  *
  * Bindings use the same `@scenario` token as bats, expressed as a
- * hash-comment directly above a `test_<name>() {` function.
+ * hash-comment above a `test_<name>() {` function — blank lines and further
+ * comments may sit between the two.
  */
 const DEFAULT_SHELL_TEST_ROOTS: string[] = ["charts/langwatch/tests"];
 
@@ -547,12 +548,11 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-library.feature",
   "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
-  // Helm chart behaviour. Cannot be bound: the tests that verify these
-  // scenarios are charts/langwatch/tests/e2e-overlays.sh, which the checker
-  // does not scan — it reads .bats files under DEFAULT_BATS_TEST_ROOTS, and
-  // these are .sh under charts/. Binding them means either porting those
-  // suites to bats or teaching the checker a shell-test root; until then a
-  // deny-list entry is honest and an "all bound ✓" is not.
+  // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
+  // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
+  // are bindable: annotate the suite's test functions with `# @scenario` and
+  // drop the file from this list. Until someone does, the scenarios are all
+  // @e2e @unimplemented and the file yields nothing to enforce.
   "specs/security/helm-strict-admission.feature",
   "specs/security/ingress-internal-path-block.feature",
   "specs/security/org-level-tenancy-enforcement.feature",
@@ -922,8 +922,8 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
 
 /**
  * Shell binding form. Mirrors the bats rule, with a shell function standing in
- * for `@test`, so an annotation still has to sit directly above the thing that
- * runs:
+ * for `@test`, so an annotation still has to introduce the thing that runs —
+ * the next line that is neither blank nor a comment must be the function:
  *
  *   # @scenario "A fractional allowance rounds up to a whole worker"
  *   test_fractional_allowance_rounds_up() {
@@ -1259,10 +1259,30 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
 
 /**
  * Hash-comment binding collector, shared by the bats and shell suites: both
- * spell the annotation `# @scenario "..."` and both require it to sit directly
- * above the thing that runs. Only "what counts as a test file" and "what counts
- * as a test line" differ.
+ * spell the annotation `# @scenario "..."` and both require the next line that
+ * is neither blank nor a comment to be the thing that runs. Only "what counts
+ * as a test file" and "what counts as a test line" differ.
  */
+function hashCommentBindingsInFile(
+  file: string,
+  isTestLine: (lines: string[], startLineIdx: number) => boolean,
+): CollectedBinding[] {
+  const lines = readFileSync(file, "utf8").split("\n");
+  const bindings: CollectedBinding[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = (lines[i] ?? "").match(BATS_ANNOTATION_RE);
+    const title = (m?.[1] ?? m?.[2] ?? "").trim();
+    if (!title || !isTestLine(lines, i + 1)) continue;
+    bindings.push({
+      title,
+      ref: { file: relative(REPO_ROOT, file), line: i + 1 },
+    });
+  }
+
+  return bindings;
+}
+
 function collectHashCommentBindings({
   testRoots,
   fileMatches,
@@ -1272,28 +1292,9 @@ function collectHashCommentBindings({
   fileMatches: (name: string) => boolean;
   isTestLine: (lines: string[], startLineIdx: number) => boolean;
 }): CollectedBinding[] {
-  const bindings: CollectedBinding[] = [];
-  const files: string[] = [];
-  for (const r of testRoots) {
-    files.push(...walkFiles(resolve(REPO_ROOT, r), fileMatches));
-  }
-
-  for (const file of files) {
-    const lines = readFileSync(file, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const m = (lines[i] ?? "").match(BATS_ANNOTATION_RE);
-      if (!m) continue;
-      const title = (m[1] ?? m[2] ?? "").trim();
-      if (!title) continue;
-      if (!isTestLine(lines, i + 1)) continue;
-      bindings.push({
-        title,
-        ref: { file: relative(REPO_ROOT, file), line: i + 1 },
-      });
-    }
-  }
-
-  return bindings;
+  return testRoots
+    .flatMap((r) => walkFiles(resolve(REPO_ROOT, r), fileMatches))
+    .flatMap((file) => hashCommentBindingsInFile(file, isTestLine));
 }
 
 function collectBatsBindings(testRoots: string[]): CollectedBinding[] {

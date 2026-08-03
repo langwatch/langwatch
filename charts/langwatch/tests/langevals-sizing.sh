@@ -17,7 +17,8 @@
 # default. See specs/setup/helm-langevals-worker-pool.feature.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
-# expressed as a hash-comment directly above the test function it verifies.
+# expressed as a hash-comment above the test function it verifies — the next
+# line that is neither blank nor a comment must be that function.
 #
 # Usage (from charts/langwatch):
 #   helm dependency build .
