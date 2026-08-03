@@ -21,6 +21,7 @@ import type {
   BudgetDebitRow,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
+import type { BudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import {
   budgetAppliesToProvider,
   type ResolvedBudget,
@@ -138,6 +139,12 @@ export type WriteGatewayDebitsPayload = z.infer<
 export interface GatewayDebitsProcessDeps {
   prisma: PrismaClient;
   budgetCHRepository: GatewayBudgetClickHouseRepository;
+  /**
+   * Gates redundant advisory BUDGET_UPDATED emissions. Optional: without it
+   * every debit emits, which is what this process did before the dedupe
+   * existed.
+   */
+  changeEventDedupe?: BudgetChangeEventDedupeService;
 }
 
 /**
@@ -244,28 +251,68 @@ function crossingCandidates(
 }
 
 /**
+ * Whether a debit against these budgets can change an enforcement decision.
+ *
+ * A BLOCK budget's spend feeds the gateway's pre-request precheck, so its
+ * change event has to reach the gateway promptly or an over-limit key keeps
+ * being served from a cached bundle. A WARN budget's spend only drives
+ * advisory signal, where the same delay costs freshness and nothing else.
+ *
+ * That asymmetry is the whole basis for deduping one and not the other:
+ * they are not the same currency, and a single window cannot price both.
+ */
+function affectsEnforcementDecision(budgets: ResolvedBudget[]): boolean {
+  return budgets.some(({ budget }) => budget.onBreach === "BLOCK");
+}
+
+/**
  * Tell the gateway its cached spend is stale, so the next request on this
  * project re-resolves rather than enforcing against the figure baked in at
  * bundle time. Narrow by project: an org-wide eviction would cold-miss
  * every other project's keys over one request's debit.
  *
+ * One instance runs per gateway request, so an ungated emit puts one change
+ * event on the feed per billable request, and every one of them evicts every
+ * bundle in the project: an L1 sweep plus a cold miss for each other virtual
+ * key in it. The emissions are redundant with each other because the event
+ * carries no spend figure. It asks for an eviction, and the re-materialise it
+ * provokes reads current spend for every budget, so one eviction per window
+ * achieves what N did.
+ *
+ * The dedupe is skipped entirely when any applicable budget blocks on breach,
+ * so an emission that could change an enforcement decision is never held
+ * back. That is why the window cannot become the dominant term in
+ * block-decision propagation: it is not on that path at all.
+ *
+ * Known limit, deliberate: this is a leading-edge window with no trailing
+ * flush. If advisory traffic stops mid-window, the last debit's refresh waits
+ * for the next debit or the bundle TTL. That is acceptable for a signal
+ * nothing enforces on, and it cannot happen on the blocking path.
+ *
  * Best effort. The ledger rows already landed, and a missed eviction costs
  * freshness until the config TTL rolls, never correctness.
  */
 async function emitBudgetUpdated(
-  prisma: PrismaClient,
+  deps: GatewayDebitsProcessDeps,
   payload: WriteGatewayDebitsPayload,
-  budgetIds: string[],
+  budgets: ResolvedBudget[],
 ): Promise<void> {
   try {
-    await new ChangeEventRepository(prisma).append({
+    if (deps.changeEventDedupe && !affectsEnforcementDecision(budgets)) {
+      const emit = await deps.changeEventDedupe.shouldEmit({
+        projectId: payload.project_id,
+      });
+      if (!emit) return;
+    }
+
+    await new ChangeEventRepository(deps.prisma).append({
       organizationId: payload.organization_id,
       projectId: payload.project_id,
       kind: "BUDGET_UPDATED",
       payload: {
         gatewayRequestId: payload.gateway_request_id,
         virtualKeyId: payload.virtual_key_id,
-        budgetIds,
+        budgetIds: budgets.map((b) => b.budget.id),
       },
     });
   } catch (error) {
@@ -313,11 +360,7 @@ export function runWriteGatewayDebits(deps: GatewayDebitsProcessDeps) {
     // the debit path, and store-level idempotency makes retries safe.
     await detectBudgetCrossings(deps, crossingCandidates(payload, budgets));
 
-    await emitBudgetUpdated(
-      deps.prisma,
-      payload,
-      budgets.map((b) => b.budget.id),
-    );
+    await emitBudgetUpdated(deps, payload, budgets);
   };
 }
 

@@ -31,6 +31,7 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -774,6 +775,7 @@ export function initializeDefaultApp(options?: {
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        changeEventDedupe: createBudgetChangeEventDedupeService(redis),
       }
     : undefined;
 
