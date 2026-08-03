@@ -1155,7 +1155,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(foreign.status).toBe(400);
       const foreignBody = await foreign.json();
       expect(foreignBody.error.code).toBe("gateway_scope_org_mismatch");
-      expect(foreignBody.error.meta.scopeKind).toBe("model provider");
+      expect(foreignBody.error.meta.scope_kind).toBe("model provider");
     });
 
     /** @scenario REST budget spend is the live ClickHouse ledger, not the stale PG column */

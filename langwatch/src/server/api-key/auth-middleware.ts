@@ -4,6 +4,10 @@ import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
+import {
+  type ApiErrorEnvelope,
+  authRefusalBody,
+} from "~/app/api/shared/canonical-error";
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
@@ -211,75 +215,38 @@ export type OrgAuthVariables = {
  * Sets `organization`, `apiKeyId`, `apiKeyUserId`, `apiKeyOrganizationId` on context.
  * Does NOT set `project` — callers that need project context should use
  * the standard project-scoped auth middleware instead.
+ *
+ * `errorEnvelope` picks the shape refusals answer with, because that shape is
+ * a property of the route family's published contract, not of the auth check:
+ * a family that emits the canonical envelope from its handlers must not
+ * answer a flat body when the same request fails one layer earlier. Families
+ * predating the envelope stay on `legacy` until they migrate deliberately.
  */
 export function createOrgAuthMiddleware({
   prisma,
+  errorEnvelope = "legacy",
 }: {
   prisma: PrismaClient;
+  errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
+  const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
-    const credentials = extractCredentials((name) => c.req.header(name));
-    const diag = collectAuthDiagnostics(c);
-
-    if (!credentials) {
-      orgLogger.warn(diag, "Org auth failed: no credentials");
-      return c.json(
-        {
-          error: "Unauthorized",
-          message:
-            "Authentication required. Use Authorization: Bearer <api-key>.",
-        },
-        401,
-      );
-    }
-
-    let resolved: OrgResolvedToken | null;
-    try {
-      resolved = await resolver.resolveOrgOnly({ token: credentials.token });
-    } catch (error) {
-      orgLogger.error({ ...diag, error }, "Database error during org auth");
-      return c.json(
-        {
-          error: "Internal Server Error",
-          message: "Authentication service error",
-        },
-        500,
-      );
-    }
-
-    if (!resolved) {
-      orgLogger.warn(
-        { ...diag, hasToken: true },
-        "Org auth failed: invalid credentials",
-      );
-      return c.json(
-        {
-          error: "Unauthorized",
-          message:
-            "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
-        },
-        401,
-      );
-    }
-
-    const organization = await prisma.organization.findUnique({
-      where: { id: resolved.organizationId },
+    const outcome = await resolveOrgPrincipal({
+      prisma,
+      resolver,
+      orgLogger,
+      credentials: extractCredentials((name) => c.req.header(name)),
+      diag: collectAuthDiagnostics(c),
     });
 
-    if (!organization) {
-      orgLogger.warn(
-        { ...diag, organizationId: resolved.organizationId },
-        "Org auth failed: organization not found",
-      );
-      return c.json(
-        { error: "Unauthorized", message: "Organization not found" },
-        401,
-      );
+    if (!outcome.ok) {
+      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
     }
 
+    const { organization, resolved } = outcome;
     c.set("organization", organization);
     c.set("apiKeyId", resolved.apiKeyId);
     c.set("apiKeyUserId", resolved.userId);
@@ -292,6 +259,107 @@ export function createOrgAuthMiddleware({
       resolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
+}
+
+/** A refusal the org auth check answers with, before it has an envelope. */
+type OrgAuthRefusal = {
+  status: number;
+  code: string;
+  legacyError: string;
+  message: string;
+};
+
+/**
+ * The organization behind a credential, or the reason there isn't one.
+ *
+ * Split out so the middleware above reads as "resolve, then set context":
+ * every refusal is described here as data and rendered into the family's
+ * envelope by its one caller, so no branch can answer in the wrong shape.
+ */
+async function resolveOrgPrincipal({
+  prisma,
+  resolver,
+  orgLogger,
+  credentials,
+  diag,
+}: {
+  prisma: PrismaClient;
+  resolver: TokenResolver;
+  orgLogger: ReturnType<typeof createLogger>;
+  credentials: { token: string; projectId: string | null } | null;
+  diag: AuthDiagnostics;
+}): Promise<
+  | { ok: true; organization: Organization; resolved: OrgResolvedToken }
+  | { ok: false; refusal: OrgAuthRefusal }
+> {
+  if (!credentials) {
+    orgLogger.warn(diag, "Org auth failed: no credentials");
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "missing_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Authentication required. Use Authorization: Bearer <api-key>.",
+      },
+    };
+  }
+
+  let resolved: OrgResolvedToken | null;
+  try {
+    resolved = await resolver.resolveOrgOnly({ token: credentials.token });
+  } catch (error) {
+    orgLogger.error({ ...diag, error }, "Database error during org auth");
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+      },
+    };
+  }
+
+  if (!resolved) {
+    orgLogger.warn(
+      { ...diag, hasToken: true },
+      "Org auth failed: invalid credentials",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "invalid_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+      },
+    };
+  }
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: resolved.organizationId },
+  });
+
+  if (!organization) {
+    orgLogger.warn(
+      { ...diag, organizationId: resolved.organizationId },
+      "Org auth failed: organization not found",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "organization_not_found",
+        legacyError: "Unauthorized",
+        message: "Organization not found",
+      },
+    };
+  }
+
+  return { ok: true, organization, resolved };
 }
 
 /**

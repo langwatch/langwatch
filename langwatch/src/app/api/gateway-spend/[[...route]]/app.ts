@@ -36,6 +36,7 @@ import {
 } from "~/server/gateway/budgetResolution.service";
 import {
   decodeSpendEventsCursor,
+  decodeSpendSummariesCursor,
   GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -200,7 +201,10 @@ async function applicableEndUserCaps(params: {
   });
 }
 
-const secured = createOrgApp({ basePath: "/api/gateway/v1" });
+const secured = createOrgApp({
+  basePath: "/api/gateway/v1",
+  errorEnvelope: "canonical",
+});
 
 secured.hono.onError(handleGatewaySpendApiError);
 
@@ -209,7 +213,9 @@ const spendSummariesQuerySchema = z.object({
   from: z.coerce.number().int().positive(),
   to: z.coerce.number().int().positive(),
   project_id: z.string().min(1).max(100).optional(),
+  cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().positive().max(1000).optional().default(500),
+  virtual_key_id: z.string().min(1).max(100).optional(),
 });
 
 secured.access(requires("gatewaySpend:view")).get(
@@ -217,22 +223,32 @@ secured.access(requires("gatewaySpend:view")).get(
   requireBillingPlan,
   describeRoute({
     description:
-      "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges.",
+      "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
   }),
   zValidator("query", spendSummariesQuerySchema),
   async (c) => {
     const organization = c.get("organization") as Organization;
     const query = c.req.valid("query");
+    // Same contract as /spend-events: a present-but-garbled cursor is refused
+    // rather than silently restarting the walk from the first key.
+    if (
+      query.cursor !== undefined &&
+      decodeSpendSummariesCursor(query.cursor) === null
+    ) {
+      throw new BadRequestError("Invalid cursor.");
+    }
     const tenantIds = await orgTenantIds(organization.id, query.project_id);
-    const rows = await spendEvents.readSpendSummaries({
+    const page = await spendEvents.readSpendSummaries({
       tenantIds,
       groupBy: query.group_by,
       fromMs: query.from,
       toMs: query.to,
+      cursor: query.cursor ?? null,
       limit: query.limit,
+      virtualKeyId: query.virtual_key_id,
     });
     return c.json({
-      data: rows.map((r) => ({
+      data: page.rows.map((r) => ({
         key: r.key,
         event_count: r.eventCount,
         settled_count: r.settledCount,
@@ -245,6 +261,7 @@ secured.access(requires("gatewaySpend:view")).get(
         },
         cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
       })),
+      next_cursor: page.nextCursor,
     });
   },
 );

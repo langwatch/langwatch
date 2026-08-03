@@ -329,6 +329,29 @@ Feature: Billing spend events, one durable record per gateway request
       Then each row sums tokens and integer nano cost over priced outcomes only
       And settled requests appear as their own count, never in the cost
 
+    @integration
+    Scenario: Summaries page by cursor instead of truncating at the limit
+      Given more keys in the window than one page holds
+      When the summaries are walked from the first page to the last
+      Then a full page hands back a cursor and the final page hands back null
+      And every key is served exactly once across the pages
+      # A checksum that silently stopped at the limit read as a complete
+      # reconciliation while missing keys entirely.
+
+    @integration
+    Scenario: Summaries accept the same virtual_key_id filter as the events pull
+      Given spend records under two different virtual keys in one window
+      When the summaries are read narrowed to one virtual key
+      Then only that key's rows are rolled up
+
+    @integration
+    Scenario: A garbled summaries cursor is refused, not silently reset
+      Given a cursor value this service never minted
+      When the summaries are read with it
+      Then the call is refused with the canonical error envelope
+      # Silently restarting the walk would re-serve the whole window as if
+      # it were the next page.
+
   Rule: The caller declares who spent it
 
     @unit

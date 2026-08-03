@@ -87,7 +87,7 @@ export class GatewayScopeOrgMismatchError extends HandledError {
     super(
       "gateway_scope_org_mismatch",
       "That scope does not belong to this organization",
-      { meta: { scopeKind }, httpStatus: 400, fault: "customer" },
+      { meta: { scope_kind: scopeKind }, httpStatus: 400, fault: "customer" },
     );
     this.name = "GatewayScopeOrgMismatchError";
   }

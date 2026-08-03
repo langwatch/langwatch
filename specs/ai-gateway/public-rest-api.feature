@@ -123,6 +123,30 @@ Feature: Public REST API — /api/gateway/v1/*
     When a legacy project key names a sibling team's project as the destination
     Then the response status is 403
 
+  @integration @rest
+  Scenario: An unauthenticated request answers the canonical error envelope
+    When a request arrives with no API key
+    Then the response status is 401
+    And the body is the canonical error envelope with type "unauthenticated"
+    And error.code is "missing_credentials"
+
+  @integration @rest
+  Scenario: A request-validation failure answers the canonical error envelope at 400
+    When a request fails its schema
+    Then the response status is 400
+    And the body is the canonical error envelope with code "validation_error"
+    And error.meta names the target and the offending fields
+    And error.meta.reasons carries one entry per violation
+    # One status for one code: the surface used to answer 422 here while the
+    # platform routes answered 400 for the same refusal.
+
+  @integration @rest
+  Scenario: An unexpected server failure answers the canonical error envelope naming nothing internal
+    When a handler fails with an unexpected error
+    Then the response status is 500
+    And the body is the canonical error envelope with code "internal_error"
+    And the message names no table, host, or stack fragment
+
   @integration @rest @rbac
   Scenario: Cross-org scopes are rejected
     When an org-admin API key requests a scope belonging to another organization

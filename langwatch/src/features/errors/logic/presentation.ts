@@ -607,6 +607,20 @@ const presentations = {
     describe: () =>
       "Browser monitoring is sending faster than we accept. It will resume on its own.",
   },
+  // ---- REST API credentials ----
+  // Raised by the organization-scoped REST boundary, which an integration
+  // calls with an API key rather than a session. The copy points at the key
+  // because that is the only thing the caller can fix.
+  missing_credentials: {
+    title: "This request carried no API key",
+    describe: () =>
+      "Send an organization API key as Authorization: Bearer <api-key>.",
+  },
+  invalid_credentials: {
+    title: "That API key was not accepted",
+    describe: () =>
+      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>
@@ -1237,7 +1251,7 @@ const presentations = {
     // confirm the existence of.
     title: "That scope isn't in this organization",
     describe: (error) => {
-      const kind = str(error, "scopeKind", "");
+      const kind = str(error, "scope_kind", "");
       return kind
         ? `Pick a ${kind} that belongs to this organization.`
         : "Pick a scope that belongs to this organization.";

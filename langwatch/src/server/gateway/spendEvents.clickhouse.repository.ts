@@ -572,21 +572,31 @@ export class GatewaySpendEventsRepository {
    * SEPARATELY so unpriced spend is visible in the checksum instead of
    * silently reading as zero cost. Admitted rows are in-flight and
    * excluded. FINAL keeps the read replacement-aware.
+   *
+   * Paged by GROUP KEY ascending, not by cost descending. A checksum is only
+   * a checksum if it covers every key, and a cursor over a cost ordering is
+   * not walkable: the sums it orders by keep moving as late folds land, so a
+   * key can cross the page boundary between two calls and be served twice or
+   * skipped entirely. The group key is immutable, so the walk is exact.
    */
   async readSpendSummaries({
     tenantIds,
     groupBy,
     fromMs,
     toMs,
+    cursor,
     limit = 500,
+    virtualKeyId,
   }: {
     tenantIds: string[];
     groupBy: "virtual_key" | "end_user";
     fromMs: number;
     toMs: number;
+    cursor?: string | null;
     limit?: number;
-  }): Promise<
-    Array<{
+    virtualKeyId?: string;
+  }): Promise<{
+    rows: Array<{
       key: string;
       eventCount: number;
       settledCount: number;
@@ -597,11 +607,25 @@ export class GatewaySpendEventsRepository {
       tokensReasoning: number;
       costNanoUsd: number;
       costUsd: string;
-    }>
-  > {
-    if (tenantIds.length === 0) return [];
+    }>;
+    nextCursor: string | null;
+  }> {
+    if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
     const keyColumn = groupBy === "virtual_key" ? "VirtualKeyId" : "EndUserId";
+
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = { tenantIds, fromMs, toMs, limit };
+    const decoded = cursor ? decodeSpendSummariesCursor(cursor) : null;
+    if (decoded !== null) {
+      clauses.push(`AND ${keyColumn} > {cursorKey:String}`);
+      params.cursorKey = decoded;
+    }
+    if (virtualKeyId !== undefined) {
+      clauses.push("AND VirtualKeyId = {virtualKeyId:String}");
+      params.virtualKeyId = virtualKeyId;
+    }
+
     const result = await client.query({
       query: `
         SELECT
@@ -619,15 +643,21 @@ export class GatewaySpendEventsRepository {
           AND Status != 'admitted'
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
+          ${clauses.join("\n          ")}
         GROUP BY GroupKey
-        ORDER BY CostNanoUSD DESC, GroupKey ASC
+        ORDER BY GroupKey ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantIds, fromMs, toMs, limit },
+      query_params: params,
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    return raw.map((r) => {
+    const last = raw[raw.length - 1];
+    const nextCursor =
+      raw.length === limit && last
+        ? encodeSpendSummariesCursor(String(last.GroupKey ?? ""))
+        : null;
+    const rows = raw.map((r) => {
       const nano = parseSummedNanoUsd(r.CostNanoUSD);
       return {
         key: String(r.GroupKey ?? ""),
@@ -642,6 +672,7 @@ export class GatewaySpendEventsRepository {
         costUsd: nanoToUsdString(nano),
       };
     });
+    return { rows, nextCursor };
   }
 
   async readEndUserSpend({
@@ -736,6 +767,30 @@ export function encodeSpendEventsCursor(cursor: SpendEventsCursor): string {
     `${cursor.eventTimestampMs}:${cursor.gatewayRequestId}`,
     "utf8",
   ).toString("base64url");
+}
+
+/**
+ * Opaque page cursor for the summaries rollup: base64url of the last group
+ * key served. Same encoding conventions as {@link encodeSpendEventsCursor} so
+ * a caller treats both surfaces' cursors identically: opaque, and passed back
+ * verbatim.
+ */
+export function encodeSpendSummariesCursor(groupKey: string): string {
+  return Buffer.from(groupKey, "utf8").toString("base64url");
+}
+
+/**
+ * The group key a summaries cursor names, or null when it is not a cursor
+ * this service minted. An empty key decodes to null: it can never advance the
+ * walk, so accepting it would serve page one forever.
+ */
+export function decodeSpendSummariesCursor(encoded: string): string | null {
+  try {
+    const raw = Buffer.from(encoded, "base64url").toString("utf8");
+    return raw.length > 0 ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 export function decodeSpendEventsCursor(

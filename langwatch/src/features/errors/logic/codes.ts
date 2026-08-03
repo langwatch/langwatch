@@ -75,6 +75,7 @@ export const APP_ERROR_CODES = [
   // code for an unhandled failure, so the scan sees it here too.
   "internal_error",
   "invalid_action_params",
+  "invalid_credentials",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
   "langy_agent_at_capacity",
@@ -111,6 +112,7 @@ export const APP_ERROR_CODES = [
   "malformed_custom_role_permissions",
   "malformed_request",
   "missing_annotator",
+  "missing_credentials",
   // Not declared by a subclass anywhere: `nlpgo/goHandledError.ts` promotes a
   // relayed Go error's `meta.reason` to the code, so this one is minted at the
   // boundary rather than thrown. It still reaches a customer, so it still needs

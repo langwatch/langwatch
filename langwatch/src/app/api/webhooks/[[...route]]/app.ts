@@ -169,7 +169,10 @@ async function recordTestFire(attempt: {
   }
 }
 
-const secured = createOrgApp({ basePath: "/api/webhooks/v1" });
+const secured = createOrgApp({
+  basePath: "/api/webhooks/v1",
+  errorEnvelope: "canonical",
+});
 
 secured.hono.onError(handleWebhookApiError);
 

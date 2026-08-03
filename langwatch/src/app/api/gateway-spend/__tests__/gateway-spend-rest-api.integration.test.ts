@@ -27,6 +27,7 @@ import {
   type SpendEventRow,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
@@ -304,7 +305,74 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
   /** @scenario Requests without an org API key are unauthorized */
   it("returns 401 without an api key", async () => {
     const res = await app.request("/api/gateway/v1/spend-events");
-    expect(res.status).toBe(401);
+    await expectCanonicalError(res, {
+      status: 401,
+      type: "unauthenticated",
+      code: "missing_credentials",
+    });
+  });
+
+  describe("canonical error envelope", () => {
+    /** @scenario An unauthenticated request answers the canonical error envelope */
+    it("answers an unauthenticated request with it", async () => {
+      const res = await app.request("/api/gateway/v1/spend-summaries");
+      await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "missing_credentials",
+      });
+    });
+
+    /** @scenario A request-validation failure answers the canonical error envelope at 400 */
+    it("answers a request-validation failure with it, at 400 and with the offending fields under meta", async () => {
+      const res = await app.request(
+        "/api/gateway/v1/spend-summaries?group_by=nonsense",
+        { headers: headers() },
+      );
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      expect(error.meta?.target).toBe("query");
+      expect(error.meta?.fields).toEqual(
+        expect.arrayContaining(["group_by", "from", "to"]),
+      );
+      // The reason chain names each offending field, in the wire's own
+      // casing, so a caller never has to parse the sentence.
+      const reasons = error.meta?.reasons as Array<{
+        code: string;
+        meta?: { field?: string };
+      }>;
+      expect(reasons.map((r) => r.meta?.field)).toEqual(
+        expect.arrayContaining(["group_by"]),
+      );
+      expect(reasons.every((r) => r.code === "schema_failure")).toBe(true);
+    });
+
+    /** @scenario An unexpected server failure answers the canonical error envelope naming nothing internal */
+    it("answers an unexpected server failure with it, naming nothing internal", async () => {
+      const boom = vi
+        .spyOn(GatewaySpendEventsRepository.prototype, "readSpendSummaries")
+        .mockRejectedValueOnce(
+          new Error('relation "GatewaySpendRecords" does not exist'),
+        );
+      try {
+        const res = await app.request(
+          `/api/gateway/v1/spend-summaries?group_by=virtual_key&from=${baseTime}&to=${baseTime + 1_000}`,
+          { headers: headers() },
+        );
+        const error = await expectCanonicalError(res, {
+          status: 500,
+          type: "internal_error",
+          code: "internal_error",
+        });
+        // The raised sentence names a table; the envelope must not.
+        expect(error.message).not.toContain("GatewaySpendRecords");
+      } finally {
+        boom.mockRestore();
+      }
+    });
   });
 
   /** @scenario Without the plan flag the surface refuses politely */
@@ -315,8 +383,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         headers: headers(),
       });
       expect(res.status).toBe(403);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toContain("enterprise");
+      const body = (await res.json()) as {
+        error: { type: string; code: string; message: string };
+      };
+      expect(body.error.type).toBe("permission_denied");
+      expect(body.error.message).toContain("enterprise");
     } finally {
       planHasWebhookEndpoints = true;
     }
@@ -402,7 +473,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       `/api/gateway/v1/spend-events?from=${baseTime + 10_000}&to=${baseTime}`,
       { headers: headers() },
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
@@ -495,7 +566,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           }),
         },
       );
-      expect(inverted.status).toBe(422);
+      expect(inverted.status).toBe(400);
     } finally {
       if (previous === undefined) {
         delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
@@ -681,6 +752,87 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(row.cost.nano_usd).toBe(50_000_000);
     expect(Number(row.cost.total_usd)).toBeCloseTo(0.05, 6);
     expect(row.usage.input_tokens).toBe(200);
+  });
+
+  /** @scenario Summaries page by cursor instead of truncating at the limit */
+  it("walks every key across pages and stops with a null cursor", async () => {
+    const win = { from: baseTime + 300_000, to: baseTime + 310_000 };
+    const keys = ["aaa", "bbb", "ccc"].map((k) => `${ns}-page-${k}`);
+    await seed(
+      keys.map((k, i) =>
+        spendRow(`${ns}-page-${i}`, {
+          endUserId: k,
+          costUsd: "0.010000",
+          occurredAt: new Date(win.from + 1_000 + i),
+        }),
+      ),
+    );
+
+    const page = async (cursor?: string) => {
+      const q = new URLSearchParams({
+        group_by: "end_user",
+        from: String(win.from),
+        to: String(win.to),
+        limit: "2",
+      });
+      if (cursor) q.set("cursor", cursor);
+      const res = await app.request(
+        `/api/gateway/v1/spend-summaries?${q.toString()}`,
+        { headers: headers() },
+      );
+      expect(res.status).toBe(200);
+      return (await res.json()) as {
+        data: Array<{ key: string }>;
+        next_cursor: string | null;
+      };
+    };
+
+    const first = await page();
+    expect(first.data.map((r) => r.key)).toEqual(keys.slice(0, 2));
+    // A full page must hand back a cursor: this is the truncation that used
+    // to be silent, and a reconciliation that stops here loses a key.
+    expect(first.next_cursor).not.toBeNull();
+
+    const second = await page(first.next_cursor!);
+    expect(second.data.map((r) => r.key)).toEqual(keys.slice(2));
+    expect(second.next_cursor).toBeNull();
+
+    // The walk is exact: every key once, none skipped, none repeated.
+    expect([...first.data, ...second.data].map((r) => r.key)).toEqual(keys);
+  });
+
+  /** @scenario Summaries accept the same virtual_key_id filter as the events pull */
+  it("narrows summaries to one virtual key", async () => {
+    const win = { from: baseTime + 320_000, to: baseTime + 330_000 };
+    await seed([
+      spendRow(`${ns}-vkf-1`, {
+        virtualKeyId: `${ns}-vk-keep`,
+        endUserId: `${ns}-vkf-user-a`,
+        occurredAt: new Date(win.from + 1_000),
+      }),
+      spendRow(`${ns}-vkf-2`, {
+        virtualKeyId: `${ns}-vk-drop`,
+        endUserId: `${ns}-vkf-user-b`,
+        occurredAt: new Date(win.from + 2_000),
+      }),
+    ]);
+
+    const res = await app.request(
+      `/api/gateway/v1/spend-summaries?group_by=end_user&from=${win.from}&to=${win.to}&virtual_key_id=${ns}-vk-keep`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ key: string }> };
+    expect(body.data.map((r) => r.key)).toEqual([`${ns}-vkf-user-a`]);
+  });
+
+  /** @scenario A garbled summaries cursor is refused, not silently reset */
+  it("rejects an undecodable summaries cursor with the canonical 400", async () => {
+    const res = await app.request(
+      `/api/gateway/v1/spend-summaries?group_by=end_user&from=${baseTime}&to=${baseTime + 1_000}&cursor=${encodeURIComponent("%%%")}`,
+      { headers: headers() },
+    );
+    await expectCanonicalError(res, { status: 400, type: "bad_request" });
   });
 
   /** @scenario The end-user rollup sums exactly that user's requests in the window */

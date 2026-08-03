@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
@@ -104,7 +105,73 @@ describe("Feature: Webhook endpoints REST API", () => {
 
   it("returns 401 without an api key", async () => {
     const res = await app.request("/api/webhooks/v1/endpoints");
-    expect(res.status).toBe(401);
+    await expectCanonicalError(res, {
+      status: 401,
+      type: "unauthenticated",
+      code: "missing_credentials",
+    });
+  });
+
+  describe("canonical error envelope", () => {
+    /** @scenario An unauthenticated request answers the canonical error envelope */
+    it("answers an unauthenticated request with it", async () => {
+      const res = await app.request("/api/webhooks/v1/event-types");
+      await expectCanonicalError(res, {
+        status: 401,
+        type: "unauthenticated",
+        code: "missing_credentials",
+      });
+    });
+
+    /** @scenario A request-validation failure answers the canonical error envelope at 400 */
+    it("answers a request-validation failure with it, at 400 and with the offending fields under meta", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ enabled_events: ["gateway.request.completed"] }),
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      expect(error.meta?.target).toBe("json");
+      expect(error.meta?.fields).toEqual(expect.arrayContaining(["url"]));
+      const reasons = error.meta?.reasons as Array<{
+        code: string;
+        meta?: { field?: string };
+      }>;
+      expect(reasons.map((r) => r.meta?.field)).toEqual(
+        expect.arrayContaining(["url"]),
+      );
+    });
+
+    /** @scenario An unexpected server failure answers the canonical error envelope naming nothing internal */
+    it("answers an unexpected server failure with it, naming nothing internal", async () => {
+      planHasWebhookEndpoints = true;
+      const { WebhookEndpointService } = await import(
+        "@ee/webhooks/webhookEndpoint.service"
+      );
+      const boom = vi
+        .spyOn(WebhookEndpointService.prototype, "getAll")
+        .mockRejectedValueOnce(
+          new Error('relation "WebhookEndpoint" does not exist'),
+        );
+      try {
+        const res = await app.request("/api/webhooks/v1/endpoints", {
+          headers: headers(),
+        });
+        const error = await expectCanonicalError(res, {
+          status: 500,
+          type: "internal_error",
+          code: "internal_error",
+        });
+        expect(error.message).not.toContain("WebhookEndpoint");
+      } finally {
+        boom.mockRestore();
+      }
+    });
   });
 
   /** @scenario The signing secret is returned only at create and roll time */
@@ -166,9 +233,11 @@ describe("Feature: Webhook endpoints REST API", () => {
         max_batch_size: 1000,
       }),
     });
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { message?: string; error?: string };
-    expect(JSON.stringify(body)).toContain("between 1 and 100");
+    const error = await expectCanonicalError(res, {
+      status: 400,
+      type: "bad_request",
+    });
+    expect(JSON.stringify(error)).toContain("between 1 and 100");
   });
 
   it("rejects unknown event selectors with a 400", async () => {
@@ -229,9 +298,11 @@ describe("Feature: Webhook endpoints REST API", () => {
       const res = await app.request("/api/webhooks/v1/endpoints", {
         headers: headers(),
       });
-      expect(res.status).toBe(403);
-      const body = (await res.json()) as { message?: string; error?: string };
-      expect(JSON.stringify(body)).toContain("enterprise");
+      const error = await expectCanonicalError(res, {
+        status: 403,
+        type: "permission_denied",
+      });
+      expect(error.message).toContain("enterprise");
     } finally {
       planHasWebhookEndpoints = true;
     }
