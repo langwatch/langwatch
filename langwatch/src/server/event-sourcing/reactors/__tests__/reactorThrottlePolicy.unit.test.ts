@@ -141,5 +141,20 @@ describe("reactor throttle policy", () => {
 
       expect(reactor.options?.delay ?? 0).toBe(0);
     });
+
+    it("never suppresses a billing trigger after one has dispatched", () => {
+      // Its dedup TTL outlives a dispatch, so if the key ALSO survived
+      // dispatch a trigger just after a UTC month rollover could be discarded
+      // and that month's first report skipped. Post-dispatch suppression is
+      // opt-in, and this reactor must never opt in while the handler decides
+      // its billing month from the clock.
+      const reactor = createBillingMeterDispatchReactor({
+        getDispatch: () => async () => {},
+      });
+
+      expect(
+        reactor.options?.deduplication?.shouldSurviveDispatch ?? false,
+      ).toBe(false);
+    });
   });
 });
