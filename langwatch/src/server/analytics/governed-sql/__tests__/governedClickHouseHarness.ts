@@ -40,6 +40,21 @@
  * these too. The server config is digested into a further label because file
  * copies are NOT part of the reuse hash — without it, editing the XML would
  * silently keep reusing a container running the old configuration.
+ *
+ * ## The reused container holds whatever was applied LAST
+ *
+ * Every statement here is `OR REPLACE`, so a normal run converges the reused
+ * container onto the current source. Two consequences worth knowing:
+ *
+ *  - Inspecting the container out of band shows the last run's provisioning,
+ *    not the source you are reading. A container left behind by a deliberately
+ *    broken run keeps the broken policy until the suite runs again — which is
+ *    a good way to convince yourself of the opposite of what the code says.
+ *  - `OR REPLACE` converges statements that still exist. A statement DELETED
+ *    from the setup list leaves its object behind in a reused container, so
+ *    the suite could pass on a policy the source no longer creates. Drop the
+ *    containers (the sweep above) when changing which objects are provisioned,
+ *    not just how.
  */
 import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
