@@ -427,6 +427,34 @@ Feature: AI Gateway — Budgets
     When I open the Budgets list
     Then the budget carries no scope warning
 
+  @integration
+  Scenario: A per-person budget anchored on a key that serves traffic carries no warning
+    Given a per-person budget is anchored on virtual key "gateway-demo-key"
+    And that key is active
+    When I open the Budgets list
+    Then the budget carries no scope warning
+
+  @integration
+  Scenario: A per-person budget anchored where no key sends traffic warns
+    Given a per-person budget is anchored on project "retired"
+    But no active key sends traffic to project "retired"
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+
+  @integration
+  Scenario: A group budget carries no warning when a member holds a key
+    Given a group budget targets group "platform"
+    And an active key is attributed to a member of group "platform"
+    When I open the Budgets list
+    Then the budget carries no scope warning
+
+  @integration
+  Scenario: A group budget warns when its members' traffic cannot be attributed to them
+    Given a group budget targets group "platform"
+    And the only active key a member of "platform" holds is attributed to nobody
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+
   # ============================================================================
   # Window resets
   # ============================================================================
