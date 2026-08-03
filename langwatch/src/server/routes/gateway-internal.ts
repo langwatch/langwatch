@@ -41,7 +41,6 @@ import {
   bucketPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -659,121 +658,6 @@ secured.access(gatewayPolicy()).get("/changes", async (c) => {
   return c.body(null, 204, {
     "X-LangWatch-Revision": current.toString(),
   });
-});
-
-/**
- * §4.4 — projective pre-request budget check.
- *
- * Request:  { vk_id, gateway_request_id, projected_cost_usd, model }
- * Response: { decision: allow|soft_warn|hard_block, warnings[], block_reason }
- */
-secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    vk_id?: string;
-    gateway_request_id?: string;
-    projected_cost_usd?: number | string;
-    model?: string;
-  };
-  if (!body.vk_id || body.projected_cost_usd === undefined) {
-    return c.json(
-      {
-        error: {
-          type: "bad_request",
-          code: "missing_required_fields",
-          message: "vk_id and projected_cost_usd are required",
-        },
-      },
-      400,
-    );
-  }
-
-  const vk = await prisma.virtualKey.findUnique({
-    where: { id: body.vk_id },
-    include: { scopes: true },
-  });
-  if (!vk) {
-    return c.json(
-      {
-        error: {
-          type: "invalid_api_key",
-          code: "virtual_key_not_found",
-          message: "unknown virtual key",
-        },
-      },
-      404,
-    );
-  }
-  // Trace project resolution mirrors the /config/:vk_id and /resolve-key
-  // paths: single-PROJECT-scope VK uses that project; otherwise fall
-  // back to the org's internal_governance project; otherwise null —
-  // budget check still runs against ORG/VIRTUAL_KEY/PRINCIPAL scopes.
-  const traceProject = await resolveTraceProject(prisma, vk);
-
-  // EC6 — admin oversight ("when did this user last use their VK")
-  // was broken because /resolve-key only fires on bundle cache miss
-  // (~once per JWT TTL = 15 min). The gateway hits /budget/check on
-  // every dispatch, so this is the right hook for last-used updates.
-  // Throttle to 60s to avoid hot-row contention at high RPS — admin
-  // dashboards refresh on minute-scale anyway. Fire-and-forget so a
-  // DB blip doesn't deny the request.
-  if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
-    const vkService = VirtualKeyService.create(prisma);
-    void vkService.touchUsage(vk.id).catch(() => {});
-  }
-
-  const service = GatewayBudgetService.create(
-    prisma,
-    isClickHouseEnabled()
-      ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-          const client = await getClickHouseClientForProject(projectId);
-          if (!client) {
-            throw new Error(
-              `ClickHouse enabled but no client for project ${projectId}`,
-            );
-          }
-          return client;
-        })
-      : undefined,
-  );
-  const result = await service.check({
-    organizationId: vk.organizationId,
-    teamId: traceProject?.teamId ?? null,
-    projectId: traceProject?.id ?? null,
-    virtualKeyId: vk.id,
-    principalUserId: vk.principalUserId,
-    projectedCostUsd: body.projected_cost_usd,
-  });
-
-  return c.json(
-    {
-      decision: result.decision,
-      warnings: result.warnings.map((w) => ({
-        scope: w.scope,
-        pct_used: w.pctUsed,
-        limit_usd: w.limitUsd,
-      })),
-      block_reason: result.blockReason,
-      blocked_by: result.blockedBy.map((b) => ({
-        budget_id: b.budgetId,
-        scope: b.scope,
-        scope_id: b.scopeId,
-        window: b.window,
-        limit_usd: b.limitUsd,
-        spent_usd: b.spentUsd,
-      })),
-      // Contract §4.4 — raw per-scope ledger consumed by the gateway's
-      // Checker.ApplyLive reconciliation path. Includes every applicable
-      // budget, not just the ones in warn/block.
-      scopes: result.scopes.map((s) => ({
-        scope: s.scope,
-        scope_id: s.scopeId,
-        window: s.window,
-        spent_usd: s.spentUsd,
-        limit_usd: s.limitUsd,
-      })),
-    },
-    200,
-  );
 });
 
 // §4.5 — `/budget/debit` is removed. Cost recording rides the spend

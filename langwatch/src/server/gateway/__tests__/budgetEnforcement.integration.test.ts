@@ -291,7 +291,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   describe("given spend recorded before the UTC rollup rebuild", () => {
     // The upgrade path migration 00058 protects: a deployment whose
     // ClickHouse ran outside UTC folded its history at local midnight, a
-    // bucket /budget/check never reads. The migration rebuilds the rollup
+    // bucket enforcement never reads. The migration rebuilds the rollup
     // from the ledger under UTC boundaries, so that history must count
     // toward warning and blocking together with spend recorded after it.
     //

@@ -3170,7 +3170,7 @@ The ClickHouse ledger is the primary read when CH is enabled (SaaS and any self-
 
 ## Pre-request check
 
-Before dispatching to the provider, the gateway runs a **purely local precheck**. There is no control-plane round trip on the hot path.
+Before dispatching to the provider, the gateway runs a **local precheck**. Every scope but one is decided from memory, with no control-plane round trip on the hot path.
 
 The gateway evaluates the VK's in-memory budget snapshot, which arrives baked into the cached bundle and is refreshed via the `/changes` long-poll. For each applicable scope it compares `spent_usd` against `limit_usd`:
 
@@ -3179,6 +3179,8 @@ The gateway evaluates the VK's in-memory budget snapshot, which arrives baked in
 - Otherwise → allow.
 
 This costs ~0 μs: it's an in-process map lookup.
+
+The exception is an attributed-user template, where one row governs a separate allowance for every end user the anchor will ever see. That fan-out cannot be baked into a bundle, so the bundle carries the template's limit and the gateway reads the request's own bucket from the control plane, cached 15 seconds per (budget, end user). A bucket it cannot read skips that scope and the request proceeds: unreadable allows, it never blocks. A request carrying no end-user id at all is a different case and is still refused, per [per-end-user budgets](#per-end-user-budgets-attributed-user-templates).
 
 ```
 request → precheck against cached snapshot (always, ~0μs)

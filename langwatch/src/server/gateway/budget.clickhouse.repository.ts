@@ -267,7 +267,7 @@ export class GatewayBudgetClickHouseRepository {
    * gateway_budget_scope_totals materialised view aggregates at INSERT time
    * and does NOT dedup. Without a pre-insert guard, replaying the same
    * gateway_request_id multiplies the rollup totals (3 fires of $0.0125 →
-   * $0.0375 visible to /budget/check until the merge eventually fires —
+   * $0.0375 enforced against the budget until the merge eventually fires,
    * which can be hours later or never if the ledger sees no further
    * activity).
    *

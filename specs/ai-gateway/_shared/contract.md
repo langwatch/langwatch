@@ -331,42 +331,51 @@ Returns array of diffs:
 
 Gateway re-fetches affected `config/:vk_id`. This replaces the 60s full-refresh with tailed diffs. Full-refresh is the fallback on startup / after disconnect.
 
-### 4.4 `POST /api/internal/gateway/budget/check`
+### 4.4 Enforcement freshness (no pre-request control-plane call)
 
-Live reconciliation for near-limit scopes. Called by the gateway only when the cached snapshot shows any scope ≥ 90% of its hard limit (see `budgets.mdx` "Tier 2 — live reconciliation"). For cold scopes the cached snapshot is authoritative and this endpoint is never hit.
+The gateway decides every request against data it already holds. There is no
+control-plane round trip on the hot path, and exactly one narrow read for the
+one figure a bundle structurally cannot carry.
 
-Request:
-```json
-{
-  "vk_id": "vk_01HZ...",
-  "gateway_request_id": "grq_01HZ...",
-  "projected_cost_usd": 0.012,
-  "model": "gpt-5-mini",
-  "hot_scopes": [                            // optional: which scopes to check live
-    { "scope": "project", "scope_id": "proj_..." },
-    { "scope": "principal", "scope_id": "user_..." }
-  ]
-}
-```
+**Totals baked into the bundle.** Each applicable scope arrives in the config
+bundle (§4.2) with its `limit_usd` and its `spent_usd`, and the checker
+compares them in process. A cached bundle is therefore as fresh as the last
+time it was refreshed.
 
-Response (dual-shape; both tiers populate both for now):
-```json
-{
-  "decision":     "allow | soft_warn | hard_block",
-  "warnings":    [ { "scope": "team", "pct_used": 89.2 } ],
-  "block_reason": null,
-  "blocked_by":   null,                      // or { "scope": "project", "window": "month" }
+**Change events do the refreshing.** Writing debits emits a `BUDGET_UPDATED`
+change event on the `/changes` long-poll (§4.3), and the gateway drops the
+bundles it affects: the bundles of one project when the event carries a
+`project_id`, otherwise every bundle of the polled organization, since only
+project-scoped budget events can name a project. The next request through an
+evicted key refetches and enforces against the new totals. The 60s
+`CONFIG_TTL` on a cached bundle is the backstop rather than the mechanism: it
+bounds staleness when a change event is missed or arrives while the gateway is
+disconnected.
 
-  "scopes": [                                // raw per-scope ledger snapshot
-    { "scope": "project",   "scope_id": "proj_...",  "window": "month",  "spent_usd": "4824.12", "limit_usd": "5000.00" },
-    { "scope": "principal", "scope_id": "user_...",  "window": "day",    "spent_usd": "19.40",   "limit_usd": "25.00"   }
-  ]
-}
-```
+**The one read a bundle cannot carry.** A per-end-user budget is a template:
+one budget row governs a separate allowance for every end user it has seen, a
+fan-out the bundle cannot bake without the control plane enumerating every
+customer of every key. The bundle carries the template's limit, and the
+gateway reads the single bucket the request needs from
+`GET /api/internal/gateway/budget-bucket-spend`, cached 15s per
+`(budget, end user)`. An unreadable bucket (no reader wired, fetch failed,
+cache cold and the fetch slow) skips that scope: permissive on error, never
+permissive on a missing end-user id, which is refused before enforcement runs.
 
-Consumers can read EITHER the `decision`/`warnings`/`block_reason`/`blocked_by` top-level fields (dispatcher-style; used by older call sites) OR the `scopes` array (raw per-scope data; used by the gateway `Checker.ApplyLive` path landed in Lane A iter 4 pt3). Both are derived from the same authoritative ledger query, so they agree by construction.
+Both surfaces read the same aggregate from the same materialised view (§4.5),
+so they cannot disagree about what was spent, only about how recently they
+looked. The bounded overshoot that follows from enforcing on a cached figure
+is deliberate and is described in `budgets.mdx` under "The stale-snapshot
+trade-off".
 
-Timeout and fail-open: gateway uses a 200 ms deadline on this call. On timeout or 5xx, the gateway falls back to its tier-1 cached decision (allow-through if cache said allow). Configurable via `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS`.
+**The retired projective check.** This section used to specify
+`POST /api/internal/gateway/budget/check`, a "tier 2 live reconciliation" the
+gateway was to call whenever a cached scope came within 90% of its hard limit.
+The control plane implemented it; no gateway release ever posted it, and no
+other client did either. It is deleted. The service method behind it,
+`GatewayBudgetService.check()`, is alive and called in process by the surfaces
+that do need a projective answer: the CLI budget pre-check
+(`GET /api/auth/cli/budget/status`) and the personal-budget screens.
 
 ### 4.5 Budget debit — derived from spend commands (no dedicated endpoint)
 
@@ -397,8 +406,10 @@ only writer of the ledger. The flow:
    be a guess.
 4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
    aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
-5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
-   materialised view, window-bounded by the current `PeriodStart`.
+5. Enforcement reads `finalizeAggregation(sumMerge(SpendUSD))` against that
+   materialised view, window-bounded by the current `PeriodStart`, through the
+   two surfaces in §4.4: the totals baked into the config bundle and the
+   per-end-user bucket read.
 
 **Only successful rows accrue enforcement spend.** A failed request still
 writes its rows, under `PROVIDER_ERROR` or, for the gateway's own guardrail
