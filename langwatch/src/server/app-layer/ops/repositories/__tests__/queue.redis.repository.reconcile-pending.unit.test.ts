@@ -32,8 +32,20 @@ class FakeRedis {
   /** Runs after every pipeline `exec`, so a test can simulate a slow pass. */
   onPipelineExec: (() => void) | null = null;
 
+  /**
+   * Ordered log of lease re-arms and ZCARD batches, so a test can tell which
+   * phase of the pass a re-arm belongs to.
+   */
+  readonly events: ("lease-refresh" | "zcard-batch")[] = [];
+
   readonly scan = vi.fn(async () => ["0", [] as string[]] as const);
-  readonly evalshaCalls: { key: string; token: string; ttlMs: number }[] = [];
+  readonly evalshaCalls: {
+    key: string;
+    token: string;
+    ttlMs: number;
+    /** Whether the marker still carried the caller's token at that moment. */
+    isHeldByCaller: boolean;
+  }[] = [];
 
   async set(
     key: string,
@@ -101,6 +113,7 @@ class FakeRedis {
             ? [new Error("ZCARD failed"), null]
             : [null, (self.zsets.get(key) ?? []).length],
         );
+        self.events.push("zcard-batch");
         self.onPipelineExec?.();
         return results;
       },
@@ -115,8 +128,15 @@ class FakeRedis {
     token: string,
     ttlMs: number,
   ): Promise<number> {
-    this.evalshaCalls.push({ key, token, ttlMs: Number(ttlMs) });
-    if (this.strings.get(key) !== token) return 0;
+    const isHeldByCaller = this.strings.get(key) === token;
+    this.evalshaCalls.push({
+      key,
+      token,
+      ttlMs: Number(ttlMs),
+      isHeldByCaller,
+    });
+    if (Number(ttlMs) === LEASE_MS) this.events.push("lease-refresh");
+    if (!isHeldByCaller) return 0;
     if (Number(ttlMs) <= 0) {
       this.strings.delete(key);
       this.expiries.delete(key);
@@ -245,13 +265,38 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
       it("re-arms the single-flight marker after each ZCARD batch", async () => {
         await repo.reconcileTotalPending(QUEUE_NAME);
 
+        const batches = redis.events.filter(
+          (event) => event === "zcard-batch",
+        ).length;
+        expect(batches).toBe(3);
+
+        // One re-arm per batch, each landing after its batch.
+        const refreshesAfterFirstBatch = redis.events
+          .slice(redis.events.indexOf("zcard-batch"))
+          .filter((event) => event === "lease-refresh").length;
+        expect(refreshesAfterFirstBatch).toBe(batches);
+
         const leaseRefreshes = redis.evalshaCalls.filter(
           (call) => call.ttlMs === LEASE_MS,
         );
-        expect(leaseRefreshes).toHaveLength(3);
         expect(leaseRefreshes.every((call) => call.key === MARKER_KEY)).toBe(
           true,
         );
+      });
+
+      it("re-arms the single-flight marker while paging the indexes, before any ZCARD runs", async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME);
+
+        // Collection is a paging walk of its own and on a large queue can outlast
+        // a lease before the first ZCARD is ever issued. If nothing re-armed
+        // during that phase, the marker could lapse and another instance could
+        // start a second pass over the same counter.
+        const firstBatchAt = redis.events.indexOf("zcard-batch");
+        const refreshesBeforeAnyBatch = redis.events
+          .slice(0, firstBatchAt)
+          .filter((event) => event === "lease-refresh").length;
+
+        expect(refreshesBeforeAnyBatch).toBeGreaterThan(0);
       });
     });
   });
@@ -323,12 +368,14 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
       it("holds the marker for the whole pass rather than letting it lapse mid-pass", async () => {
         await repo.reconcileTotalPending(QUEUE_NAME, SINGLE_FLIGHT_WINDOW_MS);
 
-        // The refresh lands after the batch that overran the window, so the
-        // marker is still this pass's own when the pass releases it.
+        // Ownership is the claim, not the call count: every re-arm has to find
+        // this pass's own token still on the marker. A count-only assertion
+        // could not fail for the reason this test exists.
         const refreshes = redis.evalshaCalls.filter(
           (call) => call.ttlMs === LEASE_MS,
         );
         expect(refreshes.length).toBeGreaterThan(0);
+        expect(refreshes.every((call) => call.isHeldByCaller)).toBe(true);
       });
     });
   });

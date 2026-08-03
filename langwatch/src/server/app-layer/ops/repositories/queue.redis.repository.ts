@@ -297,10 +297,12 @@ const PENDING_RECONCILE_ZCARD_BATCH = 1000;
 /**
  * How long the single-flight marker survives without a refresh.
  *
- * The marker is re-armed to this after every ZCARD batch, so a pass holds it for
- * as long as it runs no matter how long that is. It bounds the other direction
- * instead: an instance that dies mid-pass strands the marker for at most this
- * long before another instance may take over.
+ * The marker is re-armed to this after every index page and every ZCARD batch,
+ * so a pass holds it for as long as it runs no matter how long that is — both
+ * phases refresh, since collection is itself a paging walk and on a large queue
+ * can outlast a lease on its own. It bounds the other direction instead: an
+ * instance that dies mid-pass strands the marker for at most this long before
+ * another instance may take over.
  */
 const PENDING_RECONCILE_LEASE_MS = 30_000;
 
@@ -1632,7 +1634,21 @@ export class QueueRedisRepository implements QueueRepository {
       const raw = await this.redis.get(counterKey);
       const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
 
-      const jobsKeys = await this.collectGroupJobsKeys(prefix);
+      // Collection is itself a paging walk over several indexes, so it re-arms
+      // the lease as it goes. Without that a pass on a large queue could spend
+      // its whole lease before the first ZCARD batch and lose the marker to
+      // another instance mid-pass.
+      const refreshLease = () =>
+        this.setReconcileMarkerTtl({
+          markerKey,
+          holderToken,
+          ttlMs: PENDING_RECONCILE_LEASE_MS,
+        });
+
+      const jobsKeys = await this.collectGroupJobsKeys({
+        prefix,
+        refreshLease,
+      });
 
       const groundTruth = await this.sumPendingJobs({
         jobsKeys,
@@ -1682,11 +1698,23 @@ export class QueueRedisRepository implements QueueRepository {
    * ids are deduplicated before keys are built — counting one twice would be
    * written to the counter as ground truth.
    */
-  private async collectGroupJobsKeys(prefix: string): Promise<string[]> {
+  private async collectGroupJobsKeys(params: {
+    prefix: string;
+    refreshLease: () => Promise<void>;
+  }): Promise<string[]> {
+    const { prefix, refreshLease } = params;
     const groupIds = new Set<string>();
 
-    await this.collectZsetGroupIds({ key: `${prefix}ready`, into: groupIds });
-    await this.collectSetMembers({ key: `${prefix}blocked`, into: groupIds });
+    await this.collectZsetGroupIds({
+      key: `${prefix}ready`,
+      into: groupIds,
+      refreshLease,
+    });
+    await this.collectSetMembers({
+      key: `${prefix}blocked`,
+      into: groupIds,
+      refreshLease,
+    });
 
     // One entry per tenant currently over cap — empty in the steady state where
     // the cap is off, so the parked leg usually costs a single SSCAN.
@@ -1694,11 +1722,13 @@ export class QueueRedisRepository implements QueueRepository {
     await this.collectSetMembers({
       key: `${prefix}parked-tenants`,
       into: parkedTenants,
+      refreshLease,
     });
     for (const tenantId of parkedTenants) {
       await this.collectZsetGroupIds({
         key: `${prefix}parked:${tenantId}`,
         into: groupIds,
+        refreshLease,
       });
     }
 
@@ -1709,6 +1739,7 @@ export class QueueRedisRepository implements QueueRepository {
   private async collectZsetGroupIds(params: {
     key: string;
     into: Set<string>;
+    refreshLease: () => Promise<void>;
   }): Promise<void> {
     let cursor = "0";
     do {
@@ -1723,6 +1754,7 @@ export class QueueRedisRepository implements QueueRepository {
       for (let i = 0; i < members.length; i += 2) {
         params.into.add(members[i]!);
       }
+      await params.refreshLease();
     } while (cursor !== "0");
   }
 
@@ -1730,6 +1762,7 @@ export class QueueRedisRepository implements QueueRepository {
   private async collectSetMembers(params: {
     key: string;
     into: Set<string>;
+    refreshLease: () => Promise<void>;
   }): Promise<void> {
     let cursor = "0";
     do {
@@ -1743,6 +1776,7 @@ export class QueueRedisRepository implements QueueRepository {
       for (const member of members) {
         params.into.add(member);
       }
+      await params.refreshLease();
     } while (cursor !== "0");
   }
 
@@ -1772,7 +1806,17 @@ export class QueueRedisRepository implements QueueRepository {
         pipeline.zcard(key);
       }
       const results = await pipeline.exec();
-      for (const [err, val] of results ?? []) {
+      // A null exec is the whole batch failing, not an empty batch. Treating it
+      // as empty would contribute 0 for every key in it and write the shortfall
+      // out as ground truth — the same under-count the per-entry check refuses.
+      if (results === null) {
+        logger.warn(
+          { batchOffset: offset },
+          "ZCARD pipeline returned no results during pending reconcile — aborting to avoid under-count",
+        );
+        return null;
+      }
+      for (const [err, val] of results) {
         if (err) {
           logger.warn(
             { error: err },

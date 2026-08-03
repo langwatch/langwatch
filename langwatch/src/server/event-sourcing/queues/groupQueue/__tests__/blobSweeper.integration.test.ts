@@ -262,6 +262,70 @@ describe("BlobSweeper", () => {
     });
   });
 
+  describe("given a dry run over more blobs than one sweep's ceiling", () => {
+    describe("when the runner sweeps in dry-run mode and then for real", () => {
+      /** @scenario "A dry run does not advance the cursor past blobs it only inspected" */
+      it("leaves the cursor untouched, and only a real sweep parks one", async () => {
+        const cursorKey = `${PREFIX}blob-sweep-cursor`;
+        for (const hash of ["d01", "d02", "d03", "d04"]) {
+          await redis.set(
+            blobKey(hash),
+            "body",
+            "EX",
+            BLOB_BACKSTOP_TTL_SECONDS,
+          );
+        }
+
+        // A ceiling below the blob count guarantees the walk stops partway, so
+        // there is a real cursor position to park or discard.
+        const pacedSweeper = new BlobSweeper({ redis, maxKeysPerQueue: 1 });
+
+        const dryTally = await pacedSweeper.sweepQueue({
+          queueName: QUEUE_NAME,
+          dryRun: true,
+        });
+
+        expect(dryTally.truncated).toBe(true);
+        // Nothing was judged, so nothing may be marked as covered.
+        expect(await redis.exists(cursorKey)).toBe(0);
+
+        await pacedSweeper.sweepQueue({ queueName: QUEUE_NAME });
+
+        expect(await redis.exists(cursorKey)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a keyspace where almost nothing matches the blob pattern", () => {
+    describe("when the runner sweeps", () => {
+      /** @scenario "A sweep is bounded by the work it does, not only by the matches it finds" */
+      it("stops on its scan-call budget instead of walking the whole keyspace", async () => {
+        // Matches are what the key ceiling counts, so a keyspace with almost none
+        // would run the walk to the end of the database on every tick. Only a
+        // budget on the calls themselves bounds that.
+        const filler = redis.pipeline();
+        for (let i = 0; i < 3000; i++) {
+          filler.set(`${PREFIX}sweep-filler:${i}`, "x", "EX", 300);
+        }
+        await filler.exec();
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+
+        const budgetedSweeper = new BlobSweeper({
+          redis,
+          maxScanCallsPerQueue: 2,
+        });
+
+        const tally = await budgetedSweeper.sweepQueue({
+          queueName: QUEUE_NAME,
+        });
+
+        // Two SCAN calls cannot cross this keyspace, so the walk reports itself
+        // unfinished rather than having run to the end.
+        expect(tally.truncated).toBe(true);
+      });
+    });
+  });
+
   describe("given several queues registered in the group-queue registry", () => {
     describe("when the runner sweeps everything", () => {
       it("discovers the queue from the registry rather than a hardcoded name", async () => {

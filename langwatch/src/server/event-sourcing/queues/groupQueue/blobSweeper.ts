@@ -38,6 +38,20 @@ const SCAN_COUNT = 256;
 const DEFAULT_MAX_KEYS_PER_QUEUE = 50_000;
 
 /**
+ * Ceiling on SCAN calls per queue per sweep, bounding the walk by work done
+ * rather than by matches found.
+ *
+ * The matched-key ceiling alone does not bound a tick: SCAN pages by buckets and
+ * `MATCH` filters afterwards, so when few keys match, a tick walks the entire
+ * keyspace to collect its quota however large that keyspace is — the cost is
+ * paid whether or not anything comes back. `COUNT` is a work hint, not a
+ * guarantee, so the number of calls to cross a keyspace is not fixed either.
+ * Stopping on either ceiling makes one tick's cost bounded in both regimes, and
+ * the parked cursor means the budget defers work rather than dropping it.
+ */
+const DEFAULT_MAX_SCAN_CALLS_PER_QUEUE = 2_000;
+
+/**
  * Where the last sweep of a queue stopped, so the next one resumes there instead
  * of re-walking the slice it already judged.
  *
@@ -96,11 +110,13 @@ async function scanNode(params: {
   node: { scan: IORedis["scan"] };
   pattern: string;
   limit: number;
+  callBudget: number;
   /** Cursor the previous tick stopped at; "0" starts a fresh cycle. */
   cursor: string;
 }): Promise<{ keys: string[]; cursor: string; truncated: boolean }> {
   const keys: string[] = [];
   let cursor = params.cursor;
+  let calls = 0;
   do {
     const [nextCursor, batch] = await params.node.scan(
       cursor,
@@ -110,13 +126,16 @@ async function scanNode(params: {
       SCAN_COUNT,
     );
     cursor = nextCursor;
+    calls += 1;
     keys.push(...batch);
-    // Every key the cursor has moved past is kept, so the batch that crosses the
+    // Every key the cursor has moved past is kept, so the batch that crosses a
     // ceiling is not trimmed. Trimming it would drop keys the returned cursor has
     // already passed, and the next tick — resuming from that cursor — would never
     // come back for them. Overshooting the ceiling by at most one page is the
     // cheaper side of that trade.
-    if (keys.length >= params.limit) return { keys, cursor, truncated: true };
+    if (keys.length >= params.limit || calls >= params.callBudget) {
+      return { keys, cursor, truncated: true };
+    }
   } while (cursor !== "0");
   return { keys, cursor: "0", truncated: false };
 }
@@ -140,15 +159,20 @@ export class BlobSweeper {
   private readonly redis: IORedis | Cluster;
   private readonly maxKeysPerQueue: number;
 
+  private readonly maxScanCallsPerQueue: number;
+
   constructor({
     redis,
     maxKeysPerQueue = DEFAULT_MAX_KEYS_PER_QUEUE,
+    maxScanCallsPerQueue = DEFAULT_MAX_SCAN_CALLS_PER_QUEUE,
   }: {
     redis: IORedis | Cluster;
     maxKeysPerQueue?: number;
+    maxScanCallsPerQueue?: number;
   }) {
     this.redis = redis;
     this.maxKeysPerQueue = maxKeysPerQueue;
+    this.maxScanCallsPerQueue = maxScanCallsPerQueue;
   }
 
   /** Queue names the group queue has registered itself under. */
@@ -183,22 +207,36 @@ export class BlobSweeper {
     };
   }
 
-  private async scanBlobKeys(
-    queueName: string,
-  ): Promise<{ keys: string[]; truncated: boolean }> {
+  /**
+   * Read this queue's blob keys, resuming from the parked cursor.
+   *
+   * Returns where each node stopped rather than storing it: the cursor is only
+   * safe to advance once the blobs it covers have actually been judged, so the
+   * caller commits it after the sweep and never on a dry run. Advancing here
+   * would let a dry run — or a sweep that died before judging the batch — skip
+   * that slice until the cursor wrapped all the way around.
+   */
+  private async scanBlobKeys(queueName: string): Promise<{
+    keys: string[];
+    truncated: boolean;
+    resumeFrom: Record<string, string>;
+  }> {
     const pattern = this.blobScanPattern(queueName);
-    const cursorKey = blobSweepCursorKey(queueName);
-    const parked = await this.redis.hgetall(cursorKey);
+    const parked = await this.redis.hgetall(blobSweepCursorKey(queueName));
 
     if (!isCluster(this.redis)) {
       const result = await scanNode({
         node: this.redis,
         pattern,
         limit: this.maxKeysPerQueue,
+        callBudget: this.maxScanCallsPerQueue,
         cursor: parked[SINGLE_NODE_CURSOR_FIELD] ?? "0",
       });
-      await this.redis.hset(cursorKey, SINGLE_NODE_CURSOR_FIELD, result.cursor);
-      return { keys: result.keys, truncated: result.truncated };
+      return {
+        keys: result.keys,
+        truncated: result.truncated,
+        resumeFrom: { [SINGLE_NODE_CURSOR_FIELD]: result.cursor },
+      };
     }
 
     const seen = new Set<string>();
@@ -212,6 +250,7 @@ export class BlobSweeper {
           node,
           pattern,
           limit: this.maxKeysPerQueue,
+          callBudget: this.maxScanCallsPerQueue,
           cursor: parked[nodeField] ?? "0",
         });
         if (result.truncated) truncated = true;
@@ -219,10 +258,7 @@ export class BlobSweeper {
         for (const key of result.keys) seen.add(key);
       }),
     );
-    if (Object.keys(resumeFrom).length > 0) {
-      await this.redis.hset(cursorKey, resumeFrom);
-    }
-    return { keys: Array.from(seen), truncated };
+    return { keys: Array.from(seen), truncated, resumeFrom };
   }
 
   async sweepQueue({
@@ -233,7 +269,7 @@ export class BlobSweeper {
     dryRun?: boolean;
   }): Promise<BlobSweepTally> {
     const tally = emptyTally();
-    const { keys, truncated } = await this.scanBlobKeys(queueName);
+    const { keys, truncated, resumeFrom } = await this.scanBlobKeys(queueName);
     tally.truncated = truncated;
 
     for (const key of keys) {
@@ -268,7 +304,11 @@ export class BlobSweeper {
           gqBlobSweepTotal.inc({ queue_name: queueName, outcome });
         }
       } catch (err) {
-        // One unreadable blob must not abort the sweep; the next tick retries it.
+        // One unreadable blob must not abort the sweep. The cursor still moves
+        // past it, so it is retried when the cursor next comes around rather
+        // than on the next tick — deliberately, because holding the cursor for a
+        // blob that fails every time would stall the whole walk behind it. Its
+        // bytes stay bounded by the backstop TTL in the meantime.
         logger.warn(
           {
             queueName,
@@ -278,6 +318,14 @@ export class BlobSweeper {
           "Blob sweep failed for one blob; continuing",
         );
       }
+    }
+
+    // Commit the cursor only now, and never for a dry run: until the blobs this
+    // page covers have actually been judged, advancing past them would skip them
+    // for a whole cycle. A sweep that dies before here leaves the cursor where it
+    // was and the next tick re-judges the same page, which is idempotent.
+    if (!dryRun && Object.keys(resumeFrom).length > 0) {
+      await this.redis.hset(blobSweepCursorKey(queueName), resumeFrom);
     }
     return tally;
   }

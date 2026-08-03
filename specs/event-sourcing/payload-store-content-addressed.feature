@@ -417,6 +417,26 @@ Feature: GroupQueue content-addressed tiered payload store
     When a new unreferenced blob is written and the runner sweeps again
     Then the new blob is put on the grace window
 
+  @integration @track6
+  # A dry run is an operator asking what would happen. If it advanced the walk's
+  # position, asking the question would silently cost the next real sweep a slice
+  # of the keyspace.
+  Scenario: A dry run does not advance the cursor past blobs it only inspected
+    Given more unreferenced Redis-tier blobs than one sweep's ceiling
+    When the runner sweeps in dry-run mode
+    Then no cursor is parked for the next sweep
+    And only a real sweep parks one
+
+  @integration @track6
+  # The per-sweep ceiling counts blobs found, and SCAN pages by buckets rather
+  # than by matches, so a keyspace where almost nothing matches would be walked
+  # end to end every tick to fill a quota that never fills.
+  Scenario: A sweep is bounded by the work it does, not only by the matches it finds
+    Given a blob keyspace where almost nothing matches the blob pattern
+    When the runner sweeps
+    Then the walk stops on its own budget
+    And it reports itself as unfinished rather than having reached the end
+
   @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
     Given the reclaim runner is on its cleanup schedule
