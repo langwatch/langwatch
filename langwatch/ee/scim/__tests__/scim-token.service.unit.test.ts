@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import crypto from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScimTokenService } from "../scim-token.service";

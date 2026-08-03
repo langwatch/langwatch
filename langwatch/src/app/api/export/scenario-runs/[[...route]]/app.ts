@@ -15,13 +15,13 @@
 
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
+import { auditLog } from "@ee/audit-log/auditLog";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {

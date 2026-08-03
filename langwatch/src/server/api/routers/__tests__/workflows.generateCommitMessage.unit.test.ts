@@ -22,7 +22,7 @@ vi.mock("ai", () => ({
 
 // The mutation runs through the audit-log middleware, which writes to the
 // real Prisma singleton. Stub it so the unit test never needs a database.
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

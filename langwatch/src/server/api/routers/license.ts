@@ -1,7 +1,9 @@
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 import type { LicenseData } from "../../../../ee/licensing";
@@ -13,7 +15,7 @@ import {
   generateLicenseId,
   signLicense,
 } from "../../../../ee/licensing/signing";
-import { checkOrganizationPermission } from "../rbac";
+import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 
 const logger = createLogger("langwatch:api:licenseRouter");
 
@@ -62,6 +64,39 @@ export const licenseRouter = createTRPCRouter({
       // shared middleware maps it to NOT_FOUND and keeps it as the cause.
       // Re-wrapping it here threw away the code and the trace id.
       return await getLicenseHandler().getLicenseStatus(input.organizationId);
+    }),
+
+  /**
+   * Whether this deployment is configured for single sign-on that the license
+   * gate is refusing to switch on.
+   *
+   * The public environment cannot answer it: `NEXTAUTH_PROVIDER` there is the
+   * RESOLVED provider, which reports "email" for an unlicensed deployment and
+   * for one that never wanted SSO alike. Telling those apart is the whole point
+   * here, because the first is an operator who configured an IdP, upgraded, and
+   * now watches their company sign in by email with nothing on screen to say
+   * why (ADR-027 decided logs-only telemetry for the gate; this is a settings
+   * page, not telemetry).
+   *
+   * Deployment-wide rather than per-organization, so there is no organization
+   * to check a permission against and it skips that check deliberately. It
+   * stays behind a session: an anonymous visitor has no business learning that
+   * an install is unlicensed, and every signed-in user can already see the
+   * sign-in form this explains.
+   */
+  getSsoGateStatus: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async () => {
+      const configuredProvider = env.NEXTAUTH_PROVIDER;
+      if (!configuredProvider || configuredProvider === "email") {
+        return { configuredProvider: null, licensed: true };
+      }
+
+      return {
+        configuredProvider,
+        licensed: await platformSSOAllowed(),
+      };
     }),
 
   /**

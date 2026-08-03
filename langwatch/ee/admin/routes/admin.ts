@@ -10,6 +10,7 @@
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
 import {
@@ -20,7 +21,6 @@ import {
   getOneHandler,
 } from "ra-data-simple-prisma";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";

@@ -820,6 +820,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.appSecretName" . }}
       key: nextAuthSecret
 {{- end }}
+
+# Enterprise license. Optional: without one the deployment runs the open
+# source edition, which caps nothing it stores on your own infrastructure.
+# Setting it here entitles the whole instance, so an operator does not have
+# to activate a license per organization through the UI.
+#
+# In sharedEnv rather than the app Deployment because plan resolution runs in
+# the workers too, and a worker that reads a different entitlement than the
+# app would enforce different limits on the same organization.
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 {{- end }}
 
 {{/* ============================================================ */}}

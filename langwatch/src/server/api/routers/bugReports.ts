@@ -1,10 +1,10 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   getAllBugReports,
   getBugReportById,
 } from "~/server/app-layer/bug-reports/bug-report.service";
-import { auditLog } from "~/server/auditLog";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

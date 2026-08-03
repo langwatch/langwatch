@@ -1,7 +1,14 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import { useMemo } from "react";
+import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
 import { Select } from "../ui/select";
+import { InfoWithoutSelecting } from "./InfoWithoutSelecting";
+import {
+  LITE_MEMBER_EXPLANATION,
+  LITE_MEMBER_SHORT_DESCRIPTION,
+  SEAT_TYPES_DOC_PATH,
+} from "./seatTypeCopy";
 
 export type OrgRoleOption = {
   label: string;
@@ -23,7 +30,7 @@ export const orgRoleOptions: OrgRoleOption[] = [
   {
     label: "Lite Member",
     value: OrganizationUserRole.EXTERNAL,
-    description: "Can only view projects they are invited to, cannot see costs",
+    description: LITE_MEMBER_SHORT_DESCRIPTION,
   },
 ];
 
@@ -63,7 +70,19 @@ export function OrganizationUserRoleField({
             {orgRoleOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 <VStack align="start" gap={0} flex={1}>
-                  <Text>{option.label}</Text>
+                  <HStack gap={0}>
+                    <Text>{option.label}</Text>
+                    {option.value === OrganizationUserRole.EXTERNAL && (
+                      <InfoWithoutSelecting>
+                        <FieldInfoTooltip
+                          description={LITE_MEMBER_EXPLANATION}
+                          docHref={SEAT_TYPES_DOC_PATH}
+                          docLabel="How seats are counted"
+                          testId="lite-member-info"
+                        />
+                      </InfoWithoutSelecting>
+                    )}
+                  </HStack>
                   <Text color="fg.muted" fontSize="13px">
                     {option.description}
                   </Text>

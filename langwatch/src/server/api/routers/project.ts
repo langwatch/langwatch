@@ -1,3 +1,4 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
@@ -21,7 +22,6 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { auditLog } from "../../auditLog";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,

@@ -19,7 +19,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
   mockRequestPasswordReset: vi.fn(),
   publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+    current: {
+      NEXTAUTH_PROVIDER: "email" as string | undefined,
+      HAS_EMAIL_PROVIDER_KEY: true,
+    },
   },
 }));
 
@@ -64,7 +67,10 @@ describe("ForgotPassword page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequestPasswordReset.mockResolvedValue({ data: {}, error: null });
-    publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+    publicEnvRef.current = {
+      NEXTAUTH_PROVIDER: "email",
+      HAS_EMAIL_PROVIDER_KEY: true,
+    };
   });
 
   afterEach(() => {
@@ -99,6 +105,32 @@ describe("ForgotPassword page", () => {
     });
   });
 
+  describe("when the deployment has no outbound email configured", () => {
+    beforeEach(() => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        HAS_EMAIL_PROVIDER_KEY: false,
+      };
+    });
+
+    /** @scenario Password reset does not promise an email nobody can send */
+    it("says so instead of offering a form that would promise a link", () => {
+      renderPage();
+
+      expect(screen.getByText(/cannot send email/i)).toBeTruthy();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /send reset link/i }),
+      ).toBeNull();
+    });
+
+    it("points at the operator rather than leaving the user with nothing", () => {
+      renderPage();
+
+      expect(screen.getByText(/whoever operates it/i)).toBeTruthy();
+    });
+  });
+
   describe("when the reset endpoint fails", () => {
     /** @scenario A failure to dispatch the request still shows the neutral confirmation */
     it("still shows the same neutral confirmation and no enumeration-leaking error", async () => {
@@ -114,7 +146,10 @@ describe("ForgotPassword page", () => {
 
   describe("when the deployment uses an SSO identity provider", () => {
     it("explains the password is managed by the provider instead of a form", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "auth0",
+        HAS_EMAIL_PROVIDER_KEY: true,
+      };
       renderPage();
 
       expect(

@@ -4,7 +4,7 @@ Feature: Settings Plans Comparison Page
   So that I can understand available options and my current plan
 
   Background:
-    Given I am logged in as a member of an organization on LangWatch Cloud
+    Given I am logged in as a member of an organization
 
   # 5 of 9 scenarios are bound to existing tests in langwatch/src/components/plans/__tests__/PlansComparisonPage.integration.test.tsx.
   # The remaining 4 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
@@ -17,7 +17,7 @@ Feature: Settings Plans Comparison Page
 
   @e2e
   Scenario: Member compares plans on the plans page
-    Given my organization is on the "Free" plan
+    Given my organization runs on a self-hosted deployment with no license
     When I navigate to /settings/plans
     Then I see a comparison layout with these plan columns:
       | plan       |
@@ -25,7 +25,7 @@ Feature: Settings Plans Comparison Page
       | Growth     |
       | Enterprise |
     And plan capabilities are shown in side-by-side rows
-    And the "Free" plan is shown as my current plan
+    And no plan column is shown as my current plan, because none of these tiers describes an unlicensed self-hosted deployment
 
   @integration
   Scenario: Non-admin members can access plans comparison
@@ -48,6 +48,12 @@ Feature: Settings Plans Comparison Page
     Given my organization is on a legacy tier plan that is not shown in this comparison
     When I view /settings/plans
     Then no plan column is shown as current
+
+  @integration
+  Scenario: Plan usage lines link to the list of billable events
+    Given I am on /settings/plans
+    Then I see a link asking what counts as an event
+    And the link opens the billable events documentation in a new tab
 
   @integration
   Scenario: TIERED organizations see a discontinued plan migration notice
@@ -94,6 +100,7 @@ Feature: Settings Plans Comparison Page
       | custom data retention         |
       | custom SSO and RBAC           |
       | audit logs                    |
+      | gateway webhooks              |
       | uptime and support SLA        |
       | compliance and legal reviews  |
       | custom terms and DPA          |

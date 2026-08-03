@@ -70,16 +70,25 @@ describe("better-auth config", () => {
       }
     });
 
-    it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
+    it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email or self-hosted (ADR-027)", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,
       // letting attackers bypass Auth0/SSO in cloud mode. The original
       // NextAuth code added EITHER a social provider OR CredentialsProvider,
       // never both. The BetterAuth equivalent must mirror that gate.
+      //
+      // ADR-027 widens this: on self-hosted (`!IS_SAAS`) the routes are
+      // always mounted (even with an enterprise IdP configured) so a
+      // denied/coerced deployment has a working email door and licensed
+      // installs keep password-reset self-recovery reachable. Mounting
+      // alone is not the gate — the ALLOW-path `before`-hook block (gate
+      // site #3, tested in `ssoGate.hook.test.ts`) is the load-bearing
+      // guard that stops a licensed install from minting password
+      // accounts through these routes. SaaS is unchanged.
       const { auth } = await import("../index");
       const options = (auth as any).options;
       const { env } = await import("~/env.mjs");
-      const expected = env.NEXTAUTH_PROVIDER === "email";
+      const expected = env.NEXTAUTH_PROVIDER === "email" || !env.IS_SAAS;
       expect(options?.emailAndPassword?.enabled).toBe(expected);
     });
 
@@ -135,11 +144,11 @@ describe("better-auth config", () => {
       // The env-driven provider selection lives in pure builders so we can
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
-      const { buildGenericOAuthConfigs, isEmailPasswordEnabled } = await import(
-        "../index"
-      );
+      const { isEmailPasswordEnabled } = await import("../index");
+      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const e = {
         NEXTAUTH_PROVIDER: "auth0",
+        IS_SAAS: true,
         AUTH0_CLIENT_ID: "auth0-client-id",
         AUTH0_CLIENT_SECRET: "auth0-client-secret",
         AUTH0_ISSUER: "tenant.us.auth0.com",
@@ -164,15 +173,28 @@ describe("better-auth config", () => {
       expect(auth0Config?.redirectURI).toBe(
         "http://localhost:3000/api/auth/callback/auth0",
       );
-      // SSO-only enforcement: no email/password bypass of the IdP in auth0 mode.
+      // SSO-only enforcement on SaaS: no email/password bypass of the IdP.
       expect(isEmailPasswordEnabled(e)).toBe(false);
+    });
+
+    /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
+    it("mounts email/password on self-hosted so a denied deployment keeps a door", async () => {
+      const { isEmailPasswordEnabled } = await import("../index");
+
+      // ADR-027: mounting is not the gate. Self-hosted always mounts so an
+      // unlicensed deployment can sign in, and a licensed one keeps password
+      // reset reachable; the `before` hook is what refuses the email routes
+      // when the gate allows.
+      expect(
+        isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false }),
+      ).toBe(true);
     });
   });
 
   describe("when NEXTAUTH_PROVIDER selects google", () => {
     /** @scenario Google mode */
     it("includes google in the socialProviders map", async () => {
-      const { buildSocialProviders } = await import("../index");
+      const { buildSocialProviders } = await import("@ee/sso/providers");
       const socialProviders = buildSocialProviders({
         NEXTAUTH_PROVIDER: "google",
         GOOGLE_CLIENT_ID: "google-client-id",
@@ -246,7 +268,7 @@ describe("better-auth config", () => {
         },
       ],
     ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
-      const { buildSocialProviders } = await import("../index");
+      const { buildSocialProviders } = await import("@ee/sso/providers");
       const providers = buildSocialProviders({
         ...noSocialEnv,
         NEXTAUTH_PROVIDER: provider,
@@ -258,7 +280,7 @@ describe("better-auth config", () => {
     });
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
-      const { buildGenericOAuthConfigs } = await import("../index");
+      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const configs = buildGenericOAuthConfigs({
         NEXTAUTH_PROVIDER: "auth0",
         AUTH0_CLIENT_ID: "id",

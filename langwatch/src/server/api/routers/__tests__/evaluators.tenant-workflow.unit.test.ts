@@ -16,7 +16,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 
 // Mutations audit through the global prisma, not ctx.prisma — unmocked, the
 // middleware reaches for a real database this unit environment does not have.
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

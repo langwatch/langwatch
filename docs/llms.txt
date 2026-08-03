@@ -161,6 +161,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Help
 
 - [Pricing](https://langwatch.ai/docs/pricing.md): How LangWatch Cloud pricing works — events, data retention, and answers to common questions.
+- [What counts as a billable event](https://langwatch.ai/docs/pricing/billable-events.md): The complete list of events LangWatch Cloud bills for, what is never billed, and how deduplication works
 - [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
 - [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
 
@@ -476,6 +477,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Workspaces Personal, Team, Project](https://langwatch.ai/docs/ai-governance/workspaces.md): The three scopes every LangWatch artifact lives in. Personal for you, Team for groups of humans, Project for shared applications. How they nest, how budgets and routing policies attach, and how the workspace switcher in the chrome routes between them.
 - [Members & invites](https://langwatch.ai/docs/ai-governance/members-and-invites.md): Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
 - [Roles & permissions](https://langwatch.ai/docs/ai-governance/roles-and-permissions.md): The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
+- [Audit log](https://langwatch.ai/docs/ai-governance/audit-log.md): Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
 
 ## Dashboards
 
@@ -556,6 +558,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one
 - [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 

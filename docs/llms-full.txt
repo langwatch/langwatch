@@ -1338,7 +1338,7 @@ SCIM (System for Cross-domain Identity Management) 2.0 allows your identity prov
 
 - Organization Admin permissions in LangWatch
 - An identity provider that supports SCIM 2.0 (Okta, Azure AD, Entra ID, etc.)
-- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/sso-setup-langwatch))
+- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/configuration/sso))
 
 ## Setting Up SCIM
 
@@ -16327,8 +16327,8 @@ The fast path:
 
 1. Click **+ Add members** at the top right of the table.
 2. In the upsert drawer, type one or more emails (comma-separated).
-3. Pick the **Organization role**: `Admin`, `Member`, or `External`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
-4. Optionally tick **Lite Member** for users who should only see projects they're explicitly invited to (no cost visibility).
+3. Pick the **Organization role**: `Admin` or `Member`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
+4. Tick **Lite Member** for anyone who should only read what the team produces rather than change it. This is the same choice as the `External` org role, and it is what decides whether they occupy a full or a lite seat. The (i) next to it lists exactly what they can see; [Seats](/ai-governance/roles-and-permissions#seats) has the full breakdown.
 5. Under **Team Assignments**, pick which teams + which team-level role per team (`Admin`, `Member`, `Viewer` per team). One row per team; click **+ Add team** to scope to multiple teams.
 6. Click **Send invites**.
 
@@ -16524,6 +16524,7 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 | [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | `otel_generic` source type + `thirty_days` retention are available on the Apache 2.0 floor; multi-source + extended retention require Enterprise. |
 | [Anomaly Rules](/ai-governance/anomaly-rules) | Enterprise | Admin-curated detection rules + dispatch (Slack, PagerDuty, SIEM). |
 | [Compliance architecture](/ai-governance/compliance-architecture) | Enterprise | OCSF, SIEM export, multi-class retention, tamper-evidence (post-GA follow-up). |
+| Gateway webhooks | Enterprise | Signed delivery of AI Gateway spend and budget events to your own systems, with retries, replay and a delivery log. This is the surface platforms meter and rebill their own customers on. |
 
 In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out source-type dropdowns to `otel_generic` and retention to `thirty_days` for non-enterprise users.
 
@@ -16531,12 +16532,22 @@ In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise
 
 The repository tree is split 1:1 by license, so the directory a file lives in is its license:
 
-| Path | License | Header (first line of every source file) |
+| Path | License | SPDX identifier |
 |---|---|---|
-| Anything outside `langwatch/ee/` | Apache 2.0 | `// SPDX-License-Identifier: Apache-2.0` |
-| Anything inside `langwatch/ee/` | Enterprise (LangWatch EE) | `// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise` |
+| `typescript-sdk/`, `python-sdk/`, `mcp-server/` | MIT | `MIT` |
+| Inside `langwatch/ee/` | Enterprise (LangWatch EE) | `LicenseRef-LangWatch-Enterprise` |
+| Everything else | Apache 2.0 | `Apache-2.0` |
 
-The header is a single SPDX line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary only need to flip one line. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives at the repo root in `LICENSE-EE`.
+The client SDKs are MIT so that integrating LangWatch never puts a copyleft
+obligation on your own application. MIT still asks you to retain its copyright
+and permission notice when you redistribute the SDK or a substantial portion of
+it, which is the usual third-party-notices entry rather than a constraint on how
+you license your own code. The rows are read most-specific
+first: the SDK directories are MIT even though they sit outside `langwatch/ee/`.
+
+The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`langwatch/ee/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
+
+The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
 ## Local dev, QA license generation
 
@@ -17548,6 +17559,43 @@ The three pre-built org roles. Each user in the org has exactly one.
 | **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
+
+## Seats
+
+Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
+
+- A **full seat** is someone who can change things.
+- A **lite seat** is someone who can only look at what the team produces.
+
+ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
+
+Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
+
+### What a lite member can do
+
+They can open the projects they are invited to and read what the team produces there:
+
+| They can see | They cannot |
+|---|---|
+| Traces, including the detail view | See costs |
+| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
+| Evaluations and their results | Invite anyone or change roles |
+| Scenario runs | Manage the gateway, virtual keys or budgets |
+| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
+| Their own team | |
+| The names of the project's secrets, never their values | |
+
+Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
+
+These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
+
+<Note>
+Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
+</Note>
+
+### Choosing between them
+
+The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
 
 ## Team roles
 
@@ -51996,7 +52044,7 @@ When using the Helm chart, you rarely need to set environment variables directly
 |----------|-------------|----------|
 | `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
 | `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key | Yes |
 | `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
 
 <Warning>
@@ -52007,7 +52055,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 
 ### SSO Provider Variables
 
@@ -52028,14 +52076,6 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 | `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
 | `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
 | `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**AWS Cognito:**
-
-| Variable | Description |
-|----------|-------------|
-| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
-| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
-| `COGNITO_ISSUER` | Cognito issuer URL |
 
 **GitHub:**
 
@@ -52589,7 +52629,13 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+
+<Warning>
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
+
+The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+</Warning>
 
 ## Supported Providers
 
@@ -52597,8 +52643,7 @@ LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as 
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
-| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
@@ -52612,7 +52657,11 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `github`, `gitlab`, `google`, or `okta`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+
+<Note>
+A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
+</Note>
 
 ## Provider Setup
 
@@ -52622,7 +52671,9 @@ The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users r
 
 Reset links are sent through the same transactional email provider as the rest of LangWatch. Configure SendGrid or AWS SES as described in [Third-party integrations](/self-hosting/configuration/third-party-integrations) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled.
+When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+
+Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
 
 ### Auth0
 
@@ -52663,7 +52714,7 @@ Or via environment variables:
 ```yaml
 app:
   nextAuth:
-    provider: azureAd
+    provider: azure-ad
     providers:
       azureAd:
         clientId:
@@ -52674,39 +52725,16 @@ app:
           value: "your-tenant-id"
 ```
 
+<Note>
+The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
+</Note>
+
 | Variable | Value |
 |----------|-------|
-| `NEXTAUTH_PROVIDER` | `azureAd` |
+| `NEXTAUTH_PROVIDER` | `azure-ad` |
 | `AZURE_AD_CLIENT_ID` | Application (client) ID |
 | `AZURE_AD_CLIENT_SECRET` | Client secret value |
 | `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
-
-### AWS Cognito
-
-1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
-2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
-3. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: cognito
-    providers:
-      cognito:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
-        issuer:
-          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | User pool app client ID |
-| `COGNITO_CLIENT_SECRET` | User pool app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
 
 ### GitHub
 
@@ -53341,7 +53369,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 **What it does:**
 - Serves the LangWatch web UI (Next.js)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
-- Handles authentication (NextAuth.js with email or SSO providers)
+- Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
 - Manages the control plane via PostgreSQL (Prisma ORM)
 - Broadcasts real-time updates via Server-Sent Events (SSE)
@@ -54199,7 +54227,7 @@ Next.js server, the single external entry point for all traffic:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
-- **Authentication**: NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
+- **Authentication**: email, Google, GitHub, GitLab, Azure AD, Auth0, Okta
 - **SSE**: pushes real-time updates to connected browser clients
 - **Analytics queries**: reads from ClickHouse
 - **Control plane**: manages users, teams, projects via PostgreSQL
@@ -55154,6 +55182,148 @@ else in your install changes.
 
 ---
 
+# FILE: ./self-hosting/licensing.mdx
+
+---
+title: Editions and licensing
+description: "What self-hosted LangWatch gives you for free, what an Enterprise license unlocks, and how to activate one"
+sidebarTitle: Editions & licensing
+keywords: license, licensing, self-hosted, enterprise, SSO, RBAC, SCIM, audit logs, seats, open source
+---
+
+Self-hosted LangWatch runs the same image that powers LangWatch Cloud. There is no separate "community" build to outgrow and no feature you have to re-deploy to obtain: a license unlocks the Enterprise surface in the software you are already running.
+
+## What you get without a license
+
+Everything the platform stores on your own infrastructure is uncapped. Running unlicensed, you get:
+
+<CardGroup cols={2}>
+<Card title="Unlimited people" icon="users">
+Members, lite members, teams, and projects. Invite your whole organization.
+</Card>
+
+<Card title="Unlimited work" icon="infinity">
+Traces, spans, prompts, evaluations, scenarios and simulations, agents, experiments, datasets, dashboards, custom graphs, and automations.
+</Card>
+
+<Card title="Your full history" icon="clock-rotate-left">
+No visibility window on the data in your own ClickHouse. Retention is yours to configure.
+</Card>
+
+<Card title="The whole product surface" icon="grid-2">
+Observability, evaluations, prompt management, agent simulations, the Optimization Studio, and the AI Gateway.
+</Card>
+</CardGroup>
+
+You never need a license just to run LangWatch. A license adds the enterprise capabilities below and a support relationship.
+
+<Note>
+An Enterprise license is priced per seat, so it carries the number of members you bought and the deployment enforces it. Everything else stays uncapped: volume, history, projects, teams, and every experimentation resource. Need more seats? [Talk to us](mailto:enterprise@langwatch.ai) and we reissue the license.
+
+Seats come in two kinds, and which one a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. See [Seats](/ai-governance/roles-and-permissions#seats).
+</Note>
+
+<Note>
+Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+</Note>
+
+## What an Enterprise license unlocks
+
+| Capability | Why it is licensed |
+|---|---|
+| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso). |
+| **RBAC** with custom roles | Fine-grained permissions beyond the built-in roles. |
+| **SCIM** user provisioning | Directory-driven joiner/mover/leaver flows. |
+| **Audit logs** | Tamper-evident record of who did what, exportable to your SIEM. |
+| **Gateway webhooks** | Signed delivery of spend and budget events from the AI Gateway to your own systems, with retries, replay and a delivery log. This is what platforms build their own usage-based pricing and agent budget controls on. |
+| **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
+| **Extended retention** | Multi-class retention policies configured per category. |
+| **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`langwatch/ee/`](https://github.com/langwatch/langwatch/tree/main/langwatch/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/langwatch/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+
+## SSO requires a license
+
+Setting the SSO environment variables is not sufficient on its own. A deployment with an identity provider configured but no license runs in **email mode**: the sign-in page offers the email and password form, the identity-provider button is not shown, and SSO sign-in routes are refused.
+
+This is deliberate rather than a failure state, so an unlicensed deployment always has a working door:
+
+- Email sign-up and sign-in stay available.
+- **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox. It can only deliver if outbound email is configured; without it the screen says so rather than claiming a link was sent.
+
+Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. If `NEXTAUTH_PROVIDER` names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
+
+<Warning>
+**Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it. Those accounts have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure SMTP (see [Third-party integrations](/self-hosting/configuration/third-party-integrations)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
+
+If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs nothing but the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
+</Warning>
+
+## Activating a license
+
+<Steps>
+<Step title="Get a license">
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+</Step>
+
+<Step title="Activate it">
+In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+
+Prefer configuration over a UI step? Set the key as an environment variable instead:
+
+```bash
+LANGWATCH_LICENSE_KEY=<your signed license key>
+```
+
+On Helm, the chart takes it inline or from a Secret you already manage:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+</Step>
+
+<Step title="Restart the deployment">
+The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+</Step>
+</Steps>
+
+## Expiry
+
+Nothing is switched off on the day a license reaches its end date. Nobody is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
+
+The seat count keeps binding. A license we issued is a record of what was bought, so an expired one still covers the seats it sold: an organization holding more members than that is asked to disable the ones who no longer need access, and adding a new member is refused until the license is renewed. Everyone who already has a seat is unaffected.
+
+A license we did not issue is a different thing. Its numbers cannot be trusted, so an unreadable or altered key leaves the deployment on the uncapped open-source baseline, exactly as if it had never held a license.
+
+## Frequently asked
+
+<AccordionGroup>
+<Accordion title="Is there a user limit without a license?">
+No. Members, lite members, teams, and projects are all uncapped on a self-hosted deployment without a license.
+</Accordion>
+
+<Accordion title="Do I need a license for commercial use?">
+No. The Apache 2.0 floor covers commercial use. A license is for the Enterprise capabilities listed above and for a support relationship.
+</Accordion>
+
+<Accordion title="One organization has a license. What about the others?">
+The SSO gate is deployment-wide: one genuinely licensed organization enables SSO for the whole deployment. Plan entitlements stay per organization.
+</Accordion>
+
+<Accordion title="Does self-hosted send usage data to LangWatch?">
+No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+</Accordion>
+</AccordionGroup>
+
+---
+
 # FILE: ./self-hosting/ops/dashboard.mdx
 
 ---
@@ -55791,6 +55961,8 @@ description: "Deploy LangWatch on your own infrastructure for full data control"
 
 LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
 
+Without a license, self-hosted LangWatch is uncapped: unlimited members, teams, projects, and everything you create on your own infrastructure. An Enterprise license unlocks SSO, RBAC, SCIM, audit logs and support in the same deployment. See [Editions and licensing](/self-hosting/licensing).
+
 <Tip>
 **Get the entire LangWatch platform running with a single Helm install:**
 
@@ -55942,9 +56114,9 @@ This page covers the security features and best practices for self-hosted LangWa
 
 ## Authentication & Authorization
 
-**NextAuth.js** handles user authentication with support for:
+LangWatch handles user authentication with support for:
 - Email/password (default)
-- SSO providers: Azure AD, Okta, Auth0, AWS Cognito, Google, GitHub, GitLab
+- SSO providers: Azure AD, Okta, Auth0, Google, GitHub, GitLab
 
 See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
 
@@ -60402,6 +60574,8 @@ A **billable event** is either:
 
 Both contribute to your event count for the billing period. There are no separate charges per feature on top of this — evaluations, monitoring, and simulations all run against the same event stream.
 
+For the complete list, including exactly how many events an experiment sweep or a scenario run produces and what is never billed, see [What counts as a billable event](/pricing/billable-events).
+
 ### What's included
 
 Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more — a longer retention window or higher volume — you can [extend retention](#extending-retention) with an Enterprise plan or a self-hosted license.
@@ -60419,11 +60593,11 @@ Retention controls how long your events are kept before they're automatically re
 
 ### Extending retention
 
-Going beyond your plan's default window — keeping events longer, or storing a higher volume — is a licensed capability. It's available on **Enterprise plans**, or when you **self-host with a license**; it isn't a self-serve toggle on the standard Cloud tiers.
+The windows above are LangWatch Cloud plans. Going beyond your plan's default window, keeping events longer or storing a higher volume, is available on **Enterprise plans**; it isn't a self-serve toggle on the standard Cloud tiers.
 
-On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use. Self-hosted deployments with a license configure retention directly in the platform.
+On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use.
 
-This keeps the model predictable: your base plan covers normal usage at its default window, and longer or higher-volume retention is unlocked through an Enterprise agreement or a self-hosted license.
+Self-hosted deployments are different: the data sits in your own database, so there is no window we impose and no volume we meter. Retention is yours to configure, with or without a license. What a license adds there is multi-class retention, a separate policy per data category. See [Editions and licensing](/self-hosting/licensing).
 
 <Note>
   To extend retention beyond your plan default, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the [self-hosting docs](/self-hosting/overview) to configure retention with a license.
@@ -60444,16 +60618,22 @@ This keeps the model predictable: your base plan covers normal usage at its defa
     Run LangWatch locally on your own machine. All features are available from our [open-source repository](https://github.com/langwatch/langwatch), so you can build with sensitive data without it leaving your environment.
   </Accordion>
 
+  <Accordion title="What is the difference between a full member and a lite member?">
+    Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
+
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
+  </Accordion>
+
   <Accordion title="What counts as a billable event?">
-    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period.
+    A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including what is never billed and how retries are deduplicated.
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    Each plan includes a default retention window (see the table above). Extending it — a longer window or a higher volume of stored events — is available on **Enterprise plans** or when you **self-host with a license**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up.
+    On LangWatch Cloud each plan includes a default retention window (see the table above), and extending it, a longer window or a higher volume of stored events, is available on **Enterprise plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted, the data is in your own database: retention is yours to configure with or without a license, and a license adds multi-class retention policies per data category.
   </Accordion>
 
   <Accordion title="Can I self-host or run a hybrid setup?">
-    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free. If you require enterprise features such as SSO, RBAC, SCIM, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai).
+    Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our Cloud while your data stays on your side. See the self-hosting docs or reach out for more information. You can run the self-hosted version for free, with unlimited users, projects, and events on your own hardware. If you require enterprise features such as SSO, RBAC, SCIM, gateway webhooks, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai). See [Editions and licensing](/self-hosting/licensing) for what a license unlocks.
   </Accordion>
 
   <Accordion title="Where is my data stored?">

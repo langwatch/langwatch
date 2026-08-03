@@ -84,7 +84,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

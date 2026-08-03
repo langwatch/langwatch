@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Hono routes for webhook endpoints.
  *
@@ -7,11 +8,12 @@
  * Auth0 sends `sscim` (Successful SCIM Operation) events when a user
  * is created, updated, or deleted via SCIM on an enterprise connection.
  */
+
+import { ScimService } from "@ee/scim/scim.service";
+import { extractEmailDomain } from "@ee/sso/matching";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { extractEmailDomain } from "~/server/better-auth/sso";
 import { prisma } from "~/server/db";
-import { ScimService } from "~/server/scim/scim.service";
 
 const secured = createServiceApp({ basePath: "/api/webhooks" });
 

@@ -39,9 +39,47 @@ async function main() {
   assertLocalhostDatabaseUrl();
 
   const prisma = new PrismaClient();
+
+  // ADR-027: the ssoDomain auto-join rides the platform SSO gate, which
+  // requires a genuine (signature-valid) license. Mint one with a throwaway
+  // keypair BEFORE importing the app modules (the public key and env are
+  // captured at import time).
+  const { generateKeyPairSync } = await import("node:crypto");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+  process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
+  const { signLicense, encodeLicenseKey } = await import(
+    "../../ee/licensing/signing"
+  );
+  process.env.LANGWATCH_LICENSE_KEY = encodeLicenseKey(
+    signLicense(
+      {
+        licenseId: "lic_sso_smoke",
+        version: 1,
+        organizationName: "SSO Smoketest",
+        email: "smoketest@example.com",
+        issuedAt: new Date().toISOString(),
+        expiresAt: "2099-01-01T00:00:00Z",
+        plan: {
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          maxMembers: 100,
+          maxMessagesPerMonth: 1_000_000,
+          canPublish: true,
+        },
+      },
+      privateKey,
+    ),
+  );
+
   const { afterUserCreate, beforeAccountCreate } = await import(
     "../../src/server/better-auth/hooks"
   );
+  const { __resetSsoGateForTests } = await import("../../ee/sso/sso-gate");
+  const { env: appEnv } = await import("../../src/env.mjs");
 
   // ─────────────────────────────────────────────────────────────────
   // FIXTURES
@@ -438,6 +476,40 @@ async function main() {
     isaacOrg?.organizationId === "sso_smoke_org_google",
     isaacOrg?.organizationId,
   );
+
+  // ─────────────────────────────────────────────────────────────────
+  // [8.6] ADR-027: denied platform gate skips the ssoDomain auto-join
+  // ─────────────────────────────────────────────────────────────────
+
+  console.log("\n[8.6] Unlicensed deployment: auto-join is skipped");
+  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
+    undefined;
+  __resetSsoGateForTests();
+  await prisma.user.create({
+    data: {
+      id: "sso_smoke_denied",
+      email: "denied@google-corp.test",
+      name: "Denied",
+    },
+  });
+  await afterUserCreate({
+    prisma,
+    user: {
+      id: "sso_smoke_denied",
+      email: "denied@google-corp.test",
+      name: "Denied",
+    },
+  });
+  const deniedOrg = await prisma.organizationUser.findFirst({
+    where: { userId: "sso_smoke_denied" },
+  });
+  check(
+    "denied gate: matching-domain user NOT auto-joined",
+    deniedOrg === null,
+  );
+  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
+    process.env.LANGWATCH_LICENSE_KEY;
+  __resetSsoGateForTests();
 
   // ─────────────────────────────────────────────────────────────────
   // [9] Idempotency — running afterUserCreate twice doesn't double-add

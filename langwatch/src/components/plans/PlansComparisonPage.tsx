@@ -32,6 +32,10 @@ import {
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
 
+/** The public list of every event type that counts toward the usage lines below. */
+const BILLABLE_EVENTS_DOCS_URL =
+  "https://docs.langwatch.ai/pricing/billable-events";
+
 type PlanColumn = {
   id: ComparisonPlanId;
   name: string;
@@ -262,6 +266,20 @@ export function PlansComparisonPage({
           <Text color="fg.muted">
             Compare plans and choose the right tier for your organization.
           </Text>
+          <Link
+            href={BILLABLE_EVENTS_DOCS_URL}
+            isExternal
+            data-testid="billable-events-docs-link"
+            fontSize="sm"
+            color="fg.muted"
+            display="inline-flex"
+            alignItems="center"
+            gap={1}
+            _hover={{ color: "fg" }}
+          >
+            <Info size={13} />
+            What counts as an event?
+          </Link>
         </VStack>
         <Box flex={1} />
       </Flex>

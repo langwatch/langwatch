@@ -1,3 +1,5 @@
+import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -13,7 +15,6 @@ import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
 import { captureException } from "../../utils/posthogErrorCapture";
-import { extractEmailDomain, isSsoProviderMatch } from "./sso";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 
@@ -110,6 +111,14 @@ export const beforeUserCreate = async ({
  * the OAuth callback. The user can always be added later via invite or admin
  * action, and the pendingSsoSetup + afterAccountUpdate self-heal path covers
  * re-attempts on subsequent sign-ins.
+ *
+ * ADR-027 (Decision 7, v5 MAJOR fix): this auto-join is federation — a login
+ * capability — and runs on email+password signup too, not just OAuth. In a
+ * denied (coerced-to-email) deployment with fresh signup open, an unverified
+ * `POST /sign-up/email` at a customer's domain would otherwise auto-join
+ * that org with zero IdP round-trip. Guarded on the SAME platform gate every
+ * other provider rides — no per-org license check, just "is SSO allowed at
+ * all on this deployment".
  */
 export const afterUserCreate = async ({
   prisma,
@@ -124,6 +133,24 @@ export const afterUserCreate = async ({
 
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
+
+  // ADR-027 site #4: domain auto-join is federation and rides the platform
+  // gate. When it denies (unlicensed deployment), skip the join — but log it,
+  // because on an email-mode install the gate-resolution warning is suppressed
+  // (sso-gate.ts), so a staff-set ssoDomain silently losing auto-join would
+  // otherwise leave zero trace for an operator debugging "why wasn't this user
+  // added to the org".
+  const ssoAllowed = await platformSSOAllowed();
+  if (!ssoAllowed) {
+    // warn, matching the gate's own denial-resolution level in sso-gate.ts:
+    // both lines have the same root cause, so an operator grepping warn for
+    // "why is federation not happening" must not find only half of it.
+    logger.warn(
+      { domain },
+      "Skipped ssoDomain auto-join: platform SSO gate denies (no genuine license)",
+    );
+    return;
+  }
 
   try {
     const org = await prisma.organization.findUnique({
@@ -261,6 +288,24 @@ export const beforeAccountCreate = async ({
       code: "USER_DEACTIVATED",
       message: "USER_DEACTIVATED",
     });
+  }
+
+  // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
+  // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
+  // `pendingSsoSetup=true` soft-flag below from being written when the v6
+  // reset-recovery path creates a `credential` account for an OAuth-born user
+  // on an unlicensed install — that flag would otherwise strand them behind a
+  // permanent "Link your SSO account" banner they can never clear (every SSO
+  // path 403s on a denied deployment).
+  if (!(await platformSSOAllowed())) {
+    // warn for the same reason the `afterUserCreate` site does: an operator
+    // grepping warn for "why is federation not happening" has to find both
+    // halves of the answer, not one.
+    logger.warn(
+      { userId: user.id, providerId: account.providerId },
+      "Skipped ssoDomain enforcement: platform SSO gate denies (no genuine license)",
+    );
+    return;
   }
 
   const domain = extractEmailDomain(user.email);

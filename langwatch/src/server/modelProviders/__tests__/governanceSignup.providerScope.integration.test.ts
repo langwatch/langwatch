@@ -32,7 +32,7 @@ import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
 
-vi.mock("../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

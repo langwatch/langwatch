@@ -23,7 +23,7 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 

@@ -6,7 +6,7 @@ vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "email" },
 }));
 
-vi.mock("../../../auditLog", () => ({
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

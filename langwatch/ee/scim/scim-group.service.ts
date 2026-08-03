@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { generate } from "@langwatch/ksuid";
 import type { Group, PrismaClient } from "@prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";

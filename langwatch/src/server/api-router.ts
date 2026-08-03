@@ -2,8 +2,10 @@
  * Unified Hono API router — all /api/* routes mounted here.
  * Each sub-app sets its own basePath (e.g. "/api/traces").
  */
-import { type Context, Hono } from "hono";
 
+import { app as scimApp } from "@ee/scim/routes";
+import { app as webhooksApp } from "@ee/scim/webhooks";
+import { type Context, Hono } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
@@ -62,12 +64,10 @@ import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
-import { app as scimApp } from "./routes/scim";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
 import { app as trpcApp } from "./routes/trpc";
 import { app as unsubscribeApp } from "./routes/unsubscribe";
-import { app as webhooksApp } from "./routes/webhooks";
 import { app as workflowsApp } from "./routes/workflows";
 
 export function createApiRouter() {

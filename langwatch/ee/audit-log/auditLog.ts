@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { prisma } from "~/server/db";
 import type { NextApiRequest } from "~/types/next-stubs";
-import { getClientIp } from "../utils/getClientIp";
-import { safeTruncate } from "../utils/truncate";
-import { prisma } from "./db";
+import { getClientIp } from "~/utils/getClientIp";
+import { safeTruncate } from "~/utils/truncate";
 
 export const auditLog = async ({
   userId,
