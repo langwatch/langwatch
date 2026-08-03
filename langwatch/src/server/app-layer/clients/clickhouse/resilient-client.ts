@@ -267,6 +267,100 @@ function logSuccess({
 }
 
 /**
+ * ClickHouse streams results over HTTP. Once rows have been flushed, a
+ * failure can no longer change the 200 status code, so the server writes the
+ * error INTO the output as a final `{"exception": "..."}` line
+ * (`http_write_exception_in_output_format`, on by default). The transport
+ * never throws, the line parses as JSON, and without this guard it reaches
+ * the caller as a "row" with none of the selected columns — which surfaces
+ * as a property access on a missing column deep in a decoder, pointing every
+ * investigation away from ClickHouse. (Observed live: a
+ * MEMORY_LIMIT_EXCEEDED mid-`FINAL` arriving as a data row.)
+ *
+ * The guard wraps `json()` and throws the real ClickHouse error through the
+ * same translator the catch path uses.
+ */
+
+/**
+ * The server-side exception prefix, e.g.
+ * `Code: 241. DB::Exception: Memory limit ... (MEMORY_LIMIT_EXCEEDED)`.
+ * The class name is deliberately loose: the thrown type prints its own name
+ * (`DB::NetException`, `DB::ErrnoException`, `Coordination::Exception`) and
+ * every one of them means the query died. Missing one is the expensive
+ * direction — it puts an error row back in front of a decoder.
+ */
+const CLICKHOUSE_EXCEPTION_SIGNATURE = /^Code: \d+\. (\w+::)?\w*Exception:/;
+
+/**
+ * A row is the server's exception line only when both hold: `exception` is
+ * its sole key, and the value carries the ClickHouse error signature. The
+ * sole-key test alone would reject a legitimate one-column result such as
+ * `SELECT status AS exception`. A value that reproduces the full signature is
+ * an accepted residual false positive — the stream offers nothing else to
+ * tell it apart from the real thing.
+ */
+function inbandExceptionOf(row: unknown): string | undefined {
+  if (row === null || typeof row !== "object" || Array.isArray(row)) {
+    return undefined;
+  }
+  if (Object.keys(row).length !== 1) return undefined;
+  const exception = (row as { exception?: unknown }).exception;
+  if (typeof exception !== "string") return undefined;
+  return CLICKHOUSE_EXCEPTION_SIGNATURE.test(exception) ? exception : undefined;
+}
+
+function inbandExceptionError(message: string, durationMs: number): unknown {
+  const error = new Error(message);
+  const code = /Code:\s*(\d+)/.exec(message)?.[1];
+  if (code) (error as { code?: string }).code = code;
+  return translateClickHouseQueryError(error, durationMs);
+}
+
+/**
+ * Outcome accounting is two-phase for streamed results. The transport-level
+ * "success" is recorded when the query resolves — that cannot be deferred
+ * to consumption, because a caller may stream() or never read the body at
+ * all. When consumption then surfaces an in-band exception, the failure is
+ * recorded HERE (failure log + error counter), so dashboards alerting on
+ * errors see it. The earlier success increment is left standing and
+ * documents itself as "the server accepted and started answering"; an
+ * in-band failure therefore shows up as one success + one error for the
+ * same query, never as silence.
+ *
+ * No transport-level retry happens for in-band exceptions: the body has
+ * been consumed, and the classes that arrive in-band (memory limit, server
+ * timeout) are not transient. Callers that need a retry get it from their
+ * own layer — the job queue re-runs the whole unit of work.
+ */
+function guardInbandException<
+  T extends { json?: (...args: never[]) => unknown },
+>(result: T, startMs: number, params: unknown): T {
+  if (typeof result?.json !== "function") return result;
+  const queryType = extractQueryType(params);
+  const originalJson = result.json.bind(result);
+  result.json = (async (...args: never[]) => {
+    const rows = (await originalJson(...args)) as unknown;
+    for (const row of Array.isArray(rows) ? rows : [rows]) {
+      const exception = inbandExceptionOf(row);
+      if (exception !== undefined) {
+        const durationMs = performance.now() - startMs;
+        const error = inbandExceptionError(exception, durationMs);
+        logFailure({ operation: "query", error, durationMs, params });
+        // Dedicated outcome, and no second duration sample: the transport
+        // outcome (success + one histogram observation) was already
+        // recorded when the query resolved. Counting this as "error" too
+        // would put one query under both terminal outcomes and corrupt
+        // the success/error ratio.
+        incrementClickHouseQueryCount(queryType, "inband_error");
+        throw error;
+      }
+    }
+    return rows;
+  }) as T["json"];
+  return result;
+}
+
+/**
  * Wraps a ClickHouseClient with structured logging and insert retry.
  */
 export function createResilientClickHouseClient({
@@ -295,7 +389,7 @@ export function createResilientClickHouseClient({
       logSuccess({ operation: "query", durationMs, params });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "success");
-      return result;
+      return guardInbandException(result, start, params);
     } catch (error) {
       const durationMs = performance.now() - start;
       logFailure({ operation: "query", error, durationMs, params });

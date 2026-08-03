@@ -307,6 +307,29 @@ describe("MetricDataPointClickHouseRepository", () => {
         "ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC",
       );
     });
+
+    it("never fetches the payload column on either read", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
+
+      // The fold never reads CanonicalPayload, and it is the one
+      // megabyte-scale column: fetching it through FINAL across the folded
+      // seek branches can push a single query past the server's per-query
+      // memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). Both reads
+      // must stay payload-free.
+      const successorSeeks = query.mock.calls[0]![0].query;
+      const bucketReads = query.mock.calls[1]![0].query;
+      expect(successorSeeks).not.toContain("CanonicalPayload");
+      expect(bucketReads).not.toContain("CanonicalPayload");
+      // The seek stays minimal: sequence fields only.
+      expect(successorSeeks).not.toContain("ResourceAttributesJson");
+      expect(bucketReads).toContain("BucketCounts");
+    });
   });
 
   describe("when a folded read answers with a row it cannot decode", () => {
@@ -315,12 +338,12 @@ describe("MetricDataPointClickHouseRepository", () => {
       METRIC_ROLLUP_INTERVAL_MS;
 
     /**
-     * The shape the rollup lane actually failed on in production: a row that
-     * parses as JSON and carries its identifiers, but is missing one of the
-     * `Array(UInt64)` count columns the decoder dereferences unguarded. The
-     * decoder used to walk straight into `undefined.map`, and the queue logs
-     * only an error's message — so the incident produced no column, no series
-     * and no query to work from.
+     * The shape the rollup lane actually failed on: a row that parses as JSON
+     * and carries its identifiers, but is missing one of the `Array(UInt64)`
+     * count columns the decoder dereferences unguarded. Walking straight into
+     * `undefined.map` costs the whole diagnosis — the queue logs an error's
+     * message and nothing else, so the failure names no column, no series and
+     * no query.
      */
     function rowMissingBucketCounts() {
       const point = dataPoint();
