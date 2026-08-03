@@ -399,6 +399,24 @@ Feature: GroupQueue content-addressed tiered payload store
     Then the blob is still readable
     And the runner reports it as eligible for reclaim
 
+  @integration @track6
+  # The per-sweep ceiling bounds one tick's work and hands the rest to the next
+  # one. That only holds if the walk carries its position between ticks: a walk
+  # that restarts at the beginning re-judges the same leading slice every time,
+  # and the blobs behind it are left to the four-day backstop no matter how often
+  # the runner is scheduled — which reads as a healthy sweep in the totals.
+  Scenario: Successive sweeps advance through the keyspace instead of re-walking its first slice
+    Given more unreferenced Redis-tier blobs than one sweep's ceiling
+    When the reclaim runner sweeps enough times to cover them all
+    Then every blob has been put on the grace window
+    And none is left on its four-day backstop
+
+  @integration @track6
+  Scenario: A completed cycle rewinds so newly written blobs are picked up
+    Given the reclaim runner has finished a full pass of the blob keyspace
+    When a new unreferenced blob is written and the runner sweeps again
+    Then the new blob is put on the grace window
+
   @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
     Given the reclaim runner is on its cleanup schedule
