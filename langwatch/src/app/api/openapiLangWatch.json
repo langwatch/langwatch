@@ -7080,6 +7080,18 @@
                               "null"
                             ]
                           },
+                          "external_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
                           "scopes": {
                             "type": "array",
                             "items": {
@@ -7150,6 +7162,8 @@
                           "display_prefix",
                           "principal_user_id",
                           "trace_project_id",
+                          "external_id",
+                          "metadata",
                           "scopes",
                           "routing_policy_id",
                           "routing_mode",
@@ -7376,6 +7390,15 @@
               "maximum": 200,
               "default": 50
             }
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "description": "Exact match on the resource's `external_id`."
+            }
           }
         ],
         "summary": "List virtual keys",
@@ -7437,6 +7460,18 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
                         },
                         "scopes": {
                           "type": "array",
@@ -7508,6 +7543,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -7989,6 +8026,26 @@
                       }
                     }
                   },
+                  "external_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
                   "purpose": {
                     "type": "string",
                     "const": "user"
@@ -8061,6 +8118,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -8131,6 +8200,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -8443,6 +8514,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -8513,6 +8596,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -8995,6 +9080,26 @@
                         }
                       }
                     }
+                  },
+                  "external_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
                   }
                 }
               }
@@ -9407,6 +9512,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -9477,6 +9594,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -9752,6 +9871,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -9822,6 +9953,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -10110,6 +10243,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -10180,6 +10325,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -10451,6 +10598,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "scopes": {
                           "type": "array",
                           "items": {
@@ -10521,6 +10680,8 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "external_id",
+                        "metadata",
                         "scopes",
                         "routing_policy_id",
                         "routing_mode",
@@ -11295,6 +11456,18 @@
                               "null"
                             ]
                           },
+                          "external_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
                           "current_period_started_at": {
                             "type": "string"
                           },
@@ -11341,6 +11514,8 @@
                           "spent_nano_usd",
                           "timezone",
                           "provider_key",
+                          "external_id",
+                          "metadata",
                           "current_period_started_at",
                           "resets_at",
                           "last_reset_at",
@@ -11576,6 +11751,15 @@
               "type": "string",
               "description": "Comma-separated subset of the scope types, lowercase, e.g. `virtual_key,principal`."
             }
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "description": "Exact match on the resource's `external_id`."
+            }
           }
         ],
         "summary": "List budgets",
@@ -11675,6 +11859,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "current_period_started_at": {
                           "type": "string"
                         },
@@ -11721,6 +11917,8 @@
                         "spent_nano_usd",
                         "timezone",
                         "provider_key",
+                        "external_id",
+                        "metadata",
                         "current_period_started_at",
                         "resets_at",
                         "last_reset_at",
@@ -12094,6 +12292,26 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "external_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
                   }
                 },
                 "required": [
@@ -12203,6 +12421,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "current_period_started_at": {
                           "type": "string"
                         },
@@ -12249,6 +12479,8 @@
                         "spent_nano_usd",
                         "timezone",
                         "provider_key",
+                        "external_id",
+                        "metadata",
                         "current_period_started_at",
                         "resets_at",
                         "last_reset_at",
@@ -12600,6 +12832,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "current_period_started_at": {
                           "type": "string"
                         },
@@ -12646,6 +12890,8 @@
                         "spent_nano_usd",
                         "timezone",
                         "provider_key",
+                        "external_id",
+                        "metadata",
                         "current_period_started_at",
                         "resets_at",
                         "last_reset_at",
@@ -12895,6 +13141,26 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "external_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
                   }
                 }
               }
@@ -12996,6 +13262,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "current_period_started_at": {
                           "type": "string"
                         },
@@ -13042,6 +13320,8 @@
                         "spent_nano_usd",
                         "timezone",
                         "provider_key",
+                        "external_id",
+                        "metadata",
                         "current_period_started_at",
                         "resets_at",
                         "last_reset_at",
@@ -13347,6 +13627,18 @@
                             "null"
                           ]
                         },
+                        "external_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "current_period_started_at": {
                           "type": "string"
                         },
@@ -13393,6 +13685,8 @@
                         "spent_nano_usd",
                         "timezone",
                         "provider_key",
+                        "external_id",
+                        "metadata",
                         "current_period_started_at",
                         "resets_at",
                         "last_reset_at",
@@ -35468,7 +35762,288 @@
     },
     "/api/webhooks/v1/endpoints": {
       "post": {
-        "responses": {},
+        "responses": {
+          "201": {
+            "description": "The endpoint, with the signing secret this body alone carries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "enabled_events": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "disabled_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "disabled_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "failing_since": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_failure_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "max_batch_size": {
+                          "type": "integer"
+                        },
+                        "max_batch_delay_ms": {
+                          "type": "integer"
+                        },
+                        "max_in_flight": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "secret": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "url",
+                        "enabled_events",
+                        "status",
+                        "disabled_reason",
+                        "disabled_at",
+                        "failing_since",
+                        "last_success_at",
+                        "last_failure_at",
+                        "max_batch_size",
+                        "max_batch_delay_ms",
+                        "max_in_flight",
+                        "created_at",
+                        "updated_at",
+                        "secret"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "postApiWebhooksV1Endpoints",
         "parameters": [],
         "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
@@ -35513,7 +36088,287 @@
         }
       },
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "Every endpoint the organization has, archived ones excluded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "enabled_events": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "disabled"
+                            ]
+                          },
+                          "disabled_reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "disabled_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "failing_since": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last_success_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "last_failure_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "max_batch_size": {
+                            "type": "integer"
+                          },
+                          "max_batch_delay_ms": {
+                            "type": "integer"
+                          },
+                          "max_in_flight": {
+                            "type": "integer"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "enabled_events",
+                          "status",
+                          "disabled_reason",
+                          "disabled_at",
+                          "failing_since",
+                          "last_success_at",
+                          "last_failure_at",
+                          "max_batch_size",
+                          "max_batch_delay_ms",
+                          "max_in_flight",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1Endpoints",
         "parameters": [],
         "description": "List the organization's webhook endpoints"
@@ -35521,7 +36376,328 @@
     },
     "/api/webhooks/v1/endpoints/{id}": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "The endpoint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "enabled_events": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "disabled_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "disabled_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "failing_since": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_failure_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "max_batch_size": {
+                          "type": "integer"
+                        },
+                        "max_batch_delay_ms": {
+                          "type": "integer"
+                        },
+                        "max_in_flight": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "url",
+                        "enabled_events",
+                        "status",
+                        "disabled_reason",
+                        "disabled_at",
+                        "failing_since",
+                        "last_success_at",
+                        "last_failure_at",
+                        "max_batch_size",
+                        "max_batch_delay_ms",
+                        "max_in_flight",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1EndpointsById",
         "parameters": [
           {
@@ -35536,7 +36712,328 @@
         "description": "Get one webhook endpoint"
       },
       "patch": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "The endpoint as it now stands",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "enabled_events": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "disabled_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "disabled_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "failing_since": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_failure_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "max_batch_size": {
+                          "type": "integer"
+                        },
+                        "max_batch_delay_ms": {
+                          "type": "integer"
+                        },
+                        "max_in_flight": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "url",
+                        "enabled_events",
+                        "status",
+                        "disabled_reason",
+                        "disabled_at",
+                        "failing_since",
+                        "last_success_at",
+                        "last_failure_at",
+                        "max_batch_size",
+                        "max_batch_delay_ms",
+                        "max_in_flight",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "patchApiWebhooksV1EndpointsById",
         "parameters": [
           {
@@ -35548,7 +37045,7 @@
             "required": true
           }
         ],
-        "description": "Update a webhook endpoint's url, event subscriptions, or status (ACTIVE re-enables, DISABLED pauses; re-enabling does not re-send the gap, replay covers it)",
+        "description": "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
         "requestBody": {
           "content": {
             "application/json": {
@@ -35573,8 +37070,8 @@
                   "status": {
                     "type": "string",
                     "enum": [
-                      "ACTIVE",
-                      "DISABLED"
+                      "active",
+                      "disabled"
                     ]
                   },
                   "max_batch_size": {
@@ -35593,7 +37090,255 @@
         }
       },
       "delete": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "Archived: the endpoint is gone from every read and delivers nothing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "archived": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "archived"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "deleteApiWebhooksV1EndpointsById",
         "parameters": [
           {
@@ -35610,7 +37355,332 @@
     },
     "/api/webhooks/v1/endpoints/{id}/roll-secret": {
       "post": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "The endpoint, with the new signing secret this body alone carries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "enabled_events": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "disabled_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "disabled_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "failing_since": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_failure_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "max_batch_size": {
+                          "type": "integer"
+                        },
+                        "max_batch_delay_ms": {
+                          "type": "integer"
+                        },
+                        "max_in_flight": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "secret": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "url",
+                        "enabled_events",
+                        "status",
+                        "disabled_reason",
+                        "disabled_at",
+                        "failing_since",
+                        "last_success_at",
+                        "last_failure_at",
+                        "max_batch_size",
+                        "max_batch_delay_ms",
+                        "max_in_flight",
+                        "created_at",
+                        "updated_at",
+                        "secret"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "postApiWebhooksV1EndpointsByIdRoll-secret",
         "parameters": [
           {
@@ -35627,7 +37697,267 @@
     },
     "/api/webhooks/v1/endpoints/{id}/test": {
       "post": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "The test ran; `data.delivered` carries the receiver's verdict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "delivered": {
+                          "type": "boolean"
+                        },
+                        "response_status": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "response_body": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "delivered",
+                        "response_status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "postApiWebhooksV1EndpointsByIdTest",
         "parameters": [
           {
@@ -35644,7 +37974,312 @@
     },
     "/api/webhooks/v1/endpoints/{id}/deliveries": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "One page of delivery attempts, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "dispatch_id": {
+                            "type": "string"
+                          },
+                          "attempt": {
+                            "type": "integer"
+                          },
+                          "event_count": {
+                            "type": "integer"
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "enum": [
+                              "success",
+                              "retryable",
+                              "terminal",
+                              "pending"
+                            ]
+                          },
+                          "response_status": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "latency_ms": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "fired_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "dispatch_id",
+                          "attempt",
+                          "event_count",
+                          "outcome",
+                          "response_status",
+                          "latency_ms",
+                          "error",
+                          "fired_at"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1EndpointsByIdDeliveries",
         "parameters": [
           {
@@ -35679,7 +38314,315 @@
     },
     "/api/webhooks/v1/endpoints/{id}/health": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "The endpoint's delivery health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ]
+                        },
+                        "disabled_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "failing_since": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_failure_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "oldest_undelivered_age_ms": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "dlq_depth": {
+                          "type": "integer"
+                        },
+                        "sends_per_minute": {
+                          "type": "number"
+                        },
+                        "success_rate": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "p95_latency_ms": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "disabled_reason",
+                        "failing_since",
+                        "last_success_at",
+                        "last_failure_at",
+                        "oldest_undelivered_age_ms",
+                        "dlq_depth",
+                        "sends_per_minute",
+                        "success_rate",
+                        "p95_latency_ms"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1EndpointsByIdHealth",
         "parameters": [
           {
@@ -35696,7 +38639,229 @@
     },
     "/api/webhooks/v1/event-types": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "Every subscribable event type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "family": {
+                            "type": "string"
+                          },
+                          "schema_version": {
+                            "type": "string"
+                          },
+                          "is_emitting": {
+                            "type": "boolean"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "family",
+                          "schema_version",
+                          "is_emitting",
+                          "description"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1Event-types",
         "parameters": [],
         "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet"
@@ -35704,7 +38869,238 @@
     },
     "/api/webhooks/v1/events": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "description": "One page of emitted-event envelopes, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "string"
+                          },
+                          "schema_version": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "created",
+                          "schema_version",
+                          "data"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiWebhooksV1Events",
         "parameters": [
           {
@@ -35751,7 +39147,288 @@
             }
           }
         ],
-        "description": "The organization's emitted-events log (Stripe /v1/events parity): cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it."
+        "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly."
+      }
+    },
+    "/api/webhooks/v1/events/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The envelope, exactly as it was delivered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string"
+                        },
+                        "schema_version": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "created",
+                        "schema_version",
+                        "data"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiWebhooksV1EventsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids."
       }
     },
     "/api/gateway/v1/spend-summaries": {
@@ -38477,6 +42154,7 @@
         }
       },
       "JsonValue": {
+        "description": "Any JSON value: a string, number, boolean, null, array, or object.",
         "anyOf": [
           {
             "type": "string"
