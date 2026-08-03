@@ -9,7 +9,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteService } from "~/server/suites/suite.service";
@@ -34,7 +33,6 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = createSuiteService(ctx.prisma);
       return service.create(input);
     }),
@@ -81,7 +79,6 @@ export const suiteRouter = createTRPCRouter({
       if (!source) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
       }
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       // A SuiteDomainError is a HandledError — left to propagate so the tRPC
       // handled-error middleware maps its code and status, instead of
       // flattening every suite failure into one NOT_FOUND with prose.

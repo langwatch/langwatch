@@ -445,7 +445,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",
   "specs/licensing/notification-coverage-gaps.feature",
-  "specs/licensing/proration-preview.feature",
   "specs/licensing/resource-limit-notifications.feature",
   "specs/licensing/subscription-page.feature",
   "specs/licensing/usage-page-navigation.feature",

@@ -44,45 +44,22 @@ export const LICENSE_ERRORS = {
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 
-/** Free tier resource limits - designed for individual evaluation/POC use */
+/** Cloud free tier resource limits - designed for individual evaluation/POC use */
 const FREE_TIER_LIMITS = {
   /** Single operator model */
   MEMBERS: 1,
   /** Members Lite requires paid plan */
   MEMBERS_LITE: 0,
-  /** Single team for individual use */
-  TEAMS: 1,
-  /** Enough for a small POC */
-  PROJECTS: 2,
-  /** Minimal experimentation allowance */
-  WORKFLOWS: 3,
-  /** Minimal experimentation allowance */
-  PROMPTS: 3,
-  /** Minimal experimentation allowance */
-  EVALUATORS: 3,
-  /** Minimal experimentation allowance */
-  SCENARIOS: 3,
-  /** Minimal experimentation allowance */
-  AGENTS: 3,
-  /** Minimal experimentation allowance */
-  EXPERIMENTS: 3,
-  /** Minimal experimentation allowance */
-  ONLINE_EVALUATIONS: 3,
-  /** Minimal experimentation allowance */
-  DATASETS: 3,
-  /** Minimal experimentation allowance */
-  DASHBOARDS: 3,
-  /** Minimal experimentation allowance */
-  CUSTOM_GRAPHS: 3,
-  /** Minimal experimentation allowance */
-  AUTOMATIONS: 3,
   /** ~33 messages per day */
   MESSAGES_PER_MONTH: 1_000,
 } as const;
 
 /**
- * UNLIMITED_PLAN: Default plan for self-hosted deployments without a license.
- * Maintains backward compatibility with current OSS behavior.
+ * UNLIMITED_PLAN: the plan a self-hosted deployment runs on without a license.
+ *
+ * A license sells the Enterprise surface (SSO, SCIM, audit logs) and support,
+ * not permission to run the software, so nothing the deployment stores on its
+ * own infrastructure is capped here.
  *
  * Uses Number.MAX_SAFE_INTEGER instead of Infinity because:
  * - JSON.stringify(Infinity) returns null, causing silent failures in tRPC
@@ -97,20 +74,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   overrideAddingLimitations: true,
   maxMembers: Number.MAX_SAFE_INTEGER,
   maxMembersLite: Number.MAX_SAFE_INTEGER,
-  maxTeams: Number.MAX_SAFE_INTEGER,
-  maxProjects: Number.MAX_SAFE_INTEGER,
   maxMessagesPerMonth: Number.MAX_SAFE_INTEGER,
-  maxWorkflows: Number.MAX_SAFE_INTEGER,
-  maxPrompts: Number.MAX_SAFE_INTEGER,
-  maxEvaluators: Number.MAX_SAFE_INTEGER,
-  maxScenarios: Number.MAX_SAFE_INTEGER,
-  maxAgents: Number.MAX_SAFE_INTEGER,
-  maxExperiments: Number.MAX_SAFE_INTEGER,
-  maxOnlineEvaluations: Number.MAX_SAFE_INTEGER,
-  maxDatasets: Number.MAX_SAFE_INTEGER,
-  maxDashboards: Number.MAX_SAFE_INTEGER,
-  maxCustomGraphs: Number.MAX_SAFE_INTEGER,
-  maxAutomations: Number.MAX_SAFE_INTEGER,
   canPublish: true,
   usageUnit: "traces",
   prices: {
@@ -120,15 +84,16 @@ export const UNLIMITED_PLAN: PlanInfo = {
 };
 
 /**
- * FREE_PLAN: Fallback plan for expired or invalid licenses.
- * Provides minimal access to encourage license renewal.
+ * FREE_PLAN: the Cloud free tier.
+ *
+ * Self-hosted deployments never land here. With no license, or an expired or
+ * unreadable one, they resolve to UNLIMITED_PLAN.
  */
 export const FREE_PLAN: PlanInfo = {
   planSource: "free",
   type: "FREE",
   name: "Free",
   free: true,
-  // Self-hosted unlicensed gets the Free visibility experience.
   visibilityDays: FREE_VISIBILITY_DAYS,
   overrideAddingLimitations: false,
 
@@ -136,20 +101,7 @@ export const FREE_PLAN: PlanInfo = {
 
   maxMembers: FREE_TIER_LIMITS.MEMBERS,
   maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,
-  maxTeams: FREE_TIER_LIMITS.TEAMS,
-  maxProjects: FREE_TIER_LIMITS.PROJECTS,
 
-  maxWorkflows: FREE_TIER_LIMITS.WORKFLOWS,
-  maxPrompts: FREE_TIER_LIMITS.PROMPTS,
-  maxEvaluators: FREE_TIER_LIMITS.EVALUATORS,
-  maxScenarios: FREE_TIER_LIMITS.SCENARIOS,
-  maxAgents: FREE_TIER_LIMITS.AGENTS,
-  maxExperiments: FREE_TIER_LIMITS.EXPERIMENTS,
-  maxOnlineEvaluations: FREE_TIER_LIMITS.ONLINE_EVALUATIONS,
-  maxDatasets: FREE_TIER_LIMITS.DATASETS,
-  maxDashboards: FREE_TIER_LIMITS.DASHBOARDS,
-  maxCustomGraphs: FREE_TIER_LIMITS.CUSTOM_GRAPHS,
-  maxAutomations: FREE_TIER_LIMITS.AUTOMATIONS,
   canPublish: false,
   usageUnit: "traces",
   prices: {

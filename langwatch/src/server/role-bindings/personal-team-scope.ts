@@ -20,12 +20,12 @@ export interface RoleBindingScope {
 /**
  * Refuse any role-binding write that would change who reaches a personal team.
  *
- * A personal team holds exactly one member, its owner, and plan-limit counting
- * exempts it on that basis. Granting a second user or a group access leaves the
- * team flagged personal while it is shared in every way that matters, so
- * `getTeamCount` keeps excluding a team the organization is really using. A
- * group ADMIN binding also defeats the last-admin projection that is the only
- * thing stopping the owner from being removed from their own workspace.
+ * A personal team holds exactly one member, its owner. Granting a second user
+ * or a group access leaves the team flagged personal while it is shared in
+ * every way that matters, so the workspace the owner is promised privacy in
+ * is no longer private. A group ADMIN binding also defeats the last-admin
+ * projection that is the only thing stopping the owner from being removed
+ * from their own workspace.
  *
  * The invariant lives here rather than at each entry point because role
  * bindings are written from the role-binding service, the group router, the

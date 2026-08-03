@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Session } from "~/server/auth";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
@@ -94,8 +93,8 @@ async function copyWorkflowForEvaluator(
  *
  * Shared by `evaluators.copy` and `monitors.copy` so replicating from either
  * surface produces an identical, independently-editable evaluator in the target
- * project. The caller owns the permission checks; this helper enforces the
- * target project's evaluator license limit and assumes the source is readable.
+ * project. The caller owns the permission checks; this helper assumes the
+ * source is readable.
  */
 export async function copyEvaluatorToProject({
   ctx,
@@ -110,8 +109,6 @@ export async function copyEvaluatorToProject({
   targetProjectId: string;
   newEvaluatorId?: string;
 }) {
-  await enforceLicenseLimit(ctx, targetProjectId, "evaluators");
-
   const source = await loadSourceEvaluator(ctx, evaluatorId, sourceProjectId);
   const newWorkflowId = await copyWorkflowForEvaluator(
     ctx,

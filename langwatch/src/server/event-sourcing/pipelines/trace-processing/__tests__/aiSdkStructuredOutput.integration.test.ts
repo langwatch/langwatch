@@ -178,7 +178,21 @@ describe.skipIf(!hasTestcontainers)(
         value: [{ role: "assistant", content: '{"greeting":"Hallo"}' }],
       });
 
-      const persistedSummary = await traceSummaryStore.get(traceId, context);
+      // Poll to tolerate ClickHouse insert visibility lag, the same way
+      // traceProcessing.coalescing.integration.test.ts does. A bare read here
+      // passes on an idle machine and fails on a loaded CI runner, which is
+      // the whole difficulty: the value is correct, it is just not readable
+      // yet at the instant the fold returns.
+      let persistedSummary: TraceSummaryData | null = null;
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        persistedSummary = (await traceSummaryStore.get(
+          traceId,
+          context,
+        )) as TraceSummaryData | null;
+        if (persistedSummary?.computedOutput !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
       expect(persistedSummary?.computedOutput).toBe('{"greeting":"Hallo"}');
     }, 45_000);
   },

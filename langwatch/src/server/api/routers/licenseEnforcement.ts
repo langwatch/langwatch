@@ -6,7 +6,6 @@ import {
   limitTypeSchema,
   limitTypes,
 } from "../../license-enforcement";
-import { getLimitBreakdownByProject } from "../../license-enforcement/limit-breakdown";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -30,26 +29,6 @@ export const licenseEnforcementRouter = createTRPCRouter({
         input.limitType,
         ctx.session.user,
       );
-    }),
-
-  /**
-   * List the resources counting toward a limit, grouped by project, so the
-   * upgrade dialog can show where an org-wide count comes from. Returns an
-   * empty list for limit types that have no listable per-project resources.
-   */
-  getLimitBreakdown: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        limitType: limitTypeSchema,
-      }),
-    )
-    .use(checkOrganizationPermission("organization:view"))
-    .query(async ({ ctx, input }) => {
-      return getLimitBreakdownByProject(ctx.prisma, {
-        organizationId: input.organizationId,
-        limitType: input.limitType,
-      });
     }),
 
   /**

@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
@@ -43,9 +42,6 @@ export const scenarioCrudRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       logger.info({ projectId: input.projectId }, "Creating scenario");
-
-      // Enforce scenario limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "scenarios");
 
       const service = ScenarioService.create(ctx.prisma);
       const result = await service.create({

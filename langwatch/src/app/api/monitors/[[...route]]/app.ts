@@ -10,7 +10,6 @@ import { prisma } from "~/server/db";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { slugify } from "~/utils/slugify";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
@@ -200,7 +199,6 @@ secured.access(requires("evaluations:view")).get(
 // routes keep `:create`, because an evaluator IS the inert definition.
 secured.access(requires("evaluations:manage")).post(
   "/",
-  resourceLimitMiddleware("onlineEvaluations"),
   describeRoute({
     description: "Create a new online evaluation monitor",
     responses: {

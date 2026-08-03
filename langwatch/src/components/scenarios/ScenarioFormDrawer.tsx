@@ -16,7 +16,6 @@ import {
   showErrorToast,
 } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
-import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import {
   clearFlowCallbacks,
   getComplexProps,
@@ -24,7 +23,6 @@ import {
   useDrawer,
   useDrawerParams,
 } from "../../hooks/useDrawer";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
@@ -110,9 +108,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectSlug: project?.slug,
   });
   const scenarioId = props.scenarioId;
-
-  // License enforcement for scenario creation
-  const scenarioEnforcement = useLicenseEnforcement("scenarios");
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -294,31 +289,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [createMutation, transitionToEditMode],
   );
 
-  // Create mode: no scenarioId in the URL yet, so the create has to clear the
-  // plan limit before it runs.
-  const createNew = useCallback(
-    (args: {
-      projectId: string;
-      data: ScenarioFormData;
-      skipTransition: boolean;
-      models?: ModelOverrides;
-    }): Promise<Scenario | null> =>
-      new Promise((resolve) => {
-        // checkCompoundLimits takes a synchronous callback, so the create runs
-        // in a fire-and-forget scope that resolves the outer promise on both
-        // paths rather than returning one the caller would drop.
-        checkCompoundLimits([scenarioEnforcement], () => {
-          void createScenario(args).then(resolve);
-        });
-
-        // If limit exceeded, modal is shown and callback won't run - resolve null
-        if (!scenarioEnforcement.isAllowed) {
-          resolve(null);
-        }
-      }),
-    [createScenario, scenarioEnforcement],
-  );
-
   const handleSave = useCallback(
     async ({
       data,
@@ -339,9 +309,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             data,
             models,
           })
-        : await createNew({ projectId, data, skipTransition, models });
+        : await createScenario({ projectId, data, skipTransition, models });
     },
-    [project?.id, scenario, updateExisting, createNew],
+    [project?.id, scenario, updateExisting, createScenario],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {

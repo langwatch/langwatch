@@ -29,11 +29,9 @@ describe("UsageStatsService", () => {
     vi.clearAllMocks();
 
     mockRepository = {
-      getProjectCount: vi.fn().mockResolvedValue(2),
       getCurrentMonthCost: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(1),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),
-      getTeamCount: vi.fn().mockResolvedValue(1),
       getPromptCount: vi.fn().mockResolvedValue(0),
       getWorkflowCount: vi.fn().mockResolvedValue(0),
       getActiveScenarioCount: vi.fn().mockResolvedValue(0),
@@ -96,7 +94,7 @@ describe("UsageStatsService", () => {
     it("includes all other stats alongside usageUnit", async () => {
       const stats = await service.getUsageStats("org-123", testUser);
 
-      expect(stats.projectsCount).toBe(2);
+      expect(stats.membersCount).toBe(1);
       expect(stats.currentMonthMessagesCount).toBe(500);
       expect(stats.usageUnit).toBe("traces");
       expect(stats.messageLimitInfo).toBeDefined();

@@ -30,7 +30,6 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   HttpAuth,
@@ -225,9 +224,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     showVariablesTab ? "variables" : "body",
   );
 
-  // License enforcement for agent creation
-  const { checkAndProceed } = useLicenseEnforcement("agents");
-
   // All variables = fixed + custom
   const variables = useMemo(() => {
     return [...FIXED_VARIABLES, ...customVariables];
@@ -376,7 +372,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     );
 
     if (agentId) {
-      // Editing existing agent - no limit check needed
+      // Editing existing agent
       updateMutation.mutate({
         id: agentId,
         projectId: project.id,
@@ -384,14 +380,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         config,
       });
     } else {
-      // Creating new agent - check limit first
-      checkAndProceed(() => {
-        createMutation.mutate({
-          projectId: project.id,
-          name: name.trim(),
-          type: "http",
-          config,
-        });
+      // Creating new agent
+      createMutation.mutate({
+        projectId: project.id,
+        name: name.trim(),
+        type: "http",
+        config,
       });
     }
   }, [
@@ -408,7 +402,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     isValid,
     createMutation,
     updateMutation,
-    checkAndProceed,
   ]);
 
   const handleScenarioMappingChange = useCallback(

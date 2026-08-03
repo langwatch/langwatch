@@ -100,7 +100,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-rest-api.feature | "List datasets returns empty array for project with no datasets" | KEEP | Test "returns a paginated response with 0 datasets" exists unbound |
 | specs/features/dataset-rest-api.feature | "Create a dataset with name and column types" | KEEP | POST /api/dataset implemented; test "creates a dataset with the correct slug" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset auto-generates a unique slug from the name" | KEEP | 409 conflict handling exists; test "returns 409 Conflict" exists |
-| specs/features/dataset-rest-api.feature | "Create a dataset enforces plan limits" | KEEP | resourceLimitMiddleware applied on POST; test "returns 403 Forbidden" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset validates column types" | KEEP | Zod schema in schemas.ts; test "returns 422 Unprocessable Entity" exists |
 | specs/features/dataset-rest-api.feature | "Create a dataset requires a name" | KEEP | Zod schema validation; test "returns 422 Unprocessable Entity" exists for missing name |
 | specs/features/dataset-rest-api.feature | "Get a dataset by slug" | KEEP | GET /api/dataset/:slugOrId implemented; test "returns the dataset by slug with its records" exists |
@@ -206,7 +205,6 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-file-upload-api.feature | "Create + upload renames reserved column names" | KEEP | renameReservedColumns in upload-utils.ts:102; integration test "renames 'id' to 'id_' and 'selected' to 'selected_'" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload requires a name field" | KEEP | Zod schema validation; integration test "returns 422 Unprocessable Entity" for missing name exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload requires a file field" | KEEP | Multipart validation; integration test "returns 422 Unprocessable Entity" for missing file exists |
-| specs/features/dataset-file-upload-api.feature | "Create + upload enforces dataset plan limits" | KEEP | resourceLimitMiddleware on create+upload; integration test "returns 403 Forbidden" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload fails when slug conflicts with existing dataset" | KEEP | Conflict handling; integration test "returns 409 Conflict" exists |
 | specs/features/dataset-file-upload-api.feature | "Create + upload rejects file exceeding row limit" | KEEP | MAX_ROWS_LIMIT enforced; integration test "returns 400 Bad Request" for create+upload row limit exists |
 | specs/features/dataset-file-upload-api.feature | "Detect CSV format from .csv extension" | KEEP | detectFileFormat in upload-utils.ts:21; unit test "detects CSV format" exists |

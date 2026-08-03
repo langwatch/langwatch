@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DashboardServiceMiddlewareVariables,
   dashboardServiceMiddleware,
@@ -90,7 +89,6 @@ secured.access(requires("analytics:create")).post(
   describeRoute({
     description: "Create a new dashboard",
   }),
-  resourceLimitMiddleware("dashboards"),
   zValidator("json", createDashboardSchema),
   async (c) => {
     const project = c.get("project");

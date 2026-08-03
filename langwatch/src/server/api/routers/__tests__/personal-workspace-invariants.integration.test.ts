@@ -2,16 +2,16 @@
  * @vitest-environment node
  *
  * A personal workspace is one person's private space inside an organization:
- * one team, one project, one owner, and none of it spends the organization's
- * plan allowance. Three write paths could take that shape apart, and the
- * owner holds the permission each of them checks, so RBAC never stops them.
+ * one team, one project, one owner. Three write paths could take that shape
+ * apart, and the owner holds the permission each of them checks, so RBAC
+ * never stops them.
  *
  * Two things break when the shape goes:
  *
- *   - The plan stops counting what it should. A project is exempt because it
- *     lives in a personal workspace; moving it into a shared team, or moving
- *     a shared project into a personal team, would settle that by flag alone
- *     and hand the organization a project no limit ever sees.
+ *   - The two personal flags stop agreeing. `Project.isPersonal` mirrors
+ *     `Team.isPersonal`, and a project lives in a personal workspace only
+ *     when both say so; moving a project across that boundary would leave
+ *     the pair contradicting itself, which is a shape no reader handles.
  *   - Provisioning bricks, permanently. The uniqueness of one personal team
  *     per (organization, owner) covers archived rows, while
  *     PersonalWorkspaceService looks the workspace up with `archivedAt: null`
@@ -20,10 +20,10 @@
  *     the owner has no personal workspace in that organization ever again.
  *
  * Every rejection here is therefore asserted twice: the mutation fails, and
- * the state it would have produced is proven absent. The counts come from the
- * real LicenseEnforcementRepository and the recovery check from the real
- * PersonalWorkspaceService, because a guard that rejects while the damage
- * lands anyway would pass a test that only looked at the error.
+ * the state it would have produced is proven absent. The recovery check runs
+ * against the real PersonalWorkspaceService, because a guard that rejects
+ * while the damage lands anyway would pass a test that only looked at the
+ * error.
  *
  * One fixture serves every case, so its state and the body of each `when`
  * live at module scope and the suite below reads as the list of write paths
@@ -57,7 +57,6 @@ import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
-import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -78,7 +77,6 @@ let personalTeamId: string;
 let personalProjectId: string;
 let personalTeamName: string;
 
-let repository: LicenseEnforcementRepository;
 let workspaceService: PersonalWorkspaceService;
 
 const callerAsOwner = () =>
@@ -196,8 +194,6 @@ async function createFixture(): Promise<void> {
   personalTeamId = workspace.team.id;
   personalTeamName = workspace.team.name;
   personalProjectId = workspace.project.id;
-
-  repository = new LicenseEnforcementRepository(prisma);
 }
 
 /**
@@ -291,9 +287,7 @@ function movingThePersonalProjectIntoTheSharedTeam() {
   });
 
   /** @scenario Moving a personal project into a shared team is refused */
-  it("does not hand the organization a project the plan stops counting", async () => {
-    const before = await repository.getProjectCount(organizationId);
-
+  it("leaves the project's own flag agreeing with its team's", async () => {
     await expect(
       callerAsOwner().project.update({
         projectId: personalProjectId,
@@ -301,9 +295,18 @@ function movingThePersonalProjectIntoTheSharedTeam() {
       }),
     ).rejects.toThrow();
 
-    await expect(repository.getProjectCount(organizationId)).resolves.toBe(
-      before,
-    );
+    // `Project.isPersonal` is a denormalized mirror of `Team.isPersonal`, and
+    // a half-applied move is what leaves the two disagreeing. Nothing reads
+    // the pair to decide the shape of the workspace unless they agree, so a
+    // disagreement is the corruption this refusal exists to prevent.
+    const project = await prisma.project.findUnique({
+      where: { id: personalProjectId },
+      select: { isPersonal: true, team: { select: { isPersonal: true } } },
+    });
+    expect(project).toMatchObject({
+      isPersonal: true,
+      team: { isPersonal: true },
+    });
   });
 
   /** @scenario Moving a personal project into a shared team is refused */
@@ -340,9 +343,7 @@ function movingASharedProjectIntoThePersonalTeam() {
   });
 
   /** @scenario Moving a real project into a personal workspace is refused */
-  it("leaves the project in the shared team, still counted", async () => {
-    const before = await repository.getProjectCount(organizationId);
-
+  it("leaves the project in the shared team, still shared", async () => {
     await expect(
       callerAsOwner().project.update({
         projectId: sharedProjectId,
@@ -352,12 +353,12 @@ function movingASharedProjectIntoThePersonalTeam() {
 
     const project = await prisma.project.findUnique({
       where: { id: sharedProjectId },
-      select: { teamId: true },
+      select: { teamId: true, isPersonal: true },
     });
-    expect(project?.teamId).toBe(sharedTeamId);
-    await expect(repository.getProjectCount(organizationId)).resolves.toBe(
-      before,
-    );
+    expect(project).toMatchObject({
+      teamId: sharedTeamId,
+      isPersonal: false,
+    });
   });
 }
 
@@ -397,9 +398,7 @@ function addingAColleagueToThePersonalTeam() {
   });
 
   /** @scenario Adding a member to a personal team is refused */
-  it("does not leave a shared team the plan stops counting", async () => {
-    const before = await repository.getTeamCount(organizationId);
-
+  it("does not turn the workspace into an ordinary shared team", async () => {
     await expect(
       callerAsOwner().team.update({
         teamId: personalTeamId,
@@ -408,7 +407,12 @@ function addingAColleagueToThePersonalTeam() {
       }),
     ).rejects.toThrow();
 
-    await expect(repository.getTeamCount(organizationId)).resolves.toBe(before);
+    await expect(
+      prisma.team.findUnique({
+        where: { id: personalTeamId },
+        select: { isPersonal: true },
+      }),
+    ).resolves.toMatchObject({ isPersonal: true });
   });
 }
 

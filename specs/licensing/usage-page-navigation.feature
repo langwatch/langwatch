@@ -29,21 +29,6 @@ Feature: Plan Management Navigation
     When I click the "Change plan" button
     Then I am redirected to /settings/license
 
-  # Project limit reached redirects
-  @e2e @unimplemented
-  Scenario: Project limit reached redirects to Subscription in SaaS mode
-    Given the platform is deployed in SaaS mode
-    And the organization has reached the maximum number of projects
-    When I try to create a new project
-    Then the upgrade link redirects to /settings/subscription
-
-  @e2e @unimplemented
-  Scenario: Project limit reached redirects to License in self-hosted mode
-    Given the platform is deployed in self-hosted mode
-    And the organization has reached the maximum number of projects
-    When I try to create a new project
-    Then the upgrade link redirects to /settings/license
-
   # Message limit reached redirects
   @e2e @unimplemented
   Scenario: Message limit banner redirects to Subscription in SaaS mode

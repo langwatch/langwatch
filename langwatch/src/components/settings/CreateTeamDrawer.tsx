@@ -3,7 +3,6 @@ import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useDrawer } from "../../hooks/useDrawer";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
@@ -21,7 +20,6 @@ export function CreateTeamDrawer({
   const { data: session } = useRequiredSession();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("teams");
 
   const form = useForm<TeamFormData>({
     defaultValues: {
@@ -44,42 +42,40 @@ export function CreateTeamDrawer({
   const onSubmit: SubmitHandler<TeamFormData> = useCallback(
     (data: TeamFormData) => {
       if (!organization) return;
-      checkAndProceed(() => {
-        createTeam.mutate(
-          {
-            name: data.name,
-            organizationId: organization.id,
-            members: data.members.map((member) => ({
-              userId: member.userId?.value ?? "",
-              role: member.role.value,
-              customRoleId: member.role.customRoleId,
-            })),
+      createTeam.mutate(
+        {
+          name: data.name,
+          organizationId: organization.id,
+          members: data.members.map((member) => ({
+            userId: member.userId?.value ?? "",
+            role: member.role.value,
+            customRoleId: member.role.customRoleId,
+          })),
+        },
+        {
+          onSuccess: () => {
+            void queryClient.team.getTeamsWithRoleBindings.invalidate();
+            void queryClient.team.getTeamsWithMembers.invalidate();
+            toaster.create({
+              title: "Team created successfully",
+              type: "success",
+              duration: 5000,
+              meta: { closable: true },
+            });
+            closeDrawer();
           },
-          {
-            onSuccess: () => {
-              void queryClient.team.getTeamsWithRoleBindings.invalidate();
-              void queryClient.team.getTeamsWithMembers.invalidate();
-              toaster.create({
-                title: "Team created successfully",
-                type: "success",
-                duration: 5000,
-                meta: { closable: true },
-              });
-              closeDrawer();
-            },
-            onError: () => {
-              toaster.create({
-                title: "Failed to create team",
-                type: "error",
-                duration: 5000,
-                meta: { closable: true },
-              });
-            },
+          onError: () => {
+            toaster.create({
+              title: "Failed to create team",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
           },
-        );
-      });
+        },
+      );
     },
-    [createTeam, organization, queryClient, closeDrawer, checkAndProceed],
+    [createTeam, organization, queryClient, closeDrawer],
   );
 
   return (

@@ -7,22 +7,11 @@
  * `copy` had no integration coverage before the duplicate/copy service
  * extraction, so these pin the behavior the refactor must preserve.
  */
-import { TRPCError } from "@trpc/server";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
-import { enforceLicenseLimit } from "../../../license-enforcement";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn(),
-  };
-});
 
 vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({
   afterPromptCreated: vi.fn(),
@@ -71,8 +60,6 @@ describe("prompts.copy", () => {
   };
 
   beforeEach(async () => {
-    vi.mocked(enforceLicenseLimit).mockReset();
-
     const user = await getTestUser();
     const teamUser = await prisma.teamUser.findFirst({
       where: { userId: user.id },
@@ -172,26 +159,6 @@ describe("prompts.copy", () => {
 
         expect(await handlesIn(sourceProjectId)).toEqual(["support-bot"]);
       });
-
-      it("checks the prompt allowance the plan grants before copying", async () => {
-        const source = await givenASupportBotPrompt();
-        // `prompts.create` enforces the same limit; forget its call so this
-        // asserts on what `copy` does, not on what the setup did.
-        vi.mocked(enforceLicenseLimit).mockClear();
-
-        await caller.prompts.copy({
-          idOrHandle: source.id,
-          projectId: targetProjectId,
-          sourceProjectId,
-        });
-
-        expect(enforceLicenseLimit).toHaveBeenCalledTimes(1);
-        expect(enforceLicenseLimit).toHaveBeenCalledWith(
-          expect.anything(),
-          targetProjectId,
-          "prompts",
-        );
-      });
     });
   });
 
@@ -217,31 +184,6 @@ describe("prompts.copy", () => {
           "support-bot",
           "support-bot_copy1",
         ]);
-      });
-    });
-  });
-
-  describe("given the organization has used up the prompt allowance its plan grants", () => {
-    describe("when a copy is attempted", () => {
-      it("reports the limit and creates no prompt", async () => {
-        const source = await givenASupportBotPrompt();
-
-        vi.mocked(enforceLicenseLimit).mockRejectedValueOnce(
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: "You have reached the maximum number of prompts",
-          }),
-        );
-
-        await expect(
-          caller.prompts.copy({
-            idOrHandle: source.id,
-            projectId: targetProjectId,
-            sourceProjectId,
-          }),
-        ).rejects.toThrow(/maximum number of prompts/i);
-
-        expect(await handlesIn(targetProjectId)).toEqual([]);
       });
     });
   });

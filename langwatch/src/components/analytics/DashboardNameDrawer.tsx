@@ -8,7 +8,6 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -29,8 +28,6 @@ export function DashboardNameDrawer({
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
   const { closeDrawer } = useDrawer();
-  const { checkAndProceed } = useLicenseEnforcement("dashboards");
-  const queryClient = api.useContext();
 
   const dashboardsQuery = api.dashboards.getAll.useQuery(
     { projectId },
@@ -59,30 +56,27 @@ export function DashboardNameDrawer({
   const handleConfirm = () => {
     if (!dashboardName.trim()) return;
 
-    checkAndProceed(() => {
-      createDashboard.mutate(
-        { projectId, name: dashboardName.trim() },
-        {
-          onSuccess: (newDashboard) => {
-            void dashboardsQuery.refetch();
-            void queryClient.licenseEnforcement.checkLimit.invalidate();
-            void router.push(
-              `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
-            );
-            handleClose();
-          },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error creating dashboard",
-              type: "error",
-              duration: 3000,
-              meta: { closable: true },
-            });
-          },
+    createDashboard.mutate(
+      { projectId, name: dashboardName.trim() },
+      {
+        onSuccess: (newDashboard) => {
+          void dashboardsQuery.refetch();
+          void router.push(
+            `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
+          );
+          handleClose();
         },
-      );
-    });
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
+          toaster.create({
+            title: "Error creating dashboard",
+            type: "error",
+            duration: 3000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
   };
 
   return (

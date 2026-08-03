@@ -255,24 +255,6 @@ describe("Feature: Dashboard REST API", () => {
       const res = await helpers.api.post("/api/dashboards", { name: "" });
       expect(res.status).toBe(422);
     });
-
-    describe("when the project has reached its dashboard plan limit", () => {
-      beforeEach(async () => {
-        await createDashboard({ name: "Existing Dashboard" });
-        mockGetActivePlan.mockResolvedValue({
-          ...FREE_PLAN,
-          maxDashboards: 1,
-          overrideAddingLimitations: false,
-        });
-      });
-
-      it("returns 403 Forbidden", async () => {
-        const res = await helpers.api.post("/api/dashboards", {
-          name: "Over Limit",
-        });
-        expect(res.status).toBe(403);
-      });
-    });
   });
 
   // ── Get Single Dashboard ─────────────────────────────────────

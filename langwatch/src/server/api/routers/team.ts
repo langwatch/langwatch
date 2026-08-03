@@ -4,7 +4,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
@@ -12,12 +11,7 @@ import {
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import {
-  createLicenseEnforcementService,
-  LimitExceededError,
-} from "../../license-enforcement";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -432,38 +426,6 @@ export const teamRouter = createTRPCRouter({
       }
 
       const prisma = ctx.prisma;
-
-      // Check teams license limit via LicenseEnforcementService
-      const enforcement = createLicenseEnforcementService(prisma);
-      try {
-        await enforcement.enforceLimitByOrganization({
-          organizationId: input.organizationId,
-          limitType: "teams",
-          user: ctx.session.user,
-        });
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-            cause: {
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            },
-          });
-        }
-        throw error;
-      }
 
       const teamNanoId = nanoid();
       const teamId = `team_${teamNanoId}`;

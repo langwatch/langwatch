@@ -22,10 +22,6 @@ import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
-import {
-  createLicenseEnforcementService,
-  LimitExceededError,
-} from "../../license-enforcement";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -123,37 +119,6 @@ export const projectRouter = createTRPCRouter({
         teamId: input.teamId,
         organizationId: input.organizationId,
       });
-
-      const enforcement = createLicenseEnforcementService(prisma);
-      try {
-        await enforcement.enforceLimitByOrganization({
-          organizationId: input.organizationId,
-          limitType: "projects",
-          user: ctx.session.user,
-        });
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-            cause: {
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            },
-          });
-        }
-        throw error;
-      }
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;

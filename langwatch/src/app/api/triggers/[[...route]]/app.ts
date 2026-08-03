@@ -10,7 +10,6 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -179,7 +178,6 @@ secured.access(requires("triggers:view")).get(
 // existing caller changes and a viewer is declined as before.
 secured.access(requires("triggers:create")).post(
   "/",
-  resourceLimitMiddleware("automations"),
   describeRoute({
     description: "Create a new trigger (automation)",
     responses: {

@@ -1,6 +1,5 @@
 import { createMocks } from "node-mocks-http";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
 // Mock dependencies
@@ -19,14 +18,6 @@ vi.mock("~/server/db", () => ({
       findUnique: vi.fn(),
     },
   },
-}));
-
-vi.mock("~/server/license-enforcement", () => ({
-  createLicenseEnforcementService: vi.fn(),
-}));
-
-vi.mock("~/server/license-enforcement/limit-message", () => ({
-  buildResourceLimitMessage: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -55,13 +46,9 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 }));
 
 import { prisma } from "~/server/db";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
-import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import handler from "../init";
 
 describe("POST /api/experiment/init", () => {
-  let mockEnforceLimit: Mock;
-
   const project = {
     id: "project-123",
     slug: "my-project",
@@ -94,15 +81,6 @@ describe("POST /api/experiment/init", () => {
       id: "team-456",
       organizationId: "org-789",
     });
-
-    mockEnforceLimit = vi.fn().mockResolvedValue(undefined);
-    (createLicenseEnforcementService as Mock).mockReturnValue({
-      enforceLimit: mockEnforceLimit,
-    });
-
-    (buildResourceLimitMessage as Mock).mockResolvedValue(
-      "Free plan limit of 3 experiments reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
-    );
   });
 
   function createRequest({
@@ -132,11 +110,7 @@ describe("POST /api/experiment/init", () => {
       );
     });
 
-    it("returns 200 regardless of limit status", async () => {
-      mockEnforceLimit.mockRejectedValue(
-        new LimitExceededError("experiments", 3, 3),
-      );
-
+    it("returns 200 for the existing experiment", async () => {
       const { req, res } = createRequest({ slug: "existing-experiment" });
       await handler(req, res);
 
@@ -146,13 +120,6 @@ describe("POST /api/experiment/init", () => {
         slug: "existing-experiment",
       });
     });
-
-    it("does not call enforceLimit", async () => {
-      const { req, res } = createRequest({ slug: "existing-experiment" });
-      await handler(req, res);
-
-      expect(mockEnforceLimit).not.toHaveBeenCalled();
-    });
   });
 
   describe("when slug does not exist", () => {
@@ -161,7 +128,7 @@ describe("POST /api/experiment/init", () => {
       (prisma.experiment.create as Mock).mockResolvedValue(createdExperiment);
     });
 
-    describe("when org is under experiment limit", () => {
+    describe("when creating the experiment", () => {
       it("creates the experiment and returns 200", async () => {
         const { req, res } = createRequest({ slug: "new-experiment" });
         await handler(req, res);
@@ -171,58 +138,6 @@ describe("POST /api/experiment/init", () => {
           path: "/my-project/experiments/new-experiment",
           slug: "new-experiment",
         });
-      });
-
-      it("calls enforceLimit with the resolved organizationId", async () => {
-        const { req, res } = createRequest({ slug: "new-experiment" });
-        await handler(req, res);
-
-        expect(prisma.team.findUnique).toHaveBeenCalledWith({
-          where: { id: "team-456" },
-          select: { organizationId: true },
-        });
-        expect(mockEnforceLimit).toHaveBeenCalledWith("org-789", "experiments");
-      });
-    });
-
-    describe("when org is at experiment limit", () => {
-      beforeEach(() => {
-        mockEnforceLimit.mockRejectedValue(
-          new LimitExceededError("experiments", 3, 3),
-        );
-      });
-
-      it("returns 403 with structured error response", async () => {
-        const { req, res } = createRequest({ slug: "new-experiment" });
-        await handler(req, res);
-
-        expect(res.statusCode).toBe(403);
-        const body = res._getJSONData();
-        expect(body).toEqual({
-          error: "resource_limit_exceeded",
-          message: expect.stringContaining("experiments reached"),
-          limitType: "experiments",
-          current: 3,
-          max: 3,
-        });
-      });
-
-      it("includes a customer-facing upgrade message", async () => {
-        const { req, res } = createRequest({ slug: "new-experiment" });
-        await handler(req, res);
-
-        const body = res._getJSONData();
-        expect(body.message).toContain(
-          "Free plan limit of 3 experiments reached",
-        );
-        expect(body.message).toContain("upgrade your plan");
-      });
-
-      it("does not create the experiment", async () => {
-        const { req, res } = createRequest({ slug: "new-experiment" });
-        await handler(req, res);
-
-        expect(prisma.experiment.create).not.toHaveBeenCalled();
       });
     });
   });

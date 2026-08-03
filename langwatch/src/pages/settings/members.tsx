@@ -18,12 +18,13 @@ import {
   type OrganizationUserRole,
   RoleBindingScopeType,
 } from "@prisma/client";
-import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
@@ -202,6 +203,20 @@ function MembersList({
     );
   };
 
+  const { setMemberDisabled } = useMemberDisableAction({
+    organizationId: organization.id,
+    onChanged: () => {
+      void queryClient.organization.getOrganizationWithMembersAndTheirTeams
+        .invalidate()
+        .catch((error) => {
+          captureException(error, {
+            tags: { organizationId: organization.id },
+          });
+        });
+      void queryClient.licenseEnforcement.checkLimit.invalidate();
+    },
+  });
+
   const viewInviteLink = (inviteCode: string, email: string) => {
     setSelectedInvites([{ inviteCode, email }]);
     onInviteLinkOpen();
@@ -250,6 +265,13 @@ function MembersList({
     hasOrganizationManagePermission &&
     organization.members.length > 1 &&
     memberId !== user?.id;
+
+  // Unlike deleting, disabling is reversible and is how an organization gets
+  // back within its licensed seats, so it stays available down to the last
+  // member. The server refuses the cases that would strand the org (the last
+  // admin, or re-enabling past the seat count).
+  const canDisableMember = (memberId: string) =>
+    hasOrganizationManagePermission && memberId !== user?.id;
 
   const sentInvites = useMemo(
     () =>
@@ -365,6 +387,11 @@ function MembersList({
                               Deactivated
                             </Badge>
                           )}
+                          {member.disabledAt && (
+                            <Badge colorPalette="orange" size="sm">
+                              Disabled
+                            </Badge>
+                          )}
                         </HStack>
                       </Table.Cell>
                       <Table.Cell maxWidth="280px">
@@ -399,39 +426,14 @@ function MembersList({
                           display="flex"
                           justifyContent="end"
                         >
-                          <Menu.Root>
-                            <Menu.Trigger>
-                              <MoreVertical size={16} />
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={() => {
-                                  setSelectedMember({
-                                    userId: member.userId,
-                                    role: member.role,
-                                    user: {
-                                      name: member.user.name ?? null,
-                                      email: member.user.email ?? null,
-                                    },
-                                  });
-                                }}
-                              >
-                                <Pencil size={16} />
-                                Edit
-                              </Menu.Item>
-                              {canDeleteMember(member.userId) && (
-                                <Menu.Item
-                                  value="delete"
-                                  color="red.500"
-                                  onClick={() => deleteMember(member.userId)}
-                                >
-                                  <Trash2 size={16} />
-                                  Delete
-                                </Menu.Item>
-                              )}
-                            </Menu.Content>
-                          </Menu.Root>
+                          <MemberRowActions
+                            member={member}
+                            canDisable={canDisableMember(member.userId)}
+                            canDelete={canDeleteMember(member.userId)}
+                            onEdit={setSelectedMember}
+                            onSetDisabled={setMemberDisabled}
+                            onDelete={deleteMember}
+                          />
                         </Box>
                       </Table.Cell>
                     </Table.Row>
@@ -517,6 +519,96 @@ function MembersList({
  * to the invite drawer carrying what they typed, so the box is a fast launcher
  * rather than a second, competing invite form.
  */
+/**
+ * Row actions for a member. Disable is the reversible one, and is how an
+ * organization gets back within its licensed seats; delete removes the
+ * membership outright. See seat-reconciliation.feature.
+ */
+function MemberRowActions({
+  member,
+  canDisable,
+  canDelete,
+  onEdit,
+  onSetDisabled,
+  onDelete,
+}: {
+  member: {
+    userId: string;
+    role: OrganizationUserRole;
+    disabledAt: Date | null;
+    user: { name: string | null; email: string | null };
+  };
+  canDisable: boolean;
+  canDelete: boolean;
+  onEdit: (member: {
+    userId: string;
+    role: OrganizationUserRole;
+    user: { name: string | null; email: string | null };
+  }) => void;
+  onSetDisabled: (userId: string, disabled: boolean) => void;
+  onDelete: (userId: string) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          size="xs"
+          variant="ghost"
+          aria-label={`Actions for ${member.user.name ?? member.user.email ?? "this member"}`}
+        >
+          <MoreVertical size={16} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item
+          value="edit"
+          onClick={() =>
+            onEdit({
+              userId: member.userId,
+              role: member.role,
+              user: {
+                name: member.user.name ?? null,
+                email: member.user.email ?? null,
+              },
+            })
+          }
+        >
+          <Pencil size={16} />
+          Edit
+        </Menu.Item>
+        {canDisable &&
+          (member.disabledAt ? (
+            <Menu.Item
+              value="enable"
+              onClick={() => onSetDisabled(member.userId, false)}
+            >
+              <Undo2 size={16} />
+              Enable
+            </Menu.Item>
+          ) : (
+            <Menu.Item
+              value="disable"
+              onClick={() => onSetDisabled(member.userId, true)}
+            >
+              <Ban size={16} />
+              Disable
+            </Menu.Item>
+          ))}
+        {canDelete && (
+          <Menu.Item
+            value="delete"
+            color="red.500"
+            onClick={() => onDelete(member.userId)}
+          >
+            <Trash2 size={16} />
+            Delete
+          </Menu.Item>
+        )}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 function InlineInviteBox({
   onStartTyping,
 }: {

@@ -26,9 +26,10 @@ export default function License() {
           )}
         </HStack>
         <Text color="fg.muted">
-          Manage your LangWatch license for self-hosted deployments. A valid
-          license is required for commercial use and enables specific plan
-          limits.
+          Manage your LangWatch license. Running LangWatch, commercially
+          included, never needs one. A license covers the seats you bought and
+          unlocks the enterprise capabilities: single sign-on, SCIM provisioning
+          and audit logs.
         </Text>
         {organization?.id ? (
           <LicenseStatus

@@ -10,7 +10,6 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
@@ -153,7 +152,6 @@ secured.access(requires("analytics:view")).get(
 // Creating asks for `analytics:create`; `:manage` still implies it.
 secured.access(requires("analytics:create")).post(
   "/",
-  resourceLimitMiddleware("customGraphs"),
   describeRoute({
     description: "Create a custom graph on a dashboard",
     responses: {

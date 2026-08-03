@@ -15,6 +15,7 @@ import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
@@ -38,7 +39,10 @@ import {
 } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
-import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
+import {
+  assertMemberTypeLimitNotExceeded,
+  LICENSE_LIMIT_ERRORS,
+} from "../../license-enforcement/license-limit-guard";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
 import {
   assertEnterprisePlan,
@@ -112,6 +116,64 @@ export const organizationRouter = createTRPCRouter({
       await getApp().organizations.deleteMember({
         organizationId: input.organizationId,
         userId: input.userId,
+      });
+
+      return { success: true };
+    }),
+
+  /**
+   * Disables or re-enables a membership so an organization can reconcile down
+   * to the seats its license covers. See seat-reconciliation.feature.
+   */
+  setMemberDisabled: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        organizationId: z.string(),
+        disabled: z.boolean(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ input, ctx }) => {
+      if (input.userId === ctx.session.user.id && input.disabled) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot disable your own membership",
+        });
+      }
+
+      // Re-enabling consumes a seat, so it goes through the same check as
+      // inviting someone. Disabling only ever frees one, and is what an
+      // over-seats organization is being asked to do, so it is never blocked.
+      if (!input.disabled) {
+        const enforcement = createLicenseEnforcementService(ctx.prisma);
+        const result = await enforcement.checkLimit(
+          input.organizationId,
+          "members",
+          ctx.session.user,
+        );
+
+        if (!result.allowed) {
+          // The same shape every other member-limit refusal throws, so the
+          // client's global handler opens the limit modal with the real
+          // numbers and its "Upgrade license" link, rather than this route
+          // inventing copy of its own.
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+            cause: {
+              limitType: "members",
+              current: result.current,
+              max: result.max,
+            },
+          });
+        }
+      }
+
+      await getApp().organizations.setMemberDisabled({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        disabled: input.disabled,
       });
 
       return { success: true };

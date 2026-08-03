@@ -12,7 +12,6 @@ import {
   responseFormatSchema,
   runtimeParametersSchema,
 } from "~/prompts/schemas";
-import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
@@ -173,9 +172,6 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce prompt limit before creation
-      await enforceLicenseLimit(ctx, input.projectId, "prompts");
-
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
@@ -386,9 +382,6 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce prompt limit before copying
-      await enforceLicenseLimit(ctx, input.projectId, "prompts");
-
       // Check that the user has at least prompts:create permission on the source project
       const hasSourcePermission = await hasProjectPermission(
         ctx,
@@ -439,9 +432,6 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce prompt limit before duplicating
-      await enforceLicenseLimit(ctx, input.projectId, "prompts");
-
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 

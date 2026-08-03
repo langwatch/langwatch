@@ -234,6 +234,7 @@ import { createSharedTracePayloadCache } from "./share/shared-trace-cache.servic
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
+import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
@@ -510,7 +511,6 @@ export function initializeDefaultApp(options?: {
     eventUsageService,
     planResolver,
     orgRepo,
-    simulationReads,
   );
 
   const planProvider = config.isSaas
@@ -526,15 +526,18 @@ export function initializeDefaultApp(options?: {
           },
         }),
       )
-    : PlanProviderService.create({
-        getActivePlan: async ({ organizationId }) => {
-          const plan = await getLicenseHandler().getActivePlan(organizationId);
-          return {
-            ...plan,
-            planSource: plan.free ? ("free" as const) : ("license" as const),
-          };
-        },
-      });
+    : PlanProviderService.create(
+        createSelfHostedPlanProvider({
+          licensePlanProvider: {
+            // Self-hosted asks a different question than the composite provider
+            // above: with no subscription underneath, a license past its end
+            // date has to keep metering the seats it sold instead of stepping
+            // aside. See LicenseHandler.getSelfHostedPlan.
+            getActivePlan: ({ organizationId }) =>
+              getLicenseHandler().getSelfHostedPlan(organizationId),
+          },
+        }),
+      );
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
@@ -1567,7 +1570,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
-      SimulationRunService.create(null),
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,
