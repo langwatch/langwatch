@@ -170,29 +170,7 @@ export const EXEMPTIONS: Suppression[] = [
  * fails on an entry that no longer suppresses anything, so a fix cannot land
  * while leaving its excuse behind.
  */
-export const KNOWN_GAPS: Suppression[] = (
-  [
-    "GET /api/webhooks/v1/endpoints",
-    "POST /api/webhooks/v1/endpoints",
-    "GET /api/webhooks/v1/endpoints/{id}",
-    "PATCH /api/webhooks/v1/endpoints/{id}",
-    "DELETE /api/webhooks/v1/endpoints/{id}",
-    "POST /api/webhooks/v1/endpoints/{id}/roll-secret",
-    "POST /api/webhooks/v1/endpoints/{id}/test",
-    "GET /api/webhooks/v1/endpoints/{id}/deliveries",
-    "GET /api/webhooks/v1/endpoints/{id}/health",
-    "GET /api/webhooks/v1/event-types",
-    "GET /api/webhooks/v1/events",
-  ] as const
-).map((operation) => ({
-  operation,
-  rules: ["response-schema"] as Rule[],
-  // Every describeRoute on the webhook endpoints app declares a description
-  // and no `responses` at all, so the whole surface publishes zero response
-  // shapes. The response bodies exist and are covered by the webhook REST
-  // integration tests; only the declaration is missing.
-  why: "the webhook endpoints app declares descriptions but no responses, so no operation on this surface publishes a success shape yet",
-}));
+export const KNOWN_GAPS: Suppression[] = [];
 
 interface OpenApiOperation {
   requestBody?: unknown;

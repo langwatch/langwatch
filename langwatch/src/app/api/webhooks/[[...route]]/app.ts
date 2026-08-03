@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -27,7 +28,9 @@ import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
+import { apiErrorSchema } from "../../shared/schemas";
 import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();
@@ -145,6 +148,127 @@ function endpointResponse(endpoint: {
   };
 }
 
+// ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
+// {@link endpointResponse} is the one builder behind create, list, get,
+// patch and roll-secret, so one schema describes all five.
+
+const endpointDtoSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  enabled_events: z.array(z.string()),
+  status: endpointStatusSchema,
+  /** `manual` when an operator paused it, `auto_failures_72h` when the
+   *  failure ladder did. Null while the endpoint is active. */
+  disabled_reason: z.string().nullable(),
+  disabled_at: z.string().nullable(),
+  failing_since: z.string().nullable(),
+  last_success_at: z.string().nullable(),
+  last_failure_at: z.string().nullable(),
+  max_batch_size: z.number().int(),
+  max_batch_delay_ms: z.number().int(),
+  max_in_flight: z.number().int(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+/**
+ * The endpoint plus its plaintext signing secret. Create and roll-secret are
+ * the only two responses that carry it; every read serves
+ * {@link endpointDtoSchema}, which has no `secret` field to be absent from.
+ */
+const endpointWithSecretDtoSchema = endpointDtoSchema.extend({
+  secret: z.string(),
+});
+
+const deliveryDtoSchema = z.object({
+  id: z.string(),
+  /** The send this attempt belongs to; retries of one batch share it. */
+  dispatch_id: z.string(),
+  attempt: z.number().int(),
+  event_count: z.number().int(),
+  outcome: z.enum(["success", "retryable", "terminal", "pending"]),
+  response_status: z.number().int().nullable(),
+  latency_ms: z.number().int().nullable(),
+  error: z.string().nullable(),
+  fired_at: z.string(),
+});
+
+const healthDtoSchema = z.object({
+  status: endpointStatusSchema,
+  disabled_reason: z.string().nullable(),
+  failing_since: z.string().nullable(),
+  last_success_at: z.string().nullable(),
+  last_failure_at: z.string().nullable(),
+  /** Null when everything produced has been delivered. */
+  oldest_undelivered_age_ms: z.number().int().nullable(),
+  dlq_depth: z.number().int(),
+  sends_per_minute: z.number(),
+  /** Delivered over attempted in the last hour; null with no attempts. */
+  success_rate: z.number().nullable(),
+  p95_latency_ms: z.number().int().nullable(),
+});
+
+const eventTypeDtoSchema = z.object({
+  type: z.string(),
+  family: z.string(),
+  schema_version: z.string(),
+  is_emitting: z.boolean(),
+  description: z.string(),
+});
+
+/**
+ * One emitted event, the SAME envelope the signed deliveries carry, so a
+ * pull and a receiver parse with one reader. `data` is the per-type business
+ * payload and stays an open object: every family carries its own cut, and a
+ * closed shape here would describe only one of them.
+ */
+const webhookEventEnvelopeSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  created: z.string(),
+  schema_version: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
+
+/**
+ * A test fire's outcome. `response_body` carries the receiver's answer,
+ * truncated, when one arrived; `error` replaces it with `response_status`
+ * null when the delivery never reached a receiver at all.
+ */
+const testFireResultSchema = z.object({
+  delivered: z.boolean(),
+  response_status: z.number().int().nullable(),
+  response_body: z.string().optional(),
+  error: z.string().optional(),
+});
+
+/** The paging half of every cursor-paged list on this surface. */
+const nextCursorSchema = z
+  .string()
+  .nullable()
+  .describe(
+    "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.",
+  );
+
+/** One documented 200, in this family's canonical envelope for errors. */
+function okResponse(description: string, schema: z.ZodTypeAny) {
+  return {
+    ...canonicalBaseResponses,
+    200: {
+      description,
+      content: { "application/json": { schema: resolver(schema) } },
+    },
+  };
+}
+
+/** The refusal every route that names an endpoint or an event can answer. */
+const notFoundResponse = {
+  404: {
+    description: "Not Found",
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  },
+};
+
 const logger = createLogger("langwatch:webhooks:rest");
 
 /** The single-envelope batch a test fire sends. */
@@ -197,6 +321,18 @@ secured.access(requires("webhookEndpoints:manage")).post(
   describeRoute({
     description:
       "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
+    responses: {
+      ...canonicalBaseResponses,
+      201: {
+        description:
+          "The endpoint, with the signing secret this body alone carries",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
+          },
+        },
+      },
+    },
   }),
   zValidator("json", createEndpointSchema),
   async (c) => {
@@ -214,34 +350,42 @@ secured.access(requires("webhookEndpoints:manage")).post(
   },
 );
 
-secured
-  .access(requires("webhookEndpoints:view"))
-  .get(
-    "/endpoints",
-    requireWebhookPlan,
-    describeRoute({ description: "List the organization's webhook endpoints" }),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const list = await endpoints.getAll({ organizationId: organization.id });
-      return c.json({ data: list.map(endpointResponse) });
-    },
-  );
+secured.access(requires("webhookEndpoints:view")).get(
+  "/endpoints",
+  requireWebhookPlan,
+  describeRoute({
+    description: "List the organization's webhook endpoints",
+    responses: okResponse(
+      "Every endpoint the organization has, archived ones excluded",
+      z.object({ data: z.array(endpointDtoSchema) }),
+    ),
+  }),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const list = await endpoints.getAll({ organizationId: organization.id });
+    return c.json({ data: list.map(endpointResponse) });
+  },
+);
 
-secured
-  .access(requires("webhookEndpoints:view"))
-  .get(
-    "/endpoints/:id",
-    requireWebhookPlan,
-    describeRoute({ description: "Get one webhook endpoint" }),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const endpoint = await endpoints.getById({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({ data: endpointResponse(endpoint) });
+secured.access(requires("webhookEndpoints:view")).get(
+  "/endpoints/:id",
+  requireWebhookPlan,
+  describeRoute({
+    description: "Get one webhook endpoint",
+    responses: {
+      ...okResponse("The endpoint", z.object({ data: endpointDtoSchema })),
+      ...notFoundResponse,
     },
-  );
+  }),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const endpoint = await endpoints.getById({
+      organizationId: organization.id,
+      endpointId: c.req.param("id"),
+    });
+    return c.json({ data: endpointResponse(endpoint) });
+  },
+);
 
 secured.access(requires("webhookEndpoints:manage")).patch(
   "/endpoints/:id",
@@ -249,6 +393,13 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   describeRoute({
     description:
       "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
+    responses: {
+      ...okResponse(
+        "The endpoint as it now stands",
+        z.object({ data: endpointDtoSchema }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   zValidator("json", updateEndpointSchema),
   async (c) => {
@@ -292,21 +443,28 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   },
 );
 
-secured
-  .access(requires("webhookEndpoints:manage"))
-  .delete(
-    "/endpoints/:id",
-    requireWebhookPlan,
-    describeRoute({ description: "Archive a webhook endpoint" }),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      await endpoints.archive({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({ data: { archived: true } });
+secured.access(requires("webhookEndpoints:manage")).delete(
+  "/endpoints/:id",
+  requireWebhookPlan,
+  describeRoute({
+    description: "Archive a webhook endpoint",
+    responses: {
+      ...okResponse(
+        "Archived: the endpoint is gone from every read and delivers nothing",
+        z.object({ data: z.object({ archived: z.literal(true) }) }),
+      ),
+      ...notFoundResponse,
     },
-  );
+  }),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    await endpoints.archive({
+      organizationId: organization.id,
+      endpointId: c.req.param("id"),
+    });
+    return c.json({ data: { archived: true } });
+  },
+);
 
 secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints/:id/roll-secret",
@@ -314,6 +472,13 @@ secured.access(requires("webhookEndpoints:manage")).post(
   describeRoute({
     description:
       "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
+    responses: {
+      ...okResponse(
+        "The endpoint, with the new signing secret this body alone carries",
+        z.object({ data: endpointWithSecretDtoSchema }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
@@ -331,6 +496,13 @@ secured.access(requires("webhookEndpoints:manage")).post(
   describeRoute({
     description:
       "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
+    responses: {
+      ...okResponse(
+        "The test ran; `data.delivered` carries the receiver's verdict",
+        z.object({ data: testFireResultSchema }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
@@ -401,6 +573,16 @@ secured.access(requires("webhookEndpoints:view")).get(
   describeRoute({
     description:
       "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
+    responses: {
+      ...okResponse(
+        "One page of delivery attempts, newest first",
+        z.object({
+          data: z.array(deliveryDtoSchema),
+          next_cursor: nextCursorSchema,
+        }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   zValidator("query", deliveriesQuerySchema),
   async (c) => {
@@ -447,6 +629,13 @@ secured.access(requires("webhookEndpoints:view")).get(
   describeRoute({
     description:
       "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
+    responses: {
+      ...okResponse(
+        "The endpoint's delivery health",
+        z.object({ data: healthDtoSchema }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
@@ -477,6 +666,10 @@ secured.access(requires("webhookEndpoints:view")).get(
   describeRoute({
     description:
       "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
+    responses: okResponse(
+      "Every subscribable event type",
+      z.object({ data: z.array(eventTypeDtoSchema) }),
+    ),
   }),
   async (c) => {
     return c.json({
@@ -497,6 +690,13 @@ secured.access(requires("webhookEndpoints:view")).get(
   describeRoute({
     description:
       "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+    responses: okResponse(
+      "One page of emitted-event envelopes, newest first",
+      z.object({
+        data: z.array(webhookEventEnvelopeSchema),
+        next_cursor: nextCursorSchema,
+      }),
+    ),
   }),
   zValidator("query", eventsQuerySchema),
   async (c) => {
@@ -523,6 +723,13 @@ secured.access(requires("webhookEndpoints:view")).get(
   describeRoute({
     description:
       "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
+    responses: {
+      ...okResponse(
+        "The envelope, exactly as it was delivered",
+        z.object({ data: webhookEventEnvelopeSchema }),
+      ),
+      ...notFoundResponse,
+    },
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
