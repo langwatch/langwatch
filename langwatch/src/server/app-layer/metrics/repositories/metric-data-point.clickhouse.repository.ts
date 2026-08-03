@@ -249,7 +249,8 @@ export class MetricDataPointClickHouseRepository
 
     const authoritative = await this.pointsForAffectedBuckets({
       affectedBySeries,
-      bySeries,
+      tenantId: points[0]!.tenantId,
+      organizationId: points[0]!.organizationId,
     });
 
     const rows: MetricRollupRow[] = [];
@@ -424,10 +425,12 @@ export class MetricDataPointClickHouseRepository
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
-    bySeries,
+    tenantId,
+    organizationId,
   }: {
     affectedBySeries: ReadonlyMap<string, ReadonlySet<number>>;
-    bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+    tenantId: string;
+    organizationId: string;
   }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
       [...buckets]
@@ -437,8 +440,7 @@ export class MetricDataPointClickHouseRepository
     const found = new Map<string, CanonicalMetricDataPoint[]>();
     if (seeks.length === 0) return found;
 
-    const anyPoint = [...bySeries.values()][0]![0]!;
-    const client = await this.resolveClient(anyPoint.tenantId);
+    const client = await this.resolveClient(tenantId);
     // A bucket's predecessor may itself sit in an earlier affected bucket, so
     // the ranges overlap by design; the fold needs each point exactly once.
     // Identity is (series, point) because one query now spans many series, and
@@ -448,7 +450,7 @@ export class MetricDataPointClickHouseRepository
     // Each seek contributes two statements, so half the budget keeps a single
     // query's statement count at the same ceiling the successor seeks use.
     for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
-      const params: Record<string, unknown> = { tenantId: anyPoint.tenantId };
+      const params: Record<string, unknown> = { tenantId };
       const selects = chunk.flatMap(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
         params[`from${index}`] = new Date(start);
@@ -475,7 +477,7 @@ export class MetricDataPointClickHouseRepository
       for (const row of await result.json<RawMetricRow>()) {
         unique.set(
           `${row.SeriesId}\u0000${row.PointId}`,
-          fromRaw({ row, organizationId: anyPoint.organizationId }),
+          fromRaw({ row, organizationId }),
         );
       }
     }
