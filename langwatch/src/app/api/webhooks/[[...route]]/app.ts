@@ -15,7 +15,10 @@ import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/app-layer/automations/delivery/sendWebhook";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
@@ -323,7 +326,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
       organizationId: organization.id,
       endpointId,
     });
-    const secret = await endpoints.getSigningSecret({
+    const secrets = await endpoints.getSigningSecrets({
       organizationId: organization.id,
       endpointId,
     });
@@ -336,7 +339,8 @@ secured.access(requires("webhookEndpoints:manage")).post(
         contextLabel: `Webhook endpoint ${endpointId} (test)`,
         testFire: true,
         eventId: dispatchId,
-        signingSecret: secret,
+        dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
+        signingSecrets: secrets,
         attempt: 1,
       });
       const delivered = result.status >= 200 && result.status < 300;

@@ -20,6 +20,20 @@ interface GovernanceEnvelope {
   data: Record<string, unknown>;
 }
 
+/**
+ * Enum values leave as lower_snake_case, which is the casing of every other
+ * value on the wire.
+ *
+ * Applied HERE rather than at the producer because the event store already
+ * holds records written with the database's own casing (`window: "MONTH"`),
+ * and those records are replayed onto this seam. Converting upstream would
+ * have fixed only the events written after the change and left every replay
+ * emitting the old casing.
+ */
+function wireEnum(value: string): string {
+  return value.toLowerCase();
+}
+
 export function vkLifecycleToEnvelope(
   data: RecordVkLifecycleCommandData,
 ): GovernanceEnvelope {
@@ -60,14 +74,18 @@ export function budgetCrossingToEnvelope(
       event_type: type,
       organization_id: data.organization_id,
       budget_id: data.budget_id,
-      scope_type: data.scope_type,
+      scope_type: wireEnum(data.scope_type),
       bucket_scope_id: data.bucket_scope_id,
+      // First-class references, so a consumer rebilling on these events does
+      // not have to parse them back out of `bucket_scope_id`.
+      virtual_key_id: data.virtual_key_id,
+      anchor_project_id: data.anchor_project_id,
       end_user_id: data.end_user_id,
-      window: data.window,
+      window: wireEnum(data.window),
       period_started_at: new Date(data.period_started_at_ms).toISOString(),
       limit_usd: data.limit_usd,
       spent_usd: data.spent_usd,
-      on_breach: data.on_breach,
+      on_breach: wireEnum(data.on_breach),
       occurred_at: new Date(data.occurred_at).toISOString(),
     },
   };

@@ -46,6 +46,19 @@ export const recordBudgetCrossingCommandDataSchema = z.object({
   /** The ledger bucket that crossed (a template's is "<anchor>:<endUser>"). */
   bucket_scope_id: z.string().min(1),
   end_user_id: z.string().nullable().default(null),
+  /**
+   * The virtual key this budget targets, when it targets one: its own scope
+   * for a VIRTUAL_KEY budget, the anchor for an ATTRIBUTED_USER template.
+   * Null for budgets scoped to an org, team, project, group, or principal.
+   *
+   * A consumer rebilling on these events keys on the virtual key, and
+   * `bucket_scope_id` only carries it as the prefix of a composite it would
+   * have to parse (and could not tell apart from an end user id containing a
+   * colon).
+   */
+  virtual_key_id: z.string().nullable().default(null),
+  /** The project this budget is anchored to, when it is scoped to one. */
+  anchor_project_id: z.string().nullable().default(null),
   window: z.string().min(1),
   /** Period identity for once-per-crossing-per-period dedup, unix ms. */
   period_started_at_ms: z.number().int().min(0),

@@ -233,6 +233,12 @@ function crossingFor(options: {
     scope_type: budget.scopeType.toLowerCase(),
     bucket_scope_id: row.bucketScopeId,
     end_user_id: row.endUserId,
+    virtual_key_id:
+      budget.scopeType === "VIRTUAL_KEY" ||
+      budget.scopeType === "ATTRIBUTED_USER"
+        ? budget.scopeId
+        : null,
+    anchor_project_id: budget.scopeType === "PROJECT" ? budget.scopeId : null,
     window: budget.window,
     period_started_at_ms:
       options.periodFloorMs ?? currentPeriodStart(budget.window, now).getTime(),

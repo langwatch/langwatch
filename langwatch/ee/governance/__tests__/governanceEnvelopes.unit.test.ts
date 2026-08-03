@@ -30,6 +30,8 @@ const crossing = (kind: "threshold_crossed" | "breached") => ({
   kind,
   scope_type: "attributed_user",
   bucket_scope_id: "vk_1:user_9",
+  virtual_key_id: "vk_1",
+  anchor_project_id: null,
   end_user_id: "user_9",
   window: "MONTH",
   period_started_at_ms: 1_751_328_000_000,
@@ -70,7 +72,9 @@ describe("governance envelopes", () => {
     expect(breach.type).toBe("gateway.budget.breached");
     for (const env of [warn, breach]) {
       expect(env.data.bucket_scope_id).toBe("vk_1:user_9");
-      expect(env.data.window).toBe("MONTH");
+      // Lowercase snake is THE wire casing; the event store holds the
+      // database's own "MONTH" and the seam converts it.
+      expect(env.data.window).toBe("month");
       expect(env.data.period_started_at).toBe(
         new Date(1_751_328_000_000).toISOString(),
       );
@@ -78,6 +82,40 @@ describe("governance envelopes", () => {
       expect(env.data.spent_usd).toBe("84.500000");
     }
     expect(warn.id).not.toBe(breach.id);
+  });
+
+  /** @scenario Budget events name the key and project they belong to */
+  it("carries virtual_key_id and anchor_project_id as first-class fields", () => {
+    const env = budgetCrossingToEnvelope(crossing("breached"));
+    // Present as their own fields, not only as the prefix of a composite a
+    // consumer would have to parse (and could not split reliably when an end
+    // user id contains a colon).
+    expect(env.data.virtual_key_id).toBe("vk_1");
+    expect(env.data.anchor_project_id).toBeNull();
+
+    const projectScoped = budgetCrossingToEnvelope({
+      ...crossing("breached"),
+      scope_type: "project",
+      bucket_scope_id: "proj_9",
+      virtual_key_id: null,
+      anchor_project_id: "proj_9",
+    });
+    expect(projectScoped.data.virtual_key_id).toBeNull();
+    expect(projectScoped.data.anchor_project_id).toBe("proj_9");
+  });
+
+  /** @scenario Every enum on the webhook payload is lowercase snake */
+  it("lowercases every enum it puts on the wire", () => {
+    const env = budgetCrossingToEnvelope({
+      ...crossing("breached"),
+      // As the database spells them, which is what a replayed event holds.
+      scope_type: "ATTRIBUTED_USER",
+      window: "MONTH",
+      on_breach: "block",
+    });
+    expect(env.data.scope_type).toBe("attributed_user");
+    expect(env.data.window).toBe("month");
+    expect(env.data.on_breach).toBe("block");
   });
 
   /** @scenario A crossing fires once per bucket per period */

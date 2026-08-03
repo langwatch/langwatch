@@ -74,6 +74,71 @@ describe("webhook endpoint service", () => {
     expect(decrypted).toBe(rolled.secret);
   });
 
+  describe("given a rolled signing secret", () => {
+    /** @scenario A rolled secret keeps signing for a grace window */
+    it("signs with both secrets inside the window and the new one after", async () => {
+      const { endpoint, secret: original } = await createEndpoint();
+      const rolledAt = new Date();
+      const { secret: rolled } = await service.rollSecret({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now: rolledAt,
+      });
+
+      const inWindow = await service.getSigningSecrets({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now: new Date(rolledAt.getTime() + 23 * 60 * 60 * 1000),
+      });
+      // Newest first: a receiver that already swapped reads the new one
+      // first, and one that has not still finds its own.
+      expect(inWindow).toEqual([rolled, original]);
+
+      const afterWindow = await service.getSigningSecrets({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now: new Date(rolledAt.getTime() + 25 * 60 * 60 * 1000),
+      });
+      // The window closes on the clock, so a leaked secret's usefulness
+      // ends without anything having to sweep it.
+      expect(afterWindow).toEqual([rolled]);
+    });
+
+    it("serves a single secret before any roll", async () => {
+      const { endpoint, secret } = await createEndpoint();
+      expect(
+        await service.getSigningSecrets({
+          organizationId: organization.id,
+          endpointId: endpoint.id,
+        }),
+      ).toEqual([secret]);
+    });
+
+    it("keeps only one previous secret when rolled twice inside the window", async () => {
+      const { endpoint } = await createEndpoint();
+      const first = new Date();
+      const { secret: second } = await service.rollSecret({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now: first,
+      });
+      const { secret: third } = await service.rollSecret({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now: new Date(first.getTime() + 60_000),
+      });
+      // An operator rolling twice under suspicion of a leak means the
+      // oldest secret to stop working, not to ride a chain of windows.
+      expect(
+        await service.getSigningSecrets({
+          organizationId: organization.id,
+          endpointId: endpoint.id,
+          now: new Date(first.getTime() + 120_000),
+        }),
+      ).toEqual([third, second]);
+    });
+  });
+
   /** @scenario A success resets the failure streak */
   /** @scenario Plain-http receiver URLs need the operator opt-in */
   it("refuses http URLs unless WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS is set", async () => {

@@ -121,6 +121,24 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the reference verifier rejects it as stale
 
     @unit
+    Scenario: During a secret rotation a delivery verifies under either secret
+      Given an endpoint whose secret was rolled inside the grace window
+      When a delivery is signed
+      Then the header carries one v1 per valid secret, newest first
+      And the reference verifier accepts a match against any of them
+      # v1 REPEATS. A receiver that reads only the first one rejects every
+      # delivery signed during a rotation.
+
+    @integration
+    Scenario: A rolled secret keeps signing for a grace window
+      Given a signing secret that was just rolled
+      When the endpoint's signing secrets are read inside the window
+      Then both the new and the previous secret are returned, newest first
+      And after the window only the new secret is returned
+      # Overwriting in place made every roll a coordinated deploy, and 72h
+      # of the resulting failures auto-disables the endpoint.
+
+    @unit
     Scenario: The envelope renames the provider column to the contract field
       Given a spend record carrying a provider key
       When it is mapped to its envelope
@@ -279,6 +297,22 @@ Feature: Webhook endpoints, signed outbound event delivery
       When each crossing's envelope is built
       Then one is the threshold family and the other the breach family
       And both carry the bucket, the window, the period, and both figures
+
+    @unit
+    Scenario: Budget events name the key and project they belong to
+      Given a crossing on a budget that targets a virtual key
+      When its envelope is built
+      Then the payload carries virtual_key_id and anchor_project_id as their own fields
+      # bucket_scope_id only holds the key as the prefix of a composite, and
+      # that composite cannot be split when an end user id contains a colon.
+
+    @unit
+    Scenario: Every enum on the webhook payload is lowercase snake
+      Given a crossing whose stored values carry the database's own casing
+      When its envelope is built
+      Then scope_type, window, and on_breach are all lowercase snake
+      # Converted at the envelope seam, so replayed events emit the wire
+      # casing too rather than whatever the store happened to hold.
 
     @unit
     Scenario: A crossing fires once per bucket per period

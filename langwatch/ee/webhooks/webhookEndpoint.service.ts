@@ -8,6 +8,7 @@ import type {
   WebhookDeliveryOutcome,
   WebhookEndpoint,
 } from "@prisma/client";
+import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isValidEventSelector } from "./eventRegistry";
@@ -274,16 +275,37 @@ export class WebhookEndpointService {
     return toView(updated);
   }
 
-  /** Roll the signing secret; the new value is returned exactly once. */
+  /**
+   * Roll the signing secret; the new value is returned exactly once.
+   *
+   * The outgoing secret is KEPT for {@link WEBHOOK_PREVIOUS_SECRET_TTL_MS} and
+   * deliveries carry a signature from each, so a receiver swaps on its own
+   * schedule. Overwriting in place made every roll a coordinated deploy: the
+   * receiver rejected everything signed with the new secret until it shipped
+   * the new value, and the endpoint auto-disables after 72h of failures.
+   *
+   * A roll inside an open window discards the secret already rolled off
+   * rather than chaining a third: two valid secrets is the whole point, and
+   * an operator rolling twice under suspicion of a leak means the oldest to
+   * stop working immediately.
+   */
   async rollSecret(params: {
     organizationId: string;
     endpointId: string;
+    now?: Date;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const endpoint = await this.requireEndpoint(params);
     const secret = newSecret();
+    const now = params.now ?? new Date();
     const updated = await this.deps.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
-      data: { secretEncrypted: encrypt(secret) },
+      data: {
+        secretEncrypted: encrypt(secret),
+        previousSecretEncrypted: endpoint.secretEncrypted,
+        previousSecretExpiresAt: new Date(
+          now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+        ),
+      },
     });
     return { endpoint: toView(updated), secret };
   }
@@ -366,6 +388,32 @@ export class WebhookEndpointService {
   }): Promise<string> {
     const endpoint = await this.requireEndpoint(params);
     return decrypt(endpoint.secretEncrypted);
+  }
+
+  /**
+   * Every secret a delivery must be signed with, newest first.
+   *
+   * One entry outside a rotation window, two inside it. An expired previous
+   * secret is dropped here rather than by a sweep, so the window closes on
+   * the clock even if nothing else ran.
+   */
+  async getSigningSecrets(params: {
+    organizationId: string;
+    endpointId: string;
+    now?: Date;
+  }): Promise<string[]> {
+    const endpoint = await this.requireEndpoint(params);
+    const now = params.now ?? new Date();
+    const previousIsValid =
+      endpoint.previousSecretEncrypted !== null &&
+      endpoint.previousSecretExpiresAt !== null &&
+      endpoint.previousSecretExpiresAt.getTime() > now.getTime();
+    return [
+      decrypt(endpoint.secretEncrypted),
+      ...(previousIsValid
+        ? [decrypt(endpoint.previousSecretEncrypted as string)]
+        : []),
+    ];
   }
 
   /**

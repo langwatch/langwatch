@@ -102,18 +102,38 @@ function assertWebhookUrlAllowed({
  * as defense in depth over the save-time sanitize, plus the LangWatch envelope
  * (event id, optional signature, delivery attempt, test-fire marker).
  */
+/**
+ * The automations channel's published dispatch-identity header. One dispatch
+ * there IS one event (a trigger fired), so the name is accurate and its
+ * consumers key idempotency off it (ADR-040 §5).
+ */
+export const WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id";
+
+/**
+ * The webhook platform's dispatch-identity header.
+ *
+ * A platform delivery carries a BATCH of envelopes, each with its own `id`,
+ * so calling the batch identity an event id is a lie a consumer can act on:
+ * it reads like the thing to dedup by, and deduping by it drops every
+ * envelope in the batch but one. Dedup belongs on the envelope `id` inside
+ * the body; this header only groups the retries of one POST.
+ */
+export const WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id";
+
 function buildWebhookHeaders({
   headers,
   body,
   eventId,
-  signingSecret,
+  dispatchIdHeader,
+  signingSecrets,
   attempt,
   testFire,
 }: {
   headers: Record<string, string>;
   body: string;
   eventId: string;
-  signingSecret?: string;
+  dispatchIdHeader: string;
+  signingSecrets?: readonly string[];
   attempt?: number;
   testFire: boolean;
 }): Record<string, string> {
@@ -128,11 +148,11 @@ function buildWebhookHeaders({
   return {
     ...sanitizeWebhookHeaders(resolvedHeaders),
     "Content-Type": "application/json",
-    "X-LangWatch-Event-Id": eventId,
-    ...(signingSecret
+    [dispatchIdHeader]: eventId,
+    ...(signingSecrets && signingSecrets.length > 0
       ? {
           [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
-            secret: signingSecret,
+            secrets: signingSecrets,
             body,
             timestampSeconds: Math.floor(Date.now() / 1000),
           }),
@@ -173,15 +193,20 @@ export interface WebhookSendInput {
   /** The firing project — enables the per-project dispatch rate limit
    *  (ADR-040 §4). Omitted for a test fire. */
   projectId?: string;
-  /** Stable per-dispatch identity, sent as `X-LangWatch-Event-Id` (ADR-040
-   *  §5): every retry of the same logical fire reuses it so a receiver can
-   *  dedupe. A fresh UUID is generated when absent (e.g. a test fire). */
+  /** Stable per-dispatch identity (ADR-040 §5): every retry of the same
+   *  logical fire reuses it. A fresh UUID is generated when absent (e.g. a
+   *  test fire). */
   eventId?: string;
-  /** Per-destination signing secret. When present the request carries
-   *  `X-LangWatch-Signature: t=<unix>,v1=<hmac-sha256(secret, "<t>.<body>")>`
-   *  (5-minute receiver tolerance documented). This is the signing ADR-040
-   *  specified; any channel that stores a secret inherits it. */
-  signingSecret?: string;
+  /** Which header carries {@link eventId}. Defaults to the automations
+   *  channel's published {@link WEBHOOK_EVENT_ID_HEADER}; the webhook
+   *  platform passes {@link WEBHOOK_DELIVERY_ID_HEADER} because one of its
+   *  dispatches carries many envelopes. */
+  dispatchIdHeader?: string;
+  /** Per-destination signing secrets, newest first. When present the request
+   *  carries `X-LangWatch-Signature: t=<unix>,v1=<hmac>` with one `v1` per
+   *  secret, so a rotation window verifies under either. This is the signing
+   *  ADR-040 specified; any channel that stores a secret inherits it. */
+  signingSecrets?: readonly string[];
   /** 1-based delivery attempt, sent as `X-LangWatch-Delivery-Attempt` so
    *  receivers can distinguish first delivery from ladder retries. */
   attempt?: number;
@@ -199,7 +224,7 @@ export interface WebhookSendResult {
   responseHeaders?: Record<string, string>;
   /** Parsed `Retry-After` (ms) the receiver asked us to back off by. */
   retryAfterMs?: number;
-  /** The `X-LangWatch-Event-Id` actually sent — surfaced for the delivery log. */
+  /** The dispatch id actually sent — surfaced for the delivery log. */
   eventId: string;
 }
 
@@ -221,7 +246,8 @@ export async function sendWebhook({
   testFire = false,
   projectId,
   eventId,
-  signingSecret,
+  dispatchIdHeader = WEBHOOK_EVENT_ID_HEADER,
+  signingSecrets,
   attempt,
   contextLabel,
   allowInsecureLocal = false,
@@ -256,7 +282,8 @@ export async function sendWebhook({
       headers,
       body,
       eventId: resolvedEventId,
-      signingSecret,
+      dispatchIdHeader,
+      signingSecrets,
       attempt,
       testFire,
     }),

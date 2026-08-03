@@ -361,7 +361,7 @@ describe("webhook delivery via the transactional inbox", () => {
 
     expect(sendWebhookMock).toHaveBeenCalledTimes(1);
     const call = sendWebhookMock.mock.calls[0]![0];
-    expect(call.signingSecret).toMatch(/^whsec_/);
+    expect(call.signingSecrets?.[0]).toMatch(/^whsec_/);
     const body = JSON.parse(call.body) as {
       batch: Array<{ id: string; data: Record<string, unknown> }>;
     };
@@ -682,7 +682,7 @@ describe("webhook delivery via the transactional inbox", () => {
       // one signature, both event ids inside.
       expect(sendWebhookMock).toHaveBeenCalledTimes(1);
       const call = sendWebhookMock.mock.calls[0]![0];
-      expect(call.signingSecret).toMatch(/^whsec_/);
+      expect(call.signingSecrets?.[0]).toMatch(/^whsec_/);
       const body = JSON.parse(call.body) as {
         batch: Array<{ id: string }>;
       };

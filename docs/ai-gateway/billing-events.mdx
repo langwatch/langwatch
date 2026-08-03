@@ -108,6 +108,12 @@ Attribution is captured on the request path; nothing is provisioned per end user
 
 One resolver feeds both metering and [per-end-user budget enforcement](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates), so billing and capping can never disagree about who a request was.
 
+<Note>
+**`end_user_id` is whatever you send.** The gateway stores and echoes it verbatim, so if your application passes a raw email address in the OpenAI `user` field, that address is what lands in webhook payloads, ledger rows, and the reconciliation pull, and it stays there for the 13-month retention window.
+
+Pass a **stable pseudonymous id** instead, such as a hash of the account id, whenever you would rather not have personal data in those places. It has to be stable, because it is the identity budgets and rollups group by; a value that changes per session bills the same person as many.
+</Note>
+
 ## Reconciliation: two grains, one ledger
 
 The pull surface reads the spend **ledger**, not the webhook stream, so it includes settled rows and admitted (in-flight) rows the push deliberately types differently. Reconcile in two passes: checksums first, item diff only on divergence.

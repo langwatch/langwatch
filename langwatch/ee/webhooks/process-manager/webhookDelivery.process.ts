@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   assertWebhookDelivered,
   sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
   type WebhookSendResult,
 } from "~/server/app-layer/automations/delivery/sendWebhook";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
@@ -204,7 +205,7 @@ export type DeliverPayload = z.infer<typeof deliverSchema>;
 export const sendBatchSchema = z.object({
   organizationId: z.string(),
   endpointId: z.string(),
-  /** Stable batch identity: the X-LangWatch-Event-Id across every retry. */
+  /** Stable batch identity: the X-LangWatch-Delivery-Id across every retry. */
   batchId: z.string(),
   envelopes: z.array(
     z.object({
@@ -699,7 +700,7 @@ async function postWebhookBatch({
   endpoint: WebhookEndpointView;
   startedAt: number;
 }): Promise<WebhookSendResult> {
-  const secret = await deps.endpoints.getSigningSecret({
+  const secrets = await deps.endpoints.getSigningSecrets({
     organizationId: payload.organizationId,
     endpointId: payload.endpointId,
   });
@@ -713,7 +714,8 @@ async function postWebhookBatch({
       // per organization rather than per project.
       projectId: payload.organizationId,
       eventId: payload.batchId,
-      signingSecret: secret,
+      dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
+      signingSecrets: secrets,
       attempt: context.attempt,
       allowInsecureLocal: allowsInsecureLocalUrls(),
     });

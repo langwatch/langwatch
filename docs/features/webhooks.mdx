@@ -107,10 +107,12 @@ The spend payloads (`gateway.request.*`) are documented field by field on [Billi
   "event_type": "gateway.budget.breached",
   "organization_id": "org_01H...",
   "budget_id": "bgt_01H...",
-  "scope_type": "VIRTUAL_KEY",
+  "scope_type": "virtual_key",
   "bucket_scope_id": "vk_01H...",
+  "virtual_key_id": "vk_01H...",
+  "anchor_project_id": null,
   "end_user_id": null,
-  "window": "MONTH",
+  "window": "month",
   "period_started_at": "2026-07-01T00:00:00.000Z",
   "limit_usd": "25",
   "spent_usd": "25.1042",
@@ -120,6 +122,12 @@ The spend payloads (`gateway.request.*`) are documented field by field on [Billi
 ```
 
 The envelope id embeds the budget, the bucket, the kind, and the period start, which is what makes "once per crossing per period" hold end to end: a re-crossing in the same period dedups away, a crossing in the next period is a new event. For attributed-user budgets, `bucket_scope_id` is `<anchor_id>:<end_user_id>` and `end_user_id` is set, so your platform can tell "this user's cap" from "the tenant cap".
+
+`virtual_key_id` and `anchor_project_id` name the key and the project the budget targets, as their own fields. `virtual_key_id` is set for a virtual-key budget and for an attributed-user template (where it is the anchor); `anchor_project_id` is set for a project-scoped budget. Read those rather than splitting `bucket_scope_id`, which you cannot split reliably when an end-user id contains a colon.
+
+<Note>
+Every enum on these payloads is `lower_snake_case` (`scope_type`, `window`, `on_breach`), matching the rest of the wire.
+</Note>
 
 **`gateway.virtual_key.*`** (`data`):
 
@@ -142,12 +150,28 @@ Every delivery carries:
 
 ```
 Content-Type: application/json
-X-LangWatch-Event-Id: <dispatch id, stable across retries of this batch>
+X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
 
+<Warning>
+`X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is not an event id and must not be used for deduplication: every event in the batch shares it, so deduping on it drops all but one of them.
+
+**Deduplicate on the envelope `id` inside the body**, which is stable across retries and replays and unique per event.
+</Warning>
+
 Verify by recomputing the HMAC over the **exact raw bytes** you received (parsing and re-serializing the JSON first breaks the digest), and reject timestamps outside a 5-minute tolerance. Compare digests in constant time.
+
+<Warning>
+**`v1` may appear more than once.** During a secret rotation the header carries one `v1` per currently valid secret, newest first:
+
+```
+X-LangWatch-Signature: t=1753000000,v1=<signed with the new secret>,v1=<signed with the previous one>
+```
+
+Your verifier must accept the delivery when **any** `v1` matches. A verifier that reads only the first `v1` (or that treats the header as holding exactly one) rejects every delivery signed during a rotation window. Both snippets below collect all of them.
+</Warning>
 
 <CodeGroup>
 
@@ -169,8 +193,13 @@ export function verifySignature(params: {
     if (eq > 0) parts.set(piece.slice(0, eq).trim(), piece.slice(eq + 1).trim());
   }
   const timestamp = parts.get("t");
-  const signature = parts.get("v1");
-  if (!timestamp || !signature) return false;
+  // Every v1, not just the first: a rotation window carries one per secret.
+  const signatures = params.signatureHeader
+    .split(",")
+    .map((piece) => piece.split("="))
+    .filter(([key]) => key?.trim() === "v1")
+    .map(([, value]) => value?.trim() ?? "");
+  if (!timestamp || signatures.length === 0) return false;
 
   const timestampSeconds = Number(timestamp);
   if (!Number.isFinite(timestampSeconds)) return false;
@@ -180,13 +209,21 @@ export function verifySignature(params: {
     .update(`${timestamp}.`)
     .update(params.rawBody)
     .digest();
-  let received: Buffer;
-  try {
-    received = Buffer.from(signature, "hex");
-  } catch {
-    return false;
+  let matched = false;
+  for (const signature of signatures) {
+    let received: Buffer;
+    try {
+      received = Buffer.from(signature, "hex");
+    } catch {
+      continue;
+    }
+    // Compare every candidate even after a match, so the work does not
+    // depend on WHICH signature matched.
+    if (received.length === expected.length && timingSafeEqual(received, expected)) {
+      matched = true;
+    }
   }
-  return received.length === expected.length && timingSafeEqual(received, expected);
+  return matched;
 }
 ```
 
@@ -202,14 +239,18 @@ def verify_signature(raw_body: bytes, signature_header: str | None, secret: str)
     if not signature_header:
         return False
 
-    parts: dict[str, str] = {}
+    timestamp: str | None = None
+    signatures: list[str] = []
     for piece in signature_header.split(","):
         key, eq, value = piece.partition("=")
-        if eq:
-            parts[key.strip()] = value.strip()
-    timestamp = parts.get("t")
-    signature = parts.get("v1")
-    if not timestamp or not signature:
+        if not eq:
+            continue
+        if key.strip() == "t":
+            timestamp = value.strip()
+        elif key.strip() == "v1":
+            # Every v1: a rotation window carries one per valid secret.
+            signatures.append(value.strip())
+    if not timestamp or not signatures:
         return False
 
     try:
@@ -222,14 +263,28 @@ def verify_signature(raw_body: bytes, signature_header: str | None, secret: str)
     expected = hmac.new(
         secret.encode(), f"{timestamp}.".encode() + raw_body, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    # Compare every candidate even after a match, so the work does not
+    # depend on WHICH signature matched.
+    matched = False
+    for signature in signatures:
+        if hmac.compare_digest(expected, signature):
+            matched = True
+    return matched
 ```
 
 </CodeGroup>
 
 Both snippets, wired into working receivers, live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
 
-After a `roll-secret`, deliveries sign with the new secret immediately. Deploy the new secret to your receiver before rolling, or accept a brief window of verification failures that the retry ladder will re-deliver.
+### Rotating the signing secret
+
+`roll-secret` returns a new secret and keeps the old one valid for **24 hours**. For that window every delivery is signed with both, so there is no coordinated deploy and no gap:
+
+1. Call `roll-secret` and store the new value.
+2. Deploy it to your receiver any time in the next 24 hours. Deliveries keep verifying under the old secret until you do.
+3. After the window the old secret stops being signed with and stops verifying.
+
+Rolling twice inside a window discards the secret that was already rolling off, so the oldest one stops working immediately. That is what you want when you are rolling because a secret leaked.
 
 ## Delivery, retries, and auto-disable
 
