@@ -104,9 +104,7 @@ describe.skipIf(!hasTestcontainers)(
       spy: ReturnType<typeof vi.spyOn>,
       message: string,
     ): Record<string, unknown> | undefined {
-      const call = spy.mock.calls.find(
-        (c: unknown[]) => c[1] === message,
-      );
+      const call = spy.mock.calls.find((c: unknown[]) => c[1] === message);
       return call?.[0] as Record<string, unknown> | undefined;
     }
 
@@ -127,7 +125,10 @@ describe.skipIf(!hasTestcontainers)(
           await vi.waitFor(
             () => {
               expect(
-                loggedObjectFor(warnSpy, "Job attempt failed, re-staged with backoff"),
+                loggedObjectFor(
+                  warnSpy,
+                  "Job attempt failed, re-staged with backoff",
+                ),
               ).toBeDefined();
             },
             { timeout: 5000, interval: 50 },
