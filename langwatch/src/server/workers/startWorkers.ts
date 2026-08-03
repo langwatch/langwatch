@@ -366,10 +366,19 @@ async function wireLivenessThread(
   isMetricsAuthorized: (req: IncomingMessage) => boolean,
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
+    // Reject on early exit too: a thread that dies before listening without
+    // emitting "error" would otherwise leave this promise pending forever
+    // and the fallback server would never start.
+    const rejectOnEarlyExit = (code: number) =>
+      reject(
+        new Error(`liveness thread exited before listening (code ${code})`),
+      );
     thread.once("error", reject);
+    thread.once("exit", rejectOnEarlyExit);
     thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
       if (msg.isListening) {
         thread.removeListener("error", reject);
+        thread.removeListener("exit", rejectOnEarlyExit);
         resolve();
         return;
       }

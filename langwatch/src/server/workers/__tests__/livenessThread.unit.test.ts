@@ -10,9 +10,11 @@
 import http from "node:http";
 import { Worker } from "node:worker_threads";
 import { afterEach, describe, expect, it } from "vitest";
-import { LIVENESS_THREAD_SOURCE, WORKER_LIVENESS_PATH } from "../startWorkers";
-
-const STALL_BUDGET_MS = 5 * 60 * 1000;
+import {
+  LIVENESS_THREAD_SOURCE,
+  WORKER_HEARTBEAT_STALL_BUDGET_MS as STALL_BUDGET_MS,
+  WORKER_LIVENESS_PATH,
+} from "../startWorkers";
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve) => {
