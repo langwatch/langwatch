@@ -4,7 +4,7 @@ import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtua
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope } from "./_shared";
+import { formatScope, formatStatus } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -40,7 +40,7 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
         const tableData = keys.map((vk) => ({
           ID: vk.id,
           Name: vk.name,
-          Status: vk.status === "active" ? chalk.green("active") : chalk.red("revoked"),
+          Status: formatStatus(vk.status),
           Prefix: `${vk.display_prefix}...`,
           Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
           Routing: vk.routing_mode,

@@ -22,7 +22,8 @@ export interface VirtualKey {
   organization_id: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  /** `disabled` is the reversible stop; `revoked` is terminal. */
+  status: "active" | "disabled" | "revoked";
   /** "langy" marks a product-managed key; customers can only mint "user". */
   purpose: "user" | "langy";
   /** e.g. "vk-lw-01HZX9" — the only secret material kept after creation. */

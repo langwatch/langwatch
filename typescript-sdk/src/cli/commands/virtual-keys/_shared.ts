@@ -1,10 +1,22 @@
+import chalk from "chalk";
 import type {
+  VirtualKey,
   VirtualKeyBudgetInput,
   VirtualKeyRoutingMode,
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+
+/**
+ * Colour a key's status. `disabled` is the reversible stop and reads amber, so
+ * an operator can tell it apart from the terminal `revoked` at a glance.
+ */
+export function formatStatus(status: VirtualKey["status"]): string {
+  if (status === "active") return chalk.green("active");
+  if (status === "disabled") return chalk.yellow("disabled");
+  return chalk.red("revoked");
+}
 
 /**
  * Build the public-facing LangWatch UI URL for a VK detail page. After the
