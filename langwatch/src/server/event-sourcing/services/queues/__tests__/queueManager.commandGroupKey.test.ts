@@ -473,6 +473,108 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
       });
     });
   });
+
+  // A producer whose foldability depends on the individual job supplies a
+  // resolver instead of a constant. Its presence is the opt-in — the value is
+  // only known at dispatch, so registration cannot compare it against 1.
+  describe("given a command whose coalescing bound is resolved per payload", () => {
+    describe("when the command queue is initialized", () => {
+      it("wires processBatch and carries the resolver onto the registry entry", () => {
+        const { manager, globalJobRegistry } = buildManager();
+        const bound = (payload: any) => (payload.oversized ? 1 : 64);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: bound },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        const entry = globalJobRegistry.get("test-pipeline:command:hot");
+        expect(entry?.processBatch).toBeDefined();
+        expect(entry?.coalesceMaxBatch).toBe(bound);
+      });
+
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "hot",
+              handlerClass: createMockCommandHandlerClass("hot"),
+              options: {
+                serializeByAggregate: true,
+                coalesceMaxBatch: () => 64,
+              },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).not.toHaveBeenCalledWith(
+          expect.anything(),
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+
+      // recordSpan's own shape: sharded onto a group key, and folding only the
+      // payloads it can weigh honestly.
+      it("stays silent for a group-keyed producer too", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "sharded",
+              handlerClass:
+                createMockCommandHandlerClassWithGroupKey("sharded"),
+              options: { coalesceMaxBatch: (p: any) => (p.oversized ? 1 : 64) },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).not.toHaveBeenCalledWith(
+          expect.anything(),
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+    });
+  });
+
+  describe("given a command whose coalescing bound is exactly one", () => {
+    describe("when the command queue is initialized", () => {
+      it("leaves processBatch unset so the per-job path is unchanged", () => {
+        const { manager, globalJobRegistry } = buildManager();
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "cold",
+              handlerClass: createMockCommandHandlerClass("cold"),
+              options: { serializeByAggregate: true, coalesceMaxBatch: 1 },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(
+          globalJobRegistry.get("test-pipeline:command:cold")?.processBatch,
+        ).toBeUndefined();
+      });
+    });
+  });
 });
 
 describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {

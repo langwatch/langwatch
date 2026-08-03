@@ -33,6 +33,7 @@ import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
+import { resolveCoalesceMaxBatch } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
@@ -503,7 +504,10 @@ export class EventSourcing {
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
         const result = this.lookupEntry(payload);
-        return result?.entry.coalesceMaxBatch ?? 1;
+        if (!result) return 1;
+        // `clean`, not `payload`: a resolver sees the same shape the handler
+        // will, without this queue's routing metadata.
+        return resolveCoalesceMaxBatch(result.entry, result.clean);
       },
       coalesceMaxBytes: (payload: Record<string, unknown>) => {
         // Resolve the same way as coalesceMaxBatch: per-job via routing meta.

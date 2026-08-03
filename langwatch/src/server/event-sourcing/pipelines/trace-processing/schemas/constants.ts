@@ -187,3 +187,18 @@ export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
   "2026-04-23",
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 ] as const;
+
+/**
+ * Append-coalescing bound for an INLINE recordSpan (ADR-066 pillar 2). A trace's
+ * spans share one queue group (or one of its shards), so a busy trace appends
+ * one tiny event_log insert per span; folding the group's queued spans into a
+ * single multi-row insert keeps the producer off the per-item write path.
+ *
+ * Lower than the log/metric record bounds on purpose. An inline span is capped
+ * at COMMAND_INLINE_THRESHOLD (256 KB) — an order of magnitude fatter than a log
+ * record — so the drain's byte budget is what genuinely bounds a span batch, and
+ * this count only has to stop a burst of small spans from growing unboundedly.
+ * A spooled span is excluded from coalescing entirely; see the resolver in
+ * pipeline.ts for why.
+ */
+export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;

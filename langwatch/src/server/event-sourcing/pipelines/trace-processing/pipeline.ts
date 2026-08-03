@@ -41,6 +41,7 @@ import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProje
 import type { RecordSpanCommandData } from "./schemas/commands";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
+  RECORD_SPAN_COALESCE_MAX_BATCH,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
@@ -282,10 +283,31 @@ export function createTraceProcessingPipeline(
   const spanCommandShardCount = clampSpanShardCount(
     deps.spanCommandShardCount ?? 1,
   );
+  // ADR-066 pillar 2: a trace's spans all land in one group (or one of its
+  // shards), so a busy trace appends one tiny insert per span. Coalesce the
+  // group's queued spans into one multi-row insert instead.
+  //
+  // The bound is a resolver, not a constant, because of the ADR-022 spool. An
+  // over-threshold span is queued as a spoolRef with its attributes cleared, so
+  // its QUEUED size — the only size the drain's byte budget can weigh — is a few
+  // hundred bytes, while the span the handler reconstitutes from object storage
+  // is over 256 KB and has no upper bound. Folding those by count would let the
+  // byte budget wave through a batch whose true size it never saw. A spooled
+  // span therefore caps itself at 1 and is appended on its own, exactly as the
+  // oversized-item case is meant to behave; inline spans are bounded by
+  // COMMAND_INLINE_THRESHOLD, so for them the byte budget is honest and does the
+  // real work. The handler derives its event from its own command alone and
+  // never reads back a same-batch append, and its post-store spool cleanup runs
+  // per command, so both are safe to fold.
   const recordSpanOptions: {
     deduplication: typeof RECORD_SPAN_DEDUPLICATION;
     getGroupKey?: (payload: RecordSpanCommandData) => string;
-  } = { deduplication: RECORD_SPAN_DEDUPLICATION };
+    coalesceMaxBatch: (payload: RecordSpanCommandData) => number;
+  } = {
+    deduplication: RECORD_SPAN_DEDUPLICATION,
+    coalesceMaxBatch: (payload) =>
+      payload.spoolRef ? 1 : RECORD_SPAN_COALESCE_MAX_BATCH,
+  };
   if (spanCommandShardCount > 1) {
     recordSpanOptions.getGroupKey = (payload) => {
       const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(

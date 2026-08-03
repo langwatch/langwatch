@@ -473,7 +473,7 @@ export async function processCommandBatch<EventType extends Event>(
  * Options for configuring a command handler.
  */
 export interface CommandHandlerOptions<Payload>
-  extends CommandSerializationOptions {
+  extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;
