@@ -349,6 +349,24 @@ const PENDING_RECONCILE_ZCARD_BATCH = 1000;
  */
 const PENDING_RECONCILE_LEASE_MS = 30_000;
 
+/**
+ * How long the keyspace sweep waits once it has nothing left to adopt.
+ *
+ * At that point every group is in the pending index and the sweep is a backstop
+ * against a writer nobody noticed was missing, so it can be rare. While it is
+ * still adopting — through a rollout, or on a queue that predates the index — it
+ * runs every pass instead, which is what this reconcile cost before the index
+ * existed. See {@link QueueRedisRepository.sweepKeyspaceForGroups}.
+ */
+const PENDING_RECONCILE_SWEEP_BACKSTOP_MS = 60 * 60 * 1000;
+
+/** Suffix of the key holding when the next keyspace sweep is due. */
+const SWEEP_DUE_KEY_SUFFIX = "stats:pending-recon-sweep-due";
+
+function isClusterClient(client: IORedis | Cluster): client is Cluster {
+  return typeof (client as Cluster).nodes === "function";
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /**
@@ -1727,7 +1745,7 @@ export class QueueRedisRepository implements QueueRepository {
         return null;
       }
 
-      await this.prunePendingIndex({ prefix, emptyJobsKeys });
+      await this.prunePendingIndex({ prefix, emptyJobsKeys, refreshLease });
 
       return { counter, groundTruth, drift };
     } finally {
@@ -1814,10 +1832,25 @@ export class QueueRedisRepository implements QueueRepository {
       if (!held) return null;
     }
 
-    await this.backfillPendingIndex({
+    // The lifecycle legs only cover a group the pass actually saw, and a group
+    // moving between them mid-read is seen by neither. The keyspace sweep is what
+    // covers those, because it reads key existence rather than membership.
+    if (await this.isKeyspaceSweepDue(prefix)) {
+      const swept = await this.sweepKeyspaceForGroups({ prefix, refreshLease });
+      if (swept === null) return null;
+      for (const groupId of swept) groupIds.add(groupId);
+    }
+
+    const toAdopt = Array.from(groupIds).filter(
+      (id) => !alreadyIndexed.has(id),
+    );
+    const held = await this.backfillPendingIndex({
       prefix,
-      groupIds: Array.from(groupIds).filter((id) => !alreadyIndexed.has(id)),
+      groupIds: toAdopt,
+      refreshLease,
     });
+    if (!held) return null;
+    await this.recordSweepOutcome({ prefix, adopted: toAdopt.length });
 
     return groupIds;
   }
@@ -1827,19 +1860,19 @@ export class QueueRedisRepository implements QueueRepository {
    *
    * Until a group is in the index it is counted by reading the lifecycle indexes
    * in sequence, and a group moving between them mid-read can be missed. Writing
-   * it in on first sight closes that for every later pass, so a group staged
-   * before the index existed — or by a pod on the previous release mid-rollout —
-   * is exposed for at most the passes before something first observes it.
+   * it in on first sight closes that for every later pass.
    *
-   * Best-effort: adding is what makes later passes safe, and failing to add only
-   * leaves the group where it already was. Over-inclusion is harmless, and the
-   * prune removes anything that turns out to be empty.
+   * Returns false when the lease was lost, which aborts the pass: this runs
+   * inside the pass's marker and can span several round trips, so it has to hold
+   * the lease like every other phase rather than run on a marker that has since
+   * moved to another instance.
    */
   private async backfillPendingIndex(params: {
     prefix: string;
     groupIds: string[];
-  }): Promise<void> {
-    if (params.groupIds.length === 0) return;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<boolean> {
+    if (params.groupIds.length === 0) return true;
     const indexKey = pendingGroupsKey(params.prefix);
     try {
       for (
@@ -1854,6 +1887,7 @@ export class QueueRedisRepository implements QueueRepository {
             offset + PENDING_RECONCILE_ZCARD_BATCH,
           ),
         );
+        if (!(await params.refreshLease())) return false;
       }
     } catch (err) {
       logger.warn(
@@ -1861,6 +1895,101 @@ export class QueueRedisRepository implements QueueRepository {
         "Failed to adopt lifecycle-index groups into the pending index",
       );
     }
+    return true;
+  }
+
+  /**
+   * Walk the keyspace for `group:<id>:jobs` keys and adopt every group into the
+   * pending index.
+   *
+   * This is the one enumeration that cannot miss a group: it reads key existence,
+   * so a group is found whatever lifecycle index it is in and however it moves
+   * between them. That is what makes it the right tool for the groups the index
+   * does not know about — everything staged before the index existed, and
+   * everything staged by a pod on the previous release during a rollout. Reading
+   * the lifecycle indexes cannot cover those safely, and adopting on sight only
+   * helps a group the pass actually saw.
+   *
+   * It is also the expensive one — SCAN walks every key in the database
+   * regardless of MATCH — which is why it is not how the counter is normally
+   * enumerated. It runs when the queue has groups the index has not learned yet
+   * (so, repeatedly through a rollout, at the cost this reconcile had before the
+   * index existed and no more) and drops back to a slow backstop cadence once a
+   * sweep finds nothing new to adopt.
+   *
+   * Returns null when the lease was lost.
+   */
+  private async sweepKeyspaceForGroups(params: {
+    prefix: string;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<Set<string> | null> {
+    const pattern = `${params.prefix}group:*:jobs`;
+    const groupKeyPrefix = `${params.prefix}group:`;
+    const found = new Set<string>();
+
+    // SCAN is keyless, so on a cluster ioredis routes it to an arbitrary node and
+    // one call sees one node's keyspace. Fanning out over the masters is what
+    // makes "cannot miss a group" true there too.
+    const nodes: { scan: IORedis["scan"] }[] = isClusterClient(this.redis)
+      ? this.redis.nodes("master")
+      : [this.redis];
+
+    for (const node of nodes) {
+      let cursor = "0";
+      do {
+        const [nextCursor, keys] = await node.scan(
+          cursor,
+          "MATCH",
+          pattern,
+          "COUNT",
+          PENDING_RECONCILE_PAGE_SIZE,
+        );
+        cursor = nextCursor;
+        for (const key of keys) {
+          found.add(key.slice(groupKeyPrefix.length, -":jobs".length));
+        }
+        if (!(await params.refreshLease())) return null;
+      } while (cursor !== "0");
+    }
+
+    return found;
+  }
+
+  /**
+   * Whether a keyspace sweep is due.
+   *
+   * Due when one has never run, or when the stored due time has passed. The due
+   * time is written by {@link recordSweepOutcome}, which keeps sweeping every
+   * pass while sweeps are still finding groups to adopt.
+   */
+  private async isKeyspaceSweepDue(prefix: string): Promise<boolean> {
+    const raw = await this.redis.get(`${prefix}${SWEEP_DUE_KEY_SUFFIX}`);
+    if (raw === null) return true;
+    const dueAt = Number(raw);
+    return !Number.isFinite(dueAt) || Date.now() >= dueAt;
+  }
+
+  /**
+   * Schedule the next keyspace sweep from what this one adopted.
+   *
+   * Adopting something means the index is still behind — a rollout is in flight,
+   * or the queue predates the index — so the next pass sweeps again, which costs
+   * what this reconcile cost before the index existed and no more. Adopting
+   * nothing means the index is complete, and the sweep drops back to a slow
+   * backstop that only has to catch a writer nobody has noticed is missing.
+   */
+  private async recordSweepOutcome(params: {
+    prefix: string;
+    adopted: number;
+  }): Promise<void> {
+    const nextDueAt =
+      params.adopted > 0
+        ? Date.now()
+        : Date.now() + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
+    await this.redis.set(
+      `${params.prefix}${SWEEP_DUE_KEY_SUFFIX}`,
+      String(nextDueAt),
+    );
   }
 
   /**
@@ -1989,6 +2118,7 @@ export class QueueRedisRepository implements QueueRepository {
   private async prunePendingIndex(params: {
     prefix: string;
     emptyJobsKeys: string[];
+    refreshLease: () => Promise<boolean>;
   }): Promise<void> {
     if (params.emptyJobsKeys.length === 0) return;
     const indexKey = pendingGroupsKey(params.prefix);
@@ -2011,6 +2141,11 @@ export class QueueRedisRepository implements QueueRepository {
       }
       try {
         await pendingIndexPruneScript.run(this.redis, 1, indexKey, ...args);
+        // Pruning runs after the counter is published, so losing the lease here
+        // cannot corrupt a result — but it can leave this pass working on a
+        // marker another instance now owns, which is the overlap the marker
+        // exists to stop. Stop rather than press on.
+        if (!(await params.refreshLease())) return;
       } catch (err) {
         logger.warn(
           { error: err },

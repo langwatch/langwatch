@@ -328,7 +328,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
       it("prunes the drained group but keeps one that still holds jobs", async () => {
         const indexKey = `${queueName}:gq:pending-groups`;
 
-        await redis.del(markerKey);
+        await redis.del(markerKey, indexKey);
 
         // No jobs zset at all: the shape left behind when the safety-net TTL
         // expires a group's jobs without any script running.
@@ -357,7 +357,9 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
       it("counts it and adopts it, so later passes read it from the index", async () => {
         const indexKey = `${queueName}:gq:pending-groups`;
 
-        await redis.del(markerKey);
+        // Queue names repeat across runs of this suite, so clear the index this
+        // test asserts is empty rather than trusting a previous run left nothing.
+        await redis.del(markerKey, indexKey);
 
         // The shape left by a pod on the previous release, or by anything staged
         // before the index existed: jobs and lifecycle membership, no index entry.
@@ -378,6 +380,35 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         expect(result!.groundTruth).toBe(2);
         // Adopted, so it no longer depends on the sequential lifecycle read.
         expect(await redis.sismember(indexKey, "legacy-group")).toBe(1);
+      });
+    });
+  });
+
+  describe("given a group that no index lists at all", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group no index lists is still counted and adopted" */
+      it("finds it in the keyspace, counts it, and adopts it", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        await redis.del(markerKey, indexKey);
+
+        // Holding jobs, in neither the pending index nor any lifecycle index —
+        // the state a group passes through while it moves between them.
+        await redis.zadd(
+          `${queueName}:gq:group:orphan-mover:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+          3,
+          "j3",
+        );
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(3);
+        expect(await redis.sismember(indexKey, "orphan-mover")).toBe(1);
       });
     });
   });

@@ -41,7 +41,29 @@ class FakeRedis {
    */
   readonly events: ("lease-refresh" | "zcard-batch")[] = [];
 
-  readonly scan = vi.fn(async () => ["0", [] as string[]] as const);
+  /**
+   * Keyspace SCAN over the jobs keys the fake holds, paged like the real one.
+   * Matches on key existence, so it finds a group whatever index it is in.
+   */
+  readonly scan = vi.fn(
+    // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional scan signature
+    async (
+      cursor: string,
+      _match: "MATCH",
+      pattern: string,
+      _count: "COUNT",
+      count: number,
+    ): Promise<[string, string[]]> => {
+      const re = new RegExp(
+        `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
+      );
+      const keys = [...this.zsets.keys()].filter((k) => re.test(k)).sort();
+      const offset = Number(cursor);
+      const page = keys.slice(offset, offset + count);
+      const next = offset + page.length;
+      return [next >= keys.length ? "0" : String(next), page];
+    },
+  );
   readonly evalshaCalls: {
     key: string;
     token: string;
@@ -68,6 +90,12 @@ class FakeRedis {
     return this.strings.get(key) ?? null;
   }
 
+  /** Runs after every `sadd`, so a test can disturb a multi-batch adoption. */
+  onSadd: (() => void) | null = null;
+
+  /** How many SADD batches adoption issued, to show when it stopped. */
+  saddBatches = 0;
+
   async sadd(key: string, ...members: string[]): Promise<number> {
     const existing = this.sets.get(key) ?? [];
     let added = 0;
@@ -77,6 +105,8 @@ class FakeRedis {
       added += 1;
     }
     this.sets.set(key, existing);
+    this.saddBatches += 1;
+    this.onSadd?.();
     return added;
   }
 
@@ -281,7 +311,16 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         expect(redis.strings.get(COUNTER_KEY)).toBe("9");
       });
 
-      it("reads the group indexes instead of walking the keyspace", async () => {
+      it("reads the indexes instead of walking the keyspace once adoption is done", async () => {
+        // The steady state, which is what the cost claim rests on: with nothing
+        // left to adopt the sweep is not due, and a pass touches only the
+        // indexes. The keyspace walk is reserved for adopting groups the index
+        // does not know about yet.
+        redis.strings.set(
+          `${PREFIX}stats:pending-recon-sweep-due`,
+          String(Date.now() + 60_000),
+        );
+
         await repo.reconcileTotalPending(QUEUE_NAME);
 
         expect(redis.scan).not.toHaveBeenCalled();
@@ -577,6 +616,91 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain(
           "tenant-a/legacy",
         );
+      });
+    });
+  });
+
+  describe("given an unindexed group that moves between the lifecycle reads", () => {
+    beforeEach(() => {
+      // The counterexample the lifecycle legs cannot cover: holding jobs, in the
+      // pending index nowhere, and in no lifecycle index at the moment each of
+      // those is read — unblocked into an already-scanned `ready` before
+      // `blocked` was reached.
+      redis.zsets.set(`${PREFIX}group:tenant-a/mover:jobs`, [
+        "j1",
+        "j2",
+        "j3",
+        "j4",
+        "j5",
+      ]);
+      redis.strings.set(COUNTER_KEY, "0");
+    });
+
+    describe("when reconcile runs", () => {
+      /** @scenario "A group no index lists is still counted and adopted" */
+      it("counts it from the keyspace and adopts it for later passes", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result?.groundTruth).toBe(5);
+        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain(
+          "tenant-a/mover",
+        );
+      });
+    });
+  });
+
+  describe("given the keyspace sweep has nothing left to adopt", () => {
+    beforeEach(() => {
+      redis.seedGroup({
+        groupId: "tenant-a/known",
+        jobCount: 1,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+    });
+
+    describe("when reconcile runs twice", () => {
+      it("stops walking the keyspace once the index is complete", async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+        const afterFirst = redis.scan.mock.calls.length;
+        expect(afterFirst).toBeGreaterThan(0);
+
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+
+        // Nothing was adopted, so the sweep backs off instead of paying the
+        // keyspace walk on every pass.
+        expect(redis.scan.mock.calls.length).toBe(afterFirst);
+      });
+    });
+  });
+
+  describe("given the lease is lost while adopting a multi-batch backlog", () => {
+    beforeEach(() => {
+      for (let i = 0; i < 2500; i++) {
+        redis.seedGroup({
+          groupId: `tenant-a/legacy-${i}`,
+          jobCount: 1,
+          index: `${PREFIX}ready`,
+          indexType: "zset",
+        });
+      }
+      redis.strings.set(COUNTER_KEY, "9999");
+      // Adoption spans several SADD batches; the marker changes hands during it.
+      redis.onSadd = () => redis.stealMarker(MARKER_KEY);
+    });
+
+    describe("when reconcile runs", () => {
+      it("stops adopting instead of finishing the batches on someone else's marker", async () => {
+        // 2500 groups is three SADD batches. The publish is already safe without
+        // this check — summation re-arms the lease and would abort before writing
+        // — so what is under test is that the work stops, rather than the pass
+        // grinding through the rest of a backlog for an instance that has moved
+        // on. That overlap is the cost the marker exists to prevent.
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(redis.saddBatches).toBe(1);
+        expect(result).toBeNull();
+        expect(redis.strings.get(COUNTER_KEY)).toBe("9999");
       });
     });
   });

@@ -124,3 +124,15 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When the reconcile runs
     Then its jobs are counted
     And it is added to the pending index for later passes
+
+  # Adoption only helps a group the pass actually saw, and the lifecycle indexes
+  # are read one after another, so a group moving between them is seen by
+  # neither. Reading the keyspace finds a group by the existence of its jobs,
+  # which no movement between indexes changes — the one enumeration that cannot
+  # miss one, kept for exactly the groups the index has not learned yet.
+  @integration
+  Scenario: A group no index lists is still counted and adopted
+    Given a group holding jobs that no index lists
+    When the reconcile runs
+    Then its jobs are counted
+    And it is added to the pending index for later passes
