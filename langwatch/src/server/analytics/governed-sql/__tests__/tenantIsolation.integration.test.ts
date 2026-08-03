@@ -99,6 +99,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * a `finally` either way.
      */
     /** @scenario "Restricted identity with a valid key context reads only its own tenant's rows" */
+    /** @scenario "Detaching the row policy makes the other tenant's rows visible" */
     it("exposes the other tenant's rows once the row policy is detached, and hides them again once restored", async () => {
       const spans = harness.governedTables.find(
         (governedTable) => governedTable.table === "spans",
@@ -175,6 +176,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * caller that sends no tenant setting at all. Nothing in the request path
      * has to remember to default it — the profile already did.
      */
+    /** @scenario "A caller that sends no tenant context at all reads nothing" */
     it("returns zero rows when the caller sends no tenant setting at all", async () => {
       await expectZeroRowsWithControl({
         harness,
@@ -307,6 +309,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * `USING` expression resolves against the real table, not the caller's
      * alias, so redefining the name in the query changes nothing.
      */
+    /** @scenario "Shadowing or aliasing the key-map table name does not defeat the policy" */
     it("scopes reads when the query shadows the key-map table name", async () => {
       await expectTenantScopedRead({
         harness,
@@ -382,6 +385,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * Aliasing another governed table under the key map's name is the same
      * trick as the CTE shadow, in join position.
      */
+    /** @scenario "Shadowing or aliasing the key-map table name does not defeat the policy" */
     it("scopes a JOIN that aliases another table as the key-map table", async () => {
       await expectTenantScopedRead({
         harness,
@@ -444,6 +448,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * around a per-table policy. It is not: the policies still apply, so the
      * assertion is containment, not rejection.
      */
+    /** @scenario "The merge table function is contained by the row policies" */
     it("scopes reads through the merge() table function", async () => {
       const control = await recordSeedControl({
         harness,
@@ -468,11 +473,9 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
       expect(harness.tenantA.rawApiKey.length).toBeGreaterThanOrEqual(24);
 
       const queryId = `governed-sql-audit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      await selectRows(
-        tenantA,
-        `SELECT count() FROM ${database}.traces`,
-        { query_id: queryId },
-      );
+      await selectRows(tenantA, `SELECT count() FROM ${database}.traces`, {
+        query_id: queryId,
+      });
       await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
 
       const entries = await selectRows<Record<string, unknown>>(
@@ -614,6 +617,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * be a bypass with no policy to enforce — the reason the shipped key map is
      * a self-policed table instead.
      */
+    /** @scenario "No dictionary in the governed schema could serve the same data unpoliced" */
     it("has no dictionary in the governed database that could serve the same data unpoliced", async () => {
       const dictionaries = await selectRows<{ name: string }>(
         harness.admin,
@@ -627,14 +631,23 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
     /** @scenario "Writes, DDL, and temporary objects are rejected by the restricted identity itself" */
     it("rejects every write, DDL, and temporary-object statement by grants", async () => {
       const rejected: Array<[string, string]> = [
-        ["INSERT", `INSERT INTO ${database}.traces VALUES ('tenant-b','x','m',1)`],
+        [
+          "INSERT",
+          `INSERT INTO ${database}.traces VALUES ('tenant-b','x','m',1)`,
+        ],
         ["ALTER", `ALTER TABLE ${database}.traces DELETE WHERE 1`],
-        ["CREATE TABLE", `CREATE TABLE ${database}.evil (x UInt8) ENGINE = Memory`],
+        [
+          "CREATE TABLE",
+          `CREATE TABLE ${database}.evil (x UInt8) ENGINE = Memory`,
+        ],
         ["CREATE TEMPORARY TABLE", "CREATE TEMPORARY TABLE evil (x UInt8)"],
         ["DROP", `DROP TABLE ${database}.traces`],
         ["TRUNCATE", `TRUNCATE TABLE ${database}.traces`],
         ["CREATE VIEW", `CREATE VIEW ${database}.evil_view AS SELECT 1`],
-        ["ATTACH", `ATTACH TABLE ${database}.evil_attached (x UInt8) ENGINE = Memory`],
+        [
+          "ATTACH",
+          `ATTACH TABLE ${database}.evil_attached (x UInt8) ENGINE = Memory`,
+        ],
         [
           "CREATE ROW POLICY",
           `CREATE ROW POLICY evil ON ${database}.traces USING 1 TO ${harness.names.restrictedUser}`,
@@ -647,7 +660,10 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
           "GRANT",
           `GRANT SELECT ON ${database}.traces TO ${harness.names.restrictedUser}`,
         ],
-        ["CREATE USER", "CREATE USER evil IDENTIFIED WITH plaintext_password BY 'x'"],
+        [
+          "CREATE USER",
+          "CREATE USER evil IDENTIFIED WITH plaintext_password BY 'x'",
+        ],
       ];
 
       for (const [label, query] of rejected) {
@@ -682,9 +698,18 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
     /** @scenario "Table functions are rejected for the restricted identity by grants" */
     it("rejects the table functions that reach external systems", async () => {
       const rejected: Array<[string, string]> = [
-        ["url", `SELECT * FROM url('http://example.invalid/', 'CSV', 'a String')`],
-        ["s3", `SELECT * FROM s3('http://example.invalid/f.csv', 'CSV', 'a String')`],
-        ["remote", `SELECT * FROM remote('127.0.0.1', 'system', 'one', 'u', 'p')`],
+        [
+          "url",
+          `SELECT * FROM url('http://example.invalid/', 'CSV', 'a String')`,
+        ],
+        [
+          "s3",
+          `SELECT * FROM s3('http://example.invalid/f.csv', 'CSV', 'a String')`,
+        ],
+        [
+          "remote",
+          `SELECT * FROM remote('127.0.0.1', 'system', 'one', 'u', 'p')`,
+        ],
         ["file", `SELECT * FROM file('x.csv', 'CSV', 'a String')`],
         [
           "postgresql",
@@ -705,6 +730,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * available rather than being holes in the grant policy. Pinned so that a
      * later blanket ban is a decision someone makes, not a silent regression.
      */
+    /** @scenario "Table functions that read no data remain available" */
     it("still allows the table functions that read no data", async () => {
       const allowed: Array<[string, string]> = [
         ["numbers", "SELECT count() AS value FROM numbers(5)"],
@@ -784,6 +810,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * against the grants rather than a hard-coded count, so adding a governed
      * object does not turn this red for the wrong reason.
      */
+    /** @scenario "Only the granted objects are visible through the readable tables view" */
     it("shows only the granted objects through the readable tables view", async () => {
       const granted = await selectRows<{ table: string }>(
         harness.admin,
@@ -811,6 +838,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * governed object and granting it without writing its row policy turns this
      * red with no test edit.
      */
+    /** @scenario "Every governed object has an effective row policy" */
     it("has an effective row policy for every object the restricted identity can read", async () => {
       const coverage = await selectRows<{ table: string; has_policy: number }>(
         harness.admin,
@@ -836,6 +864,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
      * falsifiable, and immediately followed by the guard that would catch one,
      * exercised against a real offender so the guard cannot be vacuous.
      */
+    /** @scenario "A definer-rights view bypasses the row policy and is reported by the audit" */
     it("detects a DEFINER view as the row-policy bypass it is, and reports a clean database otherwise", async () => {
       const definerView = "v_definer_probe";
       const invokerView = "v_invoker_probe";

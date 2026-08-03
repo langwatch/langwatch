@@ -54,6 +54,22 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then zero rows are returned
 
   @integration
+  Scenario: A caller that sends no tenant context at all reads nothing
+    Given the restricted identity sends no tenant setting with its query
+    When it selects from a governed table
+    Then the tenant setting resolves to the profile's empty default
+    And zero rows are returned
+    And no error is raised
+
+  @integration
+  Scenario: Detaching the row policy makes the other tenant's rows visible
+    Given the restricted identity carries tenant-a's valid key-hash context
+    And a governed object holds rows for both tenants
+    When the row policy is detached from that object
+    Then tenant-b rows become visible to the restricted identity
+    And reattaching the policy hides them again
+
+  @integration
   Scenario: Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash
     Given the restricted identity carries tenant-a's valid key-hash context
     When it executes a query whose SQL text overrides the tenant setting with a guessed value
@@ -88,6 +104,50 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Given the restricted identity carries tenant-a's valid key-hash context
     When it executes queries using IN, EXISTS, and scalar subqueries over governed tables
     Then no subquery position leaks a tenant-b row
+
+  @integration
+  Scenario: Shadowing or aliasing the key-map table name does not defeat the policy
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it names the key-map table as a CTE, or aliases another table as it
+    Then only tenant-a rows are returned
+
+  @integration
+  Scenario: The merge table function is contained by the row policies
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it reads governed tables through the merge table function
+    Then only tenant-a rows are returned
+
+  @integration
+  Scenario: Table functions that read no data remain available
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it uses table functions that reach no stored data
+    Then they are allowed, because they expose nothing to contain
+
+  @integration
+  Scenario: Only the granted objects are visible through the readable tables view
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it lists the tables it can see
+    Then it sees exactly the objects it holds a grant on
+
+  @integration
+  Scenario: Every governed object has an effective row policy
+    Given the set of objects the restricted identity can read, taken from the server
+    When each is checked for a row policy bound to that identity
+    Then every object has one
+
+  @integration
+  Scenario: A definer-rights view bypasses the row policy and is reported by the audit
+    Given a view over a governed table created with definer rights
+    When the restricted identity selects from it
+    Then rows from both tenants are returned
+    And the governed-schema audit reports that view
+    And the audit reports the database clean once the view is removed
+
+  @integration
+  Scenario: No dictionary in the governed schema could serve the same data unpoliced
+    Given the governed schema's dictionaries
+    When they are enumerated
+    Then none is present, because dictionaries are not subject to row policies
 
   @integration
   Scenario: Key hash is auditable in the query log without exposing the raw key
@@ -152,6 +212,36 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And the restricted identity carries a key-hash context matching no key-map entry
     When it selects from the mapped table
     Then zero rows are returned
+
+  @integration
+  Scenario: Empty key context yields zero rows from a PG-engine mapped table
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries an empty key-hash context
+    When it selects from the mapped table
+    Then zero rows are returned
+
+  @integration
+  Scenario: A column the approved view excludes is unreachable through the mapping
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the approved view omits a sensitive column
+    When the restricted identity references that column
+    Then the query fails, because the column is unreachable rather than merely unselected
+
+  @integration
+  Scenario: The row-policy predicate is not pushed down to PostgreSQL
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries a key-hash context matching no key-map entry
+    When it selects from the mapped table
+    Then zero rows are returned
+    And the statement PostgreSQL received carries no tenant predicate
+    And PostgreSQL was asked to scan the whole approved view
+
+  @integration
+  Scenario: A predicate in the submitted SQL is pushed down to PostgreSQL
+    Given a PG-resident table is mapped into ClickHouse through the server-side named collection
+    And the restricted identity carries tenant-a's valid key-hash context
+    When its SQL carries a predicate on the mapped table
+    Then the statement PostgreSQL received carries that predicate
 
   @integration
   Scenario: Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes

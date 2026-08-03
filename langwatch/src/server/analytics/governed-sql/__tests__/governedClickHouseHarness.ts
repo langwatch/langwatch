@@ -125,7 +125,10 @@ export interface GovernedTenantFixture {
   keyHash: string;
 }
 
-function tenantFixture(tenantId: string, rawApiKey: string): GovernedTenantFixture {
+function tenantFixture(
+  tenantId: string,
+  rawApiKey: string,
+): GovernedTenantFixture {
   return {
     tenantId,
     rawApiKey,
@@ -200,7 +203,11 @@ export function governedNamesForSuite(suite: string): GovernedSqlNames {
   };
 }
 
-function writeConfigFile(directory: string, name: string, contents: string): string {
+function writeConfigFile(
+  directory: string,
+  name: string,
+  contents: string,
+): string {
   const path = join(directory, name);
   writeFileSync(path, contents);
   return path;
@@ -393,10 +400,7 @@ export async function selectScalar<T>(
   query: string,
 ): Promise<T> {
   const rows = await selectRows<{ value: T }>(client, query);
-  expect(
-    rows,
-    `expected exactly one row from: ${query}`,
-  ).toHaveLength(1);
+  expect(rows, `expected exactly one row from: ${query}`).toHaveLength(1);
   return rows[0]!.value;
 }
 
@@ -461,7 +465,10 @@ export async function expectClickHouseError(
   } catch (error) {
     thrown = error;
   }
-  expect(thrown, `${context}: expected a rejection, the statement succeeded`).toBeDefined();
+  expect(
+    thrown,
+    `${context}: expected a rejection, the statement succeeded`,
+  ).toBeDefined();
   const code = clickHouseErrorCode(thrown);
   const message = thrown instanceof Error ? thrown.message : String(thrown);
   expect(
@@ -545,7 +552,10 @@ export function expectOnlyTenantA<T extends Record<string, unknown>>({
   harness: GovernedClickHouseHarness;
   context: string;
 }): void {
-  expect(rows.length, `${context}: read returned nothing to check`).toBeGreaterThan(0);
+  expect(
+    rows.length,
+    `${context}: read returned nothing to check`,
+  ).toBeGreaterThan(0);
   const tenants = [...new Set(rows.map((row) => String(row[tenantColumn])))];
   expect(tenants, `${context}: foreign tenant rows were returned`).toEqual([
     harness.tenantA.tenantId,

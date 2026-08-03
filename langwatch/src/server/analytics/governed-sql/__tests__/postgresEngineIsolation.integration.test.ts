@@ -95,6 +95,7 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
      * The column the approved view omits is unreachable, not merely unselected:
      * the PG role has no grant on the base table, so there is no path to it.
      */
+    /** @scenario "A column the approved view excludes is unreachable through the mapping" */
     it("cannot reach a column the approved view excludes", async () => {
       await expectClickHouseError(
         () =>
@@ -107,7 +108,10 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
       );
 
       const serialised = JSON.stringify(
-        await selectRows(tenantA, `SELECT * FROM ${database}.${PG_MAPPED_TABLE}`),
+        await selectRows(
+          tenantA,
+          `SELECT * FROM ${database}.${PG_MAPPED_TABLE}`,
+        ),
       );
       expect(
         serialised.includes("secret-of-"),
@@ -128,6 +132,7 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
       });
     });
 
+    /** @scenario "Empty key context yields zero rows from a PG-engine mapped table" */
     it("returns zero rows from the mapped table for an empty context", async () => {
       await expectZeroRowsWithControl({
         harness,
@@ -350,6 +355,7 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
      * the projection fallback in the later PR of #6480, so it is pinned here
      * rather than discovered in production.
      */
+    /** @scenario "The row-policy predicate is not pushed down to PostgreSQL" */
     it("scans the whole approved view on PostgreSQL even for a key that can match no row", async () => {
       const before = await postgres.readLog();
       const client = await harness.restrictedClient({
@@ -361,7 +367,10 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
       );
       expect(rows).toHaveLength(1);
 
-      const statements = statementsLoggedSince(before, await postgres.readLog());
+      const statements = statementsLoggedSince(
+        before,
+        await postgres.readLog(),
+      );
       const scans = statements.filter((statement) =>
         statement.includes(postgres.approvedView),
       );
@@ -388,6 +397,7 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
      * push down, so the absent WHERE is specific to the policy predicate rather
      * than a sign that pushdown is off altogether.
      */
+    /** @scenario "A predicate in the submitted SQL is pushed down to PostgreSQL" */
     it("does push the caller's own predicate down to PostgreSQL", async () => {
       const before = await postgres.readLog();
       await selectRows(
@@ -396,7 +406,10 @@ describe("given a PG-resident table mapped into ClickHouse through the server-si
           `WHERE trace_id = '${harness.tenantA.tenantId}-trace-1'`,
       );
 
-      const statements = statementsLoggedSince(before, await postgres.readLog());
+      const statements = statementsLoggedSince(
+        before,
+        await postgres.readLog(),
+      );
       const scans = statements.filter((statement) =>
         statement.includes(postgres.approvedView),
       );
