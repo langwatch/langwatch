@@ -146,7 +146,7 @@ describe("Evaluators API", () => {
         });
       });
 
-      /** @scenario Updating settings replaces config.settings and preserves evaluatorType */
+      /** @scenario Updated settings take effect and the evaluator type is unchanged */
       it("keeps the canonical config shape on a settings-only update", async () => {
         const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
           config: {

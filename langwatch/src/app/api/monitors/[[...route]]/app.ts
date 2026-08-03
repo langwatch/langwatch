@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { EvaluatorNotFoundError } from "~/server/app-layer/evaluations/errors";
 import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
 import { prisma } from "~/server/db";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
@@ -51,7 +52,7 @@ const createMonitorSchema = z.object({
   parameters: z.record(z.unknown()).default({}),
   mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
-  evaluatorId: z.string().optional(),
+  evaluatorId: z.string().min(1).optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
 });
@@ -65,7 +66,7 @@ const updateMonitorSchema = z.object({
   parameters: z.record(z.unknown()).optional(),
   mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
-  evaluatorId: z.string().nullable().optional(),
+  evaluatorId: z.string().min(1).nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
   threadIdleTimeout: z.number().int().positive().nullable().optional(),
 });
@@ -235,10 +236,7 @@ secured.access(requires("evaluations:manage")).post(
       },
     });
     if (!evaluator) {
-      return c.json(
-        { error: "Evaluator not found or does not belong to this project" },
-        404,
-      );
+      throw new EvaluatorNotFoundError(body.evaluatorId);
     }
 
     const slug = `${slugify(body.name)}-${nanoid(5)}`;
@@ -328,10 +326,7 @@ secured.access(requires("evaluations:update")).patch(
         },
       });
       if (!evaluator) {
-        return c.json(
-          { error: "Evaluator not found or does not belong to this project" },
-          404,
-        );
+        throw new EvaluatorNotFoundError(body.evaluatorId);
       }
     }
 

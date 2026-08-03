@@ -181,7 +181,7 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-        evaluatorId: z.string().optional(),
+        evaluatorId: z.string().min(1).optional(),
         level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
         threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),
@@ -368,7 +368,7 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-        evaluatorId: z.string().nullable().optional(),
+        evaluatorId: z.string().min(1).nullable().optional(),
         level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
         threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),

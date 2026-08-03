@@ -477,7 +477,7 @@ describe("updateEvaluatorCommand()", () => {
   });
 
   describe("when --settings JSON is provided", () => {
-    /** @scenario The CLI sends --settings under config.settings */
+    /** @scenario Settings updated through the CLI take effect */
     it("nests the parsed settings under config.settings", async () => {
       mockGet.mockResolvedValue(makeEvaluator());
       mockUpdate.mockResolvedValue(makeEvaluator());

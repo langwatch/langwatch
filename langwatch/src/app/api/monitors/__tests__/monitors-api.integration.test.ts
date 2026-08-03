@@ -89,7 +89,7 @@ describe("Monitors API", () => {
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
-  describe("POST /api/monitors", () => {
+  describe("when creating a monitor", () => {
     describe("when no evaluator id is provided", () => {
       /** @scenario Creating a monitor without an evaluator is rejected */
       it("rejects the create with monitor_evaluator_required", async () => {
@@ -136,7 +136,7 @@ describe("Monitors API", () => {
     });
   });
 
-  describe("PATCH /api/monitors/:id", () => {
+  describe("when updating a monitor", () => {
     describe("when setting the evaluator to null", () => {
       /** @scenario Removing the evaluator from a monitor is rejected */
       it("rejects the update and keeps the evaluator", async () => {

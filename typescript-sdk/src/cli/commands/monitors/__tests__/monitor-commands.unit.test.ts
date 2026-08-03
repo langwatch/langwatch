@@ -183,6 +183,8 @@ describe("createMonitorCommand()", () => {
 
       expect(mockFetch).not.toHaveBeenCalled();
       const output = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      // The stable machine contract is the code; the prose is supplementary.
+      expect(output).toContain("validation_error");
       expect(output).toContain("--evaluator-id is required");
       expect(output).toContain("langwatch evaluator create");
       expect(output).toContain("langwatch evaluator list");
