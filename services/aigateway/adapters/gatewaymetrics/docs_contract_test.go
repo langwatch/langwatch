@@ -74,6 +74,11 @@ var notMetrics = map[string]string{
 
 	// Log fields and JSON keys.
 	"gateway_request_id": "log field and response-header value",
+
+	// `error.code` values on the REST error envelope. They share the
+	// `gateway_` prefix with the metrics because they name the same
+	// subsystem, but they are values inside a JSON body, not series.
+	"gateway_scope_org_mismatch": "REST error code",
 }
 
 // plannedMetrics are names the docs explicitly describe as not yet
