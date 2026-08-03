@@ -15,6 +15,7 @@ import type {
   ReactorContext,
   ReactorDefinition,
 } from "~/server/event-sourcing/reactors/reactor.types";
+import { throttledPerWindow } from "~/server/event-sourcing/reactors/throttleWindow";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
@@ -29,7 +30,12 @@ const logger = createLogger(
  * (TenantId, SourceId, HourBucket, TraceId) — replays collapse to the
  * latest version of the same row.
  */
-export const GOVERNANCE_KPIS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
+/**
+ * KPI rows are hour-bucketed and read only by a periodic evaluator, so holding
+ * a trace's contributions for half a minute costs the consumer nothing while
+ * collapsing a whole trace's spans into one write.
+ */
+export const GOVERNANCE_KPIS_SYNC_WINDOW_MS = 30_000;
 
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
@@ -70,9 +76,21 @@ export function createGovernanceKpisSyncReactor(
     shouldReact: (_event, context) =>
       isGovernanceOriginTrace(context.foldState.attributes),
     options: {
-      makeJobId: (payload) =>
-        `governance-kpis-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
-      ttl: GOVERNANCE_KPIS_SYNC_DEBOUNCE_TTL_MS,
+      // NOTE: the handler swallows repository failures by design (see its
+      // catch, and the test pinning it). The window makes that cheaper to get
+      // wrong: a burst now leaves ONE job, so a failed write is retried by
+      // the NEXT window rather than by the next span, and a failure in a
+      // trace's final window is not retried at all. Whether these should
+      // rethrow is an open question — rethrowing retries the job under Redis,
+      // but on the in-memory queue `send` awaits completion, so it would
+      // surface as fold redelivery instead.
+      // Level-triggered: the row carries the fold's running totals, so the
+      // LAST event of a trace must always land. shouldSurviveDispatch stays off.
+      ...throttledPerWindow({
+        makeJobId: (payload) =>
+          `governance-kpis-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
+        windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+      }),
     },
 
     async handle(

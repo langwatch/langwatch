@@ -5,12 +5,19 @@ import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
+import { throttledPerWindow } from "../../../reactors/throttleWindow";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:project-metadata-reactor",
 );
+
+/**
+ * Roughly one poll of the onboarding screen that waits on these flags, so a
+ * user who has just sent their first trace waits at most one extra cycle.
+ */
+export const PROJECT_METADATA_WINDOW_MS = 3_000;
 
 export interface ProjectMetadataReactorDeps {
   projects: ProjectService;
@@ -112,8 +119,20 @@ export function createProjectMetadataReactor(
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => projectMetadataGroupKey(payload.event),
-      makeJobId: (payload) => `project-meta:${payload.event.tenantId}`,
-      ttl: 60_000, // 60s dedup — avoid repeated writes for the same project
+      // Held to roughly one onboarding poll. This reactor flips the flags an
+      // onboarding screen waits on, and one of those screens reads them once
+      // without polling at all, so a long window would leave a user who has
+      // already sent a trace looking at the "connect your app" guide. One
+      // extra poll of latency buys collapsing an entire trace's spans, which
+      // for an established project are all no-ops anyway.
+      //
+      // The lane above and the window here are the two halves of one
+      // behaviour: the lane lets a project's concurrent traces share a dedup
+      // key at all, the window gives that key long enough to collapse them.
+      ...throttledPerWindow({
+        makeJobId: (payload) => `project-meta:${payload.event.tenantId}`,
+        windowMs: PROJECT_METADATA_WINDOW_MS,
+      }),
     },
 
     async handle(

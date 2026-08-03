@@ -13,7 +13,15 @@ interface QueuedJob<Payload> {
   payload: Payload;
   jobId: string;
   deduplicationId?: string;
-  delay?: number;
+  /**
+   * Wall-clock time this job becomes eligible to run. A delayed job WAITS IN
+   * THE QUEUE rather than in a worker slot, so it stays visible to the dedup
+   * map for its whole window and cannot squat on the concurrency limit.
+   */
+  dispatchAt: number;
+  /** Wall-clock time the dedup id stops absorbing new sends. */
+  dedupExpiresAt?: number;
+  shouldSurviveDispatch?: boolean;
   resolve: () => void;
   reject: (error: Error) => void;
 }
@@ -52,7 +60,15 @@ export class EventSourcedQueueProcessorMemory<
     string,
     QueuedJob<Payload>
   >();
+  /**
+   * Dedup ids whose job already dispatched but whose TTL is still running,
+   * for senders that asked to survive dispatch. Mirrors the GroupQueue Lua's
+   * opt-in branch: without it a dispatched key is stale and restages.
+   */
+  private readonly suppressedUntilByDeduplicationId = new Map<string, number>();
   private activeCount = 0;
+  private dispatchTimer: ReturnType<typeof setTimeout> | null = null;
+  private dispatchTimerAt = Number.POSITIVE_INFINITY;
 
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
     const { name, process, spanAttributes, deduplication, delay, options } =
@@ -96,24 +112,53 @@ export class EventSourcedQueueProcessorMemory<
     const jobId = this.generateJobId(payload);
     const deduplicationId = dedup?.makeId(payload);
 
+    const now = Date.now();
+    const dispatchAt = now + (effectiveDelay ?? 0);
+    const dedupExpiresAt =
+      dedup?.ttlMs === undefined ? undefined : now + dedup.ttlMs;
+
     // Simple job deduplication: squash onto existing job with same deduplication ID
     if (deduplicationId) {
+      const suppressedUntil =
+        this.suppressedUntilByDeduplicationId.get(deduplicationId);
+      if (suppressedUntil !== undefined) {
+        if (suppressedUntil > now) {
+          this.logger.debug(
+            { queueName: this.queueName, jobId, deduplicationId },
+            "Discarded send: dedup id still suppressed after dispatch",
+          );
+          return;
+        }
+        this.suppressedUntilByDeduplicationId.delete(deduplicationId);
+      }
+
       const existingJob =
         this.pendingJobsByDeduplicationId.get(deduplicationId);
       if (existingJob) {
-        const shouldReplace = dedup?.replace !== false;
-        const shouldExtend = dedup?.extend !== false;
-        if (shouldReplace) {
-          existingJob.payload = payload;
+        const expired =
+          existingJob.dedupExpiresAt !== undefined &&
+          existingJob.dedupExpiresAt <= now;
+        if (expired) {
+          // The window closed while the job waited. It still runs, but it
+          // stops absorbing sends so this one stages as genuinely new.
+          this.pendingJobsByDeduplicationId.delete(deduplicationId);
+        } else {
+          if (dedup?.replace !== false) {
+            existingJob.payload = payload;
+          }
+          // `extend` moves the DEADLINE, matching GroupQueue. Left off, the
+          // window stays pinned to the send that opened it, so a continuous
+          // stream cannot defer its own job indefinitely.
+          if (dedup?.extend !== false) {
+            existingJob.dispatchAt = dispatchAt;
+            existingJob.dedupExpiresAt = dedupExpiresAt;
+          }
+          this.logger.debug(
+            { queueName: this.queueName, jobId, deduplicationId },
+            "Squashed onto existing job with same deduplication ID",
+          );
+          return;
         }
-        if (shouldExtend) {
-          existingJob.delay = effectiveDelay;
-        }
-        this.logger.debug(
-          { queueName: this.queueName, jobId, deduplicationId },
-          "Squashed onto existing job with same deduplication ID",
-        );
-        return;
       }
     }
 
@@ -123,7 +168,9 @@ export class EventSourcedQueueProcessorMemory<
         payload,
         jobId,
         deduplicationId,
-        delay: effectiveDelay,
+        dispatchAt,
+        dedupExpiresAt,
+        shouldSurviveDispatch: dedup?.shouldSurviveDispatch === true,
         resolve,
         reject,
       };
@@ -155,16 +202,30 @@ export class EventSourcedQueueProcessorMemory<
       return;
     }
 
-    const job = this.queue.shift();
+    const now = Date.now();
+    const { readyIndex, earliestPending } = this.findDueJob(now);
+
+    if (readyIndex === -1) {
+      this.scheduleWake(earliestPending - now);
+      return;
+    }
+
+    const [job] = this.queue.splice(readyIndex, 1);
     if (!job) {
       return;
     }
 
-    // Remove dedup entry when job leaves staging — new sends with the same
-    // dedup ID should create a genuinely new job, not squash onto a job
-    // that's already being processed (same TOCTOU fix as GroupQueue Lua).
+    // Release the dedup entry only now, as the job actually leaves staging —
+    // new sends with the same id should squash for the whole window and only
+    // then create a genuinely new job (same TOCTOU fix as GroupQueue Lua).
     if (job.deduplicationId) {
       this.pendingJobsByDeduplicationId.delete(job.deduplicationId);
+      if (job.shouldSurviveDispatch && job.dedupExpiresAt !== undefined) {
+        this.suppressedUntilByDeduplicationId.set(
+          job.deduplicationId,
+          job.dedupExpiresAt,
+        );
+      }
     }
 
     this.activeCount++;
@@ -176,15 +237,57 @@ export class EventSourcedQueueProcessorMemory<
   }
 
   /**
-   * Processes a single job with tracing and error handling.
+   * First job whose deadline has passed, keeping FIFO among the ready ones,
+   * plus when the earliest not-yet-due job becomes eligible.
+   *
+   * A job that is not due yet stays in the queue: waiting inside a worker slot
+   * would hold the slot for the whole delay and, on a queue shared by every
+   * handler in memory mode, starve everything behind it.
+   */
+  private findDueJob(now: number): {
+    readyIndex: number;
+    earliestPending: number;
+  } {
+    let earliestPending = Number.POSITIVE_INFINITY;
+    for (const [index, queued] of this.queue.entries()) {
+      if (queued.dispatchAt <= now) {
+        return { readyIndex: index, earliestPending };
+      }
+      earliestPending = Math.min(earliestPending, queued.dispatchAt);
+    }
+    return { readyIndex: -1, earliestPending };
+  }
+
+  /**
+   * Wakes the scheduler when the earliest not-yet-due job becomes eligible.
+   * Keeps at most one timer, moving it earlier when a nearer job arrives.
+   */
+  private scheduleWake(delayMs: number): void {
+    const wakeAt = Date.now() + Math.max(0, delayMs);
+    if (this.dispatchTimer !== null && this.dispatchTimerAt <= wakeAt) {
+      return;
+    }
+    if (this.dispatchTimer !== null) {
+      clearTimeout(this.dispatchTimer);
+    }
+    this.dispatchTimerAt = wakeAt;
+    this.dispatchTimer = setTimeout(
+      () => {
+        this.dispatchTimer = null;
+        this.dispatchTimerAt = Number.POSITIVE_INFINITY;
+        this.tryProcessNext();
+      },
+      Math.max(0, delayMs),
+    );
+    // Never hold the process open just to fire a delayed job.
+    this.dispatchTimer.unref?.();
+  }
+
+  /**
+   * Processes a single job with tracing and error handling. The delay is
+   * already spent — the scheduler holds a job in the queue until it is due.
    */
   private async processJob(job: QueuedJob<Payload>): Promise<void> {
-    // Apply delay if configured (per-job delay takes precedence over instance delay)
-    const delay = job.delay;
-    if (delay && delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-
     const baseAttributes: Record<string, string | number | boolean> = {
       "queue.name": this.queueName,
       "queue.job_id": job.jobId ?? "unknown",
@@ -267,6 +370,12 @@ export class EventSourcedQueueProcessorMemory<
       "Closing memory queue processor",
     );
 
+    if (this.dispatchTimer !== null) {
+      clearTimeout(this.dispatchTimer);
+      this.dispatchTimer = null;
+      this.dispatchTimerAt = Number.POSITIVE_INFINITY;
+    }
+
     // Wait for active jobs to complete (simple polling since we don't track promises)
     while (this.activeCount > 0) {
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -282,6 +391,7 @@ export class EventSourcedQueueProcessorMemory<
     }
     this.queue.length = 0;
     this.pendingJobsByDeduplicationId.clear();
+    this.suppressedUntilByDeduplicationId.clear();
 
     this.logger.debug(
       { queueName: this.queueName },

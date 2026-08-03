@@ -13,6 +13,7 @@ import type {
   ReactorContext,
   ReactorDefinition,
 } from "~/server/event-sourcing/reactors/reactor.types";
+import { throttledPerWindow } from "~/server/event-sourcing/reactors/throttleWindow";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
@@ -27,7 +28,12 @@ const logger = createLogger(
  * (TenantId, EventId) — replays collapse to the latest version of
  * the same row.
  */
-export const GOVERNANCE_OCSF_EVENTS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
+/**
+ * OCSF rows are pulled by cursor-paginated SIEM consumers that keep their own
+ * watermark, so a row landing half a minute later is picked up by the next
+ * pull rather than missed.
+ */
+export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
 
 import {
   GOVERNANCE_ATTR,
@@ -160,9 +166,21 @@ export function createGovernanceOcsfEventsSyncReactor(
     shouldReact: (_event, context) =>
       isGovernanceOriginTrace(context.foldState.attributes),
     options: {
-      makeJobId: (payload) =>
-        `governance-ocsf-events-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
-      ttl: GOVERNANCE_OCSF_EVENTS_SYNC_DEBOUNCE_TTL_MS,
+      // NOTE: the handler swallows repository failures by design (see its
+      // catch, and the test pinning it). The window makes that cheaper to get
+      // wrong: a burst now leaves ONE job, so a failed write is retried by
+      // the NEXT window rather than by the next span, and a failure in a
+      // trace's final window is not retried at all. Whether these should
+      // rethrow is an open question — rethrowing retries the job under Redis,
+      // but on the in-memory queue `send` awaits completion, so it would
+      // surface as fold redelivery instead.
+      // Level-triggered: the envelope is rebuilt from the fold's current
+      // state, so the LAST event of a trace must always land.
+      ...throttledPerWindow({
+        makeJobId: (payload) =>
+          `governance-ocsf-events-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
+        windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+      }),
     },
 
     async handle(

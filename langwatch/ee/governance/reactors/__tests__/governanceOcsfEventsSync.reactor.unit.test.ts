@@ -382,7 +382,7 @@ describe("governanceOcsfEventsSync reactor", () => {
   });
 
   describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for BullMQ debounce", () => {
+    it("declares a per-(tenant, trace) job-id for the queue's dedup", () => {
       const { deps } = mockDeps();
       const reactor = createGovernanceOcsfEventsSyncReactor(deps);
       expect(reactor.options?.makeJobId).toBeDefined();
@@ -390,7 +390,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         event: { tenantId: "t-1", aggregateId: "trace-x" },
       } as any);
       expect(jobId).toBe("governance-ocsf-events-sync-t-1-trace-x");
-      expect(reactor.options?.ttl).toBeGreaterThan(0);
+      expect(reactor.options?.deduplication?.ttlMs).toBeGreaterThan(0);
     });
   });
 });

@@ -14,6 +14,12 @@ const logger = createLogger("langwatch:billing:meterDispatch");
 const GRACE_PERIOD_DAYS = 3;
 
 /**
+ * How long a project's dedup key lives. Sized to the downstream command's own
+ * dedup window so the two agree on the rate.
+ */
+export const BILLING_METER_DISPATCH_SUPPRESS_MS = 300_000;
+
+/**
  * One queue lane per project, matching this reactor's per-project dedup id.
  *
  * The queue's dedup key is global to the queue, but the check that decides
@@ -60,8 +66,21 @@ export function createBillingMeterDispatchReactor(deps: {
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
+      // Deliberately fires immediately, unlike the other level-triggered
+      // reactors. `handle` decides which billing months to report by reading
+      // the WALL CLOCK at the moment it runs, not the event it was given, so
+      // holding a trigger moves the decision as well as the work. A trigger
+      // arriving in the last seconds of the third grace day would run on the
+      // fourth and silently drop the previous month's dispatch — a missed
+      // report rather than a late one, since the next grace window covers a
+      // different month.
+      //
+      // A window here is safe once the month and grace decision come from the
+      // triggering event instead of the clock. Until then this reactor relies
+      // on the per-project lane above, which collapses a project's concurrent
+      // traces without deferring anything.
       makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
-      ttl: 300_000,
+      ttl: BILLING_METER_DISPATCH_SUPPRESS_MS,
     },
 
     async handle(event, context) {
