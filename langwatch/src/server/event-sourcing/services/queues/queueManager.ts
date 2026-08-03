@@ -589,17 +589,21 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
 
-      // ADR-066 pillar 2 visibility: a serialized producer that does NOT
-      // coalesce can still flood the event log one tiny insert per item under
-      // high fan-in. Record the gap at registration so it can be found and
-      // closed, instead of surfacing only as ClickHouse small-parts pressure.
-      if (
-        cmdEntry.options.serializeByAggregate &&
-        !(coalesceMaxBatch && coalesceMaxBatch > 1)
-      ) {
+      // ADR-066 pillar 2 visibility: a producer whose jobs funnel into a shared
+      // queue group and does NOT coalesce can still flood the event log one tiny
+      // insert per item under high fan-in. Both grouping shapes qualify —
+      // `serializeByAggregate` (many commands, one aggregate) and an explicit
+      // `getGroupKey` (many aggregates, one shard or bucket) — because the
+      // funnel, not the key that names it, is what parks items behind one
+      // consumer. Record the gap at registration so it can be found and closed,
+      // instead of surfacing only as ClickHouse small-parts pressure.
+      const isGroupedProducer =
+        Boolean(cmdEntry.options.serializeByAggregate) ||
+        Boolean(cmdEntry.getGroupKey);
+      if (isGroupedProducer && !(coalesceMaxBatch && coalesceMaxBatch > 1)) {
         this.logger.info(
           { pipeline: this.pipelineName, command: cmdName },
-          "serialized command producer registered without append coalescing",
+          "grouped command producer registered without append coalescing",
         );
       }
 
