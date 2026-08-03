@@ -53,6 +53,7 @@ class FakeRedis {
     return this.strings.get(key) ?? null;
   }
 
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zscan signature
   async zscan(
     key: string,
     cursor: string,
@@ -65,6 +66,7 @@ class FakeRedis {
     return [nextCursor, page.flatMap((member) => [member, "1"])];
   }
 
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional sscan signature
   async sscan(
     key: string,
     cursor: string,
@@ -105,6 +107,7 @@ class FakeRedis {
     };
   }
 
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
   async evalsha(
     _sha: string,
     _numKeys: number,

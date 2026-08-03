@@ -1634,40 +1634,12 @@ export class QueueRedisRepository implements QueueRepository {
 
       const jobsKeys = await this.collectGroupJobsKeys(prefix);
 
-      // Pipeline ZCARD for every collected key and sum the results, re-arming
-      // the single-flight lease between batches so a long pass keeps its hold.
-      // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
-      // a partial under-count as ground truth; the next cycle retries.
-      let groundTruth = 0;
-      for (
-        let offset = 0;
-        offset < jobsKeys.length;
-        offset += PENDING_RECONCILE_ZCARD_BATCH
-      ) {
-        const pipeline = this.redis.pipeline();
-        for (const key of jobsKeys.slice(
-          offset,
-          offset + PENDING_RECONCILE_ZCARD_BATCH,
-        )) {
-          pipeline.zcard(key);
-        }
-        const results = await pipeline.exec();
-        for (const [err, val] of results ?? []) {
-          if (err) {
-            logger.warn(
-              { error: err },
-              "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
-            );
-            return null;
-          }
-          groundTruth += Number(val) || 0;
-        }
-        await this.setReconcileMarkerTtl({
-          markerKey,
-          holderToken,
-          ttlMs: PENDING_RECONCILE_LEASE_MS,
-        });
-      }
+      const groundTruth = await this.sumPendingJobs({
+        jobsKeys,
+        markerKey,
+        holderToken,
+      });
+      if (groundTruth === null) return null;
 
       const drift = counter - groundTruth;
 
@@ -1713,69 +1685,110 @@ export class QueueRedisRepository implements QueueRepository {
   private async collectGroupJobsKeys(prefix: string): Promise<string[]> {
     const groupIds = new Set<string>();
 
-    let readyCursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.zscan(
-        `${prefix}ready`,
-        readyCursor,
-        "COUNT",
-        PENDING_RECONCILE_PAGE_SIZE,
-      );
-      readyCursor = nextCursor;
-      // A ZSCAN page alternates [member, score, member, score, ...].
-      for (let i = 0; i < members.length; i += 2) {
-        groupIds.add(members[i]!);
-      }
-    } while (readyCursor !== "0");
-
-    let blockedCursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        `${prefix}blocked`,
-        blockedCursor,
-        "COUNT",
-        PENDING_RECONCILE_PAGE_SIZE,
-      );
-      blockedCursor = nextCursor;
-      for (const groupId of members) {
-        groupIds.add(groupId);
-      }
-    } while (blockedCursor !== "0");
+    await this.collectZsetGroupIds({ key: `${prefix}ready`, into: groupIds });
+    await this.collectSetMembers({ key: `${prefix}blocked`, into: groupIds });
 
     // One entry per tenant currently over cap — empty in the steady state where
     // the cap is off, so the parked leg usually costs a single SSCAN.
     const parkedTenants = new Set<string>();
-    let tenantCursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        `${prefix}parked-tenants`,
-        tenantCursor,
-        "COUNT",
-        PENDING_RECONCILE_PAGE_SIZE,
-      );
-      tenantCursor = nextCursor;
-      for (const tenantId of members) {
-        parkedTenants.add(tenantId);
-      }
-    } while (tenantCursor !== "0");
-
+    await this.collectSetMembers({
+      key: `${prefix}parked-tenants`,
+      into: parkedTenants,
+    });
     for (const tenantId of parkedTenants) {
-      let parkedCursor = "0";
-      do {
-        const [nextCursor, members] = await this.redis.zscan(
-          `${prefix}parked:${tenantId}`,
-          parkedCursor,
-          "COUNT",
-          PENDING_RECONCILE_PAGE_SIZE,
-        );
-        parkedCursor = nextCursor;
-        for (let i = 0; i < members.length; i += 2) {
-          groupIds.add(members[i]!);
-        }
-      } while (parkedCursor !== "0");
+      await this.collectZsetGroupIds({
+        key: `${prefix}parked:${tenantId}`,
+        into: groupIds,
+      });
     }
 
     return Array.from(groupIds, (groupId) => `${prefix}group:${groupId}:jobs`);
+  }
+
+  /** Page a zset of group ids with ZSCAN, adding every member into `into`. */
+  private async collectZsetGroupIds(params: {
+    key: string;
+    into: Set<string>;
+  }): Promise<void> {
+    let cursor = "0";
+    do {
+      const [nextCursor, members] = await this.redis.zscan(
+        params.key,
+        cursor,
+        "COUNT",
+        PENDING_RECONCILE_PAGE_SIZE,
+      );
+      cursor = nextCursor;
+      // A ZSCAN page alternates [member, score, member, score, ...].
+      for (let i = 0; i < members.length; i += 2) {
+        params.into.add(members[i]!);
+      }
+    } while (cursor !== "0");
+  }
+
+  /** Page a set with SSCAN, adding every member into `into`. */
+  private async collectSetMembers(params: {
+    key: string;
+    into: Set<string>;
+  }): Promise<void> {
+    let cursor = "0";
+    do {
+      const [nextCursor, members] = await this.redis.sscan(
+        params.key,
+        cursor,
+        "COUNT",
+        PENDING_RECONCILE_PAGE_SIZE,
+      );
+      cursor = nextCursor;
+      for (const member of members) {
+        params.into.add(member);
+      }
+    } while (cursor !== "0");
+  }
+
+  /**
+   * Sum ZCARD over the collected keys in batches, re-arming the single-flight
+   * lease between batches so a long pass keeps its hold.
+   *
+   * Returns null if ANY pipeline entry errors — a flaky ZCARD must never write
+   * a partial under-count as ground truth; the next cycle retries.
+   */
+  private async sumPendingJobs(params: {
+    jobsKeys: string[];
+    markerKey: string;
+    holderToken: string;
+  }): Promise<number | null> {
+    let groundTruth = 0;
+    for (
+      let offset = 0;
+      offset < params.jobsKeys.length;
+      offset += PENDING_RECONCILE_ZCARD_BATCH
+    ) {
+      const pipeline = this.redis.pipeline();
+      for (const key of params.jobsKeys.slice(
+        offset,
+        offset + PENDING_RECONCILE_ZCARD_BATCH,
+      )) {
+        pipeline.zcard(key);
+      }
+      const results = await pipeline.exec();
+      for (const [err, val] of results ?? []) {
+        if (err) {
+          logger.warn(
+            { error: err },
+            "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
+          );
+          return null;
+        }
+        groundTruth += Number(val) || 0;
+      }
+      await this.setReconcileMarkerTtl({
+        markerKey: params.markerKey,
+        holderToken: params.holderToken,
+        ttlMs: PENDING_RECONCILE_LEASE_MS,
+      });
+    }
+    return groundTruth;
   }
 
   /**
