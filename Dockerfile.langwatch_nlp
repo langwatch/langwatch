@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
 #
 # This prune block is shared verbatim with the production Lambda image so both
 # artifacts install byte-identically from the one requirements file.
-FROM python:3.11-slim-bookworm AS sandbox-build
+FROM python:3.14-slim-bookworm AS sandbox-build
 COPY services/nlpgo/app/engine/blocks/codeblock/sandbox-requirements.txt /tmp/sandbox-requirements.txt
 RUN pip install --no-cache-dir --target=/pylibs -r /tmp/sandbox-requirements.txt
 RUN set -eux; \
