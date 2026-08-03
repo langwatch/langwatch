@@ -7,6 +7,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
+import { FilterFieldUnknownError, FilterParseError } from "../errors";
 import type { TraceSummaryData } from "../types";
 import {
   MAX_NODE_COUNT,
@@ -47,7 +48,11 @@ export function evaluateQueryInMemory(
   queryText: string,
   trace: InMemoryTrace,
 ): boolean {
-  return evaluateQueryInMemoryDetailed(queryText, trace, true).isMatch;
+  return evaluateQueryInMemoryDetailed({
+    queryText,
+    trace,
+    shouldLogUnsupported: true,
+  }).isMatch;
 }
 
 interface QueryEvaluationDiagnostic {
@@ -57,21 +62,34 @@ interface QueryEvaluationDiagnostic {
 }
 
 function evaluateQueryInMemoryDetailed(
-  queryText: string,
-  trace: InMemoryTrace,
-  shouldLogUnsupported: boolean,
+  {
+    queryText,
+    trace,
+    shouldLogUnsupported,
+  }: {
+    queryText: string;
+    trace: InMemoryTrace;
+    shouldLogUnsupported: boolean;
+  },
 ): QueryEvaluationDiagnostic {
   // Reuse the compiler as the validation gate — it enforces the exact
   // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
-  // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
+  // FilterFieldUnknownError for unknown fields. User input errors fail closed;
+  // compiler invariant failures must remain visible to operators.
   let compiled: { sql: string; params: Record<string, unknown> } | null;
   try {
     compiled = translateFilterToClickHouse(queryText, "__in_memory__", {
       from: 0,
       to: 0,
     });
-  } catch {
-    return { isMatch: false, invalid: true, unsupportedFields: [] };
+  } catch (error) {
+    if (
+      error instanceof FilterParseError ||
+      error instanceof FilterFieldUnknownError
+    ) {
+      return { isMatch: false, invalid: true, unsupportedFields: [] };
+    }
+    throw error;
   }
   // `null` means no filter (empty / whitespace) — every trace matches.
   if (compiled === null) {
@@ -136,17 +154,17 @@ export function diagnoseFilterQueryReachability(queryText: string): {
     traceName: "",
     containsErrorStatus: false,
   } as unknown as TraceSummaryData;
-  const result = evaluateQueryInMemoryDetailed(
+  const result = evaluateQueryInMemoryDetailed({
     queryText,
-    {
+    trace: {
       summary,
       evaluations: needs.has("evaluations") ? [] : null,
       events: needs.has("events") ? [] : null,
       // Production dispatch deliberately does not derive span rows yet.
       spans: null,
     },
-    false,
-  );
+    shouldLogUnsupported: false,
+  });
   return {
     invalid: result.invalid,
     unsupportedFields: result.unsupportedFields,
