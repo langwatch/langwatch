@@ -474,7 +474,7 @@ export class MetricDataPointClickHouseRepository
       });
       for (const row of await result.json<RawMetricRow>()) {
         unique.set(
-          `${row.SeriesId} ${row.PointId}`,
+          `${row.SeriesId}\u0000${row.PointId}`,
           fromRaw({ row, organizationId: anyPoint.organizationId }),
         );
       }
