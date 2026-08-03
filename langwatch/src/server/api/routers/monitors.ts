@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
 import { getApp } from "~/server/app-layer";
+import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
@@ -202,17 +203,20 @@ export const monitorsRouter = createTRPCRouter({
       } = input;
       const prisma = ctx.prisma;
 
-      // Validate evaluator exists and belongs to project if provided
-      if (evaluatorId) {
-        const evaluator = await prisma.evaluator.findFirst({
-          where: { id: evaluatorId, projectId, archivedAt: null },
+      // A monitor without an evaluator sits enabled but evaluates nothing —
+      // reject at the boundary instead of creating it broken.
+      if (!evaluatorId) {
+        throw new MonitorEvaluatorRequiredError();
+      }
+
+      const evaluator = await prisma.evaluator.findFirst({
+        where: { id: evaluatorId, projectId, archivedAt: null },
+      });
+      if (!evaluator) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Evaluator not found or does not belong to this project",
         });
-        if (!evaluator) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Evaluator not found or does not belong to this project",
-          });
-        }
       }
 
       validateCheckSettings(checkType, parameters);
@@ -388,6 +392,13 @@ export const monitorsRouter = createTRPCRouter({
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
+
+      // Stripping the evaluator would leave the monitor unable to evaluate
+      // anything — legacy monitors without one keep working as long as the
+      // update leaves `evaluatorId` untouched.
+      if (evaluatorId === null) {
+        throw new MonitorEvaluatorRequiredError();
+      }
 
       // Validate evaluator exists and belongs to project if provided
       if (evaluatorId) {

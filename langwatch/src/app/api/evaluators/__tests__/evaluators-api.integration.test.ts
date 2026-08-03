@@ -146,6 +146,22 @@ describe("Evaluators API", () => {
         });
       });
 
+      /** @scenario Updating settings replaces config.settings and preserves evaluatorType */
+      it("keeps the canonical config shape on a settings-only update", async () => {
+        const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
+          config: {
+            settings: { model: "openai/gpt-5-mini", prompt: "Judge it" },
+          },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.config).toEqual({
+          evaluatorType: "langevals/exact_match",
+          settings: { model: "openai/gpt-5-mini", prompt: "Judge it" },
+        });
+      });
+
       it("rejects changing evaluatorType", async () => {
         const res = await helpers.api.put(`/api/evaluators/${evaluator.id}`, {
           config: {

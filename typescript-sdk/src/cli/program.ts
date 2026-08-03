@@ -2397,7 +2397,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--check-type <type>", "Evaluator check type (e.g. ragas/toxicity, custom/my-eval)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE (default), AS_GUARDRAIL, MANUALLY", "ON_MESSAGE")
       .option("--sample <rate>", "Sampling rate 0.0-1.0 (default: 1.0)")
-      .option("--evaluator-id <id>", "Link to a saved evaluator")
+      .option("--evaluator-id <id>", "Saved evaluator to run (required; see `langwatch evaluator list`)")
       .option("--level <level>", "Evaluation level: trace (default) or thread")
       .option("--parameters <json>", "Evaluator settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),

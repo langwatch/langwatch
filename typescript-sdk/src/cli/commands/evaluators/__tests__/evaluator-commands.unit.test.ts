@@ -30,6 +30,7 @@ import { listEvaluatorsCommand } from "../list";
 import { getEvaluatorCommand } from "../get";
 import { createEvaluatorCommand } from "../create";
 import { deleteEvaluatorCommand } from "../delete";
+import { updateEvaluatorCommand } from "../update";
 import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 
 class ProcessExitError extends Error {
@@ -452,5 +453,53 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
     await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
     expect(() => JSON.parse(printedStdout())).toThrow();
+  });
+});
+
+describe("updateEvaluatorCommand()", () => {
+  let mockGet: ReturnType<typeof vi.fn>;
+  let mockUpdate: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGet = vi.fn();
+    mockUpdate = vi.fn();
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
+      getAll: vi.fn(),
+      get: mockGet,
+      create: vi.fn(),
+      update: mockUpdate,
+      delete: vi.fn(),
+    }) as unknown as EvaluatorsApiService; });
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when --settings JSON is provided", () => {
+    /** @scenario The CLI sends --settings under config.settings */
+    it("nests the parsed settings under config.settings", async () => {
+      mockGet.mockResolvedValue(makeEvaluator());
+      mockUpdate.mockResolvedValue(makeEvaluator());
+
+      await updateEvaluatorCommand("test-evaluator", {
+        settings: JSON.stringify({ model: "openai/gpt-5-mini", prompt: "Judge it" }),
+      });
+
+      expect(mockUpdate).toHaveBeenCalledWith("evaluator_abc123", {
+        config: {
+          settings: { model: "openai/gpt-5-mini", prompt: "Judge it" },
+        },
+      });
+    });
+
+    it("exits when the settings are not valid JSON", async () => {
+      mockGet.mockResolvedValue(makeEvaluator());
+
+      await expect(
+        updateEvaluatorCommand("test-evaluator", { settings: "{not json" }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
   });
 });

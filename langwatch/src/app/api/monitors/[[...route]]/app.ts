@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
 import { prisma } from "~/server/db";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -219,20 +220,25 @@ secured.access(requires("evaluations:manage")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating monitor");
 
-    if (body.evaluatorId) {
-      const evaluator = await prisma.evaluator.findFirst({
-        where: {
-          id: body.evaluatorId,
-          projectId: project.id,
-          archivedAt: null,
-        },
-      });
-      if (!evaluator) {
-        return c.json(
-          { error: "Evaluator not found or does not belong to this project" },
-          404,
-        );
-      }
+    // A monitor without an evaluator sits enabled but evaluates nothing —
+    // the edit drawer shows an empty evaluator selection and no evaluation
+    // ever runs off it. Reject at the boundary instead of creating it broken.
+    if (!body.evaluatorId) {
+      throw new MonitorEvaluatorRequiredError();
+    }
+
+    const evaluator = await prisma.evaluator.findFirst({
+      where: {
+        id: body.evaluatorId,
+        projectId: project.id,
+        archivedAt: null,
+      },
+    });
+    if (!evaluator) {
+      return c.json(
+        { error: "Evaluator not found or does not belong to this project" },
+        404,
+      );
     }
 
     const slug = `${slugify(body.name)}-${nanoid(5)}`;
@@ -249,7 +255,7 @@ secured.access(requires("evaluations:manage")).post(
         mappings: (body.mappings ?? null) as Prisma.InputJsonValue,
         sample: body.sample,
         enabled: true,
-        evaluatorId: body.evaluatorId ?? null,
+        evaluatorId: body.evaluatorId,
         level: body.level,
         threadIdleTimeout: body.threadIdleTimeout ?? null,
       },
@@ -304,6 +310,13 @@ secured.access(requires("evaluations:update")).patch(
 
     if (!existing) {
       return c.json({ error: "Monitor not found" }, 404);
+    }
+
+    // Stripping the evaluator would leave the monitor unable to evaluate
+    // anything — legacy monitors without one keep working as long as the
+    // update leaves `evaluatorId` untouched.
+    if (body.evaluatorId === null) {
+      throw new MonitorEvaluatorRequiredError();
     }
 
     if (body.evaluatorId) {

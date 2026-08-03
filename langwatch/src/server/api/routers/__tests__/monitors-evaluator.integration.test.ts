@@ -84,19 +84,22 @@ describe("Monitor-Evaluator Integration", () => {
       expect(result.evaluatorId).toBe(testEvaluatorId);
     });
 
-    it("creates a monitor without evaluatorId (legacy mode)", async () => {
-      const result = await caller.monitors.create({
-        projectId,
-        name: "Legacy Monitor",
-        checkType: "langevals/exact_match",
-        preconditions: [],
-        settings: { caseSensitive: true },
-        sample: 0.5,
-        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+    /** @scenario Creating a monitor without an evaluator is rejected */
+    it("rejects creating a monitor without evaluatorId", async () => {
+      await expect(
+        caller.monitors.create({
+          projectId,
+          name: "Monitor Without Evaluator",
+          checkType: "langevals/exact_match",
+          preconditions: [],
+          settings: { caseSensitive: true },
+          sample: 0.5,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        cause: expect.objectContaining({ code: "monitor_evaluator_required" }),
       });
-
-      expect(result.id).toMatch(/^monitor_/);
-      expect(result.evaluatorId).toBeNull();
     });
 
     it("throws error when evaluatorId does not exist", async () => {
@@ -149,16 +152,22 @@ describe("Monitor-Evaluator Integration", () => {
   });
 
   describe("update with evaluatorId", () => {
-    it("links an existing monitor to an evaluator", async () => {
-      // Create a monitor without evaluatorId
-      const created = await caller.monitors.create({
-        projectId,
-        name: "Monitor To Be Linked",
-        checkType: "langevals/exact_match",
-        preconditions: [],
-        settings: { caseSensitive: false },
-        sample: 1.0,
-        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+    it("links an existing legacy monitor to an evaluator", async () => {
+      // Legacy monitors predate evaluators — seed one directly, the create
+      // path no longer allows creating a monitor without an evaluator.
+      const created = await prisma.monitor.create({
+        data: {
+          id: `check_${Date.now()}`,
+          projectId,
+          name: "Monitor To Be Linked",
+          slug: `monitor-to-be-linked-${Date.now()}`,
+          checkType: "langevals/exact_match",
+          preconditions: [],
+          parameters: { caseSensitive: false },
+          sample: 1.0,
+          enabled: true,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        },
       });
 
       expect(created.evaluatorId).toBeNull();
@@ -180,7 +189,8 @@ describe("Monitor-Evaluator Integration", () => {
       expect(updated.evaluatorId).toBe(testEvaluatorId);
     });
 
-    it("unlinks a monitor from an evaluator by setting null", async () => {
+    /** @scenario Removing the evaluator from a monitor is rejected */
+    it("rejects unlinking a monitor from its evaluator", async () => {
       // Create a monitor with evaluatorId
       const created = await caller.monitors.create({
         projectId,
@@ -195,21 +205,23 @@ describe("Monitor-Evaluator Integration", () => {
 
       expect(created.evaluatorId).toBe(testEvaluatorId);
 
-      // Update to unlink
-      const updated = await caller.monitors.update({
-        id: created.id,
-        projectId,
-        name: "Monitor To Be Unlinked",
-        checkType: "langevals/exact_match",
-        preconditions: [],
-        settings: { caseSensitive: false },
-        mappings: {},
-        sample: 1.0,
-        executionMode: EvaluationExecutionMode.ON_MESSAGE,
-        evaluatorId: null,
+      await expect(
+        caller.monitors.update({
+          id: created.id,
+          projectId,
+          name: "Monitor To Be Unlinked",
+          checkType: "langevals/exact_match",
+          preconditions: [],
+          settings: { caseSensitive: false },
+          mappings: {},
+          sample: 1.0,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+          evaluatorId: null,
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        cause: expect.objectContaining({ code: "monitor_evaluator_required" }),
       });
-
-      expect(updated.evaluatorId).toBeNull();
     });
   });
 

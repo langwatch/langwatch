@@ -196,6 +196,11 @@ const presentations = {
 
   // ---- evaluations & experiments ----
   evaluation_not_found: { title: "Evaluation not found" },
+  monitor_evaluator_required: {
+    title: "This evaluation needs an evaluator",
+    describe: () =>
+      "Pick an existing evaluator or create one first, then attach it to the evaluation.",
+  },
   evaluator_not_found: { title: "Evaluator not found" },
   evaluator_config_error: {
     title: "This evaluator isn't configured correctly",
