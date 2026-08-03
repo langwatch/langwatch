@@ -6,11 +6,16 @@
  *
  * These are file-content assertions against the real chart values on disk, in
  * the same spirit as stored-objects/__tests__/helm-and-docs-shape.unit.test.ts.
- * They exist because the failure they guard against is invisible to the chart
- * CI: `helm template` proves the YAML renders, and the chart e2e either
- * disables the evaluations service or grants it 4Gi on a small runner, so a
- * profile can ship a ceiling the service cannot live within and every check
- * stays green.
+ * The values files ARE the artifact here — what a profile asks for is a fact
+ * about its text, not about a render — so reading them is the direct check,
+ * not a proxy for one.
+ *
+ * What this file deliberately does NOT cover is the worker count the chart
+ * computes. That is arithmetic over a Kubernetes CPU quantity, and asserting
+ * that the template mentions `ceil` would pass just as happily if it said
+ * `floor`. It is verified by rendering instead, in
+ * charts/langwatch/tests/langevals-sizing.sh, which the chart CI runs on every
+ * change under charts/.
  *
  * The figures come from the published images running on a real cluster. See
  * specs/setup/helm-langevals-memory.feature for the measurement table and for
@@ -48,10 +53,6 @@ const SMALL_PROFILES = [
 ];
 
 const CHART_DEFAULTS = "charts/langwatch/values.yaml";
-const DEPLOYMENT_TEMPLATE =
-  "charts/langwatch/templates/langevals/deployment.yaml";
-const HELPERS_TEMPLATE = "charts/langwatch/templates/_helpers.tpl";
-
 const MEBIBYTES: Record<string, number> = { Mi: 1, Gi: 1024, M: 1, G: 1024 };
 
 function readRepoFile(relativePath: string): string {
@@ -95,43 +96,8 @@ function langevalsMemory(relativePath: string): {
 }
 
 describe("Helm sizing for the evaluations service", () => {
-  describe("when the chart renders the evaluations service", () => {
-    /** @scenario "A profile that asks for a fraction of a CPU gets a single worker" */
-    /** @scenario "A profile that asks for more CPU gets a proportionally larger pool" */
-    it("derives the worker count from the container's CPU allowance", () => {
-      const helpers = readRepoFile(HELPERS_TEMPLATE);
-
-      // The helper reads the CPU the container is allowed, falling back to the
-      // request, so the pool tracks the allowance rather than the node.
-      expect(helpers).toContain('define "langwatch.langevals.cpuCount"');
-      expect(helpers).toMatch(/dig "limits" "cpu"/);
-      expect(helpers).toMatch(/dig "requests" "cpu"/);
-
-      // Millicore quantities have to become whole workers, never zero.
-      expect(helpers).toMatch(/hasSuffix "m"/);
-      expect(helpers).toMatch(/max 1/);
-    });
-
-    /** @scenario "A profile that asks for a fraction of a CPU gets a single worker" */
-    it("passes the worker count as CPU_COUNT, the variable the service reads", () => {
-      const deployment = readRepoFile(DEPLOYMENT_TEMPLATE);
-
-      expect(deployment).toContain("name: CPU_COUNT");
-      expect(deployment).toContain(
-        'include "langwatch.langevals.cpuCount" . | quote',
-      );
-    });
-
-    /** @scenario "An operator who sets the worker count keeps it" */
-    it("yields to an operator who set CPU_COUNT themselves", () => {
-      const deployment = readRepoFile(DEPLOYMENT_TEMPLATE);
-
-      // Guarded on the operator's own extraEnvs, so the chart never emits a
-      // second CPU_COUNT alongside theirs.
-      expect(deployment).toMatch(/if not \(has "CPU_COUNT" \$envNames\)/);
-    });
-
-    /** @scenario "An operator who sets the worker count keeps it" */
+  describe("when a profile configures the evaluations service", () => {
+    /** @scenario "No shipped profile claims a worker bound it does not have" */
     it("never leans on WEB_CONCURRENCY, which this server ignores", () => {
       // The server passes an explicit worker count to gunicorn, overriding the
       // environment default, so WEB_CONCURRENCY silently does nothing. Any
@@ -182,7 +148,7 @@ describe("Helm sizing for the evaluations service", () => {
   });
 
   describe("when no profile is layered on top", () => {
-    /** @scenario "A profile that asks for more CPU gets a proportionally larger pool" */
+    /** @scenario "A default install covers every worker its CPU allowance buys" */
     it("ships a default ceiling covering every worker its CPU allowance buys", () => {
       const { request, limit } = langevalsMemory(CHART_DEFAULTS);
 

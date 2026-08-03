@@ -104,6 +104,7 @@ jobs:
             # edited only scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
+              - 'charts/langwatch/tests/**'
               - 'langwatch/**'
               - 'tools/**'
               - 'mcp-server/**'

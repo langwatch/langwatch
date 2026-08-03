@@ -92,6 +92,20 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
 ];
 
 /**
+ * Roots scanned for `.sh` shell tests. Helm chart behaviour is verified by
+ * rendering the chart, which needs helm and its built dependencies, so those
+ * suites live beside the chart and run in the chart workflow rather than under
+ * vitest or bats. Without this scan path their scenarios could only be
+ * @unimplemented or bound to assertions on template *text* — and asserting
+ * that a template contains `ceil` passes just as happily when it says `floor`,
+ * which is the vacuous check rendering exists to replace.
+ *
+ * Bindings use the same `@scenario` token as bats, expressed as a
+ * hash-comment directly above a `test_<name>() {` function.
+ */
+const DEFAULT_SHELL_TEST_ROOTS: string[] = ["charts/langwatch/tests"];
+
+/**
  * Roots scanned for Go `_test.go` files. Go-side scenarios use the same
  * `@scenario` token as TS, but the proximity check looks for a
  * `func TestXxx(t *testing.T) {` line instead of `it(` / `test(`. Without
@@ -635,6 +649,7 @@ const LEGACY_INERT: string[] = [
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
+const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
 const PYTHON_TEST_FILE_RE = /^test_.+\.py$/;
 const FEATURE_FILE_RE = /\.feature$/;
@@ -901,6 +916,28 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
     if (trimmed === "") continue;
     if (trimmed.startsWith("#")) continue;
     return /^@test\b/.test(trimmed);
+  }
+  return false;
+}
+
+/**
+ * Shell binding form. Mirrors the bats rule, with a shell function standing in
+ * for `@test`, so an annotation still has to sit directly above the thing that
+ * runs:
+ *
+ *   # @scenario "A fractional allowance rounds up to a whole worker"
+ *   test_fractional_allowance_rounds_up() {
+ *
+ * The `test_` prefix is required: it keeps a stray annotation above a helper
+ * from counting as a binding.
+ */
+function isNextLineShellTest(lines: string[], startLineIdx: number): boolean {
+  for (let i = startLineIdx; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    if (trimmed.startsWith("#")) continue;
+    return /^test_[A-Za-z0-9_]*[ \t]*\([ \t]*\)[ \t]*\{/.test(trimmed);
   }
   return false;
 }
@@ -1220,25 +1257,35 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   return bindings;
 }
 
-function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
+/**
+ * Hash-comment binding collector, shared by the bats and shell suites: both
+ * spell the annotation `# @scenario "..."` and both require it to sit directly
+ * above the thing that runs. Only "what counts as a test file" and "what counts
+ * as a test line" differ.
+ */
+function collectHashCommentBindings({
+  testRoots,
+  fileMatches,
+  isTestLine,
+}: {
+  testRoots: string[];
+  fileMatches: (name: string) => boolean;
+  isTestLine: (lines: string[], startLineIdx: number) => boolean;
+}): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
-    files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)),
-    );
+    files.push(...walkFiles(resolve(REPO_ROOT, r), fileMatches));
   }
 
   for (const file of files) {
-    const src = readFileSync(file, "utf8");
-    const lines = src.split("\n");
+    const lines = readFileSync(file, "utf8").split("\n");
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? "";
-      const m = line.match(BATS_ANNOTATION_RE);
+      const m = (lines[i] ?? "").match(BATS_ANNOTATION_RE);
       if (!m) continue;
       const title = (m[1] ?? m[2] ?? "").trim();
       if (!title) continue;
-      if (!isNextLineBatsTest(lines, i + 1)) continue;
+      if (!isTestLine(lines, i + 1)) continue;
       bindings.push({
         title,
         ref: { file: relative(REPO_ROOT, file), line: i + 1 },
@@ -1247,6 +1294,22 @@ function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
   }
 
   return bindings;
+}
+
+function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
+  return collectHashCommentBindings({
+    testRoots,
+    fileMatches: (n) => BATS_FILE_RE.test(n),
+    isTestLine: isNextLineBatsTest,
+  });
+}
+
+function collectShellBindings(testRoots: string[]): CollectedBinding[] {
+  return collectHashCommentBindings({
+    testRoots,
+    fileMatches: (n) => SHELL_TEST_FILE_RE.test(n),
+    isTestLine: isNextLineShellTest,
+  });
 }
 
 function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
@@ -1475,6 +1538,7 @@ function main(): void {
   const bindings = [
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
+    ...collectShellBindings(DEFAULT_SHELL_TEST_ROOTS),
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
     ...collectPythonBindings(DEFAULT_PYTHON_TEST_ROOTS),
   ];
