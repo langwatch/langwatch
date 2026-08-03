@@ -400,42 +400,42 @@ Feature: GroupQueue content-addressed tiered payload store
     And the runner reports it as eligible for reclaim
 
   @integration @track6
-  # The per-sweep ceiling bounds one tick's work and hands the rest to the next
-  # one. That only holds if the walk carries its position between ticks: a walk
-  # that restarts at the beginning re-judges the same leading slice every time,
-  # and the blobs behind it are left to the four-day backstop no matter how often
-  # the runner is scheduled — which reads as a healthy sweep in the totals.
-  Scenario: Successive sweeps advance through the keyspace instead of re-walking its first slice
-    Given more unreferenced Redis-tier blobs than one sweep's ceiling
+  # A sweep judges only so many blobs before it stops, and hands the rest to the
+  # next one. That only holds if each sweep takes over where the last left off. A
+  # runner that always begins again at the same place re-judges the same blobs
+  # forever, and the ones behind them keep their full backstop however often it
+  # runs — which looks like a healthy sweep in the totals.
+  Scenario: Successive sweeps reach the blobs the previous ones stopped short of
+    Given more unreferenced Redis-tier blobs than one sweep judges
     When the reclaim runner sweeps enough times to cover them all
     Then every blob has been put on the grace window
     And none is left on its four-day backstop
 
   @integration @track6
-  Scenario: A completed cycle rewinds so newly written blobs are picked up
-    Given the reclaim runner has finished a full pass of the blob keyspace
+  Scenario: Once every blob has been judged the runner begins again
+    Given the reclaim runner has judged every blob it can see
     When a new unreferenced blob is written and the runner sweeps again
     Then the new blob is put on the grace window
 
   @integration @track6
-  # A dry run is an operator asking what would happen. If it advanced the walk's
-  # position, asking the question would silently cost the next real sweep a slice
-  # of the keyspace.
-  Scenario: A dry run does not advance the cursor past blobs it only inspected
-    Given more unreferenced Redis-tier blobs than one sweep's ceiling
+  # A dry run is an operator asking what would happen. If it counted the blobs it
+  # only looked at as judged, asking the question would silently cost the next
+  # real sweep the chance to act on them.
+  Scenario: A dry run leaves the blobs it inspected for the next real sweep
+    Given more unreferenced Redis-tier blobs than one sweep judges
     When the runner sweeps in dry-run mode
-    Then no cursor is parked for the next sweep
-    And only a real sweep parks one
+    Then it records no progress for the next sweep to resume from
+    And only a real sweep records any
 
   @integration @track6
-  # The per-sweep ceiling counts blobs found, and SCAN pages by buckets rather
-  # than by matches, so a keyspace where almost nothing matches would be walked
-  # end to end every tick to fill a quota that never fills.
-  Scenario: A sweep is bounded by the work it does, not only by the matches it finds
-    Given a blob keyspace where almost nothing matches the blob pattern
-    When the runner sweeps
-    Then the walk stops on its own budget
-    And it reports itself as unfinished rather than having reached the end
+  # How much a sweep costs is decided by how far it looks, not by how much it
+  # finds. Capping only what it finds leaves it unbounded whenever there is
+  # little to find, which is the state the runner is meant to reach.
+  Scenario: A sweep stays bounded even when it finds almost nothing to judge
+    Given a blob store holding almost nothing the runner can judge
+    When the reclaim runner sweeps
+    Then the sweep still stops at a limit of its own
+    And it reports itself unfinished so the next one carries on
 
   @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
@@ -518,6 +518,12 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> A dry run reports what it would reclaim without deleting anything
   #   AC6.6 "The sweep is scheduled and singly-executed"
   #     -> The runner is driven by the schedule, not by a request
+  #   AC6.7 "Each sweep resumes where the last one stopped"
+  #     -> Successive sweeps reach the blobs the previous ones stopped short of
+  #     -> Once every blob has been judged the runner begins again
+  #     -> A dry run leaves the blobs it inspected for the next real sweep
+  #   AC6.8 "A sweep is bounded by how far it looks, not by what it finds"
+  #     -> A sweep stays bounded even when it finds almost nothing to judge
   #
   # Count: 21 ADR-029 ACs -> 21 scenarios (@unimplemented pending the Outside-In
   # TDD pass), plus 6 Track 5 amendment ACs and 6 Track 6 reclaim ACs -> 12

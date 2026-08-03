@@ -189,7 +189,7 @@ describe("BlobSweeper", () => {
      * sweep in the totals while the bytes accumulate.
      */
     describe("when the runner sweeps repeatedly", () => {
-      /** @scenario "Successive sweeps advance through the keyspace instead of re-walking its first slice" */
+      /** @scenario "Successive sweeps reach the blobs the previous ones stopped short of" */
       it("reaches every blob across successive sweeps rather than only the first slice", async () => {
         const hashes = ["h01", "h02", "h03", "h04", "h05", "h06"];
         for (const hash of hashes) {
@@ -236,7 +236,7 @@ describe("BlobSweeper", () => {
         }
       });
 
-      /** @scenario "A completed cycle rewinds so newly written blobs are picked up" */
+      /** @scenario "Once every blob has been judged the runner begins again" */
       it("rewinds to the start once the keyspace is exhausted", async () => {
         await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
 
@@ -264,7 +264,7 @@ describe("BlobSweeper", () => {
 
   describe("given a dry run over more blobs than one sweep's ceiling", () => {
     describe("when the runner sweeps in dry-run mode and then for real", () => {
-      /** @scenario "A dry run does not advance the cursor past blobs it only inspected" */
+      /** @scenario "A dry run leaves the blobs it inspected for the next real sweep" */
       it("leaves the cursor untouched, and only a real sweep parks one", async () => {
         const cursorKey = `${PREFIX}blob-sweep-cursor`;
         for (const hash of ["d01", "d02", "d03", "d04"]) {
@@ -298,7 +298,7 @@ describe("BlobSweeper", () => {
 
   describe("given a keyspace where almost nothing matches the blob pattern", () => {
     describe("when the runner sweeps", () => {
-      /** @scenario "A sweep is bounded by the work it does, not only by the matches it finds" */
+      /** @scenario "A sweep stays bounded even when it finds almost nothing to judge" */
       it("stops on its scan-call budget instead of walking the whole keyspace", async () => {
         // Matches are what the key ceiling counts, so a keyspace with almost none
         // would run the walk to the end of the database on every tick. Only a
