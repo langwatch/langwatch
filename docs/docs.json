@@ -817,16 +817,6 @@
             ]
           },
           {
-            "group": "Langy",
-            "pages": [
-              "self-hosting/langy/overview",
-              "self-hosting/langy/setup",
-              "self-hosting/langy/github-app",
-              "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
-            ]
-          },
-          {
             "group": "Deployment",
             "pages": [
               "self-hosting/deployment/docker-compose",
@@ -861,6 +851,16 @@
               "self-hosting/ops/projection-replay",
               "self-hosting/ops/dejaview",
               "self-hosting/ops/foundry"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           }
         ]
