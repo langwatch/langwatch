@@ -67,6 +67,8 @@ export const APP_ERROR_CODES = [
   "gateway_guardrail_project_mismatch",
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
+  "governed_sql_not_permitted",
+  "governed_sql_unparseable",
   "guardrail_attach_forbidden",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",

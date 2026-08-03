@@ -158,6 +158,15 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  governed_sql_unparseable: {
+    title: "This query couldn't be read",
+    describe: () => "Check the SQL syntax and try again.",
+  },
+  governed_sql_not_permitted: {
+    title: "This query isn't allowed here",
+    describe: () =>
+      "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",

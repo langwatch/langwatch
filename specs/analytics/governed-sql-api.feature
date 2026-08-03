@@ -533,8 +533,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When a client attempts to execute SQL against a PostgreSQL query endpoint
     Then no such endpoint exists
 
-  # @unimplemented: dependency guard lands with the validator PR of #6480.
-  @unit @unimplemented
+  @unit
   Scenario: No custom query language and no new BI platform dependency ships
     Given the application's dependency manifest and source tree
     When inspected for a custom query grammar, compiler, IR, or a Cube or Trino dependency
@@ -548,8 +547,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then the SQL the database executes is the submitted statement, not a rewritten one
     And no UI or natural-language translation layer is involved
 
-  # @unimplemented: the ADR lands alongside the table-function policy wiring in #6480.
-  @unit @unimplemented
+  @unit
   Scenario: The table-function and SSRF policy is captured as an ADR
     Given the repository's ADR index
     When the table-function and SSRF policy is looked up
