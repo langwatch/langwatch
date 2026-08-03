@@ -110,7 +110,7 @@ def test_spend_facade_routes_and_envelopes():
                 "data": {"end_user_id": "user/9", "caps": []}
             },
             ("POST", "/api/gateway/v1/budgets/b_1/reset"): {
-                "budget": {"id": "b_1", "window": "MANUAL"}
+                "budget": {"id": "b_1", "window": "manual"}
             },
             ("POST", "/api/gateway/v1/virtual-keys/vk_1/disable"): {
                 "virtual_key": {"id": "vk_1", "status": "disabled"}
@@ -139,7 +139,7 @@ def test_spend_facade_routes_and_envelopes():
     assert "user%2F9" in wire[1]
 
     reset = facade.reset_budget("b_1", reason="period close")
-    assert reset["window"] == "MANUAL"
+    assert reset["window"] == "manual"
     reset_call = next(c for c in calls if c[1].endswith("/budgets/b_1/reset"))
     assert reset_call[2] == {"reason": "period close"}
 
@@ -177,9 +177,9 @@ def test_gateway_admin_scopes_org_keys_with_the_project_header():
     assert minted["secret"] == "vk-lw-once"
 
     budget = facade.create_budget(
-        scope={"kind": "ATTRIBUTED_USER", "anchor_virtual_key_id": "vk_1"},
+        scope={"kind": "attributed_user", "anchor_virtual_key_id": "vk_1"},
         name="per-user",
-        window="MONTH",
+        window="month",
         limit_usd="1.00",
     )
     assert budget["id"] == "b_1"

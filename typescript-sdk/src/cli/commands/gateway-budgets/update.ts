@@ -28,8 +28,10 @@ export const updateGatewayBudgetCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
+  // The flag stays case-insensitive for the human typing it; the wire value
+  // is always lowercase.
   const onBreach: BudgetOnBreach | undefined = options.onBreach
-    ? (options.onBreach.toUpperCase() as BudgetOnBreach)
+    ? (options.onBreach.toLowerCase() as BudgetOnBreach)
     : undefined;
 
   const noFieldsProvided =
@@ -69,10 +71,10 @@ export const updateGatewayBudgetCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
-        console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
+        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type}:${budget.scope_id}`);
+        console.log(`${chalk.bold("Window:")}   ${budget.window}`);
         console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
-        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
+        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach}`);
         console.log(`${chalk.bold("Timezone:")} ${budget.timezone ?? chalk.gray("—")}`);
         console.log();
       },

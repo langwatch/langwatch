@@ -1647,7 +1647,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--description <desc>", "Optional description")
       .option(
         "--scope <typeAndId>",
-        "Scope row in TYPE:id form (repeat the flag for several). Types: ORG | TEAM | PROJECT. Defaults to the calling project when omitted. Example: --scope ORG:acme --scope TEAM:platform",
+        "Scope row in type:id form (repeat the flag for several). Types: org | team | project. Defaults to the calling project when omitted. Example: --scope org:acme --scope team:platform",
         (value: string, previous: string[] = []) => [...previous, value],
       )
       .option("--trace-project <id>", "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)")

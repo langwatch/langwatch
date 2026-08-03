@@ -70,6 +70,7 @@ import {
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 import { requestTraceIds } from "../../shared/canonical-error";
@@ -78,6 +79,38 @@ import { apiErrorBody, apiErrorSchema } from "../../shared/schemas";
 const logger = createLogger("langwatch:api:gateway-platform");
 
 patchZodOpenapi();
+
+// ── Wire enums ──────────────────────────────────────────────────────────
+// Every enum this surface publishes and accepts is lower_snake_case, input
+// AND output, with no dual-casing tolerance: the stored SCREAMING_SNAKE is
+// Prisma's convention, not a contract, and `toWireEnum` / `toStoredEnum`
+// translate at this seam in both directions.
+
+const vkScopeTypeSchema = z.enum(["organization", "team", "project"]);
+
+const budgetScopeTypeSchema = z.enum([
+  "organization",
+  "team",
+  "project",
+  "virtual_key",
+  "principal",
+  "group",
+  "attributed_user",
+]);
+
+const budgetWindowSchema = z.enum([
+  "minute",
+  "hour",
+  "day",
+  "week",
+  "month",
+  "total",
+  "manual",
+]);
+
+const onBreachSchema = z.enum(["block", "warn"]);
+
+const routingModeWireSchema = z.enum(["none", "fallback_all", "policy"]);
 
 // ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
 // These mirror the shapes returned by toVirtualKeySnakeDto / budget DTO /
@@ -88,16 +121,20 @@ const virtualKeyDtoSchema = z.object({
   organization_id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  status: z.enum(["active", "revoked"]),
+  // `disabled` is the reversible stop POST /virtual-keys/:id/disable puts a
+  // key into. It was always reachable and never documented.
+  status: z.enum(["active", "disabled", "revoked"]),
   purpose: z.enum(["user", "langy"]),
   display_prefix: z.string(),
   principal_user_id: z.string().nullable(),
   // Where an org- or team-owned key's traces and costs land. Not a
   // scope: it grants no access to the key.
   trace_project_id: z.string().nullable(),
-  scopes: z.array(z.object({ scope_type: z.string(), scope_id: z.string() })),
+  scopes: z.array(
+    z.object({ scope_type: vkScopeTypeSchema, scope_id: z.string() }),
+  ),
   routing_policy_id: z.string().nullable(),
-  routing_mode: z.enum(["NONE", "FALLBACK_ALL", "POLICY"]),
+  routing_mode: routingModeWireSchema,
   config: z.unknown(),
   revision: z.string(),
   created_at: z.string(),
@@ -109,20 +146,12 @@ const virtualKeyDtoSchema = z.object({
 const budgetDtoSchema = z.object({
   id: z.string(),
   organization_id: z.string(),
-  scope_type: z.enum([
-    "ORGANIZATION",
-    "TEAM",
-    "PROJECT",
-    "VIRTUAL_KEY",
-    "PRINCIPAL",
-    "GROUP",
-    "ATTRIBUTED_USER",
-  ]),
+  scope_type: budgetScopeTypeSchema,
   scope_id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  window: z.string(),
-  on_breach: z.enum(["BLOCK", "WARN"]),
+  window: budgetWindowSchema,
+  on_breach: onBreachSchema,
   limit_usd: z.string(),
   spent_usd: z.string(),
   timezone: z.string().nullable(),
@@ -176,7 +205,7 @@ const cacheRuleDtoSchema = z.object({
     ttl: z.number().int().optional(),
     salt: z.string().optional(),
   }),
-  mode_enum: z.enum(["RESPECT", "FORCE", "DISABLE"]),
+  mode_enum: z.enum(["respect", "force", "disable"]),
   archived_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -198,7 +227,7 @@ async function orgIdForProject(projectId: string): Promise<string> {
 // ── Request wire schemas ────────────────────────────────────────────────
 
 const scopeWireSchema = z.object({
-  scope_type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+  scope_type: vkScopeTypeSchema,
   scope_id: z.string().min(1),
 });
 
@@ -223,12 +252,10 @@ const usdAmountSchema = z
 
 const budgetWireSchema = z.object({
   limit_usd: usdAmountSchema,
-  window: z.enum(["DAY", "WEEK", "MONTH"]),
-  on_breach: z.enum(["BLOCK", "WARN"]).optional(),
+  window: z.enum(["day", "week", "month"]),
+  on_breach: onBreachSchema.optional(),
   name: z.string().min(1).max(128).optional(),
 });
-
-const routingModeWireSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
 
 const createVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
@@ -292,19 +319,9 @@ const updateBudgetSchema = z.object({
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
   limit_usd: usdAmountSchema.optional(),
-  on_breach: z.enum(["BLOCK", "WARN"]).optional(),
+  on_breach: onBreachSchema.optional(),
   timezone: z.string().nullable().optional(),
 });
-
-const budgetScopeTypeSchema = z.enum([
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-  "VIRTUAL_KEY",
-  "PRINCIPAL",
-  "GROUP",
-  "ATTRIBUTED_USER",
-]);
 
 const disableVkSchema = z.object({
   /** Operator note, audit-logged and shown in the key's detail view. */
@@ -318,27 +335,27 @@ const resetBudgetSchema = z.object({
 
 const createBudgetSchema = z.object({
   scope: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("ORGANIZATION"), organization_id: z.string() }),
-    z.object({ kind: z.literal("TEAM"), team_id: z.string() }),
-    z.object({ kind: z.literal("PROJECT"), project_id: z.string() }),
-    z.object({ kind: z.literal("VIRTUAL_KEY"), virtual_key_id: z.string() }),
-    z.object({ kind: z.literal("PRINCIPAL"), principal_user_id: z.string() }),
+    z.object({ kind: z.literal("organization"), organization_id: z.string() }),
+    z.object({ kind: z.literal("team"), team_id: z.string() }),
+    z.object({ kind: z.literal("project"), project_id: z.string() }),
+    z.object({ kind: z.literal("virtual_key"), virtual_key_id: z.string() }),
+    z.object({ kind: z.literal("principal"), principal_user_id: z.string() }),
     // Per-member group budgets. Creation is service-guarded: it needs the
     // ClickHouse spend path (group_budget_requires_clickhouse otherwise).
-    z.object({ kind: z.literal("GROUP"), group_id: z.string() }),
+    z.object({ kind: z.literal("group"), group_id: z.string() }),
     // Per-end-user template on an anchor (exactly one of the two ids).
     // Service-guarded like GROUP: per-user buckets need the spend ledger.
     z.object({
-      kind: z.literal("ATTRIBUTED_USER"),
+      kind: z.literal("attributed_user"),
       anchor_virtual_key_id: z.string().optional(),
       anchor_project_id: z.string().optional(),
     }),
   ]),
   name: z.string().min(1).max(128),
   description: z.string().optional(),
-  window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL", "MANUAL"]),
+  window: budgetWindowSchema,
   limit_usd: usdAmountSchema,
-  on_breach: z.enum(["BLOCK", "WARN"]).optional(),
+  on_breach: onBreachSchema.optional(),
   timezone: z.string().nullable().optional(),
   /**
    * ModelProvider row id the budget counts and constrains. Null / absent
@@ -482,7 +499,10 @@ function scopesFromWire(
   if (!scopes) {
     return [{ scopeType: "PROJECT", scopeId: fallbackProjectId }];
   }
-  return scopes.map((s) => ({ scopeType: s.scope_type, scopeId: s.scope_id }));
+  return scopes.map((s) => ({
+    scopeType: toStoredEnum(s.scope_type),
+    scopeId: s.scope_id,
+  }));
 }
 
 /**
@@ -499,8 +519,8 @@ function budgetFromWire(
       typeof budget.limit_usd === "number"
         ? String(budget.limit_usd)
         : budget.limit_usd,
-    window: budget.window,
-    onBreach: budget.on_breach,
+    window: toStoredEnum(budget.window),
+    onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
     name: budget.name,
   });
   if (!parsed.success) {
@@ -510,6 +530,85 @@ function budgetFromWire(
     });
   }
   return parsed.data;
+}
+
+/**
+ * The authorization pre-flight for a virtual key patch, and the scope set the
+ * update should apply.
+ *
+ * The same two gates the tRPC update runs: `virtualKeys:update` on a scope the
+ * key ALREADY lives in, plus `virtualKeys:manage` on every NEW scope. Lifted
+ * out of the handler so the route body reads as "authorize, then update"
+ * rather than interleaving eight awaits with the field mapping.
+ */
+async function authorizeVirtualKeyUpdate({
+  actor,
+  service,
+  id,
+  organizationId,
+  fallbackProjectId,
+  patch,
+}: {
+  actor: VirtualKeyActor;
+  service: ReturnType<typeof VirtualKeyService.create>;
+  id: string;
+  organizationId: string;
+  fallbackProjectId: string;
+  patch: z.infer<typeof updateVirtualKeySchema>;
+}): Promise<ScopeInput[] | undefined> {
+  const existing = await requireExistingVk(service, id, organizationId);
+  await assertActorCanOperateOnAnyScope(
+    { prisma, actor },
+    existing.scopes,
+    "virtualKeys:update",
+  );
+
+  const scopes = patch.scopes
+    ? scopesFromWire(patch.scopes, fallbackProjectId)
+    : undefined;
+  if (scopes) {
+    await assertActorCanManageAllScopes({ prisma, actor }, scopes);
+    await assertScopesBelongToOrg(prisma, organizationId, scopes);
+  }
+
+  if (patch.trace_project_id !== undefined) {
+    await assertTraceProjectBelongsToOrg(
+      prisma,
+      organizationId,
+      patch.trace_project_id,
+    );
+    // Re-pointing the destination is the same decision as choosing it at
+    // create: it needs manage on the target project.
+    if (patch.trace_project_id) {
+      await assertActorCanManageAllScopes({ prisma, actor }, [
+        { scopeType: "PROJECT", scopeId: patch.trace_project_id },
+      ]);
+    }
+  }
+
+  const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
+    vkId: id,
+    inputScopes: scopes,
+    traceProjectId:
+      patch.trace_project_id !== undefined
+        ? patch.trace_project_id
+        : existing.traceProjectId,
+  });
+  // Newly-submitted attachments are always validated. A scope change without
+  // re-sent config revalidates the existing attachments against the new
+  // project; a plain metadata update touches neither.
+  const attachmentsToCheck =
+    patch.config?.guardrailAttachments ??
+    (scopes !== undefined
+      ? parseVirtualKeyConfig(existing.config).guardrailAttachments
+      : undefined);
+  await assertGuardrailAttachmentsAllowed(
+    { prisma, actor },
+    vkProjectId,
+    attachmentsToCheck,
+  );
+
+  return scopes;
 }
 
 const secured = createProjectApp({
@@ -631,7 +730,8 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
         scopes,
         traceProjectId: body.data.trace_project_id ?? null,
         routingPolicyId: body.data.routing_policy_id ?? null,
-        routingMode: body.data.routing_mode,
+        routingMode:
+          body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
         actorUserId,
@@ -828,57 +928,14 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await requireExistingVk(service, id, organizationId);
-      // Mutating an existing key needs virtualKeys:update on one of the
-      // scopes it already lives in; re-scoping additionally needs manage
-      // on every NEW scope — the same two gates as the tRPC update.
-      await assertActorCanOperateOnAnyScope(
-        { prisma, actor },
-        existing.scopes,
-        "virtualKeys:update",
-      );
-      const scopes = body.data.scopes
-        ? scopesFromWire(body.data.scopes, project.id)
-        : undefined;
-      if (scopes) {
-        await assertActorCanManageAllScopes({ prisma, actor }, scopes);
-        await assertScopesBelongToOrg(prisma, organizationId, scopes);
-      }
-      if (body.data.trace_project_id !== undefined) {
-        await assertTraceProjectBelongsToOrg(
-          prisma,
-          organizationId,
-          body.data.trace_project_id,
-        );
-        // Re-pointing the destination is the same decision as choosing
-        // it at create: it needs manage on the target project.
-        if (body.data.trace_project_id) {
-          await assertActorCanManageAllScopes({ prisma, actor }, [
-            { scopeType: "PROJECT", scopeId: body.data.trace_project_id },
-          ]);
-        }
-      }
-      const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
-        vkId: id,
-        inputScopes: scopes,
-        traceProjectId:
-          body.data.trace_project_id !== undefined
-            ? body.data.trace_project_id
-            : existing.traceProjectId,
+      const scopes = await authorizeVirtualKeyUpdate({
+        actor,
+        service,
+        id,
+        organizationId,
+        fallbackProjectId: project.id,
+        patch: body.data,
       });
-      // Newly-submitted attachments are always validated. A scope change
-      // without re-sent config revalidates the existing attachments
-      // against the new project; a plain metadata update touches neither.
-      const attachmentsToCheck =
-        body.data.config?.guardrailAttachments ??
-        (scopes !== undefined
-          ? parseVirtualKeyConfig(existing.config).guardrailAttachments
-          : undefined);
-      await assertGuardrailAttachmentsAllowed(
-        { prisma, actor },
-        vkProjectId,
-        attachmentsToCheck,
-      );
       const updated = await service.update({
         id,
         organizationId,
@@ -888,7 +945,8 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         scopes,
         traceProjectId: body.data.trace_project_id,
         routingPolicyId: body.data.routing_policy_id,
-        routingMode: body.data.routing_mode,
+        routingMode:
+          body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
       });
@@ -1002,7 +1060,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
   describeRoute({
     summary: "Enable virtual key",
     description:
-      "Reverses disable: the key returns to ACTIVE exactly as it was, including any rotation grace that was running. Idempotent.",
+      "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -1150,7 +1208,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   describeRoute({
     summary: "List budgets",
     description:
-      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
+      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1180,10 +1238,14 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const rawFilter = c.req.query("scope_type");
     let scopeTypes: Set<z.infer<typeof budgetScopeTypeSchema>> | null = null;
     if (rawFilter !== undefined) {
+      // Strict: the filter takes the same lowercase values the rows carry.
+      // The `.toUpperCase()` that used to sit here was the only dual-casing
+      // tolerance on the surface, and it made `scope_type=Group` work while
+      // the body's `kind` refused the same spelling.
       const parsed = z
         .array(budgetScopeTypeSchema)
         .min(1)
-        .safeParse(rawFilter.split(",").map((s) => s.trim().toUpperCase()));
+        .safeParse(rawFilter.split(",").map((s) => s.trim()));
       if (!parsed.success) {
         return c.json(
           {
@@ -1203,7 +1265,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const { budgets, spendAvailable } =
       await service.listWithHealth(organizationId);
     const rows = scopeTypes
-      ? budgets.filter((b) => scopeTypes.has(b.scopeType))
+      ? budgets.filter((b) => scopeTypes.has(toWireEnum(b.scopeType)))
       : budgets;
     const memberCounts = await groupMemberCounts(rows);
     return c.json({
@@ -1218,7 +1280,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   describeRoute({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1251,9 +1313,9 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
         scope: scopeFromWire(body.data.scope),
         name: body.data.name,
         description: body.data.description ?? null,
-        window: body.data.window,
+        window: toStoredEnum(body.data.window),
         limitUsd: body.data.limit_usd,
-        onBreach: body.data.on_breach,
+        onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
         timezone: body.data.timezone ?? null,
         providerKey: body.data.provider_key ?? null,
         actorUserId,
@@ -1303,7 +1365,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
         name: body.data.name,
         description: body.data.description,
         limitUsd: body.data.limit_usd,
-        onBreach: body.data.on_breach,
+        onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
         timezone: body.data.timezone,
         actorUserId,
       });
@@ -1360,7 +1422,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
   describeRoute({
     summary: "Reset budget period",
     description:
-      "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on MANUAL windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
+      "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1673,7 +1735,7 @@ function toCacheRuleDto(r: GatewayCacheRule) {
       ttl?: number;
       salt?: string;
     },
-    mode_enum: r.modeEnum,
+    mode_enum: toWireEnum(r.modeEnum),
     archived_at: r.archivedAt?.toISOString() ?? null,
     created_at: r.createdAt.toISOString(),
     updated_at: r.updatedAt.toISOString(),
@@ -1705,12 +1767,12 @@ function toBudgetDto(b: GatewayBudgetWithSeats, memberCount?: number) {
   return {
     id: b.id,
     organization_id: b.organizationId,
-    scope_type: b.scopeType,
+    scope_type: toWireEnum(b.scopeType),
     scope_id: b.scopeId,
     name: b.name,
     description: b.description,
-    window: b.window,
-    on_breach: b.onBreach,
+    window: toWireEnum(b.window),
+    on_breach: toWireEnum(b.onBreach),
     limit_usd: b.limitUsd.toString(),
     spent_usd: b.spentUsd.toString(),
     timezone: b.timezone,
@@ -1732,19 +1794,19 @@ function scopeFromWire(
   scope: z.infer<typeof createBudgetSchema>["scope"],
 ): BudgetScope {
   switch (scope.kind) {
-    case "ORGANIZATION":
+    case "organization":
       return { kind: "ORGANIZATION", organizationId: scope.organization_id };
-    case "TEAM":
+    case "team":
       return { kind: "TEAM", teamId: scope.team_id };
-    case "PROJECT":
+    case "project":
       return { kind: "PROJECT", projectId: scope.project_id };
-    case "VIRTUAL_KEY":
+    case "virtual_key":
       return { kind: "VIRTUAL_KEY", virtualKeyId: scope.virtual_key_id };
-    case "PRINCIPAL":
+    case "principal":
       return { kind: "PRINCIPAL", principalUserId: scope.principal_user_id };
-    case "GROUP":
+    case "group":
       return { kind: "GROUP", groupId: scope.group_id };
-    case "ATTRIBUTED_USER":
+    case "attributed_user":
       return {
         kind: "ATTRIBUTED_USER",
         anchorVirtualKeyId: scope.anchor_virtual_key_id,

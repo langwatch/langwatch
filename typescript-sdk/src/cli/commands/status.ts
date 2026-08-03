@@ -108,7 +108,7 @@ export interface BudgetAtRisk {
   spentUsd: string;
   limitUsd: string;
   onBreach: string;
-  /** ATTRIBUTED_USER rows only: end users with spend this period, and how many
+  /** `attributed_user` rows only: end users with spend this period, and how many
    * of them are at or over the per-person cap. On those rows the standing is
    * this pair, not `spentUsd`. */
   endUsersSeen?: number;
@@ -282,7 +282,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   /**
    * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team,
    * project, virtual-key, principal, group, and per-person, with live ledger
-   * spend, so a virtual-key budget at 100% with `on_breach: BLOCK` is visible
+   * spend, so a virtual-key budget at 100% with `on_breach: block` is visible
    * here like any other. The one honesty signal is `spend_available`: when the
    * server could not total spend, the numbers are not real spend and the scan
    * must say so instead of ticking green.
@@ -304,12 +304,12 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
           unreadable.push(budget.name);
           return [];
         }
-        // ATTRIBUTED_USER rows: limit_usd is a per-person cap and spent_usd
+        // `attributed_user` rows: limit_usd is a per-person cap and spent_usd
         // totals the template's bare anchor, which no debit lands on. A
         // percentage of it is a confident zero about nobody. The standing is
         // a headcount: how many of the people seen this period are at or over
         // their own cap.
-        if (budget.scope_type === "ATTRIBUTED_USER") {
+        if (budget.scope_type === "attributed_user") {
           const seen = budget.end_users_seen ?? 0;
           const over = budget.end_users_over ?? 0;
           return [
@@ -326,12 +326,12 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             },
           ];
         }
-        // GROUP rows: limit_usd is the PER-MEMBER allowance while
+        // `group` rows: limit_usd is the PER-MEMBER allowance while
         // spent_usd sums the whole group, so the comparable ceiling is
         // limit x member_count. Without a member count (empty group) the
         // allowance covers nobody and any spend is over it.
         const effectiveLimit =
-          budget.scope_type === "GROUP"
+          budget.scope_type === "group"
             ? limit * (budget.member_count ?? 0)
             : limit;
         return [
@@ -341,7 +341,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             window: budget.window,
             // A limit of zero admits no spend at all: it is the maximally
             // breached state, not a 0%-utilized one. Scoring it 0 and dropping
-            // it below the threshold is how a BLOCK budget that rejects every
+            // it below the threshold is how a `block` budget that rejects every
             // single request turns into a green tick.
             utilizationPct:
               effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
@@ -369,7 +369,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
     return scored
       .filter((budget) =>
-        budget.scope === "ATTRIBUTED_USER"
+        budget.scope === "attributed_user"
           ? // One person refused is worth a look, and the share of seats over
             // cap is not a utilization to threshold on: 1 of 20 people blocked
             // reads as 5% and would never surface.
@@ -542,7 +542,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
           overCap !== undefined
             ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
             : `at ${budget.utilizationPct}%, $${budget.spentUsd} of $${budget.limitUsd}`;
-        const line = `    ⚠ budget "${budget.name}" (${budget.window.toLowerCase()}, ${budget.scope.toLowerCase()}) ${standing}${budget.onBreach === "BLOCK" ? ", blocks on breach" : ""}`;
+        const line = `    ⚠ budget "${budget.name}" (${budget.window}, ${budget.scope}) ${standing}${budget.onBreach === "block" ? ", blocks on breach" : ""}`;
         console.log(
           (breached ? chalk.red(line) : chalk.yellow(line)) +
             chalk.gray(`  →  langwatch gateway-budgets list`),

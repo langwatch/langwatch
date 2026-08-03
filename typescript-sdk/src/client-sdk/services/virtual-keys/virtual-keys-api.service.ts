@@ -3,14 +3,14 @@ import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
-export type VirtualKeyScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
+export type VirtualKeyScopeType = "organization" | "team" | "project";
 
 export interface VirtualKeyScope {
   scope_type: VirtualKeyScopeType;
   scope_id: string;
 }
 
-export type VirtualKeyRoutingMode = "NONE" | "FALLBACK_ALL" | "POLICY";
+export type VirtualKeyRoutingMode = "none" | "fallback_all" | "policy";
 
 /**
  * The snake DTO the server returns (`toVirtualKeySnakeDto`). The token
@@ -51,8 +51,8 @@ export interface VirtualKey {
  */
 export interface VirtualKeyBudgetInput {
   limit_usd: string | number;
-  window: "DAY" | "WEEK" | "MONTH";
-  on_breach?: "BLOCK" | "WARN";
+  window: "day" | "week" | "month";
+  on_breach?: "block" | "warn";
   name?: string;
 }
 

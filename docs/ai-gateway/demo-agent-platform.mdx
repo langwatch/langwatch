@@ -18,7 +18,7 @@ Point your coding agent at the repo as the canonical integration example for gat
 - **Billing**: meters fed exclusively by LangWatch's signed webhooks, with signature verification, dedup by envelope id, and settled-row supersession (replace, never sum). If the numbers on screen are right, the pipeline works end to end.
 - **Reconciliation**: checksum comparison against `spend-summaries`, cursor diff against `spend-events` on divergence.
 - **Breach UX**: the `402` meta's `budget_scope` drives two different messages, "your allowance ran out" versus "your workspace's budget ran out".
-- **Period close**: a reset button drives `POST /budgets/:id/reset` on the `MANUAL` windows; recorded spend never changes.
+- **Period close**: a reset button drives `POST /budgets/:id/reset` on the `manual` windows; recorded spend never changes.
 
 ## The app
 
@@ -30,9 +30,9 @@ One `POST` mints the virtual key and attaches three real budgets to it:
 
 | Budget | Scope | Window | Limit | On breach |
 |---|---|---|---|---|
-| Hard cap | `VIRTUAL_KEY` | `MANUAL` | $5.00 | `BLOCK` |
-| Soft cap | `VIRTUAL_KEY` | `MANUAL` | $2.50 | `WARN` |
-| Per-seat allowance | `ATTRIBUTED_USER` anchored to the key | `MONTH` | $1.00 | `BLOCK` |
+| Hard cap | `virtual_key` | `manual` | $5.00 | `block` |
+| Soft cap | `virtual_key` | `manual` | $2.50 | `warn` |
+| Per-seat allowance | `attributed_user` anchored to the key | `month` | $1.00 | `block` |
 
 The form then redirects into the dashboard with a success toast naming the caps it just created, so the customer sees the outcome instead of a spinner. A workspace name that is already taken comes back as a structured `409` carrying `code: "customer_exists"` and an offer to open the existing workspace, never a database error.
 
@@ -48,7 +48,7 @@ The app hosts its receiver in-process at `POST /webhooks/langwatch`. It verifies
 
 `/admin` is the SaaS owner's side of the same data: every customer with their virtual key, caps, spend and request counts, plus the actions a platform operator needs.
 
-- **Close billing period**, per customer, resets the `MANUAL`-window caps only. The `MONTH`-window seat allowance is left to roll over on its own, because closing the company's books does not hand every seat a fresh personal allowance, and recorded spend is never mutated.
+- **Close billing period**, per customer, resets the `manual`-window caps only. The `month`-window seat allowance is left to roll over on its own, because closing the company's books does not hand every seat a fresh personal allowance, and recorded spend is never mutated.
 - **Adjust caps**, per customer, calls the budgets update API. Raising a breached cap admits traffic again with the books intact.
 - **Webhook receiver health**: whether this app's endpoint is registered, and how many events it has ingested.
 - **A live feed of billing events**, signed deliveries as they arrive.

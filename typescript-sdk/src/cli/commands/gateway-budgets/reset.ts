@@ -44,7 +44,7 @@ export const resetGatewayBudgetCommand = async (
         );
         console.log(
           chalk.gray("Next reset:     ") +
-            (budget.window === "MANUAL" || budget.window === "TOTAL"
+            (budget.window === "manual" || budget.window === "total"
               ? chalk.gray("manual")
               : new Date(budget.resets_at).toLocaleString()),
         );

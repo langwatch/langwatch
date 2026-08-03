@@ -39,6 +39,7 @@ import {
   decodeSpendSummariesCursor,
   GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
@@ -190,8 +191,11 @@ async function applicableEndUserCaps(params: {
     return {
       budget_id: t.id,
       anchor_id: t.scopeId,
-      window: t.window,
-      on_breach: t.onBreach,
+      // Lowercase like every other enum under /api/gateway/v1. These two were
+      // passing Prisma's casing straight through, so the same prefix served
+      // `"MONTH"` here and `"month"` from the platform routes.
+      window: toWireEnum(t.window),
+      on_breach: toWireEnum(t.onBreach),
       limit_usd: t.limitUsd.toString(),
       spent_usd: spentByBudget.get(t.id) ?? "0",
       period_started_at: (

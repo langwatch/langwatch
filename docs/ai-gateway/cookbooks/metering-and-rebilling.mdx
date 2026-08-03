@@ -29,9 +29,9 @@ sequenceDiagram
     participant LW as LangWatch REST
     B->>LW: POST /api/gateway/v1/virtual-keys {name: "customer-acme"}
     LW-->>B: {virtual_key.id, secret}  secret shown once
-    B->>LW: POST /budgets {VIRTUAL_KEY, MANUAL, $500, BLOCK}
-    B->>LW: POST /budgets {VIRTUAL_KEY, MANUAL, $400, WARN}
-    B->>LW: POST /budgets {ATTRIBUTED_USER on the key, MONTH, $25, BLOCK}
+    B->>LW: POST /budgets {virtual_key, manual, $500, block}
+    B->>LW: POST /budgets {virtual_key, manual, $400, warn}
+    B->>LW: POST /budgets {attributed_user on the key, month, $25, block}
     B->>B: store key id + secret + budget ids on the customer
     Note over B,LW: end users need no provisioning: their buckets<br/>appear on first spend under the template
 ```
@@ -46,26 +46,26 @@ curl -sS $LW/api/gateway/v1/virtual-keys \
 # Hard cap: blocks at the limit
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "VIRTUAL_KEY", "virtual_key_id": "vk_..."},
-       "name": "acme hard cap", "window": "MANUAL", "limit_usd": "500", "on_breach": "BLOCK"}'
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+       "name": "acme hard cap", "window": "manual", "limit_usd": "500", "on_breach": "block"}'
 
 # Soft cap: warns without blocking (a second, lower budget)
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "VIRTUAL_KEY", "virtual_key_id": "vk_..."},
-       "name": "acme soft cap", "window": "MANUAL", "limit_usd": "400", "on_breach": "WARN"}'
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+       "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
 # Per-end-user allowance: ONE template covers every current and future end user
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "ATTRIBUTED_USER", "anchor_virtual_key_id": "vk_..."},
-       "name": "acme per-user cap", "window": "MONTH", "limit_usd": "25", "on_breach": "BLOCK"}'
+  -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."},
+       "name": "acme per-user cap", "window": "month", "limit_usd": "25", "on_breach": "block"}'
 ```
 
 Choices worth making deliberately:
 
-- **`MANUAL` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`MONTH`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
-- **The hard and soft caps are two budgets**, not one field: `BLOCK` at the real ceiling, `WARN` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
+- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
+- **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
 - **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
 
 ## 2. Register your webhook endpoint (once)
@@ -170,9 +170,9 @@ When a cap is hit, the request is rejected with `402` and machine-readable meta:
 }
 ```
 
-`budget_scope` is the branch your product copy needs: `attributed_user` means "your allowance ran out" (show the end user an upgrade path), `virtual_key` means "your organization's cap ran out" (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `WARN` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
+`budget_scope` is the branch your product copy needs: `attributed_user` means "your allowance ran out" (show the end user an upgrade path), `virtual_key` means "your organization's cap ran out" (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `warn` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
 
-At period close, reset the tenant's `MANUAL` budgets:
+At period close, reset the tenant's `manual` budgets:
 
 ```bash
 # Whole tenant: new period starts now
@@ -202,13 +202,13 @@ Requests on the key are rejected with the distinct `virtual_key_disabled` error 
 
 The pair every tenant dashboard wants, current spend against the cap:
 
-- Per tenant: `GET /api/gateway/v1/budgets?scope_type=VIRTUAL_KEY` returns each budget with live `spent_usd` and `limit_usd`.
+- Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key` returns each budget with live `spent_usd` and `limit_usd`.
 - Per end user: `GET /api/gateway/v1/end-users/:id/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
 
 ## Where to go deeper
 
 - [Billing & spend events](/ai-gateway/billing-events): every payload field, money rules, reconciliation, replay.
 - [Webhooks](/features/webhooks): signatures, retries, auto-disable, health, delivery controls.
-- [Budgets](/ai-gateway/budgets): scopes, windows including `MANUAL`, thresholds, the breach error catalog.
+- [Budgets](/ai-gateway/budgets): scopes, windows including `manual`, thresholds, the breach error catalog.
 - [Multi-tenant SaaS reseller pattern](/ai-gateway/cookbooks/multi-tenant-reseller): the provisioning-side cookbook this billing loop plugs into.
 - [The demo agent platform](/ai-gateway/demo-agent-platform): what the reference repo shows and how to run it.

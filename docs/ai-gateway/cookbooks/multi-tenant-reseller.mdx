@@ -79,8 +79,8 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
       // which is exactly where you want the customer's traces to land.
       budget: {
         limit_usd: planLimitUsd, // from your plans table
-        window: "MONTH",
-        on_breach: "BLOCK",      // or WARN for grace periods
+        window: "month",
+        on_breach: "block",      // or warn for grace periods
       },
       config: {
         modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
@@ -102,18 +102,18 @@ await fetch(`${LW}/budgets`, {
   method: "POST",
   headers,
   body: JSON.stringify({
-    scope: { kind: "ATTRIBUTED_USER", anchor_virtual_key_id: vkId },
+    scope: { kind: "attributed_user", anchor_virtual_key_id: vkId },
     name: `customer-${customerId} per-user cap`,
-    window: "MONTH",
+    window: "month",
     limit_usd: "25",
-    on_breach: "BLOCK",
+    on_breach: "block",
   }),
 });
 ```
 
 Requests then carry the end-user id in the OpenAI `user` field (or the `X-LangWatch-End-User-Id` header); see [Budgets → per-end-user budgets](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates).
 
-The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "POLICY"` if you run a custom ordering; otherwise leave routing at its default.
+The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "policy"` if you run a custom ordering; otherwise leave routing at its default.
 
 In a signup webhook:
 
@@ -136,7 +136,7 @@ export async function setCustomerPlan(vkId: string, planLimitUsd: string) {
   await fetch(`${LW}/virtual-keys/${vkId}`, {
     method: "PATCH",
     headers,
-    body: JSON.stringify({ budget: { limit_usd: planLimitUsd, window: "MONTH" } }),
+    body: JSON.stringify({ budget: { limit_usd: planLimitUsd, window: "month" } }),
   });
 }
 ```
@@ -196,7 +196,7 @@ Rating stays in your billing system: you define the markup over the gateway-repo
 
 ## Handling over-limit customers
 
-When `on_breach: BLOCK`, the gateway returns `402 budget_exceeded`. Your customer sees:
+When `on_breach: block`, the gateway returns `402 budget_exceeded`. Your customer sees:
 
 ```json
 {

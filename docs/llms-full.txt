@@ -2080,9 +2080,9 @@ Response:
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
       "trace_project_id": null,
-      "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
+      "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
-      "routing_mode": "NONE",
+      "routing_mode": "none",
       "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
       "revision": "3",
       "created_at": "2026-04-10T12:00:00Z",
@@ -2109,18 +2109,18 @@ Body (only `name` is required):
   "name": "ci-key",
   "description": "CI smoke tests",
   "principal_user_id": null,
-  "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
-  "routing_mode": "NONE",
+  "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
+  "routing_mode": "none",
   "routing_policy_id": null,
-  "budget": { "limit_usd": "25", "window": "MONTH", "on_breach": "BLOCK" },
+  "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
   "config": { "providersAllowed": ["mp_openai..."] }
 }
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
 - An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
-- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `DAY`, `WEEK`, `MONTH`.
-- `routing_mode` is one of `NONE` (default: no silent failover), `FALLBACK_ALL`, or `POLICY` (requires `routing_policy_id`).
+- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
+- `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 
 Response `201`:
 
@@ -2173,9 +2173,9 @@ Body (all fields optional):
 ```jsonc
 {
   "name": "new-name",
-  "scopes": [{ "scope_type": "TEAM", "scope_id": "team_..." }],
-  "routing_mode": "FALLBACK_ALL",
-  "budget": { "limit_usd": "50", "window": "MONTH" },
+  "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
+  "routing_mode": "fallback_all",
+  "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
@@ -2222,10 +2222,10 @@ Idempotent: revoking an already-revoked VK returns `200` with the same status. R
 
 ```
 GET /budgets
-GET /budgets?scope_type=VIRTUAL_KEY,PRINCIPAL
+GET /budgets?scope_type=virtual_key,principal
 ```
 
-Returns every non-archived budget in your organization across all seven scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`, `ATTRIBUTED_USER`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+Returns every non-archived budget in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
 
 Response:
 
@@ -2236,12 +2236,12 @@ Response:
     {
       "id": "bgt_01HZ...",
       "organization_id": "org_01HZ...",
-      "scope_type": "VIRTUAL_KEY",
+      "scope_type": "virtual_key",
       "scope_id": "vk_01HZX...",
       "name": "customer-acme cap",
       "description": null,
-      "window": "MONTH",
-      "on_breach": "BLOCK",
+      "window": "month",
+      "on_breach": "block",
       "limit_usd": "25",
       "spent_usd": "12.4531",
       "timezone": null,
@@ -2257,8 +2257,8 @@ Response:
 ```
 
 - `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` as real spend in that case.
-- `GROUP` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
-- `ATTRIBUTED_USER` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
+- `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
+- `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
 - `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
 
 ### Create
@@ -2272,24 +2272,24 @@ Body:
 ```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP, ATTRIBUTED_USER
+    "kind": "project",         // or organization, team, virtual_key, principal, group, attributed_user
     "project_id": "proj_..."   // the id field depends on scope.kind:
                                // organization_id | team_id | project_id |
                                // virtual_key_id | principal_user_id | group_id;
-                               // ATTRIBUTED_USER takes exactly one of
+                               // attributed_user takes exactly one of
                                // anchor_virtual_key_id | anchor_project_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
-  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL | MANUAL
+  "window": "month",           // minute | hour | day | week | month | total | manual
   "limit_usd": 5000,           // or "5000.00"
-  "on_breach": "BLOCK",        // or WARN
+  "on_breach": "block",        // or warn
   "timezone": "Europe/Amsterdam",
   "provider_key": null         // optional ModelProvider id to pin the budget to one provider
 }
 ```
 
-`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `ATTRIBUTED_USER` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `MANUAL` windows accrue until an explicit [reset](#reset-period). See [Budgets](/ai-gateway/budgets) for semantics.
+`group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period). See [Budgets](/ai-gateway/budgets) for semantics.
 
 ### Update
 
@@ -2306,7 +2306,7 @@ POST /budgets/:id/reset
 POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
 ```
 
-Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `MANUAL` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
 
 ### End-user spend
 
@@ -2348,7 +2348,7 @@ Requires `gatewayCacheRules:view`. Returns rules sorted priority DESC, excluding
       "enabled": true,
       "matchers": { "vk_tags": ["tier=enterprise"] },
       "action": { "mode": "force", "ttl": 600 },
-      "mode_enum": "FORCE",
+      "mode_enum": "force",
       "archived_at": null,
       "created_at": "2026-04-19T09:00:00Z",
       "updated_at": "2026-04-19T09:00:00Z"
@@ -2357,7 +2357,7 @@ Requires `gatewayCacheRules:view`. Returns rules sorted priority DESC, excluding
 }
 ```
 
-`mode_enum` is echoed in upper case alongside the lower-case `action.mode` so Prometheus, dashboards can filter by it without parsing the JSON action.
+`mode_enum` is echoed as a top-level field alongside `action.mode` so Prometheus, dashboards can filter by it without parsing the JSON action.
 
 ### Get
 
@@ -3009,8 +3009,8 @@ One call answers both halves of the question: what this user consumed over a win
       {
         "budget_id": "bgt_01H...",
         "anchor_id": "vk_01H...",
-        "window": "MONTH",
-        "on_breach": "BLOCK",
+        "window": "month",
+        "on_breach": "block",
         "limit_usd": "25",
         "spent_usd": "0.412209",
         "period_started_at": "2026-07-01T00:00:00.000Z"
@@ -5622,9 +5622,9 @@ sequenceDiagram
     participant LW as LangWatch REST
     B->>LW: POST /api/gateway/v1/virtual-keys {name: "customer-acme"}
     LW-->>B: {virtual_key.id, secret}  secret shown once
-    B->>LW: POST /budgets {VIRTUAL_KEY, MANUAL, $500, BLOCK}
-    B->>LW: POST /budgets {VIRTUAL_KEY, MANUAL, $400, WARN}
-    B->>LW: POST /budgets {ATTRIBUTED_USER on the key, MONTH, $25, BLOCK}
+    B->>LW: POST /budgets {virtual_key, manual, $500, block}
+    B->>LW: POST /budgets {virtual_key, manual, $400, warn}
+    B->>LW: POST /budgets {attributed_user on the key, month, $25, block}
     B->>B: store key id + secret + budget ids on the customer
     Note over B,LW: end users need no provisioning: their buckets<br/>appear on first spend under the template
 ```
@@ -5639,26 +5639,26 @@ curl -sS $LW/api/gateway/v1/virtual-keys \
 # Hard cap: blocks at the limit
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "VIRTUAL_KEY", "virtual_key_id": "vk_..."},
-       "name": "acme hard cap", "window": "MANUAL", "limit_usd": "500", "on_breach": "BLOCK"}'
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+       "name": "acme hard cap", "window": "manual", "limit_usd": "500", "on_breach": "block"}'
 
 # Soft cap: warns without blocking (a second, lower budget)
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "VIRTUAL_KEY", "virtual_key_id": "vk_..."},
-       "name": "acme soft cap", "window": "MANUAL", "limit_usd": "400", "on_breach": "WARN"}'
+  -d '{"scope": {"kind": "virtual_key", "virtual_key_id": "vk_..."},
+       "name": "acme soft cap", "window": "manual", "limit_usd": "400", "on_breach": "warn"}'
 
 # Per-end-user allowance: ONE template covers every current and future end user
 curl -sS $LW/api/gateway/v1/budgets \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" -H "Content-Type: application/json" \
-  -d '{"scope": {"kind": "ATTRIBUTED_USER", "anchor_virtual_key_id": "vk_..."},
-       "name": "acme per-user cap", "window": "MONTH", "limit_usd": "25", "on_breach": "BLOCK"}'
+  -d '{"scope": {"kind": "attributed_user", "anchor_virtual_key_id": "vk_..."},
+       "name": "acme per-user cap", "window": "month", "limit_usd": "25", "on_breach": "block"}'
 ```
 
 Choices worth making deliberately:
 
-- **`MANUAL` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`MONTH`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
-- **The hard and soft caps are two budgets**, not one field: `BLOCK` at the real ceiling, `WARN` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
+- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
+- **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
 - **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
 
 ## 2. Register your webhook endpoint (once)
@@ -5763,9 +5763,9 @@ When a cap is hit, the request is rejected with `402` and machine-readable meta:
 }
 ```
 
-`budget_scope` is the branch your product copy needs: `attributed_user` means "your allowance ran out" (show the end user an upgrade path), `virtual_key` means "your organization's cap ran out" (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `WARN` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
+`budget_scope` is the branch your product copy needs: `attributed_user` means "your allowance ran out" (show the end user an upgrade path), `virtual_key` means "your organization's cap ran out" (route to the tenant admin). The same moment emits `gateway.budget.breached` to your endpoint, so your backend learns about it without polling. On `warn` budgets the request still passes and the response carries the `X-LangWatch-Budget-Warning` header instead.
 
-At period close, reset the tenant's `MANUAL` budgets:
+At period close, reset the tenant's `manual` budgets:
 
 ```bash
 # Whole tenant: new period starts now
@@ -5795,14 +5795,14 @@ Requests on the key are rejected with the distinct `virtual_key_disabled` error 
 
 The pair every tenant dashboard wants, current spend against the cap:
 
-- Per tenant: `GET /api/gateway/v1/budgets?scope_type=VIRTUAL_KEY` returns each budget with live `spent_usd` and `limit_usd`.
+- Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key` returns each budget with live `spent_usd` and `limit_usd`.
 - Per end user: `GET /api/gateway/v1/end-users/:id/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
 
 ## Where to go deeper
 
 - [Billing & spend events](/ai-gateway/billing-events): every payload field, money rules, reconciliation, replay.
 - [Webhooks](/features/webhooks): signatures, retries, auto-disable, health, delivery controls.
-- [Budgets](/ai-gateway/budgets): scopes, windows including `MANUAL`, thresholds, the breach error catalog.
+- [Budgets](/ai-gateway/budgets): scopes, windows including `manual`, thresholds, the breach error catalog.
 - [Multi-tenant SaaS reseller pattern](/ai-gateway/cookbooks/multi-tenant-reseller): the provisioning-side cookbook this billing loop plugs into.
 - [The demo agent platform](/ai-gateway/demo-agent-platform): what the reference repo shows and how to run it.
 
@@ -6247,8 +6247,8 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
       // which is exactly where you want the customer's traces to land.
       budget: {
         limit_usd: planLimitUsd, // from your plans table
-        window: "MONTH",
-        on_breach: "BLOCK",      // or WARN for grace periods
+        window: "month",
+        on_breach: "block",      // or warn for grace periods
       },
       config: {
         modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
@@ -6270,18 +6270,18 @@ await fetch(`${LW}/budgets`, {
   method: "POST",
   headers,
   body: JSON.stringify({
-    scope: { kind: "ATTRIBUTED_USER", anchor_virtual_key_id: vkId },
+    scope: { kind: "attributed_user", anchor_virtual_key_id: vkId },
     name: `customer-${customerId} per-user cap`,
-    window: "MONTH",
+    window: "month",
     limit_usd: "25",
-    on_breach: "BLOCK",
+    on_breach: "block",
   }),
 });
 ```
 
 Requests then carry the end-user id in the OpenAI `user` field (or the `X-LangWatch-End-User-Id` header); see [Budgets → per-end-user budgets](/ai-gateway/budgets#per-end-user-budgets-attributed-user-templates).
 
-The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "POLICY"` if you run a custom ordering; otherwise leave routing at its default.
+The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "policy"` if you run a custom ordering; otherwise leave routing at its default.
 
 In a signup webhook:
 
@@ -6304,7 +6304,7 @@ export async function setCustomerPlan(vkId: string, planLimitUsd: string) {
   await fetch(`${LW}/virtual-keys/${vkId}`, {
     method: "PATCH",
     headers,
-    body: JSON.stringify({ budget: { limit_usd: planLimitUsd, window: "MONTH" } }),
+    body: JSON.stringify({ budget: { limit_usd: planLimitUsd, window: "month" } }),
   });
 }
 ```
@@ -6364,7 +6364,7 @@ Rating stays in your billing system: you define the markup over the gateway-repo
 
 ## Handling over-limit customers
 
-When `on_breach: BLOCK`, the gateway returns `402 budget_exceeded`. Your customer sees:
+When `on_breach: block`, the gateway returns `402 budget_exceeded`. Your customer sees:
 
 ```json
 {
@@ -7038,7 +7038,7 @@ Point your coding agent at the repo as the canonical integration example for gat
 - **Billing**: meters fed exclusively by LangWatch's signed webhooks, with signature verification, dedup by envelope id, and settled-row supersession (replace, never sum). If the numbers on screen are right, the pipeline works end to end.
 - **Reconciliation**: checksum comparison against `spend-summaries`, cursor diff against `spend-events` on divergence.
 - **Breach UX**: the `402` meta's `budget_scope` drives two different messages, "your allowance ran out" versus "your workspace's budget ran out".
-- **Period close**: a reset button drives `POST /budgets/:id/reset` on the `MANUAL` windows; recorded spend never changes.
+- **Period close**: a reset button drives `POST /budgets/:id/reset` on the `manual` windows; recorded spend never changes.
 
 ## The app
 
@@ -7050,9 +7050,9 @@ One `POST` mints the virtual key and attaches three real budgets to it:
 
 | Budget | Scope | Window | Limit | On breach |
 |---|---|---|---|---|
-| Hard cap | `VIRTUAL_KEY` | `MANUAL` | $5.00 | `BLOCK` |
-| Soft cap | `VIRTUAL_KEY` | `MANUAL` | $2.50 | `WARN` |
-| Per-seat allowance | `ATTRIBUTED_USER` anchored to the key | `MONTH` | $1.00 | `BLOCK` |
+| Hard cap | `virtual_key` | `manual` | $5.00 | `block` |
+| Soft cap | `virtual_key` | `manual` | $2.50 | `warn` |
+| Per-seat allowance | `attributed_user` anchored to the key | `month` | $1.00 | `block` |
 
 The form then redirects into the dashboard with a success toast naming the caps it just created, so the customer sees the outcome instead of a spinner. A workspace name that is already taken comes back as a structured `409` carrying `code: "customer_exists"` and an offer to open the existing workspace, never a database error.
 
@@ -7068,7 +7068,7 @@ The app hosts its receiver in-process at `POST /webhooks/langwatch`. It verifies
 
 `/admin` is the SaaS owner's side of the same data: every customer with their virtual key, caps, spend and request counts, plus the actions a platform operator needs.
 
-- **Close billing period**, per customer, resets the `MANUAL`-window caps only. The `MONTH`-window seat allowance is left to roll over on its own, because closing the company's books does not hand every seat a fresh personal allowance, and recorded spend is never mutated.
+- **Close billing period**, per customer, resets the `manual`-window caps only. The `month`-window seat allowance is left to roll over on its own, because closing the company's books does not hand every seat a fresh personal allowance, and recorded spend is never mutated.
 - **Adjust caps**, per customer, calls the budgets update API. Raising a breached cap admits traffic again with the books intact.
 - **Webhook receiver health**: whether this app's endpoint is registered, and how many events it has ingested.
 - **A live feed of billing events**, signed deliveries as they arrive.

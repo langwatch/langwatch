@@ -1,6 +1,6 @@
 """
 API facade for gateway provisioning: virtual keys (the tenant boundary)
-and gateway budgets, including the attributed-user templates, the MANUAL
+and gateway budgets, including the attributed-user templates, the ``manual``
 window, period resets, and reversible key disable and enable.
 
 These routes live on the project-scoped provisioning surface: an
@@ -137,13 +137,13 @@ class GatewayAdminFacade:
         name: str,
         window: str,
         limit_usd: str,
-        on_breach: str = "BLOCK",
+        on_breach: str = "block",
         **fields: Any,
     ) -> Dict[str, Any]:
         """Create a budget. ``scope`` is the discriminated target, e.g.
-        {"kind": "VIRTUAL_KEY", "virtual_key_id": vk} or the per-end-user
-        template {"kind": "ATTRIBUTED_USER", "anchor_virtual_key_id": vk}.
-        MANUAL windows accrue until an explicit reset."""
+        {"kind": "virtual_key", "virtual_key_id": vk} or the per-end-user
+        template {"kind": "attributed_user", "anchor_virtual_key_id": vk}.
+        ``manual`` windows accrue until an explicit reset."""
         body = {
             "scope": scope,
             "name": name,

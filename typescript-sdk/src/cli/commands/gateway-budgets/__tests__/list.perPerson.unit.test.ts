@@ -33,12 +33,12 @@ function budget(overrides: Record<string, unknown> = {}) {
   return {
     id: "bdg_template",
     organization_id: "org_1",
-    scope_type: "ATTRIBUTED_USER",
+    scope_type: "attributed_user",
     scope_id: "vk_anchor_0123456789",
     name: "Per-seat cap",
     description: null,
-    window: "MONTH",
-    on_breach: "BLOCK",
+    window: "month",
+    on_breach: "block",
     limit_usd: "1.00",
     spent_usd: "0",
     timezone: null,
@@ -107,7 +107,7 @@ describe("gateway-budgets list rendering a per-person template", () => {
   it("keeps every other scope on the spend percentage", async () => {
     const table = await renderedTable([
       budget({
-        scope_type: "PROJECT",
+        scope_type: "project",
         limit_usd: "100.00",
         spent_usd: "25.00",
         end_users_seen: undefined,

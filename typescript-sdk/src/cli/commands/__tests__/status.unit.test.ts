@@ -64,12 +64,12 @@ const noExperiments = {
 const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "bud_1",
   organization_id: "org_1",
-  scope_type: "PROJECT",
+  scope_type: "project",
   scope_id: "proj_1",
   name: "prod",
   description: null,
-  window: "MONTH",
-  on_breach: "BLOCK",
+  window: "month",
+  on_breach: "block",
   limit_usd: "100",
   spent_usd: "92",
   timezone: null,
@@ -590,12 +590,12 @@ describe("statusCommand", () => {
       });
     });
 
-    describe("when a BLOCK budget has a zero limit", () => {
+    describe("when a block budget has a zero limit", () => {
       it("reports the zero-limit budget as fully breached", async () => {
         mockAllSuccess();
         // A limit of 0 admits no spend at all: maximally breached, not 0%.
         global.fetch = mockGatewayFetch({
-          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "BLOCK" })],
+          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" })],
         });
 
         await statusCommand();
@@ -627,12 +627,12 @@ describe("statusCommand", () => {
     describe("when budgets live on the once-invisible scope dimensions", () => {
       it("scores a virtual-key-scoped budget like any other", async () => {
         mockAllSuccess();
-        // Before #6261 the REST list hid VIRTUAL_KEY/PRINCIPAL scopes, so a
-        // VK budget at 92% BLOCK was structurally invisible here. Now it is
+        // Before #6261 the REST list hid virtual_key/principal scopes, so a
+        // VK budget at 92% block was structurally invisible here. Now it is
         // a row like any other and must gate the tick.
         global.fetch = mockGatewayFetch({
           budgets: [
-            budgetFixture({ scope_type: "VIRTUAL_KEY", scope_id: "vk_1" }),
+            budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" }),
           ],
         });
 
@@ -646,12 +646,12 @@ describe("statusCommand", () => {
 
       it("compares group spend against the per-member allowance times members", async () => {
         mockAllSuccess();
-        // GROUP rows: limit_usd is per member, spent_usd sums the group.
+        // `group` rows: limit_usd is per member, spent_usd sums the group.
         // $10/member x 2 members with $19 spent is 95%, not 190%.
         global.fetch = mockGatewayFetch({
           budgets: [
             budgetFixture({
-              scope_type: "GROUP",
+              scope_type: "group",
               scope_id: "grp_1",
               limit_usd: "10",
               spent_usd: "19",
@@ -670,7 +670,7 @@ describe("statusCommand", () => {
 
       it("reads a per-person template as a headcount, not as its anchor's total", async () => {
         mockAllSuccess();
-        // ATTRIBUTED_USER rows cap each end user separately. The template's
+        // `attributed_user` rows cap each end user separately. The template's
         // own spent_usd totals a bare anchor no debit lands on, so scoring it
         // like any other scope printed a confident 0% while three people were
         // being refused.
@@ -678,7 +678,7 @@ describe("statusCommand", () => {
           budgets: [
             budgetFixture({
               name: "seat cap",
-              scope_type: "ATTRIBUTED_USER",
+              scope_type: "attributed_user",
               scope_id: "vk_anchor",
               limit_usd: "1.00",
               spent_usd: "0",
@@ -706,7 +706,7 @@ describe("statusCommand", () => {
           budgets: [
             budgetFixture({
               name: "seat cap",
-              scope_type: "ATTRIBUTED_USER",
+              scope_type: "attributed_user",
               limit_usd: "1.00",
               spent_usd: "0",
               end_users_seen: 10,
@@ -728,7 +728,7 @@ describe("statusCommand", () => {
           budgets: [
             budgetFixture({
               name: "seat cap",
-              scope_type: "ATTRIBUTED_USER",
+              scope_type: "attributed_user",
               limit_usd: "1.00",
               spent_usd: "0",
               end_users_seen: 10,
@@ -742,7 +742,7 @@ describe("statusCommand", () => {
         const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
         expect(doc.attention.budgetsAtRisk).toHaveLength(1);
         expect(doc.attention.budgetsAtRisk[0]).toMatchObject({
-          scope: "ATTRIBUTED_USER",
+          scope: "attributed_user",
           endUsersSeen: 10,
           endUsersOver: 3,
         });

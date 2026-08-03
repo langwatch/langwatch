@@ -14,13 +14,13 @@ export interface ListGatewayBudgetsOptions {
 }
 
 const SCOPE_KINDS: BudgetScopeKind[] = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-  "VIRTUAL_KEY",
-  "PRINCIPAL",
-  "GROUP",
-  "ATTRIBUTED_USER",
+  "organization",
+  "team",
+  "project",
+  "virtual_key",
+  "principal",
+  "group",
+  "attributed_user",
 ];
 
 /**
@@ -37,16 +37,18 @@ export const listGatewayBudgetsCommand = async (
 
   let scopeTypes: BudgetScopeKind[] | undefined;
   if (options.scopeType) {
+    // The flag stays case-insensitive and accepts dashes for the human
+    // typing it; the query param is always lowercase snake_case.
     const requested = options.scopeType
       .split(",")
-      .map((s) => s.trim().toUpperCase().replace(/-/g, "_"));
+      .map((s) => s.trim().toLowerCase().replace(/-/g, "_"));
     const invalid = requested.filter(
       (s) => !(SCOPE_KINDS as readonly string[]).includes(s),
     );
     if (invalid.length > 0) {
       console.error(
         chalk.red(
-          `Error: --scope-type must be a comma-separated subset of ${SCOPE_KINDS.map((s) => s.toLowerCase()).join(", ")}`,
+          `Error: --scope-type must be a comma-separated subset of ${SCOPE_KINDS.join(", ")}`,
         ),
       );
       process.exit(1);
@@ -80,13 +82,13 @@ export const listGatewayBudgetsCommand = async (
         const tableData = budgets.map((b) => {
           const limit = Number.parseFloat(b.limit_usd);
           const spent = Number.parseFloat(b.spent_usd);
-          // GROUP rows: limit is the PER-MEMBER allowance while spent sums
+          // `group` rows: limit is the PER-MEMBER allowance while spent sums
           // the whole group, so utilization compares against limit x members.
-          const isGroup = b.scope_type === "GROUP";
-          // ATTRIBUTED_USER rows: the limit belongs to each end user
+          const isGroup = b.scope_type === "group";
+          // `attributed_user` rows: the limit belongs to each end user
           // separately, so there is no total to be a percentage of. The
           // standing is a headcount of who has passed their own cap.
-          const isPerPerson = b.scope_type === "ATTRIBUTED_USER";
+          const isPerPerson = b.scope_type === "attributed_user";
           const seatsSeen = b.end_users_seen ?? 0;
           const seatsOver = b.end_users_over ?? 0;
           const effectiveLimit = isGroup ? limit * (b.member_count ?? 0) : limit;
@@ -106,9 +108,9 @@ export const listGatewayBudgetsCommand = async (
           return {
             ID: b.id,
             Name: b.name,
-            Scope: `${b.scope_type.toLowerCase()}:${b.scope_id.slice(0, 10)}...`,
-            Window: b.window.toLowerCase(),
-            Breach: b.on_breach === "BLOCK" ? chalk.red("block") : chalk.yellow("warn"),
+            Scope: `${b.scope_type}:${b.scope_id.slice(0, 10)}...`,
+            Window: b.window,
+            Breach: b.on_breach === "block" ? chalk.red("block") : chalk.yellow("warn"),
             Limit: isGroup
               ? `$${limit.toFixed(2)}/member x${b.member_count ?? 0}`
               : isPerPerson

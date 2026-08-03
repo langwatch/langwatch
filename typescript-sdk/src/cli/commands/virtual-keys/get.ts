@@ -42,7 +42,7 @@ export const getVirtualKeyCommand = async (
         if (vk.trace_project_id) {
           console.log(`${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}`);
         }
-        console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode.toLowerCase()}`);
+        console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode}`);
         console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);
         console.log(`${chalk.bold("Created:")}      ${new Date(vk.created_at).toLocaleString()}`);
         if (vk.last_used_at) {

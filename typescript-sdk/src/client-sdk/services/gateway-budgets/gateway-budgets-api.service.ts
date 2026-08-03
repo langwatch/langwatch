@@ -4,16 +4,16 @@ import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export type BudgetScopeKind =
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "VIRTUAL_KEY"
-  | "PRINCIPAL"
-  | "GROUP"
-  | "ATTRIBUTED_USER";
+  | "organization"
+  | "team"
+  | "project"
+  | "virtual_key"
+  | "principal"
+  | "group"
+  | "attributed_user";
 
-export type BudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
-export type BudgetOnBreach = "BLOCK" | "WARN";
+export type BudgetWindow = "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
+export type BudgetOnBreach = "block" | "warn";
 
 export interface GatewayBudget {
   id: string;
@@ -25,9 +25,9 @@ export interface GatewayBudget {
   window: BudgetWindow;
   on_breach: BudgetOnBreach;
   /**
-   * For GROUP rows this is the PER-MEMBER allowance, not a group total;
+   * For `group` rows this is the PER-MEMBER allowance, not a group total;
    * `spent_usd` sums the whole group and `member_count` says how many
-   * members the allowance currently covers. For ATTRIBUTED_USER rows it is
+   * members the allowance currently covers. For `attributed_user` rows it is
    * the PER-PERSON cap, and `end_users_seen` / `end_users_over` carry the
    * standing instead of `spent_usd`.
    */
@@ -41,11 +41,11 @@ export interface GatewayBudget {
   last_reset_at: string | null;
   archived_at: string | null;
   created_at: string;
-  /** GROUP rows only. */
+  /** `group` rows only. */
   member_count?: number;
-  /** ATTRIBUTED_USER rows only: end users with spend this period. */
+  /** `attributed_user` rows only: end users with spend this period. */
   end_users_seen?: number;
-  /** ATTRIBUTED_USER rows only: how many of those are at or over the cap. */
+  /** `attributed_user` rows only: how many of those are at or over the cap. */
   end_users_over?: number;
 }
 
@@ -59,16 +59,16 @@ export interface GatewayBudgetList {
 }
 
 export type CreateGatewayBudgetScope =
-  | { kind: "ORGANIZATION"; organization_id: string }
-  | { kind: "TEAM"; team_id: string }
-  | { kind: "PROJECT"; project_id: string }
-  | { kind: "VIRTUAL_KEY"; virtual_key_id: string }
-  | { kind: "PRINCIPAL"; principal_user_id: string }
-  | { kind: "GROUP"; group_id: string }
+  | { kind: "organization"; organization_id: string }
+  | { kind: "team"; team_id: string }
+  | { kind: "project"; project_id: string }
+  | { kind: "virtual_key"; virtual_key_id: string }
+  | { kind: "principal"; principal_user_id: string }
+  | { kind: "group"; group_id: string }
   // Template: each distinct external end user on the anchor gets the
   // budget's limit per window. Exactly one anchor id.
   | {
-      kind: "ATTRIBUTED_USER";
+      kind: "attributed_user";
       anchor_virtual_key_id?: string;
       anchor_project_id?: string;
     };

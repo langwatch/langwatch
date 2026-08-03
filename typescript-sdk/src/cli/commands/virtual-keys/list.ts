@@ -43,7 +43,7 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
           Status: vk.status === "active" ? chalk.green("active") : chalk.red("revoked"),
           Prefix: `${vk.display_prefix}...`,
           Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
-          Routing: vk.routing_mode.toLowerCase(),
+          Routing: vk.routing_mode,
           Purpose: vk.purpose === "langy" ? chalk.magenta("langy") : "user",
           "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
         }));

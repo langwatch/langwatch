@@ -111,7 +111,7 @@ export interface EndUserCap {
   budget_id: string;
   anchor_id: string;
   window: string;
-  on_breach: "BLOCK" | "WARN";
+  on_breach: "block" | "warn";
   limit_usd: string;
   spent_usd: string;
   period_started_at: string;

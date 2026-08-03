@@ -540,9 +540,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(body.secret).toMatch(/^vk-lw-/);
       expect(body.virtual_key.name).toBe(`sdk-min-${suffix}`);
       expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "PROJECT", scope_id: PROJECT_ID },
+        { scope_type: "project", scope_id: PROJECT_ID },
       ]);
-      expect(body.virtual_key.routing_mode).toBe("NONE");
+      expect(body.virtual_key.routing_mode).toBe("none");
       expect(body.virtual_key.purpose).toBe("user");
       expect(body.virtual_key.status).toBe("active");
       // The ghost of the deleted GatewayProviderCredential entity must be
@@ -575,12 +575,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("accepts explicit scopes, config, and routing_mode", async () => {
       const { status, body } = await createVk({
         name: `explicit-${suffix}`,
-        scopes: [{ scope_type: "PROJECT", scope_id: PROJECT_ID }],
-        routing_mode: "FALLBACK_ALL",
+        scopes: [{ scope_type: "project", scope_id: PROJECT_ID }],
+        routing_mode: "fallback_all",
         config: { modelsAllowed: ["gpt-5-mini"] },
       });
       expect(status).toBe(201);
-      expect(body.virtual_key.routing_mode).toBe("FALLBACK_ALL");
+      expect(body.virtual_key.routing_mode).toBe("fallback_all");
       expect(body.virtual_key.config.modelsAllowed).toEqual(["gpt-5-mini"]);
     });
 
@@ -588,7 +588,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses org-scoped creation for a legacy project key", async () => {
       const { status, body } = await createVk({
         name: `legacy-org-${suffix}`,
-        scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }],
+        scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
       });
       expect(status).toBe(403);
       expect(body.error.type).toBe("permission_denied");
@@ -600,13 +600,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `org-scoped-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
         },
         apiKeyAuth(adminToken),
       );
       expect(status).toBe(201);
       expect(body.virtual_key.scopes).toEqual([
-        { scope_type: "ORGANIZATION", scope_id: ORG_ID },
+        { scope_type: "organization", scope_id: ORG_ID },
       ]);
     });
 
@@ -629,7 +629,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `nogov-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: NOGOV_ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: NOGOV_ORG_ID }],
         },
         apiKeyAuth(nogovAdminToken, NOGOV_PROJECT_ID),
       );
@@ -644,7 +644,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `nogov-explicit-${suffix}`,
-          scopes: [{ scope_type: "ORGANIZATION", scope_id: NOGOV_ORG_ID }],
+          scopes: [{ scope_type: "organization", scope_id: NOGOV_ORG_ID }],
           trace_project_id: NOGOV_PROJECT_ID,
         },
         apiKeyAuth(nogovAdminToken, NOGOV_PROJECT_ID),
@@ -670,7 +670,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const { status, body } = await createVk(
         {
           name: `cross-org-${suffix}`,
-          scopes: [{ scope_type: "PROJECT", scope_id: FOREIGN_PROJECT_ID }],
+          scopes: [{ scope_type: "project", scope_id: FOREIGN_PROJECT_ID }],
         },
         apiKeyAuth(adminToken),
       );
@@ -686,7 +686,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses POLICY routing without a policy id", async () => {
       const { status, body } = await createVk({
         name: `policy-less-${suffix}`,
-        routing_mode: "POLICY",
+        routing_mode: "policy",
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("routing_policy_required");
@@ -706,7 +706,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("creates the key's own budget alongside it", async () => {
       const { status, body } = await createVk({
         name: `capped-${suffix}`,
-        budget: { limit_usd: "12.50", window: "MONTH" },
+        budget: { limit_usd: "12.50", window: "month" },
       });
       expect(status).toBe(201);
       const budget = await prisma.gatewayBudget.findFirst({
@@ -726,7 +726,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("refuses a malformed budget via the same schema tRPC uses", async () => {
       const { status, body } = await createVk({
         name: `bad-cap-${suffix}`,
-        budget: { limit_usd: "10abs", window: "MONTH" },
+        budget: { limit_usd: "10abs", window: "month" },
       });
       expect(status).toBe(400);
       expect(body.error.code).toBe("validation_error");
@@ -800,7 +800,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         `/api/gateway/v1/virtual-keys/${created.body.virtual_key.id}`,
         {
           name: `updated-${suffix}`,
-          budget: { limit_usd: "3", window: "DAY" },
+          budget: { limit_usd: "3", window: "day" },
         },
         legacyAuth(),
       );
@@ -824,7 +824,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const created = await createVk({ name: `rescope-${suffix}` });
       const res = await patch(
         `/api/gateway/v1/virtual-keys/${created.body.virtual_key.id}`,
-        { scopes: [{ scope_type: "ORGANIZATION", scope_id: ORG_ID }] },
+        { scopes: [{ scope_type: "organization", scope_id: ORG_ID }] },
         legacyAuth(),
       );
       expect(res.status).toBe(403);
@@ -848,7 +848,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("revokes idempotently and retires the key's budget", async () => {
       const created = await createVk({
         name: `revocable-${suffix}`,
-        budget: { limit_usd: "5", window: "MONTH" },
+        budget: { limit_usd: "5", window: "month" },
       });
       const id = created.body.virtual_key.id;
       const first = await post(
@@ -917,25 +917,25 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         "/api/gateway/v1/budgets",
         {
           scope: {
-            kind: "VIRTUAL_KEY",
+            kind: "virtual_key",
             virtual_key_id: vk.body.virtual_key.id,
           },
           name: `vk-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 25,
         },
         legacyAuth(),
       );
       expect(createRes.status).toBe(201);
       const created = await createRes.json();
-      expect(created.budget.scope_type).toBe("VIRTUAL_KEY");
+      expect(created.budget.scope_type).toBe("virtual_key");
 
       const principalRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PRINCIPAL", principal_user_id: MEMBER_USER_ID },
+          scope: { kind: "principal", principal_user_id: MEMBER_USER_ID },
           name: `principal-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 10,
         },
         legacyAuth(),
@@ -953,26 +953,26 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const scopeTypes = new Set(
         listBody.data.map((b: any) => b.scope_type as string),
       );
-      expect(scopeTypes.has("VIRTUAL_KEY")).toBe(true);
-      expect(scopeTypes.has("PRINCIPAL")).toBe(true);
+      expect(scopeTypes.has("virtual_key")).toBe(true);
+      expect(scopeTypes.has("principal")).toBe(true);
 
       const filtered = await app.request(
-        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        "/api/gateway/v1/budgets?scope_type=virtual_key",
         { headers: legacyAuth() },
       );
       const filteredBody = await filtered.json();
       expect(filteredBody.data.length).toBeGreaterThan(0);
       expect(
-        filteredBody.data.every((b: any) => b.scope_type === "VIRTUAL_KEY"),
+        filteredBody.data.every((b: any) => b.scope_type === "virtual_key"),
       ).toBe(true);
 
       const excluded = await app.request(
-        "/api/gateway/v1/budgets?scope_type=ORGANIZATION,TEAM",
+        "/api/gateway/v1/budgets?scope_type=organization,team",
         { headers: legacyAuth() },
       );
       const excludedBody = await excluded.json();
       expect(
-        excludedBody.data.some((b: any) => b.scope_type === "VIRTUAL_KEY"),
+        excludedBody.data.some((b: any) => b.scope_type === "virtual_key"),
       ).toBe(false);
     });
 
@@ -985,14 +985,66 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(res.status).toBe(400);
     });
 
+    /** @scenario The wire enums are lowercase only, with no casing tolerance */
+    it("refuses the stored casing of an enum on input", async () => {
+      // The surface used to accept `scope_type=Group` on this filter (it
+      // uppercased whatever arrived) while the create body's `kind` refused
+      // the same spelling. One casing, both directions, no tolerance.
+      const filter = await app.request(
+        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        { headers: legacyAuth() },
+      );
+      expect(filter.status).toBe(400);
+
+      const create = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          name: `stored-casing-${suffix}`,
+          window: "MONTH",
+          limit_usd: 5,
+        },
+        legacyAuth(),
+      );
+      expect(create.status).toBe(400);
+
+      const vk = await createVk({
+        name: `stored-casing-vk-${suffix}`,
+        scopes: [{ scope_type: "PROJECT", scope_id: PROJECT_ID }],
+      });
+      expect(vk.status).toBe(400);
+    });
+
+    /** @scenario Every enum a budget read returns is lowercase */
+    it("returns lowercase enums on every budget field", async () => {
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `lowercase-read-${suffix}`,
+          window: "month",
+          limit_usd: 9,
+          on_breach: "warn",
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const body = await created.json();
+      expect(body.budget).toMatchObject({
+        scope_type: "project",
+        window: "month",
+        on_breach: "warn",
+      });
+    });
+
     /** @scenario A PRINCIPAL budget must target a member of the org */
     it("refuses a PRINCIPAL budget for a non-member", async () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PRINCIPAL", principal_user_id: OUTSIDE_USER_ID },
+          scope: { kind: "principal", principal_user_id: OUTSIDE_USER_ID },
           name: `outsider-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(),
@@ -1005,9 +1057,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "TEAM", team_id: FOREIGN_TEAM_ID },
+          scope: { kind: "team", team_id: FOREIGN_TEAM_ID },
           name: `foreign-team-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(),
@@ -1020,20 +1072,20 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "GROUP", group_id: GROUP_ID },
+          scope: { kind: "group", group_id: GROUP_ID },
           name: `group-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: "40",
         },
         legacyAuth(),
       );
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.budget.scope_type).toBe("GROUP");
+      expect(body.budget.scope_type).toBe("group");
       expect(body.budget.member_count).toBe(2);
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=GROUP",
+        "/api/gateway/v1/budgets?scope_type=group",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
@@ -1051,11 +1103,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         "/api/gateway/v1/budgets",
         {
           scope: {
-            kind: "ATTRIBUTED_USER",
+            kind: "attributed_user",
             anchor_virtual_key_id: anchorId,
           },
           name: `seat-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: "1",
         },
         legacyAuth(),
@@ -1093,7 +1145,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       }
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=ATTRIBUTED_USER",
+        "/api/gateway/v1/budgets?scope_type=attributed_user",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
@@ -1110,9 +1162,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const createRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          scope: { kind: "project", project_id: PROJECT_ID },
           name: `no-seats-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 30,
         },
         legacyAuth(),
@@ -1120,7 +1172,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(createRes.status).toBe(201);
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=PROJECT",
+        "/api/gateway/v1/budgets?scope_type=project",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
@@ -1136,9 +1188,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "GROUP", group_id: GROUP_ID },
+          scope: { kind: "group", group_id: GROUP_ID },
           name: `foreign-group-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 5,
         },
         legacyAuth(FOREIGN_LEGACY_KEY),
@@ -1151,9 +1203,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const res = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          scope: { kind: "project", project_id: PROJECT_ID },
           name: `provider-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 15,
           provider_key: MP_OPENAI_ID,
         },
@@ -1165,9 +1217,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const foreign = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: FOREIGN_PROJECT_ID },
+          scope: { kind: "project", project_id: FOREIGN_PROJECT_ID },
           name: `foreign-provider-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 15,
           provider_key: MP_OPENAI_ID,
         },
@@ -1190,9 +1242,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const createRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "VIRTUAL_KEY", virtual_key_id: vkId },
+          scope: { kind: "virtual_key", virtual_key_id: vkId },
           name: `ledger-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 100,
         },
         legacyAuth(),
@@ -1229,7 +1281,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(pgRow!.spentUsd.toString()).toBe("0");
 
       const list = await app.request(
-        "/api/gateway/v1/budgets?scope_type=VIRTUAL_KEY",
+        "/api/gateway/v1/budgets?scope_type=virtual_key",
         { headers: legacyAuth() },
       );
       const listBody = await list.json();
@@ -1243,9 +1295,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const createRes = await post(
         "/api/gateway/v1/budgets",
         {
-          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          scope: { kind: "project", project_id: PROJECT_ID },
           name: `mutable-budget-${suffix}`,
-          window: "MONTH",
+          window: "month",
           limit_usd: 30,
         },
         legacyAuth(),
@@ -1254,13 +1306,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
       const updateRes = await patch(
         `/api/gateway/v1/budgets/${id}`,
-        { limit_usd: 45, on_breach: "WARN" },
+        { limit_usd: 45, on_breach: "warn" },
         legacyAuth(),
       );
       expect(updateRes.status).toBe(200);
       const updated = await updateRes.json();
       expect(updated.budget.limit_usd).toBe("45");
-      expect(updated.budget.on_breach).toBe("WARN");
+      expect(updated.budget.on_breach).toBe("warn");
 
       const deleteRes = await app.request(`/api/gateway/v1/budgets/${id}`, {
         method: "DELETE",

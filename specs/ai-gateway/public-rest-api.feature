@@ -59,7 +59,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 201
     And the body has a `secret` starting with "vk-lw-", returned exactly once
     And `virtual_key.scopes` defaults to the caller's project
-    And `virtual_key.routing_mode` is "NONE" and `virtual_key.purpose` is "user"
+    And `virtual_key.routing_mode` is "none" and `virtual_key.purpose` is "user"
     And the response carries no `provider_credential_ids` field
     And a subsequent GET returns the key without the secret
 
@@ -73,7 +73,7 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest
   Scenario: Explicit project scopes are accepted with config
-    When I create a key with explicit PROJECT scopes, routing_mode FALLBACK_ALL, and a config
+    When I create a key with explicit project scopes, routing_mode fallback_all, and a config
     Then the response status is 201
     And the config round-trips on the returned DTO
 
@@ -82,14 +82,14 @@ Feature: Public REST API — /api/gateway/v1/*
     # Legacy project keys keep their historical power: full access to their
     # own project, nothing above it. Broader provisioning requires a scoped
     # API key that can prove the grants.
-    When a legacy project key requests an ORGANIZATION-scoped key
+    When a legacy project key requests an organization-scoped key
     Then the response status is 403
     And the error names the missing `virtualKeys:manage` grant
 
   @integration @rest @rbac
   Scenario: An org-admin API key provisions an org-scoped key
     Given a scoped API key whose bindings grant ADMIN at the organization
-    When they create a key with scopes `[{"scope_type": "ORGANIZATION", "scope_id": <org>}]`
+    When they create a key with scopes `[{"scope_type": "organization", "scope_id": <org>}]`
     Then the response status is 201
     And the key is reachable org-wide
 
@@ -109,14 +109,14 @@ Feature: Public REST API — /api/gateway/v1/*
     # The trace_project_required invariant lives in VirtualKeyService.create
     # and nowhere else — REST refusing here proves it runs the service.
     Given an organization with no governance project
-    When an org-admin API key creates an ORGANIZATION-scoped key there
+    When an org-admin API key creates an organization-scoped key there
     Then the response status is 400
     And error.code is "trace_project_required"
 
   @integration @rest @rbac
   Scenario: An explicit trace destination gives an org-scoped key a home for its spend
     Given the same organization with no governance project
-    When the org-admin creates the ORGANIZATION-scoped key with `trace_project_id` naming a project there
+    When the org-admin creates the organization-scoped key with `trace_project_id` naming a project there
     Then the response status is 201 and the DTO echoes `trace_project_id`
     # The destination routes traces AND budget debits into that project,
     # so choosing it needs `virtualKeys:manage` on the target project:
@@ -164,7 +164,7 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest
   Scenario: routing_mode POLICY requires a routing policy id
-    When I create a key with routing_mode "POLICY" and no routing_policy_id
+    When I create a key with routing_mode "policy" and no routing_policy_id
     Then the response status is 400
     And error.code is "routing_policy_required"
 
@@ -177,7 +177,7 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @budgets
   Scenario: A key and its cap are created atomically over REST
-    When I create a key with `budget: { "limit_usd": "12.50", "window": "MONTH" }`
+    When I create a key with `budget: { "limit_usd": "12.50", "window": "month" }`
     Then the response status is 201
     And a VIRTUAL_KEY-scoped GatewayBudget targeting the new key exists in the same transaction
 
@@ -185,7 +185,7 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: A malformed cap is refused with the shared validation
     # The budget wire parses through the SAME zod schema the tRPC create
     # uses, so a cap tRPC would refuse cannot arrive via REST.
-    When I create a key with `budget: { "limit_usd": "10abs", "window": "MONTH" }`
+    When I create a key with `budget: { "limit_usd": "10abs", "window": "month" }`
     Then the response status is 400
     And the message names `limit_usd`
 
@@ -220,7 +220,7 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @rbac
   Scenario: Re-scoping over REST demands manage at the new scope
-    When a legacy project key PATCHes a key's scopes to ORGANIZATION
+    When a legacy project key PATCHes a key's scopes to organization
     Then the response status is 403
 
   @integration @rest
@@ -248,10 +248,27 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: A VK-scoped budget created over REST is visible in the REST list
     # Create-then-list must round-trip. Before #6261 the list filtered to
     # ORGANIZATION/TEAM/PROJECT and hid the very rows POST /budgets minted.
-    When I create a VIRTUAL_KEY-scoped and a PRINCIPAL-scoped budget over REST
+    When I create a virtual_key-scoped and a principal-scoped budget over REST
     Then `GET /api/gateway/v1/budgets` returns both, with `spend_available: true`
-    And `?scope_type=VIRTUAL_KEY` filters to VIRTUAL_KEY rows only
-    And `?scope_type=ORGANIZATION,TEAM` excludes them
+    And `?scope_type=virtual_key` filters to virtual_key rows only
+    And `?scope_type=organization,team` excludes them
+
+  @integration @rest @budgets
+  Scenario: The wire enums are lowercase only, with no casing tolerance
+    # The surface used to accept `scope_type=Group` on the list filter, which
+    # uppercased whatever arrived, while the create body's `kind` refused the
+    # same spelling. One casing, both directions.
+    When I send the stored casing on `?scope_type`, on a budget `kind`, or on a
+    virtual key `scope_type`
+    Then each answers 400 with code "validation_error"
+
+  @integration @rest @budgets
+  Scenario: Every enum a budget read returns is lowercase
+    When I create a budget and read it back
+    Then `scope_type`, `window` and `on_breach` are all lower_snake_case
+    # The database stores these SCREAMING_SNAKE, which is Prisma's convention
+    # and not a contract; the gateway config payload and the governance
+    # webhooks already published lowercase, and this surface was the outlier.
 
   @integration @rest @budgets
   Scenario: An invalid scope_type filter is refused
@@ -260,20 +277,20 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @budgets
   Scenario: A PRINCIPAL budget must target a member of the org
-    When I create a PRINCIPAL budget for a user outside the organization
+    When I create a principal budget for a user outside the organization
     Then the response status is 400
     # Otherwise the budget would be a silent no-op that never matches traffic.
 
   @integration @rest @budgets
   Scenario: A TEAM budget cannot target another org's team
-    When I create a TEAM budget naming a foreign organization's team id
+    When I create a team budget naming a foreign organization's team id
     Then the response status is 400
 
   @integration @rest @budgets @groups
   Scenario: A GROUP budget over REST carries the per-member semantics
     Given a group with 2 members
-    When I create a GROUP-scoped budget with limit_usd "40"
-    Then the response status is 201 with scope_type "GROUP" and member_count 2
+    When I create a group-scoped budget with limit_usd "40"
+    Then the response status is 201 with scope_type "group" and member_count 2
     And the list row says limit_usd "40" (the PER-MEMBER allowance) while spent_usd sums the whole group's ledger buckets
 
   @integration @rest @budgets @groups
@@ -384,7 +401,7 @@ Feature: Public REST API — /api/gateway/v1/*
       """
     Then the response status is 201
     And body.id is a 21-character nanoid (no prefix — `GatewayCacheRule.id @default(nanoid())`)
-    And body.mode_enum = "FORCE"
+    And body.mode_enum = "force"
     And body.archived_at is null
     And a GatewayChangeEvent (CACHE_RULE_CREATED) was emitted
 
