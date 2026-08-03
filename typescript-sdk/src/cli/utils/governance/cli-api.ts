@@ -82,6 +82,13 @@ export interface CliApiOptions {
   fetchImpl?: typeof fetch;
   /** Seams for the automatic session refresh. Tests only. */
   refreshDeps?: SessionRefreshDeps;
+  /**
+   * Abort the request after this many milliseconds. Set it on any call
+   * a user is waiting behind: without it a connection that opens and
+   * never answers holds the CLI forever, since fetch has no default
+   * timeout of its own.
+   */
+  timeoutMs?: number;
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
@@ -110,9 +117,18 @@ async function authorizedFetch(
     fetchImpl: opts.fetchImpl,
     ...opts.refreshDeps,
   };
+  // Each attempt gets its own signal: one shared deadline would arm the
+  // clock before the refresh round-trip and abort the retry early.
+  const send = () =>
+    f(url, {
+      ...init(cfg.access_token!),
+      ...(opts.timeoutMs === undefined
+        ? {}
+        : { signal: AbortSignal.timeout(opts.timeoutMs) }),
+    });
   await refreshSessionIfExpired(cfg, deps);
 
-  const res = await f(url, init(cfg.access_token!));
+  const res = await send();
   if (res.status !== 401 || !canRefreshSession(cfg)) return res;
 
   const outcome = await refreshSession(cfg, deps);
@@ -122,7 +138,7 @@ async function authorizedFetch(
   // a 401 first attempt cannot have committed a write. That argument is
   // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
   // which can follow a partially applied write.
-  return f(url, init(cfg.access_token!));
+  return send();
 }
 
 async function getJSON<T>(
@@ -339,6 +355,61 @@ export async function getCliBootstrap(
     return await getJSON<CliBootstrapResponse>(
       cfg,
       `/api/auth/cli/bootstrap`,
+      options,
+    );
+  } catch (err) {
+    if (err instanceof GovernanceCliError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * One budget that binds the user's key, labelled with its scope. Wire
+ * shape of `GET /api/auth/cli/budget-overview` items (which mirrors the
+ * tRPC `api.user.budgetOverview` procedure byte-for-byte).
+ */
+export interface BudgetOverviewItem {
+  id: string;
+  name: string;
+  /** e.g. "whole organization budget", "personal budget". */
+  scopePhrase: string;
+  /** "MONTH" | "WEEK" | "DAY" | "HOUR" | "MINUTE" | "TOTAL". */
+  window: string;
+  limitUsd: string;
+  spentUsd: string;
+  /** Display name when the budget counts a single provider only. */
+  providerLabel: string | null;
+  /** ISO timestamp of the next reset; null for TOTAL windows. */
+  resetsAt: string | null;
+  isPerMember: boolean;
+}
+
+export interface BudgetOverviewResponse {
+  /**
+   * False when the org gives this user no member-facing gateway path
+   * (governance flag off / not a member): render nothing budget-related.
+   */
+  gatewayAccess: boolean;
+  reason?: string;
+  /** Most binding first; empty when no budget applies. */
+  budgets: BudgetOverviewItem[];
+}
+
+/**
+ * Fetch every budget that binds the user's key for the login epilogue.
+ * Returns null on 404 (older server without the endpoint) so the caller
+ * can fall back to the /bootstrap collapsed budget line.
+ */
+export async function getBudgetOverview(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<BudgetOverviewResponse | null> {
+  try {
+    return await getJSON<BudgetOverviewResponse>(
+      cfg,
+      `/api/auth/cli/budget-overview`,
       options,
     );
   } catch (err) {

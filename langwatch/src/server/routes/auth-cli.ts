@@ -56,14 +56,11 @@ import {
 } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
+import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { connection as redisConnection } from "~/server/redis";
 
@@ -1105,19 +1102,6 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
 // 200 because we have no spend data; the gateway itself will surface
 // the actual block at request time via the same code path.
 // ---------------------------------------------------------------------------
-function chRepoOrUndefined(): GatewayBudgetClickHouseRepository | undefined {
-  if (!isClickHouseEnabled()) return undefined;
-  return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
-}
-
 function requestIncreaseUrl(opts: {
   scope: string;
   scopeId: string;
@@ -1235,6 +1219,36 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
   }
   const service = CliBootstrapService.create(prisma);
   const result = await service.resolve({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget-overview
+// ---------------------------------------------------------------------------
+// Every budget that binds the caller's own keys, labelled per scope, for
+// the `langwatch login` epilogue. Wire shape matches the tRPC
+// `api.user.budgetOverview` procedure byte-for-byte (both surfaces share
+// BudgetOverviewService), replacing the collapsed single number the
+// /bootstrap `budget` field carries for older CLIs.
+// ---------------------------------------------------------------------------
+
+secured.access(CLI_POLICY).get("/budget-overview", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = BudgetOverviewService.create(prisma, chRepoOrUndefined());
+  const result = await service.overviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
