@@ -59,6 +59,7 @@ const admitted = () =>
       tenantId: TENANT,
       virtual_key_id: "vk_1",
       principal_user_id: "",
+      team_id: "team_1",
       end_user_id: "end-user-7",
       model: "openai/gpt-5",
       model_provider_id: "mp_1",

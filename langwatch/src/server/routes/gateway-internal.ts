@@ -30,7 +30,7 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
-  admitSpendCommandDataSchema,
+  admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
   type SpendUsage,
@@ -1007,7 +1007,7 @@ const SPEND_COMMAND_NAMES = [
 ] as const;
 
 const SPEND_COMMAND_SCHEMAS = {
-  admitSpend: admitSpendCommandDataSchema,
+  admitSpend: admitSpendWireSchema,
   confirmSpend: confirmSpendWireSchema,
   failSpend: failSpendWireSchema,
 } as const;
@@ -1161,6 +1161,144 @@ function groupSpendCommands(records: SpendCommandRecord[]): {
   return { perCommand, rejected };
 }
 
+/** How stale `lastUsedAt` has to be before a drain batch advances it.
+ *  Admin oversight reads the column on minute scale, so writing it per
+ *  request would buy nothing. */
+const VIRTUAL_KEY_TOUCH_THROTTLE_MS = 60_000;
+
+/** The key row an admission is attributed against. */
+type AttributionVirtualKey = {
+  id: string;
+  organizationId: string;
+  principalUserId: string | null;
+  lastUsedAt: Date | null;
+};
+
+/** The ids an admit record was validated with. Every one of them is a
+ *  required field on the wire schema, so these reads are total. */
+function admitIdentity(admit: Record<string, unknown>): {
+  gatewayRequestId: string;
+  virtualKeyId: string;
+  projectId: string;
+  organizationId: string;
+} {
+  return {
+    gatewayRequestId: String(admit.gateway_request_id ?? ""),
+    virtualKeyId: String(admit.virtual_key_id ?? ""),
+    projectId: String(admit.tenantId ?? ""),
+    organizationId: String(admit.organization_id ?? ""),
+  };
+}
+
+/**
+ * Advance `lastUsedAt` on the keys this batch admitted.
+ *
+ * Admission is the one moment that sees every kind of use: the requests the
+ * gateway went on to block over a budget or a guardrail, and the ones whose
+ * outcome never arrives, are all admitted first. One conditional write per
+ * drain batch, decided off the rows the enrichment already read, and a batch
+ * whose keys were all touched recently writes nothing.
+ *
+ * Best effort: the column is oversight, not enforcement, and failing the
+ * batch over it would cost the drainer a retry of records that appended.
+ */
+async function touchAdmittedVirtualKeys(
+  virtualKeys: AttributionVirtualKey[],
+  now: Date,
+): Promise<void> {
+  const staleIds = virtualKeys
+    .filter(
+      (vk) =>
+        !vk.lastUsedAt ||
+        now.getTime() - vk.lastUsedAt.getTime() > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
+    )
+    .map((vk) => vk.id);
+  if (staleIds.length === 0) return;
+  try {
+    await prisma.virtualKey.updateMany({
+      where: { id: { in: staleIds } },
+      data: { lastUsedAt: now },
+    });
+  } catch (error) {
+    logger.warn(
+      { virtualKeyIds: staleIds, error },
+      "failed to advance virtualKey.lastUsedAt for admitted spend commands",
+    );
+  }
+}
+
+/**
+ * Join every admission to the attribution the gateway cannot see: the key's
+ * principal and the tenant project's team. Two batched reads answer for a
+ * whole batch of up to 500 records, and the appended event carries the
+ * result from then on, so nothing downstream re-reads identity per request.
+ *
+ * The two ways this can come up short are deliberately not treated alike. A
+ * MISSING row (a key deleted between dispatch and drain, a project without a
+ * team) is a fact about the world: that one record degrades to empty
+ * attribution, still owes its organization, project and key debits, and logs
+ * the ids so the team, principal and group budgets it skipped can be
+ * reconciled from the log. A prisma FAILURE is not a fact, it is an unknown,
+ * and an event is immutable once appended, so it propagates to a 500 and the
+ * drainer retries the whole batch.
+ */
+async function enrichAdmitCommands(
+  admits: Array<Record<string, unknown>>,
+): Promise<void> {
+  if (admits.length === 0) return;
+  const identities = admits.map(admitIdentity);
+  const [virtualKeys, projects] = await Promise.all([
+    prisma.virtualKey.findMany({
+      where: {
+        id: { in: [...new Set(identities.map((i) => i.virtualKeyId))] },
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        principalUserId: true,
+        lastUsedAt: true,
+      },
+    }),
+    prisma.project.findMany({
+      where: { id: { in: [...new Set(identities.map((i) => i.projectId))] } },
+      select: { id: true, teamId: true },
+    }),
+  ]);
+  const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
+  const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));
+
+  admits.forEach((admit, index) => {
+    const identity = identities[index]!;
+    const key = keyById.get(identity.virtualKeyId);
+    const teamId = teamIdByProject.get(identity.projectId) ?? "";
+    if (!key) {
+      logger.error(
+        identity,
+        "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+      );
+    } else if (key.organizationId !== identity.organizationId) {
+      // Logged, not dropped. The record is already durable on the gateway's
+      // side, and a discarded admission loses the outcome that follows it;
+      // the mismatch is a control-plane inconsistency to chase, not a reason
+      // to lose billing evidence.
+      logger.error(
+        { ...identity, keyOrganizationId: key.organizationId },
+        "spend admission names a virtual key from another organization",
+      );
+    }
+    if (!teamId) {
+      logger.error(
+        identity,
+        "spend admission names a project with no team: team budgets will not see this request",
+      );
+    }
+    admit.principal_user_id = key?.principalUserId ?? "";
+    admit.team_id = teamId;
+  });
+
+  await touchAdmittedVirtualKeys(virtualKeys, new Date());
+}
+
 interface SpendCommandSender {
   sendBatch?: (payloads: unknown[]) => Promise<unknown>;
   send: (payload: unknown) => Promise<unknown>;
@@ -1202,6 +1340,11 @@ async function sendSpendCommands(
  * counts rejects; a nonzero rate is a contract bug, and a rejected outcome
  * still surfaces later when settlement flags the admission for
  * reconciliation (the pod-seq gap detector only covers admits).
+ *
+ * Admissions are enriched before they append, which is the one thing here
+ * that can fail the whole batch: attribution the gateway cannot see has to
+ * be right on an immutable event, so an unreadable database answers 500 and
+ * lets the drainer come back rather than appending a guess.
  */
 secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
   const parsed = spendCommandBatchSchema.safeParse(
@@ -1236,6 +1379,8 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
   }
 
   const { perCommand, rejected } = groupSpendCommands(parsed.data.records);
+
+  await enrichAdmitCommands(perCommand.admitSpend);
 
   const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
   if (unregistered) {

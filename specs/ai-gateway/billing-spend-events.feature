@@ -147,6 +147,45 @@ Feature: Billing spend events, one durable record per gateway request
       Then the command is rejected so another worker retries it
       And the rejection names the gateway request at error level
 
+  Rule: Attribution the gateway cannot see is resolved once, at ingest
+
+    The gateway knows the key and the project it dispatched for. The key's
+    principal and the project's team live on control-plane rows it never
+    reads, so the ingest seam joins them on the way in and the appended event
+    carries them from then on. An event is immutable once appended, which is
+    what makes the difference between a missing row and an unreachable
+    database matter: one is a fact to record, the other is an unknown to
+    retry.
+
+    @integration
+    Scenario: An admitted request carries the team and principal it debits
+      Given a virtual key owned by a seat, in a project belonging to a team
+      When the gateway's admission for that key reaches the ingest route
+      Then the appended admission carries the team and the principal
+      And the whole batch resolved them in two reads, not two per record
+
+    @integration
+    Scenario: A key in constant use is not written on every request
+      Given a key whose last use was recorded moments ago
+      When another batch of its admissions arrives
+      Then its last-used timestamp is left alone
+      And a key admitted after a long silence has its timestamp advanced
+
+    @integration
+    Scenario: A deleted key or a teamless project degrades one record, not the batch
+      Given an admission naming a key deleted since it was dispatched
+      When the batch reaches the ingest route
+      Then that record appends with empty principal attribution
+      And the ids it could not resolve are logged at error level
+      And every other record in the batch keeps its full attribution
+
+    @integration
+    Scenario: An unreadable control plane retries the batch instead of guessing
+      Given a control-plane database that cannot be read
+      When a batch of admissions arrives
+      Then the route fails the whole batch
+      And nothing is appended with guessed attribution
+
   Rule: The fold is the spend record
 
     @unit

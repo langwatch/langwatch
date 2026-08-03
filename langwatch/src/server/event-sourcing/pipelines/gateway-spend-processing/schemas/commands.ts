@@ -60,7 +60,7 @@ export const spendUsageSchema = z.object({
 });
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
 
-export const admitSpendCommandDataSchema = z.object({
+export const admitSpendWireSchema = z.object({
   gateway_request_id: boundedId,
   /** Request time, unix ms. Period placement anchors here, never ingest time. */
   occurred_at: occurredAtMs,
@@ -69,6 +69,8 @@ export const admitSpendCommandDataSchema = z.object({
    *  filter key off this. The ingest route maps the wire's project_id here. */
   tenantId: boundedId,
   virtual_key_id: boundedId,
+  /** The key's owner. The gateway does not carry it: the ingest seam reads
+   *  it off the key row when it joins the rest of the attribution. */
   principal_user_id: z.string().max(256).default(""),
   end_user_id: z.string().max(256).default(""),
   model: z.string().min(1).max(512),
@@ -85,6 +87,16 @@ export const admitSpendCommandDataSchema = z.object({
    *  gap detector: a hole in (pod_id, pod_seq) is an asserted loss. */
   pod_id: z.string().max(128).default(""),
   pod_seq: z.number().int().min(0).default(0),
+});
+
+/** What the ingest seam appends once it has joined the control-plane
+ *  attribution the gateway cannot see: `team_id` is the tenant project's
+ *  team, resolved per drain batch alongside the key's principal. The debits
+ *  process manager is its only reader, so the fold, the webhook process
+ *  manager and the delivered envelope keep the shapes they were frozen at;
+ *  adopting the team on any of them later costs no wire change. */
+export const admitSpendCommandDataSchema = admitSpendWireSchema.extend({
+  team_id: z.string().max(256).default(""),
 });
 export type AdmitSpendCommandData = z.infer<typeof admitSpendCommandDataSchema>;
 
