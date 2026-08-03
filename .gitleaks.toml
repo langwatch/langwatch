@@ -33,9 +33,12 @@ paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
 # Scoped to the two test files and the generic rule only, so a real token
 # landing in either is still caught by every provider-specific rule.
 [[allowlists]]
-description = "Sequential-hex HMAC fixture in the signed-route test, not a credential"
+description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''']
+paths = [
+  '''langwatch/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
+  '''langwatch/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+]
 
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"

@@ -13,19 +13,10 @@
 -- per-VK trend, ops dashboards) will read from this CH table instead, using
 -- the pre-aggregated gateway_budget_scope_totals ReplacingMergeTree below.
 --
--- Write path: the debits process manager on the gateway-spend pipeline is
--- the only writer. Idempotency is preserved via (BudgetId,
--- GatewayRequestId) uniqueness — the ORDER BY + ReplacingMergeTree dedup
--- collapses replays safely.
---
--- That identity means "one debit per budget per request", and it is only
--- sound while exactly ONE writer owns a budget's row for a given request.
--- A budget may own many buckets: GROUP fans out one per member and
--- ATTRIBUTED_USER one per end user. A single request resolves exactly one
--- of them, which is what keeps the key correct. Two writers disagreeing
--- about the bucket for the same request would NOT produce two rows, they
--- would collapse to one and file the spend under whichever bucket won,
--- which is why there is exactly one.
+-- Write path (next iter): BudgetOutbox.Flush dual-writes to PG and CH during
+-- the shadow-migrate window, then cutover PG to a 24h-retained hot buffer.
+-- Idempotency is preserved via (BudgetId, GatewayRequestId) uniqueness —
+-- the ORDER BY + ReplacingMergeTree dedup collapses replays safely.
 -- ============================================================================
 
 -- +goose StatementBegin
@@ -36,12 +27,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_ledger_events
 
     -- Budget + identity
     BudgetId String CODEC(ZSTD(1)),
-    Scope LowCardinality(String),                    -- "org" | "team" | "project" | "virtual_key" | "principal" | "group" | "attributed_user"
-    -- The BUCKET spend accrues under, which is the budget's own target for
-    -- most scopes but not all: "<group>:<member>" for GROUP and
-    -- "<anchor>:<end-user>" for ATTRIBUTED_USER, each optionally suffixed
-    -- "|provider:<key>". Reads match this value exactly.
-    ScopeId String CODEC(ZSTD(1)),                   -- org_xxx | team_xxx | project_xxx | vk_xxx | grp_xxx:user_xxx | vk_xxx:someone@example.com
+    Scope LowCardinality(String),                    -- "org" | "team" | "project" | "virtual_key"
+    ScopeId String CODEC(ZSTD(1)),                   -- org_xxx | team_xxx | project_xxx | vk_xxx
     Window LowCardinality(String),                   -- "DAY" | "WEEK" | "MONTH"
     VirtualKeyId String CODEC(ZSTD(1)),
     ProviderCredentialId String DEFAULT '' CODEC(ZSTD(1)),

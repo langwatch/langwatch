@@ -42,7 +42,8 @@ const PROJECT_ID = `proj-ingest-${suffix}`;
 const USER_ID = `usr-ingest-${suffix}`;
 const VK_ID = `vk-ingest-${suffix}`;
 const FOREIGN_VK_ID = `vk-ingest-foreign-${suffix}`;
-// gitleaks:allow — sequential-hex HMAC fixture for the signed-route test, not a credential
+// Sequential-hex HMAC fixture for the signed-route test, not a credential;
+// allowlisted by path in .gitleaks.toml.
 const SECRET = "0123456789abcdef0123456789abcdef";
 
 /** Every admission the route appended, in order, as the pipeline saw it. */
