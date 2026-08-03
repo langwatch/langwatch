@@ -19,7 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
-import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import { nanoUsdToDecimalString } from "./wireMoney";
 
 const TABLE = "gateway_spend" as const;
 
@@ -48,7 +48,7 @@ export type SpendEventRow = {
   tokensReasoning: number;
   /** Integer nano-USD, the authoritative figure. */
   costNanoUsd: number;
-  /** Fixed-point USD string derived from costNanoUsd (6 decimals). */
+  /** Decimal USD string derived from costNanoUsd, up to 9 fractional digits. */
   costUsd: string;
   rateVersion: string;
   status: SpendEventStatus;
@@ -99,10 +99,6 @@ export function parseSummedNanoUsd(value: unknown): number {
   return Number(asBig);
 }
 
-function nanoToUsdString(nano: number): string {
-  return (nano / NANO_USD_PER_USD).toFixed(6);
-}
-
 export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
@@ -131,7 +127,7 @@ export function mapSpendEventRow(r: Record<string, unknown>): SpendEventRow {
     tokensCacheWrite: Number(r.TokensCacheWrite),
     tokensReasoning: Number(r.TokensReasoning),
     costNanoUsd: nano,
-    costUsd: nanoToUsdString(nano),
+    costUsd: nanoUsdToDecimalString(nano),
     rateVersion: String(r.RateVersion ?? ""),
     status,
     errorClass: String(r.ErrorClass),
@@ -669,7 +665,7 @@ export class GatewaySpendEventsRepository {
         tokensCacheWrite: Number(r.TokensCacheWrite ?? 0),
         tokensReasoning: Number(r.TokensReasoning ?? 0),
         costNanoUsd: nano,
-        costUsd: nanoToUsdString(nano),
+        costUsd: nanoUsdToDecimalString(nano),
       };
     });
     return { rows, nextCursor };
@@ -698,7 +694,7 @@ export class GatewaySpendEventsRepository {
     tokensReasoning: number;
   }> {
     const empty = {
-      spendUsd: "0.000000",
+      spendUsd: nanoUsdToDecimalString(0),
       spendNanoUsd: 0,
       requestCount: 0,
       tokensInput: 0,
@@ -744,7 +740,7 @@ export class GatewaySpendEventsRepository {
     if (!row) return empty;
     const nano = parseSummedNanoUsd(row.SpendNanoUSD);
     return {
-      spendUsd: nanoToUsdString(nano),
+      spendUsd: nanoUsdToDecimalString(nano),
       spendNanoUsd: nano,
       requestCount: Number(row.RequestCount ?? 0),
       tokensInput: Number(row.TokensInput ?? 0),

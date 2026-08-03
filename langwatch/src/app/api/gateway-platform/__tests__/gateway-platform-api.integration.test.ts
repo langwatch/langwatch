@@ -1385,7 +1385,9 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const listBody = await list.json();
       const row = listBody.data.find((b: any) => b.id === budgetId);
       expect(row).toBeDefined();
-      expect(Number(row.spent_usd)).toBeCloseTo(1.25, 4);
+      expect(row.spent_usd).toBe("1.25");
+      // The display string and the integer beside it are one number.
+      expect(row.spent_nano_usd).toBe(1_250_000_000);
     });
 
     /** @scenario Budget update and archive over REST */
@@ -1560,8 +1562,38 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(Number(body.spent_usd)).toBeCloseTo(1.25, 4);
+      // Exact, not `toBeCloseTo`: the field is a display STRING, and a
+      // tolerance-based assertion is what let float noise onto the wire
+      // unnoticed in the first place.
+      expect(body.spent_usd).toBe("1.25");
       expect(body.requests).toBe(2);
+    });
+
+    /** @scenario Per-key spend publishes a clean decimal string, whatever the sum drifted to */
+    it("publishes a sub-cent total without the Float64 sum's drift", async () => {
+      const vk = await createVk({ name: `dust-${suffix}` });
+      const vkId = vk.body.virtual_key.id;
+      // 24 x 0.000001875 is 0.000045 exactly, but the Float64 sum of it lands
+      // one ULP low and stringifies as "0.000044999999999999996". Any other
+      // summation order drifts differently, so the assertion is the amount.
+      for (let i = 0; i < 24; i++) {
+        await insertGatewayTrace({
+          tenantId: PROJECT_ID,
+          traceId: `trace-gwrest-dust-${i}-${suffix}`,
+          virtualKeyId: vkId,
+          occurredAt: new Date(Date.now() - 60_000),
+          totalCost: 0.000001875,
+        });
+      }
+
+      const res = await app.request(
+        `/api/gateway/v1/virtual-keys/${vkId}/spend`,
+        { headers: legacyAuth() },
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.spent_usd).toBe("0.000045");
+      expect(body.requests).toBe(24);
     });
 
     /** @scenario The spend read validates its window */

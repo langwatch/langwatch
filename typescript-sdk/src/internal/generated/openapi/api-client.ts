@@ -6176,6 +6176,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         virtual_key_id: string;
+                        /** @description Spend over the window, summed from the cost path. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
                         spent_usd: string;
                         requests: number;
                         window: {
@@ -7106,9 +7107,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -7289,9 +7294,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -7423,9 +7432,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -7578,9 +7591,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -7727,9 +7744,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -7870,9 +7891,13 @@ export interface operations {
                             window: "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
                             /** @enum {string} */
                             on_breach: "block" | "warn";
+                            /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic. */
                             limit_usd: string;
+                            /** @description Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads. */
                             limit_nano_usd: number | null;
+                            /** @description Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic. */
                             spent_usd: string | null;
+                            /** @description Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees. */
                             spent_nano_usd: number | null;
                             timezone: string | null;
                             provider_key: string | null;
@@ -18260,7 +18285,9 @@ export interface operations {
                                 reasoning_tokens: number;
                             };
                             cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
                                 total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
                                 nano_usd: number;
                             };
                         }[];
@@ -18394,7 +18421,9 @@ export interface operations {
                                     reasoning_tokens: number;
                                 } | null;
                                 cost: {
+                                    /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
                                     total_usd: string;
+                                    /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
                                     nano_usd: number;
                                 } | null;
                                 status: string;
@@ -18528,7 +18557,9 @@ export interface operations {
                             from: string;
                             to: string;
                             cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
                                 total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
                                 nano_usd: number;
                             };
                             request_count: number;
@@ -18545,7 +18576,9 @@ export interface operations {
                                 window: string;
                                 /** @enum {string} */
                                 on_breach: "block" | "warn";
+                                /** @description The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
                                 limit_usd: string;
+                                /** @description Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
                                 spent_usd: string;
                                 period_started_at: string;
                             }[];

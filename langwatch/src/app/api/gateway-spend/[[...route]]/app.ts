@@ -41,6 +41,10 @@ import {
   GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { toWireEnum } from "~/server/gateway/wireEnums";
+import {
+  USD_DISPLAY_STRING_FORMAT,
+  usdDisplayString,
+} from "~/server/gateway/wireMoney";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
@@ -198,8 +202,8 @@ async function applicableEndUserCaps(params: {
       // `"MONTH"` here and `"month"` from the platform routes.
       window: toWireEnum(t.window),
       on_breach: toWireEnum(t.onBreach),
-      limit_usd: t.limitUsd.toString(),
-      spent_usd: spentByBudget.get(t.id) ?? "0",
+      limit_usd: usdDisplayString(t.limitUsd),
+      spent_usd: usdDisplayString(spentByBudget.get(t.id) ?? "0"),
       period_started_at: (
         bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt
       ).toISOString(),
@@ -222,8 +226,17 @@ const usageSchema = z.object({
 
 /** Money is published twice: a display string and the canonical integer. */
 const costSchema = z.object({
-  total_usd: z.string(),
-  nano_usd: z.number().int(),
+  total_usd: z
+    .string()
+    .describe(
+      `Display value. ${USD_DISPLAY_STRING_FORMAT} Use nano_usd for arithmetic.`,
+    ),
+  nano_usd: z
+    .number()
+    .int()
+    .describe(
+      "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against.",
+    ),
 });
 
 /** Null when the walk is exhausted. A full page does NOT imply more. */
@@ -278,8 +291,12 @@ const endUserCapSchema = z.object({
   anchor_id: z.string(),
   window: z.string(),
   on_breach: z.enum(["block", "warn"]),
-  limit_usd: z.string(),
-  spent_usd: z.string(),
+  limit_usd: z
+    .string()
+    .describe(`The cap for this end user. ${USD_DISPLAY_STRING_FORMAT}`),
+  spent_usd: z
+    .string()
+    .describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
   period_started_at: z.string(),
 });
 

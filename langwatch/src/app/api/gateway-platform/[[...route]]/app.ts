@@ -78,6 +78,7 @@ import {
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
 import {
   decodePageCursor,
   nextPageCursor,
@@ -169,14 +170,31 @@ const budgetDtoSchema = z.object({
   description: z.string().nullable(),
   window: budgetWindowSchema,
   on_breach: onBreachSchema,
-  /** Display value. Use `limit_nano_usd` for arithmetic. */
-  limit_usd: z.string(),
-  /** Canonical integer amount, nano-USD. Null past the safe integer range. */
-  limit_nano_usd: z.number().int().nullable(),
-  /** Display value, null when `spend_available` is false. */
-  spent_usd: z.string().nullable(),
-  /** Canonical integer spend, nano-USD. Null when spend is unavailable. */
-  spent_nano_usd: z.number().int().nullable(),
+  limit_usd: z
+    .string()
+    .describe(
+      `Display value. ${USD_DISPLAY_STRING_FORMAT} Use limit_nano_usd for arithmetic.`,
+    ),
+  limit_nano_usd: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads.",
+    ),
+  spent_usd: z
+    .string()
+    .nullable()
+    .describe(
+      `Display value, null when spend_available is false. ${USD_DISPLAY_STRING_FORMAT} Use spent_nano_usd for arithmetic.`,
+    ),
+  spent_nano_usd: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees.",
+    ),
   timezone: z.string().nullable(),
   provider_key: z.string().nullable(),
   /** The caller's own id for this budget, unique within the organization. */
@@ -195,7 +213,11 @@ const budgetDtoSchema = z.object({
 
 const spendSummaryDtoSchema = z.object({
   virtual_key_id: z.string(),
-  spent_usd: z.string(),
+  spent_usd: z
+    .string()
+    .describe(
+      `Spend over the window, summed from the cost path. ${USD_DISPLAY_STRING_FORMAT}`,
+    ),
   requests: z.number().int(),
   /** Epoch milliseconds, the unit every spend surface takes and returns. */
   window: z.object({

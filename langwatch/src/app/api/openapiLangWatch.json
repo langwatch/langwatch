@@ -9122,7 +9122,8 @@
                       "type": "string"
                     },
                     "spent_usd": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Spend over the window, summed from the cost path. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation."
                     },
                     "requests": {
                       "type": "integer"
@@ -11424,25 +11425,29 @@
                             ]
                           },
                           "limit_usd": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                           },
                           "limit_nano_usd": {
                             "type": [
                               "integer",
                               "null"
-                            ]
+                            ],
+                            "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                           },
                           "spent_usd": {
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                           },
                           "spent_nano_usd": {
                             "type": [
                               "integer",
                               "null"
-                            ]
+                            ],
+                            "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                           },
                           "timezone": {
                             "type": [
@@ -11827,25 +11832,29 @@
                           ]
                         },
                         "limit_usd": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                         },
                         "limit_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                         },
                         "spent_usd": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                         },
                         "spent_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                         },
                         "timezone": {
                           "type": [
@@ -12389,25 +12398,29 @@
                           ]
                         },
                         "limit_usd": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                         },
                         "limit_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                         },
                         "spent_usd": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                         },
                         "spent_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                         },
                         "timezone": {
                           "type": [
@@ -12800,25 +12813,29 @@
                           ]
                         },
                         "limit_usd": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                         },
                         "limit_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                         },
                         "spent_usd": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                         },
                         "spent_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                         },
                         "timezone": {
                           "type": [
@@ -13230,25 +13247,29 @@
                           ]
                         },
                         "limit_usd": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                         },
                         "limit_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                         },
                         "spent_usd": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                         },
                         "spent_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                         },
                         "timezone": {
                           "type": [
@@ -13595,25 +13616,29 @@
                           ]
                         },
                         "limit_usd": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use limit_nano_usd for arithmetic."
                         },
                         "limit_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer amount, nano-USD. Null past the safe integer range, where limit_usd still reads."
                         },
                         "spent_usd": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "Display value, null when spend_available is false. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic."
                         },
                         "spent_nano_usd": {
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the same integer as spent_usd, so the pair always agrees."
                         },
                         "timezone": {
                           "type": [
@@ -39486,10 +39511,12 @@
                             "type": "object",
                             "properties": {
                               "total_usd": {
-                                "type": "string"
+                                "type": "string",
+                                "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
                               },
                               "nano_usd": {
-                                "type": "integer"
+                                "type": "integer",
+                                "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
                               }
                             },
                             "required": [
@@ -39854,10 +39881,12 @@
                                 ],
                                 "properties": {
                                   "total_usd": {
-                                    "type": "string"
+                                    "type": "string",
+                                    "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
                                   },
                                   "nano_usd": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
                                   }
                                 },
                                 "required": [
@@ -40268,10 +40297,12 @@
                           "type": "object",
                           "properties": {
                             "total_usd": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
                             },
                             "nano_usd": {
-                              "type": "integer"
+                              "type": "integer",
+                              "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
                             }
                           },
                           "required": [
@@ -40331,10 +40362,12 @@
                                 ]
                               },
                               "limit_usd": {
-                                "type": "string"
+                                "type": "string",
+                                "description": "The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation."
                               },
                               "spent_usd": {
-                                "type": "string"
+                                "type": "string",
+                                "description": "Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation."
                               },
                               "period_started_at": {
                                 "type": "string"

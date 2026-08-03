@@ -340,6 +340,27 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the `_nano_usd` field is null
     # A JSON number past that has already lost its low digits, and a wrong
     # money figure is worse than an absent one.
+    # The display string has no such ceiling: it is digits, so it keeps
+    # reading for amounts whose integer cannot be published.
+
+  @unit @spend @budgets
+  Scenario: A `_usd` string is rendered from the integer, never from a float
+    Given a nano-USD amount
+    Then the `_usd` string carries up to nine fractional digits
+    And trailing zeros are trimmed, so 1 USD reads "1" and not "1.000000"
+    And it is never exponent notation, so 1 nano-USD reads "0.000000001"
+    # `nano / 1e9` puts back the drift the integer exists to avoid, and the
+    # `.toFixed(6)` that hid it also dropped the three digits the nano unit is
+    # named for, rendering a one-nano charge as "0.000000".
+
+  @unit @spend @budgets
+  Scenario: A Float64 spend sum publishes the amount, not its measurement drift
+    Given ClickHouse sums 45 micro-USD of spend and stringifies the Float64
+    Then the wire reads "0.000045", not "0.000044999999999999996"
+    And `_usd` and `_nano_usd` are derived from one integer, so the pair agrees
+    # Per-key spend is a Float64 `sum(TraceCost)` over `trace_summaries`, so
+    # the drift is in the input. The wire promise is a decimal string, so it
+    # is normalised at the seam that makes the promise.
 
   @unit @budgets
   Scenario: Spend that could not be totalled is null, never a stale figure
@@ -425,6 +446,15 @@ Feature: Public REST API — /api/gateway/v1/*
     And the echoed window starts at the first of the current UTC month
     # Zero is only honest because the spend source is present; without it
     # the endpoint answers 412 spend_source_unavailable instead.
+
+  @integration @rest @spend @clickhouse
+  Scenario: Per-key spend publishes a clean decimal string, whatever the sum drifted to
+    Given 24 traces for the key costing 0.000001875 each
+    When I read the key's spend over REST
+    Then spent_usd is "0.000045"
+    # `sum(TraceCost)` is a Float64 sum, so its stringified total lands one ULP
+    # low at "0.000044999999999999996". The wire promise is a decimal string,
+    # so the read boundary normalises it whatever order the sum ran in.
 
   @integration @rest @spend @clickhouse
   Scenario: Key spend over REST reads the same trace_summaries the UI reads

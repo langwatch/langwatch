@@ -9,7 +9,7 @@
 import type { GatewayBudgetWithSeats } from "./budget.service";
 import { metadataFromRow } from "./resourceMetadata";
 import { toWireEnum } from "./wireEnums";
-import { decimalUsdToNanoUsd } from "./wireMoney";
+import { decimalUsdToNanoUsd, usdDisplayString } from "./wireMoney";
 
 export /**
  * The budget row on the wire.
@@ -36,9 +36,9 @@ function toBudgetDto(
     // `_usd` is the display value; `_nano_usd` is the canonical integer, the
     // same unit the spend events carry, so the two reconcile without parsing
     // decimals. Null nano means the amount is past the safe integer range.
-    limit_usd: b.limitUsd.toString(),
+    limit_usd: usdDisplayString(b.limitUsd),
     limit_nano_usd: decimalUsdToNanoUsd(b.limitUsd),
-    spent_usd: spendAvailable ? b.spentUsd.toString() : null,
+    spent_usd: spendAvailable ? usdDisplayString(b.spentUsd) : null,
     spent_nano_usd: spendAvailable ? decimalUsdToNanoUsd(b.spentUsd) : null,
     timezone: b.timezone,
     provider_key: b.providerKey,

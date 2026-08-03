@@ -750,7 +750,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(row.event_count).toBe(2);
     expect(row.settled_count).toBe(1);
     expect(row.cost.nano_usd).toBe(50_000_000);
-    expect(Number(row.cost.total_usd)).toBeCloseTo(0.05, 6);
+    expect(row.cost.total_usd).toBe("0.05");
     expect(row.usage.input_tokens).toBe(200);
   });
 
@@ -867,7 +867,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         caps: unknown[];
       };
     };
-    expect(Number(body.data.cost.total_usd)).toBeCloseTo(0.05, 6);
+    expect(body.data.cost.total_usd).toBe("0.05");
     expect(body.data.request_count).toBe(2);
     expect(body.data.usage.input_tokens).toBe(200);
     // No attributed-user template in this org: the caps list is empty,
@@ -934,8 +934,8 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     const cap = body.data.caps.find((c) => c.budget_id === template.id);
     expect(cap).toBeDefined();
     expect(cap!.anchor_id).toBe(templateAnchor);
-    expect(Number.parseFloat(cap!.limit_usd)).toBe(100);
-    expect(Number.parseFloat(cap!.spent_usd)).toBeCloseTo(12.5, 3);
+    expect(cap!.limit_usd).toBe("100");
+    expect(cap!.spent_usd).toBe("12.5");
   });
 
   /** @scenario A virtual key filter narrows the rollup */
@@ -961,7 +961,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     const body = (await res.json()) as {
       data: { cost: { total_usd: string }; request_count: number };
     };
-    expect(Number(body.data.cost.total_usd)).toBeCloseTo(0.01, 6);
+    expect(body.data.cost.total_usd).toBe("0.01");
     expect(body.data.request_count).toBe(1);
   });
 });

@@ -23,6 +23,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { usdDisplayString } from "./wireMoney";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";
 const VK_ATTRIBUTE = "langwatch.virtual_key_id";
@@ -117,7 +118,12 @@ export class GatewayVirtualKeySpendRepository {
       const rows = (await result.json()) as Row[];
       return rows.map((r) => ({
         virtualKeyId: r.VirtualKeyId,
-        spentUsd: r.SpentUSD,
+        // `SpentUSD` is a stringified `Float64` sum, so it arrives carrying
+        // the drift of the addition: 45 micro-USD of spend reads
+        // "0.000044999999999999996". Normalising at the read boundary is what
+        // keeps the REST string and the UI's number the same figure, the same
+        // way the spend-event rows derive theirs from nano here.
+        spentUsd: usdDisplayString(r.SpentUSD),
         requests: Number(r.Requests) || 0,
       }));
     } catch (error) {

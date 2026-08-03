@@ -25,13 +25,13 @@ import {
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
@@ -297,7 +297,7 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     tokensCacheWrite: usage.cache_creation_input_tokens,
     tokensReasoning: usage.reasoning_tokens,
     costNanoUsd: payload.cost_nano_usd,
-    costUsd: (payload.cost_nano_usd / NANO_USD_PER_USD).toFixed(6),
+    costUsd: nanoUsdToDecimalString(payload.cost_nano_usd),
     rateVersion: payload.rate_version,
     status: payload.status,
     errorClass: payload.error?.type ?? "",
