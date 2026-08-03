@@ -1,4 +1,4 @@
-Feature: An absent evaluator score is never presented or stored as zero
+Feature: An absent evaluator score is never presented as zero
   As a user who configured a custom LLM-judge evaluator
   I want my saved prompt to reach the judge on every trace, and a missing score to read as "not scored"
   So that I can trust the scores my monitors produce and tell "the judge said zero" apart from "the judge never scored this"
@@ -51,11 +51,11 @@ Feature: An absent evaluator score is never presented or stored as zero
 
   @integration
   Scenario: A settings-less config never reaches the judge as an empty object
-    Given a monitor whose evaluator config has no settings key
+    Given a monitor whose evaluator config carries the user's prompt with no settings key
     And the monitor carries no fallback parameters
     When the online evaluation pipeline executes the monitor for a trace
-    Then the judge either receives the user's prompt or the run fails with a named error
-    And the judge is never asked to evaluate using its own default prompt
+    Then the judge is asked to evaluate exactly once
+    And the settings sent to the judge carry the user's prompt
 
   # ⚠ NOT SHIPPED. AC0c took its read-time branch: write-side normalisation was
   # implemented, broke code evaluators (config is `{code, inputs, outputs}` with no
@@ -83,6 +83,29 @@ Feature: An absent evaluator score is never presented or stored as zero
     Given the settings-resolution change is disabled by its kill switch
     When the online evaluation pipeline executes a monitor for a trace
     Then the settings sent to the judge are the ones the previous behaviour produced
+
+  # ⚠ The flag is read BEFORE the handler's error-handling boundary, so an
+  # unguarded failure escapes with no skipped and no error event for the trace —
+  # the rollback switch would become a new way for every evaluation to fail.
+
+  @integration
+  Scenario: The rollback flag failing to answer leaves recovery active
+    Given the kill switch for the settings-resolution change cannot be read
+    When the online evaluation pipeline executes a monitor for a trace
+    Then the settings sent to the judge carry the user's prompt
+    And the evaluation is not failed by the unreadable kill switch
+
+  # AC0d wanted a production database read nobody had credentials for. The
+  # running system reports the same number instead, one line per affected
+  # evaluation — which also makes the count self-extinguishing as configs are
+  # fixed. Keys only: settings carry customer prompts.
+
+  @integration
+  Scenario: An affected evaluator config is reported so its prevalence can be counted
+    Given a monitor whose evaluator config carries the user's prompt with no settings key
+    When the online evaluation pipeline executes the monitor for a trace
+    Then the affected configuration is reported for counting
+    And the report names the recovered keys without carrying the prompt text
 
   @integration
   Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
@@ -189,9 +212,13 @@ Feature: An absent evaluator score is never presented or stored as zero
 # AC 0c2: already-bad rows are handled, + the kill switch pinned ON by default
 #        -> Scenario: The new settings resolution is active in the shipped default configuration
 #        -> Scenario: The new settings resolution can be switched off for rollback
+#        -> Scenario: The rollback flag failing to answer leaves recovery active
 #        -> Scenario: An evaluator already stored in the unreadable shape still resolves its prompt
-# AC 0d: prevalence measured. NO SCENARIO -- a one-off production measurement, and a CLOSE gate.
-#        Credential-gated: needs an org-level admin API key or the SQL run against prod.
+# AC 0d: prevalence measured. Still a CLOSE gate, not a ship gate. The one-off prod
+#        SQL read stays credential-gated, so the online path reports each affected
+#        config instead -- the same number, from the running system, no credentials.
+#        Counting the emitted reports is the operator step that closes the AC.
+#        -> Scenario: An affected evaluator config is reported so its prevalence can be counted
 # AC 0e: the behaviour this fix INVERTS is named and its assertions updated
 #        -> Scenario: The evaluator's own prompt wins over the monitor's parameters
 #        -> Scenario: A monitor with no evaluator still falls back to its own parameters

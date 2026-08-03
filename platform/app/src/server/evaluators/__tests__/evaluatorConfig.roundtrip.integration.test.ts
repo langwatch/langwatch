@@ -73,7 +73,10 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
         parameters: null,
       });
 
-      expect(settings).toMatchObject({
+      // Exact, not partial: `toMatchObject` cannot fail if the resolver leaks
+      // `evaluatorType` (a CONFIG_METADATA_KEY) into the payload sent to the
+      // judge, and stripping that metadata is half of what the resolver does.
+      expect(settings).toEqual({
         prompt: USER_PROMPT,
         model: "openai/gpt-5-mini",
       });

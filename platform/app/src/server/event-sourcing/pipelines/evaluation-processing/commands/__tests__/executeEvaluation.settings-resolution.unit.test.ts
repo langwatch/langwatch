@@ -242,6 +242,48 @@ describe("ExecuteEvaluationCommand settings resolution", () => {
     });
   });
 
+  describe("given the rollback flag cannot be read", () => {
+    const topLevelConfig = {
+      id: "evaluator_1",
+      type: "evaluator",
+      config: {
+        evaluatorType: "custom/settings-eval",
+        prompt: "the evaluator's own prompt",
+      },
+    };
+
+    // The flag is resolved BEFORE handle()'s try block, so an unguarded failure
+    // escapes the handler entirely — no skipped and no error event for the
+    // trace. A safety valve would become a new way for every evaluation to
+    // fail. `executeWith` asserts the judge was reached exactly once, so these
+    // go red on a throw as well as on a wrong fallback.
+
+    /** @scenario The rollback flag failing to answer leaves recovery active */
+    it("stays on the shipped behaviour when the lookup rejects", async () => {
+      const call = await executeWith(
+        buildMonitor({ evaluator: topLevelConfig }),
+        () => Promise.reject(new Error("flag service unreachable")),
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "the evaluator's own prompt",
+      });
+    });
+
+    it("stays on the shipped behaviour when the lookup throws synchronously", async () => {
+      const call = await executeWith(
+        buildMonitor({ evaluator: topLevelConfig }),
+        () => {
+          throw new Error("flag client misconfigured");
+        },
+      );
+
+      expect(call.settings).toMatchObject({
+        prompt: "the evaluator's own prompt",
+      });
+    });
+  });
+
   describe("given a settings-less config and no monitor parameters", () => {
     /** @scenario A settings-less config never reaches the judge as an empty object */
     it("recovers the evaluator's own settings rather than sending an empty object", async () => {

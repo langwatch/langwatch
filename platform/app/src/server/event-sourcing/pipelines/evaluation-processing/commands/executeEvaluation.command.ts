@@ -130,6 +130,19 @@ const SCHEMA = defineCommandSchema(
 const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
 
 /**
+ * Where the settings handed to the judge came from.
+ *
+ * `top-level-recovery` is the langwatch#6397 case: the prompt the previous rule
+ * dropped. It is reported at the call site because AC0d asks for the PREVALENCE
+ * of affected evaluator configs, and this is the only place that knows an
+ * individual config was in the losing shape.
+ */
+export type EvaluatorSettingsSource =
+  | "config-settings"
+  | "top-level-recovery"
+  | "monitor-parameters";
+
+/**
  * Resolves the settings sent to the judge for an online (monitor-driven) evaluation.
  *
  * Nothing guarantees `config.settings` exists: `EvaluatorService.create`/`.update` are raw
@@ -145,7 +158,7 @@ const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
  * ordering satisfies every other acceptance criterion identically while leaving the bug live for
  * any monitor with populated `parameters`.
  */
-export function resolveEvaluatorSettings({
+export function resolveEvaluatorSettingsWithSource({
   config,
   parameters,
   recoveryDisabled = false,
@@ -158,25 +171,40 @@ export function resolveEvaluatorSettings({
    * configuration — gets the recovery.
    */
   recoveryDisabled?: boolean;
-}): Record<string, unknown> | null | undefined {
+}): {
+  settings: Record<string, unknown> | null | undefined;
+  source: EvaluatorSettingsSource;
+} {
   if (!config) {
-    return parameters;
+    return { settings: parameters, source: "monitor-parameters" };
   }
 
   const nested = config.settings;
   if (nested && typeof nested === "object") {
-    return nested as Record<string, unknown>;
+    return {
+      settings: nested as Record<string, unknown>,
+      source: "config-settings",
+    };
   }
 
   if (recoveryDisabled) {
-    return parameters;
+    return { settings: parameters, source: "monitor-parameters" };
   }
 
   const recovered = Object.fromEntries(
     Object.entries(config).filter(([key]) => !CONFIG_METADATA_KEYS.has(key)),
   );
 
-  return Object.keys(recovered).length > 0 ? recovered : parameters;
+  return Object.keys(recovered).length > 0
+    ? { settings: recovered, source: "top-level-recovery" }
+    : { settings: parameters, source: "monitor-parameters" };
+}
+
+/** Settings-only view of {@link resolveEvaluatorSettingsWithSource}. */
+export function resolveEvaluatorSettings(
+  args: Parameters<typeof resolveEvaluatorSettingsWithSource>[0],
+): Record<string, unknown> | null | undefined {
+  return resolveEvaluatorSettingsWithSource(args).settings;
 }
 
 /**
@@ -223,6 +251,28 @@ export class ExecuteEvaluationCommand
       return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
     }
     return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
+  }
+
+  /**
+   * Reads the emergency rollback flag, failing open to the shipped default
+   * (recovery ACTIVE).
+   *
+   * The lookup is resolved before `handle`'s try block, so an unguarded
+   * rejection would escape `handle()` entirely — no `skipped` and no `error`
+   * event for the trace. That would invert the flag's purpose: a safety valve
+   * would become a new way for every evaluation to fail. Catches synchronous
+   * throws as well as rejections, since `deps` is injected.
+   */
+  private async isSettingsRecoveryDisabled(): Promise<boolean> {
+    try {
+      return (await this.deps.isSettingsRecoveryDisabled?.()) ?? false;
+    } catch (error) {
+      logger.warn(
+        { error },
+        "Settings-recovery rollback flag could not be read — leaving recovery active",
+      );
+      return false;
+    }
   }
 
   async handle(
@@ -360,12 +410,32 @@ export class ExecuteEvaluationCommand
     }
 
     // 4. Run evaluation via app-layer service
-    const settings = resolveEvaluatorSettings({
-      config: monitor.evaluator?.config as Record<string, unknown> | null,
-      parameters: monitor.parameters as Record<string, unknown> | null,
-      recoveryDisabled:
-        (await this.deps.isSettingsRecoveryDisabled?.()) ?? false,
-    });
+    const { settings, source: settingsSource } =
+      resolveEvaluatorSettingsWithSource({
+        config: monitor.evaluator?.config as Record<string, unknown> | null,
+        parameters: monitor.parameters as Record<string, unknown> | null,
+        recoveryDisabled: await this.isSettingsRecoveryDisabled(),
+      });
+
+    // AC0d wants the PREVALENCE of configs in the losing shape, and a prod SQL
+    // read was never available. This is the same number from the running system:
+    // one line per affected evaluation, countable by `settingsSource`. Emitted at
+    // info so it survives production log levels — volume is bounded by the defect
+    // being measured, and it goes silent once no such config is left. Keys only,
+    // never values: settings carry customer prompts.
+    if (settingsSource === "top-level-recovery") {
+      logger.info(
+        {
+          tenantId,
+          // The monitor id: `getMonitorById(data.evaluatorId)` above. Distinct
+          // values of this pair ARE the prevalence count.
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          recoveredKeys: Object.keys(settings ?? {}),
+        },
+        "Recovered evaluator settings from the top level of config — langwatch#6397 affected config",
+      );
+    }
 
     const workflowId =
       monitor.evaluator?.type === "workflow"
