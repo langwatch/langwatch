@@ -164,6 +164,13 @@ const registry = {
     tips: ["Check the evaluator type against the list of available evaluators"],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_evaluator_required: {
+    tips: [
+      "Create an evaluator first: langwatch evaluator create <name> --type <type>, then pass its id via evaluatorId",
+      "Or pick an existing one: langwatch evaluator list",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
 
   // ---- langy ----
   langy_conversation_not_found: {

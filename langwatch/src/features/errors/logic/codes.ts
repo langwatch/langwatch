@@ -124,6 +124,7 @@ export const APP_ERROR_CODES = [
   "model_provider_not_found",
   "model_provider_scope_forbidden",
   "model_provider_scopes_required",
+  "monitor_evaluator_required",
   "no_admin_configured",
   // Also a Go code, with copy already written under the shared/transport
   // heading — `ee/admin/routes/admin.ts` raises it to hide the admin surface

@@ -83,15 +83,22 @@ describe("monitors.copy", () => {
   describe("given a monitor with inline settings and no linked evaluator", () => {
     describe("when it is replicated to the target project", () => {
       it("recreates a disabled monitor with the same config and leaves the source alone", async () => {
-        const source = await caller.monitors.create({
-          projectId: sourceProjectId,
-          name: "Inline Monitor",
-          checkType: "custom/test",
-          preconditions: [],
-          settings: { foo: "bar" },
-          sample: 0.5,
-          executionMode: "ON_MESSAGE",
-          level: "trace",
+        // Legacy monitors predate evaluators — seed one directly, the create
+        // path no longer allows creating a monitor without an evaluator.
+        const source = await prisma.monitor.create({
+          data: {
+            id: `check_inline_${Date.now()}`,
+            projectId: sourceProjectId,
+            name: "Inline Monitor",
+            slug: `inline-monitor-${Date.now()}`,
+            checkType: "custom/test",
+            preconditions: [],
+            parameters: { foo: "bar" },
+            sample: 0.5,
+            enabled: true,
+            executionMode: "ON_MESSAGE",
+            level: "trace",
+          },
         });
 
         const replica = await caller.monitors.copy({
@@ -213,14 +220,21 @@ describe("monitors.copy", () => {
   describe("given a name that already exists in the target project", () => {
     describe("when a monitor with that name is replicated", () => {
       it("de-duplicates the replicated monitor name", async () => {
-        const source = await caller.monitors.create({
-          projectId: sourceProjectId,
-          name: "Dup Monitor",
-          checkType: "custom/test",
-          preconditions: [],
-          settings: {},
-          sample: 1,
-          executionMode: "ON_MESSAGE",
+        // Seeded directly: the create path requires an evaluator, and this
+        // test only cares about name de-duplication on copy.
+        const source = await prisma.monitor.create({
+          data: {
+            id: `check_dup_${Date.now()}`,
+            projectId: sourceProjectId,
+            name: "Dup Monitor",
+            slug: `dup-monitor-${Date.now()}`,
+            checkType: "custom/test",
+            preconditions: [],
+            parameters: {},
+            sample: 1,
+            enabled: true,
+            executionMode: "ON_MESSAGE",
+          },
         });
 
         const first = await caller.monitors.copy({

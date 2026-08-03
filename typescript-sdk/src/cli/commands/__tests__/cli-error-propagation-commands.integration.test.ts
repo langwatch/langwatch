@@ -209,6 +209,8 @@ describe("CLI error propagation across commands", () => {
           "m1",
           "--check-type",
           "not-a-real-type",
+          "--evaluator-id",
+          "evaluator_123",
         ],
         testDir,
       );

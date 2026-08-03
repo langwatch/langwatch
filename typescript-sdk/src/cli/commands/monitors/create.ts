@@ -26,6 +26,19 @@ export const createMonitorCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
+  // A monitor without an evaluator would be created broken: it sits enabled
+  // but evaluates nothing. Fail before calling the API with the way out.
+  if (!options.evaluatorId) {
+    reportCommandError({
+      error: commandValidationError(
+        "--evaluator-id is required: a monitor runs a saved evaluator.\n" +
+          "  Create one first: langwatch evaluator create <name> --type <type>\n" +
+          "  Or pick an existing one: langwatch evaluator list",
+      ),
+    });
+    process.exit(1);
+  }
+
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
   if (options.executionMode && !validModes.includes(options.executionMode)) {
     reportCommandError({
