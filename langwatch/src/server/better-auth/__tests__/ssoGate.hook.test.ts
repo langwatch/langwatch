@@ -268,10 +268,10 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
     });
 
-    it("still refuses the SSO routes there is no provider behind", async () => {
-      // The gate allows, so these are not blocked as unlicensed; they simply
-      // have nothing mounted to serve them. Nothing here should start
-      // pretending otherwise.
+    it("still refuses credential management, which no deployment state opens", async () => {
+      // Opening the email form back up must not drag the credential-mutation
+      // routes with it. `/set-password` is refused in every gate state and for
+      // its own reason, not because the provider failed to mount.
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/set-password")),
       ).rejects.toMatchObject({ statusCode: 400 });
