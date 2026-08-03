@@ -119,7 +119,6 @@ describe("worker liveness thread", () => {
     });
 
     /** @scenario A metrics request fails when the main thread never replies */
-    /** @scenario A metrics request fails when the main thread never replies */
     it("answers 503 when the parent never replies (stalled main loop)", async () => {
       const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
       heartbeat[0] = BigInt(Date.now());

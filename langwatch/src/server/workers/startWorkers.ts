@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
 import { assertRedisReady } from "~/server/redis";
 
 const logger = createLogger("langwatch:workers");
@@ -302,12 +303,6 @@ server.listen(workerData.port, () => parentPort.postMessage({ isListening: true 
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  // Deferred like every boot dependency in this file: keeps the worker's
-  // module graph (and prom-client registry construction) off the process
-  // import path until the metrics server actually boots.
-  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
-    "~/server/metrics"
-  );
   const metricsPort = getWorkerMetricsPort();
 
   // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
@@ -330,43 +325,16 @@ async function bootMetricsServer(
         proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
       },
     });
+    await wireLivenessThread(thread, isMetricsAuthorized);
     const startedThread = thread;
-    await new Promise<void>((resolve, reject) => {
-      startedThread.once("error", reject);
-      startedThread.on(
-        "message",
-        (msg: { isListening?: boolean; id?: number }) => {
-          if (msg.isListening) {
-            startedThread.removeListener("error", reject);
-            resolve();
-            return;
-          }
-          if (msg.id === undefined) return;
-          void respondToLivenessThread(
-            startedThread,
-            msg as { id: number; url: string; authorization: string | null },
-            isMetricsAuthorized,
-          );
-        },
-      );
-    });
-    // Post-startup lifecycle: an unhandled Worker "error" would re-throw on
-    // the main thread and kill the process. Log instead — a dead thread stops
-    // answering the port, probes fail, and the pod restarts through the
-    // normal Kubernetes path.
-    startedThread.on("error", (error) => {
-      logger.error({ error }, "worker liveness thread errored");
-    });
-    startedThread.on("exit", (code) => {
-      if (code !== 0) {
-        logger.error({ code }, "worker liveness thread exited unexpectedly");
-      }
-    });
     logger.info(
       `worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
     );
     shutdownHandles.push(async () => {
       clearInterval(heartbeatTimer);
+      // terminate() itself emits a non-zero "exit"; that's a graceful
+      // shutdown, not the unexpected-death case the listener reports.
+      startedThread.removeAllListeners("exit");
       await startedThread.terminate();
     });
   } catch (error) {
@@ -378,22 +346,75 @@ async function bootMetricsServer(
       { error },
       "liveness thread failed to start; serving metrics/liveness on the main loop",
     );
-    const metricsServer = http.createServer(
-      createWorkerMetricsHandler(isMetricsAuthorized),
-    );
-    await new Promise<void>((resolve, reject) => {
-      metricsServer.once("error", reject);
-      metricsServer.listen(metricsPort, () => {
-        metricsServer.removeListener("error", reject);
-        logger.info(`worker metrics server listening on port ${metricsPort}`);
-        resolve();
-      });
+    await bootFallbackMetricsServer({
+      metricsPort,
+      isMetricsAuthorized,
+      shutdownHandles,
     });
-    shutdownHandles.push(
-      () =>
-        new Promise<void>((resolve) => metricsServer.close(() => resolve())),
-    );
   }
+}
+
+/**
+ * Wires the liveness thread's lifecycle: resolves once it is listening,
+ * routes its proxy messages, and installs the post-startup error/exit
+ * listeners (an unhandled Worker "error" would re-throw on the main thread
+ * and kill the process; a dead thread instead stops answering the port,
+ * probes fail, and the pod restarts through the normal Kubernetes path).
+ */
+async function wireLivenessThread(
+  thread: Worker,
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    thread.once("error", reject);
+    thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
+      if (msg.isListening) {
+        thread.removeListener("error", reject);
+        resolve();
+        return;
+      }
+      if (msg.id === undefined) return;
+      void respondToLivenessThread(
+        thread,
+        msg as { id: number; url: string; authorization: string | null },
+        isMetricsAuthorized,
+      );
+    });
+  });
+  thread.on("error", (error) => {
+    logger.error({ error }, "worker liveness thread errored");
+  });
+  thread.on("exit", (code) => {
+    if (code !== 0) {
+      logger.error({ code }, "worker liveness thread exited unexpectedly");
+    }
+  });
+}
+
+/** The pre-thread in-loop server, kept as the fallback when the thread cannot start. */
+async function bootFallbackMetricsServer({
+  metricsPort,
+  isMetricsAuthorized,
+  shutdownHandles,
+}: {
+  metricsPort: number;
+  isMetricsAuthorized: (req: IncomingMessage) => boolean;
+  shutdownHandles: ShutdownHandles;
+}): Promise<void> {
+  const metricsServer = http.createServer(
+    createWorkerMetricsHandler(isMetricsAuthorized),
+  );
+  await new Promise<void>((resolve, reject) => {
+    metricsServer.once("error", reject);
+    metricsServer.listen(metricsPort, () => {
+      metricsServer.removeListener("error", reject);
+      logger.info(`worker metrics server listening on port ${metricsPort}`);
+      resolve();
+    });
+  });
+  shutdownHandles.push(
+    () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+  );
 }
 
 /**
