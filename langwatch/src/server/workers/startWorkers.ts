@@ -1,7 +1,9 @@
+import { Worker } from "node:worker_threads";
 import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
 import { assertRedisReady } from "~/server/redis";
 
 const logger = createLogger("langwatch:workers");
@@ -151,8 +153,51 @@ async function bootUsageStatsWorker(
 export const WORKER_LIVENESS_PATH = "/healthz";
 
 /**
+ * The single bearer gate + registry fetch for the worker's `/metrics`,
+ * transport-agnostic so the in-loop HTTP handler and the liveness thread's
+ * proxy share ONE copy of the security decision (two copies drift).
+ */
+async function evaluateMetricsRequest({
+  url,
+  request,
+  isMetricsAuthorized,
+}: {
+  url: string | undefined;
+  /** The auth input, shaped like the parts of IncomingMessage the gate reads. */
+  request: Pick<IncomingMessage, "headers">;
+  isMetricsAuthorized: (req: IncomingMessage) => boolean;
+}): Promise<{
+  status: number;
+  headers?: Record<string, string>;
+  body?: string;
+}> {
+  if (url !== "/metrics") return { status: 404 };
+  try {
+    if (!isMetricsAuthorized(request as IncomingMessage))
+      return { status: 401 };
+  } catch (error) {
+    // Fail closed when METRICS_API_KEY is unset in production.
+    logger.error({ error }, "worker metrics auth misconfigured");
+    return { status: 500 };
+  }
+  try {
+    const metrics = await register.metrics();
+    return {
+      status: 200,
+      headers: { "Content-Type": register.contentType },
+      body: metrics,
+    };
+  } catch (error) {
+    logger.error({ error }, "error getting worker metrics");
+    return { status: 500 };
+  }
+}
+
+/**
  * The worker metrics server's request handler, split out so the routing and
- * auth branches are testable without binding a port.
+ * auth branches are testable without binding a port. Used directly only on
+ * the fallback path (liveness thread failed to start); the normal path serves
+ * the same decisions through the thread proxy.
  */
 export function createWorkerMetricsHandler(
   isMetricsAuthorized: (req: IncomingMessage) => boolean,
@@ -162,29 +207,13 @@ export function createWorkerMetricsHandler(
       res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
       return;
     }
-    if (req.url !== "/metrics") {
-      res.writeHead(404).end();
-      return;
-    }
-    try {
-      if (!isMetricsAuthorized(req)) {
-        res.writeHead(401).end();
-        return;
-      }
-    } catch (error) {
-      // Fail closed when METRICS_API_KEY is unset in production.
-      logger.error({ error }, "worker metrics auth misconfigured");
-      res.writeHead(500).end();
-      return;
-    }
-    res.setHeader("Content-Type", register.contentType);
-    register
-      .metrics()
-      .then((metrics) => res.end(metrics))
-      .catch((error) => {
-        logger.error({ error }, "error getting worker metrics");
-        res.writeHead(500).end();
-      });
+    void evaluateMetricsRequest({
+      url: req.url,
+      request: req,
+      isMetricsAuthorized,
+    }).then(({ status, headers, body }) => {
+      res.writeHead(status, headers ?? {}).end(body ?? "");
+    });
   };
 }
 
@@ -198,15 +227,189 @@ export function createWorkerMetricsHandler(
 // In that in-process mode this listener is skipped entirely; the web server
 // serves the same shared registry at /metrics.
 //
-// The same listener serves the unauthenticated liveness path the chart's
-// probes call.
+/**
+ * How often the main event loop stamps its heartbeat, and how stale that
+ * stamp may get before the liveness thread reports the process dead.
+ *
+ * A worker saturated with queue catch-up can pin the event loop for over a
+ * minute of legitimate work; `/healthz` served on that same loop then misses
+ * any realistic kubelet probe budget, and Kubernetes kills exactly the
+ * busiest pods — requeueing their in-flight jobs and deepening the backlog
+ * that caused the saturation. Serving liveness from a worker thread with a
+ * loop heartbeat separates the two questions: "is the process alive" (thread
+ * answers instantly, always) and "is the main loop moving" (heartbeat age,
+ * judged against a budget far beyond any legitimate saturation but well
+ * short of "restart never comes").
+ */
+export const WORKER_HEARTBEAT_INTERVAL_MS = 1_000;
+export const WORKER_HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
+const METRICS_PROXY_TIMEOUT_MS = 10_000;
+
+/**
+ * Source for the liveness thread, evaluated via `new Worker(src, {eval:true})`
+ * so it survives every bundler/runtime (no file to resolve). Plain CommonJS,
+ * Node built-ins only. It owns the metrics port: `/healthz` is answered
+ * in-thread from the shared heartbeat; anything else is proxied to the main
+ * thread over `parentPort` (metrics bodies come from the prom-client registry,
+ * which lives there) with a timeout so a stalled loop fails the scrape, never
+ * the probe.
+ */
+export const LIVENESS_THREAD_SOURCE = `
+const http = require("node:http");
+const { parentPort, workerData } = require("node:worker_threads");
+// BigInt64 + Atomics: plain cross-thread Float64Array access has no atomicity
+// guarantee (a torn read yields a garbage timestamp); Atomics only supports
+// integer typed arrays, and epoch millis fit BigInt64 exactly.
+const heartbeat = new BigInt64Array(workerData.heartbeat);
+const pending = new Map();
+let nextId = 1;
+parentPort.on("message", (msg) => {
+  const entry = pending.get(msg.id);
+  if (!entry) return;
+  pending.delete(msg.id);
+  clearTimeout(entry.timer);
+  entry.res.writeHead(msg.status, msg.headers ?? {}).end(msg.body ?? "");
+});
+const server = http.createServer((req, res) => {
+  if (req.url === workerData.livenessPath) {
+    const stalledMs = Date.now() - Number(Atomics.load(heartbeat, 0));
+    if (stalledMs > workerData.stallBudgetMs) {
+      res.writeHead(503, { "Content-Type": "text/plain" })
+        .end("main loop stalled " + Math.round(stalledMs / 1000) + "s");
+    } else {
+      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+    }
+    return;
+  }
+  const id = nextId++;
+  const timer = setTimeout(() => {
+    pending.delete(id);
+    res.writeHead(503).end();
+  }, workerData.proxyTimeoutMs);
+  pending.set(id, { res, timer });
+  parentPort.postMessage({
+    id,
+    url: req.url,
+    authorization: req.headers.authorization ?? null,
+  });
+});
+server.listen(workerData.port, () => parentPort.postMessage({ isListening: true }));
+`;
+
+// The metrics port is bound by the liveness thread (LIVENESS_THREAD_SOURCE)
+// so `/healthz` keeps answering while the main loop is saturated. If the
+// thread cannot start, fall back to the old in-loop server rather than boot
+// with no probe target at all.
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
-    "~/server/metrics"
-  );
   const metricsPort = getWorkerMetricsPort();
+
+  // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
+  const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+  Atomics.store(heartbeat, 0, BigInt(Date.now()));
+  const heartbeatTimer = setInterval(() => {
+    Atomics.store(heartbeat, 0, BigInt(Date.now()));
+  }, WORKER_HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref();
+
+  let thread: Worker | undefined;
+  try {
+    thread = new Worker(LIVENESS_THREAD_SOURCE, {
+      eval: true,
+      workerData: {
+        port: metricsPort,
+        livenessPath: WORKER_LIVENESS_PATH,
+        heartbeat: heartbeat.buffer,
+        stallBudgetMs: WORKER_HEARTBEAT_STALL_BUDGET_MS,
+        proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
+      },
+    });
+    await wireLivenessThread(thread, isMetricsAuthorized);
+    const startedThread = thread;
+    logger.info(
+      `worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
+    );
+    shutdownHandles.push(async () => {
+      clearInterval(heartbeatTimer);
+      // terminate() itself emits a non-zero "exit"; that's a graceful
+      // shutdown, not the unexpected-death case the listener reports.
+      startedThread.removeAllListeners("exit");
+      await startedThread.terminate();
+    });
+  } catch (error) {
+    // The fallback server has no heartbeat consumer, so stop stamping it —
+    // and reap the thread if it was spawned but failed before listening.
+    clearInterval(heartbeatTimer);
+    await thread?.terminate().catch(() => undefined);
+    logger.warn(
+      { error },
+      "liveness thread failed to start; serving metrics/liveness on the main loop",
+    );
+    await bootFallbackMetricsServer({
+      metricsPort,
+      isMetricsAuthorized,
+      shutdownHandles,
+    });
+  }
+}
+
+/**
+ * Wires the liveness thread's lifecycle: resolves once it is listening,
+ * routes its proxy messages, and installs the post-startup error/exit
+ * listeners (an unhandled Worker "error" would re-throw on the main thread
+ * and kill the process; a dead thread instead stops answering the port,
+ * probes fail, and the pod restarts through the normal Kubernetes path).
+ */
+async function wireLivenessThread(
+  thread: Worker,
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    // Reject on early exit too: a thread that dies before listening without
+    // emitting "error" would otherwise leave this promise pending forever
+    // and the fallback server would never start.
+    const rejectOnEarlyExit = (code: number) =>
+      reject(
+        new Error(`liveness thread exited before listening (code ${code})`),
+      );
+    thread.once("error", reject);
+    thread.once("exit", rejectOnEarlyExit);
+    thread.on("message", (msg: { isListening?: boolean; id?: number }) => {
+      if (msg.isListening) {
+        thread.removeListener("error", reject);
+        thread.removeListener("exit", rejectOnEarlyExit);
+        resolve();
+        return;
+      }
+      if (msg.id === undefined) return;
+      void respondToLivenessThread(
+        thread,
+        msg as { id: number; url: string; authorization: string | null },
+        isMetricsAuthorized,
+      );
+    });
+  });
+  thread.on("error", (error) => {
+    logger.error({ error }, "worker liveness thread errored");
+  });
+  thread.on("exit", (code) => {
+    if (code !== 0) {
+      logger.error({ code }, "worker liveness thread exited unexpectedly");
+    }
+  });
+}
+
+/** The pre-thread in-loop server, kept as the fallback when the thread cannot start. */
+async function bootFallbackMetricsServer({
+  metricsPort,
+  isMetricsAuthorized,
+  shutdownHandles,
+}: {
+  metricsPort: number;
+  isMetricsAuthorized: (req: IncomingMessage) => boolean;
+  shutdownHandles: ShutdownHandles;
+}): Promise<void> {
   const metricsServer = http.createServer(
     createWorkerMetricsHandler(isMetricsAuthorized),
   );
@@ -221,6 +424,24 @@ async function bootMetricsServer(
   shutdownHandles.push(
     () => new Promise<void>((resolve) => metricsServer.close(() => resolve())),
   );
+}
+
+/**
+ * Main-thread side of the liveness thread's proxy: only `/metrics` exists,
+ * with the same bearer gate and fail-closed auth semantics as the in-loop
+ * handler.
+ */
+async function respondToLivenessThread(
+  thread: Worker,
+  msg: { id: number; url: string; authorization: string | null },
+  isMetricsAuthorized: (req: IncomingMessage) => boolean,
+): Promise<void> {
+  const { status, headers, body } = await evaluateMetricsRequest({
+    url: msg.url,
+    request: { headers: { authorization: msg.authorization ?? undefined } },
+    isMetricsAuthorized,
+  });
+  thread.postMessage({ id: msg.id, status, headers, body });
 }
 
 /**
