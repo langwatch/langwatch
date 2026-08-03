@@ -507,6 +507,21 @@ describe("jobEnvelope", () => {
           expect(readJobPayloadBytes(legacy)).toBe(MAX_BLOB_BYTES);
         });
 
+        // A recorded size that is not a byte count must not be able to talk the
+        // budget down. `1e999` is the one that matters: it is valid JSON, parses
+        // to Infinity, and would reach the Lua drain as an unparseable ARGV.
+        // Written as raw header text because JSON.stringify cannot emit these.
+        const SIZES = ["1e999", "0.1", "-1", '"4096"', "null"];
+
+        it.each(
+          SIZES,
+        )("ignores a recorded size of %s, costing the cap", (s) => {
+          const header = `{"v":2,"e":"redis","s":${s}}`;
+          const value = `GQ2|${Buffer.byteLength(header)}|${header}`;
+
+          expect(readJobPayloadBytes(value)).toBe(MAX_BLOB_BYTES);
+        });
+
         it("keeps the stored length for a plain inline body", async () => {
           const { tieredBlobs } = makeTiered();
           const encoded = await encodeJobEnvelope({

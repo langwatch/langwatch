@@ -445,8 +445,12 @@ local function gqPayloadSize(value)
       if headerLen and headerLen > 0 then
         local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
         if ok and type(header) == "table" then
-          if type(header["s"]) == "number" and header["s"] >= 0 then
-            return header["s"]
+          local s = header["s"]
+          -- Finite non-negative integer or it is not a byte count. NaN fails
+          -- the >= 0 test; math.floor(inf) == inf, so infinity needs the
+          -- explicit math.huge bound.
+          if type(s) == "number" and s >= 0 and s < math.huge and s == math.floor(s) then
+            return s
           end
           if header["e"] ~= "j" then
             return ${MAX_BLOB_BYTES}

@@ -762,7 +762,12 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
  *
  * Three cases, only one of which is a plain measurement:
  *
- * 1. `s` present — the payload size the encoder recorded. Exact.
+ * 1. `s` present and a non-negative safe integer — the payload size the encoder
+ *    recorded. Exact. Anything else in that field (fractional, `Infinity`,
+ *    `NaN`, negative) is not a byte count and is not trusted: a forged or
+ *    corrupt header must not be able to talk the budget down, and `Infinity`
+ *    would reach the Lua drain as an unparseable ARGV. Those fall through to
+ *    the encoding rule below, so an offloaded body still costs the cap.
  * 2. No `s`, body inline and uncompressed (`e:"j"`), or legacy bare JSON — the
  *    stored length IS the payload. Exact enough.
  * 3. No `s`, body compressed or offloaded (`e` of `gz`/`ref`/`redis`/`s3`, or
@@ -793,8 +798,10 @@ export function readJobPayloadBytes(value: string): number {
   try {
     if (isEnvelope(value)) {
       const { header } = splitEnvelope(value);
-      if (typeof header.s === "number" && header.s >= 0) return header.s;
-      // Pre-`s` envelope: only a plain inline body is worth its stored length.
+      if (Number.isSafeInteger(header.s) && (header.s as number) >= 0) {
+        return header.s as number;
+      }
+      // No usable `s`: only a plain inline body is worth its stored length.
       if (header.e !== "j") return MAX_BLOB_BYTES;
     }
   } catch {

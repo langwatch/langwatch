@@ -155,7 +155,11 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         // burst inside a 20 KiB budget. Six 8 KiB payloads do not fit.
         const maxBatch =
           batches.length > 0 ? Math.max(...batches.map((b) => b.length)) : 0;
-        expect(maxBatch).toBeLessThanOrEqual(2);
+        // Exactly two, not "at most two": an upper bound alone also passes when
+        // coalescing stops happening at all (maxBatch 0), which would be as
+        // wrong as a six-wide batch. The budget fits two 8 KiB payloads, and
+        // all six are staged before the consumer drains, so two is the answer.
+        expect(maxBatch).toBe(2);
         // Every payload was still resolved in full, and delivered exactly once.
         const all = [...batches.flat(), ...singles];
         expect(new Set(all.map((p) => p.id)).size).toBe(6);

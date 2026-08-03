@@ -5297,7 +5297,7 @@ describe("GroupStagingScripts.drainGroupReady", () => {
       // closes, in the window with the deepest backlog.
       describe("given a pre-`s` envelope whose body was compressed or offloaded", () => {
         /** Every body encoding whose stored length is a fraction of its payload. */
-        const ENCODINGS = ["redis", "s3", "ref", "gz"];
+        const ENCODINGS = ["redis", "s3", "ref", "gz"] as const;
 
         const sizelessEnvelope = (encoding: string) => {
           const header = JSON.stringify({
@@ -5335,9 +5335,8 @@ describe("GroupStagingScripts.drainGroupReady", () => {
             initialBytes: 0,
           });
 
-          // Unknown payload: no sibling is coalesced, and none is dropped —
-          // the dispatched job processes alone and these stay staged for their
-          // own later dispatch.
+          // Unknown payload: nothing is coalesced and nothing is dropped —
+          // both jobs stay staged for their own later dispatch.
           expect(drained).toEqual([]);
           expect(await inspectGroupJobs("group-a")).toEqual([
             "j1",
@@ -5345,6 +5344,29 @@ describe("GroupStagingScripts.drainGroupReady", () => {
             "j2",
             "200",
           ]);
+          expect(await inspectTotalPending()).toBe("2");
+        });
+
+        // cjson decodes `1e999` to a Lua infinity, which `s >= 0` alone lets
+        // through and which no arithmetic downstream survives sensibly.
+        it.each([
+          "1e999",
+          "0.1",
+          "-1",
+          '"4096"',
+        ])("ignores a recorded size of %s, costing the cap", async (s) => {
+          const header = `{"v":2,"e":"redis","s":${s}}`;
+          await stageTwo(`GQ2|${Buffer.byteLength(header)}|${header}`);
+
+          const drained = await scripts.drainGroupReady({
+            groupId: "group-a",
+            nowMs: 10_000,
+            maxJobs: 10,
+            maxBytes: 4 * 1024 * 1024,
+            initialBytes: 0,
+          });
+
+          expect(drained).toEqual([]);
           expect(await inspectTotalPending()).toBe("2");
         });
 
