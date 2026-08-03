@@ -107,3 +107,22 @@ Feature: Coding-agent sessions
     When the session is read
     Then the version that folded the most telemetry is returned
     And reading it again returns that same version
+
+  # A busy session can queue its whole transcript faster than it is written.
+  # Writing those contributions together is what keeps up, but the session's
+  # story is told in order — so the grouping must not reorder it.
+  Scenario: a busy session's contributions are written together
+    Given a session queueing telemetry faster than it is written
+    When its waiting contributions are written
+    Then they are written as one batch
+    And not one write per contribution
+
+  Scenario: writing contributions together keeps the session's order
+    Given several of a session's contributions written together
+    When the session is assembled from them
+    Then they apply in the order the agent produced them
+
+  Scenario: an agent that reports only logs keeps its model-call sequence
+    Given an agent whose model calls are reported as logs rather than spans
+    When a run of its model calls is written together
+    Then the session's context growth, final request and stop reason match the last call in that run

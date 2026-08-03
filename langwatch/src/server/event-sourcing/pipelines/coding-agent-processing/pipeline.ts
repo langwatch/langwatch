@@ -16,6 +16,7 @@ import {
   SessionMetricSeriesMapProjection,
   type SessionMetricSeriesRecord,
 } from "./projections/sessionMetricSeries.mapProjection";
+import { CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
 
 export interface CodingAgentProcessingPipelineDeps {
@@ -53,29 +54,49 @@ export interface CodingAgentProcessingPipelineDeps {
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
 ) {
-  return definePipeline<CodingAgentProcessingEvent>()
-    .withName("coding_agent_processing")
-    .withAggregateType("coding_agent_session")
-    .withFoldProjection(
-      "codingAgentSession",
-      new CodingAgentSessionFoldProjection({
-        store: deps.codingAgentSessionStore,
-      }),
-    )
-    .withMapProjection(
-      "codingAgentTraceSessions",
-      new CodingAgentTraceSessionsMapProjection({
-        store: deps.codingAgentTraceSessionAppendStore,
-      }),
-    )
-    .withMapProjection(
-      "sessionMetricSeries",
-      new SessionMetricSeriesMapProjection({
-        store: deps.sessionMetricSeriesAppendStore,
-      }),
-    )
-    .withCommand("contributeSpanFacts", ContributeSpanFactsCommand)
-    .withCommand("contributeLogFacts", ContributeLogFactsCommand)
-    .withCommand("contributeMetricFacts", ContributeMetricFactsCommand)
-    .build();
+  return (
+    definePipeline<CodingAgentProcessingEvent>()
+      .withName("coding_agent_processing")
+      .withAggregateType("coding_agent_session")
+      .withFoldProjection(
+        "codingAgentSession",
+        new CodingAgentSessionFoldProjection({
+          store: deps.codingAgentSessionStore,
+        }),
+      )
+      .withMapProjection(
+        "codingAgentTraceSessions",
+        new CodingAgentTraceSessionsMapProjection({
+          store: deps.codingAgentTraceSessionAppendStore,
+        }),
+      )
+      .withMapProjection(
+        "sessionMetricSeries",
+        new SessionMetricSeriesMapProjection({
+          store: deps.sessionMetricSeriesAppendStore,
+        }),
+      )
+      // ADR-066 pillar 2: every contribution is keyed on its session, so one
+      // session is one queue group and a long run drains its transcript one tiny
+      // insert at a time. Fold the group's queued contributions into a single
+      // multi-row append instead.
+      //
+      // Safe to fold, and safe ONLY as a fold — coalescing preserves the group's
+      // order (the drain takes the head in score order and the batch is handled,
+      // appended and dispatched in that order), which this pipeline needs.
+      // Sharding the session key would not preserve it; see the note above
+      // `CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH` and the derivation's
+      // model-call chain. Each handler derives its event from its own command
+      // alone and never reads back a same-batch append.
+      .withCommand("contributeSpanFacts", ContributeSpanFactsCommand, {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      })
+      .withCommand("contributeLogFacts", ContributeLogFactsCommand, {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      })
+      .withCommand("contributeMetricFacts", ContributeMetricFactsCommand, {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      })
+      .build()
+  );
 }
