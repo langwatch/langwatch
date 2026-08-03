@@ -1,28 +1,23 @@
 import { Alert, Badge } from "@chakra-ui/react";
 import { AlertTriangle } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { AutomationReachabilityDiagnostic } from "~/server/app-layer/automations/automation-reachability";
 
-interface ReachabilityReason {
-  code: string;
-  fields: string[];
-}
-
-interface ReachabilityDiagnostic {
-  status: "unreachable";
-  reasons: ReachabilityReason[];
-}
-
-function diagnosticDescription(diagnostic: ReachabilityDiagnostic): string {
-  const codes = new Set(diagnostic.reasons.map((reason) => reason.code));
+function diagnosticDescription(
+  diagnostic: AutomationReachabilityDiagnostic,
+): string {
   const fields = [
     ...new Set(diagnostic.reasons.flatMap((reason) => reason.fields)),
   ];
 
-  if (codes.has("invalid_filter_query")) {
+  if (diagnostic.reasons.some(({ code }) => code === "invalid_filter_query")) {
     return "The saved filter query is invalid, so this automation cannot match a trace.";
   }
-  if (codes.has("invalid_evaluation_state")) {
-    const field = fields[0] ?? "evaluation state";
+  const invalidEvaluationState = diagnostic.reasons.find(
+    ({ code }) => code === "invalid_evaluation_state",
+  );
+  if (invalidEvaluationState) {
+    const field = invalidEvaluationState.fields[0] ?? "evaluation state";
     return `The configured ${field} is outside the states an evaluation can have, so this automation cannot match.`;
   }
 
@@ -34,7 +29,7 @@ export function AutomationReachabilityWarning({
   diagnostic,
   compact = false,
 }: {
-  diagnostic: ReachabilityDiagnostic | null | undefined;
+  diagnostic: AutomationReachabilityDiagnostic | null | undefined;
   compact?: boolean;
 }) {
   if (!diagnostic) return null;

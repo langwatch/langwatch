@@ -2,10 +2,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import type { AutomationReachabilityDiagnostic } from "~/server/app-layer/automations/automation-reachability";
 import { AutomationReachabilityWarning } from "../AutomationReachabilityWarning";
 
-const diagnostic = {
-  status: "unreachable" as const,
+const diagnostic: AutomationReachabilityDiagnostic = {
+  status: "unreachable",
   reasons: [
     {
       code: "unsupported_filter_query_fields",
@@ -41,6 +42,32 @@ describe("AutomationReachabilityWarning", () => {
 
     expect(screen.getByText("Cannot fire")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("describes the matching reason when diagnostics contain multiple fields", () => {
+    const mixedDiagnostic: AutomationReachabilityDiagnostic = {
+      status: "unreachable",
+      reasons: [
+        {
+          code: "unsupported_structured_fields",
+          fields: ["metadata.key"],
+        },
+        {
+          code: "invalid_evaluation_state",
+          fields: ["evaluations.state"],
+        },
+      ],
+    };
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <AutomationReachabilityWarning diagnostic={mixedDiagnostic} />
+      </ChakraProvider>,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("configured evaluations.state");
+    expect(alert.textContent).not.toContain("configured metadata.key");
   });
 
   it("renders nothing for a reachable automation", () => {

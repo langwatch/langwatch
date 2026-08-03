@@ -47,11 +47,11 @@ export function evaluateQueryInMemory(
   queryText: string,
   trace: InMemoryTrace,
 ): boolean {
-  return evaluateQueryInMemoryDetailed(queryText, trace, true).matches;
+  return evaluateQueryInMemoryDetailed(queryText, trace, true).isMatch;
 }
 
 interface QueryEvaluationDiagnostic {
-  matches: boolean;
+  isMatch: boolean;
   invalid: boolean;
   unsupportedFields: string[];
 }
@@ -59,7 +59,7 @@ interface QueryEvaluationDiagnostic {
 function evaluateQueryInMemoryDetailed(
   queryText: string,
   trace: InMemoryTrace,
-  logUnsupported: boolean,
+  shouldLogUnsupported: boolean,
 ): QueryEvaluationDiagnostic {
   // Reuse the compiler as the validation gate — it enforces the exact
   // MAX_NODE_COUNT / MAX_PARAM_COUNT caps, rejects invalid syntax, and throws
@@ -71,18 +71,18 @@ function evaluateQueryInMemoryDetailed(
       to: 0,
     });
   } catch {
-    return { matches: false, invalid: true, unsupportedFields: [] };
+    return { isMatch: false, invalid: true, unsupportedFields: [] };
   }
   // `null` means no filter (empty / whitespace) — every trace matches.
   if (compiled === null) {
-    return { matches: true, invalid: false, unsupportedFields: [] };
+    return { isMatch: true, invalid: false, unsupportedFields: [] };
   }
 
   let ast: LiqeQuery;
   try {
     ast = parse(normalizeQuery(queryText));
   } catch {
-    return { matches: false, invalid: true, unsupportedFields: [] };
+    return { isMatch: false, invalid: true, unsupportedFields: [] };
   }
 
   const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
@@ -95,7 +95,7 @@ function evaluateQueryInMemoryDetailed(
   // should be rejected at save time or made evaluable is a product call; until
   // then, at least make the silence audible.
   const unsupportedFields = [...new Set(state.unsupportedFields)];
-  if (logUnsupported && unsupportedFields.length > 0) {
+  if (shouldLogUnsupported && unsupportedFields.length > 0) {
     logger.warn(
       {
         traceId: trace.summary.traceId,
@@ -108,7 +108,7 @@ function evaluateQueryInMemoryDetailed(
 
   // UNSUPPORTED anywhere ⇒ the query can't be positively evaluated ⇒ false.
   return {
-    matches: result === true,
+    isMatch: result === true,
     invalid: false,
     unsupportedFields,
   };
