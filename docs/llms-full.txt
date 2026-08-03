@@ -16327,8 +16327,8 @@ The fast path:
 
 1. Click **+ Add members** at the top right of the table.
 2. In the upsert drawer, type one or more emails (comma-separated).
-3. Pick the **Organization role**: `Admin`, `Member`, or `External`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
-4. Optionally tick **Lite Member** for users who should only see projects they're explicitly invited to (no cost visibility).
+3. Pick the **Organization role**: `Admin` or `Member`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
+4. Tick **Lite Member** for anyone who should only read what the team produces rather than change it. This is the same choice as the `External` org role, and it is what decides whether they occupy a full or a lite seat. The (i) next to it lists exactly what they can see; [Seats](/ai-governance/roles-and-permissions#seats) has the full breakdown.
 5. Under **Team Assignments**, pick which teams + which team-level role per team (`Admin`, `Member`, `Viewer` per team). One row per team; click **+ Add team** to scope to multiple teams.
 6. Click **Send invites**.
 
@@ -17556,6 +17556,40 @@ The three pre-built org roles. Each user in the org has exactly one.
 | **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
+
+## Seats
+
+Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
+
+- A **full seat** is someone who can change things.
+- A **lite seat** is someone who can only look at what the team produces.
+
+ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat, unless you assign it a custom role granting anything beyond viewing, in which case that person can change things and counts as a full seat from then on.
+
+### What a lite member can do
+
+They can open the projects they are invited to and read what the team produces there:
+
+| They can see | They cannot |
+|---|---|
+| Traces, including the detail view | See costs |
+| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
+| Evaluations and their results | Invite anyone or change roles |
+| Scenario runs | Manage the gateway, virtual keys or budgets |
+| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
+| Their own team | |
+
+Annotations are the exception: a lite member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
+
+These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
+
+<Note>
+Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
+</Note>
+
+### Choosing between them
+
+The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
 
 ## Team roles
 
@@ -55179,6 +55213,8 @@ You never need a license just to run LangWatch. A license adds the enterprise ca
 
 <Note>
 An Enterprise license is priced per seat, so it carries the number of members you bought and the deployment enforces it. Everything else stays uncapped: volume, history, projects, teams, and every experimentation resource. Need more seats? [Talk to us](mailto:enterprise@langwatch.ai) and we reissue the license.
+
+Seats come in two kinds, and which one a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. See [Seats](/ai-governance/roles-and-permissions#seats).
 </Note>
 
 <Note>
@@ -60574,6 +60610,12 @@ Self-hosted deployments are different: the data sits in your own database, so th
 
   <Accordion title="What if I'm working with sensitive data from the start?">
     Run LangWatch locally on your own machine. All features are available from our [open-source repository](https://github.com/langwatch/langwatch), so you can build with sensitive data without it leaving your environment.
+  </Accordion>
+
+  <Accordion title="What is the difference between a full member and a lite member?">
+    Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
+
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
   </Accordion>
 
   <Accordion title="What counts as a billable event?">

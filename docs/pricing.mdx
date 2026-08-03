@@ -67,6 +67,12 @@ Self-hosted deployments are different: the data sits in your own database, so th
     Run LangWatch locally on your own machine. All features are available from our [open-source repository](https://github.com/langwatch/langwatch), so you can build with sensitive data without it leaving your environment.
   </Accordion>
 
+  <Accordion title="What is the difference between a full member and a lite member?">
+    Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
+
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
+  </Accordion>
+
   <Accordion title="What counts as a billable event?">
     A billable event is either a span within a trace or a scenario run used to test your AI agents. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including what is never billed and how retries are deduplicated.
   </Accordion>

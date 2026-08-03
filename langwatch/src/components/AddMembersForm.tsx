@@ -25,10 +25,16 @@ import {
 import { Checkbox } from "~/components/ui/checkbox";
 import { api } from "~/utils/api";
 import {
+  LITE_MEMBER_EXPLANATION,
+  LITE_MEMBER_SHORT_DESCRIPTION,
+  SEAT_TYPES_DOC_PATH,
+} from "./settings/seatTypeCopy";
+import {
   type RoleOption,
   TeamRoleSelectItemContent,
   teamRolesOptions,
 } from "./settings/TeamUserRoleField";
+import { FieldInfoTooltip } from "./ui/FieldInfoTooltip";
 import { Select } from "./ui/select";
 
 type Option = { label: string; value: string; description?: string };
@@ -240,12 +246,23 @@ export function AddMembersForm({
                   alignItems="flex-start"
                 >
                   <VStack align="start" gap={0}>
-                    <Text fontSize="sm" fontWeight="medium" lineHeight="short">
-                      Lite Member
-                    </Text>
+                    <HStack gap={0}>
+                      <Text
+                        fontSize="sm"
+                        fontWeight="medium"
+                        lineHeight="short"
+                      >
+                        Lite Member
+                      </Text>
+                      <FieldInfoTooltip
+                        description={LITE_MEMBER_EXPLANATION}
+                        docHref={SEAT_TYPES_DOC_PATH}
+                        docLabel="How seats are counted"
+                        testId="lite-member-info"
+                      />
+                    </HStack>
                     <Text fontSize="xs" color="fg.muted">
-                      Can only view projects they are invited to, cannot see
-                      costs
+                      {LITE_MEMBER_SHORT_DESCRIPTION}
                     </Text>
                   </VStack>
                 </Checkbox>
