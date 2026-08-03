@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
@@ -173,20 +174,53 @@ export class EvaluationRunClickHouseRepository
    * `argMax(ScheduledAt, UpdatedAt)` takes the ScheduledAt of the latest
    * version (the same row the dedup keeps). Returns undefined when the
    * evaluation isn't in the table, where the caller stays unbounded.
+   *
+   * Two-phase probe: without a ScheduledAt predicate this seek itself walks
+   * every weekly partition's index — including S3-tiered cold ones — costing
+   * whole seconds per call, while the job paths call it for evaluations
+   * scheduled minutes ago. Probing the recent window first keeps the hot
+   * path on local-disk partitions; only a miss (old or unknown evaluation)
+   * pays the unbounded fallback.
    */
   private async resolveScheduledAtMs(
     tenantId: string,
     evaluationId: string,
   ): Promise<number | undefined> {
+    const recent = await this.queryScheduledAtMs({
+      tenantId,
+      evaluationId,
+      sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
+    });
+    if (recent !== undefined) return recent;
+    return this.queryScheduledAtMs({ tenantId, evaluationId });
+  }
+
+  private async queryScheduledAtMs({
+    tenantId,
+    evaluationId,
+    sinceMs,
+  }: {
+    tenantId: string;
+    evaluationId: string;
+    sinceMs?: number;
+  }): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
+    const windowPredicate =
+      sinceMs !== undefined
+        ? "AND ScheduledAt >= fromUnixTimestamp64Milli({sinceMs:Int64})"
+        : "";
     const result = await client.query({
       query: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND EvaluationId = {evaluationId:String}
+          ${windowPredicate}
       `,
-      query_params: { tenantId, evaluationId },
+      query_params:
+        sinceMs !== undefined
+          ? { tenantId, evaluationId, sinceMs }
+          : { tenantId, evaluationId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
