@@ -78,7 +78,7 @@ export class GatewayBudgetNotFoundError extends HandledError {
  *
  * A cross-tenant guard, not a typo check: the scope id is request-supplied, so
  * without it a caller could put a budget or a key on another tenant's team.
- * That is why `meta` carries the TYPE of scope and never the id — the id names
+ * That is why `meta` carries the TYPE of scope and never the id: the id names
  * another tenant's record, and the sentence it used to sit in
  * (`scope_org_mismatch: team tm_… is not in organization org_…`) shipped both
  * that id and ours to whoever asked.
@@ -174,7 +174,7 @@ const EXTERNAL_ID_INDEX_FIELD = "externalId";
  * version: an array of field names on some, the index NAME on others. Both are
  * matched, and the match is on the field name specifically rather than on
  * "the write had an external id", because {@link VirtualKey} carries a SECOND
- * unique index — `hashedSecret` — whose collision means a minted secret
+ * unique index, `hashedSecret`, whose collision means a minted secret
  * repeated and is emphatically not a customer-facing conflict. Translating
  * that one would report a platform failure as the caller's bad input and hide
  * a broken secret generator behind a 409.

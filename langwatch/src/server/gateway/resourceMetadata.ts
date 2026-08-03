@@ -8,7 +8,7 @@
  * the caps below are asserted in one place.
  *
  * NOTHING here is read by the gateway. Neither field participates in routing,
- * authorization or spend attribution — a caller that puts a secret in
+ * authorization or spend attribution. A caller that puts a secret in
  * `metadata` has handed us a secret we will echo back to anyone who can read
  * the row, which is why the docs say bookkeeping and nothing else.
  */
@@ -90,7 +90,7 @@ export function metadataPatch(
  * The `externalId` half of a create or patch.
  *
  * Explicit null clears the column back to SQL NULL, which is the value that
- * does not participate in the unique index — the same reason the column is
+ * does not participate in the unique index, the same reason the column is
  * nullable at all. Absent leaves it alone.
  */
 export function externalIdPatch(

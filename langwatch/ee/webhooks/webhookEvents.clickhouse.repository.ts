@@ -166,7 +166,7 @@ export class WebhookEventsClickHouseRepository {
    *
    * Null covers three cases the caller cannot tell apart and does not need
    * to: never emitted, out of retention, or belonging to another
-   * organization. Collapsing them is deliberate — distinguishing "expired"
+   * organization. Collapsing them is deliberate: distinguishing "expired"
    * from "not yours" would make the endpoint an existence oracle for other
    * tenants' request ids.
    *
