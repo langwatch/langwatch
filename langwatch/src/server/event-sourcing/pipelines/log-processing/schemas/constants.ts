@@ -18,3 +18,15 @@ export const DEFAULT_LOG_COMMAND_SHARDS = 16;
 export const MIN_LOG_COMMAND_SHARDS = 1;
 export const MAX_LOG_COMMAND_SHARDS = 128;
 export const LOG_MAP_COALESCE_MAX_BATCH = 256;
+
+/**
+ * Append-coalescing bound for recordLogRecord (ADR-066 pillar 2). Log records
+ * arrive one command per record and are sharded onto a fixed set of group keys,
+ * so a busy exporter parks many records behind one shard — one tiny event_log
+ * insert each, which floods the log with small parts. Folding a shard's queued
+ * records into a single multi-row insert keeps the producer off the per-item
+ * write path. Matches {@link LOG_MAP_COALESCE_MAX_BATCH} so both stages of this
+ * pipeline fold at the same width; the drain's byte bound backs it up, and binds
+ * first for records near {@link MAX_CANONICAL_LOG_PAYLOAD_BYTES}.
+ */
+export const LOG_COMMAND_COALESCE_MAX_BATCH = 256;

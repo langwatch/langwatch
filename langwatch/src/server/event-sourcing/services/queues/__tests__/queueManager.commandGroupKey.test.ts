@@ -222,6 +222,9 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
   });
 });
 
+const UNCOALESCED_PRODUCER_MESSAGE =
+  "grouped command producer registered without append coalescing";
+
 // ADR-066 pillar 2 — append coalescing wiring + the un-coalesced-producer
 // visibility record. See specs/event-sourcing/producer-append-coalescing.feature.
 describe("QueueManager.initializeCommandQueues append coalescing", () => {
@@ -330,7 +333,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         expect(infoSpy).toHaveBeenCalledWith(
           { pipeline: "test-pipeline", command: "cold" },
-          "serialized command producer registered without append coalescing",
+          UNCOALESCED_PRODUCER_MESSAGE,
         );
       });
     });
@@ -356,7 +359,116 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         expect(infoSpy).not.toHaveBeenCalledWith(
           expect.anything(),
-          "serialized command producer registered without append coalescing",
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+    });
+  });
+
+  // A shard/bucket group key funnels many aggregates into one consumer just as
+  // serializeByAggregate funnels many commands into one aggregate — the same
+  // producer shape, so the same gap has to be visible.
+  describe("given a group-keyed producer registered without coalescing", () => {
+    describe("when the group key comes from the command class", () => {
+      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "sharded",
+              handlerClass:
+                createMockCommandHandlerClassWithGroupKey("sharded"),
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).toHaveBeenCalledWith(
+          { pipeline: "test-pipeline", command: "sharded" },
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+    });
+
+    describe("when the group key comes from the registration options", () => {
+      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      it("emits a record naming the producer and its pipeline", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "sharded",
+              handlerClass: createMockCommandHandlerClass("sharded"),
+              options: {
+                getGroupKey: (payload: any) => `shard:${payload.index}`,
+              },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).toHaveBeenCalledWith(
+          { pipeline: "test-pipeline", command: "sharded" },
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+    });
+  });
+
+  describe("given a group-keyed producer that DOES coalesce", () => {
+    describe("when the command queue is initialized", () => {
+      it("does not emit the un-coalesced visibility record", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "sharded",
+              handlerClass:
+                createMockCommandHandlerClassWithGroupKey("sharded"),
+              options: { coalesceMaxBatch: 256 },
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).not.toHaveBeenCalledWith(
+          expect.anything(),
+          UNCOALESCED_PRODUCER_MESSAGE,
+        );
+      });
+    });
+  });
+
+  describe("given a producer keyed only by its own aggregate", () => {
+    describe("when the command queue is initialized", () => {
+      it("stays silent — one aggregate per job is not a funnel", () => {
+        const { manager } = buildManager();
+        const infoSpy = loggerInfoSpyOf(manager);
+
+        manager.initializeCommandQueues(
+          [
+            {
+              name: "perAggregate",
+              handlerClass: createMockCommandHandlerClass("perAggregate"),
+            },
+          ],
+          vi.fn(),
+          "test-pipeline",
+        );
+
+        expect(infoSpy).not.toHaveBeenCalledWith(
+          expect.anything(),
+          UNCOALESCED_PRODUCER_MESSAGE,
         );
       });
     });
