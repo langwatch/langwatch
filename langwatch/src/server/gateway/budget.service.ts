@@ -484,6 +484,30 @@ export class GatewayBudgetService {
     return { budgets, spendAvailable, scopeReach };
   }
 
+  /**
+   * One budget in exactly the shape `listWithHealth` returns its rows in,
+   * including whether the spend figure is real.
+   *
+   * A single-resource read that dropped `spendAvailable` would render an
+   * untotalled `spentUsd` as if it were spend, which is the same confusion
+   * the list already refuses to create.
+   */
+  async getWithHealth(
+    id: string,
+    organizationId: string,
+  ): Promise<{
+    budget: GatewayBudgetWithSeats;
+    spendAvailable: boolean;
+  } | null> {
+    const row = await this.prisma.gatewayBudget.findFirst({
+      where: { id, organizationId, archivedAt: null },
+    });
+    if (!row) return null;
+    const { budgets, spendAvailable } =
+      await this.applyClickHouseSpendWithHealth([row], organizationId);
+    return { budget: budgets[0] ?? row, spendAvailable };
+  }
+
   async get(
     id: string,
     organizationId: string,

@@ -31,10 +31,10 @@ import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import { toBudgetDto } from "~/server/gateway/budget.dto";
 import {
   type BudgetScope,
   GatewayBudgetService,
-  type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
@@ -152,8 +152,14 @@ const budgetDtoSchema = z.object({
   description: z.string().nullable(),
   window: budgetWindowSchema,
   on_breach: onBreachSchema,
+  /** Display value. Use `limit_nano_usd` for arithmetic. */
   limit_usd: z.string(),
-  spent_usd: z.string(),
+  /** Canonical integer amount, nano-USD. Null past the safe integer range. */
+  limit_nano_usd: z.number().int().nullable(),
+  /** Display value, null when `spend_available` is false. */
+  spent_usd: z.string().nullable(),
+  /** Canonical integer spend, nano-USD. Null when spend is unavailable. */
+  spent_nano_usd: z.number().int().nullable(),
   timezone: z.string().nullable(),
   provider_key: z.string().nullable(),
   current_period_started_at: z.string(),
@@ -1208,7 +1214,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   describeRoute({
     summary: "List budgets",
     description:
-      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
+      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1270,7 +1276,64 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const memberCounts = await groupMemberCounts(rows);
     return c.json({
       spend_available: spendAvailable,
-      data: rows.map((b) => toBudgetDto(b, memberCounts.get(b.scopeId))),
+      data: rows.map((b) =>
+        toBudgetDto(b, memberCounts.get(b.scopeId), spendAvailable),
+      ),
+    });
+  },
+);
+
+secured.access(apiKeyPermission("gatewayBudgets:view")).get(
+  "/budgets/:id",
+  describeRoute({
+    summary: "Get budget",
+    description:
+      "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend.",
+    tags: ["Budgets"],
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "The budget",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                budget: budgetDtoSchema,
+                spend_available: z.boolean(),
+              }),
+            ),
+          },
+        },
+      },
+      404: {
+        description: "Not found",
+        content: {
+          "application/json": { schema: resolver(apiErrorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const found = await service.getWithHealth(id, organizationId);
+    if (!found) {
+      return errorResponse(c, {
+        status: 404,
+        code: "budget_not_found",
+        message: `budget ${id} not found`,
+      });
+    }
+    const memberCounts = await groupMemberCounts([found.budget]);
+    return c.json({
+      spend_available: found.spendAvailable,
+      budget: toBudgetDto(
+        found.budget,
+        memberCounts.get(found.budget.scopeId),
+        found.spendAvailable,
+      ),
     });
   },
 );
@@ -1761,33 +1824,6 @@ async function groupMemberCounts(
     select: { id: true, _count: { select: { members: true } } },
   });
   return new Map(groups.map((g) => [g.id, g._count.members]));
-}
-
-function toBudgetDto(b: GatewayBudgetWithSeats, memberCount?: number) {
-  return {
-    id: b.id,
-    organization_id: b.organizationId,
-    scope_type: toWireEnum(b.scopeType),
-    scope_id: b.scopeId,
-    name: b.name,
-    description: b.description,
-    window: toWireEnum(b.window),
-    on_breach: toWireEnum(b.onBreach),
-    limit_usd: b.limitUsd.toString(),
-    spent_usd: b.spentUsd.toString(),
-    timezone: b.timezone,
-    provider_key: b.providerKey,
-    current_period_started_at: b.currentPeriodStartedAt.toISOString(),
-    resets_at: b.resetsAt.toISOString(),
-    last_reset_at: b.lastResetAt?.toISOString() ?? null,
-    archived_at: b.archivedAt?.toISOString() ?? null,
-    created_at: b.createdAt.toISOString(),
-    ...(memberCount !== undefined ? { member_count: memberCount } : {}),
-    // Per-person templates only: one allowance per end user, so the wire
-    // reports the distribution instead of pretending there is one total.
-    ...(b.endUsersSeen !== undefined ? { end_users_seen: b.endUsersSeen } : {}),
-    ...(b.endUsersOver !== undefined ? { end_users_over: b.endUsersOver } : {}),
-  };
 }
 
 function scopeFromWire(

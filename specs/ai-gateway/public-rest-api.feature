@@ -271,6 +271,47 @@ Feature: Public REST API — /api/gateway/v1/*
     # webhooks already published lowercase, and this surface was the outlier.
 
   @integration @rest @budgets
+  Scenario: One budget can be read on its own
+    # The surface could list budgets and mutate one, but never read one. An
+    # integrator holding an id had to page the whole list to find it.
+    When I send `GET /api/gateway/v1/budgets/{id}`
+    Then the response status is 200 with `spend_available`
+    And `budget` is field-for-field the row `GET /budgets` serves for that id
+
+  @integration @rest @budgets
+  Scenario: An absent budget answers a canonical 404
+    When I send `GET /api/gateway/v1/budgets/{unknown}`
+    Then the response status is 404
+    And the body is the canonical error envelope with code "budget_not_found"
+
+  @unit @budgets
+  Scenario: A budget amount converts to nano-USD without float drift
+    Given a budget limit stored as `Decimal(18,6)`
+    Then `limit_nano_usd` is the exactly-scaled integer of the decimal string
+    # Scaling the string, not `toNumber() * 1e9`, which lands fractions of a
+    # cent off for amounts a budget actually holds.
+
+  @unit @budgets
+  Scenario: An amount past the safe integer range reports no nano figure
+    Given an amount above `Number.MAX_SAFE_INTEGER` nano-USD
+    Then the `_nano_usd` field is null
+    # A JSON number past that has already lost its low digits, and a wrong
+    # money figure is worse than an absent one.
+
+  @unit @budgets
+  Scenario: Spend that could not be totalled is null, never a stale figure
+    Given `spend_available` is false
+    Then `spent_usd` and `spent_nano_usd` are both null
+    And `limit_usd` still reads, because a limit is a setting, not a measurement
+    # The row used to carry the stale `spentUsd` column alongside the false
+    # flag, so a caller that ignored the flag read it as real money.
+
+  @unit @budgets
+  Scenario: Per-person and per-member fields appear only on their scopes
+    Then `member_count` is present only for a group budget
+    And `end_users_seen` / `end_users_over` only for an attributed-user template
+
+  @integration @rest @budgets
   Scenario: An invalid scope_type filter is refused
     When I send `GET /api/gateway/v1/budgets?scope_type=BANANA`
     Then the response status is 400

@@ -976,6 +976,56 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       ).toBe(false);
     });
 
+    /** @scenario One budget can be read on its own */
+    it("serves a single budget in the list row shape", async () => {
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `single-read-${suffix}`,
+          window: "month",
+          limit_usd: "25.5",
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const id = (await created.json()).budget.id;
+
+      const res = await app.request(`/api/gateway/v1/budgets/${id}`, {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.spend_available).toBe(true);
+      expect(body.budget).toMatchObject({
+        id,
+        scope_type: "project",
+        window: "month",
+        on_breach: "block",
+        limit_usd: "25.5",
+        limit_nano_usd: 25_500_000_000,
+      });
+
+      // The single read must be the SAME row the list serves, field for
+      // field, or a caller has to learn two budget shapes.
+      const list = await app.request("/api/gateway/v1/budgets", {
+        headers: legacyAuth(),
+      });
+      const listed = (await list.json()).data.find((b: any) => b.id === id);
+      expect(body.budget).toEqual(listed);
+    });
+
+    /** @scenario An absent budget answers a canonical 404 */
+    it("answers 404 for a budget that does not exist", async () => {
+      const res = await app.request("/api/gateway/v1/budgets/bgt_missing", {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({
+        error: { type: "not_found", code: "budget_not_found" },
+      });
+    });
+
     /** @scenario An invalid scope_type filter is refused */
     it("rejects an unknown scope_type value", async () => {
       const res = await app.request(
