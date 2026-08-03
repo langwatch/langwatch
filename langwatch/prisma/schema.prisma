@@ -2412,6 +2412,19 @@ model VirtualKey {
   status      VirtualKeyStatus  @default(ACTIVE)
   purpose     VirtualKeyPurpose @default(USER)
 
+  // The id the customer's own system knows this key by, unique per
+  // organization so a provisioning run can address a key it created without
+  // storing our id. Stored NULL rather than "" when absent: Postgres treats
+  // NULLs as distinct in a unique index, which is what lets any number of
+  // keys carry no external id at all.
+  externalId String?
+
+  // Customer-owned key/value map, echoed back verbatim on every read and
+  // REPLACED wholesale on patch. Never read by the gateway, never used for
+  // routing or authorization: it exists so a caller can carry its own
+  // bookkeeping on our row.
+  metadata Json @default("{}")
+
   // Set while status is DISABLED; cleared on enable. Revoke does not touch
   // these: DISABLED and REVOKED are independent lifecycle exits.
   disabledAt     DateTime?
@@ -2482,6 +2495,7 @@ model VirtualKey {
   routingMode VirtualKeyRoutingMode @default(NONE)
 
   @@unique([hashedSecret])
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@index([displayPrefix])
   @@index([status])
@@ -3135,6 +3149,12 @@ model GatewayBudget {
   onBreach    GatewayBudgetBreachAction @default(BLOCK)
   timezone    String? // org-level default if null
 
+  // See the matching fields on VirtualKey: the customer's own id for this
+  // budget, unique per organization and stored NULL when absent, plus a
+  // customer-owned map this platform only ever echoes back.
+  externalId String?
+  metadata   Json    @default("{}")
+
   // Mutated by the ledger, read by the gateway as part of the config payload.
   spentUsd               Decimal   @default(0) @db.Decimal(18, 6)
   currentPeriodStartedAt DateTime  @default(now())
@@ -3158,6 +3178,7 @@ model GatewayBudget {
   // own delete permission.
   managedByVirtualKeyId String?
 
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@index([scopeType, scopeId, providerKey])
   @@index([managedByVirtualKeyId])

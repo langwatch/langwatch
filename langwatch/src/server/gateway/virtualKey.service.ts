@@ -26,6 +26,12 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
+import { translateExternalIdConflict } from "./errors";
+import {
+  identityPatchData,
+  metadataPatch,
+  type ResourceMetadata,
+} from "./resourceMetadata";
 import {
   eligibleModelProvidersForVk,
   resolveTraceProject,
@@ -115,6 +121,10 @@ export type CreateVirtualKeyInput = {
    * `virtualKeys:manage` at each scope before calling.
    */
   scopes: ScopeInput[];
+  /** The caller's own id for this key; must be free within the organization. */
+  externalId?: string | null;
+  /** Customer-owned bookkeeping. Never read by the gateway. */
+  metadata?: ResourceMetadata;
   /**
    * Explicit trace destination for org- and team-owned keys. NOT a scope:
    * it grants no visibility and no operate rights on the key.
@@ -143,6 +153,10 @@ export type UpdateVirtualKeyInput = {
   name?: string;
   description?: string | null;
   scopes?: ScopeInput[];
+  /** Undefined leaves it alone; null clears it; a value claims it. */
+  externalId?: string | null;
+  /** Undefined leaves the stored map alone; a value REPLACES it wholesale. */
+  metadata?: ResourceMetadata;
   traceProjectId?: string | null;
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
@@ -207,6 +221,7 @@ export class VirtualKeyService {
     organizationId: string;
     limit: number;
     cursor: { createdAt: Date; id: string } | null;
+    externalId?: string;
   }): Promise<VirtualKeyWithScopes[]> {
     return this.repository.findPageInOrganization(args);
   }
@@ -265,64 +280,73 @@ export class VirtualKeyService {
 
     const id = this.nextVirtualKeyId();
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const vk = await this.repository.create(
-        {
-          id,
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description,
-          hashedSecret,
-          displayPrefix,
-          principalUserId: input.principalUserId,
-          config: config as Prisma.InputJsonValue,
-          createdById: input.actorUserId,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId ?? null,
-          routingPolicyId: input.routingPolicyId ?? null,
-          routingMode,
-          purpose: input.purpose,
-        },
-        tx,
-      );
-      await this.assertTraceProjectResolvable(vk, tx);
-      await this.assertProvidersAllowedReachable(
-        vk,
-        config.providersAllowed,
-        tx,
-      );
-      if (input.budget) {
-        await this.upsertKeyBudget(
+    const created = await this.prisma
+      .$transaction(async (tx) => {
+        const vk = await this.repository.create(
           {
-            virtualKey: vk,
-            budget: input.budget,
-            actorUserId: input.actorUserId,
+            id,
+            organizationId: input.organizationId,
+            name: input.name,
+            description: input.description,
+            hashedSecret,
+            displayPrefix,
+            principalUserId: input.principalUserId,
+            config: config as Prisma.InputJsonValue,
+            externalId: input.externalId ?? null,
+            metadata: metadataPatch(input.metadata),
+            createdById: input.actorUserId,
+            scopes: input.scopes,
+            traceProjectId: input.traceProjectId ?? null,
+            routingPolicyId: input.routingPolicyId ?? null,
+            routingMode,
+            purpose: input.purpose,
           },
           tx,
         );
-      }
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "VK_CREATED",
-          virtualKeyId: vk.id,
-        },
-        tx,
+        await this.assertTraceProjectResolvable(vk, tx);
+        await this.assertProvidersAllowedReachable(
+          vk,
+          config.providersAllowed,
+          tx,
+        );
+        if (input.budget) {
+          await this.upsertKeyBudget(
+            {
+              virtualKey: vk,
+              budget: input.budget,
+              actorUserId: input.actorUserId,
+            },
+            tx,
+          );
+        }
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "VK_CREATED",
+            virtualKeyId: vk.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.created",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            after: serialiseForAudit(vk),
+          },
+          tx,
+        );
+        return vk;
+      })
+      // The unique index is what actually decides whether the external id was
+      // free, so the refusal is read off its violation rather than off a
+      // pre-flight SELECT that two concurrent creates would both pass.
+      .catch((error: unknown) =>
+        translateExternalIdConflict(error, "virtual_key", input.externalId),
       );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId: null,
-          actorUserId: input.actorUserId,
-          action: "gateway.virtual_key.created",
-          targetKind: "virtual_key",
-          targetId: vk.id,
-          after: serialiseForAudit(vk),
-        },
-        tx,
-      );
-      return vk;
-    });
 
     await emitVkLifecycle(this.prisma, { vk: created, action: "created" });
     return { virtualKey: created, secret };
@@ -376,112 +400,117 @@ export class VirtualKeyService {
         : existing.routingMode;
     assertProvidersAllowedShape(input.config?.providersAllowed);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (input.scopes) {
-        if (input.scopes.length === 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "At least one scope is required",
-          });
+    const updated = await this.prisma
+      .$transaction(async (tx) => {
+        if (input.scopes) {
+          if (input.scopes.length === 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "At least one scope is required",
+            });
+          }
+          await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
-        await this.repository.replaceScopes(input.id, input.scopes, tx);
-      }
 
-      const vk = await tx.virtualKey.update({
-        where: { id: input.id, organizationId: input.organizationId },
-        data: {
-          name: input.name ?? existing.name,
-          description: input.description ?? existing.description,
-          config: config as Prisma.InputJsonValue,
-          ...(input.routingPolicyId !== undefined
-            ? { routingPolicyId: input.routingPolicyId }
-            : {}),
-          ...(input.traceProjectId !== undefined
-            ? { traceProjectId: input.traceProjectId }
-            : {}),
-          routingMode,
-          revision: { increment: 1n },
-        },
-        include: { scopes: true },
-      });
+        const vk = await tx.virtualKey.update({
+          where: { id: input.id, organizationId: input.organizationId },
+          data: {
+            name: input.name ?? existing.name,
+            description: input.description ?? existing.description,
+            config: config as Prisma.InputJsonValue,
+            ...identityPatchData(input),
+            ...(input.routingPolicyId !== undefined
+              ? { routingPolicyId: input.routingPolicyId }
+              : {}),
+            ...(input.traceProjectId !== undefined
+              ? { traceProjectId: input.traceProjectId }
+              : {}),
+            routingMode,
+            revision: { increment: 1n },
+          },
+          include: { scopes: true },
+        });
 
-      await this.assertTraceProjectResolvable(vk, tx);
-      await this.assertProvidersAllowedReachable(
-        vk,
-        config.providersAllowed,
-        tx,
-      );
+        await this.assertTraceProjectResolvable(vk, tx);
+        await this.assertProvidersAllowedReachable(
+          vk,
+          config.providersAllowed,
+          tx,
+        );
 
-      if (input.budget !== undefined) {
-        if (input.budget) {
-          await this.upsertKeyBudget(
+        if (input.budget !== undefined) {
+          if (input.budget) {
+            await this.upsertKeyBudget(
+              {
+                virtualKey: vk,
+                budget: input.budget,
+                actorUserId: input.actorUserId,
+              },
+              tx,
+            );
+          } else {
+            await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+          }
+        }
+
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "VK_CONFIG_UPDATED",
+            virtualKeyId: vk.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: null,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.updated",
+            targetKind: "virtual_key",
+            targetId: vk.id,
+            before,
+            after: serialiseForAudit(vk),
+          },
+          tx,
+        );
+        // Guardrail attach/detach are governance events distinct from a
+        // generic config edit; the AuditLog target stays the VK (the row
+        // that opted in), not the guardrail. One row per added / removed
+        // guardrail id so SIEM exports see each wire change individually.
+        for (const a of guardrailDelta.attached) {
+          await this.auditLog.append(
             {
-              virtualKey: vk,
-              budget: input.budget,
+              organizationId: input.organizationId,
+              projectId: null,
               actorUserId: input.actorUserId,
+              action: "gateway.virtual_key.guardrail_attached",
+              targetKind: "virtual_key",
+              targetId: vk.id,
+              after: { direction: a.direction, guardrailId: a.guardrailId },
             },
             tx,
           );
-        } else {
-          await this.archiveKeyBudgets(vk, input.actorUserId, tx);
         }
-      }
-
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "VK_CONFIG_UPDATED",
-          virtualKeyId: vk.id,
-        },
-        tx,
+        for (const d of guardrailDelta.detached) {
+          await this.auditLog.append(
+            {
+              organizationId: input.organizationId,
+              projectId: null,
+              actorUserId: input.actorUserId,
+              action: "gateway.virtual_key.guardrail_detached",
+              targetKind: "virtual_key",
+              targetId: vk.id,
+              before: { direction: d.direction, guardrailId: d.guardrailId },
+            },
+            tx,
+          );
+        }
+        return vk;
+      })
+      .catch((error: unknown) =>
+        translateExternalIdConflict(error, "virtual_key", input.externalId),
       );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId: null,
-          actorUserId: input.actorUserId,
-          action: "gateway.virtual_key.updated",
-          targetKind: "virtual_key",
-          targetId: vk.id,
-          before,
-          after: serialiseForAudit(vk),
-        },
-        tx,
-      );
-      // Guardrail attach/detach are governance events distinct from a
-      // generic config edit; the AuditLog target stays the VK (the row
-      // that opted in), not the guardrail. One row per added / removed
-      // guardrail id so SIEM exports see each wire change individually.
-      for (const a of guardrailDelta.attached) {
-        await this.auditLog.append(
-          {
-            organizationId: input.organizationId,
-            projectId: null,
-            actorUserId: input.actorUserId,
-            action: "gateway.virtual_key.guardrail_attached",
-            targetKind: "virtual_key",
-            targetId: vk.id,
-            after: { direction: a.direction, guardrailId: a.guardrailId },
-          },
-          tx,
-        );
-      }
-      for (const d of guardrailDelta.detached) {
-        await this.auditLog.append(
-          {
-            organizationId: input.organizationId,
-            projectId: null,
-            actorUserId: input.actorUserId,
-            action: "gateway.virtual_key.guardrail_detached",
-            targetKind: "virtual_key",
-            targetId: vk.id,
-            before: { direction: d.direction, guardrailId: d.guardrailId },
-          },
-          tx,
-        );
-      }
-      return vk;
-    });
 
     return updated;
   }

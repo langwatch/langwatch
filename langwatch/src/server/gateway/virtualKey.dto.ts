@@ -12,6 +12,7 @@
  * The token format is `vk-lw-<ulid>` with no live/test discriminator;
  * the gateway never branches on environment, so there is no env field.
  */
+import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 import { toWireEnum } from "./wireEnums";
 
@@ -32,6 +33,10 @@ export type VirtualKeyCamelDto = {
   /** Explicit trace destination; grants no access to the key. */
   traceProjectId: string | null;
   principalUser: { name: string | null; email: string | null } | null;
+  /** The caller's own id for this key, unique per organization. */
+  externalId: string | null;
+  /** Customer-owned bookkeeping, echoed back verbatim. */
+  metadata: ResourceMetadata;
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode: "NONE" | "FALLBACK_ALL" | "POLICY";
@@ -53,6 +58,8 @@ export type VirtualKeySnakeDto = {
   display_prefix: string;
   principal_user_id: string | null;
   trace_project_id: string | null;
+  external_id: string | null;
+  metadata: ResourceMetadata;
   /**
    * Wire casing, lower_snake_case, unlike the camel DTO next to it: this is
    * the shape the public REST surface publishes, and every enum it carries is
@@ -93,6 +100,8 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     principalUser: vk.principalUser
       ? { name: vk.principalUser.name, email: vk.principalUser.email }
       : null,
+    externalId: vk.externalId ?? null,
+    metadata: metadataFromRow(vk.metadata),
     scopes: vk.scopes.map((s) => ({
       scopeType: s.scopeType,
       scopeId: s.scopeId,
@@ -128,6 +137,8 @@ export function toVirtualKeySnakeDto(
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
     trace_project_id: base.traceProjectId,
+    external_id: base.externalId,
+    metadata: base.metadata,
     scopes: base.scopes.map((s) => ({
       scope_type: toWireEnum(s.scopeType),
       scope_id: s.scopeId,

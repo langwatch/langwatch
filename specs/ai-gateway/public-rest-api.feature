@@ -540,3 +540,61 @@ Feature: Public REST API — /api/gateway/v1/*
     When hono-openapi's `describeRoute` output is generated for this app
     Then the schema matches the DTOs the handlers actually return
     And the CLI's VirtualKeysApiService can be migrated from direct-fetch to the typed openapi client with zero behavioural change
+
+  # ============================================================================
+  # external_id and metadata
+  # ============================================================================
+  #
+  # The two customer-owned fields on the governed resources. `external_id` is
+  # the id the caller's own system knows the row by; `metadata` is a string map
+  # this platform stores and echoes and never interprets. Neither participates
+  # in routing, authorization or spend attribution.
+
+  @integration @rest @virtual-keys
+  Scenario: A virtual key carries the caller's own id and bookkeeping
+    When I send `POST /api/gateway/v1/virtual-keys` with `external_id` and `metadata`
+    Then the response status is 201
+    And `virtual_key.external_id` and `virtual_key.metadata` echo what was sent
+    And a subsequent GET-by-id returns both
+    And `GET /api/gateway/v1/virtual-keys?external_id=` returns exactly that key
+
+  @integration @rest @virtual-keys
+  Scenario: A key with no external id reads as null, not as an empty string
+    When I create a virtual key naming neither field
+    Then `virtual_key.external_id` is null
+    And `virtual_key.metadata` is an empty object
+
+  @integration @rest @virtual-keys
+  Scenario: Patching metadata replaces the stored map rather than merging
+    Given a virtual key whose metadata holds two keys
+    When I send `PATCH /api/gateway/v1/virtual-keys/:id` with a one-key `metadata`
+    Then the stored map holds only that one key
+    And sending `external_id: null` clears the id
+    And another key may then claim the cleared id
+
+  @integration @rest @virtual-keys
+  Scenario: A second resource cannot claim an external id already in use
+    Given a virtual key already carrying external id "vk-dupe"
+    When I create another virtual key with the same external id
+    Then the response status is 409
+    And error.code = "external_id_conflict"
+    And error.meta names the resource and the id the caller sent
+
+  @integration @rest @budgets
+  Scenario: A budget carries the caller's own id and bookkeeping
+    When I create a budget with `external_id` and `metadata`
+    Then both are returned on create, on GET-by-id, and on the list row
+    And `GET /api/gateway/v1/budgets?external_id=` returns exactly that budget
+    And a second budget claiming the same id is refused with 409 external_id_conflict
+
+  @integration @rest
+  Scenario: Metadata beyond the documented caps is refused, naming the key
+    When I send a `metadata` value longer than 500 characters
+    Then the response status is 400 with error.code = "validation_error"
+    And error.meta.fields names the offending key
+    And a map of more than 40 keys is refused the same way
+
+  @integration @rest @virtual-keys
+  Scenario: Two keys may both carry no external id
+    When I create two virtual keys naming no external id
+    Then both are created

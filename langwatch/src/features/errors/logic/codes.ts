@@ -61,6 +61,7 @@ export const APP_ERROR_CODES = [
   "evaluator_not_found",
   "experiment_not_found",
   "export_failed",
+  "external_id_conflict",
   "filter_field_unknown",
   "filter_parse_error",
   "gateway_budget_not_found",

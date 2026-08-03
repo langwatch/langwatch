@@ -43,6 +43,11 @@ import {
   chRepoOrUndefined,
   spendRepoOrUndefined,
 } from "~/server/gateway/clickhouseRepos";
+import {
+  EXTERNAL_ID_MAX_LENGTH,
+  externalIdSchema,
+  resourceMetadataSchema,
+} from "~/server/gateway/resourceMetadata";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
   assertActorCanManageAllScopes,
@@ -138,6 +143,10 @@ const virtualKeyDtoSchema = z.object({
   // Where an org- or team-owned key's traces and costs land. Not a
   // scope: it grants no access to the key.
   trace_project_id: z.string().nullable(),
+  /** The caller's own id for this key, unique within the organization. */
+  external_id: z.string().nullable(),
+  /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
+  metadata: z.record(z.string(), z.string()),
   scopes: z.array(
     z.object({ scope_type: vkScopeTypeSchema, scope_id: z.string() }),
   ),
@@ -170,6 +179,10 @@ const budgetDtoSchema = z.object({
   spent_nano_usd: z.number().int().nullable(),
   timezone: z.string().nullable(),
   provider_key: z.string().nullable(),
+  /** The caller's own id for this budget, unique within the organization. */
+  external_id: z.string().nullable(),
+  /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
+  metadata: z.record(z.string(), z.string()),
   current_period_started_at: z.string(),
   resets_at: z.string(),
   last_reset_at: z.string().nullable(),
@@ -283,6 +296,24 @@ const pageQuerySchema = z.object({
     .default(PAGE_LIMIT_DEFAULT),
 });
 
+/**
+ * The `?external_id=` filter both governed lists take.
+ *
+ * Exact match on the caller's own id, which makes the list the lookup for a
+ * resource whose LangWatch id the caller never stored. It returns a page
+ * rather than a single row so one shape serves both readings, and so a caller
+ * that has not yet claimed the id back gets an empty page, not a 404.
+ */
+const externalIdFilterSchema = z
+  .string()
+  .max(EXTERNAL_ID_MAX_LENGTH)
+  .optional()
+  .describe("Exact match on the resource's `external_id`.");
+
+const virtualKeyListQuerySchema = pageQuerySchema.extend({
+  external_id: externalIdFilterSchema,
+});
+
 const budgetListQuerySchema = pageQuerySchema.extend({
   scope_type: z
     .string()
@@ -290,6 +321,7 @@ const budgetListQuerySchema = pageQuerySchema.extend({
     .describe(
       "Comma-separated subset of the scope types, lowercase, e.g. `virtual_key,principal`.",
     ),
+  external_id: externalIdFilterSchema,
 });
 
 const resetBudgetQuerySchema = z.object({
@@ -386,6 +418,10 @@ const createVirtualKeySchema = z.object({
   /** Optional cap created atomically with the key, targeted at the key. */
   budget: budgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
+  /** The caller's own id for this key. 409s when the org already uses it. */
+  external_id: externalIdSchema.nullable().optional(),
+  /** Customer-owned bookkeeping. Never read by the gateway. */
+  metadata: resourceMetadataSchema.optional(),
   /**
    * Only "user". Product-managed purposes (langy) are provisioned by the
    * product itself, never over the public API — a product-managed key is
@@ -405,6 +441,10 @@ const updateVirtualKeySchema = z.object({
   /** Undefined leaves the key's cap alone; a value upserts it; null archives it. */
   budget: budgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
+  /** Absent leaves it alone; null clears it; a value claims it. */
+  external_id: externalIdSchema.nullable().optional(),
+  /** REPLACES the stored map rather than merging into it. `{}` empties it. */
+  metadata: resourceMetadataSchema.optional(),
 });
 
 const createCacheRuleSchema = z.object({
@@ -431,6 +471,10 @@ const updateBudgetSchema = z.object({
   limit_usd: usdAmountSchema.optional(),
   on_breach: onBreachSchema.optional(),
   timezone: z.string().nullable().optional(),
+  /** Absent leaves it alone; null clears it; a value claims it. */
+  external_id: externalIdSchema.nullable().optional(),
+  /** REPLACES the stored map rather than merging into it. `{}` empties it. */
+  metadata: resourceMetadataSchema.optional(),
 });
 
 const disableVkSchema = z.object({
@@ -473,6 +517,10 @@ const createBudgetSchema = z.object({
    * makes the full target x provider matrix expressible.
    */
   provider_key: z.string().nullable().optional(),
+  /** The caller's own id for this budget. 409s when the org already uses it. */
+  external_id: externalIdSchema.nullable().optional(),
+  /** Customer-owned bookkeeping. Never read by the gateway. */
+  metadata: resourceMetadataSchema.optional(),
 });
 
 const toVkDto = toVirtualKeySnakeDto;
@@ -752,7 +800,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
       },
     },
   }),
-  zValidator("query", pageQuerySchema),
+  zValidator("query", virtualKeyListQuerySchema),
   async (c) => {
     const project = c.get("project");
     const page = { data: c.req.valid("query") };
@@ -766,6 +814,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
       organizationId,
       limit: page.data.limit,
       cursor: cursor ?? null,
+      externalId: page.data.external_id,
     });
     // Visibility is applied to the page, not to the query, because
     // `isVisibleToMembership` is the shared implementation the tRPC list uses
@@ -869,6 +918,8 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
+        externalId: body.data.external_id,
+        metadata: body.data.metadata,
         actorUserId,
       };
       const { virtualKey, secret } = await service.create(input);
@@ -1076,6 +1127,8 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
           body.data.routing_mode && toStoredEnum(body.data.routing_mode),
         budget: budgetFromWire(body.data.budget),
         config: body.data.config,
+        externalId: body.data.external_id,
+        metadata: body.data.metadata,
       });
       return c.json({ virtual_key: toVkDto(updated) });
     } catch (error) {
@@ -1426,6 +1479,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       scopeTypes: scopeTypes
         ? Array.from(scopeTypes, (t) => toStoredEnum(t))
         : undefined,
+      externalId: page.data.external_id,
     });
     const memberCounts = await groupMemberCounts(rows);
     return c.json({
@@ -1539,6 +1593,8 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
         onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
         timezone: body.data.timezone ?? null,
         providerKey: body.data.provider_key ?? null,
+        externalId: body.data.external_id,
+        metadata: body.data.metadata,
         actorUserId,
       });
       const memberCounts = await groupMemberCounts([row]);
@@ -1588,6 +1644,8 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
         limitUsd: body.data.limit_usd,
         onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
         timezone: body.data.timezone,
+        externalId: body.data.external_id,
+        metadata: body.data.metadata,
         actorUserId,
       });
       const memberCounts = await groupMemberCounts([row]);

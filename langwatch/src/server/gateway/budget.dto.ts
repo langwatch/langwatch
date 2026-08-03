@@ -7,6 +7,7 @@
  * budget with no spend source renders as.
  */
 import type { GatewayBudgetWithSeats } from "./budget.service";
+import { metadataFromRow } from "./resourceMetadata";
 import { toWireEnum } from "./wireEnums";
 import { decimalUsdToNanoUsd } from "./wireMoney";
 
@@ -41,6 +42,8 @@ function toBudgetDto(
     spent_nano_usd: spendAvailable ? decimalUsdToNanoUsd(b.spentUsd) : null,
     timezone: b.timezone,
     provider_key: b.providerKey,
+    external_id: b.externalId ?? null,
+    metadata: metadataFromRow(b.metadata),
     current_period_started_at: b.currentPeriodStartedAt.toISOString(),
     resets_at: b.resetsAt.toISOString(),
     last_reset_at: b.lastResetAt?.toISOString() ?? null,

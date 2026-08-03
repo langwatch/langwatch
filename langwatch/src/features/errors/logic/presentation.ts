@@ -1277,6 +1277,17 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  external_id_conflict: {
+    // The id is the caller's own, so naming it back is the fastest way to see
+    // which of a batch of provisioning calls collided.
+    title: "That external ID is already in use",
+    describe: (error) => {
+      const externalId = str(error, "external_id", "");
+      return externalId
+        ? `Another record in this organization already uses "${externalId}". Pick a different one, or update that record instead.`
+        : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
+    },
+  },
   cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",

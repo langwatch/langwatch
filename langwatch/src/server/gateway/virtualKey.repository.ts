@@ -45,6 +45,10 @@ export type CreateVirtualKeyData = {
   displayPrefix: string;
   principalUserId?: string | null;
   config: Prisma.InputJsonValue;
+  /** The caller's own id for the key. Null when it named none. */
+  externalId?: string | null;
+  /** Customer-owned bookkeeping, stored verbatim. */
+  metadata?: Prisma.InputJsonValue;
   createdById: string;
   /**
    * Scope set the VK is reachable from. Empty array is rejected by the
@@ -161,11 +165,16 @@ export class VirtualKeyRepository {
     organizationId: string;
     limit: number;
     cursor: { createdAt: Date; id: string } | null;
+    /** Exact match, not a prefix: this is an id, not a search box. */
+    externalId?: string;
   }): Promise<VirtualKeyWithScopes[]> {
     return this.prisma.virtualKey.findMany({
       where: {
         organizationId: args.organizationId,
         purpose: "USER",
+        ...(args.externalId !== undefined
+          ? { externalId: args.externalId }
+          : {}),
         ...(args.cursor
           ? {
               OR: keysetAfter([
@@ -254,6 +263,8 @@ export class VirtualKeyRepository {
         principalUserId: data.principalUserId ?? null,
         traceProjectId: data.traceProjectId ?? null,
         config: data.config,
+        externalId: data.externalId ?? null,
+        ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,
         ...(data.routingMode ? { routingMode: data.routingMode } : {}),

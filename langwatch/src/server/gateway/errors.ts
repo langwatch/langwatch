@@ -6,6 +6,9 @@
  * prose — `message` is for whoever reads the trace.
  */
 import { HandledError } from "@langwatch/handled-error";
+import { Prisma } from "@prisma/client";
+
+import type { ExternalIdResource } from "./resourceMetadata";
 
 /**
  * The caller may see the virtual key but not attach guardrails to its project.
@@ -130,6 +133,80 @@ export class GatewaySpendUnavailableError extends HandledError {
     });
     this.name = "GatewaySpendUnavailableError";
   }
+}
+
+/**
+ * Two rows in one organization cannot answer to the same `external_id`.
+ *
+ * A 409 rather than a 400: the request is well-formed and would have been
+ * accepted a moment earlier, so the caller's fix is to pick another id or to
+ * patch the row that already holds this one, not to correct a malformed field.
+ *
+ * `meta.external_id` echoes the id the caller sent, which is the caller's own
+ * value and therefore safe to return: unlike the scope-mismatch guard above,
+ * this leaks nothing about the colliding row beyond the fact that the caller
+ * already used the id.
+ */
+export class GatewayExternalIdConflictError extends HandledError {
+  declare readonly code: "external_id_conflict";
+
+  constructor(resource: ExternalIdResource, externalId: string) {
+    super("external_id_conflict", "That external_id is already in use", {
+      meta: { resource, external_id: externalId },
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "GatewayExternalIdConflictError";
+  }
+}
+
+/** The unique index each resource's `externalId` is guarded by. */
+const EXTERNAL_ID_INDEX_FIELD = "externalId";
+
+/**
+ * Does this P2002 name the external-id index?
+ *
+ * Prisma reports the offending constraint differently per connector and per
+ * version: an array of field names on some, the index NAME on others. Both are
+ * matched, and the match is on the field name specifically rather than on
+ * "the write had an external id", because {@link VirtualKey} carries a SECOND
+ * unique index — `hashedSecret` — whose collision means a minted secret
+ * repeated and is emphatically not a customer-facing conflict. Translating
+ * that one would report a platform failure as the caller's bad input and hide
+ * a broken secret generator behind a 409.
+ */
+function namesExternalIdIndex(target: unknown): boolean {
+  if (Array.isArray(target)) {
+    return target.some(
+      (field) => typeof field === "string" && field === EXTERNAL_ID_INDEX_FIELD,
+    );
+  }
+  return typeof target === "string" && target.includes(EXTERNAL_ID_INDEX_FIELD);
+}
+
+/**
+ * Re-throw `error` as {@link GatewayExternalIdConflictError} when it is the
+ * external-id uniqueness violation, and untouched otherwise.
+ *
+ * Written as a translate-and-rethrow rather than a pre-flight SELECT because a
+ * check-then-write races: two concurrent creates both find the id free and one
+ * of them still hits the index. The index is the only thing that actually
+ * decides, so it is what the error is read from.
+ */
+export function translateExternalIdConflict(
+  error: unknown,
+  resource: ExternalIdResource,
+  externalId: string | null | undefined,
+): never {
+  if (
+    externalId &&
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002" &&
+    namesExternalIdIndex(error.meta?.target)
+  ) {
+    throw new GatewayExternalIdConflictError(resource, externalId);
+  }
+  throw error;
 }
 
 /**

@@ -38,8 +38,10 @@ import {
   GatewayBudgetNotFoundError,
   GatewayGroupBudgetUnsupportedError,
   GatewayScopeOrgMismatchError,
+  translateExternalIdConflict,
   VirtualKeyNotFoundError,
 } from "./errors";
+import { identityPatchData, type ResourceMetadata } from "./resourceMetadata";
 import { keysetAfter } from "./wirePagination";
 
 const logger = createLogger("langwatch:gateway:budget-service");
@@ -98,6 +100,10 @@ export type CreateBudgetInput = {
    * is what makes the full target x provider matrix expressible.
    */
   providerKey?: string | null;
+  /** The caller's own id for this budget; must be free within the org. */
+  externalId?: string | null;
+  /** Customer-owned bookkeeping. Never read by the gateway. */
+  metadata?: ResourceMetadata;
   actorUserId: string;
 };
 
@@ -109,6 +115,10 @@ export type UpdateBudgetInput = {
   limitUsd?: number | string | Prisma.Decimal;
   onBreach?: "BLOCK" | "WARN";
   timezone?: string | null;
+  /** Undefined leaves it alone; null clears it; a value claims it. */
+  externalId?: string | null;
+  /** Undefined leaves the stored map alone; a value REPLACES it wholesale. */
+  metadata?: ResourceMetadata;
   actorUserId: string;
 };
 
@@ -463,12 +473,17 @@ export class GatewayBudgetService {
     limit: number;
     cursor: { createdAt: Date; id: string } | null;
     scopeTypes?: GatewayBudgetScopeType[];
+    /** Exact match, not a prefix: this is an id, not a search box. */
+    externalId?: string;
   }): Promise<BudgetListWithHealth> {
     const rows = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId: args.organizationId,
         archivedAt: null,
         ...(args.scopeTypes ? { scopeType: { in: args.scopeTypes } } : {}),
+        ...(args.externalId !== undefined
+          ? { externalId: args.externalId }
+          : {}),
         ...(args.cursor
           ? {
               OR: keysetAfter([
@@ -953,47 +968,55 @@ export class GatewayBudgetService {
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.gatewayBudget.create({
-        data: {
-          organizationId: input.organizationId,
-          scopeType: scopeKindToEnum(input.scope.kind),
-          scopeId: scopeIdForScope(input.scope),
-          name: input.name,
-          description: input.description ?? null,
-          window: input.window,
-          limitUsd: new Prisma.Decimal(input.limitUsd.toString()),
-          onBreach: input.onBreach ?? "BLOCK",
-          timezone: input.timezone ?? null,
-          providerKey: input.providerKey ?? null,
-          resetsAt,
-          currentPeriodStartedAt: new Date(),
-          createdById: input.actorUserId,
-        },
-      });
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          projectId,
-          kind: "BUDGET_CREATED",
-          budgetId: row.id,
-        },
-        tx,
+    const created = await this.prisma
+      .$transaction(async (tx) => {
+        const row = await tx.gatewayBudget.create({
+          data: {
+            organizationId: input.organizationId,
+            scopeType: scopeKindToEnum(input.scope.kind),
+            scopeId: scopeIdForScope(input.scope),
+            name: input.name,
+            description: input.description ?? null,
+            window: input.window,
+            limitUsd: new Prisma.Decimal(input.limitUsd.toString()),
+            onBreach: input.onBreach ?? "BLOCK",
+            timezone: input.timezone ?? null,
+            providerKey: input.providerKey ?? null,
+            externalId: input.externalId ?? null,
+            ...identityPatchData({ metadata: input.metadata }),
+            resetsAt,
+            currentPeriodStartedAt: new Date(),
+            createdById: input.actorUserId,
+          },
+        });
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            projectId,
+            kind: "BUDGET_CREATED",
+            budgetId: row.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId,
+            actorUserId: input.actorUserId,
+            action: "gateway.budget.created",
+            targetKind: "budget",
+            targetId: row.id,
+            after: serializeRowForAudit(row),
+          },
+          tx,
+        );
+        return row;
+      })
+      // As on the virtual-key create: the index decides, so the refusal is
+      // read off its violation rather than off a racy pre-flight SELECT.
+      .catch((error: unknown) =>
+        translateExternalIdConflict(error, "budget", input.externalId),
       );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          projectId,
-          actorUserId: input.actorUserId,
-          action: "gateway.budget.created",
-          targetKind: "budget",
-          targetId: row.id,
-          after: serializeRowForAudit(row),
-        },
-        tx,
-      );
-      return row;
-    });
 
     return created;
   }
@@ -1003,46 +1026,51 @@ export class GatewayBudgetService {
     if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
 
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.gatewayBudget.update({
-        where: { id: input.id },
-        data: {
-          name: input.name ?? existing.name,
-          description:
-            input.description === undefined
-              ? existing.description
-              : input.description,
-          limitUsd:
-            input.limitUsd !== undefined
-              ? new Prisma.Decimal(input.limitUsd.toString())
-              : existing.limitUsd,
-          onBreach: input.onBreach ?? existing.onBreach,
-          timezone:
-            input.timezone === undefined ? existing.timezone : input.timezone,
-        },
-      });
-      await this.changeEvents.append(
-        {
-          organizationId: input.organizationId,
-          kind: "BUDGET_UPDATED",
-          budgetId: updated.id,
-        },
-        tx,
+    return this.prisma
+      .$transaction(async (tx) => {
+        const updated = await tx.gatewayBudget.update({
+          where: { id: input.id },
+          data: {
+            name: input.name ?? existing.name,
+            description:
+              input.description === undefined
+                ? existing.description
+                : input.description,
+            limitUsd:
+              input.limitUsd !== undefined
+                ? new Prisma.Decimal(input.limitUsd.toString())
+                : existing.limitUsd,
+            onBreach: input.onBreach ?? existing.onBreach,
+            timezone:
+              input.timezone === undefined ? existing.timezone : input.timezone,
+            ...identityPatchData(input),
+          },
+        });
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            kind: "BUDGET_UPDATED",
+            budgetId: updated.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            actorUserId: input.actorUserId,
+            action: "gateway.budget.updated",
+            targetKind: "budget",
+            targetId: updated.id,
+            before,
+            after: serializeRowForAudit(updated),
+          },
+          tx,
+        );
+        return updated;
+      })
+      .catch((error: unknown) =>
+        translateExternalIdConflict(error, "budget", input.externalId),
       );
-      await this.auditLog.append(
-        {
-          organizationId: input.organizationId,
-          actorUserId: input.actorUserId,
-          action: "gateway.budget.updated",
-          targetKind: "budget",
-          targetId: updated.id,
-          before,
-          after: serializeRowForAudit(updated),
-        },
-        tx,
-      );
-      return updated;
-    });
   }
 
   async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {

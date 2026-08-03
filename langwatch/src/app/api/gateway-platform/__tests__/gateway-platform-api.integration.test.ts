@@ -1607,4 +1607,190 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe("external_id and metadata", () => {
+    /** @scenario A virtual key carries the caller's own id and bookkeeping */
+    it("round-trips external_id and metadata on a virtual key", async () => {
+      const externalId = `vk-ext-${suffix}`;
+      const { status, body } = await createVk({
+        name: `ext-vk-${suffix}`,
+        external_id: externalId,
+        metadata: { team: "platform", cost_center: "cc-42" },
+      });
+      expect(status).toBe(201);
+      expect(body.virtual_key.external_id).toBe(externalId);
+      expect(body.virtual_key.metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+
+      // Both fields must survive every read shape, not just the create echo.
+      const get = await app.request(
+        `/api/gateway/v1/virtual-keys/${body.virtual_key.id}`,
+        { headers: legacyAuth() },
+      );
+      const fetched = await get.json();
+      expect(fetched.virtual_key.external_id).toBe(externalId);
+      expect(fetched.virtual_key.metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+
+      const list = await app.request(
+        `/api/gateway/v1/virtual-keys?external_id=${externalId}`,
+        { headers: legacyAuth() },
+      );
+      expect(list.status).toBe(200);
+      const listed = await list.json();
+      expect(listed.data).toHaveLength(1);
+      expect(listed.data[0].id).toBe(body.virtual_key.id);
+      expect(listed.data[0].metadata).toEqual({
+        team: "platform",
+        cost_center: "cc-42",
+      });
+    });
+
+    /** @scenario A key with no external id reads as null, not as an empty string */
+    it("defaults external_id to null and metadata to an empty map", async () => {
+      const { body } = await createVk({ name: `ext-absent-${suffix}` });
+      expect(body.virtual_key.external_id).toBeNull();
+      expect(body.virtual_key.metadata).toEqual({});
+    });
+
+    /** @scenario Patching metadata replaces the stored map rather than merging */
+    it("replaces metadata on patch and clears external_id with null", async () => {
+      const { body } = await createVk({
+        name: `ext-patch-${suffix}`,
+        external_id: `vk-patch-${suffix}`,
+        metadata: { keep: "no", drop: "yes" },
+      });
+      const id = body.virtual_key.id;
+
+      const replaced = await patch(
+        `/api/gateway/v1/virtual-keys/${id}`,
+        { metadata: { keep: "yes" } },
+        legacyAuth(),
+      );
+      expect(replaced.status).toBe(200);
+      // A merge would have left `drop` behind; replacement is the contract.
+      expect((await replaced.json()).virtual_key.metadata).toEqual({
+        keep: "yes",
+      });
+
+      const cleared = await patch(
+        `/api/gateway/v1/virtual-keys/${id}`,
+        { external_id: null },
+        legacyAuth(),
+      );
+      expect(cleared.status).toBe(200);
+      expect((await cleared.json()).virtual_key.external_id).toBeNull();
+
+      // Clearing must free the id for another key, which is only true if the
+      // column went to SQL NULL rather than to an empty string.
+      const reuse = await createVk({
+        name: `ext-reuse-${suffix}`,
+        external_id: `vk-patch-${suffix}`,
+      });
+      expect(reuse.status).toBe(201);
+    });
+
+    /** @scenario A second resource cannot claim an external id already in use */
+    it("409s with external_id_conflict on a duplicate virtual key id", async () => {
+      const externalId = `vk-dupe-${suffix}`;
+      const first = await createVk({
+        name: `ext-dupe-a-${suffix}`,
+        external_id: externalId,
+      });
+      expect(first.status).toBe(201);
+
+      const second = await createVk({
+        name: `ext-dupe-b-${suffix}`,
+        external_id: externalId,
+      });
+      expect(second.status).toBe(409);
+      expect(second.body.error.code).toBe("external_id_conflict");
+      expect(second.body.error.meta.resource).toBe("virtual_key");
+      expect(second.body.error.meta.external_id).toBe(externalId);
+    });
+
+    /** @scenario A budget carries the caller's own id and bookkeeping */
+    it("round-trips external_id and metadata on a budget, and conflicts", async () => {
+      const externalId = `bg-ext-${suffix}`;
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `ext-budget-${suffix}`,
+          window: "month",
+          limit_usd: 5,
+          external_id: externalId,
+          metadata: { owner: "finance" },
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const createdBody = await created.json();
+      expect(createdBody.budget.external_id).toBe(externalId);
+      expect(createdBody.budget.metadata).toEqual({ owner: "finance" });
+
+      const byId = await app.request(
+        `/api/gateway/v1/budgets/${createdBody.budget.id}`,
+        { headers: legacyAuth() },
+      );
+      expect((await byId.json()).budget.external_id).toBe(externalId);
+
+      const filtered = await app.request(
+        `/api/gateway/v1/budgets?external_id=${externalId}`,
+        { headers: legacyAuth() },
+      );
+      expect(filtered.status).toBe(200);
+      const filteredBody = await filtered.json();
+      expect(filteredBody.data).toHaveLength(1);
+      expect(filteredBody.data[0].id).toBe(createdBody.budget.id);
+
+      const duplicate = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `ext-budget-dupe-${suffix}`,
+          window: "month",
+          limit_usd: 5,
+          external_id: externalId,
+        },
+        legacyAuth(),
+      );
+      expect(duplicate.status).toBe(409);
+      expect((await duplicate.json()).error.code).toBe("external_id_conflict");
+    });
+
+    /** @scenario Metadata beyond the documented caps is refused, naming the key */
+    it("refuses metadata past the value and key-count caps", async () => {
+      const tooLong = await createVk({
+        name: `ext-cap-value-${suffix}`,
+        metadata: { note: "x".repeat(501) },
+      });
+      expect(tooLong.status).toBe(400);
+      expect(tooLong.body.error.code).toBe("validation_error");
+      expect(tooLong.body.error.meta.fields).toContain("metadata.note");
+
+      const tooMany = await createVk({
+        name: `ext-cap-keys-${suffix}`,
+        metadata: Object.fromEntries(
+          Array.from({ length: 41 }, (_, i) => [`k${i}`, "v"]),
+        ),
+      });
+      expect(tooMany.status).toBe(400);
+      expect(tooMany.body.error.code).toBe("validation_error");
+    });
+
+    /** @scenario Two keys may both carry no external id */
+    it("lets any number of keys carry no external id", async () => {
+      // The unique index is on (organizationId, externalId); if the column
+      // defaulted to "" instead of NULL this would be the second collision.
+      const a = await createVk({ name: `ext-null-a-${suffix}` });
+      const b = await createVk({ name: `ext-null-b-${suffix}` });
+      expect(a.status).toBe(201);
+      expect(b.status).toBe(201);
+    });
+  });
 });
