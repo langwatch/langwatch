@@ -182,7 +182,24 @@ export type LedgerEventRow = {
 /** Raw shape of a per-bucket spend row, in the ledger's column casing. */
 type BucketSpendRow = { ScopeId: string; SpentUSD: string };
 
+/** Raw shape of a rollup total row, in the rollup's column casing. */
+type RollupScopeRow = { Scope: string; ScopeId: string; SpentUSD: string };
+
 type ClickHouseClientFor = Awaited<ReturnType<ClickHouseClientResolver>>;
+
+/** The `TenantId IN (...)` placeholder list a read across tenants binds. */
+function tenantPlaceholders(tenantIds: string[]): string {
+  return tenantIds.map((_, i) => `{tenant${i}:String}`).join(",");
+}
+
+/** The parameters `tenantPlaceholders` refers to. */
+function tenantParams(tenantIds: string[]): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (let i = 0; i < tenantIds.length; i++) {
+    params[`tenant${i}`] = tenantIds[i]!;
+  }
+  return params;
+}
 
 /**
  * Everything the two per-bucket reads share: the bound parameters, the
@@ -214,10 +231,8 @@ function bucketQueryShape(args: {
     window: windowToClickHouse(budget.window),
     prefix: `${budget.scopeId}:`,
     sep: PROVIDER_BUCKET_SEPARATOR,
+    ...tenantParams(tenantIds),
   };
-  for (let i = 0; i < tenantIds.length; i++) {
-    params[`tenant${i}`] = tenantIds[i]!;
-  }
 
   // A provider-filtered template writes only buckets carrying its own
   // suffix and an unfiltered one only buckets carrying none, so neither
@@ -247,14 +262,126 @@ function bucketQueryShape(args: {
   return {
     params,
     tenantIds,
-    tenantPlaceholders: tenantIds
-      .map((_, i) => `{tenant${i}:String}`)
-      .join(","),
+    tenantPlaceholders: tenantPlaceholders(tenantIds),
     bucketFilter: `startsWith(ScopeId, {prefix:String}) AND ${providerGuard}`,
     movedBoundaryPredicates,
     movedBoundaryBuckets: boundaries.map((b) => b.bucketScopeId),
     budgetFloorMs,
   };
+}
+
+/**
+ * The SQL that says a row belongs to one target: a single bucket, or every
+ * bucket under the anchor carrying the target's provider suffix. An
+ * unfiltered target matches only buckets carrying no suffix at all, so it
+ * never absorbs a provider-filtered sibling's spend.
+ */
+function bucketMatchSql(
+  target: BudgetSpendTarget,
+  scopeIdParam: string,
+  suffixParam: string,
+): string {
+  if (target.match !== "prefix") return `ScopeId = {${scopeIdParam}:String}`;
+  const anchored = `startsWith(ScopeId, {${scopeIdParam}:String})`;
+  return target.bucketSuffix
+    ? `${anchored} AND endsWith(ScopeId, {${suffixParam}:String})`
+    : `${anchored} AND position(ScopeId, {sep:String}) = 0`;
+}
+
+/**
+ * One conditional sum per floored target, aliased `T<i>`, with the
+ * parameters it binds. Conditioned per target rather than per bucket so two
+ * budgets sharing a bucket with different boundaries each get their own
+ * total.
+ */
+function flooredTargetSums(targets: BudgetSpendTarget[]): {
+  sql: string;
+  params: Record<string, string | number>;
+} {
+  const params: Record<string, string | number> = {
+    sep: PROVIDER_BUCKET_SEPARATOR,
+  };
+  const sums = targets.map((t, i) => {
+    params[`fscope${i}`] = scopeToClickHouse(t.scope);
+    params[`fscopeId${i}`] = t.scopeId;
+    params[`fwindow${i}`] = windowToClickHouse(t.window);
+    params[`ffloor${i}`] = t.periodFloorMs!;
+    if (t.match === "prefix" && t.bucketSuffix) {
+      params[`fsuffix${i}`] = t.bucketSuffix;
+    }
+    const bucket = bucketMatchSql(t, `fscopeId${i}`, `fsuffix${i}`);
+    return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
+  });
+  return { sql: sums.join(",\n              "), params };
+}
+
+/**
+ * The `WHERE` term selecting every target's buckets in one rollup read, with
+ * the parameters it binds. Targets are OR-ed together so a single round-trip
+ * answers a whole window.
+ */
+function rollupScopeFilter(targets: BudgetSpendTarget[]): {
+  sql: string;
+  params: Record<string, string | number>;
+} {
+  const params: Record<string, string | number> = {
+    sep: PROVIDER_BUCKET_SEPARATOR,
+  };
+  const terms = targets.map((t, i) => {
+    params[`scope${i}`] = scopeToClickHouse(t.scope);
+    params[`scopeId${i}`] = t.scopeId;
+    if (t.bucketSuffix) params[`suffix${i}`] = t.bucketSuffix;
+    const bucket = bucketMatchSql(t, `scopeId${i}`, `suffix${i}`);
+    return `(Scope = {scope${i}:String} AND ${bucket})`;
+  });
+  return { sql: terms.join(" OR "), params };
+}
+
+/**
+ * The targets still sitting on their calendar boundary, grouped by window.
+ * The rollup is keyed by period, so one round-trip answers every target that
+ * shares a window.
+ */
+function targetsByWindow(
+  targets: BudgetSpendTarget[],
+): Map<GatewayBudgetWindow, BudgetSpendTarget[]> {
+  const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
+  for (const t of targets) {
+    if (t.periodFloorMs !== undefined) continue;
+    const list = byWindow.get(t.window) ?? [];
+    list.push(t);
+    byWindow.set(t.window, list);
+  }
+  return byWindow;
+}
+
+/** Whether a rollup row is one of this target's buckets. Mirrors `bucketMatchSql`. */
+function rollupRowMatchesTarget(
+  row: RollupScopeRow,
+  target: BudgetSpendTarget,
+  scope: string,
+): boolean {
+  if (row.Scope !== scope) return false;
+  if (target.match !== "prefix") return row.ScopeId === target.scopeId;
+  if (!row.ScopeId.startsWith(target.scopeId)) return false;
+  return target.bucketSuffix
+    ? row.ScopeId.endsWith(target.bucketSuffix)
+    : !row.ScopeId.includes(PROVIDER_BUCKET_SEPARATOR);
+}
+
+/**
+ * What one target's buckets total in a rollup result. The query asks for
+ * every target in the window at once, so the rows come back mixed and each
+ * target picks out its own.
+ */
+function sumRollupRowsForTarget(
+  rows: RollupScopeRow[],
+  target: BudgetSpendTarget,
+): number {
+  const scope = scopeToClickHouse(target.scope);
+  return rows
+    .filter((r) => rollupRowMatchesTarget(r, target, scope))
+    .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
 }
 
 export class GatewayBudgetClickHouseRepository {
@@ -500,180 +627,132 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
-    // Targets with a moved boundary (MANUAL windows, mid-period resets)
-    // cannot use the rollup: its buckets are keyed by calendar PeriodStart
-    // and pre-aggregate the whole bucket, so a floor inside the bucket is
-    // unanswerable there. They read the raw ledger bounded by OccurredAt.
-    const floored = targets.filter((t) => t.periodFloorMs !== undefined);
-    const fast = targets.filter((t) => t.periodFloorMs === undefined);
-
-    const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
-    for (const t of fast) {
-      const list = byWindow.get(t.window) ?? [];
-      list.push(t);
-      byWindow.set(t.window, list);
+    // Two reads, because a target whose boundary has moved cannot be
+    // answered from the rollup: the rollup's buckets are keyed by calendar
+    // PeriodStart and pre-aggregate the whole bucket, so a floor sitting
+    // inside one is unanswerable there.
+    const spends = await this.readFlooredTargetSpend(tenantIds, targets);
+    for (const [window, targetsForWindow] of targetsByWindow(targets)) {
+      spends.push(
+        ...(await this.readRollupTargetSpend({
+          tenantIds,
+          window,
+          targets: targetsForWindow,
+          now,
+        })),
+      );
     }
 
-    const out: Map<string, ScopeSpend> = new Map();
-
-    if (floored.length > 0) {
-      const tenantPlaceholders = tenantIds
-        .map((_, i) => `{tenant${i}:String}`)
-        .join(",");
-      const params: Record<string, string | number> = {
-        sep: PROVIDER_BUCKET_SEPARATOR,
-      };
-      for (let i = 0; i < tenantIds.length; i++) {
-        params[`tenant${i}`] = tenantIds[i]!;
-      }
-      // One conditional sum per target: exact even when two budgets share
-      // a bucket with different boundaries.
-      const sumExprs = floored
-        .map((t, i) => {
-          params[`fscope${i}`] = scopeToClickHouse(t.scope);
-          params[`fscopeId${i}`] = t.scopeId;
-          params[`fwindow${i}`] = windowToClickHouse(t.window);
-          params[`ffloor${i}`] = t.periodFloorMs!;
-          const bucket =
-            t.match === "prefix"
-              ? t.bucketSuffix
-                ? ((params[`fsuffix${i}`] = t.bucketSuffix),
-                  `startsWith(ScopeId, {fscopeId${i}:String}) AND endsWith(ScopeId, {fsuffix${i}:String})`)
-                : `startsWith(ScopeId, {fscopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0`
-              : `ScopeId = {fscopeId${i}:String}`;
-          return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
-        })
-        .join(",\n              ");
-      try {
-        const client = await this.resolveClient(tenantIds[0]!);
-        const result = await client.query({
-          query: `
-            SELECT
-              ${sumExprs}
-            FROM ${EVENTS_TABLE} FINAL
-            WHERE TenantId IN (${tenantPlaceholders})
-              AND Status = 'success'
-          `,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        const rows = (await result.json()) as Array<Record<string, string>>;
-        const row = rows[0] ?? {};
-        for (let i = 0; i < floored.length; i++) {
-          const t = floored[i]!;
-          const total = Number.parseFloat(row[`T${i}`] ?? "0") || 0;
-          out.set(t.budgetId, {
-            budgetId: t.budgetId,
-            scope: t.scope,
-            scopeId: t.scopeId,
-            spentUsd: total.toFixed(6),
-          });
-        }
-      } catch (error) {
-        logger.error(
-          { tenantIds, targets: floored.length, error },
-          "failed to read boundary-floored gateway budget spend",
-        );
-        throw error;
-      }
-    }
-
-    for (const [window, targetsForWindow] of byWindow) {
-      const periodStart = currentPeriodStart(window, now);
-
-      // One round-trip per window: every bucket is asked for at once and
-      // stitched back onto its budget after. Prefix targets are grouped
-      // and summed per target rather than per bucket.
-      const scopeFilter = targetsForWindow
-        .map((t, i) => {
-          if (t.match !== "prefix") {
-            return `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`;
-          }
-          return t.bucketSuffix
-            ? `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND endsWith(ScopeId, {suffix${i}:String}))`
-            : `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0)`;
-        })
-        .join(" OR ");
-      const tenantPlaceholders = tenantIds
-        .map((_, i) => `{tenant${i}:String}`)
-        .join(",");
-      const params: Record<string, string | number> = {
-        window: windowToClickHouse(window),
-        periodStart: periodStart.getTime(),
-      };
-      for (let i = 0; i < tenantIds.length; i++) {
-        params[`tenant${i}`] = tenantIds[i]!;
-      }
-      params.sep = PROVIDER_BUCKET_SEPARATOR;
-      for (let i = 0; i < targetsForWindow.length; i++) {
-        params[`scope${i}`] = scopeToClickHouse(targetsForWindow[i]!.scope);
-        params[`scopeId${i}`] = targetsForWindow[i]!.scopeId;
-        const suffix = targetsForWindow[i]!.bucketSuffix;
-        if (suffix) params[`suffix${i}`] = suffix;
-      }
-
-      try {
-        // Resolve any tenant for the client lookup — the query hits
-        // `gateway_budget_scope_totals` which is a single physical
-        // table; `resolveClient` only differs by project for routing.
-        const client = await this.resolveClient(tenantIds[0]!);
-        const result = await client.query({
-          query: `
-            SELECT
-              Scope,
-              ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
-            FROM ${TOTALS_TABLE}
-            WHERE TenantId IN (${tenantPlaceholders})
-              AND Window = {window:String}
-              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
-              AND (${scopeFilter})
-            GROUP BY Scope, ScopeId
-          `,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
-        const rows = (await result.json()) as Row[];
-        for (const t of targetsForWindow) {
-          const scope = scopeToClickHouse(t.scope);
-          const total = rows
-            .filter(
-              (r) =>
-                r.Scope === scope &&
-                (t.match === "prefix"
-                  ? r.ScopeId.startsWith(t.scopeId) &&
-                    (t.bucketSuffix
-                      ? r.ScopeId.endsWith(t.bucketSuffix)
-                      : !r.ScopeId.includes(PROVIDER_BUCKET_SEPARATOR))
-                  : r.ScopeId === t.scopeId),
-            )
-            .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
-          out.set(t.budgetId, {
-            budgetId: t.budgetId,
-            scope: t.scope,
-            scopeId: t.scopeId,
-            spentUsd: total.toFixed(6),
-          });
-        }
-      } catch (error) {
-        logger.error(
-          { tenantIds, window, error },
-          "failed to read gateway budget scope totals across tenants",
-        );
-        throw error;
-      }
-    }
-
+    const byBudget = new Map<string, ScopeSpend>();
+    for (const spend of spends) byBudget.set(spend.budgetId, spend);
     return targets.map(
       (t) =>
-        out.get(t.budgetId) ?? {
+        byBudget.get(t.budgetId) ?? {
           budgetId: t.budgetId,
           scope: t.scope,
           scopeId: t.scopeId,
           spentUsd: "0",
         },
     );
+  }
+
+  /**
+   * Spend for the targets whose period floor has moved off the calendar:
+   * MANUAL windows, and calendar windows reset mid-period. The floor sits
+   * inside the rollup's calendar bucket, which cannot answer it, so the
+   * total is summed straight off the ledger, successful requests only.
+   */
+  private async readFlooredTargetSpend(
+    tenantIds: string[],
+    targets: BudgetSpendTarget[],
+  ): Promise<ScopeSpend[]> {
+    const floored = targets.filter((t) => t.periodFloorMs !== undefined);
+    if (floored.length === 0) return [];
+
+    const sums = flooredTargetSums(floored);
+    try {
+      const client = await this.resolveClient(tenantIds[0]!);
+      const result = await client.query({
+        query: `
+            SELECT
+              ${sums.sql}
+            FROM ${EVENTS_TABLE} FINAL
+            WHERE TenantId IN (${tenantPlaceholders(tenantIds)})
+              AND Status = 'success'
+          `,
+        query_params: { ...tenantParams(tenantIds), ...sums.params },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<Record<string, string>>;
+      const row = rows[0] ?? {};
+      return floored.map((t, i) => ({
+        budgetId: t.budgetId,
+        scope: t.scope,
+        scopeId: t.scopeId,
+        spentUsd: (Number.parseFloat(row[`T${i}`] ?? "0") || 0).toFixed(6),
+      }));
+    } catch (error) {
+      logger.error(
+        { tenantIds, targets: floored.length, error },
+        "failed to read boundary-floored gateway budget spend",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Spend for one window's worth of targets, read off the rollup. It already
+   * holds one pre-aggregated row per bucket per period, so every bucket in
+   * the window is asked for at once and stitched back onto its budget after.
+   */
+  private async readRollupTargetSpend(args: {
+    tenantIds: string[];
+    window: GatewayBudgetWindow;
+    targets: BudgetSpendTarget[];
+    now: Date;
+  }): Promise<ScopeSpend[]> {
+    const { tenantIds, window, targets, now } = args;
+    const scopeFilter = rollupScopeFilter(targets);
+    try {
+      // Any tenant resolves the client: the query hits
+      // `gateway_budget_scope_totals`, a single physical table, and
+      // `resolveClient` only differs by project for routing.
+      const client = await this.resolveClient(tenantIds[0]!);
+      const result = await client.query({
+        query: `
+            SELECT
+              Scope,
+              ScopeId,
+              toString(sumMerge(SpendUSD)) AS SpentUSD
+            FROM ${TOTALS_TABLE}
+            WHERE TenantId IN (${tenantPlaceholders(tenantIds)})
+              AND Window = {window:String}
+              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
+              AND (${scopeFilter.sql})
+            GROUP BY Scope, ScopeId
+          `,
+        query_params: {
+          ...tenantParams(tenantIds),
+          ...scopeFilter.params,
+          window: windowToClickHouse(window),
+          periodStart: currentPeriodStart(window, now).getTime(),
+        },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as RollupScopeRow[];
+      return targets.map((t) => ({
+        budgetId: t.budgetId,
+        scope: t.scope,
+        scopeId: t.scopeId,
+        spentUsd: sumRollupRowsForTarget(rows, t).toFixed(6),
+      }));
+    } catch (error) {
+      logger.error(
+        { tenantIds, window, error },
+        "failed to read gateway budget scope totals across tenants",
+      );
+      throw error;
+    }
   }
 
   /**
