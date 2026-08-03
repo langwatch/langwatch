@@ -28,13 +28,44 @@ const SCAN_COUNT = 256;
  * Ceiling on blobs examined per queue per sweep, so one pass can never turn into
  * an unbounded walk of a multi-million-key keyspace. Work not reached this tick
  * is reached the next one; the sweep is periodic, not transactional.
+ *
+ * That promise only holds because the SCAN cursor is carried across ticks (see
+ * {@link blobSweepCursorKey}). A ceiling on a walk that always restarts at the
+ * beginning is not a rate limit, it is a blind spot: it would pin every sweep to
+ * the same leading slice of the keyspace and leave everything past it to the
+ * backstop TTL, however often the sweep ran.
  */
 const DEFAULT_MAX_KEYS_PER_QUEUE = 50_000;
+
+/**
+ * Where the last sweep of a queue stopped, so the next one resumes there instead
+ * of re-walking the slice it already judged.
+ *
+ * A SCAN cursor stays valid indefinitely, so parking one between ticks is safe:
+ * a full cycle still returns every key that exists for the whole of it. Keys
+ * created mid-cycle may not be seen until the following one, which is the normal
+ * SCAN guarantee and is what a periodic reclaim pass already assumes.
+ *
+ * It lives in Redis rather than in the process so progress survives a restart
+ * and is shared by whichever pod runs the tick. One field per node, because in
+ * cluster mode each master is iterated separately and a cursor only means
+ * anything against the node that issued it.
+ */
+function blobSweepCursorKey(queueName: string): string {
+  return `${queueName}:gq:blob-sweep-cursor`;
+}
+
+/** Cursor field for a non-clustered client, which has exactly one keyspace. */
+const SINGLE_NODE_CURSOR_FIELD = "single";
 
 export interface BlobSweepTally extends Record<BlobSweepOutcome, number> {
   /** Blobs examined, i.e. the sum of every outcome. */
   scanned: number;
-  /** True when the per-queue ceiling stopped the walk before the keyspace ended. */
+  /**
+   * True when the per-queue ceiling stopped the walk before the keyspace ended.
+   * The next tick resumes from where this one stopped, so on a keyspace larger
+   * than the ceiling this is the steady state, not a fault.
+   */
   truncated: boolean;
 }
 
@@ -61,27 +92,33 @@ function isCluster(client: IORedis | Cluster): client is Cluster {
  * script touches but does nothing for iteration, so the fan-out over masters is
  * required for correctness, not throughput.
  */
-async function scanNode(
-  node: { scan: IORedis["scan"] },
-  pattern: string,
-  limit: number,
-): Promise<{ keys: string[]; truncated: boolean }> {
+async function scanNode(params: {
+  node: { scan: IORedis["scan"] };
+  pattern: string;
+  limit: number;
+  /** Cursor the previous tick stopped at; "0" starts a fresh cycle. */
+  cursor: string;
+}): Promise<{ keys: string[]; cursor: string; truncated: boolean }> {
   const keys: string[] = [];
-  let cursor = "0";
+  let cursor = params.cursor;
   do {
-    const [nextCursor, batch] = await node.scan(
+    const [nextCursor, batch] = await params.node.scan(
       cursor,
       "MATCH",
-      pattern,
+      params.pattern,
       "COUNT",
       SCAN_COUNT,
     );
     cursor = nextCursor;
     keys.push(...batch);
-    if (keys.length >= limit)
-      return { keys: keys.slice(0, limit), truncated: true };
+    // Every key the cursor has moved past is kept, so the batch that crosses the
+    // ceiling is not trimmed. Trimming it would drop keys the returned cursor has
+    // already passed, and the next tick — resuming from that cursor — would never
+    // come back for them. Overshooting the ceiling by at most one page is the
+    // cheaper side of that trade.
+    if (keys.length >= params.limit) return { keys, cursor, truncated: true };
   } while (cursor !== "0");
-  return { keys, truncated: false };
+  return { keys, cursor: "0", truncated: false };
 }
 
 /**
@@ -150,19 +187,41 @@ export class BlobSweeper {
     queueName: string,
   ): Promise<{ keys: string[]; truncated: boolean }> {
     const pattern = this.blobScanPattern(queueName);
+    const cursorKey = blobSweepCursorKey(queueName);
+    const parked = await this.redis.hgetall(cursorKey);
+
     if (!isCluster(this.redis)) {
-      return scanNode(this.redis, pattern, this.maxKeysPerQueue);
+      const result = await scanNode({
+        node: this.redis,
+        pattern,
+        limit: this.maxKeysPerQueue,
+        cursor: parked[SINGLE_NODE_CURSOR_FIELD] ?? "0",
+      });
+      await this.redis.hset(cursorKey, SINGLE_NODE_CURSOR_FIELD, result.cursor);
+      return { keys: result.keys, truncated: result.truncated };
     }
+
     const seen = new Set<string>();
+    const resumeFrom: Record<string, string> = {};
     let truncated = false;
     const nodes = this.redis.nodes("master");
     await Promise.all(
       nodes.map(async (node) => {
-        const result = await scanNode(node, pattern, this.maxKeysPerQueue);
+        const nodeField = `${node.options.host ?? "?"}:${node.options.port ?? "?"}`;
+        const result = await scanNode({
+          node,
+          pattern,
+          limit: this.maxKeysPerQueue,
+          cursor: parked[nodeField] ?? "0",
+        });
         if (result.truncated) truncated = true;
+        resumeFrom[nodeField] = result.cursor;
         for (const key of result.keys) seen.add(key);
       }),
     );
+    if (Object.keys(resumeFrom).length > 0) {
+      await this.redis.hset(cursorKey, resumeFrom);
+    }
     return { keys: Array.from(seen), truncated };
   }
 
@@ -259,8 +318,9 @@ export class BlobSweeper {
           truncated: totals.truncated,
           durationMs: report.durationMs,
         },
-        // Truncation is called out because a sweep that never finishes the
-        // keyspace is the failure mode that looks like success.
+        // Truncation is reported so the covered fraction of a large keyspace
+        // stays visible: one tick judges a slice, and the cycle is only as fast
+        // as the ceiling and the interval together allow.
         "Blob sweep completed",
       );
     }

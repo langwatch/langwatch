@@ -180,6 +180,88 @@ describe("BlobSweeper", () => {
     });
   });
 
+  describe("given more unreferenced blobs than one sweep's ceiling", () => {
+    /**
+     * The ceiling only bounds a tick if the walk resumes where it stopped. When
+     * it restarts at the beginning every tick it re-judges the same leading
+     * slice forever, and every blob past that slice is left to the 4-day
+     * backstop no matter how often the sweep runs — which reads as a healthy
+     * sweep in the totals while the bytes accumulate.
+     */
+    describe("when the runner sweeps repeatedly", () => {
+      /** @scenario "Successive sweeps advance through the keyspace instead of re-walking its first slice" */
+      it("reaches every blob across successive sweeps rather than only the first slice", async () => {
+        const hashes = ["h01", "h02", "h03", "h04", "h05", "h06"];
+        for (const hash of hashes) {
+          // Bytes on the full backstop with no lease and no holder: the shape
+          // the repair pass pulls onto the grace window.
+          await redis.set(
+            blobKey(hash),
+            "body",
+            "EX",
+            BLOB_BACKSTOP_TTL_SECONDS,
+          );
+        }
+
+        // SCAN pages by buckets, not by matches, so a handful of keys would all
+        // come back in one call and a single tick would cover them however the
+        // cursor behaved. Padding the keyspace past several pages is what forces
+        // a tick to stop partway and makes resumption the thing under test.
+        // The filler shares the suite prefix so it is torn down with everything
+        // else, and carries no "<project>/<hash>" segment so the blob glob skips it.
+        const filler = redis.pipeline();
+        for (let i = 0; i < 3000; i++) {
+          filler.set(`${PREFIX}sweep-filler:${i}`, "x", "EX", 300);
+        }
+        await filler.exec();
+
+        const ceiling = 2;
+        const pacedSweeper = new BlobSweeper({
+          redis,
+          maxKeysPerQueue: ceiling,
+        });
+
+        // Enough ticks to cover the keyspace at this ceiling, with headroom for
+        // SCAN returning short pages.
+        for (let tick = 0; tick < hashes.length * 3; tick++) {
+          await pacedSweeper.sweepQueue({ queueName: QUEUE_NAME });
+        }
+
+        // Every blob was reached, so every one is on the grace window rather
+        // than still sitting on the backstop.
+        for (const hash of hashes) {
+          const ttl = await redis.ttl(blobKey(hash));
+          expect(ttl).toBeGreaterThan(0);
+          expect(ttl).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+        }
+      });
+
+      /** @scenario "A completed cycle rewinds so newly written blobs are picked up" */
+      it("rewinds to the start once the keyspace is exhausted", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+
+        // A ceiling above the keyspace finishes the walk in one tick.
+        const roomySweeper = new BlobSweeper({ redis, maxKeysPerQueue: 1000 });
+        const tally = await roomySweeper.sweepQueue({ queueName: QUEUE_NAME });
+        expect(tally.truncated).toBe(false);
+
+        // A blob written after that cycle finished is still found next tick,
+        // which only holds if the exhausted cursor rewound to "0".
+        await redis.set(
+          blobKey("later"),
+          "body",
+          "EX",
+          BLOB_BACKSTOP_TTL_SECONDS,
+        );
+        await roomySweeper.sweepQueue({ queueName: QUEUE_NAME });
+
+        const ttl = await redis.ttl(blobKey("later"));
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+      });
+    });
+  });
+
   describe("given several queues registered in the group-queue registry", () => {
     describe("when the runner sweeps everything", () => {
       it("discovers the queue from the registry rather than a hardcoded name", async () => {
