@@ -339,7 +339,7 @@ describe("MetricDataPointClickHouseRepository", () => {
       };
     }
 
-    it("names the missing column instead of dereferencing it", async () => {
+    it("names the missing column, the series and the point instead of dereferencing it", async () => {
       const query = vi.fn(async () => ({
         json: async () => [rowMissingBucketCounts()],
       }));
@@ -349,28 +349,20 @@ describe("MetricDataPointClickHouseRepository", () => {
         resolveOrganizationClient: async () => client,
       });
 
+      const point = dataPoint();
+      // One rejection, three identifiers: the column that was absent, and the
+      // series + point that locate the untrustworthy row. That is the whole
+      // contract this guard exists for — a bare undefined-property error named
+      // none of them.
       await expect(
         repository.recomputeAffectedRollupsMany({
-          points: [{ ...dataPoint(), timeUnixMs: base }],
+          points: [{ ...point, timeUnixMs: base }],
         }),
-      ).rejects.toThrow(/missing the BucketCounts column/);
-    });
-
-    it("does not surface the bare undefined-property failure", async () => {
-      const query = vi.fn(async () => ({
-        json: async () => [rowMissingBucketCounts()],
-      }));
-      const client = { query, insert: vi.fn(async () => {}) } as never;
-      const repository = new MetricDataPointClickHouseRepository({
-        resolveClient: async () => client,
-        resolveOrganizationClient: async () => client,
-      });
-
-      await expect(
-        repository.recomputeAffectedRollupsMany({
-          points: [{ ...dataPoint(), timeUnixMs: base }],
-        }),
-      ).rejects.not.toThrow(/Cannot read properties of undefined/);
+      ).rejects.toThrow(
+        new RegExp(
+          `missing the BucketCounts column \\(series ${point.seriesId}, point ${point.pointId}\\)`,
+        ),
+      );
     });
   });
 });

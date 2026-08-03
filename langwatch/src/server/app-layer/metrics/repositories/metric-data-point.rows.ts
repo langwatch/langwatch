@@ -257,8 +257,12 @@ function countsColumn({
 }): string[] {
   const counts = row[column];
   if (!Array.isArray(counts)) {
+    const problem =
+      counts === undefined
+        ? `is missing the ${column} column`
+        : `carries a non-array ${typeof counts} in the ${column} column`;
     throw new Error(
-      `metric_data_points row is missing the ${column} column (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
+      `metric_data_points row ${problem} (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
     );
   }
   return counts.map(String);

@@ -5,6 +5,7 @@ import {
   affectedRollupBuckets,
   buildMetricRollups,
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup";
+import { comparePoints } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
 import type {
   CanonicalMetricDataPoint,
@@ -84,14 +85,26 @@ function affectedBucketsBySeries({
 }): Map<string, Set<number>> {
   const affectedBySeries = new Map<string, Set<number>>();
   for (const [seriesId, seriesPoints] of bySeries) {
+    // Sorted once so each point's successor is a binary search, not a rescan
+    // of every candidate — the per-point scan made a single hot series cost
+    // O(N²) per chunk. `affectedRollupBuckets` stays the sole owner of the
+    // bucket semantics; it just receives the one candidate that can matter.
     const candidates = [
       ...seriesPoints,
       ...(successorsBySeries.get(seriesId) ?? []),
-    ];
+    ].sort(comparePoints);
     const affected = new Set<number>();
     for (const point of seriesPoints) {
+      let lo = 0;
+      let hi = candidates.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (comparePoints(candidates[mid]!, point) > 0) hi = mid;
+        else lo = mid + 1;
+      }
+      const successor = candidates[lo];
       for (const bucket of affectedRollupBuckets({
-        points: candidates,
+        points: successor ? [successor] : [],
         insertedPoint: point,
       })) {
         affected.add(bucket);
