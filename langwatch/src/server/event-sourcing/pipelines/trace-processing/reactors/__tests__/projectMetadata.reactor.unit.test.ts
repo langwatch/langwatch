@@ -24,6 +24,7 @@ import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createProjectMetadataReactor,
+  PROJECT_METADATA_WINDOW_MS,
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
 
@@ -644,10 +645,13 @@ describe("createProjectMetadataReactor()", () => {
     expect(jobId).toBe(`project-meta:${tenantId}`);
   });
 
-  it("has a 60-second dedup TTL", () => {
+  it("holds events for one onboarding poll before writing", () => {
     const reactor = createProjectMetadataReactor(deps);
 
-    expect(reactor.options!.ttl).toBe(60_000);
+    expect(reactor.options!.delay).toBe(PROJECT_METADATA_WINDOW_MS);
+    expect(reactor.options!.deduplication?.ttlMs).toBe(
+      PROJECT_METADATA_WINDOW_MS,
+    );
   });
 
   it("runs only in worker", () => {

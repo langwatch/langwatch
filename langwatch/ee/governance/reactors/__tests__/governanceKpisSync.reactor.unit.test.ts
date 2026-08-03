@@ -334,7 +334,7 @@ describe("governanceKpisSync reactor", () => {
   });
 
   describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for BullMQ debounce", () => {
+    it("declares a per-(tenant, trace) job-id for the queue's dedup", () => {
       const { deps } = mockDeps();
       const reactor = createGovernanceKpisSyncReactor(deps);
       expect(reactor.options?.makeJobId).toBeDefined();
@@ -342,7 +342,7 @@ describe("governanceKpisSync reactor", () => {
         event: { tenantId: "t-1", aggregateId: "trace-x" },
       } as any);
       expect(jobId).toBe("governance-kpis-sync-t-1-trace-x");
-      expect(reactor.options?.ttl).toBeGreaterThan(0);
+      expect(reactor.options?.deduplication?.ttlMs).toBeGreaterThan(0);
     });
   });
 });

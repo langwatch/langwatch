@@ -4,6 +4,7 @@ import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
+import { throttledPerWindow } from "../../../reactors/throttleWindow";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 
@@ -15,6 +16,9 @@ export interface TraceUpdateBroadcastReactorDeps {
   broadcast: BroadcastService;
   hasRedis?: boolean;
 }
+
+/** Mirrors the listener-side debounce so the two windows do not stack. */
+export const TRACE_UPDATE_BROADCAST_WINDOW_MS = 2_000;
 
 /**
  * Reactor that broadcasts trace updates to connected SSE clients.
@@ -32,9 +36,17 @@ export function createTraceUpdateBroadcastReactor(
       runIn: ["worker"],
       // Without Redis, worker-to-web pub/sub bridge is unavailable
       disabled: deps.hasRedis === false,
-      makeJobId: (payload) =>
-        `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 30_000, // Debounce broadcasts — frontend already debounces duplicate events
+      // Deliberately short. Nothing polls behind this while the live stream is
+      // connected, so the window is the whole latency a watching user sees;
+      // it matches the debounce the listener already applies, which puts the
+      // collapsing on the side that can drop the work instead of the side that
+      // has already paid to deliver it. Level-triggered, so surviveDispatch
+      // stays off and the final update always arrives.
+      ...throttledPerWindow({
+        makeJobId: (payload) =>
+          `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,
+        windowMs: TRACE_UPDATE_BROADCAST_WINDOW_MS,
+      }),
     },
 
     async handle(

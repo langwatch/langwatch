@@ -7,11 +7,21 @@ import {
 import type { Event } from "../../domain/types";
 import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { throttledPerWindow } from "../../reactors/throttleWindow";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 
 /** Number of days at the start of a new month to also check the previous month. */
 const GRACE_PERIOD_DAYS = 3;
+
+/** How long a project's events are held before one dispatch is sent. */
+export const BILLING_METER_DISPATCH_WINDOW_MS = 30_000;
+
+/**
+ * How long a project stays suppressed after dispatching. Sized to the
+ * downstream command's own dedup window so the two agree on the rate.
+ */
+export const BILLING_METER_DISPATCH_SUPPRESS_MS = 300_000;
 
 /**
  * One queue lane per project, matching this reactor's per-project dedup id.
@@ -60,8 +70,24 @@ export function createBillingMeterDispatchReactor(deps: {
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
-      makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
-      ttl: 300_000,
+      // The only reactor here that may keep suppressing after it fires. The
+      // handler reads nothing from the event it was handed — it resolves the
+      // org and the current billing month from the clock — so every trigger
+      // in the window is genuinely the same work, and discarding the later
+      // ones cannot strand any state. That makes the per-project suppression
+      // this reactor always documented finally take effect: without it the
+      // dedup key is dropped the moment the job dispatches and the very next
+      // event re-triggers.
+      //
+      // The lane above and the window here are the two halves of one
+      // behaviour: the lane lets a project's concurrent traces share a dedup
+      // key at all, the window gives that key long enough to collapse them.
+      ...throttledPerWindow({
+        makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
+        windowMs: BILLING_METER_DISPATCH_WINDOW_MS,
+        dedupTtlMs: BILLING_METER_DISPATCH_SUPPRESS_MS,
+        surviveDispatch: true,
+      }),
     },
 
     async handle(event, context) {
