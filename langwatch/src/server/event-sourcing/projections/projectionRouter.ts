@@ -90,6 +90,16 @@ const MAX_LOGGED_EVENT_IDS = 10;
 const LIVE_DISPATCH_IS_REPLAY = false;
 
 /**
+ * One event paired with the projection state a reactor should see for it.
+ *
+ * A fold repeats the same accumulated state across a batch; a map produces a
+ * distinct record per event. Pairing them here lets both dispatch through one
+ * path without a map batch having to pick a single record to stand for all of
+ * its events. It is also exactly the queue job's payload shape.
+ */
+type ReactorDelivery<E extends Event> = { event: E; foldState: unknown };
+
+/**
  * Central router that registers fold and map projections and dispatches events.
  *
  * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
@@ -727,8 +737,7 @@ export class ProjectionRouter<
               await this.dispatchToReactors({
                 foldName: name,
                 reactors: mapReactors,
-                events: [event],
-                foldState: record,
+                deliveries: [{ event, foldState: record }],
               });
             }
           },
@@ -788,14 +797,22 @@ export class ProjectionRouter<
 
             const mapReactors = this.reactorsForMap.get(name);
             if (mapReactors && mapReactors.length > 0) {
-              for (const { event, record } of mapped) {
-                await this.dispatchToReactors({
-                  foldName: name,
-                  reactors: mapReactors,
-                  events: [event],
+              // One dispatch for the whole batch, not one per mapped event.
+              // Dispatching per event put each send in its own call, so the
+              // per-reactor collapse only ever saw a single event and could
+              // never fire — a drained batch sent one job per event for
+              // reactors keyed on the aggregate, and the queue then squashed
+              // all but the last. Each delivery keeps its own record, so a
+              // reactor that reads one still sees the record its event
+              // produced.
+              await this.dispatchToReactors({
+                foldName: name,
+                reactors: mapReactors,
+                deliveries: mapped.map(({ event, record }) => ({
+                  event,
                   foldState: record,
-                });
-              }
+                })),
+              });
             }
           },
         },
@@ -1186,8 +1203,7 @@ export class ProjectionRouter<
               await this.dispatchToReactors({
                 foldName: name,
                 reactors: mapReactors,
-                events: [event],
-                foldState: record,
+                deliveries: [{ event, foldState: record }],
               });
             }
           } catch (error) {
@@ -1673,8 +1689,7 @@ export class ProjectionRouter<
       await this.dispatchToReactors({
         foldName: projectionName,
         reactors,
-        events,
-        foldState,
+        deliveries: events.map((event) => ({ event, foldState })),
       });
     } catch (error) {
       this.recordPostStoreFailure({
@@ -1918,54 +1933,57 @@ export class ProjectionRouter<
    *
    * Reactors keyed per event (`…:${event.id}`) collapse to nothing and are
    * dispatched for every event, as are reactors with no job id at all.
+   *
+   * Each delivery carries its own state because a map batch has no single one:
+   * a fold hands the same accumulated state to every event, but a map produces
+   * a separate record per event, and the survivor must keep the record it was
+   * actually paired with.
    */
   private collapseByJobId({
     reactor,
-    events,
-    foldState,
+    deliveries,
   }: {
     reactor: ReactorDefinition<EventType>;
-    events: EventType[];
-    foldState: unknown;
-  }): EventType[] {
+    deliveries: ReactorDelivery<EventType>[];
+  }): ReactorDelivery<EventType>[] {
     const makeJobId = reactor.options?.makeJobId;
-    if (!makeJobId || events.length < 2) return events;
+    if (!makeJobId || deliveries.length < 2) return deliveries;
 
     try {
-      // Keep the LAST event per job id — the one the queue's dedup squash would
-      // have left behind (STAGE_LUA overwrites the stored value when
+      // Keep the LAST delivery per job id — the one the queue's dedup squash
+      // would have left behind (STAGE_LUA overwrites the stored value when
       // `shouldReplace`, which every reactor here defaults to).
       //
       // A Map alone would order the survivors by each job id's FIRST
       // occurrence while holding its last value, so a batch carrying two job
       // ids could dispatch a later event before an earlier one. Re-sort by the
-      // surviving event's position so dispatch really is in occurredAt order —
-      // `events` arrives sorted, so the index IS that order.
+      // surviving delivery's position so dispatch really is in occurredAt
+      // order — deliveries arrive sorted, so the index IS that order.
       const lastIndexPerJobId = new Map<string, number>();
-      events.forEach((event, index) => {
-        lastIndexPerJobId.set(makeJobId({ event, foldState }), index);
+      deliveries.forEach((delivery, index) => {
+        lastIndexPerJobId.set(makeJobId(delivery), index);
       });
       const survivors = [...lastIndexPerJobId.values()].sort((a, b) => a - b);
-      if (survivors.length === events.length) return events;
+      if (survivors.length === deliveries.length) return deliveries;
 
       incrementEsReactorCollapsedTotal(
         this.pipelineName,
         reactor.name,
-        events.length - survivors.length,
+        deliveries.length - survivors.length,
       );
-      return survivors.map((index) => events[index]!);
+      return survivors.map((index) => deliveries[index]!);
     } catch (error) {
       // Fail open, like `shouldReact`: a throwing job-id function must never
       // drop a side effect. Worst case is the un-collapsed fan-out we had before.
       this.logger.error(
         {
           reactorName: reactor.name,
-          eventCount: events.length,
+          eventCount: deliveries.length,
           error: error instanceof Error ? error.message : String(error),
         },
         "Reactor makeJobId threw while collapsing a batch — dispatching every event",
       );
-      return events;
+      return deliveries;
     }
   }
 
@@ -1981,13 +1999,11 @@ export class ProjectionRouter<
   private async dispatchToReactors({
     foldName,
     reactors,
-    events,
-    foldState,
+    deliveries,
   }: {
     foldName: string;
     reactors: ReactorDefinition<EventType>[];
-    events: EventType[];
-    foldState: unknown;
+    deliveries: ReactorDelivery<EventType>[];
   }): Promise<void> {
     const errors: Error[] = [];
 
@@ -1995,20 +2011,21 @@ export class ProjectionRouter<
       if (reactor.options?.disabled) continue;
       if (this.isReactorExcluded(reactor)) continue;
 
-      const relevant: EventType[] = [];
-      for (const event of events) {
-        if (this.reactorShouldReact(reactor, event, foldState)) {
-          relevant.push(event);
+      const relevant: ReactorDelivery<EventType>[] = [];
+      for (const delivery of deliveries) {
+        if (
+          this.reactorShouldReact(reactor, delivery.event, delivery.foldState)
+        ) {
+          relevant.push(delivery);
         } else {
           incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
         }
       }
       if (relevant.length === 0) continue;
 
-      for (const event of this.collapseByJobId({
+      for (const { event, foldState } of this.collapseByJobId({
         reactor,
-        events: relevant,
-        foldState,
+        deliveries: relevant,
       })) {
         await this.dispatchOneToReactor({
           foldName,
