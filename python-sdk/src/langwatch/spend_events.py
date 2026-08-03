@@ -9,7 +9,7 @@ generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import httpx
 
@@ -96,24 +96,94 @@ class SpendEventsFacade:
         _raise_for_status(response, operation="list spend events")
         return response.json()
 
+    def summaries_page(
+        self,
+        *,
+        group_by: str,
+        from_ms: int,
+        to_ms: int,
+        cursor: Optional[str] = None,
+        limit: Optional[int] = None,
+        virtual_key_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """One page of reconciliation checksums, as {data, next_cursor}.
+
+        Rollups are paged by group key ascending. Follow next_cursor until
+        it comes back null: a full page does not mean the window held
+        nothing more, so a reconciler that reads one page under-counts
+        every key past the limit.
+        group_by: "virtual_key" or "end_user"."""
+        params: Dict[str, Any] = {"group_by": group_by, "from": from_ms, "to": to_ms}
+        if cursor is not None:
+            params["cursor"] = cursor
+        if limit is not None:
+            params["limit"] = limit
+        if virtual_key_id is not None:
+            params["virtual_key_id"] = virtual_key_id
+        if project_id is not None:
+            params["project_id"] = project_id
+        response = self._http().get("/api/gateway/v1/spend-summaries", params=params)
+        _raise_for_status(response, operation="spend summaries")
+        return response.json()
+
     def summaries(
         self,
         *,
         group_by: str,
         from_ms: int,
         to_ms: int,
+        cursor: Optional[str] = None,
         limit: Optional[int] = None,
+        virtual_key_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Reconciliation checksums per key: event_count, settled_count,
         token classes, and integer nano-USD cost. Compare a closed
         period's counts and sums first; walk list() only on divergence.
-        group_by: "virtual_key" or "end_user"."""
-        params: Dict[str, Any] = {"group_by": group_by, "from": from_ms, "to": to_ms}
-        if limit is not None:
-            params["limit"] = limit
-        response = self._http().get("/api/gateway/v1/spend-summaries", params=params)
-        _raise_for_status(response, operation="spend summaries")
-        return response.json()["data"]
+        group_by: "virtual_key" or "end_user".
+
+        Returns one page's rows. Use summaries_page() when you need
+        next_cursor, or iter_summaries() to walk every page."""
+        return self.summaries_page(
+            group_by=group_by,
+            from_ms=from_ms,
+            to_ms=to_ms,
+            cursor=cursor,
+            limit=limit,
+            virtual_key_id=virtual_key_id,
+            project_id=project_id,
+        )["data"]
+
+    def iter_summaries(
+        self,
+        *,
+        group_by: str,
+        from_ms: int,
+        to_ms: int,
+        limit: Optional[int] = None,
+        virtual_key_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Every rollup row in the window, walking the cursor for you.
+
+        The whole-window read a reconciler actually wants, so getting the
+        totals right does not depend on remembering to page."""
+        cursor: Optional[str] = None
+        while True:
+            page = self.summaries_page(
+                group_by=group_by,
+                from_ms=from_ms,
+                to_ms=to_ms,
+                cursor=cursor,
+                limit=limit,
+                virtual_key_id=virtual_key_id,
+                project_id=project_id,
+            )
+            yield from page["data"]
+            cursor = page.get("next_cursor")
+            if not cursor:
+                return
 
     def replay(
         self,

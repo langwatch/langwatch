@@ -1,6 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
+import {
+  SpendEventsApiService,
+  type SpendSummaryRow,
+} from "@/client-sdk/services/spend-events/spend-events-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -54,16 +57,27 @@ export const spendSummaryCommand = async (options: {
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
   try {
-    const { data } = await service.summaries({
-      groupBy,
-      from: fromMs,
-      to: toMs,
-      projectId: options.project,
-      limit:
-        options.limit !== undefined
-          ? parsePositiveInt(options.limit, "--limit")
-          : undefined,
-    });
+    // Walk every page. Reading only the first one reported "50 keys" for a
+    // window holding thousands, and a reconciliation checksum that silently
+    // covers part of the window is worse than no checksum at all. `--limit`
+    // is the page size; the walk is always the whole window.
+    const data: SpendSummaryRow[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await service.summaries({
+        groupBy,
+        from: fromMs,
+        to: toMs,
+        projectId: options.project,
+        cursor,
+        limit:
+          options.limit !== undefined
+            ? parsePositiveInt(options.limit, "--limit")
+            : undefined,
+      });
+      data.push(...page.data);
+      cursor = page.next_cursor ?? undefined;
+    } while (cursor);
     const settled = data.reduce((sum, row) => sum + row.settled_count, 0);
     spinner.succeed(
       `${data.length} ${groupBy === "virtual_key" ? "keys" : "end users"}${settled > 0 ? chalk.yellow(`, ${settled} settled request${settled !== 1 ? "s" : ""} unpriced`) : ""}`,

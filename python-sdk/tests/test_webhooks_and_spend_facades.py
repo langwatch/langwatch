@@ -199,3 +199,46 @@ def test_gateway_admin_project_header_rides_every_call():
     facade.list_virtual_keys()
     facade.list_budgets()
     assert seen_headers == ["proj_9", "proj_9"]
+
+
+def test_summaries_walk_follows_the_cursor_to_the_end():
+    """A reconciler must see every key in the window, not the first page.
+
+    The facade used to drop next_cursor on the floor, so a window holding
+    more keys than the page limit silently reconciled against a prefix of
+    itself and the totals looked clean.
+    """
+    pages = [
+        {"data": [{"key": "vk_1"}, {"key": "vk_2"}], "next_cursor": "c1"},
+        {"data": [{"key": "vk_3"}], "next_cursor": None},
+    ]
+    seen_cursors: List[Optional[str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/gateway/v1/spend-summaries"
+        seen_cursors.append(request.url.params.get("cursor"))
+        return httpx.Response(200, json=pages[len(seen_cursors) - 1])
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    rows = list(facade.iter_summaries(group_by="virtual_key", from_ms=1, to_ms=2))
+
+    assert [r["key"] for r in rows] == ["vk_1", "vk_2", "vk_3"]
+    # First call carries no cursor; the second carries the one page 1 issued.
+    assert seen_cursors == [None, "c1"]
+
+
+def test_summaries_page_exposes_the_cursor_and_the_key_filter():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params.get("virtual_key_id") == "vk_7"
+        assert request.url.params.get("cursor") == "c0"
+        return httpx.Response(200, json={"data": [], "next_cursor": None})
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    page = facade.summaries_page(
+        group_by="virtual_key",
+        from_ms=1,
+        to_ms=2,
+        cursor="c0",
+        virtual_key_id="vk_7",
+    )
+    assert page["next_cursor"] is None

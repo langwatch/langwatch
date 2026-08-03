@@ -71,6 +71,12 @@ export interface SpendSummaryRow {
 
 export interface SpendSummariesResponse {
   data: SpendSummaryRow[];
+  /**
+   * Pass back as `cursor` for the next page; null means the walk is done.
+   * A full page does NOT mean there is more, so follow this until null
+   * rather than stopping when a page comes back short.
+   */
+  next_cursor: string | null;
 }
 
 export interface SpendEventsPage {
@@ -212,11 +218,21 @@ export class SpendEventsApiService {
     );
   }
 
+  /**
+   * Per-key spend rollups for a window, paged by group key ascending.
+   *
+   * The page is a walk, not a whole answer: follow `next_cursor` until it
+   * comes back null. A reconciler that reads only the first page silently
+   * under-counts every tenant past the limit.
+   */
   async summaries(options: {
     groupBy: "virtual_key" | "end_user";
     from: number;
     to: number;
     projectId?: string;
+    /** Narrow the rollup to one key, exact match. */
+    virtualKeyId?: string;
+    cursor?: string;
     limit?: number;
   }): Promise<SpendSummariesResponse> {
     const params = new URLSearchParams();
@@ -224,6 +240,9 @@ export class SpendEventsApiService {
     params.set("from", String(options.from));
     params.set("to", String(options.to));
     if (options.projectId) params.set("project_id", options.projectId);
+    if (options.virtualKeyId)
+      params.set("virtual_key_id", options.virtualKeyId);
+    if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
     return await this.request<SpendSummariesResponse>(
       "read spend summaries",
