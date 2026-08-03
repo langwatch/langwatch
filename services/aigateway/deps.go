@@ -260,6 +260,16 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 			}
 		}
 	}
+	if spendSpool != nil {
+		metrics.TrackSpendSpool(func() gatewaymetrics.SpoolStats {
+			stats := spendSpool.Stats()
+			return gatewaymetrics.SpoolStats{
+				Appended:        stats.Appended,
+				DroppedIntake:   stats.DroppedIntake,
+				DroppedOverflow: stats.DroppedOverflow,
+			}
+		})
+	}
 
 	return ctx, &Deps{
 		Logger:        logger,

@@ -43,14 +43,19 @@ type Config struct {
 }
 
 // SpendEmitterConfig governs the async spend-command emission (the billing
-// pipeline's gateway leg). Disabled unless Enabled is set: the drainer would
-// otherwise retry against a control plane that has not deployed the ingest
-// route yet. When enabled, records spool under SpoolDir (bounded, oldest
-// dropped first with a counter when full) and ship to the control plane's
-// spend-command ingest, signed with the shared internal secret. The request
-// hot path never performs a networked write and is never delayed or refused
-// for recordability.
+// pipeline's gateway leg). Enabled by default, because these commands are the
+// only source of gateway budget debits: a gateway that does not emit records
+// no spend, and every budget it enforces against goes stale at zero. When
+// enabled, records spool under SpoolDir (bounded, oldest dropped first with a
+// counter when full) and ship to the control plane's spend-command ingest,
+// signed with the shared internal secret. The request hot path never performs
+// a networked write and is never delayed or refused for recordability.
 type SpendEmitterConfig struct {
+	// Enabled defaults to true (see defaultConfig). LW_GATEWAY_SPEND_ENABLED
+	// is the kill switch: false or 0 stops emission, for the case where the
+	// control plane is older than the gateway and has no spend-command ingest
+	// route yet. Leaving it on through that window is degraded but safe, so
+	// the switch is a deliberate operator action rather than an opt-in.
 	Enabled bool `env:"ENABLED"`
 	// SpoolDir holds the on-disk spool. Empty defaults to
 	// <os.TempDir()>/langwatch-gateway-spend-spool.
@@ -145,6 +150,12 @@ func defaultConfig() Config {
 		},
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
+		},
+		// config.Hydrate leaves a field alone when its env var is unset or
+		// empty, so this default survives everything except an explicit
+		// LW_GATEWAY_SPEND_ENABLED=false (or 0).
+		SpendEmitter: SpendEmitterConfig{
+			Enabled: true,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
