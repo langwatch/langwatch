@@ -597,10 +597,10 @@ export class QueueManager<EventType extends Event = Event> {
       // funnel, not the key that names it, is what parks items behind one
       // consumer. Record the gap at registration so it can be found and closed,
       // instead of surfacing only as ClickHouse small-parts pressure.
-      const groupsJobs =
+      const isGroupedProducer =
         Boolean(cmdEntry.options.serializeByAggregate) ||
         Boolean(cmdEntry.getGroupKey);
-      if (groupsJobs && !(coalesceMaxBatch && coalesceMaxBatch > 1)) {
+      if (isGroupedProducer && !(coalesceMaxBatch && coalesceMaxBatch > 1)) {
         this.logger.info(
           { pipeline: this.pipelineName, command: cmdName },
           "grouped command producer registered without append coalescing",
