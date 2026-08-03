@@ -84,6 +84,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // Seed: 2 jobs in one group, counter = 2 (no drift)
         await redis.zadd(groupJobsKey, 1000, "job-x1", 1001, "job-x2");
+        await redis.zadd(`${queueName}:gq:ready`, 1, "groupX");
         await redis.set(counterKey, "2");
 
         const result = await repo.reconcileTotalPending(queueName);
@@ -109,6 +110,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // Seed: 1 job, counter = 999 (drifted)
         await redis.zadd(groupJobsKey, 1000, "job-y1");
+        await redis.zadd(`${queueName}:gq:ready`, 1, "groupY");
         await redis.set(counterKey, "999");
 
         // First call — heals the counter
@@ -147,6 +149,7 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         );
         await redis.zadd(`${queueName}:gq:group:gb:jobs`, 4, "j4", 5, "j5");
         await redis.zadd(`${queueName}:gq:group:gc:jobs`, 6, "j6", 7, "j7");
+        await redis.zadd(`${queueName}:gq:ready`, 1, "ga", 1, "gb", 1, "gc");
 
         // SET counter = 3 (under-counted)
         await redis.set(counterKey, "3");
@@ -184,6 +187,243 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
 
         // Counter must be healed to zero
         expect(await redis.get(counterKey)).toBe("0");
+      });
+    });
+  });
+
+  describe("given groups held outside the ready set", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario Reconcile counts blocked and parked groups alongside ready ones */
+      it("counts the jobs of ready, blocked and parked groups", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        await redis.del(markerKey);
+
+        // A live group in ready, one held for operator triage in blocked, and
+        // one deferred by the per-tenant cap into its tenant's parked set.
+        await redis.zadd(`${queueName}:gq:group:tenant-a/ready:jobs`, 1, "j1");
+        await redis.zadd(`${queueName}:gq:ready`, 1, "tenant-a/ready");
+
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-a/blocked:jobs`,
+          1,
+          "j2",
+          2,
+          "j3",
+        );
+        await redis.sadd(`${queueName}:gq:blocked`, "tenant-a/blocked");
+
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-b/parked:jobs`,
+          1,
+          "j4",
+          2,
+          "j5",
+          3,
+          "j6",
+        );
+        await redis.zadd(
+          `${queueName}:gq:parked:tenant-b`,
+          1,
+          "tenant-b/parked",
+        );
+        await redis.sadd(`${queueName}:gq:parked-tenants`, "tenant-b");
+
+        await redis.set(counterKey, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(6);
+        expect(await redis.get(counterKey)).toBe("6");
+      });
+    });
+  });
+
+  describe("given a group that is in both the ready and blocked indexes", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario Reconcile counts a group listed in two indexes only once */
+      it("counts the group's jobs once", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        await redis.del(markerKey);
+
+        await redis.zadd(
+          `${queueName}:gq:group:groupDup:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+        );
+        await redis.zadd(`${queueName}:gq:ready`, 1, "groupDup");
+        await redis.sadd(`${queueName}:gq:blocked`, "groupDup");
+        await redis.set(counterKey, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(2);
+      });
+    });
+  });
+
+  describe("given a pass that ran past its single-flight window", () => {
+    describe("when reconcile completes", () => {
+      /** @scenario An overrunning reconcile releases the marker instead of holding it past the window */
+      it("releases the marker so the next cycle can start immediately", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        await redis.del(markerKey);
+        await redis.zadd(`${queueName}:gq:group:groupZ:jobs`, 1, "j1");
+        await redis.zadd(`${queueName}:gq:ready`, 1, "groupZ");
+        await redis.set(counterKey, "9");
+
+        // A zero-length window is the same state a pass reaches by outliving
+        // its window: nothing of it remains to hand back.
+        const result = await repo.reconcileTotalPending(queueName, 0);
+
+        expect(result).not.toBeNull();
+        expect(await redis.exists(markerKey)).toBe(0);
+
+        // The next cycle is free to run rather than being told to wait.
+        expect(await repo.reconcileTotalPending(queueName)).not.toBeNull();
+      });
+    });
+  });
+
+  describe("given a group listed only in the pending index", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group counted from the pending index needs no lifecycle membership" */
+      it("counts its jobs without it appearing in ready, blocked or parked", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        await redis.del(markerKey);
+
+        // Exactly the state a group is in while it moves between lifecycle
+        // indexes: holding jobs, in none of them.
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-a/in-flight-move:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+          3,
+          "j3",
+        );
+        await redis.sadd(
+          `${queueName}:gq:pending-groups`,
+          "tenant-a/in-flight-move",
+        );
+        await redis.set(counterKey, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(3);
+        expect(await redis.get(counterKey)).toBe("3");
+      });
+    });
+  });
+
+  describe("given a drained group still listed in the pending index", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A drained group is dropped from the pending index" */
+      it("prunes the drained group but keeps one that still holds jobs", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        await redis.del(markerKey, indexKey);
+
+        // No jobs zset at all: the shape left behind when the safety-net TTL
+        // expires a group's jobs without any script running.
+        await redis.sadd(indexKey, "tenant-a/drained");
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-a/live:jobs`,
+          1,
+          "still-here",
+        );
+        await redis.sadd(indexKey, "tenant-a/live");
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(1);
+        expect((await redis.smembers(indexKey)).sort()).toEqual([
+          "tenant-a/live",
+        ]);
+      });
+    });
+  });
+
+  describe("given a group the pending index has not learned about yet", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group known only to the lifecycle indexes is adopted into the pending index" */
+      it("counts it and adopts it, so later passes read it from the index", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        // Queue names repeat across runs of this suite, so clear the index this
+        // test asserts is empty rather than trusting a previous run left nothing.
+        await redis.del(markerKey, indexKey);
+
+        // The shape left by a pod on the previous release, or by anything staged
+        // before the index existed: jobs and lifecycle membership, no index entry.
+        await redis.zadd(
+          `${queueName}:gq:group:legacy-group:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+        );
+        await redis.zadd(`${queueName}:gq:ready`, 1, "legacy-group");
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        expect(await redis.exists(indexKey)).toBe(0);
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(2);
+        // Adopted, so it no longer depends on the sequential lifecycle read.
+        expect(await redis.sismember(indexKey, "legacy-group")).toBe(1);
+      });
+    });
+  });
+
+  describe("given a group that no index lists at all", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group no index lists is still counted and adopted" */
+      it("finds it in the keyspace, counts it, and adopts it", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        await redis.del(markerKey, indexKey);
+
+        // Holding jobs, in neither the pending index nor any lifecycle index —
+        // the state a group passes through while it moves between them.
+        await redis.zadd(
+          `${queueName}:gq:group:orphan-mover:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+          3,
+          "j3",
+        );
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(3);
+        expect(await redis.sismember(indexKey, "orphan-mover")).toBe(1);
+      });
+    });
+  });
+
+  describe("given another instance holds the single-flight marker", () => {
+    describe("when a reconcile is declined", () => {
+      /** @scenario A declined reconcile leaves the holder's marker untouched */
+      it("leaves the holder's marker and its expiry alone", async () => {
+        await redis.set(markerKey, "other-instance-token", "PX", 30_000);
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result).toBeNull();
+        expect(await redis.get(markerKey)).toBe("other-instance-token");
+        expect(await redis.pttl(markerKey)).toBeGreaterThan(0);
       });
     });
   });

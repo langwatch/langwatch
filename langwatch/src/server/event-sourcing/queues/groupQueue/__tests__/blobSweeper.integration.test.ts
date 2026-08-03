@@ -43,6 +43,50 @@ describe("BlobSweeper", () => {
   const sweepOnce = (dryRun = false) =>
     sweeper.sweepQueue({ queueName: QUEUE_NAME, dryRun });
 
+  /** Bytes on the full backstop, no lease and no holder: the shape repair acts on. */
+  const giveBackstopBlobs = async (hashes: string[]) => {
+    for (const hash of hashes) {
+      await redis.set(blobKey(hash), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+    }
+  };
+
+  /**
+   * Pad the keyspace past several SCAN pages.
+   *
+   * SCAN pages by buckets and filters by MATCH afterwards, so a handful of keys
+   * come back in one call and a single tick would cover them however the cursor
+   * behaved. The padding is what makes a tick stop partway. It shares the suite
+   * prefix so teardown removes it, and carries no "<project>/<hash>" segment so
+   * the blob glob skips it.
+   */
+  const padKeyspace = async (count: number) => {
+    const filler = redis.pipeline();
+    for (let i = 0; i < count; i++) {
+      filler.set(`${PREFIX}sweep-filler:${i}`, "x", "EX", 300);
+    }
+    await filler.exec();
+  };
+
+  const sweepRepeatedly = async (
+    sweeperUnderTest: BlobSweeper,
+    ticks: number,
+  ) => {
+    for (let tick = 0; tick < ticks; tick++) {
+      await sweeperUnderTest.sweepQueue({ queueName: QUEUE_NAME });
+    }
+  };
+
+  /**
+   * TTLs of the given blobs, for a caller to assert on. Returns rather than
+   * asserts so the expectations stay in the test that owns them.
+   */
+  const blobTtls = async (hashes: string[]) =>
+    await Promise.all(hashes.map((hash) => redis.ttl(blobKey(hash))));
+
+  /** A blob the runner has judged sits on the grace window, not the backstop. */
+  const notOnGraceWindow = (ttls: number[]) =>
+    ttls.filter((ttl) => ttl <= 0 || ttl > BLOB_RELEASE_GRACE_TTL_SECONDS);
+
   beforeAll(() => {
     redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
       maxRetriesPerRequest: 0,
@@ -176,6 +220,111 @@ describe("BlobSweeper", () => {
         // Nothing to scan, so nothing is examined — the keys expire on their own
         // via BLOB_LEASE_SET_TTL_SECONDS. Asserted so the bound is deliberate.
         expect(tally.scanned).toBe(0);
+      });
+    });
+  });
+
+  describe("given more unreferenced blobs than one sweep's ceiling", () => {
+    /**
+     * The ceiling only bounds a tick if the walk resumes where it stopped. When
+     * it restarts at the beginning every tick it re-judges the same leading
+     * slice forever, and every blob past that slice is left to the 4-day
+     * backstop no matter how often the sweep runs — which reads as a healthy
+     * sweep in the totals while the bytes accumulate.
+     */
+    describe("when the runner sweeps repeatedly", () => {
+      /** @scenario "Successive sweeps reach the blobs the previous ones stopped short of" */
+      it("reaches every blob across successive sweeps rather than only the first slice", async () => {
+        const hashes = ["h01", "h02", "h03", "h04", "h05", "h06"];
+        await giveBackstopBlobs(hashes);
+        await padKeyspace(3000);
+
+        const pacedSweeper = new BlobSweeper({ redis, maxKeysPerQueue: 2 });
+
+        // Enough ticks to cover the keyspace at this ceiling, with headroom for
+        // SCAN returning short pages.
+        await sweepRepeatedly(pacedSweeper, hashes.length * 3);
+
+        // Naming the offenders rather than asserting a bare boolean, so a
+        // failure says which blob was left behind and on what TTL.
+        expect(notOnGraceWindow(await blobTtls(hashes))).toEqual([]);
+      });
+
+      /** @scenario "Once every blob has been judged the runner begins again" */
+      it("rewinds to the start once the keyspace is exhausted", async () => {
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+
+        // A ceiling above the keyspace finishes the walk in one tick.
+        const roomySweeper = new BlobSweeper({ redis, maxKeysPerQueue: 1000 });
+        const tally = await roomySweeper.sweepQueue({ queueName: QUEUE_NAME });
+        expect(tally.truncated).toBe(false);
+
+        // A blob written after that cycle finished is still found next tick,
+        // which only holds if the exhausted cursor rewound to "0".
+        await redis.set(
+          blobKey("later"),
+          "body",
+          "EX",
+          BLOB_BACKSTOP_TTL_SECONDS,
+        );
+        await roomySweeper.sweepQueue({ queueName: QUEUE_NAME });
+
+        const ttl = await redis.ttl(blobKey("later"));
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+      });
+    });
+  });
+
+  describe("given a dry run over more blobs than one sweep's ceiling", () => {
+    describe("when the runner sweeps in dry-run mode and then for real", () => {
+      /** @scenario "A dry run leaves the blobs it inspected for the next real sweep" */
+      it("leaves the cursor untouched, and only a real sweep parks one", async () => {
+        const cursorKey = `${PREFIX}blob-sweep-cursor`;
+        await giveBackstopBlobs(["d01", "d02", "d03", "d04"]);
+
+        // A ceiling below the blob count guarantees the walk stops partway, so
+        // there is a real cursor position to park or discard.
+        const pacedSweeper = new BlobSweeper({ redis, maxKeysPerQueue: 1 });
+
+        const dryTally = await pacedSweeper.sweepQueue({
+          queueName: QUEUE_NAME,
+          dryRun: true,
+        });
+
+        expect(dryTally.truncated).toBe(true);
+        // Nothing was judged, so nothing may be marked as covered.
+        expect(await redis.exists(cursorKey)).toBe(0);
+
+        await pacedSweeper.sweepQueue({ queueName: QUEUE_NAME });
+
+        expect(await redis.exists(cursorKey)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a keyspace where almost nothing matches the blob pattern", () => {
+    describe("when the runner sweeps", () => {
+      /** @scenario "A sweep stays bounded even when it finds almost nothing to judge" */
+      it("stops on its scan-call budget instead of walking the whole keyspace", async () => {
+        // Matches are what the key ceiling counts, so a keyspace with almost none
+        // would run the walk to the end of the database on every tick. Only a
+        // budget on the calls themselves bounds that.
+        await padKeyspace(3000);
+        await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+
+        const budgetedSweeper = new BlobSweeper({
+          redis,
+          maxScanCallsPerQueue: 2,
+        });
+
+        const tally = await budgetedSweeper.sweepQueue({
+          queueName: QUEUE_NAME,
+        });
+
+        // Two SCAN calls cannot cross this keyspace, so the walk reports itself
+        // unfinished rather than having run to the end.
+        expect(tally.truncated).toBe(true);
       });
     });
   });
