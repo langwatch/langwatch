@@ -852,7 +852,7 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 **Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `ModelProviderService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
 
-**OpenAPI spec:** generated into `langwatch/src/app/api/openapiLangWatch.json` by `pnpm run task generateOpenAPISpec`, served unauthenticated at `/api/gateway/v1/openapi.json`, and published on the docs site.
+**OpenAPI spec:** generated into `langwatch/src/app/api/openapiLangWatch.json` by `pnpm run task generateOpenAPISpec`, served unauthenticated at `/api/gateway/v1/openapi.json`, and published on the docs site. `pnpm check:openapi-completeness` gates the generated document over both `/api/gateway/v1` and `/api/webhooks/v1`: every body-accepting write declares a `requestBody`, every operation whose handler reads the query string declares its query parameters, and every operation declares a 2xx response carrying a schema. Exemptions live in `langwatch/scripts/check-openapi-completeness.ts` as data with a reason per entry, and an entry that stops excusing anything fails the check.
 
 ## 12b. Billing events, webhooks, and end-user attribution (2026-07)
 
