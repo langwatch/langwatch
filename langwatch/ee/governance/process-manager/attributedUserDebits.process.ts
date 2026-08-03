@@ -46,9 +46,13 @@ export const ATTRIBUTED_DEBITS_PROCESS_NAME = "attributedUserDebits" as const;
  * serve.
  *
  * Ownership split with the trace reactor: this writer owns ONLY
- * ATTRIBUTED_USER budget rows for a request; the reactor owns the rest.
- * The insert probes per (BudgetId, GatewayRequestId) so the two writers
- * never suppress each other.
+ * ATTRIBUTED_USER budget rows for a request; the reactor owns the rest,
+ * and the reactor excludes templates at the source. That split is what
+ * keeps the two writers apart, not the per-budget insert probe: the
+ * ledger keys rows by (TenantId, BudgetId, GatewayRequestId) with no
+ * bucket in the key, so two writers claiming one budget on one request
+ * cannot both be recorded whatever the probe does. One of them is
+ * dropped, and the spend lands in whichever bucket won.
  */
 
 export interface AttributedDebitsState {
@@ -56,6 +60,19 @@ export interface AttributedDebitsState {
   virtualKeyId: string;
   organizationId: string;
   teamId: string;
+  /**
+   * Whether the admit event has been folded in. Attribution alone cannot
+   * answer that: an admission carrying no end user leaves `endUserId`
+   * empty, which reads identically to no admission at all. The two owe
+   * opposite things, so the outcome handlers need them apart.
+   */
+  admitted: boolean;
+  /**
+   * An outcome this instance saw before its admission. Outcomes can
+   * outrun their admit append, and a debit cannot name a bucket without
+   * the end user, so the outcome waits here until `admitted` releases it.
+   */
+  pendingOutcome: WriteAttributedDebitsPayload | null;
   [key: string]: JsonValue;
 }
 
@@ -64,6 +81,8 @@ const INITIAL_STATE: AttributedDebitsState = {
   virtualKeyId: "",
   organizationId: "",
   teamId: "",
+  admitted: false,
+  pendingOutcome: null,
 };
 
 export const writeAttributedDebitsSchema = z.object({
@@ -255,12 +274,42 @@ function writeDebitsPayload(
   };
 }
 
+/** What an outcome handler needs from the process context. */
+interface OutcomeContext<Intent> {
+  projectId: string;
+  intents: {
+    writeDebits: (key: string, payload: WriteAttributedDebitsPayload) => Intent;
+  };
+}
+
+/**
+ * One outcome, routed by what the instance knows. Before any admission the
+ * outcome is stashed for the admitted handler to release. After an
+ * admission naming an end user it freezes its debit intent. After one
+ * naming nobody there is no bucket to debit, so it commits nothing.
+ */
+function onOutcome<Intent>(
+  state: AttributedDebitsState,
+  ctx: OutcomeContext<Intent>,
+  outcome: SpendOutcome,
+): { state: AttributedDebitsState; intents?: Intent[] } {
+  const payload = writeDebitsPayload(state, ctx.projectId, outcome);
+  if (!state.admitted) return { state: { ...state, pendingOutcome: payload } };
+  if (!state.endUserId) return { state };
+  return {
+    state,
+    intents: [ctx.intents.writeDebits(`debits:${outcome.status}`, payload)],
+  };
+}
+
 /**
  * One instance per gateway request, like the delivery process: `admitted`
  * stores who the request belonged to, the outcome event freezes one
- * deterministic `writeDebits` intent. Requests with no end-user id never
- * commit an intent at all, so anchors without templates and traffic
- * without attribution cost nothing here.
+ * deterministic `writeDebits` intent. An outcome that outruns its
+ * admission waits in state until admission releases it, so log order
+ * never costs a debit. Requests admitted without an end-user id commit no
+ * intent at all, so anchors without templates and traffic without
+ * attribution cost nothing here.
  */
 export function attributedUserDebitsPM(
   deps: AttributedDebitsProcessDeps,
@@ -273,47 +322,60 @@ export function attributedUserDebitsPM(
         writeAttributedDebitsSchema,
         runWriteAttributedDebits(deps),
       )
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data) => {
+      // Admission carries the end user every debit needs, so it also
+      // releases an outcome that arrived ahead of it. One admission per
+      // instance keeps `debits:late` minted at most once.
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
         const admitted = data as AdmitSpendCommandData;
-        return {
-          state: {
-            ...state,
-            endUserId: admitted.end_user_id ?? "",
-            virtualKeyId: admitted.virtual_key_id,
-            organizationId: admitted.organization_id,
-          },
+        const endUserId = admitted.end_user_id ?? "";
+        const stashed = state.pendingOutcome;
+        const next = {
+          ...state,
+          endUserId,
+          virtualKeyId: admitted.virtual_key_id,
+          organizationId: admitted.organization_id,
+          admitted: true,
+          pendingOutcome: null,
         };
-      })
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
-        if (!state.endUserId) return { state };
+        if (!stashed) return { state: next };
+        if (!endUserId) {
+          // The request was never attributable, so there is no bucket to
+          // debit. Loud because a debit reaching here and evaporating is
+          // exactly the shape of the loss this process exists to prevent.
+          logger.error(
+            {
+              gatewayRequestId: stashed.gateway_request_id,
+              virtualKeyId: admitted.virtual_key_id,
+              reason: "admission carried no end user",
+            },
+            "dropping attributed-user debit: nothing to attribute it to",
+          );
+          return { state: next };
+        }
         return {
-          state,
+          state: next,
           intents: [
-            ctx.intents.writeDebits(
-              "debits:confirmed",
-              writeDebitsPayload(state, ctx.projectId, {
-                status: "confirmed",
-                data: data as ConfirmSpendCommandData,
-              }),
-            ),
+            ctx.intents.writeDebits("debits:late", {
+              ...stashed,
+              organization_id: admitted.organization_id,
+              virtual_key_id: admitted.virtual_key_id,
+              end_user_id: endUserId,
+            }),
           ],
         };
       })
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
-        if (!state.endUserId) return { state };
-        return {
-          state,
-          intents: [
-            ctx.intents.writeDebits(
-              "debits:failed",
-              writeDebitsPayload(state, ctx.projectId, {
-                status: "failed",
-                data: data as FailSpendCommandData,
-              }),
-            ),
-          ],
-        };
-      })
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
+        onOutcome(state, ctx, {
+          status: "confirmed",
+          data: data as ConfirmSpendCommandData,
+        }),
+      )
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) =>
+        onOutcome(state, ctx, {
+          status: "failed",
+          data: data as FailSpendCommandData,
+        }),
+      )
       .toPayload((event) => event.data as unknown as JsonValue)
       .outbox({
         maxAttempts: 8,

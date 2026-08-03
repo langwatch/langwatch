@@ -11,7 +11,7 @@
  *       specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
 import {
@@ -25,6 +25,27 @@ import {
 } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
 import { attributedUserBucketScopeId } from "../budgetResolution.service";
+
+/**
+ * Loggers are stubbed so the suppressed-debit report can be asserted;
+ * everything else in the observability module stays real.
+ */
+const capturedLogs = vi.hoisted(() => {
+  const stub = {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+  } as Record<string, unknown>;
+  stub.child = () => stub;
+  return stub as typeof stub & { error: ReturnType<typeof vi.fn> };
+});
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, createLogger: () => capturedLogs };
+});
 
 const suffix = nanoid(8);
 const ORG_ID = `org-attr-${suffix}`;
@@ -198,6 +219,65 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     const byId = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
     expect(Number.parseFloat(byId.get(template.id)!)).toBeCloseTo(10, 3);
     expect(Number.parseFloat(byId.get(other.id)!)).toBeCloseTo(10, 3);
+  });
+
+  /** @scenario A debit that would land in another writer's bucket is never quiet */
+  it("reports a suppressed debit naming a different bucket, and stays silent on a replay", async () => {
+    const template = await service.create({
+      organizationId: ORG_ID,
+      scope: { kind: "ATTRIBUTED_USER", anchorVirtualKeyId: VK_ID },
+      name: "collision template",
+      window: "MONTH",
+      limitUsd: 100,
+      actorUserId: USER_ID,
+    });
+    const requestId = `req-${suffix}-collision`;
+    // The bucket a writer with no end-user context can only produce.
+    const anchorBucket = VK_ID;
+    const perUserBucket = attributedUserBucketScopeId(VK_ID, "user-collide");
+
+    await chRepo.insertDebitsForBudgets([
+      debitRow({
+        budgetId: template.id,
+        window: "MONTH",
+        scopeId: anchorBucket,
+        gatewayRequestId: requestId,
+      }),
+    ]);
+
+    // The per-user writer follows, same budget and request, different bucket.
+    capturedLogs.error.mockClear();
+    await chRepo.insertDebitsForBudgets([
+      debitRow({
+        budgetId: template.id,
+        window: "MONTH",
+        scopeId: perUserBucket,
+        gatewayRequestId: requestId,
+      }),
+    ]);
+
+    expect(capturedLogs.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayRequestId: requestId,
+        budgetId: template.id,
+        droppedScopeId: perUserBucket,
+        existingScopeId: anchorBucket,
+      }),
+      expect.stringContaining("different bucket"),
+    );
+
+    // A genuine replay of the same writer names the same bucket, which is
+    // the idempotency the probe exists for, and must stay quiet.
+    capturedLogs.error.mockClear();
+    await chRepo.insertDebitsForBudgets([
+      debitRow({
+        budgetId: template.id,
+        window: "MONTH",
+        scopeId: anchorBucket,
+        gatewayRequestId: requestId,
+      }),
+    ]);
+    expect(capturedLogs.error).not.toHaveBeenCalled();
   });
 
   /** @scenario Resetting a budget moves the boundary and never the ledger */

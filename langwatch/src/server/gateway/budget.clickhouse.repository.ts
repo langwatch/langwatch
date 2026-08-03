@@ -307,16 +307,38 @@ export class GatewayBudgetClickHouseRepository {
     const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
     const client = await this.resolveClient(tenantId);
     const probe = await client.query({
-      query: `SELECT DISTINCT BudgetId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
+      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
       query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
       format: "JSONEachRow",
     });
-    const seen = new Set(
-      ((await probe.json()) as Array<{ BudgetId: string }>).map(
-        (r) => r.BudgetId,
-      ),
+    const existing = new Map(
+      (
+        (await probe.json()) as Array<{ BudgetId: string; ScopeId: string }>
+      ).map((r) => [r.BudgetId, r.ScopeId]),
     );
-    const fresh = rows.filter((r) => !seen.has(r.budgetId));
+    // A budget already on this request suppresses the row, which is how a
+    // replay stays idempotent. When the row that already sits there names
+    // a DIFFERENT bucket, the suppression is not a replay: the ledger keys
+    // rows by (TenantId, BudgetId, GatewayRequestId) with no bucket in the
+    // key, so two writers disagreeing about the bucket silently drop one
+    // side's spend from whichever bucket enforcement reads. Never quiet.
+    for (const row of rows) {
+      const seenScopeId = existing.get(row.budgetId);
+      if (seenScopeId === undefined || seenScopeId === row.scopeId) continue;
+      logger.error(
+        {
+          tenantId,
+          gatewayRequestId,
+          budgetId: row.budgetId,
+          scope: row.scope,
+          droppedScopeId: row.scopeId,
+          existingScopeId: seenScopeId,
+          reason: "another writer already claimed this budget on the request",
+        },
+        "dropping a budget debit that would land in a different bucket",
+      );
+    }
+    const fresh = rows.filter((r) => !existing.has(r.budgetId));
     if (fresh.length === 0) return;
     await this.insertRows(fresh);
   }

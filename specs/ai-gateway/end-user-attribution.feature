@@ -107,6 +107,29 @@ Feature: Per-end-user budgets by attribution
     # The whole-request probe would make two writers mutually exclusive;
     # the template writer probes per budget instead.
 
+  @unit
+  Scenario: The trace fold never debits an attributed-user template
+    Given a key carrying both a per-seat template and a key cap
+    When the trace fold writes that request's debit rows
+    Then it writes the key cap's row and no template row
+    # The fold has no end user, so a template row could only name the
+    # bare anchor. The ledger keys rows by request and budget with no
+    # bucket in the key, so an anchor row takes the per-user row's slot
+    # and the seat cap stops seeing the spend it is meant to stop.
+
+  @unit
+  Scenario: An outcome that outruns its admission still debits
+    Given a confirmed outcome consumed before its admit event
+    When the admission arrives naming the end user
+    Then the debit intent is committed then, against the per-user bucket
+    And an admission naming nobody drops the outcome loudly instead
+
+  @integration
+  Scenario: A debit that would land in another writer's bucket is never quiet
+    Given a row already on this request for the same budget
+    When a second writer inserts that budget against a different bucket
+    Then the suppressed debit is reported at error with its request id
+
   # ────────────────────────────────────────────────────────────────────────────
   # Reads
   # ────────────────────────────────────────────────────────────────────────────

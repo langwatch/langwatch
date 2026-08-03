@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { attributedUserDebitsPM } from "../process-manager/attributedUserDebits.process";
+
+const logged = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logged,
+}));
 
 /**
  * Pure harness: replay the applier against a recording builder, then
@@ -55,7 +65,25 @@ const ctx = () => ({
   },
 });
 
+const outcomeData = (requestId: string) => ({
+  gateway_request_id: requestId,
+  model: "gpt-x",
+  model_provider_id: "mp_1",
+  usage: {
+    input_tokens: 10,
+    output_tokens: 5,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    reasoning_tokens: 0,
+  },
+  cost_nano_usd: 3_500,
+  rate_version: "catalog@2026-07-30",
+  duration_ms: 120,
+  occurred_at: 1_753_800_000_000,
+});
+
 describe("attributed-user debits process", () => {
+  beforeEach(() => vi.clearAllMocks());
   /** @scenario Attributed debits ride the spend pipeline, not the trace fold */
   it("joins admission with the outcome, and skips requests without an end user", () => {
     const { handlers, initial } = capture();
@@ -135,5 +163,72 @@ describe("attributed-user debits process", () => {
     );
     expect(silent.intents ?? []).toHaveLength(0);
     expect(c2.intents.writeDebits).not.toHaveBeenCalled();
+  });
+
+  /** @scenario An outcome that outruns its admission still debits */
+  it("holds an outcome that arrives first and debits when admission lands", () => {
+    const { handlers, initial } = capture();
+    const admitted = handlers.get(GATEWAY_SPEND_ADMITTED_EVENT_TYPE)!;
+    const confirmed = handlers.get(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE)!;
+
+    // The outcome outruns its admit append: nothing to attribute yet.
+    const early = ctx();
+    const stashed = confirmed(initial(), outcomeData("req_late"), early);
+    expect(stashed.intents ?? []).toHaveLength(0);
+    expect(early.intents.writeDebits).not.toHaveBeenCalled();
+
+    // Admission arrives and releases it.
+    const late = ctx();
+    const released = admitted(
+      stashed.state,
+      {
+        gateway_request_id: "req_late",
+        organization_id: "org_1",
+        virtual_key_id: "vk_1",
+        end_user_id: "user_9",
+      },
+      late,
+    );
+    expect(released.intents).toHaveLength(1);
+    expect(late.intents.writeDebits).toHaveBeenCalledWith(
+      "debits:late",
+      expect.objectContaining({
+        gateway_request_id: "req_late",
+        organization_id: "org_1",
+        virtual_key_id: "vk_1",
+        end_user_id: "user_9",
+        status: "confirmed",
+        cost_nano_usd: 3_500,
+      }),
+    );
+  });
+
+  it("drops an outrunning outcome loudly when admission names nobody", () => {
+    const { handlers, initial } = capture();
+    const admitted = handlers.get(GATEWAY_SPEND_ADMITTED_EVENT_TYPE)!;
+    const confirmed = handlers.get(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE)!;
+
+    const stashed = confirmed(initial(), outcomeData("req_orphan"), ctx());
+    const c = ctx();
+    const resolved = admitted(
+      stashed.state,
+      {
+        gateway_request_id: "req_orphan",
+        organization_id: "org_1",
+        virtual_key_id: "vk_1",
+        end_user_id: "",
+      },
+      c,
+    );
+
+    expect(resolved.intents ?? []).toHaveLength(0);
+    expect(c.intents.writeDebits).not.toHaveBeenCalled();
+    expect(logged.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayRequestId: "req_orphan",
+        reason: "admission carried no end user",
+      }),
+      expect.stringContaining("dropping attributed-user debit"),
+    );
   });
 });

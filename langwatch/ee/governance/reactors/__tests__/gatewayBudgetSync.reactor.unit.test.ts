@@ -348,6 +348,112 @@ describe("gatewayBudgetSync reactor", () => {
     });
   });
 
+  describe("when the VK carries an attributed-user template", () => {
+    /** @scenario The trace fold never debits an attributed-user template */
+    it("writes the key cap's row and leaves the template to its own writer", async () => {
+      const template = {
+        id: "budget-template",
+        scopeType: "ATTRIBUTED_USER",
+        scopeId: "vk-1",
+        window: "MONTH",
+      } as GatewayBudget;
+      const keyCap = {
+        id: "budget-key",
+        scopeType: "VIRTUAL_KEY",
+        scopeId: "vk-1",
+        window: "MONTH",
+      } as GatewayBudget;
+
+      const { deps, insertDebitsForBudgets } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [template, keyCap],
+        // The fold has no end user, so the resolver hands the template
+        // back keyed on its bare anchor: the shape that collides.
+        [
+          {
+            budget: template,
+            bucketScopeId: "vk-1",
+            principalUserId: null,
+            groupId: null,
+          },
+          {
+            budget: keyCap,
+            bucketScopeId: "vk-1",
+            principalUserId: null,
+            groupId: null,
+          },
+        ],
+      );
+      const reactor = createGatewayBudgetSyncReactor(deps);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState({
+            "langwatch.virtual_key_id": "vk-1",
+            "langwatch.gateway_request_id": "req-tpl-1",
+          }),
+        ),
+      );
+
+      expect(insertDebitsForBudgets).toHaveBeenCalledTimes(1);
+      const rows = insertDebitsForBudgets.mock.calls[0]![0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        budgetId: "budget-key",
+        scope: "VIRTUAL_KEY",
+      });
+      expect(
+        rows.some((r: { scope: string }) => r.scope === "ATTRIBUTED_USER"),
+      ).toBe(false);
+    });
+
+    it("writes nothing at all when the template is the only budget", async () => {
+      const template = {
+        id: "budget-template",
+        scopeType: "ATTRIBUTED_USER",
+        scopeId: "vk-1",
+        window: "MONTH",
+      } as GatewayBudget;
+
+      const { deps, insertDebitsForBudgets } = mockDeps(
+        { id: "vk-1", organizationId: "org-1", principalUserId: null },
+        {
+          id: "project-1",
+          teamId: "team-1",
+          team: { organizationId: "org-1" },
+        },
+        [template],
+        [
+          {
+            budget: template,
+            bucketScopeId: "vk-1",
+            principalUserId: null,
+            groupId: null,
+          },
+        ],
+      );
+      const reactor = createGatewayBudgetSyncReactor(deps);
+
+      await reactor.handle(
+        event,
+        ctx(
+          createFoldState({
+            "langwatch.virtual_key_id": "vk-1",
+            "langwatch.gateway_request_id": "req-tpl-2",
+          }),
+        ),
+      );
+
+      expect(insertDebitsForBudgets).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the trace was blocked by a guardrail", () => {
     it("emits BLOCKED_BY_GUARDRAIL status with zero cost", async () => {
       const budget = {

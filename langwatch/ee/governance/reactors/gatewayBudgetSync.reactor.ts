@@ -387,31 +387,46 @@ async function foldGatewayTrace(
     foldState.attributes["langwatch.model_provider_id"] ?? null;
 
   const resolved = await deps.budgetRepository.resolveForRequest(scopes);
-  const budgets = resolved.filter((r) =>
+  const applicable = resolved.filter((r) =>
     budgetAppliesToProvider(r.budget, dispatchedProviderKey),
   );
-  if (budgets.length === 0) return;
+  if (applicable.length === 0) return;
 
-  const amountUsd = formatDecimal(foldState.totalCost ?? 0);
-  await writeDebits(
-    deps,
-    buildDebitRows({
-      projectId,
-      gatewayRequestId,
-      virtualKeyId: vk.id,
-      providerKey: dispatchedProviderKey,
-      amountUsd,
-      budgets,
-      foldState,
-    }),
+  // ATTRIBUTED_USER templates bucket spend per end user, and the end user
+  // rides the spend commands, never trace fold state. Resolved here the
+  // template yields its bare anchor, a bucket no enforcement reads. Worse,
+  // the ledger keys rows by (TenantId, BudgetId, GatewayRequestId) with no
+  // bucket in the key, so an anchor row claims the same slot as the
+  // per-user row and the insert probe drops whichever writer arrives
+  // second. The attributed-user process manager owns these rows alone.
+  const budgets = applicable.filter(
+    (r) => r.budget.scopeType !== "ATTRIBUTED_USER",
   );
 
+  const amountUsd = formatDecimal(foldState.totalCost ?? 0);
+  if (budgets.length > 0) {
+    await writeDebits(
+      deps,
+      buildDebitRows({
+        projectId,
+        gatewayRequestId,
+        virtualKeyId: vk.id,
+        providerKey: dispatchedProviderKey,
+        amountUsd,
+        budgets,
+        foldState,
+      }),
+    );
+  }
+
+  // Templates still evict the gateway's cached bundle: the row they are
+  // waiting on lands on the spend pipeline's clock, not this one.
   await emitBudgetUpdated(deps.prisma, {
     projectId,
     organizationId: project.team.organizationId,
     gatewayRequestId,
     virtualKeyId: vk.id,
-    budgetIds: budgets.map((r) => r.budget.id),
+    budgetIds: applicable.map((r) => r.budget.id),
     amountUsd,
   });
 }
