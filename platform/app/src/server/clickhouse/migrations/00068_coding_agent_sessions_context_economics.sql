@@ -32,8 +32,14 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- `DEFAULT map()` is not cosmetic. A variable-size column added by ALTER is
+-- unmaterialised in every part written before it, so a read decodes a size
+-- header that was never written; 00014 and 00057 both fixed that, and 00057
+-- records that the same header applies to Map. A read of this column on a
+-- pre-00068 session row is exactly that case, and the default makes it
+-- synthesise an empty map instead.
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
-  ADD COLUMN IF NOT EXISTS CompactionTriggers Map(LowCardinality(String), UInt32) CODEC(ZSTD(1));
+  ADD COLUMN IF NOT EXISTS CompactionTriggers Map(LowCardinality(String), UInt32) DEFAULT map() CODEC(ZSTD(1));
 -- +goose StatementEnd
 
 -- +goose StatementBegin
