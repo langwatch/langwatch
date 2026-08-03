@@ -86,7 +86,7 @@ export function createBillingMeterDispatchReactor(deps: {
         makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
         windowMs: BILLING_METER_DISPATCH_WINDOW_MS,
         dedupTtlMs: BILLING_METER_DISPATCH_SUPPRESS_MS,
-        surviveDispatch: true,
+        shouldSurviveDispatch: true,
       }),
     },
 

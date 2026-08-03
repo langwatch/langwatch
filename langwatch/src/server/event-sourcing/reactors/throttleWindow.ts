@@ -23,7 +23,7 @@ export type ReactorJobPayload = { event: Event; foldState: unknown };
  * first event, carrying the newest payload (`replace` stays on), and the next
  * event opens a fresh window.
  *
- * `surviveDispatch` defaults to false, and callers should think hard before
+ * `shouldSurviveDispatch` defaults to false, and callers should think hard before
  * setting it. It discards triggers that arrive after dispatch while the TTL
  * runs, which is right for work that must not repeat, and wrong for anything
  * level-triggered: dropping the LAST event of an aggregate leaves whatever
@@ -41,14 +41,14 @@ export function throttledPerWindow({
   makeJobId,
   windowMs,
   dedupTtlMs = windowMs,
-  surviveDispatch = false,
+  shouldSurviveDispatch = false,
 }: {
   makeJobId: (payload: ReactorJobPayload) => string;
   /** How long to hold events before firing, and the default dedup TTL. */
   windowMs: number;
   /** Override when the suppression window must outlast the firing delay. */
   dedupTtlMs?: number;
-  surviveDispatch?: boolean;
+  shouldSurviveDispatch?: boolean;
 }): Pick<ReactorOptions, "delay" | "makeJobId" | "deduplication"> {
   return {
     delay: windowMs,
@@ -60,7 +60,7 @@ export function throttledPerWindow({
       ttlMs: dedupTtlMs,
       extend: false,
       replace: true,
-      shouldSurviveDispatch: surviveDispatch,
+      shouldSurviveDispatch,
     },
   };
 }

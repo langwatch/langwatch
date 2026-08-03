@@ -645,7 +645,7 @@ describe("createProjectMetadataReactor()", () => {
     expect(jobId).toBe(`project-meta:${tenantId}`);
   });
 
-  it("holds events for one onboarding poll before writing", () => {
+  it("configures a window and dedup ttl of one onboarding poll", () => {
     const reactor = createProjectMetadataReactor(deps);
 
     expect(reactor.options!.delay).toBe(PROJECT_METADATA_WINDOW_MS);

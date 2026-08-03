@@ -82,7 +82,7 @@ describe("throttledPerWindow", () => {
         throttledPerWindow({
           makeJobId,
           windowMs: 5_000,
-          surviveDispatch: true,
+          shouldSurviveDispatch: true,
         }).deduplication?.shouldSurviveDispatch,
       ).toBe(true);
     });

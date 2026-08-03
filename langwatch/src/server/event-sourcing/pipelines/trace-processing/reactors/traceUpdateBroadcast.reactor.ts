@@ -40,7 +40,7 @@ export function createTraceUpdateBroadcastReactor(
       // connected, so the window is the whole latency a watching user sees;
       // it matches the debounce the listener already applies, which puts the
       // collapsing on the side that can drop the work instead of the side that
-      // has already paid to deliver it. Level-triggered, so surviveDispatch
+      // has already paid to deliver it. Level-triggered, so shouldSurviveDispatch
       // stays off and the final update always arrives.
       ...throttledPerWindow({
         makeJobId: (payload) =>

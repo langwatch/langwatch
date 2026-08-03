@@ -20,46 +20,90 @@ import type { ReactorDefinition } from "../reactor.types";
 
 const anyDeps = {} as never;
 
-/** Every reactor that holds events in a window, with the window it uses. */
-const windowed: { name: string; reactor: ReactorDefinition<never, never> }[] = [
+/** The policy only ever reads `options`, so the generic parameters do not matter. */
+type AnyReactor = ReactorDefinition<never, never>;
+
+/**
+ * Every reactor that holds events in a window, with the window it must use.
+ *
+ * The numbers are the point of the policy, not an implementation detail: each
+ * one was chosen against a specific consumer's tolerance, and widening it
+ * silently is how a reactor starts costing a user latency nobody signed off
+ * on. They are written as literals here so changing one has to change this
+ * table too, next to the reason it is what it is.
+ */
+const windowed = [
   {
     name: "traceUpdateBroadcast",
+    // Nothing polls behind it while the live stream is connected.
+    windowMs: 2_000,
+    dedupTtlMs: 2_000,
     reactor: createTraceUpdateBroadcastReactor({
       broadcast: anyDeps,
       hasRedis: true,
-    }) as never,
+    }) as unknown as AnyReactor,
   },
   {
     name: "projectMetadata",
-    reactor: createProjectMetadataReactor({ projects: anyDeps }) as never,
+    // Roughly one poll of the onboarding screen waiting on its flags.
+    windowMs: 3_000,
+    dedupTtlMs: 3_000,
+    reactor: createProjectMetadataReactor({
+      projects: anyDeps,
+    }) as unknown as AnyReactor,
   },
   {
     name: "governanceKpisSync",
-    reactor: createGovernanceKpisSyncReactor(anyDeps) as never,
+    // Hour-bucketed rows read by a five-minute worker.
+    windowMs: 30_000,
+    dedupTtlMs: 30_000,
+    reactor: createGovernanceKpisSyncReactor(anyDeps) as unknown as AnyReactor,
   },
   {
     name: "governanceOcsfEventsSync",
-    reactor: createGovernanceOcsfEventsSyncReactor(anyDeps) as never,
+    // Cursor-paginated export pulls pick up a late row on the next pass.
+    windowMs: 30_000,
+    dedupTtlMs: 30_000,
+    reactor: createGovernanceOcsfEventsSyncReactor(
+      anyDeps,
+    ) as unknown as AnyReactor,
   },
   {
     name: "billingMeterDispatch",
+    // Suppression outlives the window here, sized to the downstream command's
+    // own dedup so the two agree on the rate.
+    windowMs: 30_000,
+    dedupTtlMs: 300_000,
     reactor: createBillingMeterDispatchReactor({
       getDispatch: () => async () => {},
-    }) as never,
+    }) as unknown as AnyReactor,
   },
-];
+] as const satisfies readonly {
+  name: string;
+  windowMs: number;
+  dedupTtlMs: number;
+  reactor: AnyReactor;
+}[];
 
 describe("reactor throttle policy", () => {
-  describe.each(windowed)("given the $name reactor", ({ reactor }) => {
-    it("holds events for a window instead of firing on every event", () => {
-      expect(reactor.options?.delay).toBeGreaterThan(0);
+  describe.each(windowed)("given the $name reactor", ({
+    reactor,
+    windowMs,
+    dedupTtlMs,
+  }) => {
+    it("holds events for exactly the window the policy assigns it", () => {
+      expect(reactor.options?.delay).toBe(windowMs);
     });
 
     it("pins the window's deadline so a continuous stream cannot defer it forever", () => {
       expect(reactor.options?.deduplication?.extend).toBe(false);
     });
 
-    it("keeps a dedup ttl at least as long as the window, so the key outlives the wait", () => {
+    it("keeps its dedup key alive for exactly the suppression the policy assigns it", () => {
+      expect(reactor.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
+    });
+
+    it("never lets the key expire before the job it is holding dispatches", () => {
       const { delay, deduplication } = reactor.options!;
       expect(deduplication?.ttlMs).toBeGreaterThanOrEqual(delay!);
     });

@@ -77,7 +77,7 @@ export function createGovernanceKpisSyncReactor(
       isGovernanceOriginTrace(context.foldState.attributes),
     options: {
       // Level-triggered: the row carries the fold's running totals, so the
-      // LAST event of a trace must always land. surviveDispatch stays off.
+      // LAST event of a trace must always land. shouldSurviveDispatch stays off.
       ...throttledPerWindow({
         makeJobId: (payload) =>
           `governance-kpis-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
