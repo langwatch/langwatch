@@ -328,17 +328,22 @@ describe("billingMeterDispatchReactor", () => {
   });
 
   describe("options", () => {
-    it("configures runIn, makeJobId, and ttl", async () => {
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
-      );
+    it("configures runIn, makeJobId, and its suppression window", async () => {
+      const {
+        BILLING_METER_DISPATCH_SUPPRESS_MS,
+        BILLING_METER_DISPATCH_WINDOW_MS,
+        createBillingMeterDispatchReactor,
+      } = await import("../billingMeterDispatch.reactor");
 
       const reactor = createBillingMeterDispatchReactor({
         getDispatch: () => vi.fn(),
       });
 
       expect(reactor.options?.runIn).toEqual(["worker"]);
-      expect(reactor.options?.ttl).toBe(300_000);
+      expect(reactor.options?.delay).toBe(BILLING_METER_DISPATCH_WINDOW_MS);
+      expect(reactor.options?.deduplication?.ttlMs).toBe(
+        BILLING_METER_DISPATCH_SUPPRESS_MS,
+      );
 
       const payload = { event: makeEvent("proj-1"), foldState: {} };
       expect(reactor.options?.makeJobId?.(payload)).toBe(
