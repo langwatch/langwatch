@@ -30,16 +30,16 @@ Feature: AI Gateway — Budgets
   approaching a hard cap warn too: the request still succeeds, and the header is
   the only notice before the 402 starts.
 
-  Spend is derived from traces. The gateway emits one OTel span per request
-  carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
-  The trace-processing pipeline enriches the span with cost (pricing catalog ×
-  tokens), and a dedicated reactor writes one row per applicable budget to
-  gateway_budget_ledger_events in ClickHouse. An AggregatingMergeTree
-  materialised view (gateway_budget_scope_totals) rolls up spend per (scope,
-  scope_id, window, period_start). /budget/check reads from the materialised
-  view using sumMerge. There is no separate debit endpoint — the OTel trace
-  itself IS the debit signal. Idempotency is guaranteed by the ReplacingMergeTree
-  ORDER BY (TenantId, BudgetId, GatewayRequestId).
+  Spend is derived from the gateway's own spend commands. Every request
+  emits admit and outcome records (priced once at the ingest seam), and the
+  debits process manager on the gateway-spend pipeline writes one row per
+  applicable budget to gateway_budget_ledger_events in ClickHouse. It is the
+  sole writer. An AggregatingMergeTree materialised view
+  (gateway_budget_scope_totals) rolls up spend per (scope, scope_id, window,
+  period_start), which is what enforcement reads. There is no debit
+  endpoint: the spend command itself is the debit signal, and a request the
+  gateway refused is a record too. Idempotency is guaranteed by the
+  ReplacingMergeTree ORDER BY (TenantId, BudgetId, GatewayRequestId).
 
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
