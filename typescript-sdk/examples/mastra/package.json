@@ -41,6 +41,7 @@
     "js-yaml": ">=3.15.0 <4",
     "fast-uri@>=4.0.0 <4.1.1": "4.1.1",
     "brace-expansion@<1.1.16": "1.1.16",
-    "brace-expansion@>=2.0.0 <2.1.2": "2.1.2"
+    "brace-expansion@>=2.0.0 <2.1.2": "2.1.2",
+    "@opentelemetry/core@>=2.0.0 <2.8.0": ">=2.8.0 <3"
   }
 }
