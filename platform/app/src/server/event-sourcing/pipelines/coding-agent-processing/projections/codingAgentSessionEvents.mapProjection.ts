@@ -11,7 +11,7 @@ import {
 } from "../schemas/events";
 
 /**
- * One row per coding-agent session EVENT — the per-call fact table
+ * One row per coding-agent session EVENT, the per-call fact table
  * (`coding_agent_session_events`). Where `coding_agent_sessions` converges a
  * session into one row of totals, this keeps the sequence: every model call
  * with its own context and cost, every compaction with its before/after
@@ -23,10 +23,10 @@ import {
  * carrier with tokens + cost + duration + request id together, so consuming
  * only logs makes double-counting against `llm_request` spans impossible by
  * construction. Span-only agents (codex today) contribute no `model_call`
- * rows until they grow a log carrier — documented degradation, not a bug.
+ * rows until they grow a log carrier: documented degradation, not a bug.
  *
  * Scalar columns only; no free-form attribute map. The wire rides user
- * identity on nearly every event and content lives in the canonical rows —
+ * identity on nearly every event and content lives in the canonical rows, so
  * `recordId` reaches `log_records` for anything not typed here.
  */
 export interface CodingAgentSessionEventRecord {
@@ -76,7 +76,7 @@ export interface CodingAgentSessionEventRecord {
 /**
  * Raw wire event names that become rows, mapped to the row's EventKind.
  * Everything else (hooks, plugin loads, MCP connections, request/response
- * bodies) maps to null and contributes no row — the session fold still
+ * bodies) maps to null and contributes no row. The session fold still
  * counted it where relevant, and the body events' content stays in
  * `log_records`.
  *

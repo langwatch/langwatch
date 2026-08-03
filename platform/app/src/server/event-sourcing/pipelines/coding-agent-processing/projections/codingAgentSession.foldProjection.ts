@@ -57,7 +57,7 @@ const codingAgentSessionEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
  *
- *  2026-08-02 — the context-economics columns of migration 00068 joined the
+ *  2026-08-02: the context-economics columns of migration 00068 joined the
  *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
  *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
  *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows

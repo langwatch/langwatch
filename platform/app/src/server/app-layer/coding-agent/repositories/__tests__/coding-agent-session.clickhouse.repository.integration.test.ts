@@ -11,8 +11,8 @@
  * ADR-066 additions: the 00053 read-back state columns (sub-agent ids, ordered
  * step start times, previous-call context, converged metric units) that let
  * store.get() reconstruct working state without touching event_log, the
- * 00054 AppliedEventIds watermark that survives cache loss — including the
- * mixed-deploy read of a pre-00054 row whose body omits the column entirely —
+ * 00054 AppliedEventIds watermark that survives cache loss (including the
+ * mixed-deploy read of a pre-00054 row whose body omits the column entirely),
  * and the 00068 context-economics columns (reported rate-limit events,
  * compactions by trigger, spawn lineage).
  */

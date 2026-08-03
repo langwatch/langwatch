@@ -52,7 +52,7 @@ export interface CodingAgentProcessingPipelineDeps {
  * - sessionMetricSeries (map) → `session_metric_series`, the converged
  *   per-series totals (replace, never increment — ADR-056 §5)
  * - codingAgentSessionEvents (map) → `coding_agent_session_events`, one row
- *   per session event (model call, compaction, rate limit, tool run, …) —
+ *   per session event (model call, compaction, rate limit, tool run, …),
  *   the per-call sequence the session fold's converged totals erase
  *
  * Consumption is subscribers + projections + one process manager — no

@@ -44,7 +44,7 @@ class ProcessExitError extends Error {
 }
 
 const noop = () => {
-	// intentionally empty — suppresses output during tests
+	// intentionally empty, suppresses output during tests
 };
 
 describe("sessionEventsCommand()", () => {

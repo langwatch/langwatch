@@ -79,7 +79,7 @@ const sessionEventSchema = z.object({
 
 const secured = createProjectApp({ basePath: "/api/coding-agent" });
 
-// GET /sessions/:sessionId/events — one session's event sequence, in time
+// GET /sessions/:sessionId/events: one session's event sequence, in time
 // order: every model call with its context and cost, every compaction with
 // its before/after tokens, rate limits, tool runs, prompts. The raw material
 // for per-call context and cost analytics; scalar facts only, content stays

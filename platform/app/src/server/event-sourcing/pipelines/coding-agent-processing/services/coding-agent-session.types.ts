@@ -154,7 +154,7 @@ export interface CodingAgentSessionData {
   compactionTokensBefore: number;
   compactionTokensAfter: number;
   /**
-   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}` — a session
+   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}`. A session
    * that keeps auto-compacting is out of headroom, one the user compacts is
    * being STEERED; "unknown" buckets telemetry predating the attribute.
    */

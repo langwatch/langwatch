@@ -2,27 +2,27 @@
 -- +goose ENVSUB ON
 
 -- ============================================================================
--- coding_agent_sessions — context-economics columns.
+-- coding_agent_sessions: context-economics columns.
 --
 -- Four session facts the fold already sees but the row could not carry:
 --
---   RateLimitEvents    — rate-limit events the agent REPORTED
+--   RateLimitEvents:     rate-limit events the agent REPORTED
 --                        (`rate_limit_event` / `rate_limit_info`), kept apart
 --                        from the 429-inferred `RateLimited`: the event also
 --                        fires on warnings and status updates, so the two
 --                        counters answer different questions.
---   CompactionTriggers — compactions by trigger kind (`{"auto": 3,
+--   CompactionTriggers:  compactions by trigger kind (`{"auto": 3,
 --                        "manual": 1}`). A session that keeps auto-compacting
 --                        is out of headroom; one the user compacts is being
 --                        steered. Mirrors the ErrorTypes map pattern.
---   ParentSessionId    — the session that SPAWNED this one, when the agent
+--   ParentSessionId:     the session that SPAWNED this one, when the agent
 --                        stamps lineage. Empty for root sessions and for
 --                        agents that emit none.
---   IsFork             — this session FORKED its parent's context (inheriting
+--   IsFork:              this session FORKED its parent's context (inheriting
 --                        the whole window, and its cost) rather than starting
 --                        fresh. The expensive spawn mode worth flagging.
 --
--- Each ALTER is its own statement block — ClickHouse does not support
+-- Each ALTER is its own statement block, because ClickHouse does not support
 -- multi-statement queries.
 -- ============================================================================
 
