@@ -18,7 +18,7 @@ import {
 } from "~/hooks/usePlanManagementUrl";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PlanTypes } from "../../../ee/billing/planTypes";
-import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { UNLIMITED_PLAN } from "../../../ee/licensing/constants";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
@@ -140,7 +140,7 @@ function Usage() {
     isSelfHosted &&
     licenseStatus.data?.hasLicense &&
     "plan" in licenseStatus.data;
-  const isFreeTier =
+  const isUnlicensed =
     isSelfHosted &&
     licenseStatus.data &&
     !licenseStatus.data.hasLicense &&
@@ -256,14 +256,13 @@ function Usage() {
             />
           )}
 
-        {/* Self-hosted: Free tier */}
-        {isFreeTier && (
+        {/* Self-hosted without a license: the Open Source baseline, uncapped */}
+        {isUnlicensed && (
           <ResourceLimitsCard
-            planLabel="Free"
+            planLabel="Open Source"
             planColorPalette="gray"
-            subtitle="Current usage versus free tier limits"
-            limits={mapUsageToLimits(usage.data, FREE_PLAN)}
-            showLimits
+            subtitle="Current usage on this deployment"
+            limits={mapUsageToLimits(usage.data, UNLIMITED_PLAN)}
             showLiteMembers={showLiteMembers}
             actionHref="/settings/license"
             actionLabel={unlicensedActionLabel}

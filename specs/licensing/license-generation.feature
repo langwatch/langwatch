@@ -27,14 +27,10 @@ Feature: License Generation
     And I set the plan limits:
       | Field               | Value  |
       | maxMembers          | 10     |
-      | maxProjects         | 20     |
+      | maxMembersLite      | 5      |
       | maxMessagesPerMonth | 100000 |
-      | evaluationsCredit   | 500    |
-      | maxWorkflows        | 50     |
-      | maxPrompts          | 50     |
-      | maxEvaluators       | 50     |
-      | maxScenarios        | 50     |
       | canPublish          | true   |
+      | usageUnit           | traces |
     And I click "Generate License"
     Then a license file is automatically downloaded
     And the downloaded file is named "Acme Corp.langwatch-license"
@@ -61,14 +57,10 @@ Feature: License Generation
     Then the plan limits are populated with enterprise defaults:
       | Field               | Value    |
       | maxMembers          | 100      |
-      | maxProjects         | 500      |
+      | maxMembersLite      | 50       |
       | maxMessagesPerMonth | 10000000 |
-      | evaluationsCredit   | 10000    |
-      | maxWorkflows        | 1000     |
-      | maxPrompts          | 1000     |
-      | maxEvaluators       | 1000     |
-      | maxScenarios        | 1000     |
       | canPublish          | true     |
+      | usageUnit           | traces   |
 
   @integration @unimplemented
   Scenario: Customize plan limits after selecting template
@@ -77,7 +69,7 @@ Feature: License Generation
     And I fill in the email "admin@custom.corp"
     And I select the plan type "PRO"
     When I change maxMembers to "25"
-    And I change maxProjects to "50"
+    And I change maxMembersLite to "12"
     Then the form retains the custom values
     And other fields keep the PRO template defaults
 

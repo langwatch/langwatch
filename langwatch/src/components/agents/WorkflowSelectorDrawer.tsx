@@ -19,13 +19,11 @@ import {
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
-import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
   getFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -72,12 +70,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // License enforcement for agent AND workflow creation
-  // Creating a workflow agent requires creating both a workflow AND an agent,
-  // so we need to check both limits before proceeding
-  const agentEnforcement = useLicenseEnforcement("agents");
-  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -274,13 +266,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               </Button>
               <Button
                 colorPalette="blue"
-                onClick={() => {
-                  // Check both workflows and agents limits before proceeding
-                  checkCompoundLimits(
-                    [workflowEnforcement, agentEnforcement],
-                    () => void handleSubmit(onSubmit)(),
-                  );
-                }}
+                onClick={() => void handleSubmit(onSubmit)()}
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-agent-button"

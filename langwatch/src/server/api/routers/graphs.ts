@@ -4,7 +4,6 @@ import { z } from "zod";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -37,7 +36,6 @@ export const graphsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("analytics:create"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "customGraphs");
       const graph = JSON.parse(input.graph);
 
       if (

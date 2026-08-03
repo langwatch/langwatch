@@ -106,20 +106,12 @@ export interface IUsageUnitResolver {
  * Usage statistics result for an organization.
  */
 export interface UsageStats {
-  projectsCount: number;
   currentMonthMessagesCount: number | null;
   currentMonthCost: number;
   activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
-  teamsCount: number;
-  promptsCount: number;
-  workflowsCount: number;
-  scenariosCount: number;
-  evaluatorsCount: number;
-  agentsCount: number;
-  experimentsCount: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -166,36 +158,20 @@ export class UsageStatsService {
     user: MinimalUser,
   ): Promise<UsageStats> {
     const [
-      projectsCount,
       currentMonthMessagesCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
-      teamsCount,
-      promptsCount,
-      workflowsCount,
-      scenariosCount,
-      evaluatorsCount,
-      agentsCount,
-      experimentsCount,
       usageUnit,
     ] = await Promise.all([
-      this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
-      this.repository.getTeamCount(organizationId),
-      this.repository.getPromptCount(organizationId),
-      this.repository.getWorkflowCount(organizationId),
-      this.repository.getActiveScenarioCount(organizationId),
-      this.repository.getEvaluatorCount(organizationId),
-      this.repository.getAgentCount(organizationId),
-      this.repository.getExperimentCount(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -221,20 +197,12 @@ export class UsageStatsService {
     );
 
     return {
-      projectsCount,
       currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
-      teamsCount,
-      promptsCount,
-      workflowsCount,
-      scenariosCount,
-      evaluatorsCount,
-      agentsCount,
-      experimentsCount,
       messageLimitInfo,
       usageUnit,
     };

@@ -16,7 +16,6 @@ import {
 } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { Dialog } from "../../../components/ui/dialog";
-import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { trackEvent } from "../../../utils/tracking";
@@ -171,9 +170,6 @@ export const NewWorkflowForm = ({
       : getRandomWorkflowIcon(),
   );
 
-  // License enforcement for workflow creation
-  const { checkAndProceed } = useLicenseEnforcement("workflows");
-
   const form = useForm<FormData>({
     defaultValues: {
       name: template.name ?? "New Workflow",
@@ -204,34 +200,30 @@ export const NewWorkflowForm = ({
       icon: data.icon ?? defaultIcon,
     };
 
-    checkAndProceed(() => {
-      createWorkflowMutation.mutate(
-        {
-          projectId: project.id,
-          dsl: newWorkflow,
-          commitMessage: "Workflow creation",
+    createWorkflowMutation.mutate(
+      {
+        projectId: project.id,
+        dsl: newWorkflow,
+        commitMessage: "Workflow creation",
+      },
+      {
+        onSuccess: (createdWorkflow) => {
+          trackEvent("workflow_create", { project_id: project?.id });
+          onClose();
+          void router.push(
+            `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
+          );
         },
-        {
-          onSuccess: (createdWorkflow) => {
-            trackEvent("workflow_create", { project_id: project?.id });
-            onClose();
-            void router.push(
-              `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
-            );
-          },
-          onError: (error) => {
-            if (
-              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
-            )
-              return;
-            showErrorToast({
-              error,
-              fallbackTitle: "Couldn't create workflow",
-            });
-          },
+        onError: (error) => {
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't create workflow",
+          });
         },
-      );
-    });
+      },
+    );
   };
 
   const nameRef = useRef<HTMLInputElement>(null);

@@ -194,6 +194,17 @@ export interface DeleteMemberInput {
 }
 
 /**
+ * Input for disabling or re-enabling a membership. Disabling revokes the
+ * person's access to this organization and returns their licensed seat,
+ * without touching their role, department or history.
+ */
+export interface SetMemberDisabledInput {
+  organizationId: string;
+  userId: string;
+  disabled: boolean;
+}
+
+/**
  * Input for updating a member's organization role and cascading team roles.
  */
 export interface UpdateMemberRoleInput {
@@ -288,6 +299,8 @@ export interface OrganizationRepository {
   update(input: UpdateOrganizationInput): Promise<void>;
 
   deleteMember(input: DeleteMemberInput): Promise<void>;
+
+  setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
   updateMemberRole(input: UpdateMemberRoleInput): Promise<void>;
 
@@ -420,6 +433,8 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async update(_input: UpdateOrganizationInput): Promise<void> {}
 
   async deleteMember(_input: DeleteMemberInput): Promise<void> {}
+
+  async setMemberDisabled(_input: SetMemberDisabledInput): Promise<void> {}
 
   async updateMemberRole(_input: UpdateMemberRoleInput): Promise<void> {}
 

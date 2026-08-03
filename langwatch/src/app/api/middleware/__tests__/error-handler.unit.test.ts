@@ -62,7 +62,7 @@ describe("handleError()", () => {
   describe("when error is a LimitExceededError", () => {
     /** @scenario "A known failure is normalised by Hono to a client-safe body" */
     it("returns 403 with HandledError shape", async () => {
-      const error = new LimitExceededError("prompts", 5, 5);
+      const error = new LimitExceededError("members", 5, 5);
       const app = createTestApp(error);
 
       const res = await app.request("/");
@@ -71,20 +71,20 @@ describe("handleError()", () => {
       const body = await res.json();
       expect(body.error).toBe("resource_limit_exceeded");
       expect(body.message).toBe(
-        "You have reached the maximum number of prompts",
+        "You have reached the maximum number of team members",
       );
     });
 
     /** @scenario "A known failure is normalised by Hono to a client-safe body" */
     /** @scenario "An external contract wins over cross-transport symmetry" */
     it("includes meta fields in the response body", async () => {
-      const error = new LimitExceededError("prompts", 5, 5);
+      const error = new LimitExceededError("members", 5, 5);
       const app = createTestApp(error);
 
       const res = await app.request("/");
 
       const body = await res.json();
-      expect(body).toHaveProperty("limitType", "prompts");
+      expect(body).toHaveProperty("limitType", "members");
       expect(body).toHaveProperty("current", 5);
       expect(body).toHaveProperty("max", 5);
     });

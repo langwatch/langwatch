@@ -17,7 +17,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import { ScenarioRepository } from "../scenario.repository";
 import { ScenarioService } from "../scenario.service";
 
@@ -232,19 +231,12 @@ describe("ScenarioService", () => {
   });
 
   // ==========================================================================
-  // License Limits
+  // Active scenario counting
   // ==========================================================================
 
-  describe("license limit counting", () => {
+  describe("active scenario counting", () => {
     describe("when scenarios are archived", () => {
-      it("excludes archived scenarios from license count", async () => {
-        const organization = await prisma.organization.findUnique({
-          where: { slug: "test-organization" },
-        });
-        expect(organization).not.toBeNull();
-
-        const licenseRepo = new LicenseEnforcementRepository(prisma);
-
+      it("excludes archived scenarios from a count of active scenarios", async () => {
         // Create 3 active scenarios
         await createScenario({ name: "Active 1" });
         await createScenario({ name: "Active 2" });
@@ -253,10 +245,14 @@ describe("ScenarioService", () => {
         // Archive one
         await service.archive({ id: toArchive.id, projectId });
 
-        // Count should only include active scenarios
-        const count = await licenseRepo.getActiveScenarioCount(
-          organization!.id,
-        );
+        // Count should only include active (non-archived) scenarios.
+        // Scope by projectId so the multitenancy middleware accepts the query.
+        const count = await prisma.scenario.count({
+          where: {
+            projectId,
+            archivedAt: null,
+          },
+        });
         expect(count).toBe(2);
       });
     });

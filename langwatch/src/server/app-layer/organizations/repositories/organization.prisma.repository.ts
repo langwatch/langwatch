@@ -20,6 +20,7 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
+import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../compute-effective-team-role-updates";
 import type {
   AuditLogFilters,
@@ -33,6 +34,7 @@ import type {
   OrganizationRepository,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
+  SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
@@ -58,9 +60,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }): Promise<OrganizationUserRole | null> {
     const orgUser = await this.prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true },
+      select: { role: true, disabledAt: true },
     });
-    return orgUser?.role ?? null;
+    // A disabled membership carries no role: this is the gate that makes
+    // disabling actually revoke access rather than only free a seat.
+    if (!orgUser || orgUser.disabledAt) return null;
+    return orgUser.role;
   }
 
   async getUserOrgRoleByTeamId({
@@ -84,6 +89,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       where: {
         userId,
         organizationId: team.organizationId,
+        disabledAt: null,
       },
       select: { role: true },
     });
@@ -309,9 +315,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               ]
             : []),
           {
+            // A disabled membership must not put the organization back in the
+            // user's switcher, or they would see a workspace they cannot act
+            // in.
             members: {
               some: {
                 userId,
+                disabledAt: null,
               },
             },
           },
@@ -359,9 +369,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return this.prisma.organization.findFirst({
       where: {
         id: organizationId,
+        // The caller must hold an active membership to see the organization.
+        // The `members` list below is deliberately NOT filtered the same way:
+        // an admin has to see who is disabled in order to re-enable them.
         members: {
           some: {
             userId,
+            disabledAt: null,
           },
         },
       },
@@ -404,6 +418,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       where: {
         organizationId,
         userId: currentUserId,
+        disabledAt: null,
       },
     });
 
@@ -439,6 +454,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         orgMemberships: {
           some: {
             organizationId,
+            disabledAt: null,
           },
         },
       },
@@ -490,6 +506,51 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         where: { organizationId, userId },
       });
     });
+  }
+
+  async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
+    const { organizationId, userId, disabled } = input;
+
+    await this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationUser.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: { role: true },
+      });
+
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+
+      // Same guard as demoting the last admin: an organization with no admin
+      // who can sign in cannot be recovered from inside the product.
+      if (disabled && member.role === OrganizationUserRole.ADMIN) {
+        const activeAdmins = await tx.organizationUser.count({
+          where: {
+            organizationId,
+            role: OrganizationUserRole.ADMIN,
+            disabledAt: null,
+          },
+        });
+
+        if (activeAdmins <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot disable the last admin of an organization",
+          });
+        }
+      }
+
+      await tx.organizationUser.update({
+        where: { userId_organizationId: { userId, organizationId } },
+        data: { disabledAt: disabled ? new Date() : null },
+      });
+    });
+
+    if (disabled) {
+      // Revoking the seat has to revoke the live session too, or the person
+      // keeps working until their token happens to expire.
+      await revokeAllSessionsForUser({ prisma: this.prisma, userId });
+    }
   }
 
   async updateMemberRole(input: UpdateMemberRoleInput): Promise<void> {

@@ -1,5 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EXPIRED_LICENSE_KEY } from "../../../../ee/licensing/__tests__/fixtures/testLicenses";
+import { floorAtOssBaseline } from "../../../../ee/licensing/ossBaselineFloor";
+import { mapToPlanInfo } from "../../../../ee/licensing/planMapping";
+import { parseLicenseKey } from "../../../../ee/licensing/validation";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 import {
   assertMemberTypeLimitNotExceeded,
@@ -42,19 +46,6 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     return {
       getMemberCount: vi.fn().mockResolvedValue(memberCount),
       getMembersLiteCount: vi.fn().mockResolvedValue(membersLiteCount),
-      getWorkflowCount: vi.fn(),
-      getPromptCount: vi.fn(),
-      getEvaluatorCount: vi.fn(),
-      getActiveScenarioCount: vi.fn(),
-      getProjectCount: vi.fn(),
-      getTeamCount: vi.fn(),
-      getAgentCount: vi.fn(),
-      getExperimentCount: vi.fn(),
-      getOnlineEvaluationCount: vi.fn(),
-      getDatasetCount: vi.fn(),
-      getDashboardCount: vi.fn(),
-      getCustomGraphCount: vi.fn(),
-      getAutomationCount: vi.fn(),
       getCurrentMonthCost: vi.fn(),
       getCurrentMonthCostForProjects: vi.fn(),
     };
@@ -303,6 +294,48 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           limits,
         ),
       ).rejects.toThrow(TRPCError);
+    });
+  });
+
+  describe("when the organization's license reached its end date", () => {
+    /** @scenario Adding a member is refused once a lapsed license is full */
+    it("refuses the next full member on the seats the lapsed license sold", async () => {
+      // The plan a lapsed license resolves to, built the way production builds
+      // it: the signed payload mapped to a plan, then floored at the
+      // open-source baseline. Seats are the one thing the floor leaves alone,
+      // so they are still what arms this guard.
+      const lapsed = parseLicenseKey(EXPIRED_LICENSE_KEY);
+      if (!lapsed) throw new Error("Expected the expired fixture to parse");
+      const plan = floorAtOssBaseline(mapToPlanInfo(lapsed.data));
+      const mockRepo = createMockRepo(plan.maxMembers);
+
+      await expect(
+        assertMemberTypeLimitNotExceeded(
+          "lite-to-full",
+          organizationId,
+          mockRepo,
+          plan,
+        ),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+      });
+    });
+
+    it("still allows a full member while a seat is free", async () => {
+      const lapsed = parseLicenseKey(EXPIRED_LICENSE_KEY);
+      if (!lapsed) throw new Error("Expected the expired fixture to parse");
+      const plan = floorAtOssBaseline(mapToPlanInfo(lapsed.data));
+      const mockRepo = createMockRepo(plan.maxMembers - 1);
+
+      await expect(
+        assertMemberTypeLimitNotExceeded(
+          "lite-to-full",
+          organizationId,
+          mockRepo,
+          plan,
+        ),
+      ).resolves.toBeUndefined();
     });
   });
 });

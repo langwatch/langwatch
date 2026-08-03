@@ -12,7 +12,6 @@ import { ProjectRepository } from "~/server/projects/project.repository";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -203,7 +202,6 @@ secured.access(requires("scenarios:view")).get(
 // and is declined exactly as before.
 secured.access(requires("scenarios:create")).post(
   "/",
-  resourceLimitMiddleware("experiments"),
   describeRoute({
     description: "Create a new suite (run plan)",
     responses: {

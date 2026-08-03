@@ -7,6 +7,7 @@ import {
   hasLicenseMetadata,
   isCorruptedLicense,
   isLicenseExpired,
+  licenseMetersSeats,
   normalizeKeyForActivation,
 } from "../licenseStatusUtils";
 
@@ -68,11 +69,22 @@ function createValidLicenseStatus(expiresAt = "2099-12-31") {
 
 /**
  * Creates an invalid LicenseStatus with all required resource fields.
+ *
+ * `expired` is the server's verdict on whether the signature checked out and
+ * only the term ran out, which is why these helpers set it explicitly rather
+ * than letting the date imply it.
  */
-function createInvalidLicenseStatus(expiresAt = "2023-12-31") {
+function createInvalidLicenseStatus({
+  expiresAt = "2023-12-31",
+  expired = true,
+}: {
+  expiresAt?: string;
+  expired?: boolean;
+} = {}) {
   return {
     hasLicense: true as const,
     valid: false as const,
+    expired,
     plan: "team",
     planName: "Team",
     expiresAt,
@@ -82,9 +94,19 @@ function createInvalidLicenseStatus(expiresAt = "2023-12-31") {
 }
 
 describe("isLicenseExpired", () => {
-  it("returns true when license has past expiresAt date", () => {
-    const status = createInvalidLicenseStatus("2023-12-31");
+  it("returns true when the server reports the license term ended", () => {
+    const status = createInvalidLicenseStatus({ expired: true });
     expect(isLicenseExpired(status)).toBe(true);
+  });
+
+  it("returns false for a license we did not sign, whatever date it claims", () => {
+    // A forged payload can name any date it likes, so a past one is not
+    // evidence of anything. The signature check is, and it lives server-side.
+    const status = createInvalidLicenseStatus({
+      expiresAt: "2023-12-31",
+      expired: false,
+    });
+    expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when license is corrupted (no metadata)", () => {
@@ -93,11 +115,6 @@ describe("isLicenseExpired", () => {
       valid: false,
       corrupted: true,
     } as const;
-    expect(isLicenseExpired(status)).toBe(false);
-  });
-
-  it("returns false when license is invalid but has future expiresAt", () => {
-    const status = createInvalidLicenseStatus("2099-12-31");
     expect(isLicenseExpired(status)).toBe(false);
   });
 
@@ -114,10 +131,48 @@ describe("isLicenseExpired", () => {
   it("returns false when status is undefined", () => {
     expect(isLicenseExpired(undefined)).toBe(false);
   });
+});
 
-  it("returns false when expiresAt is an invalid date string", () => {
-    const status = createInvalidLicenseStatus("not-a-valid-date");
-    expect(isLicenseExpired(status)).toBe(false);
+describe("licenseMetersSeats", () => {
+  describe("given a license we signed", () => {
+    it("meters seats while the license is valid", () => {
+      expect(licenseMetersSeats(createValidLicenseStatus())).toBe(true);
+    });
+
+    it("keeps metering seats after the term ends", () => {
+      // The whole point of the lapse policy: a license we signed keeps
+      // metering what it sold, so an over-seats organization is still told.
+      expect(
+        licenseMetersSeats(createInvalidLicenseStatus({ expired: true })),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a license we did not sign", () => {
+    it("meters nothing, so no seat count can be exceeded", () => {
+      expect(
+        licenseMetersSeats(createInvalidLicenseStatus({ expired: false })),
+      ).toBe(false);
+    });
+
+    it("meters nothing when the license cannot even be read", () => {
+      expect(
+        licenseMetersSeats({
+          hasLicense: true,
+          valid: false,
+          corrupted: true,
+        } as const),
+      ).toBe(false);
+    });
+  });
+
+  describe("given no license", () => {
+    it("meters nothing, since the deployment runs uncapped", () => {
+      expect(licenseMetersSeats({ hasLicense: false, valid: false })).toBe(
+        false,
+      );
+      expect(licenseMetersSeats(undefined)).toBe(false);
+    });
   });
 });
 
@@ -147,7 +202,7 @@ describe("hasLicenseMetadata", () => {
   });
 
   it("returns true for invalid license with metadata (expired)", () => {
-    const status = createInvalidLicenseStatus("2023-12-31");
+    const status = createInvalidLicenseStatus();
     expect(hasLicenseMetadata(status)).toBe(true);
   });
 
@@ -177,7 +232,7 @@ describe("isCorruptedLicense", () => {
   });
 
   it("returns false for invalid license with metadata", () => {
-    const status = createInvalidLicenseStatus("2023-12-31");
+    const status = createInvalidLicenseStatus();
     expect(isCorruptedLicense(status)).toBe(false);
   });
 });

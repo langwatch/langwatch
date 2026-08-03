@@ -7,6 +7,7 @@ import { getLicenseHandler } from "~/server/subscriptionHandler";
 import type { LicenseData } from "../../../../ee/licensing";
 import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
 import { licenseValidationError } from "../../../../ee/licensing/errors";
+import { buildMintedPlan } from "../../../../ee/licensing/mintedPlan";
 import {
   encodeLicenseKey,
   generateLicenseId,
@@ -16,37 +17,18 @@ import { checkOrganizationPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:licenseRouter");
 
-/** Schema for plan limits input */
+/**
+ * Schema for plan limits input. Licenses encode only the enforced levers
+ * (member seats, messages volume) plus identity; projects, teams, and
+ * experimentation resources are OSS/uncapped and not part of licenses.
+ */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
   maxMembersLite: z
     .number()
     .int()
     .positive("Plan limits must be positive numbers"),
-  maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
-  maxProjects: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
   maxMessagesPerMonth: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxWorkflows: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
-  maxEvaluators: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxScenarios: z
-    .number()
-    .int()
-    .positive("Plan limits must be positive numbers"),
-  maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
-  maxExperiments: z
     .number()
     .int()
     .positive("Plan limits must be positive numbers"),
@@ -172,25 +154,16 @@ export const licenseRouter = createTRPCRouter({
         email,
         issuedAt: new Date().toISOString(),
         expiresAt: expiresAt.toISOString(),
-        plan: {
+        plan: buildMintedPlan({
           type: planTypeValue,
           name: planName,
           maxMembers: plan.maxMembers,
           maxMembersLite: plan.maxMembersLite,
-          maxTeams: plan.maxTeams,
-          maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
-          evaluationsCredit: 0,
-          maxWorkflows: plan.maxWorkflows,
-          maxPrompts: plan.maxPrompts,
-          maxEvaluators: plan.maxEvaluators,
-          maxScenarios: plan.maxScenarios,
-          maxAgents: plan.maxAgents,
-          maxExperiments: plan.maxExperiments,
           canPublish: plan.canPublish,
           webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
           usageUnit: plan.usageUnit,
-        },
+        }),
       };
 
       try {

@@ -230,7 +230,18 @@ describe.skipIf(!hasTestcontainers)(
           // Unlike body-present decode failures, this path retires its lease:
           // the body was already read, so keeping the lease buys a later worker
           // nothing. Shared bytes remain for lazy lifecycle reclaim.
-          expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
+          //
+          // Polled rather than asserted once: the drop counter increments in
+          // process memory, while the release is a Redis round-trip issued
+          // after it, so the two are not observable at the same instant.
+          await vi.waitFor(
+            async () => {
+              expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(
+                0,
+              );
+            },
+            { timeout: 15000, interval: 100 },
+          );
           expect(objectStore.deleted).toHaveLength(0);
           expect(objectStore.store.size).toBe(1);
           // AC8 still holds here: a discard is not a completion.

@@ -64,7 +64,6 @@ import {
   triggerFiltersPermissiveSchema,
   triggerFiltersSchema,
 } from "../../filters/types";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { rateLimit } from "../../rateLimit";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -286,8 +285,6 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "automations");
-
       // This legacy mutation cannot carry the validated/encrypted webhook
       // destination shape. Never let a direct caller create a malformed or
       // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
@@ -1195,7 +1192,6 @@ export const automationRouter = createTRPCRouter({
           },
         });
       } else {
-        await enforceLicenseLimit(ctx, input.projectId, "automations");
         // A graph alert owns its custom-graph's unique `customGraphId` slot.
         // `deleteById` soft-deletes (keeps the row and its @unique
         // customGraphId occupied), so a fresh `create` for a graph that ever

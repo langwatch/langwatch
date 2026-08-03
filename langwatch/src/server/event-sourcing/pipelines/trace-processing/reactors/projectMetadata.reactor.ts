@@ -31,6 +31,28 @@ export interface ProjectMetadataReactorDeps {
 }
 
 /**
+ * One queue lane per project, matching this reactor's per-project dedup id.
+ *
+ * The queue's dedup key is global to the queue, but the check that decides
+ * whether a duplicate is still squashable looks the existing job up in the
+ * CURRENT group's job set. So a dedup id that spans groups never squashes:
+ * the lookup misses, the key is treated as stale, and it is deleted before a
+ * fresh job stages — which also drops the guard protecting the pending job in
+ * the other group. A per-project dedup id therefore only bites under a
+ * per-project lane, and inheriting the default per-trace lane silently turns
+ * the dedup into a no-op that leaves one live job per concurrent trace.
+ *
+ * This reactor's work is per-project and level-triggered — it asserts the
+ * project's metadata from whichever trace happens to carry it — so all of a
+ * project's jobs belong in one serialized lane where the dedup collapses them
+ * to one. The queue prefixes `<tenantId>/fold/traceSummary/reactor/
+ * projectMetadata/` around this key.
+ */
+export function projectMetadataGroupKey(event: { tenantId: string }): string {
+  return `project-metadata:${event.tenantId}`;
+}
+
+/**
  * Reactor that marks the project as having received its first message.
  *
  * Sets project.firstMessage = true, project.integrated (unless optimization_studio),
@@ -89,6 +111,7 @@ export function createProjectMetadataReactor(
     shouldReact: (_event, context) => isRealFirstIngest(context.foldState),
     options: {
       runIn: ["worker"],
+      groupKeyFn: (payload) => projectMetadataGroupKey(payload.event),
       makeJobId: (payload) => `project-meta:${payload.event.tenantId}`,
       ttl: 60_000, // 60s dedup — avoid repeated writes for the same project
     },

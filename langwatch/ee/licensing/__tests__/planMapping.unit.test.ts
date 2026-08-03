@@ -17,13 +17,7 @@ describe("mapToPlanInfo", () => {
       type: "PRO",
       name: "Pro",
       maxMembers: 10,
-      maxProjects: 99,
       maxMessagesPerMonth: 100_000,
-      evaluationsCredit: 100,
-      maxWorkflows: 50,
-      maxPrompts: 50,
-      maxEvaluators: 50,
-      maxScenarios: 50,
       canPublish: true,
       ...planOverrides,
     },
@@ -45,24 +39,15 @@ describe("mapToPlanInfo", () => {
   it("maps all numeric limits correctly", () => {
     const licenseData = createLicenseData({
       maxMembers: 5,
-      maxProjects: 10,
+      maxMembersLite: 10,
       maxMessagesPerMonth: 50000,
-      evaluationsCredit: 100,
-      maxWorkflows: 25,
-      maxPrompts: 30,
-      maxEvaluators: 35,
-      maxScenarios: 40,
     });
 
     const result = mapToPlanInfo(licenseData);
 
     expect(result.maxMembers).toBe(5);
-    expect(result.maxProjects).toBe(10);
+    expect(result.maxMembersLite).toBe(10);
     expect(result.maxMessagesPerMonth).toBe(50000);
-    expect(result.maxWorkflows).toBe(25);
-    expect(result.maxPrompts).toBe(30);
-    expect(result.maxEvaluators).toBe(35);
-    expect(result.maxScenarios).toBe(40);
   });
 
   /** @scenario Maps canPublish flag correctly when true */
@@ -127,7 +112,7 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
   });
 
-  it("uses DEFAULT_LIMIT for optional fields not in older licenses", () => {
+  it("defaults maxMembersLite for older licenses without the field", () => {
     // Simulate an older license that doesn't have the new optional fields
     const oldLicenseData: LicenseData = {
       licenseId: "lic-old-001",
@@ -140,21 +125,14 @@ describe("mapToPlanInfo", () => {
         type: "PRO",
         name: "Pro",
         maxMembers: 10,
-        maxProjects: 99,
         maxMessagesPerMonth: 100_000,
-        evaluationsCredit: 100,
-        maxWorkflows: 50,
         canPublish: true,
-        // Note: maxPrompts, maxEvaluators, maxScenarios, maxMembersLite are NOT provided
+        // Note: maxMembersLite is NOT provided
       },
     };
 
     const result = mapToPlanInfo(oldLicenseData);
 
-    // Should use DEFAULT_LIMIT for missing optional fields
-    expect(result.maxPrompts).toBe(DEFAULT_LIMIT);
-    expect(result.maxEvaluators).toBe(DEFAULT_LIMIT);
-    expect(result.maxScenarios).toBe(DEFAULT_LIMIT);
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
   });
 
@@ -178,10 +156,7 @@ describe("mapToPlanInfo", () => {
         type: "PRO",
         name: "Pro",
         maxMembers: 10,
-        maxProjects: 99,
         maxMessagesPerMonth: 100_000,
-        evaluationsCredit: 100,
-        maxWorkflows: 50,
         canPublish: true,
       },
     };

@@ -36,7 +36,6 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
@@ -146,9 +145,6 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
-  // License enforcement for agent creation
-  const { checkAndProceed } = useLicenseEnforcement("agents");
-
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId: project?.id ?? "" },
@@ -233,7 +229,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     });
 
     if (agentId) {
-      // Editing existing agent - no limit check needed
+      // Editing existing agent
       updateMutation.mutate({
         id: agentId,
         projectId: project.id,
@@ -241,14 +237,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         config,
       });
     } else {
-      // Creating new agent - check limit first
-      checkAndProceed(() => {
-        createMutation.mutate({
-          projectId: project.id,
-          name: name.trim(),
-          type: "code",
-          config,
-        });
+      // Creating new agent
+      createMutation.mutate({
+        projectId: project.id,
+        name: name.trim(),
+        type: "code",
+        config,
       });
     }
   }, [
@@ -263,7 +257,6 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     isValid,
     createMutation,
     updateMutation,
-    checkAndProceed,
   ]);
 
   const handleNameChange = (value: string) => {

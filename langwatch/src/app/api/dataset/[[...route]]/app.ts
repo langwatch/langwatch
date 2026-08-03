@@ -1,5 +1,4 @@
 import { Readable } from "node:stream";
-import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -22,11 +21,6 @@ import {
 } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
-  enforceResourceLimitOrRespond,
-  resolveOrganizationId,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
 } from "../../middleware/dataset-service";
@@ -46,8 +40,6 @@ import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
-
-const logger = createLogger("langwatch:api:dataset");
 
 // -- Validation schemas for new endpoints --
 
@@ -196,7 +188,6 @@ secured.access(requires("datasets:create")).post(
   describeRoute({
     description: "Create a new dataset",
   }),
-  resourceLimitMiddleware("datasets"),
   zValidator("json", createDatasetSchema),
   async (c) => {
     const project = c.get("project");
@@ -251,7 +242,6 @@ secured.access(requires("datasets:create")).post(
     description:
       "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
   }),
-  resourceLimitMiddleware("datasets"),
   async (c) => {
     const project = c.get("project");
     const service = c.get("datasetService");
@@ -342,29 +332,6 @@ secured.access(directUploadSessionAuth).post(
       // handled error behind them.
       return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
-
-    // Resource-limit enforcement runs inline here (not via
-    // `resourceLimitMiddleware`) because the org is only known after in-handler
-    // auth resolves the project.
-    const organizationId = await resolveOrganizationId(auth.teamId);
-    if (!organizationId) {
-      // Fail CLOSED, matching `resourceLimitMiddleware`: never skip the limit
-      // check just because the org couldn't be resolved. `Team.organizationId`
-      // is non-null, so this is a should-never-happen guard — but the inline
-      // path must not be more permissive than the shared middleware (which 500s
-      // here), or a create could slip past the dataset limit.
-      logger.error(
-        { projectId: auth.projectId, teamId: auth.teamId },
-        "Could not resolve organization for dataset resource limit check",
-      );
-      throw new InternalServerError("Could not resolve organization");
-    }
-    const overLimit = await enforceResourceLimitOrRespond({
-      c,
-      organizationId,
-      limitType: "datasets",
-    });
-    if (overLimit) return overLimit;
 
     const name = body.name;
     if (!name || typeof name !== "string" || name.trim() === "") {

@@ -98,6 +98,51 @@ describe.skipIf(!hasTestcontainers)(
     }
 
     describe("send()", () => {
+      describe("when jobs are staged faster than they are processed", () => {
+        /** @scenario "Staging a job records its group as holding pending work" */
+        it("records the group in the pending index", async () => {
+          // The ops reconcile counts jobs by asking this index which groups to
+          // look at, and it is written by the staging script itself. Held here
+          // by a processor that never finishes the first job, so the siblings
+          // stay staged for the assertion.
+          let releaseFirst: (() => void) | undefined;
+          const firstJobHeld = new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+          const queueName = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+          const queue = createQueue(
+            async () => {
+              await firstJobHeld;
+            },
+            { name: queueName },
+          );
+          await queue.waitUntilReady();
+
+          for (const id of ["p1", "p2", "p3"]) {
+            await queue.send({ id, groupId: "pending-group", value: id });
+          }
+
+          try {
+            await vi.waitFor(
+              async () => {
+                expect(
+                  await redis.sismember(
+                    `${queueName}:gq:pending-groups`,
+                    "pending-group",
+                  ),
+                ).toBe(1);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+          } finally {
+            // Unblock the processor even when the assertion fails, so teardown
+            // closes a queue that is idle rather than waiting out its shutdown
+            // timeout and charging the delay to whichever test runs next.
+            releaseFirst?.();
+          }
+        });
+      });
+
       describe("when a job is sent", () => {
         it("stages and processes the job with correct payload", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();

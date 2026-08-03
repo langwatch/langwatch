@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
@@ -13,6 +15,8 @@ import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/red
 import {
   GROUP_QUEUE_REGISTRY_KEY,
   PARK_HELPER_LUA,
+  PENDING_INDEX_HELPER_LUA,
+  pendingGroupsKey,
   TTL_HELPER_LUA,
 } from "~/server/event-sourcing/queues/groupQueue/scripts";
 import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
@@ -202,6 +206,7 @@ return count
 `;
 
 const REPLAY_FROM_DLQ_LUA =
+  PENDING_INDEX_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -222,6 +227,9 @@ if count > 0 then
   for i = 1, #jobs, 2 do
     redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
   end
+  -- Replaying puts jobs back on the live group, so it is a pending-index write
+  -- like any other stage. Same atomic step as the ZADD above.
+  gqMarkPending(parkKeyPrefixOf(readyKey), groupId)
 end
 
 local data = redis.call("HGETALL", dlqDataKey)
@@ -249,6 +257,57 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
+// Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile
+// single-flight marker, but only while the caller still holds it. A marker that
+// lapsed mid-pass may already have been re-acquired by another instance, and
+// extending or dropping that one would put two reconcile passes on the same
+// counter at once — exactly what the marker exists to prevent. GET-then-act is
+// safe only inside a script, where nothing else can run in between.
+const RECONCILE_MARKER_TTL_LUA = `
+local markerKey  = KEYS[1]
+local holderToken = ARGV[1]
+local ttlMs       = tonumber(ARGV[2])
+
+if redis.call("GET", markerKey) ~= holderToken then return 0 end
+if ttlMs <= 0 then return redis.call("DEL", markerKey) end
+return redis.call("PEXPIRE", markerKey, ttlMs)
+`;
+
+// Write the reconciled counter only while this pass still holds the marker.
+//
+// Losing the marker means another pass has started and may already have written
+// a fresher value; a late write from the old pass would put a stale count back.
+// The check and the write have to be one step, so a marker lost between them
+// cannot leave the stale write to land anyway.
+const RECONCILE_WRITE_LUA = `
+local markerKey  = KEYS[1]
+local counterKey = KEYS[2]
+local holderToken = ARGV[1]
+local groundTruth = ARGV[2]
+
+if redis.call("GET", markerKey) ~= holderToken then return 0 end
+redis.call("SET", counterKey, groundTruth)
+return 1
+`;
+
+// Drop a group from the pending index, but only while its jobs zset is still
+// empty. The reconcile decides what to prune from a ZCARD it read earlier, and a
+// group can be staged again in between; re-reading inside the script is what
+// stops a live group being dropped on the strength of a stale observation.
+// Losing a group from this index would hide its jobs from every later pass.
+const PENDING_INDEX_PRUNE_LUA = `
+local indexKey = KEYS[1]
+local pruned = 0
+for i = 1, #ARGV, 2 do
+  local groupId = ARGV[i]
+  local jobsKey = ARGV[i + 1]
+  if redis.call("ZCARD", jobsKey) == 0 then
+    pruned = pruned + redis.call("SREM", indexKey, groupId)
+  end
+end
+return pruned
+`;
+
 // ── Cached scripts ───────────────────────────────────────────────────
 //
 // EVALSHA, not EVAL: plain EVAL re-transfers and re-hashes the full source on
@@ -262,13 +321,51 @@ const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
 const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+const reconcileMarkerTtlScript = new CachedLuaScript(RECONCILE_MARKER_TTL_LUA);
+const reconcileWriteScript = new CachedLuaScript(RECONCILE_WRITE_LUA);
+const pendingIndexPruneScript = new CachedLuaScript(PENDING_INDEX_PRUNE_LUA);
 
 // ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
 const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
-const PENDING_RECONCILE_SCAN_COUNT = 1000;
+
+/** Page size for the index reads that enumerate a queue's groups. */
+const PENDING_RECONCILE_PAGE_SIZE = 1000;
+
+/** Number of ZCARDs sent per pipeline round trip during a reconcile pass. */
+const PENDING_RECONCILE_ZCARD_BATCH = 1000;
+
+/**
+ * How long the single-flight marker survives without a refresh.
+ *
+ * The marker is re-armed to this after every index page and every ZCARD batch,
+ * so a pass holds it for as long as it runs no matter how long that is — both
+ * phases refresh, since collection is itself a paging walk and on a large queue
+ * can outlast a lease on its own. It bounds the other direction instead: an
+ * instance that dies mid-pass strands the marker for at most this long before
+ * another instance may take over.
+ */
+const PENDING_RECONCILE_LEASE_MS = 30_000;
+
+/**
+ * How long the keyspace sweep waits once it has nothing left to adopt.
+ *
+ * At that point every group is in the pending index and the sweep is a backstop
+ * against a writer nobody noticed was missing, so it can be rare. While it is
+ * still adopting — through a rollout, or on a queue that predates the index — it
+ * runs every pass instead, which is what this reconcile cost before the index
+ * existed. See {@link QueueRedisRepository.sweepKeyspaceForGroups}.
+ */
+const PENDING_RECONCILE_SWEEP_BACKSTOP_MS = 60 * 60 * 1000;
+
+/** Suffix of the key holding when the next keyspace sweep is due. */
+const SWEEP_DUE_KEY_SUFFIX = "stats:pending-recon-sweep-due";
+
+function isClusterClient(client: IORedis | Cluster): client is Cluster {
+  return typeof (client as Cluster).nodes === "function";
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -1551,9 +1648,9 @@ export class QueueRedisRepository implements QueueRepository {
    * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
    * ground truth is safe and does not affect dispatch correctness.
    *
-   * The ground truth is the authoritative Σ ZCARD over ALL `group:*:jobs` keys
-   * for this queue — intentionally the complete count, distinct from the top-N
-   * sampled per-group dashboard tile.
+   * The ground truth is the authoritative Σ ZCARD over the `:jobs` zset of every
+   * group this queue knows about — intentionally the complete count, distinct
+   * from the top-N sampled per-group dashboard tile.
    *
    * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
    * window is acceptable and self-corrects on the next scheduled cycle.
@@ -1563,7 +1660,11 @@ export class QueueRedisRepository implements QueueRepository {
    * against multi-pod overlap.
    *
    * The reconcile is single-flighted per `singleFlightWindowMs` so only one
-   * pod recomputes per window. It is intentionally off the hot dispatch path.
+   * pod recomputes per window. The marker is held for the whole pass and only
+   * then downgraded to the remainder of the window, so a pass that outlives the
+   * window cannot be joined by a second one — the regime where a stacked pass
+   * would hurt most is exactly the regime where passes run long. It is
+   * intentionally off the hot dispatch path.
    *
    * See issue #4683.
    */
@@ -1574,69 +1675,517 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${queueName}:gq:`;
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
+    const holderToken = randomUUID();
+    const startedAtMs = Date.now();
 
-    // Single-flight gate: only one pod/cycle runs per window.
+    // Single-flight gate: only one pod/cycle runs per window. The marker is
+    // taken on a refreshable lease rather than for the full window so a pod that
+    // dies mid-pass cannot wedge the reconcile until the window elapses.
     const acquired = await this.redis.set(
       markerKey,
-      String(Date.now()),
+      holderToken,
       "PX",
-      singleFlightWindowMs,
+      PENDING_RECONCILE_LEASE_MS,
       "NX",
     );
     if (acquired !== "OK") return null;
 
-    // Read the pre-reconcile counter.
-    const raw = await this.redis.get(counterKey);
-    const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
+    try {
+      // Read the pre-reconcile counter.
+      const raw = await this.redis.get(counterKey);
+      const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
 
-    // Enumerate all group-jobs zsets via SCAN.
-    const jobsKeys: string[] = [];
-    const matchPattern = `${prefix}group:*:jobs`;
-    let cursor = "0";
-    do {
-      const [nextCursor, keys] = await this.redis.scan(
-        cursor,
-        "MATCH",
-        matchPattern,
-        "COUNT",
-        PENDING_RECONCILE_SCAN_COUNT,
+      // Collection is itself a paging walk, so it re-arms the lease as it goes.
+      // Without that a pass on a large queue could spend its whole lease before
+      // the first ZCARD batch and lose the marker to another instance mid-pass.
+      //
+      // Losing it aborts the pass. A pass that no longer holds the marker cannot
+      // know whether a newer one has already written, so anything it computed is
+      // a candidate for overwriting fresher state with staler state.
+      const refreshLease = async (): Promise<boolean> =>
+        await this.setReconcileMarkerTtl({
+          markerKey,
+          holderToken,
+          ttlMs: PENDING_RECONCILE_LEASE_MS,
+        });
+
+      const groupIds = await this.collectPendingGroupIds({
+        prefix,
+        refreshLease,
+      });
+      if (groupIds === null) return null;
+
+      const jobsKeys = Array.from(
+        groupIds,
+        (groupId) => `${prefix}group:${groupId}:jobs`,
       );
-      cursor = nextCursor;
-      for (const key of keys) {
-        jobsKeys.push(key);
-      }
-    } while (cursor !== "0");
 
-    // Pipeline ZCARD for every collected key and sum the results.
-    // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
-    // a partial under-count as ground truth; the next cycle retries.
-    let groundTruth = 0;
-    if (jobsKeys.length > 0) {
-      const pipeline = this.redis.pipeline();
-      for (const key of jobsKeys) {
-        pipeline.zcard(key);
+      const summed = await this.sumPendingJobs({ jobsKeys, refreshLease });
+      if (summed === null) return null;
+      const { groundTruth, emptyJobsKeys } = summed;
+
+      const drift = counter - groundTruth;
+
+      // Fenced write: a pass that lost the marker must not put its count back
+      // over a newer pass's. `0` means the marker moved on, so this pass reports
+      // nothing rather than a result it did not manage to publish.
+      const wrote = await reconcileWriteScript.run(
+        this.redis,
+        2,
+        markerKey,
+        counterKey,
+        holderToken,
+        String(groundTruth),
+      );
+      if (Number(wrote) !== 1) {
+        logger.warn(
+          { queueName },
+          "Pending reconcile lost its single-flight marker before writing — discarding the pass",
+        );
+        return null;
       }
-      const results = await pipeline.exec();
-      if (results) {
-        for (const [err, val] of results) {
-          if (err) {
-            logger.warn(
-              { error: err },
-              "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
-            );
-            return null;
-          }
-          groundTruth += Number(val) || 0;
-        }
-      }
+
+      await this.prunePendingIndex({ prefix, emptyJobsKeys, refreshLease });
+
+      return { counter, groundTruth, drift };
+    } finally {
+      // Hand the marker back as the unspent remainder of the window, so the
+      // cadence stays one reconcile per window measured from when this pass
+      // started. A pass that already outlived the window drops it outright and
+      // the next scheduled cycle may run immediately.
+      await this.setReconcileMarkerTtl({
+        markerKey,
+        holderToken,
+        ttlMs: singleFlightWindowMs - (Date.now() - startedAtMs),
+      });
+    }
+  }
+
+  /**
+   * Collect the ids of every group that can be holding a pending job.
+   *
+   * Deliberately not a keyspace SCAN: SCAN walks every key in the database
+   * regardless of MATCH, so the cost of a pass would track the size of the whole
+   * Redis instance rather than the number of groups in this queue.
+   *
+   * The authority is `pending-groups`, written atomically with every job insert
+   * (see PENDING_INDEX_HELPER_LUA). It is read as a single index, so no group can
+   * slip between two reads the way it can between the lifecycle indexes.
+   *
+   * The lifecycle indexes are still read, and cover the groups the index does not
+   * yet know about: everything staged before it existed, and everything staged by
+   * a pod on the previous release while a rollout is in progress. Those groups are
+   * still exposed to the sequential-read race the index exists to remove, so any
+   * id found there is written into the index as it is read. One observation is
+   * enough — from then on the group is counted from the index and is immune,
+   * which bounds the exposure at "until first seen" rather than "until drained".
+   *
+   * The legs can be dropped once no queue predates the index and no pod predates
+   * the writers.
+   *
+   * Returns null when the pass lost its single-flight marker partway.
+   */
+  private async collectPendingGroupIds(params: {
+    prefix: string;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<Set<string> | null> {
+    const { prefix, refreshLease } = params;
+    const groupIds = new Set<string>();
+
+    const parkedTenants = new Set<string>();
+    const heldThroughTenants = await this.collectIndexMembers({
+      key: `${prefix}parked-tenants`,
+      type: "set",
+      into: parkedTenants,
+      refreshLease,
+    });
+    if (!heldThroughTenants) return null;
+
+    const indexed = await this.collectIndexMembers({
+      key: pendingGroupsKey(prefix),
+      type: "set",
+      into: groupIds,
+      refreshLease,
+    });
+    if (!indexed) return null;
+    const alreadyIndexed = new Set(groupIds);
+
+    // TODO(cleanup): the lifecycle legs below exist only for groups the index has
+    // not learned about yet. Removable once no queue predates the index and no pod
+    // predates the writers.
+    const legacyLegs: { key: string; type: "zset" | "set" }[] = [
+      { key: `${prefix}ready`, type: "zset" },
+      { key: `${prefix}blocked`, type: "set" },
+      ...Array.from(parkedTenants, (tenantId) => ({
+        key: `${prefix}parked:${tenantId}`,
+        type: "zset" as const,
+      })),
+    ];
+
+    for (const leg of legacyLegs) {
+      const held = await this.collectIndexMembers({
+        key: leg.key,
+        type: leg.type,
+        into: groupIds,
+        refreshLease,
+      });
+      if (!held) return null;
     }
 
-    const drift = counter - groundTruth;
+    // The lifecycle legs only cover a group the pass actually saw, and a group
+    // moving between them mid-read is seen by neither. The keyspace sweep is what
+    // covers those, because it reads key existence rather than membership.
+    if (await this.isKeyspaceSweepDue(prefix)) {
+      const swept = await this.sweepKeyspaceForGroups({ prefix, refreshLease });
+      if (swept === null) return null;
+      for (const groupId of swept) groupIds.add(groupId);
+    }
 
-    // Overwrite the counter with the ground truth.
-    await this.redis.set(counterKey, String(groundTruth));
+    const toAdopt = Array.from(groupIds).filter(
+      (id) => !alreadyIndexed.has(id),
+    );
+    const held = await this.backfillPendingIndex({
+      prefix,
+      groupIds: toAdopt,
+      refreshLease,
+    });
+    if (!held) return null;
+    await this.recordSweepOutcome({ prefix, adopted: toAdopt.length });
 
-    return { counter, groundTruth, drift };
+    return groupIds;
+  }
+
+  /**
+   * Adopt groups the lifecycle indexes know about but the pending index does not.
+   *
+   * Until a group is in the index it is counted by reading the lifecycle indexes
+   * in sequence, and a group moving between them mid-read can be missed. Writing
+   * it in on first sight closes that for every later pass.
+   *
+   * Returns false when the lease was lost, which aborts the pass: this runs
+   * inside the pass's marker and can span several round trips, so it has to hold
+   * the lease like every other phase rather than run on a marker that has since
+   * moved to another instance.
+   */
+  private async backfillPendingIndex(params: {
+    prefix: string;
+    groupIds: string[];
+    refreshLease: () => Promise<boolean>;
+  }): Promise<boolean> {
+    if (params.groupIds.length === 0) return true;
+    const indexKey = pendingGroupsKey(params.prefix);
+    try {
+      for (
+        let offset = 0;
+        offset < params.groupIds.length;
+        offset += PENDING_RECONCILE_ZCARD_BATCH
+      ) {
+        await this.redis.sadd(
+          indexKey,
+          ...params.groupIds.slice(
+            offset,
+            offset + PENDING_RECONCILE_ZCARD_BATCH,
+          ),
+        );
+        if (!(await params.refreshLease())) return false;
+      }
+    } catch (err) {
+      logger.warn(
+        { error: err },
+        "Failed to adopt lifecycle-index groups into the pending index",
+      );
+    }
+    return true;
+  }
+
+  /**
+   * Walk the keyspace for `group:<id>:jobs` keys and adopt every group into the
+   * pending index.
+   *
+   * This is the one enumeration that cannot miss a group: it reads key existence,
+   * so a group is found whatever lifecycle index it is in and however it moves
+   * between them. That is what makes it the right tool for the groups the index
+   * does not know about — everything staged before the index existed, and
+   * everything staged by a pod on the previous release during a rollout. Reading
+   * the lifecycle indexes cannot cover those safely, and adopting on sight only
+   * helps a group the pass actually saw.
+   *
+   * It is also the expensive one — SCAN walks every key in the database
+   * regardless of MATCH — which is why it is not how the counter is normally
+   * enumerated. It runs when the queue has groups the index has not learned yet
+   * (so, repeatedly through a rollout, at the cost this reconcile had before the
+   * index existed and no more) and drops back to a slow backstop cadence once a
+   * sweep finds nothing new to adopt.
+   *
+   * Returns null when the lease was lost.
+   */
+  private async sweepKeyspaceForGroups(params: {
+    prefix: string;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<Set<string> | null> {
+    const pattern = `${params.prefix}group:*:jobs`;
+    const groupKeyPrefix = `${params.prefix}group:`;
+    const found = new Set<string>();
+
+    // SCAN is keyless, so on a cluster ioredis routes it to an arbitrary node and
+    // one call sees one node's keyspace. Fanning out over the masters is what
+    // makes "cannot miss a group" true there too.
+    const nodes: { scan: IORedis["scan"] }[] = isClusterClient(this.redis)
+      ? this.redis.nodes("master")
+      : [this.redis];
+
+    for (const node of nodes) {
+      let cursor = "0";
+      do {
+        const [nextCursor, keys] = await node.scan(
+          cursor,
+          "MATCH",
+          pattern,
+          "COUNT",
+          PENDING_RECONCILE_PAGE_SIZE,
+        );
+        cursor = nextCursor;
+        for (const key of keys) {
+          found.add(key.slice(groupKeyPrefix.length, -":jobs".length));
+        }
+        if (!(await params.refreshLease())) return null;
+      } while (cursor !== "0");
+    }
+
+    return found;
+  }
+
+  /**
+   * Whether a keyspace sweep is due.
+   *
+   * Due when one has never run, or when the stored due time has passed. The due
+   * time is written by {@link recordSweepOutcome}, which keeps sweeping every
+   * pass while sweeps are still finding groups to adopt.
+   */
+  private async isKeyspaceSweepDue(prefix: string): Promise<boolean> {
+    const raw = await this.redis.get(`${prefix}${SWEEP_DUE_KEY_SUFFIX}`);
+    if (raw === null) return true;
+    const dueAt = Number(raw);
+    return !Number.isFinite(dueAt) || Date.now() >= dueAt;
+  }
+
+  /**
+   * Schedule the next keyspace sweep from what this one adopted.
+   *
+   * Adopting something means the index is still behind — a rollout is in flight,
+   * or the queue predates the index — so the next pass sweeps again, which costs
+   * what this reconcile cost before the index existed and no more. Adopting
+   * nothing means the index is complete, and the sweep drops back to a slow
+   * backstop that only has to catch a writer nobody has noticed is missing.
+   */
+  private async recordSweepOutcome(params: {
+    prefix: string;
+    adopted: number;
+  }): Promise<void> {
+    const nextDueAt =
+      params.adopted > 0
+        ? Date.now()
+        : Date.now() + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
+    await this.redis.set(
+      `${params.prefix}${SWEEP_DUE_KEY_SUFFIX}`,
+      String(nextDueAt),
+    );
+  }
+
+  /**
+   * Page one index into `into`, re-arming the lease after each page.
+   *
+   * Returns false when the lease was lost, which aborts the pass: a pass that no
+   * longer owns the marker must not go on to publish a count.
+   */
+  private async collectIndexMembers(params: {
+    key: string;
+    type: "zset" | "set";
+    into: Set<string>;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<boolean> {
+    // A ZSCAN page alternates [member, score, ...]; an SSCAN page is members only.
+    const stride = params.type === "zset" ? 2 : 1;
+    let cursor = "0";
+    do {
+      const [nextCursor, members] =
+        params.type === "zset"
+          ? await this.redis.zscan(
+              params.key,
+              cursor,
+              "COUNT",
+              PENDING_RECONCILE_PAGE_SIZE,
+            )
+          : await this.redis.sscan(
+              params.key,
+              cursor,
+              "COUNT",
+              PENDING_RECONCILE_PAGE_SIZE,
+            );
+      cursor = nextCursor;
+      for (let i = 0; i < members.length; i += stride) {
+        params.into.add(members[i]!);
+      }
+      if (!(await params.refreshLease())) return false;
+    } while (cursor !== "0");
+    return true;
+  }
+
+  /**
+   * Sum ZCARD over the collected keys in batches, re-arming the single-flight
+   * lease between batches so a long pass keeps its hold.
+   *
+   * Returns null if any pipeline entry errors, if the whole batch fails, or if
+   * the lease was lost — a flaky ZCARD must never write a partial under-count as
+   * ground truth, and a pass that lost the marker must not write at all. The next
+   * cycle retries.
+   *
+   * Also reports the keys observed empty, which the caller may prune from the
+   * pending index.
+   */
+  private async sumPendingJobs(params: {
+    jobsKeys: string[];
+    refreshLease: () => Promise<boolean>;
+  }): Promise<{ groundTruth: number; emptyJobsKeys: string[] } | null> {
+    let groundTruth = 0;
+    const emptyJobsKeys: string[] = [];
+    for (
+      let offset = 0;
+      offset < params.jobsKeys.length;
+      offset += PENDING_RECONCILE_ZCARD_BATCH
+    ) {
+      const batch = await this.countOneBatch(
+        params.jobsKeys.slice(offset, offset + PENDING_RECONCILE_ZCARD_BATCH),
+        offset,
+      );
+      if (batch === null) return null;
+      groundTruth += batch.sum;
+      emptyJobsKeys.push(...batch.emptyKeys);
+      if (!(await params.refreshLease())) return null;
+    }
+    return { groundTruth, emptyJobsKeys };
+  }
+
+  /**
+   * ZCARD one batch of keys in a single round trip.
+   *
+   * Returns null on any failure — whole-batch or single-entry — so the caller
+   * abandons the pass rather than folding a shortfall into the total.
+   */
+  private async countOneBatch(
+    jobsKeys: string[],
+    batchOffset: number,
+  ): Promise<{ sum: number; emptyKeys: string[] } | null> {
+    const pipeline = this.redis.pipeline();
+    for (const key of jobsKeys) {
+      pipeline.zcard(key);
+    }
+    const results = await pipeline.exec();
+    // A null exec is the whole batch failing, not an empty batch. Treating it as
+    // empty would contribute 0 for every key in it and write the shortfall out as
+    // ground truth — the same under-count the per-entry check refuses.
+    if (results === null) {
+      logger.warn(
+        { batchOffset },
+        "ZCARD pipeline returned no results during pending reconcile — aborting to avoid under-count",
+      );
+      return null;
+    }
+    let sum = 0;
+    const emptyKeys: string[] = [];
+    for (const [index, [err, val]] of results.entries()) {
+      if (err) {
+        logger.warn(
+          { error: err },
+          "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
+        );
+        return null;
+      }
+      const count = Number(val) || 0;
+      sum += count;
+      if (count === 0) emptyKeys.push(jobsKeys[index]!);
+    }
+    return { sum, emptyKeys };
+  }
+
+  /**
+   * Drop groups this pass observed empty from the pending index.
+   *
+   * Best-effort and never fatal: the index is allowed to over-report, so a failed
+   * prune costs a few wasted ZCARDs on later passes and nothing else. The script
+   * re-reads each zset atomically, so a group staged since the observation stays.
+   */
+  private async prunePendingIndex(params: {
+    prefix: string;
+    emptyJobsKeys: string[];
+    refreshLease: () => Promise<boolean>;
+  }): Promise<void> {
+    if (params.emptyJobsKeys.length === 0) return;
+    const indexKey = pendingGroupsKey(params.prefix);
+    const groupKeyPrefix = `${params.prefix}group:`;
+    for (
+      let offset = 0;
+      offset < params.emptyJobsKeys.length;
+      offset += PENDING_RECONCILE_ZCARD_BATCH
+    ) {
+      const args: string[] = [];
+      for (const jobsKey of params.emptyJobsKeys.slice(
+        offset,
+        offset + PENDING_RECONCILE_ZCARD_BATCH,
+      )) {
+        // The script needs both the id to remove and the key to re-read.
+        args.push(
+          jobsKey.slice(groupKeyPrefix.length, -":jobs".length),
+          jobsKey,
+        );
+      }
+      try {
+        await pendingIndexPruneScript.run(this.redis, 1, indexKey, ...args);
+        // Pruning runs after the counter is published, so losing the lease here
+        // cannot corrupt a result — but it can leave this pass working on a
+        // marker another instance now owns, which is the overlap the marker
+        // exists to stop. Stop rather than press on.
+        if (!(await params.refreshLease())) return;
+      } catch (err) {
+        logger.warn(
+          { error: err },
+          "Failed to prune drained groups from the pending index",
+        );
+        return;
+      }
+    }
+  }
+
+  /**
+   * Re-arm the single-flight marker this pass holds, or drop it when the
+   * requested TTL has already run out.
+   *
+   * Returns whether this pass still owned the marker. A false is the signal to
+   * abort: the marker has moved to another instance, so anything this pass went
+   * on to write could overwrite fresher state. An error reports the same way —
+   * being unable to prove ownership is not the same as holding it.
+   */
+  private async setReconcileMarkerTtl(params: {
+    markerKey: string;
+    holderToken: string;
+    ttlMs: number;
+  }): Promise<boolean> {
+    try {
+      const held = await reconcileMarkerTtlScript.run(
+        this.redis,
+        1,
+        params.markerKey,
+        params.holderToken,
+        Math.trunc(params.ttlMs),
+      );
+      return Number(held) === 1;
+    } catch (err) {
+      logger.warn(
+        { error: err },
+        "Failed to re-arm the pending reconcile single-flight marker",
+      );
+      return false;
+    }
   }
 
   // ── Private Filter Helpers ──────────────────────────────────────

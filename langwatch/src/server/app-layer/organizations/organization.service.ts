@@ -276,6 +276,22 @@ export class OrganizationService {
   }
 
   /**
+   * Disables or re-enables a membership, which revokes or restores access to
+   * this organization and returns or takes back a licensed seat. Role,
+   * department and history are untouched, so this is reversible.
+   *
+   * The seat check on re-enabling is the caller's (router) job, same as
+   * `updateMemberRole`: it needs request-scoped plan context.
+   */
+  async setMemberDisabled(params: {
+    organizationId: string;
+    userId: string;
+    disabled: boolean;
+  }): Promise<void> {
+    return this.repo.setMemberDisabled(params);
+  }
+
+  /**
    * Updates a member's organization role and cascades effective team role changes.
    * Computes effective team role updates from the requested updates and current memberships.
    *

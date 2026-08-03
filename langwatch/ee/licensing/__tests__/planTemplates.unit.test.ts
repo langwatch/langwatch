@@ -20,32 +20,8 @@ describe("PRO_TEMPLATE", () => {
     expect(PRO_TEMPLATE.maxMembers).toBe(10);
   });
 
-  it("has maxProjects of 20", () => {
-    expect(PRO_TEMPLATE.maxProjects).toBe(20);
-  });
-
   it("has maxMessagesPerMonth of 100000", () => {
     expect(PRO_TEMPLATE.maxMessagesPerMonth).toBe(100000);
-  });
-
-  it("has maxWorkflows of 50", () => {
-    expect(PRO_TEMPLATE.maxWorkflows).toBe(50);
-  });
-
-  it("has maxPrompts of 50", () => {
-    expect(PRO_TEMPLATE.maxPrompts).toBe(50);
-  });
-
-  it("has maxEvaluators of 50", () => {
-    expect(PRO_TEMPLATE.maxEvaluators).toBe(50);
-  });
-
-  it("has maxScenarios of 50", () => {
-    expect(PRO_TEMPLATE.maxScenarios).toBe(50);
-  });
-
-  it("has maxOnlineEvaluations of 50", () => {
-    expect(PRO_TEMPLATE.maxOnlineEvaluations).toBe(50);
   });
 
   it("has canPublish true", () => {
@@ -70,32 +46,8 @@ describe("ENTERPRISE_TEMPLATE", () => {
     expect(ENTERPRISE_TEMPLATE.maxMembers).toBe(100);
   });
 
-  it("has maxProjects of 500", () => {
-    expect(ENTERPRISE_TEMPLATE.maxProjects).toBe(500);
-  });
-
   it("has maxMessagesPerMonth of 10000000", () => {
     expect(ENTERPRISE_TEMPLATE.maxMessagesPerMonth).toBe(10000000);
-  });
-
-  it("has maxWorkflows of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxWorkflows).toBe(1000);
-  });
-
-  it("has maxPrompts of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxPrompts).toBe(1000);
-  });
-
-  it("has maxEvaluators of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxEvaluators).toBe(1000);
-  });
-
-  it("has maxScenarios of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxScenarios).toBe(1000);
-  });
-
-  it("has maxOnlineEvaluations of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxOnlineEvaluations).toBe(1000);
   });
 
   it("has canPublish true", () => {
@@ -129,20 +81,7 @@ describe("GROWTH_TEMPLATE", () => {
     it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
       const unlimitedFields = [
         "maxMembersLite",
-        "maxTeams",
-        "maxProjects",
         "maxMessagesPerMonth",
-        "maxWorkflows",
-        "maxPrompts",
-        "maxEvaluators",
-        "maxScenarios",
-        "maxAgents",
-        "maxExperiments",
-        "maxOnlineEvaluations",
-        "maxDatasets",
-        "maxDashboards",
-        "maxCustomGraphs",
-        "maxAutomations",
       ] as const;
 
       for (const field of unlimitedFields) {

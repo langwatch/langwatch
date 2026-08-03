@@ -6,22 +6,11 @@
  *
  * Binds specs/prompts/duplicate-prompt.feature.
  */
-import { TRPCError } from "@trpc/server";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
-import { enforceLicenseLimit } from "../../../license-enforcement";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn(),
-  };
-});
 
 // Fire-and-forget billing hook; it is not what these tests are about.
 vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({
@@ -64,8 +53,6 @@ describe("prompts.duplicate", () => {
   };
 
   beforeEach(async () => {
-    vi.mocked(enforceLicenseLimit).mockReset();
-
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: { user: { id: user.id }, expires: "1" },
@@ -178,25 +165,6 @@ describe("prompts.duplicate", () => {
           'Duplicated from "support-bot"',
         );
       });
-
-      it("checks the prompt allowance the plan grants before duplicating", async () => {
-        const original = await givenASupportBotPrompt();
-        // `prompts.create` enforces the same limit; forget its call so this
-        // asserts on what `duplicate` does, not on what the setup did.
-        vi.mocked(enforceLicenseLimit).mockClear();
-
-        await caller.prompts.duplicate({
-          idOrHandle: original.id,
-          projectId,
-        });
-
-        expect(enforceLicenseLimit).toHaveBeenCalledTimes(1);
-        expect(enforceLicenseLimit).toHaveBeenCalledWith(
-          expect.anything(),
-          projectId,
-          "prompts",
-        );
-      });
     });
 
     describe("when it is duplicated twice", () => {
@@ -220,28 +188,6 @@ describe("prompts.duplicate", () => {
           "support-bot-1",
           "support-bot-2",
         ]);
-      });
-    });
-  });
-
-  describe("given the organization has used up the prompt allowance its plan grants", () => {
-    describe("when a duplicate is attempted", () => {
-      /** @scenario Duplicating is blocked when the plan's prompt allowance is used up */
-      it("reports the limit and creates no prompt", async () => {
-        const original = await givenASupportBotPrompt();
-
-        vi.mocked(enforceLicenseLimit).mockRejectedValueOnce(
-          new TRPCError({
-            code: "FORBIDDEN",
-            message: "You have reached the maximum number of prompts",
-          }),
-        );
-
-        await expect(
-          caller.prompts.duplicate({ idOrHandle: original.id, projectId }),
-        ).rejects.toThrow(/maximum number of prompts/i);
-
-        expect(await promptHandles()).toEqual(["support-bot"]);
       });
     });
   });

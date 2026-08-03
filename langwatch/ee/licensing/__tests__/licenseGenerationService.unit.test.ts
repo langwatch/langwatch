@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "../constants";
 import { generateLicenseKey } from "../licenseGenerationService";
+import { GROWTH_TEMPLATE } from "../planTemplates";
 import { validateLicense } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 
@@ -32,25 +33,16 @@ describe("generateLicenseKey", () => {
       expect(licenseData.plan.maxMembers).toBe(5);
     });
 
-    it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
+    it("inherits the GROWTH template member-lite and messages limits", () => {
       const { licenseData } = generateLicenseKey(baseParams);
       const { plan } = licenseData;
 
+      expect(plan.maxMembersLite).toBe(GROWTH_TEMPLATE.maxMembersLite);
       expect(plan.maxMembersLite).toBe(DEFAULT_LIMIT);
-      expect(plan.maxTeams).toBe(DEFAULT_LIMIT);
-      expect(plan.maxProjects).toBe(DEFAULT_LIMIT);
+      expect(plan.maxMessagesPerMonth).toBe(
+        GROWTH_TEMPLATE.maxMessagesPerMonth,
+      );
       expect(plan.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
-      expect(plan.maxWorkflows).toBe(DEFAULT_LIMIT);
-      expect(plan.maxPrompts).toBe(DEFAULT_LIMIT);
-      expect(plan.maxEvaluators).toBe(DEFAULT_LIMIT);
-      expect(plan.maxScenarios).toBe(DEFAULT_LIMIT);
-      expect(plan.maxAgents).toBe(DEFAULT_LIMIT);
-      expect(plan.maxExperiments).toBe(DEFAULT_LIMIT);
-      expect(plan.maxOnlineEvaluations).toBe(DEFAULT_LIMIT);
-      expect(plan.maxDatasets).toBe(DEFAULT_LIMIT);
-      expect(plan.maxDashboards).toBe(DEFAULT_LIMIT);
-      expect(plan.maxCustomGraphs).toBe(DEFAULT_LIMIT);
-      expect(plan.maxAutomations).toBe(DEFAULT_LIMIT);
     });
 
     it("sets plan type to GROWTH and name to Growth", () => {
@@ -65,6 +57,46 @@ describe("generateLicenseKey", () => {
 
       expect(licenseData.plan.canPublish).toBe(true);
       expect(licenseData.plan.usageUnit).toBe("events");
+    });
+
+    /** @scenario GROWTH plan includes all features with no artificial limits */
+    it("mints a GROWTH license with seats and publishing but no feature caps", () => {
+      const { licenseData } = generateLicenseKey({
+        ...baseParams,
+        maxMembers: 10,
+      });
+      const { plan } = licenseData;
+
+      expect(plan.type).toBe("GROWTH");
+      expect(plan.maxMembers).toBe(10);
+      expect(plan.canPublish).toBe(true);
+
+      // "all other features are unlimited". maxProjects and maxWorkflows are
+      // still minted, but at an unlimited value: deployments released before
+      // those fields became optional reject a license without them. See
+      // `buildMintedPlan`. Everything else is simply absent.
+      for (const cap of ["maxProjects", "maxWorkflows"] as const) {
+        expect(plan[cap], `${cap} should be minted as unlimited`).toBe(
+          Number.MAX_SAFE_INTEGER,
+        );
+      }
+
+      const uncappedAndUnminted = [
+        "maxTeams",
+        "maxPrompts",
+        "maxEvaluators",
+        "maxScenarios",
+        "maxAgents",
+        "maxExperiments",
+        "maxOnlineEvaluations",
+        "maxDatasets",
+        "maxDashboards",
+        "maxCustomGraphs",
+        "maxAutomations",
+      ] as const;
+      for (const cap of uncappedAndUnminted) {
+        expect(plan, `${cap} should not be minted`).not.toHaveProperty(cap);
+      }
     });
   });
 
@@ -84,7 +116,9 @@ describe("generateLicenseKey", () => {
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
       expect(licenseData.plan.maxMembers).toBe(10);
-      expect(licenseData.plan.maxProjects).toBe(20);
+      expect(licenseData.plan.maxMembersLite).toBe(5);
+      expect(licenseData.plan.maxMessagesPerMonth).toBe(100000);
+      expect(licenseData.plan.usageUnit).toBe("traces");
     });
   });
 
@@ -126,7 +160,9 @@ describe("generateLicenseKey", () => {
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
       expect(licenseData.plan.maxMembers).toBe(50);
-      expect(licenseData.plan.maxProjects).toBe(500);
+      expect(licenseData.plan.maxMembersLite).toBe(50);
+      expect(licenseData.plan.maxMessagesPerMonth).toBe(10000000);
+      expect(licenseData.plan.usageUnit).toBe("traces");
     });
   });
 

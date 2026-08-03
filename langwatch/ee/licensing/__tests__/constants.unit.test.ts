@@ -55,9 +55,8 @@ describe("UNLIMITED_PLAN", () => {
     expect(UNLIMITED_PLAN.free).toBe(true);
     expect(UNLIMITED_PLAN.overrideAddingLimitations).toBe(true);
     expect(UNLIMITED_PLAN.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
-    expect(UNLIMITED_PLAN.maxProjects).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.maxMembersLite).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
-    expect(UNLIMITED_PLAN.maxWorkflows).toBe(Number.MAX_SAFE_INTEGER);
     expect(UNLIMITED_PLAN.canPublish).toBe(true);
   });
 });
@@ -70,16 +69,15 @@ describe("CONTACT_SALES_URL", () => {
 });
 
 describe("FREE_PLAN", () => {
-  /** @scenario FREE_PLAN has correct limits for expired/invalid licenses */
+  /** @scenario FREE_PLAN has the Cloud free-tier limits */
   /** @scenario PlanInfo defaults maxMembers to 1 when not specified */
-  it("has the expected fallback limits for expired/invalid licenses", () => {
+  it("has the Cloud free-tier limits", () => {
     expect(FREE_PLAN.type).toBe("FREE");
     expect(FREE_PLAN.name).toBe("Free");
     expect(FREE_PLAN.free).toBe(true);
     expect(FREE_PLAN.maxMembers).toBe(1);
-    expect(FREE_PLAN.maxProjects).toBe(2);
+    expect(FREE_PLAN.maxMembersLite).toBe(0);
     expect(FREE_PLAN.maxMessagesPerMonth).toBe(1000);
-    expect(FREE_PLAN.maxWorkflows).toBe(3);
     expect(FREE_PLAN.canPublish).toBe(false);
   });
 });

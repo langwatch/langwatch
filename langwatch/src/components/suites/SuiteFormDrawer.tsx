@@ -38,7 +38,6 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { api } from "~/utils/api";
@@ -120,9 +119,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
 
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
-
-  // License enforcement for suite creation
-  const { checkAndProceed } = useLicenseEnforcement("experiments");
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -233,19 +229,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (isEditMode && suite) {
         updateMutation.mutate({ ...payload, id: suite.id });
       } else {
-        checkAndProceed(() => {
-          createMutation.mutate(payload);
-        });
+        createMutation.mutate(payload);
       }
     },
-    [
-      project,
-      isEditMode,
-      suite,
-      createMutation,
-      updateMutation,
-      checkAndProceed,
-    ],
+    [project, isEditMode, suite, createMutation, updateMutation],
   );
 
   const submitAndRun = useCallback(
@@ -271,10 +258,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         saveAndRunRef.current = true;
         updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
       } else {
-        checkAndProceed(() => {
-          saveAndRunRef.current = true;
-          createMutation.mutate(payload, { onSuccess });
-        });
+        saveAndRunRef.current = true;
+        createMutation.mutate(payload, { onSuccess });
       }
     },
     [
@@ -287,7 +272,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onRunRequested,
       runMutation,
       idempotencyKey,
-      checkAndProceed,
     ],
   );
 

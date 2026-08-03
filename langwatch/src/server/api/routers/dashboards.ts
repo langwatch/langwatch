@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { DashboardService } from "../../dashboards/dashboard.service";
 import { dashboardErrorHandler } from "../../dashboards/middleware";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -51,7 +50,6 @@ export const dashboardsRouter = createTRPCRouter({
     .use(checkProjectPermission("analytics:create"))
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "dashboards");
       const service = DashboardService.create(ctx.prisma);
       return await service.create(input.projectId, input.name);
     }),

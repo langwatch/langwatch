@@ -5,7 +5,6 @@ import { useState } from "react";
 import { createInitialState } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { showErrorToast } from "~/features/errors";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -19,7 +18,6 @@ export const CreateExperimentButton = () => {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
   const utils = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("experiments");
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
       void utils.experiments.getAllForEvaluationsList.invalidate();
@@ -38,23 +36,21 @@ export const CreateExperimentButton = () => {
   if (!project || !hasPermission("workflows:create")) return null;
 
   const handleCreate = () => {
-    checkAndProceed(() => {
-      if (isCreating) return;
+    if (isCreating) return;
 
-      setIsCreating(true);
-      const name = generateHumanReadableId();
-      const initialState = createInitialState();
-      initialState.name = name;
-      const persistedState = extractPersistedState(initialState);
+    setIsCreating(true);
+    const name = generateHumanReadableId();
+    const initialState = createInitialState();
+    initialState.name = name;
+    const persistedState = extractPersistedState(initialState);
 
-      createExperiment.mutate({
-        projectId: project.id,
-        experimentId: undefined,
-        state: {
-          ...persistedState,
-          experimentSlug: name,
-        },
-      });
+    createExperiment.mutate({
+      projectId: project.id,
+      experimentId: undefined,
+      state: {
+        ...persistedState,
+        experimentSlug: name,
+      },
     });
   };
 

@@ -1,7 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
@@ -47,7 +46,6 @@ export function CreateProjectDrawer({
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("projects");
 
   const createProject = api.project.create.useMutation();
 
@@ -72,50 +70,48 @@ export function CreateProjectDrawer({
     const resolvedTeamId =
       data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId || defaultTeamId;
 
-    checkAndProceed(() => {
-      createProject.mutate(
-        {
-          organizationId: effectiveOrganizationId,
-          name: data.name,
-          teamId: resolvedTeamId,
-          newTeamName: data.newTeamName,
-          language: data.language,
-          framework: data.framework,
+    createProject.mutate(
+      {
+        organizationId: effectiveOrganizationId,
+        name: data.name,
+        teamId: resolvedTeamId,
+        newTeamName: data.newTeamName,
+        language: data.language,
+        framework: data.framework,
+      },
+      {
+        onSuccess: (result) => {
+          invalidateProjectListQueries(queryClient);
+
+          trackEvent("project_created", {
+            project_slug: result.projectSlug,
+            language: data.language,
+            framework: data.framework,
+          });
+
+          toaster.create({
+            title: "Project Created",
+            description: `Successfully created ${result.projectSlug}`,
+            type: "success",
+            meta: { closable: true },
+          });
+
+          onCreated?.({ projectSlug: result.projectSlug });
+
+          if (navigateOnCreate) {
+            // Use hard redirect to ensure fresh data after project creation
+            window.location.href = `/${result.projectSlug}`;
+            return;
+          }
+
+          handleClose();
         },
-        {
-          onSuccess: (result) => {
-            invalidateProjectListQueries(queryClient);
-
-            trackEvent("project_created", {
-              project_slug: result.projectSlug,
-              language: data.language,
-              framework: data.framework,
-            });
-
-            toaster.create({
-              title: "Project Created",
-              description: `Successfully created ${result.projectSlug}`,
-              type: "success",
-              meta: { closable: true },
-            });
-
-            onCreated?.({ projectSlug: result.projectSlug });
-
-            if (navigateOnCreate) {
-              // Use hard redirect to ensure fresh data after project creation
-              window.location.href = `/${result.projectSlug}`;
-              return;
-            }
-
-            handleClose();
-          },
-          // No toast: `ProjectForm` renders `<HandledErrorAlert>` for this
-          // same error. A failed create is a state that is still true, not a
-          // moment that just passed, so the inline alert is the right surface
-          // — and it already carries the tips, docs link and error id.
-        },
-      );
-    });
+        // No toast: `ProjectForm` renders `<HandledErrorAlert>` for this
+        // same error. A failed create is a state that is still true, not a
+        // moment that just passed, so the inline alert is the right surface
+        // — and it already carries the tips, docs link and error id.
+      },
+    );
   };
 
   return (

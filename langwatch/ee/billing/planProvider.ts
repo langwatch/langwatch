@@ -14,20 +14,7 @@ type NumericOverrideField = {
 export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMembers",
   "maxMembersLite",
-  "maxProjects",
   "maxMessagesPerMonth",
-  "maxWorkflows",
-  "maxTeams",
-  "maxPrompts",
-  "maxEvaluators",
-  "maxScenarios",
-  "maxAgents",
-  "maxExperiments",
-  "maxOnlineEvaluations",
-  "maxDatasets",
-  "maxDashboards",
-  "maxCustomGraphs",
-  "maxAutomations",
 ];
 
 type MinimalUser = {

@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -64,7 +63,6 @@ export function ScenarioCreateModal({
 }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
   const { hasEnabledProviders, providers } = useModelProvidersSettings({
@@ -132,7 +130,7 @@ export function ScenarioCreateModal({
       <ModelProviderRequiredModal
         open={open}
         onClose={onClose}
-        onProceedAnyway={() => checkAndProceed(handleSkip)}
+        onProceedAnyway={handleSkip}
       />
     );
   }
@@ -144,8 +142,8 @@ export function ScenarioCreateModal({
       title={MODAL_TITLE}
       placeholder={MODAL_PLACEHOLDER}
       exampleTemplates={EXAMPLE_TEMPLATES}
-      onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
-      onSkip={() => checkAndProceed(handleSkip)}
+      onGenerate={(desc) => handleGenerate(desc)}
+      onSkip={handleSkip}
       generatingText={GENERATING_TEXT}
       footerHint={<ResolvedModelCaption model={resolvedDefault.data?.model} />}
       assistant={{

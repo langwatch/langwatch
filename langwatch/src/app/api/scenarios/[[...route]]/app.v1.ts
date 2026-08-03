@@ -10,7 +10,6 @@ import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { AuthMiddlewareVariables } from "../../middleware";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -150,7 +149,6 @@ export function registerScenarioRoutes(
   // read routes and are declined the write, as before.
   secured.access(requires("scenarios:create")).post(
     "/",
-    resourceLimitMiddleware("scenarios"),
     describeRoute({
       description: "Create a new scenario",
       responses: {

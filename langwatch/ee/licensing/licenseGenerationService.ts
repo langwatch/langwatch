@@ -1,3 +1,4 @@
+import { buildMintedPlan } from "./mintedPlan";
 import { getPlanTemplate } from "./planTemplates";
 import { encodeLicenseKey, generateLicenseId, signLicense } from "./signing";
 import type { LicenseData } from "./types";
@@ -43,33 +44,19 @@ export function generateLicenseKey({
 
   const resolvedOrgName = organizationName.trim() || email;
 
-  // Build plan with keys matching Zod schema field order.
-  // Signature verification re-serializes via JSON.stringify after Zod parsing,
-  // which reorders keys to schema order. Key order must match at sign time.
-  const plan: LicenseData["plan"] = {
+  // Licenses encode only the enforced levers (member seats, messages volume)
+  // plus identity, and the retired fields older deployments still require.
+  // See `buildMintedPlan` for both constraints.
+  const plan: LicenseData["plan"] = buildMintedPlan({
     type: template.type,
     name: template.name,
     maxMembers: seats,
     maxMembersLite: template.maxMembersLite,
-    maxTeams: template.maxTeams,
-    maxProjects: template.maxProjects,
     maxMessagesPerMonth: template.maxMessagesPerMonth,
-    evaluationsCredit: template.evaluationsCredit ?? 0,
-    maxWorkflows: template.maxWorkflows,
-    maxPrompts: template.maxPrompts,
-    maxEvaluators: template.maxEvaluators,
-    maxScenarios: template.maxScenarios,
-    maxAgents: template.maxAgents,
-    maxExperiments: template.maxExperiments,
-    maxOnlineEvaluations: template.maxOnlineEvaluations,
-    maxDatasets: template.maxDatasets,
-    maxDashboards: template.maxDashboards,
-    maxCustomGraphs: template.maxCustomGraphs,
-    maxAutomations: template.maxAutomations,
     canPublish: template.canPublish,
     webhookEndpointsEnabled: template.webhookEndpointsEnabled,
     usageUnit: template.usageUnit,
-  };
+  });
 
   const licenseData: LicenseData = {
     licenseId: generateLicenseId(),

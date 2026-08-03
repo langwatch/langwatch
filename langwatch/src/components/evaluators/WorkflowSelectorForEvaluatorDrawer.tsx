@@ -19,13 +19,11 @@ import {
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
-import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
   getFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -77,12 +75,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
     flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // License enforcement for evaluator AND workflow creation
-  // Creating a workflow evaluator requires creating both a workflow AND an evaluator,
-  // so we need to check both limits before proceeding
-  const evaluatorEnforcement = useLicenseEnforcement("evaluators");
-  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -279,13 +271,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
               </Button>
               <Button
                 colorPalette="green"
-                onClick={() => {
-                  // Check both workflows and evaluators limits before proceeding
-                  checkCompoundLimits(
-                    [workflowEnforcement, evaluatorEnforcement],
-                    () => void handleSubmit(onSubmit)(),
-                  );
-                }}
+                onClick={() => void handleSubmit(onSubmit)()}
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-evaluator-button"

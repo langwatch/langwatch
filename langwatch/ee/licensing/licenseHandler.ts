@@ -7,17 +7,23 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { PlanInfo } from "./planInfo";
+import { mapToPlanInfo } from "./planMapping";
 import type {
   LicensePlanLimits,
   LicenseStatus,
   RemoveLicenseResult,
   StoreLicenseResult,
 } from "./types";
-import { parseLicenseKey, validateLicense } from "./validation";
+import {
+  isExpired,
+  parseLicenseKey,
+  validateLicense,
+  verifySignature,
+} from "./validation";
 
 const logger = createLogger("langwatch:licensing:licenseHandler");
 
@@ -42,9 +48,12 @@ interface LicenseHandlerConfig {
  * Manages license validation and storage for self-hosted deployments.
  *
  * Key behaviors:
- * - No license stored = FREE_PLAN (restricted access)
+ * - No license stored = UNLIMITED_PLAN (the OSS baseline)
  * - Valid license = license-based limits
- * - Invalid/expired license = FREE_PLAN (restricted fallback)
+ * - Unreadable or unsigned license = UNLIMITED_PLAN (the OSS baseline)
+ * - License past its end date: depends on the caller. `getSelfHostedPlan` keeps
+ *   the numbers it sold; `getActivePlan`, which Cloud composes with a Stripe
+ *   subscription, reports the baseline so the subscription underneath applies.
  *
  * ## Design Note (SRP)
  *
@@ -71,36 +80,95 @@ export class LicenseHandler {
   }
 
   /**
-   * Gets the active plan for an organization based on its stored license.
+   * Gets the active plan for an organization based on its stored license, as
+   * the *override* leg of the Cloud composite provider.
    *
    * Returns:
-   * - FREE_PLAN if no license is stored
-   * - License-based PlanInfo if valid license exists
-   * - FREE_PLAN if license is invalid or expired
+   * - UNLIMITED_PLAN if no license is stored
+   * - License-based PlanInfo if a valid license exists
+   * - UNLIMITED_PLAN if the license is unreadable, unsigned, or past its end
+   *   date
+   *
+   * A license buys the Enterprise surface (SSO, SCIM, audit logs) and the
+   * support relationship, not permission to run the software. Everything a
+   * self-hosted deployment stores on its own infrastructure is uncapped without
+   * one: seats, projects, teams, experimentation resources, and its own trace
+   * history. That is what `UNLIMITED_PLAN` encodes.
+   *
+   * A license past its end date resolves here to that same baseline, and that
+   * is what the composite provider needs: `UNLIMITED_PLAN.free` is true, so a
+   * Cloud org whose license lapsed falls through to the Stripe subscription
+   * sitting underneath it. Self-hosted has no such subscription to fall through
+   * to, so it asks `getSelfHostedPlan` instead.
    */
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { license: true },
-    });
+    const licenseKey = await this.readStoredLicense(organizationId);
 
-    // No license stored = FREE_PLAN (enforcement enabled requires valid license)
-    if (!organization?.license) {
-      return FREE_PLAN;
+    if (!licenseKey) {
+      return UNLIMITED_PLAN;
     }
 
     // Validate the stored license
-    const result = validateLicense({
-      licenseKey: organization.license,
-      publicKey: this.publicKey,
-    });
+    const result = validateLicense({ licenseKey, publicKey: this.publicKey });
 
     if (result.valid) {
       return result.planInfo;
     }
 
-    // Invalid or expired license = restricted FREE_PLAN
-    return FREE_PLAN;
+    return UNLIMITED_PLAN;
+  }
+
+  /**
+   * Gets the active plan for a self-hosted deployment, where the stored license
+   * is the only source of a plan and there is nothing underneath it to fall
+   * through to.
+   *
+   * The signature decides, not the date. A license LangWatch signed is a record
+   * of what was bought, and reaching its end date does not unmake the purchase,
+   * so the numbers in the signed payload keep binding: seats stay at the count
+   * that was paid for and the capabilities the plan names stay switched on.
+   *
+   * Resolving expiry the other way would make lapsing worth more than renewing.
+   * The baseline is uncapped, so a deployment that let its license run out would
+   * get its seat cap lifted and start reporting itself as unlicensed, which is
+   * both a better deal than the customer paid for and a worse description of
+   * reality.
+   *
+   * Nothing about access changes on that day. This resolves a plan, it does not
+   * disable anybody, so an organization holding more members than a lapsed
+   * license covers lands in the same over-seats state as one that just activated
+   * a license for fewer seats than it had: everyone keeps working and only new
+   * members are refused. See seat-reconciliation.feature.
+   *
+   * A license we did not sign is not a license. Its numbers could say anything,
+   * so an unreadable or tampered key resolves to the baseline, exactly like no
+   * license at all.
+   */
+  async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
+    const licenseKey = await this.readStoredLicense(organizationId);
+
+    if (!licenseKey) {
+      return UNLIMITED_PLAN;
+    }
+
+    const signedLicense = parseLicenseKey(licenseKey);
+
+    if (!signedLicense || !verifySignature(signedLicense, this.publicKey)) {
+      return UNLIMITED_PLAN;
+    }
+
+    return mapToPlanInfo(signedLicense.data);
+  }
+
+  private async readStoredLicense(
+    organizationId: string,
+  ): Promise<string | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { license: true },
+    });
+
+    return organization?.license ?? null;
   }
 
   /**
@@ -211,17 +279,14 @@ export class LicenseHandler {
    * invalid licenses so the UI can display "license expired" messages.
    */
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { license: true },
-    });
+    const licenseKey = await this.readStoredLicense(organizationId);
 
-    if (!organization?.license) {
+    if (!licenseKey) {
       return { hasLicense: false, valid: false };
     }
 
     const validationResult = validateLicense({
-      licenseKey: organization.license,
+      licenseKey,
       publicKey: this.publicKey,
     });
 
@@ -244,7 +309,7 @@ export class LicenseHandler {
     }
 
     // For invalid licenses, parse separately to get metadata for UI display
-    const signedLicense = parseLicenseKey(organization.license);
+    const signedLicense = parseLicenseKey(licenseKey);
     if (!signedLicense) {
       return { hasLicense: true, valid: false, corrupted: true };
     }
@@ -257,6 +322,14 @@ export class LicenseHandler {
     return {
       hasLicense: true,
       valid: false,
+      // A lapsed license and one we never signed both read as invalid, and the
+      // page has to tell them apart: the first still meters its seats, the
+      // second means nothing at all. The date in the payload cannot answer that
+      // on its own, since a forged payload can claim any date it likes, so the
+      // answer comes from here, where the signature was actually checked.
+      expired:
+        verifySignature(signedLicense, this.publicKey) &&
+        isExpired(licenseData.expiresAt),
       plan: licenseData.plan.type,
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,
@@ -294,73 +367,18 @@ export class LicenseHandler {
           )
       : Promise.resolve(0);
 
-    const [
-      currentMembers,
-      currentMembersLite,
-      currentTeams,
-      currentProjects,
-      currentPrompts,
-      currentWorkflows,
-      currentScenarios,
-      currentEvaluators,
-      currentAgents,
-      currentExperiments,
-      currentOnlineEvaluations,
-      currentDatasets,
-      currentDashboards,
-      currentCustomGraphs,
-      currentAutomations,
-      currentMessagesPerMonth,
-    ] = await Promise.all([
-      this.repository.getMemberCount(organizationId),
-      this.repository.getMembersLiteCount(organizationId),
-      this.repository.getTeamCount(organizationId),
-      this.repository.getProjectCount(organizationId),
-      this.repository.getPromptCount(organizationId),
-      this.repository.getWorkflowCount(organizationId),
-      this.repository.getActiveScenarioCount(organizationId),
-      this.repository.getEvaluatorCount(organizationId),
-      this.repository.getAgentCount(organizationId),
-      this.repository.getExperimentCount(organizationId),
-      this.repository.getOnlineEvaluationCount(organizationId),
-      this.repository.getDatasetCount(organizationId),
-      this.repository.getDashboardCount(organizationId),
-      this.repository.getCustomGraphCount(organizationId),
-      this.repository.getAutomationCount(organizationId),
-      messagesCountPromise,
-    ]);
+    const [currentMembers, currentMembersLite, currentMessagesPerMonth] =
+      await Promise.all([
+        this.repository.getMemberCount(organizationId),
+        this.repository.getMembersLiteCount(organizationId),
+        messagesCountPromise,
+      ]);
 
     return {
       currentMembers,
       maxMembers: resolved.maxMembers,
       currentMembersLite,
       maxMembersLite: resolved.maxMembersLite,
-      currentTeams,
-      maxTeams: resolved.maxTeams,
-      currentProjects,
-      maxProjects: resolved.maxProjects,
-      currentPrompts,
-      maxPrompts: resolved.maxPrompts,
-      currentWorkflows,
-      maxWorkflows: resolved.maxWorkflows,
-      currentScenarios,
-      maxScenarios: resolved.maxScenarios,
-      currentEvaluators,
-      maxEvaluators: resolved.maxEvaluators,
-      currentAgents,
-      maxAgents: resolved.maxAgents,
-      currentExperiments,
-      maxExperiments: resolved.maxExperiments,
-      currentOnlineEvaluations,
-      maxOnlineEvaluations: resolved.maxOnlineEvaluations,
-      currentDatasets,
-      maxDatasets: resolved.maxDatasets,
-      currentDashboards,
-      maxDashboards: resolved.maxDashboards,
-      currentCustomGraphs,
-      maxCustomGraphs: resolved.maxCustomGraphs,
-      currentAutomations,
-      maxAutomations: resolved.maxAutomations,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
     };
@@ -369,9 +387,8 @@ export class LicenseHandler {
   /**
    * Removes the license from an organization (idempotent).
    *
-   * This clears all license-related fields, returning the organization
-   * to unlimited mode (when enforcement is disabled) or FREE_PLAN
-   * (when enforcement is enabled).
+   * This clears all license-related fields, returning the organization to the
+   * OSS baseline (`UNLIMITED_PLAN`) and withdrawing the Enterprise surface.
    *
    * @returns { removed: true } when complete
    * @throws OrganizationNotFoundError if organization does not exist

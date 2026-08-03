@@ -1,11 +1,16 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { api } from "~/utils/api";
 import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
 import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
+import { LicenseLoadError } from "./license/LicenseLoadError";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
-import { normalizeKeyForActivation } from "./license/licenseStatusUtils";
+import {
+  licenseMetersSeats,
+  normalizeKeyForActivation,
+} from "./license/licenseStatusUtils";
 import { NoLicenseCard } from "./license/NoLicenseCard";
+import { OverSeatsCallout } from "./license/OverSeatsCallout";
 import { useLicenseActions } from "./license/useLicenseActions";
 
 interface LicenseStatusProps {
@@ -65,20 +70,7 @@ export function LicenseStatus({
   }
 
   if (isError) {
-    return (
-      <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
-        <VStack align="start" gap={4}>
-          <Text fontWeight="medium">Unable to load license</Text>
-          <Text color="fg.muted">
-            Your license status could not be retrieved. Please try again or
-            contact support if the issue persists.
-          </Text>
-          <Button onClick={() => void refetch()} size="sm">
-            Retry
-          </Button>
-        </VStack>
-      </Box>
-    );
+    return <LicenseLoadError onRetry={() => void refetch()} />;
   }
 
   if (!status?.hasLicense) {
@@ -102,6 +94,12 @@ export function LicenseStatus({
 
   return (
     <VStack align="start" gap={0} width="full">
+      {licenseMetersSeats(status) && (
+        <OverSeatsCallout
+          currentMembers={status.currentMembers}
+          maxMembers={status.maxMembers}
+        />
+      )}
       <LicenseDetailsCard
         status={status}
         onRemove={remove}
