@@ -70,3 +70,45 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When a reconcile is triggered
     Then the trigger declines without running
     And the holder's marker and its expiry are left untouched
+
+  # The reconcile has to decide which groups to count. Asking the lifecycle
+  # indexes cannot answer that safely: they are read one after another, and a
+  # group moving between them mid-read is in none of the reads even though it
+  # never stopped holding jobs. The pending index is keyed on holding jobs
+  # instead, which no lifecycle transition changes.
+  @integration
+  Scenario: A group counted from the pending index needs no lifecycle membership
+    Given a group holding jobs while it moves between lifecycle states
+    When the reconcile runs
+    Then its jobs are still counted
+
+  @integration
+  Scenario: A drained group is dropped from the pending index
+    Given a group listed as pending whose jobs have all gone
+    And another listed group that still holds jobs
+    When the reconcile runs
+    Then the drained group is dropped from the index
+    And the group that still holds jobs is kept
+
+  # Two passes must never both publish. A pass that lost the marker cannot know
+  # whether a newer one has already written, so its count is only safe to
+  # discard — publishing it would put a stale number back over a fresh one.
+  @unit
+  Scenario: A pass that loses the marker mid-run publishes nothing
+    Given a reconcile pass that is overtaken by another instance
+    When it finishes computing its count
+    Then it discards the pass
+    And the counter is left for the instance that now holds the marker
+
+  @unit
+  Scenario: A pass whose marker lapses unclaimed publishes nothing
+    Given a reconcile pass whose marker expires with nobody taking it
+    When it finishes computing its count
+    Then it declines to write
+
+  @unit
+  Scenario: The counter write itself refuses to run without the marker
+    Given a reconcile pass that keeps the marker until its final check
+    And the marker changes hands before the write lands
+    When the pass goes to write its result
+    Then nothing is published

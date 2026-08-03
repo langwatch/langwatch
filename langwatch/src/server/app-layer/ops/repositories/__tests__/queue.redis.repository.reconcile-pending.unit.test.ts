@@ -32,6 +32,9 @@ class FakeRedis {
   /** Runs after every pipeline `exec`, so a test can simulate a slow pass. */
   onPipelineExec: (() => void) | null = null;
 
+  /** Runs between the last lease re-arm and the fenced counter write. */
+  onBeforeFencedWrite: (() => void) | null = null;
+
   /**
    * Ordered log of lease re-arms and ZCARD batches, so a test can tell which
    * phase of the pass a re-arm belongs to.
@@ -120,14 +123,66 @@ class FakeRedis {
     };
   }
 
-  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
+  /**
+   * Replace the marker as another instance would: a different token, so the
+   * holder's compare-and-set no longer matches.
+   */
+  stealMarker(key: string): void {
+    this.strings.set(key, "other-instance-token");
+  }
+
+  /** Expire the marker as a lapsed lease would, leaving it unowned. */
+  expireKey(key: string): void {
+    this.strings.delete(key);
+    this.expiries.delete(key);
+  }
+
+  /**
+   * Models the three cached scripts, told apart by their first key: the fenced
+   * counter write and the marker re-arm both act on the marker (and are then
+   * separated by arity), while the prune acts on the pending index.
+   */
   async evalsha(
     _sha: string,
     _numKeys: number,
     key: string,
-    token: string,
-    ttlMs: number,
+    ...rest: (string | number)[]
   ): Promise<number> {
+    if (key.endsWith("pending-groups")) {
+      return this.applyPrune(key, rest as string[]);
+    }
+    if (rest.length === 3) {
+      // Fires in the one window the fence exists for: after the last lease
+      // re-arm succeeded, before the write lands.
+      this.onBeforeFencedWrite?.();
+      const [counterKey, token, value] = rest as [string, string, string];
+      if (this.strings.get(key) !== token) return 0;
+      this.strings.set(counterKey, String(value));
+      return 1;
+    }
+    const [token, ttlMs] = rest as [string, number];
+    return this.applyMarkerTtl(key, token, Number(ttlMs));
+  }
+
+  /** SREM each id whose jobs zset re-reads as empty, atomically per the script. */
+  private applyPrune(indexKey: string, args: string[]): number {
+    const members = this.sets.get(indexKey) ?? [];
+    let pruned = 0;
+    for (let i = 0; i < args.length; i += 2) {
+      const groupId = args[i]!;
+      const jobsKey = args[i + 1]!;
+      if ((this.zsets.get(jobsKey) ?? []).length > 0) continue;
+      const at = members.indexOf(groupId);
+      if (at >= 0) {
+        members.splice(at, 1);
+        pruned += 1;
+      }
+    }
+    this.sets.set(indexKey, members);
+    return pruned;
+  }
+
+  private applyMarkerTtl(key: string, token: string, ttlMs: number): number {
     const isHeldByCaller = this.strings.get(key) === token;
     this.evalshaCalls.push({
       key,
@@ -376,6 +431,129 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         );
         expect(refreshes.length).toBeGreaterThan(0);
         expect(refreshes.every((call) => call.isHeldByCaller)).toBe(true);
+      });
+    });
+  });
+
+  describe("given the pass loses its marker to another instance mid-pass", () => {
+    beforeEach(() => {
+      redis.seedGroup({
+        groupId: "tenant-a/group",
+        jobCount: 4,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+      redis.strings.set(COUNTER_KEY, "99");
+      // The marker changes hands while this pass is between batches, which is
+      // what happens when a lease lapses and another instance acquires it.
+      redis.onPipelineExec = () => redis.stealMarker(MARKER_KEY);
+    });
+
+    describe("when reconcile finishes computing", () => {
+      /** @scenario "A pass that loses the marker mid-run publishes nothing" */
+      it("discards the pass instead of publishing its count", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result).toBeNull();
+      });
+
+      it("leaves the counter for the instance that now holds the marker", async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME);
+
+        // Writing 4 here would put this pass's count over whatever the newer
+        // holder has since published.
+        expect(redis.strings.get(COUNTER_KEY)).toBe("99");
+      });
+    });
+  });
+
+  describe("given the marker changes hands after the last lease check", () => {
+    beforeEach(() => {
+      redis.seedGroup({
+        groupId: "tenant-a/group",
+        jobCount: 7,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+      redis.strings.set(COUNTER_KEY, "42");
+      // Every lease re-arm succeeds, so the pass runs to completion believing it
+      // still holds the marker. It changes hands in the gap the re-arms cannot
+      // cover: after the final one, before the write.
+      redis.onBeforeFencedWrite = () => redis.stealMarker(MARKER_KEY);
+    });
+
+    describe("when reconcile goes to write its result", () => {
+      /** @scenario "The counter write itself refuses to run without the marker" */
+      it("does not publish, because the write itself checks ownership", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result).toBeNull();
+        expect(redis.strings.get(COUNTER_KEY)).toBe("42");
+      });
+    });
+  });
+
+  describe("given the marker expires mid-pass and nobody else takes it", () => {
+    beforeEach(() => {
+      redis.seedGroup({
+        groupId: "tenant-a/group",
+        jobCount: 2,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+      redis.strings.set(COUNTER_KEY, "50");
+      redis.onPipelineExec = () => redis.expireKey(MARKER_KEY);
+    });
+
+    describe("when reconcile finishes computing", () => {
+      /** @scenario "A pass whose marker lapses unclaimed publishes nothing" */
+      it("still declines to write, having lost the right to", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result).toBeNull();
+        expect(redis.strings.get(COUNTER_KEY)).toBe("50");
+      });
+    });
+  });
+
+  describe("given a group that moves between lifecycle indexes during the pass", () => {
+    beforeEach(() => {
+      // The pending index is what the group is counted from. It is written with
+      // the job itself, so it holds the group no matter which lifecycle index the
+      // group happens to be sitting in when each of those is read.
+      redis.seedGroup({
+        groupId: "tenant-a/moving-group",
+        jobCount: 6,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+      // In no lifecycle index at all: mid-transition, in neither the one already
+      // read nor the one still to be read.
+      redis.strings.set(COUNTER_KEY, "0");
+    });
+
+    describe("when reconcile runs", () => {
+      it("still counts the group's jobs", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result?.groundTruth).toBe(6);
+      });
+    });
+  });
+
+  describe("given a group in the pending index whose jobs have drained", () => {
+    beforeEach(() => {
+      redis.sets.set(`${PREFIX}pending-groups`, ["tenant-a/drained"]);
+      redis.zsets.set(`${PREFIX}group:tenant-a/drained:jobs`, []);
+      redis.strings.set(COUNTER_KEY, "3");
+    });
+
+    describe("when reconcile runs", () => {
+      it("counts it as zero and prunes it from the index", async () => {
+        const result = await repo.reconcileTotalPending(QUEUE_NAME);
+
+        expect(result?.groundTruth).toBe(0);
+        expect(redis.sets.get(`${PREFIX}pending-groups`)).toEqual([]);
       });
     });
   });

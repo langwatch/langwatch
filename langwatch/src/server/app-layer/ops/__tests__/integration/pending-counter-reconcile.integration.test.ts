@@ -289,6 +289,68 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
     });
   });
 
+  describe("given a group listed only in the pending index", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A group counted from the pending index needs no lifecycle membership" */
+      it("counts its jobs without it appearing in ready, blocked or parked", async () => {
+        const counterKey = `${queueName}:gq:stats:total-pending`;
+
+        await redis.del(markerKey);
+
+        // Exactly the state a group is in while it moves between lifecycle
+        // indexes: holding jobs, in none of them.
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-a/in-flight-move:jobs`,
+          1,
+          "j1",
+          2,
+          "j2",
+          3,
+          "j3",
+        );
+        await redis.sadd(
+          `${queueName}:gq:pending-groups`,
+          "tenant-a/in-flight-move",
+        );
+        await redis.set(counterKey, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(3);
+        expect(await redis.get(counterKey)).toBe("3");
+      });
+    });
+  });
+
+  describe("given a drained group still listed in the pending index", () => {
+    describe("when reconcile runs", () => {
+      /** @scenario "A drained group is dropped from the pending index" */
+      it("prunes the drained group but keeps one that still holds jobs", async () => {
+        const indexKey = `${queueName}:gq:pending-groups`;
+
+        await redis.del(markerKey);
+
+        // No jobs zset at all: the shape left behind when the safety-net TTL
+        // expires a group's jobs without any script running.
+        await redis.sadd(indexKey, "tenant-a/drained");
+        await redis.zadd(
+          `${queueName}:gq:group:tenant-a/live:jobs`,
+          1,
+          "still-here",
+        );
+        await redis.sadd(indexKey, "tenant-a/live");
+        await redis.set(`${queueName}:gq:stats:total-pending`, "0");
+
+        const result = await repo.reconcileTotalPending(queueName);
+
+        expect(result!.groundTruth).toBe(1);
+        expect((await redis.smembers(indexKey)).sort()).toEqual([
+          "tenant-a/live",
+        ]);
+      });
+    });
+  });
+
   describe("given another instance holds the single-flight marker", () => {
     describe("when a reconcile is declined", () => {
       /** @scenario A declined reconcile leaves the holder's marker untouched */

@@ -66,3 +66,11 @@ Feature: Pending counter conservation across job lifecycle
     Given a group with several staged jobs (INCR at stage)
     When the coalescing path drains some of them in one call
     Then the counter is decremented once per drained job (same as dispatch)
+
+  # The ops reconcile counts jobs by asking this index which groups to look at,
+  # so a staged job that never reached it would be invisible to the count.
+  @integration
+  Scenario: Staging a job records its group as holding pending work
+    Given a queue whose processor has not finished its first job
+    When further jobs are staged for the same group
+    Then the group is recorded as holding pending work
