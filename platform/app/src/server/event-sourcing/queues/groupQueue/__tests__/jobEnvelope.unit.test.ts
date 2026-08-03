@@ -511,7 +511,14 @@ describe("jobEnvelope", () => {
         // budget down. `1e999` is the one that matters: it is valid JSON, parses
         // to Infinity, and would reach the Lua drain as an unparseable ARGV.
         // Written as raw header text because JSON.stringify cannot emit these.
-        const SIZES = ["1e999", "0.1", "-1", '"4096"', "null"];
+        const SIZES = [
+          "1e999",
+          "9007199254740992",
+          "0.1",
+          "-1",
+          '"4096"',
+          "null",
+        ];
 
         it.each(
           SIZES,

@@ -5347,14 +5347,21 @@ describe("GroupStagingScripts.drainGroupReady", () => {
           expect(await inspectTotalPending()).toBe("2");
         });
 
-        // cjson decodes `1e999` to a Lua infinity, which `s >= 0` alone lets
-        // through and which no arithmetic downstream survives sensibly.
-        it.each([
+        // The same set the TS twin rejects, asserted here so the two ends of
+        // one budget cannot drift: cjson decodes `1e999` to a Lua infinity, and
+        // `2^53` is the first integer outside JS's safe range, so accepting it
+        // here would have meant the two helpers disagreeing on one value.
+        const INVALID_SIZES = [
           "1e999",
+          "9007199254740992",
           "0.1",
           "-1",
           '"4096"',
-        ])("ignores a recorded size of %s, costing the cap", async (s) => {
+        ];
+
+        it.each(
+          INVALID_SIZES,
+        )("ignores a size of %s, costing the cap", async (s) => {
           const header = `{"v":2,"e":"redis","s":${s}}`;
           await stageTwo(`GQ2|${Buffer.byteLength(header)}|${header}`);
 

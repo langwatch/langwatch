@@ -446,10 +446,13 @@ local function gqPayloadSize(value)
         local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
         if ok and type(header) == "table" then
           local s = header["s"]
-          -- Finite non-negative integer or it is not a byte count. NaN fails
-          -- the >= 0 test; math.floor(inf) == inf, so infinity needs the
-          -- explicit math.huge bound.
-          if type(s) == "number" and s >= 0 and s < math.huge and s == math.floor(s) then
+          -- Non-negative integer within JS's safe-integer range, which is what
+          -- the TS twin's Number.isSafeInteger admits — the same set, or the
+          -- two ends of one budget disagree on a value. NaN fails the >= 0
+          -- test, and the upper bound is what rejects infinity: cjson decodes
+          -- 1e999 to inf, and math.floor(inf) == inf would pass an integer
+          -- check on its own.
+          if type(s) == "number" and s >= 0 and s <= ${Number.MAX_SAFE_INTEGER} and s == math.floor(s) then
             return s
           end
           if header["e"] ~= "j" then
