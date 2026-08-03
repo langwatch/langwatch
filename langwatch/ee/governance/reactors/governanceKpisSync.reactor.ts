@@ -2,7 +2,7 @@
 
 import {
   GOVERNANCE_ATTR,
-  GOVERNANCE_ORIGIN_KIND_VALUE,
+  isGovernanceOriginTrace,
 } from "@ee/governance/services/governanceAttributeKeys";
 import type {
   GovernanceKpiContribution,
@@ -31,10 +31,8 @@ const logger = createLogger(
  */
 export const GOVERNANCE_KPIS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
 
-const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
-const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
 export interface GovernanceKpisSyncReactorDeps {
   governanceKpisRepository: GovernanceKpisClickHouseRepository;
@@ -51,8 +49,8 @@ export interface GovernanceKpisSyncReactorDeps {
  * traceSummary fold. Reads the governance origin attributes off the
  * fold state (hoisted from spans into trace_summaries.Attributes by
  * the SPAN_ATTR_MAPPINGS edit shipped in step 3a / fd118131c). Traces
- * without `langwatch.origin.kind = "ingestion_source"` are skipped —
- * not governance traffic.
+ * without `langwatch.origin.kind = "ingestion_source"` are not
+ * governance traffic and are declined before a job is enqueued.
  *
  * Spec: specs/ai-gateway/governance/folds.feature
  */
@@ -61,6 +59,16 @@ export function createGovernanceKpisSyncReactor(
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "governanceKpisSync",
+    // Pre-enqueue (ADR-026). The origin check is a pure read of the same
+    // payload the handler receives, so deciding here is equivalent to the
+    // early-return below — except a non-governance trace never pays a
+    // serialize + queue round-trip for a job that would immediately no-op.
+    // Every trace in a project fans this reactor out, and governance traffic
+    // is a small slice of it. Kept in `handle` too: the queue is not the only
+    // caller (inline mode), a fail-open `shouldReact` may dispatch anyway,
+    // and an already-queued job may predate this gate.
+    shouldReact: (_event, context) =>
+      isGovernanceOriginTrace(context.foldState.attributes),
     options: {
       makeJobId: (payload) =>
         `governance-kpis-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
@@ -73,8 +81,7 @@ export function createGovernanceKpisSyncReactor(
     ): Promise<void> {
       const { tenantId, foldState } = context;
 
-      const originKind = foldState.attributes[ATTR_ORIGIN_KIND];
-      if (originKind !== ORIGIN_KIND_VALUE) {
+      if (!isGovernanceOriginTrace(foldState.attributes)) {
         return;
       }
 

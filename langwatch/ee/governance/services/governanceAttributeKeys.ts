@@ -39,3 +39,20 @@ export const GOVERNANCE_ATTR = {
 
 export type GovernanceAttrKey =
   (typeof GOVERNANCE_ATTR)[keyof typeof GOVERNANCE_ATTR];
+
+/**
+ * True when a trace's accumulated attributes mark it as governance
+ * traffic. Pure and synchronous so the governance reactors can use it
+ * as their `shouldReact` predicate (pre-enqueue) as well as their
+ * in-handler guard; see ADR-026.
+ *
+ * Tolerates a missing attribute bag: a fold state that has not
+ * accumulated any attributes yet is simply not governance traffic.
+ */
+export function isGovernanceOriginTrace(
+  attributes: Record<string, string> | undefined,
+): boolean {
+  return (
+    attributes?.[GOVERNANCE_ATTR.ORIGIN_KIND] === GOVERNANCE_ORIGIN_KIND_VALUE
+  );
+}

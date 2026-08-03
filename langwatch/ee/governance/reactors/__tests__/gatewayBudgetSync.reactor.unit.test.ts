@@ -169,6 +169,45 @@ describe("gatewayBudgetSync reactor", () => {
     });
   });
 
+  describe("pre-enqueue gate", () => {
+    describe("when the trace lacks either gateway attribute", () => {
+      it("declines before a job is packed", () => {
+        const { deps } = mockDeps(null, null, []);
+        const reactor = createGatewayBudgetSyncReactor(deps);
+
+        expect(reactor.shouldReact).toBeDefined();
+        expect(reactor.shouldReact!(event, ctx(createFoldState({})))).toBe(
+          false,
+        );
+        expect(
+          reactor.shouldReact!(
+            event,
+            ctx(createFoldState({ "langwatch.virtual_key_id": "vk-1" })),
+          ),
+        ).toBe(false);
+        expect(
+          reactor.shouldReact!(
+            event,
+            ctx(createFoldState({ "langwatch.gateway_request_id": "greq-1" })),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the trace carries both gateway attributes", () => {
+      it("accepts the event", () => {
+        const { deps } = mockDeps(null, null, []);
+        const reactor = createGatewayBudgetSyncReactor(deps);
+        const state = createFoldState({
+          "langwatch.virtual_key_id": "vk-1",
+          "langwatch.gateway_request_id": "greq-1",
+        });
+
+        expect(reactor.shouldReact!(event, ctx(state))).toBe(true);
+      });
+    });
+  });
+
   describe("when the VK is unknown", () => {
     it("logs + skips without writing to CH", async () => {
       const { deps, insertDebit } = mockDeps(null, null, []);
