@@ -1305,7 +1305,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       stagedJobId,
                       failStreak,
                       threshold: this.quarantineFailStreakThreshold,
-                      error: error.message,
+                      error,
                     },
                     "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
                   );
@@ -1466,7 +1466,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     attempt,
                     maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
                     backoffMs,
-                    error: error.message,
+                    // The whole Error, not `error.message`: the serializer emits
+                    // the stack, and for a handler crash the stack IS the
+                    // diagnosis — a bare "undefined is not a function" names no
+                    // file and no line, and the queue is the only place that
+                    // ever sees the throw.
+                    error,
                   },
                   "Job attempt failed, re-staged with backoff",
                 );
@@ -1483,7 +1488,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       stagedJobId,
                       attempt,
                       errorCategory: category,
-                      error: error.message,
+                      error,
                     },
                     "Job failed with non-retryable error, skipping retries",
                   );
@@ -1811,7 +1816,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
         stagedJobId,
         restagedAs: newStagedJobId,
-        error: lastError?.message,
+        error: lastError,
       },
       "Group blocked after exhausted retries, job re-staged",
     );
@@ -1959,9 +1964,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         envelopeVersion: descriptor.version,
         blobId: descriptor.blobId,
         bodyPreserved,
+        // Redacted text, not the raw Error: drop errors can quote storage
+        // URIs, and the stack's first line repeats the message — so both go
+        // through the same redaction.
         err: redactStorageUrisInText(
           err instanceof Error ? err.message : String(err),
         ),
+        errStack:
+          err instanceof Error && err.stack
+            ? redactStorageUrisInText(err.stack)
+            : undefined,
       },
       message,
     );
@@ -2250,7 +2262,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.logger.error(
         {
           queueName: this.queueName,
-          error: error instanceof Error ? error.message : String(error),
+          error,
           queueIdle: this.processingQueue.idle(),
           dispatcherActive: this.dispatcher != null,
         },
