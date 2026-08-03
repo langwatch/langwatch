@@ -2144,10 +2144,10 @@ Response: `{ "virtual_key": {...} }`. No secret.
 ### Spend
 
 ```
-GET /virtual-keys/:id/spend?from=2026-07-01T00:00:00Z&to=2026-07-15T00:00:00Z
+GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
 ```
 
-Requires `gatewayUsage:view`. Both window params are optional; the default window is the current UTC calendar month. Reads the same cost path (`trace_summaries`) the dashboard reads, so this number and the UI agree by construction.
+Requires `gatewayUsage:view`. `from` and `to` are epoch milliseconds, the same unit every spend endpoint takes. Both are optional; the default window is the current UTC calendar month. The echoed `window` uses the same unit, so a response can be fed straight back as the next request. Reads the same cost path (`trace_summaries`) the dashboard reads, so this number and the UI agree by construction.
 
 Response:
 
@@ -2156,7 +2156,7 @@ Response:
   "virtual_key_id": "vk_01HZX...",
   "spent_usd": "12.4531",
   "requests": 1841,
-  "window": { "from": "2026-07-01T00:00:00.000Z", "to": "2026-07-15T00:00:00.000Z" }
+  "window": { "from": 1782950400000, "to": 1784160000000 }
 }
 ```
 

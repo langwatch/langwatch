@@ -1387,6 +1387,8 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       const body = await res.json();
       expect(body.spent_usd).toBe("0");
       expect(body.requests).toBe(0);
+      // Epoch milliseconds, the unit every other spend endpoint speaks.
+      expect(typeof body.window.from).toBe("number");
       expect(new Date(body.window.from).getUTCDate()).toBe(1);
     });
 
@@ -1422,11 +1424,35 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     /** @scenario The spend read validates its window */
     it("refuses an inverted window", async () => {
       const vk = await createVk({ name: `windowed-${suffix}` });
+      const id = vk.body.virtual_key.id;
+      const from = Date.UTC(2026, 1, 1);
+      const to = Date.UTC(2026, 0, 1);
       const res = await app.request(
-        `/api/gateway/v1/virtual-keys/${vk.body.virtual_key.id}/spend?from=2026-02-01T00:00:00Z&to=2026-01-01T00:00:00Z`,
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=${from}&to=${to}`,
         { headers: legacyAuth() },
       );
       expect(res.status).toBe(400);
+    });
+
+    /** @scenario The spend window is epoch milliseconds, like every spend endpoint */
+    it("takes epoch-ms and echoes a window it would accept back", async () => {
+      const vk = await createVk({ name: `epoch-window-${suffix}` });
+      const id = vk.body.virtual_key.id;
+      const from = Date.UTC(2026, 6, 1);
+      const to = Date.UTC(2026, 6, 15);
+      const res = await app.request(
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=${from}&to=${to}`,
+        { headers: legacyAuth() },
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).window).toEqual({ from, to });
+
+      // The ISO strings this route used to take are no longer a window.
+      const iso = await app.request(
+        `/api/gateway/v1/virtual-keys/${id}/spend?from=2026-07-01T00:00:00Z`,
+        { headers: legacyAuth() },
+      );
+      expect(iso.status).toBe(400);
     });
 
     /** @scenario Spend for an unknown key is a 404, not a zero */

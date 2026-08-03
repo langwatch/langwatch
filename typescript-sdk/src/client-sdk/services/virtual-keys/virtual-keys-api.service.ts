@@ -97,7 +97,8 @@ export interface VirtualKeySpendSummary {
   virtual_key_id: string;
   spent_usd: string;
   requests: number;
-  window: { from: string; to: string };
+  /** Epoch milliseconds, the unit every spend surface takes and returns. */
+  window: { from: number; to: number };
 }
 
 export class VirtualKeysApiError extends Error {
@@ -234,17 +235,18 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Aggregate spend for one key. Defaults to the current UTC calendar
-   * month server-side. Reads the same cost path the dashboard reads, so
-   * this number and the UI agree by construction.
+   * Aggregate spend for one key over a window in epoch milliseconds.
+   * Defaults to the current UTC calendar month server-side. Reads the same
+   * cost path the dashboard reads, so this number and the UI agree by
+   * construction.
    */
   async spend(
     id: string,
-    window?: { from?: string; to?: string },
+    window?: { from?: number; to?: number },
   ): Promise<VirtualKeySpendSummary> {
     const params = new URLSearchParams();
-    if (window?.from) params.set("from", window.from);
-    if (window?.to) params.set("to", window.to);
+    if (window?.from !== undefined) params.set("from", String(window.from));
+    if (window?.to !== undefined) params.set("to", String(window.to));
     const query = params.size > 0 ? `?${params.toString()}` : "";
     return this.request<VirtualKeySpendSummary>(
       `read virtual key spend "${id}"`,

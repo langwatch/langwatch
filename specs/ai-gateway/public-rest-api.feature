@@ -270,6 +270,17 @@ Feature: Public REST API — /api/gateway/v1/*
     # and not a contract; the gateway config payload and the governance
     # webhooks already published lowercase, and this surface was the outlier.
 
+  @integration @rest
+  Scenario: The spend window is epoch milliseconds, like every spend endpoint
+    # This route took ISO-8601 while every other spend endpoint took epoch-ms,
+    # so one reconciliation script had to hold two time formats for the same
+    # concept.
+    When I send `GET /virtual-keys/{id}/spend?from={epochMs}&to={epochMs}`
+    Then the response status is 200
+    And the echoed `window` is in the same unit, so it can be sent straight back
+    When I send the ISO-8601 form this route used to take
+    Then the response status is 400
+
   @integration @rest @budgets
   Scenario: One budget can be read on its own
     # The surface could list budgets and mutate one, but never read one. An

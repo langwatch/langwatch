@@ -11,6 +11,27 @@ export interface VirtualKeySpendOptions {
 }
 
 /**
+ * A `--from` / `--to` flag as the epoch milliseconds the API takes.
+ *
+ * The flag stays human: a date or timestamp anyone would type, or the epoch
+ * value itself. Only the wire is strict about the unit.
+ */
+function parseWindowBound(
+  flag: string,
+  value: string | undefined,
+): number | undefined {
+  if (value === undefined) return undefined;
+  const asEpoch = Number(value);
+  const ms = Number.isFinite(asEpoch) ? asEpoch : Date.parse(value);
+  if (!Number.isFinite(ms)) {
+    throw new Error(
+      `${flag} must be a date or epoch milliseconds, got "${value}"`,
+    );
+  }
+  return Math.trunc(ms);
+}
+
+/**
  * Aggregate spend for one key over a window (default: the current UTC
  * calendar month). The server reads the same cost path the dashboard
  * reads, so this number and the UI column agree by construction — the
@@ -28,8 +49,8 @@ export const virtualKeySpendCommand = async (
 
   try {
     const summary = await service.spend(id, {
-      from: options.from,
-      to: options.to,
+      from: parseWindowBound("--from", options.from),
+      to: parseWindowBound("--to", options.to),
     });
 
     spinner.succeed(`Spend for ${chalk.cyan(id)}`);

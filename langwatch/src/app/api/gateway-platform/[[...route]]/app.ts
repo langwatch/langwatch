@@ -176,7 +176,24 @@ const spendSummaryDtoSchema = z.object({
   virtual_key_id: z.string(),
   spent_usd: z.string(),
   requests: z.number().int(),
-  window: z.object({ from: z.string(), to: z.string() }),
+  /** Epoch milliseconds, the unit every spend surface takes and returns. */
+  window: z.object({
+    from: z.number().int(),
+    to: z.number().int(),
+  }),
+});
+
+/**
+ * The spend window, in epoch milliseconds.
+ *
+ * This route used to take ISO-8601 strings while every other spend endpoint
+ * took epoch-ms integers, so one reconciliation script had to hold two time
+ * formats for the same concept. The echoed `window` is in the same unit as the
+ * input, so a caller can feed a response straight back as the next request.
+ */
+const vkSpendWindowSchema = z.object({
+  from: z.coerce.number().int().positive().safe().optional(),
+  to: z.coerce.number().int().positive().safe().optional(),
 });
 
 const cacheRuleMatchersSchema = z
@@ -801,7 +818,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
   describeRoute({
     summary: "Read a virtual key's spend",
     description:
-      "Aggregate spend and request count for one key over a window (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
+      "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -828,23 +845,20 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const windowParse = z
-      .object({
-        from: z.string().datetime({ offset: true }).optional(),
-        to: z.string().datetime({ offset: true }).optional(),
-      })
-      .safeParse({
-        from: c.req.query("from"),
-        to: c.req.query("to"),
-      });
+    const windowParse = vkSpendWindowSchema.safeParse({
+      from: c.req.query("from"),
+      to: c.req.query("to"),
+    });
     if (!windowParse.success) {
       return validationErrorResponse(c, windowParse.error);
     }
     const now = new Date();
-    const fromDate = windowParse.data.from
-      ? new Date(windowParse.data.from)
-      : startOfCurrentMonthUTC(now);
-    const toDate = windowParse.data.to ? new Date(windowParse.data.to) : now;
+    const fromDate =
+      windowParse.data.from !== undefined
+        ? new Date(windowParse.data.from)
+        : startOfCurrentMonthUTC(now);
+    const toDate =
+      windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
     if (fromDate.getTime() >= toDate.getTime()) {
       return errorResponse(c, {
         status: 400,
@@ -895,7 +909,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       // genuinely spent nothing, so zero is the honest render.
       spent_usd: row?.spentUsd ?? "0",
       requests: row?.requests ?? 0,
-      window: { from: fromDate.toISOString(), to: toDate.toISOString() },
+      window: { from: fromDate.getTime(), to: toDate.getTime() },
     });
   },
 );
