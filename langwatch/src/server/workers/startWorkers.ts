@@ -318,6 +318,8 @@ async function bootMetricsServer(
       await thread.terminate();
     });
   } catch (error) {
+    // The fallback server has no heartbeat consumer, so stop stamping it.
+    clearInterval(heartbeatTimer);
     logger.warn(
       { error },
       "liveness thread failed to start; serving metrics/liveness on the main loop",
