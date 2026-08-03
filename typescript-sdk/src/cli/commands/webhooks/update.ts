@@ -82,7 +82,7 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Enabling webhook endpoint...").start();
   try {
-    const endpoint = await service.update(id, { status: "ACTIVE" });
+    const endpoint = await service.update(id, { status: "active" });
     spinner.succeed(`Endpoint ${endpoint.id} is active`);
     return {
       data: endpoint,
@@ -103,7 +103,7 @@ export const disableWebhookCommand = async (id: string): Promise<CommandResult |
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Disabling webhook endpoint...").start();
   try {
-    const endpoint = await service.update(id, { status: "DISABLED" });
+    const endpoint = await service.update(id, { status: "disabled" });
     spinner.succeed(`Endpoint ${endpoint.id} disabled (deliveries drain without sending)`);
     return {
       data: endpoint,

@@ -25,6 +25,7 @@ import {
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import { handleWebhookApiError } from "./error-handler";
@@ -66,6 +67,14 @@ async function requireWebhookPlan(c: Context, next: Next): Promise<void> {
   await next();
 }
 
+// ── Wire enums ──────────────────────────────────────────────────────────
+// Every enum this surface publishes and accepts is lower_snake_case, input
+// AND output, with no dual-casing tolerance: the stored SCREAMING_SNAKE is
+// Prisma's convention, not a contract, and `toWireEnum` / `toStoredEnum`
+// translate at this seam in both directions.
+
+const endpointStatusSchema = z.enum(["active", "disabled"]);
+
 const deliveryControlsSchema = {
   max_batch_size: z.number().int().optional(),
   max_batch_delay_ms: z.number().int().optional(),
@@ -85,7 +94,7 @@ const updateEndpointSchema = z.object({
     .min(1)
     .max(100)
     .optional(),
-  status: z.enum(["ACTIVE", "DISABLED"]).optional(),
+  status: endpointStatusSchema.optional(),
   ...deliveryControlsSchema,
 });
 
@@ -122,7 +131,7 @@ function endpointResponse(endpoint: {
     id: endpoint.id,
     url: endpoint.url,
     enabled_events: endpoint.enabledEvents,
-    status: endpoint.status,
+    status: toWireEnum(endpoint.status),
     disabled_reason: endpoint.disabledReason,
     disabled_at: endpoint.disabledAt?.toISOString() ?? null,
     failing_since: endpoint.failingSince?.toISOString() ?? null,
@@ -239,7 +248,7 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   requireWebhookPlan,
   describeRoute({
     description:
-      "Update a webhook endpoint's url, event subscriptions, or status (ACTIVE re-enables, DISABLED pauses; re-enabling does not re-send the gap, replay covers it)",
+      "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
   }),
   zValidator("json", updateEndpointSchema),
   async (c) => {
@@ -267,12 +276,13 @@ secured.access(requires("webhookEndpoints:manage")).patch(
           organizationId: organization.id,
           endpointId,
         });
-    if (body.status === "DISABLED" && endpoint.status === "ACTIVE") {
+    const requestedStatus = body.status && toStoredEnum(body.status);
+    if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
       endpoint = await endpoints.disable({
         organizationId: organization.id,
         endpointId,
       });
-    } else if (body.status === "ACTIVE" && endpoint.status === "DISABLED") {
+    } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
       endpoint = await endpoints.enable({
         organizationId: organization.id,
         endpointId,
@@ -446,7 +456,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     });
     return c.json({
       data: {
-        status: report.status,
+        status: toWireEnum(report.status),
         disabled_reason: report.disabledReason,
         failing_since: report.failingSince?.toISOString() ?? null,
         last_success_at: report.lastSuccessAt?.toISOString() ?? null,

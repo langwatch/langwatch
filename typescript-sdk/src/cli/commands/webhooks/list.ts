@@ -28,7 +28,7 @@ export const listWebhooksCommand = async (): Promise<CommandResult | void> => {
           data: endpoints.map((e) => ({
             ID: e.id,
             URL: e.url.length > 45 ? `${e.url.slice(0, 42)}...` : e.url,
-            Status: e.status === "ACTIVE" ? chalk.green("active") : chalk.red(`disabled${e.disabled_reason ? ` (${e.disabled_reason})` : ""}`),
+            Status: e.status === "active" ? chalk.green("active") : chalk.red(`disabled${e.disabled_reason ? ` (${e.disabled_reason})` : ""}`),
             Events: e.enabled_events.length > 2 ? `${e.enabled_events.slice(0, 2).join(", ")} +${e.enabled_events.length - 2}` : e.enabled_events.join(", "),
             "Last success": e.last_success_at ? new Date(e.last_success_at).toLocaleString() : chalk.gray("never"),
           })),

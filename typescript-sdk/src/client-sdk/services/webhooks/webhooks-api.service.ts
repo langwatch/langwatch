@@ -9,7 +9,7 @@ export interface WebhookEndpointSummary {
   max_batch_delay_ms: number;
   max_in_flight: number;
   enabled_events: string[];
-  status: "ACTIVE" | "DISABLED";
+  status: "active" | "disabled";
   disabled_reason: string | null;
   disabled_at: string | null;
   failing_since: string | null;
@@ -44,7 +44,7 @@ export interface WebhookTestResult {
 }
 
 export interface WebhookEndpointHealth {
-  status: "ACTIVE" | "DISABLED";
+  status: "active" | "disabled";
   disabled_reason: string | null;
   failing_since: string | null;
   last_success_at: string | null;
@@ -180,7 +180,7 @@ export class WebhooksApiService {
     input: {
       url?: string;
       enabledEvents?: string[];
-      status?: "ACTIVE" | "DISABLED";
+      status?: "active" | "disabled";
       maxBatchSize?: number;
       maxBatchDelayMs?: number;
       maxInFlight?: number;

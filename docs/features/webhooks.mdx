@@ -21,7 +21,7 @@ An endpoint belongs to your **organization** and carries:
 |---|---|
 | `url` | Where batches are POSTed. HTTPS required (see [self-hosted egress](/self-hosting/webhooks) for the local-development exception). |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
-| `status` | `ACTIVE` or `DISABLED`. Disabled endpoints receive nothing; sources keep accruing. |
+| `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
@@ -296,12 +296,12 @@ Your receiver acks with any `2xx`. The delivery classifier:
 
 Retries follow a multi-day ladder: **1m, 5m, 30m, 2h, 6h, 12h, then every 12h**, 11 attempts in total, keeping the last retry inside 72 hours of the first failure. Batches retry independently per endpoint, so one dead endpoint never delays another.
 
-After **72 hours of unbroken failures** the endpoint flips to `DISABLED` with `disabled_reason: "auto_failures_72h"` and delivery stops. Sources keep accruing the whole time: disabling delivery never loses events.
+After **72 hours of unbroken failures** the endpoint flips to `disabled` with `disabled_reason: "auto_failures_72h"` and delivery stops. Sources keep accruing the whole time: disabling delivery never loses events.
 
 To recover:
 
 1. Fix the receiver.
-2. Re-enable: `PATCH /endpoints/:id {"status": "ACTIVE"}`.
+2. Re-enable: `PATCH /endpoints/:id {"status": "active"}`.
 3. Re-enabling does **not** re-send the gap. Replay it explicitly: for spend events, [`POST /api/gateway/v1/spend-events/replay`](/ai-gateway/billing-events#replay) with the gap window and this endpoint's id.
 
 ```mermaid
@@ -332,7 +332,7 @@ Three per-endpoint knobs, validated server-side against fixed bounds; out-of-ran
 ```json
 {
   "data": {
-    "status": "ACTIVE",
+    "status": "active",
     "disabled_reason": null,
     "failing_since": null,
     "last_success_at": "2026-07-27T14:02:58.000Z",

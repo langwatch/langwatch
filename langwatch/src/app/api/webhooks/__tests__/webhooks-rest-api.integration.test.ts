@@ -270,13 +270,13 @@ describe("Feature: Webhook endpoints REST API", () => {
       {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ status: "DISABLED" }),
+        body: JSON.stringify({ status: "disabled" }),
       },
     );
     const disabled = (await disableRes.json()) as {
       data: { status: string; disabled_reason: string };
     };
-    expect(disabled.data.status).toBe("DISABLED");
+    expect(disabled.data.status).toBe("disabled");
     expect(disabled.data.disabled_reason).toBe("manual");
 
     const enableRes = await app.request(
@@ -284,11 +284,31 @@ describe("Feature: Webhook endpoints REST API", () => {
       {
         method: "PATCH",
         headers: headers(),
-        body: JSON.stringify({ status: "ACTIVE" }),
+        body: JSON.stringify({ status: "active" }),
       },
     );
     const enabled = (await enableRes.json()) as { data: { status: string } };
-    expect(enabled.data.status).toBe("ACTIVE");
+    expect(enabled.data.status).toBe("active");
+  });
+
+  it("refuses the stored SCREAMING_SNAKE spelling of status", async () => {
+    planHasWebhookEndpoints = true;
+    const createRes = await app.request("/api/webhooks/v1/endpoints", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        url: "https://example.com/hooks/casing",
+        enabled_events: ["gateway.*"],
+      }),
+    });
+    const { data } = (await createRes.json()) as { data: { id: string } };
+
+    const res = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ status: "DISABLED" }),
+    });
+    expect(res.status).toBe(400);
   });
 
   /** @scenario Without the plan flag the surface refuses politely */
@@ -357,7 +377,7 @@ describe("Feature: Webhook endpoints REST API", () => {
         sends_per_minute: number;
       };
     };
-    expect(body.data.status).toBe("ACTIVE");
+    expect(body.data.status).toBe("active");
     expect(body.data.oldest_undelivered_age_ms).toBeNull();
     expect(body.data.dlq_depth).toBe(0);
     expect(body.data.sends_per_minute).toBe(0);

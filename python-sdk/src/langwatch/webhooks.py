@@ -104,7 +104,7 @@ class WebhooksFacade:
 
     def update(self, endpoint_id: str, **fields: Any) -> Dict[str, Any]:
         """Partial update: url, enabled_events, description, status
-        (ACTIVE | DISABLED), and the delivery controls (max_batch_size,
+        (active | disabled), and the delivery controls (max_batch_size,
         max_batch_delay_ms, max_in_flight, each within server bounds)."""
         response = self._http().patch(
             f"/api/webhooks/v1/endpoints/{_quote(endpoint_id)}", json=fields
