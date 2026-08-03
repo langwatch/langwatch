@@ -298,6 +298,11 @@ describe("MetricDataPointClickHouseRepository", () => {
       await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
 
       const successorSeeks = query.mock.calls[0]![0].query;
+      // The bound is what encodes "successor" — an ascending order with a `<`
+      // bound would still read backwards, so pin the direction of both.
+      expect(successorSeeks).toContain(
+        "metric_data_points.TimeUnixMs > {time0:DateTime64(3)}",
+      );
       expect(successorSeeks).toContain(
         "ORDER BY metric_data_points.TimeUnixMs",
       );

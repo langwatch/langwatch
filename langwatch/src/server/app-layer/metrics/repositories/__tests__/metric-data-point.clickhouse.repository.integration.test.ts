@@ -270,6 +270,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
   // is a counter reset, so the fold's dependency on each sample's predecessor
   // is live rather than incidental.
   const values = [10, 15, 18, 26, 31, 4, 9, 14, 22, 27, 33, 40];
+  // Shared, because the read-counting block below compares its own rollups
+  // against this series rather than writing a second copy of them.
+  const chunkSeriesId = "d".repeat(64);
 
   function samples(seriesId: string): CanonicalMetricDataPoint[] {
     return values.map((value, index) =>
@@ -291,7 +294,6 @@ describe("given a cumulative series long enough to span several rollup buckets",
     // Both series use the same timestamps, so the fixture derives the same
     // point ids for both. That is deliberate: a point id is only unique within
     // its series, and the chunk path reads many series in one query.
-    const chunkSeriesId = "d".repeat(64);
     const perPointSeriesId = "e".repeat(64);
 
     beforeAll(async () => {
@@ -351,9 +353,10 @@ describe("given a cumulative series long enough to span several rollup buckets",
     });
 
     it("still produces the same rollups as the uncounted chunk", async () => {
-      expect(await readRollups(countedSeriesId)).toEqual(
-        await readRollups("d".repeat(64)),
-      );
+      const counted = await readRollups(countedSeriesId);
+
+      expect(counted).toHaveLength(4);
+      expect(counted).toEqual(await readRollups(chunkSeriesId));
     });
   });
 });
