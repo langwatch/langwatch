@@ -1290,8 +1290,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   // Carried into handleExhaustedRetries as the group's stored
                   // error so /ops shows WHY it was blocked (a run of failures),
                   // not just the last job's error.
+                  // The handler error rides along as `cause` so the blocked
+                  // record can persist the throwing location — the quarantine
+                  // wrapper's own stack starts in queue control flow and names
+                  // nothing an investigator can use.
                   quarantineError = new Error(
                     `Poison guard: group quarantined after ${failStreak} consecutive failures (threshold ${this.quarantineFailStreakThreshold}) with no success. Last error: ${error.message}. Inspect the staged jobs, then unblock the group.`,
+                    { cause: error },
                   );
                   gqGroupsPoisonParkedTotal.inc({
                     queue_name: this.queueName,
@@ -1305,7 +1310,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       stagedJobId,
                       failStreak,
                       threshold: this.quarantineFailStreakThreshold,
-                      error: error.message,
+                      error,
                     },
                     "Group quarantined after a run of failures with no success; blocking it to protect the shared queue",
                   );
@@ -1466,7 +1471,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     attempt,
                     maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
                     backoffMs,
-                    error: error.message,
+                    // The whole Error, not `error.message`: the serializer emits
+                    // the stack, and for a handler crash the stack IS the
+                    // diagnosis — a bare "undefined is not a function" names no
+                    // file and no line, and the queue is the only place that
+                    // ever sees the throw.
+                    error,
                   },
                   "Job attempt failed, re-staged with backoff",
                 );
@@ -1483,7 +1493,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                       stagedJobId,
                       attempt,
                       errorCategory: category,
-                      error: error.message,
+                      error,
                     },
                     "Job failed with non-retryable error, skipping retries",
                   );
@@ -1792,6 +1802,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       groupId,
     });
 
+    // The quarantine breaker wraps the handler error to explain WHY the group
+    // is blocked; the wrapper's stack is queue control flow. The persisted
+    // stack must be the handler's — that is the only place the throwing
+    // location survives once the job stops retrying.
+    const handlerError =
+      lastError?.cause instanceof Error ? lastError.cause : lastError;
+
     // Atomically: block the group, re-stage the job, update ready score, store error
     await this.scripts.restageAndBlock({
       groupId,
@@ -1799,7 +1816,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       score,
       jobDataJson,
       errorMessage: lastError?.message,
-      errorStack: lastError?.stack,
+      errorStack: handlerError?.stack,
     });
 
     gqGroupsBlockedTotal.inc(routingLabels);
@@ -1811,7 +1828,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
         stagedJobId,
         restagedAs: newStagedJobId,
-        error: lastError?.message,
+        error: lastError,
+        // Explicit rather than relying on the serializer to walk the cause
+        // chain: when the quarantine breaker wrapped the handler error, this
+        // is the stack that names the throwing line.
+        handlerStack:
+          handlerError === lastError ? undefined : handlerError?.stack,
       },
       "Group blocked after exhausted retries, job re-staged",
     );
@@ -1959,9 +1981,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         envelopeVersion: descriptor.version,
         blobId: descriptor.blobId,
         bodyPreserved,
+        // Redacted text, not the raw Error: drop errors can quote storage
+        // URIs, and the stack's first line repeats the message — so both go
+        // through the same redaction.
         err: redactStorageUrisInText(
           err instanceof Error ? err.message : String(err),
         ),
+        errStack:
+          err instanceof Error && err.stack
+            ? redactStorageUrisInText(err.stack)
+            : undefined,
       },
       message,
     );
@@ -2250,7 +2279,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.logger.error(
         {
           queueName: this.queueName,
-          error: error instanceof Error ? error.message : String(error),
+          error,
           queueIdle: this.processingQueue.idle(),
           dispatcherActive: this.dispatcher != null,
         },

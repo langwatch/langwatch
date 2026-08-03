@@ -235,6 +235,39 @@ export function rollupRow({
   };
 }
 
+/**
+ * One of the three `Array(UInt64)` count columns, refusing to decode a row that
+ * does not carry it.
+ *
+ * These are the only fields `fromRaw` dereferences without a null check, so a
+ * row arriving without them used to surface as a bare
+ * `Cannot read properties of undefined (reading 'map')` — no column, no series,
+ * no query, and a stack the queue drops in favour of the message alone. Naming
+ * the column and the row turns the next occurrence into evidence instead of a
+ * guess. It stays a plain `Error`: nothing here is customer-actionable, so it
+ * degrades to a generic failure with a trace id at the boundary and the queue
+ * retries it on the normal backoff (dev/docs/best_practices/error-handling.md).
+ */
+function countsColumn({
+  row,
+  column,
+}: {
+  row: RawMetricRow;
+  column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
+}): string[] {
+  const counts = row[column];
+  if (!Array.isArray(counts)) {
+    const problem =
+      counts === undefined
+        ? `is missing the ${column} column`
+        : `carries a non-array ${typeof counts} in the ${column} column`;
+    throw new Error(
+      `metric_data_points row ${problem} (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
+    );
+  }
+  return counts.map(String);
+}
+
 export function fromRaw({
   row,
   organizationId,
@@ -277,14 +310,14 @@ export function fromRaw({
     min: row.Min,
     max: row.Max,
     explicitBounds: row.ExplicitBounds,
-    bucketCounts: row.BucketCounts.map(String),
+    bucketCounts: countsColumn({ row, column: "BucketCounts" }),
     exponentialScale: row.ExponentialScale,
     exponentialZeroThreshold: row.ExponentialZeroThreshold,
     zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
     positiveOffset: row.PositiveOffset,
-    positiveBucketCounts: row.PositiveBucketCounts.map(String),
+    positiveBucketCounts: countsColumn({ row, column: "PositiveBucketCounts" }),
     negativeOffset: row.NegativeOffset,
-    negativeBucketCounts: row.NegativeBucketCounts.map(String),
+    negativeBucketCounts: countsColumn({ row, column: "NegativeBucketCounts" }),
     summaryQuantilesJson: row.SummaryQuantilesJson,
     canonicalPayload: row.CanonicalPayload,
     canonicalSizeBytes: Number(row._size_bytes),
