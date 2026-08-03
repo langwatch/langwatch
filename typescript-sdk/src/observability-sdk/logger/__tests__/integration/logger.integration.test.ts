@@ -44,7 +44,7 @@ const TEST_GEN_AI_ATTRIBUTES = {
 
 describe("Logger Integration Tests", () => {
   const logRecordExporter = new InMemoryLogRecordExporter();
-  const logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+  const logRecordProcessor = new SimpleLogRecordProcessor({ exporter: logRecordExporter });
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   beforeEach(() => {

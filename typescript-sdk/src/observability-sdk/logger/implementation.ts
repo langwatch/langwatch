@@ -44,6 +44,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
     this.logger.emit(logRecord);
   }
 
+  enabled(options?: Parameters<Logger["enabled"]>[0]): boolean {
+    return this.logger.enabled(options);
+  }
+
   emitGenAISystemMessageEvent(
     body: LangWatchSpanGenAISystemMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
