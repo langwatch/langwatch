@@ -1281,6 +1281,24 @@ const presentations = {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",
   },
+  budget_not_found: {
+    title: "Budget not found",
+    describe: () => "It may have been archived by someone else.",
+  },
+  gateway_provider_bindings_gone: {
+    // A 410 whose copy only says "gone" leaves the reader stuck. The whole
+    // value of this refusal is naming where the capability moved to.
+    title: "Gateway provider bindings have moved",
+    describe: () =>
+      "Rate limits, rotation and fallback priority now live on the model provider itself, under the Advanced (Gateway) tab.",
+  },
+  invalid_cursor: {
+    // Restarting the walk silently would re-serve every row the caller already
+    // has, so this refuses instead; the copy says what to do about it.
+    title: "That page cursor isn't valid",
+    describe: () =>
+      "Start the list again from the beginning and follow next_cursor from there.",
+  },
   gateway_group_budget_unsupported: {
     // Refusing beats creating a cap that quietly means something else, so the
     // copy says what the budget would NOT have done — that is the whole reason
