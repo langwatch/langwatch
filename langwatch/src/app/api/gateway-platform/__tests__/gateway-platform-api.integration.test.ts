@@ -478,6 +478,27 @@ describe("gateway platform REST API (real PG + real CH)", () => {
     it("returns 401 without credentials", async () => {
       const res = await app.request("/api/gateway/v1/virtual-keys");
       expect(res.status).toBe(401);
+      // A refusal one layer beneath the handlers still answers the shape this
+      // family publishes, with the SAME code the org-scoped families under
+      // this prefix answer, so a caller writes exactly one error reader.
+      expect(await res.json()).toMatchObject({
+        error: { type: "unauthenticated", code: "missing_credentials" },
+      });
+    });
+
+    /** @scenario Every gateway platform refusal is the canonical envelope */
+    it("refuses at the API key ceiling in the canonical envelope", async () => {
+      const res = await createVk(
+        { name: "denied-by-ceiling" },
+        apiKeyAuth(viewerToken),
+      );
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        error: {
+          type: "permission_denied",
+          code: "api_key_permission_denied",
+        },
+      });
     });
 
     /** @scenario Provider binding routes are gone since the ModelProvider fold */
@@ -486,8 +507,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         headers: legacyAuth(),
       });
       expect(res.status).toBe(410);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        error: { type: "gone", code: "gateway_provider_bindings_gone" },
+      });
       // A 410 without a forwarding address is a dead end for SDK authors.
-      expect((await res.json()).message).toContain("model-providers");
+      expect(body.error.message).toContain("model-providers");
     });
 
     /** @scenario A viewer-scoped API key can list but not create virtual keys */

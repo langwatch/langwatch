@@ -74,6 +74,7 @@ export const API_ERROR_TYPE_BY_STATUS: Record<number, string> = {
   403: "permission_denied",
   404: "not_found",
   409: "conflict",
+  410: "gone",
   412: "precondition_failed",
   422: "unprocessable_entity",
   429: "rate_limited",

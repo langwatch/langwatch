@@ -147,6 +147,15 @@ Feature: Public REST API — /api/gateway/v1/*
     And the body is the canonical error envelope with code "internal_error"
     And the message names no table, host, or stack fragment
 
+  @integration @rest
+  Scenario: Every gateway platform refusal is the canonical envelope
+    When the API key ceiling refuses a create
+    Then the response status is 403
+    And the body is the canonical error envelope with type "permission_denied"
+    And error.code is "api_key_permission_denied"
+    # The ceiling refuses BENEATH the family's error handler, so it is the
+    # layer that most easily drifts back to a flat body.
+
   @integration @rest @rbac
   Scenario: Cross-org scopes are rejected
     When an org-admin API key requests a scope belonging to another organization
@@ -342,6 +351,8 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: Provider binding routes are gone since the ModelProvider fold
     When I send `GET /api/gateway/v1/providers`
     Then the response status is 410
+    And the body is the canonical error envelope with type "gone"
+    And error.code is "gateway_provider_bindings_gone"
     And the message points at /api/gateway-platform/v1/model-providers
 
   # ============================================================================

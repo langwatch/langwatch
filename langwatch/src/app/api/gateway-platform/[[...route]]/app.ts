@@ -71,7 +71,9 @@ import {
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { baseResponses } from "../../shared/base-responses";
+import { canonicalBaseResponses } from "../../shared/base-responses";
+import { requestTraceIds } from "../../shared/canonical-error";
+import { apiErrorBody, apiErrorSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -178,16 +180,6 @@ const cacheRuleDtoSchema = z.object({
   archived_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-});
-
-const errorSchema = z.object({
-  error: z.object({
-    type: z.string(),
-    code: z.string(),
-    message: z.string(),
-    /** Present when the refusal carries structured detail, e.g. `scopeKind`. */
-    meta: z.record(z.string(), z.unknown()).optional(),
-  }),
 });
 
 /**
@@ -415,19 +407,27 @@ const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
   TOO_MANY_REQUESTS: 429,
 };
 
-const ERROR_TYPE_BY_STATUS: Record<number, string> = {
-  400: "bad_request",
-  401: "unauthenticated",
-  403: "permission_denied",
-  404: "not_found",
-  409: "conflict",
-  412: "precondition_failed",
-  429: "rate_limited",
-};
+/**
+ * Answer `error` as the canonical envelope, with this route family's status.
+ *
+ * One helper for every refusal a handler raises, so a code path cannot
+ * hand-build a body that drifts from {@link apiErrorSchema}.
+ */
+function errorResponse(
+  c: GatewayContext,
+  args: {
+    status: ContentfulStatusCode;
+    code: string;
+    message: string;
+    meta?: Record<string, unknown>;
+  },
+): Response {
+  return c.json(apiErrorBody({ ...args, ...requestTraceIds(c) }), args.status);
+}
 
 /**
- * Map a service-layer TRPCError onto the REST error envelope. The service
- * messages follow the `snake_code: detail` convention, so the machine
+ * Map a service-layer TRPCError onto the canonical error envelope. The
+ * service messages follow the `snake_code: detail` convention, so the machine
  * code (`trace_project_required`, `group_budget_requires_clickhouse`, …)
  * survives onto the wire for SDKs to branch on. Anything that is not a
  * TRPCError is rethrown for the app-level error handler.
@@ -439,53 +439,35 @@ function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
   // instead of scraping a prefix off the message, which is what the
   // TRPCError branch below has to do.
   if (error instanceof HandledError) {
-    const status = error.httpStatus as ContentfulStatusCode;
-    return c.json(
-      {
-        error: {
-          type: ERROR_TYPE_BY_STATUS[status] ?? "internal_error",
-          code: error.code,
-          message: error.message,
-          // The copy deliberately names no ids -- a mismatched scope id
-          // belongs to another tenant -- so `meta` is where the caller
-          // learns WHICH of the scopes it sent was the foreign one.
-          ...(error.meta && Object.keys(error.meta).length > 0
-            ? { meta: error.meta }
-            : {}),
-        },
-      },
-      status,
-    );
+    return errorResponse(c, {
+      status: error.httpStatus as ContentfulStatusCode,
+      code: error.code,
+      message: error.message,
+      // The copy deliberately names no ids -- a mismatched scope id
+      // belongs to another tenant -- so `meta` is where the caller
+      // learns WHICH of the scopes it sent was the foreign one.
+      meta: error.meta,
+    });
   }
   if (!(error instanceof TRPCError)) throw error;
   const status = TRPC_HTTP_STATUS[error.code] ?? (500 as ContentfulStatusCode);
   const codeMatch = /^([a-z0-9_]+):/.exec(error.message);
-  return c.json(
-    {
-      error: {
-        type: ERROR_TYPE_BY_STATUS[status] ?? "internal_error",
-        code: codeMatch?.[1] ?? error.code.toLowerCase(),
-        message: error.message,
-      },
-    },
+  return errorResponse(c, {
     status,
-  );
+    code: codeMatch?.[1] ?? error.code.toLowerCase(),
+    message: error.message,
+  });
 }
 
 function validationErrorResponse(
   c: GatewayContext,
   error: z.ZodError,
 ): Response {
-  return c.json(
-    {
-      error: {
-        type: "bad_request",
-        code: "validation_error",
-        message: error.message,
-      },
-    },
-    400,
-  );
+  return errorResponse(c, {
+    status: 400,
+    code: "validation_error",
+    message: error.message,
+  });
 }
 
 type ScopeInput = {
@@ -530,7 +512,10 @@ function budgetFromWire(
   return parsed.data;
 }
 
-const secured = createProjectApp({ basePath: "/api/gateway/v1" });
+const secured = createProjectApp({
+  basePath: "/api/gateway/v1",
+  errorEnvelope: "canonical",
+});
 
 // ── Virtual keys ────────────────────────────────────────────────────────
 
@@ -542,7 +527,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
       "Returns every virtual key visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Ordered by creation time.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Visible virtual keys",
         content: {
@@ -573,7 +558,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       201: {
         description: "Virtual key created",
         content: {
@@ -590,13 +575,13 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       400: {
         description: "Validation error",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
       403: {
         description: "Caller lacks virtualKeys:manage at a requested scope",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -670,7 +655,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     summary: "Get virtual key",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Virtual key detail",
         content: {
@@ -682,7 +667,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
       404: {
         description: "Not found",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -713,7 +698,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       "Aggregate spend and request count for one key over a window (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Spend summary for the key",
         content: {
@@ -723,13 +708,13 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       404: {
         description: "Not found",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
       412: {
         description: "No spend source on this deployment",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -755,16 +740,11 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
       : startOfCurrentMonthUTC(now);
     const toDate = windowParse.data.to ? new Date(windowParse.data.to) : now;
     if (fromDate.getTime() >= toDate.getTime()) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "validation_error",
-            message: "`from` must be before `to`",
-          },
-        },
-        400,
-      );
+      return errorResponse(c, {
+        status: 400,
+        code: "validation_error",
+        message: "`from` must be before `to`",
+      });
     }
 
     const organizationId = await orgIdForProject(project.id);
@@ -784,17 +764,12 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
     // a confident zero would be indistinguishable from a zero-spend key.
     const spendRepo = spendRepoOrUndefined();
     if (!spendRepo) {
-      return c.json(
-        {
-          error: {
-            type: "precondition_failed",
-            code: "spend_source_unavailable",
-            message:
-              "spend_source_unavailable: this deployment has no ClickHouse spend source to read key spend from",
-          },
-        },
-        412,
-      );
+      return errorResponse(c, {
+        status: 412,
+        code: "spend_source_unavailable",
+        message:
+          "spend_source_unavailable: this deployment has no ClickHouse spend source to read key spend from",
+      });
     }
 
     const usage = GatewayUsageService.create({
@@ -827,7 +802,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
       "Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Updated",
         content: {
@@ -839,7 +814,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
       400: {
         description: "Validation error",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -932,7 +907,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
       "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Rotated",
         content: {
@@ -981,7 +956,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
       "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Disabled",
         content: {
@@ -1030,7 +1005,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
       "Reverses disable: the key returns to ACTIVE exactly as it was, including any rotation grace that was running. Idempotent.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Enabled",
         content: {
@@ -1074,7 +1049,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
       "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.",
     tags: ["Virtual Keys"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Revoked",
         content: {
@@ -1120,45 +1095,23 @@ secured.access(apiKeyPermission("gatewayProviders:view")).get(
       "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
     tags: ["Providers"],
     responses: {
-      ...baseResponses,
-      200: {
-        description: "Provider bindings",
+      ...canonicalBaseResponses,
+      410: {
+        description:
+          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                data: z.array(
-                  z.object({
-                    id: z.string(),
-                    model_provider_id: z.string(),
-                    model_provider_name: z.string(),
-                    slot: z.string(),
-                    rate_limit_rpm: z.number().nullable(),
-                    rate_limit_tpm: z.number().nullable(),
-                    rate_limit_rpd: z.number().nullable(),
-                    rotation_policy: z.string(),
-                    fallback_priority_global: z.number().nullable(),
-                    health_status: z.string(),
-                    disabled_at: z.string().nullable(),
-                    created_at: z.string(),
-                  }),
-                ),
-              }),
-            ),
-          },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
   }),
   async (c) => {
-    return c.json(
-      {
-        error: "gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
-      },
-      410,
-    );
+    return errorResponse(c, {
+      status: 410,
+      code: "gateway_provider_bindings_gone",
+      message:
+        "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
+    });
   },
 );
 
@@ -1170,30 +1123,23 @@ secured.access(apiKeyPermission("gatewayProviders:manage")).post(
       "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
     tags: ["Providers"],
     responses: {
-      ...baseResponses,
-      201: {
-        description: "Binding created",
+      ...canonicalBaseResponses,
+      410: {
+        description:
+          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                provider_credential: z.object({ id: z.string() }),
-              }),
-            ),
-          },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
   }),
   async (c) => {
-    return c.json(
-      {
-        error: "gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
-      },
-      410,
-    );
+    return errorResponse(c, {
+      status: 410,
+      code: "gateway_provider_bindings_gone",
+      message:
+        "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
+    });
   },
 );
 
@@ -1207,7 +1153,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
     tags: ["Budgets"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Budgets for the organization",
         content: {
@@ -1224,7 +1170,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       400: {
         description: "Invalid scope_type filter",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -1275,7 +1221,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
     tags: ["Budgets"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       201: {
         description: "Budget created",
         content: {
@@ -1287,7 +1233,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
       400: {
         description: "Validation error",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -1331,7 +1277,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
       "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
     tags: ["Budgets"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Updated",
         content: {
@@ -1379,7 +1325,7 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
       "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
     tags: ["Budgets"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Archived",
         content: {
@@ -1417,7 +1363,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
       "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on MANUAL windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
     tags: ["Budgets"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Reset",
         content: {
@@ -1465,30 +1411,23 @@ secured.access(apiKeyPermission("gatewayProviders:update")).patch(
       "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
     tags: ["Providers"],
     responses: {
-      ...baseResponses,
-      200: {
-        description: "Updated",
+      ...canonicalBaseResponses,
+      410: {
+        description:
+          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                provider_credential: z.object({ id: z.string() }),
-              }),
-            ),
-          },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
   }),
   async (c) => {
-    return c.json(
-      {
-        error: "gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
-      },
-      410,
-    );
+    return errorResponse(c, {
+      status: 410,
+      code: "gateway_provider_bindings_gone",
+      message:
+        "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
+    });
   },
 );
 
@@ -1500,33 +1439,23 @@ secured.access(apiKeyPermission("gatewayProviders:manage")).delete(
       "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
     tags: ["Providers"],
     responses: {
-      ...baseResponses,
-      200: {
-        description: "Disabled",
+      ...canonicalBaseResponses,
+      410: {
+        description:
+          "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
         content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                provider_credential: z.object({
-                  id: z.string(),
-                  disabled_at: z.string().nullable(),
-                }),
-              }),
-            ),
-          },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
   }),
   async (c) => {
-    return c.json(
-      {
-        error: "gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
-      },
-      410,
-    );
+    return errorResponse(c, {
+      status: 410,
+      code: "gateway_provider_bindings_gone",
+      message:
+        "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
+    });
   },
 );
 
@@ -1540,7 +1469,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
       "Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.",
     tags: ["Cache Rules"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Cache rules for the organisation",
         content: {
@@ -1568,7 +1497,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
       "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
     tags: ["Cache Rules"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "The rule",
         content: {
@@ -1586,16 +1515,11 @@ secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
     const service = GatewayCacheRuleService.create(prisma);
     const row = await service.get(id, organizationId);
     if (!row) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "cache_rule_not_found",
-            message: `cache rule ${id} not found`,
-          },
-        },
-        404,
-      );
+      return errorResponse(c, {
+        status: 404,
+        code: "cache_rule_not_found",
+        message: `cache rule ${id} not found`,
+      });
     }
     return c.json({ cache_rule: toCacheRuleDto(row) });
   },
@@ -1609,7 +1533,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
       "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
     tags: ["Cache Rules"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       201: {
         description: "Created",
         content: {
@@ -1621,7 +1545,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
       400: {
         description: "Validation error",
         content: {
-          "application/json": { schema: resolver(errorSchema) },
+          "application/json": { schema: resolver(apiErrorSchema) },
         },
       },
     },
@@ -1659,7 +1583,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
       "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
     tags: ["Cache Rules"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Updated",
         content: {
@@ -1705,7 +1629,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
       "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
     tags: ["Cache Rules"],
     responses: {
-      ...baseResponses,
+      ...canonicalBaseResponses,
       200: {
         description: "Archived",
         content: {
