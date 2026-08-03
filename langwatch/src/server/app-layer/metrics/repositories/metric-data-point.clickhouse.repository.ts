@@ -5,7 +5,10 @@ import {
   affectedRollupBuckets,
   buildMetricRollups,
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup";
-import { comparePoints } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
+import {
+  comparePoints,
+  type MetricSequencePoint,
+} from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
 import type {
   CanonicalMetricDataPoint,
@@ -21,11 +24,14 @@ import type {
   SeriesTotalByPointAttribute,
 } from "./metric-data-point.repository";
 import {
+  AUTHORITATIVE_SELECT,
   fromRaw,
-  RAW_SELECT,
+  fromSeekRow,
   type RawMetricRow,
   rawRow,
   rollupRow,
+  SEEK_SELECT,
+  type SeekMetricRow,
   seriesRow,
   usageEstimateRow,
   validatePoint,
@@ -53,10 +59,10 @@ function chunked<T>(items: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-function groupBySeries(
-  points: readonly CanonicalMetricDataPoint[],
-): Map<string, CanonicalMetricDataPoint[]> {
-  const bySeries = new Map<string, CanonicalMetricDataPoint[]>();
+function groupBySeries<T extends { seriesId: string }>(
+  points: readonly T[],
+): Map<string, T[]> {
+  const bySeries = new Map<string, T[]>();
   for (const point of points) {
     const existing = bySeries.get(point.seriesId);
     if (existing) existing.push(point);
@@ -81,7 +87,7 @@ function affectedBucketsBySeries({
   successorsBySeries,
 }: {
   bySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
-  successorsBySeries: ReadonlyMap<string, CanonicalMetricDataPoint[]>;
+  successorsBySeries: ReadonlyMap<string, MetricSequencePoint[]>;
 }): Map<string, Set<number>> {
   const affectedBySeries = new Map<string, Set<number>>();
   for (const [seriesId, seriesPoints] of bySeries) {
@@ -89,7 +95,7 @@ function affectedBucketsBySeries({
     // of every candidate — the per-point scan made a single hot series cost
     // O(N²) per chunk. `affectedRollupBuckets` stays the sole owner of the
     // bucket semantics; it just receives the one candidate that can matter.
-    const candidates = [
+    const candidates: MetricSequencePoint[] = [
       ...seriesPoints,
       ...(successorsBySeries.get(seriesId) ?? []),
     ].sort(comparePoints);
@@ -104,7 +110,7 @@ function affectedBucketsForSeries({
   candidates,
 }: {
   seriesPoints: readonly CanonicalMetricDataPoint[];
-  candidates: readonly CanonicalMetricDataPoint[];
+  candidates: readonly MetricSequencePoint[];
 }): Set<number> {
   const affected = new Set<number>();
   for (const point of seriesPoints) {
@@ -124,9 +130,9 @@ function successorIn({
   sorted,
   point,
 }: {
-  sorted: readonly CanonicalMetricDataPoint[];
-  point: CanonicalMetricDataPoint;
-}): CanonicalMetricDataPoint | undefined {
+  sorted: readonly MetricSequencePoint[];
+  point: MetricSequencePoint;
+}): MetricSequencePoint | undefined {
   let lo = 0;
   let hi = sorted.length;
   while (lo < hi) {
@@ -416,17 +422,17 @@ export class MetricDataPointClickHouseRepository
    * optimize_read_in_order is syntactic and cannot infer that, so ordering on
    * TimeUnixNano alone made ClickHouse materialise and sort every point in
    * the series (each carrying a ZSTD CanonicalPayload) to return one row.
-   * TimeUnixMs is table-qualified throughout: RAW_SELECT aliases
+   * TimeUnixMs is table-qualified throughout: SEEK_SELECT aliases
    * toUnixTimestamp64Milli(...) AS TimeUnixMs, and a bare TimeUnixMs
    * resolves to that alias (epoch millis), never matching a DateTime64
    * bound — the same pitfall log-record-storage documents.
    */
   private async successorsOf(
     points: CanonicalMetricDataPoint[],
-  ): Promise<CanonicalMetricDataPoint[]> {
+  ): Promise<MetricSequencePoint[]> {
     const tenantId = points[0]!.tenantId;
     const client = await this.resolveClient(tenantId);
-    const found: CanonicalMetricDataPoint[] = [];
+    const found: MetricSequencePoint[] = [];
 
     for (const chunk of chunked(points, SEEKS_PER_QUERY)) {
       const params: Record<string, unknown> = { tenantId };
@@ -435,7 +441,12 @@ export class MetricDataPointClickHouseRepository
         params[`time${index}`] = new Date(point.timeUnixMs);
         params[`nano${index}`] = point.timeUnixNano;
         params[`point${index}`] = point.pointId;
-        return `(SELECT ${RAW_SELECT}
+        // SEEK_SELECT, never the full row: each branch runs FINAL over its
+        // series, and materialising the megabyte-scale payload column across
+        // SEEKS_PER_QUERY branches is what pushed one query past the server's
+        // per-query memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted).
+        // The seek only exists to order points and locate buckets.
+        return `(SELECT ${SEEK_SELECT}
           FROM metric_data_points FINAL
           WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
             AND (metric_data_points.TimeUnixMs > {time${index}:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time${index}:DateTime64(3)} AND (TimeUnixNano > {nano${index}:UInt64} OR (TimeUnixNano = {nano${index}:UInt64} AND PointId > {point${index}:String}))))
@@ -446,8 +457,8 @@ export class MetricDataPointClickHouseRepository
         query_params: params,
         format: "JSONEachRow",
       });
-      for (const row of await result.json<RawMetricRow>()) {
-        found.push(fromRaw({ row, organizationId: points[0]!.organizationId }));
+      for (const row of await result.json<SeekMetricRow>()) {
+        found.push(fromSeekRow(row));
       }
     }
     return found;
@@ -502,14 +513,17 @@ export class MetricDataPointClickHouseRepository
         params[`cutoff${index}`] = new Date(
           start - retentionDays * 24 * 60 * 60 * 1000,
         );
+        // AUTHORITATIVE_SELECT: everything the fold reads, without the
+        // payload column — the fold never touches it, and it is the column
+        // that made these FINAL reads memory-heavy.
         return [
-          `(SELECT ${RAW_SELECT}
+          `(SELECT ${AUTHORITATIVE_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
               AND metric_data_points.TimeUnixMs >= {cutoff${index}:DateTime64(3)}
             ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
-          `(SELECT ${RAW_SELECT}
+          `(SELECT ${AUTHORITATIVE_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs >= {from${index}:DateTime64(3)}
@@ -522,7 +536,9 @@ export class MetricDataPointClickHouseRepository
         query_params: params,
         format: "JSONEachRow",
       });
-      for (const row of await result.json<RawMetricRow>()) {
+      for (const row of await result.json<
+        Omit<RawMetricRow, "CanonicalPayload">
+      >()) {
         unique.set(
           `${row.SeriesId}\u0000${row.PointId}`,
           fromRaw({ row, organizationId }),

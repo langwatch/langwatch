@@ -1,3 +1,4 @@
+import type { MetricSequencePoint } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import type {
   AggregationTemporality,
   CanonicalMetricDataPoint,
@@ -252,7 +253,14 @@ function countsColumn({
   row,
   column,
 }: {
-  row: RawMetricRow;
+  row: Pick<
+    RawMetricRow,
+    | "SeriesId"
+    | "PointId"
+    | "BucketCounts"
+    | "PositiveBucketCounts"
+    | "NegativeBucketCounts"
+  >;
   column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
 }): string[] {
   const counts = row[column];
@@ -268,11 +276,59 @@ function countsColumn({
   return counts.map(String);
 }
 
+/**
+ * The columns the rollup fold actually reads. Identical to {@link RAW_SELECT}
+ * minus CanonicalPayload: the fold never touches the payload, and it is the
+ * one megabyte-scale column, so fetching it through `FINAL` was what pushed
+ * the folded seek queries past the server's per-query memory cap
+ * (MEMORY_LIMIT_EXCEEDED while executing ReplacingSorted).
+ */
+export const AUTHORITATIVE_SELECT = RAW_SELECT.replace(
+  "SummaryQuantilesJson, CanonicalPayload, _size_bytes,",
+  "SummaryQuantilesJson, _size_bytes,",
+);
+
+/**
+ * The columns a successor seek needs: just enough to order points
+ * (TimeUnixNano, PointId), locate their buckets (TimeUnixMs) and decide
+ * predecessor dependency (MetricKind, AggregationTemporality). Everything else
+ * — attributes, values, buckets, payload — is dead weight the seek used to
+ * materialise through `FINAL` for every one of its folded branches.
+ */
+export const SEEK_SELECT = `
+  SeriesId, PointId,
+  toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs, TimeUnixNano,
+  MetricKind, AggregationTemporality
+`;
+
+export interface SeekMetricRow {
+  SeriesId: string;
+  PointId: string;
+  TimeUnixMs: string | number;
+  TimeUnixNano: string;
+  MetricKind: MetricKind;
+  AggregationTemporality: AggregationTemporality;
+}
+
+export function fromSeekRow(row: SeekMetricRow): MetricSequencePoint {
+  return {
+    seriesId: row.SeriesId,
+    pointId: row.PointId,
+    timeUnixMs: Number(row.TimeUnixMs),
+    timeUnixNano: String(row.TimeUnixNano),
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+  };
+}
+
 export function fromRaw({
   row,
   organizationId,
 }: {
-  row: RawMetricRow;
+  // CanonicalPayload is optional on purpose: the authoritative bucket reads
+  // deliberately do not select it (see AUTHORITATIVE_SELECT), and the fold
+  // never reads the decoded field.
+  row: Omit<RawMetricRow, "CanonicalPayload"> & { CanonicalPayload?: string };
   organizationId: string;
 }): CanonicalMetricDataPoint {
   return {
@@ -319,7 +375,7 @@ export function fromRaw({
     negativeOffset: row.NegativeOffset,
     negativeBucketCounts: countsColumn({ row, column: "NegativeBucketCounts" }),
     summaryQuantilesJson: row.SummaryQuantilesJson,
-    canonicalPayload: row.CanonicalPayload,
+    canonicalPayload: row.CanonicalPayload ?? "",
     canonicalSizeBytes: Number(row._size_bytes),
     occurredAt: Number(row.OccurredAt),
     acceptedAt: Number(row.AcceptedAt),

@@ -307,6 +307,115 @@ describe("MetricDataPointClickHouseRepository", () => {
         "ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC",
       );
     });
+
+    it("never fetches the payload column on either read", async () => {
+      const { query, client } = reader();
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => client,
+        resolveOrganizationClient: async () => client,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: chunkOf(2) });
+
+      // The fold never reads CanonicalPayload, and it is the one
+      // megabyte-scale column: fetching it through FINAL across the folded
+      // seek branches can push a single query past the server's per-query
+      // memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). Both reads
+      // must stay payload-free.
+      const successorSeeks = query.mock.calls[0]![0].query;
+      const bucketReads = query.mock.calls[1]![0].query;
+      expect(successorSeeks).not.toContain("CanonicalPayload");
+      expect(bucketReads).not.toContain("CanonicalPayload");
+      // The seek stays minimal: sequence fields only.
+      expect(successorSeeks).not.toContain("ResourceAttributesJson");
+      expect(bucketReads).toContain("BucketCounts");
+    });
+
+    it("folds rows that arrive without the payload column all the way to a rollup write", async () => {
+      // Runtime counterpart to the SQL-text assertions above: the mock
+      // REJECTS any read that asks for the payload column and answers with
+      // rows that omit it, so this executes fromSeekRow and the
+      // payload-free fromRaw end to end instead of only inspecting strings.
+      const point = { ...dataPoint(), timeUnixMs: base + 1_000 };
+      const seekRow = {
+        SeriesId: point.seriesId,
+        PointId: "f".repeat(64),
+        TimeUnixMs: base + 2_000,
+        TimeUnixNano: String(BigInt(base + 2_000) * 1_000_000n),
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+      };
+      const authoritativeRow = {
+        TenantId: point.tenantId,
+        PointId: point.pointId,
+        SeriesId: point.seriesId,
+        ResourceSchemaUrl: "",
+        ResourceAttributesJson: "[]",
+        ResourceAttributeKeys: [],
+        ScopeSchemaUrl: "",
+        ScopeName: "scope",
+        ScopeVersion: "",
+        ScopeAttributesJson: "[]",
+        ScopeAttributeKeys: [],
+        MetricName: "requests",
+        MetricDescription: "",
+        MetricUnit: "1",
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+        IsMonotonic: null,
+        PointAttributesJson: "[]",
+        PointAttributeKeys: [],
+        StartTimeUnixNano: "0",
+        TimeUnixNano: point.timeUnixNano,
+        TimeUnixMs: point.timeUnixMs,
+        Flags: 0,
+        ValueType: "double",
+        ValueInt: null,
+        ValueDouble: 1.5,
+        Count: null,
+        Sum: null,
+        Min: null,
+        Max: null,
+        ExplicitBounds: [],
+        BucketCounts: [],
+        ExponentialScale: null,
+        ExponentialZeroThreshold: null,
+        ZeroCount: null,
+        PositiveOffset: null,
+        PositiveBucketCounts: [],
+        NegativeOffset: null,
+        NegativeBucketCounts: [],
+        SummaryQuantilesJson: "[]",
+        _size_bytes: 23,
+        OccurredAt: point.timeUnixMs,
+        AcceptedAt: point.timeUnixMs,
+      };
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async ({ query: sql }) => {
+        if (sql.includes("CanonicalPayload")) {
+          throw new Error("read selected the payload column");
+        }
+        return sql.includes("{from0:")
+          ? { json: async () => [authoritativeRow] }
+          : { json: async () => [seekRow] };
+      });
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => {});
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => ({ query, insert }) as never,
+        resolveOrganizationClient: async () => ({ query, insert }) as never,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: [point] });
+
+      const rollupInsert = insert.mock.calls.find(
+        (call) => call[0].table === "metric_time_rollups",
+      );
+      expect(rollupInsert).toBeDefined();
+      expect(rollupInsert![0].values.length).toBeGreaterThan(0);
+    });
   });
 
   describe("when a folded read answers with a row it cannot decode", () => {
@@ -315,12 +424,12 @@ describe("MetricDataPointClickHouseRepository", () => {
       METRIC_ROLLUP_INTERVAL_MS;
 
     /**
-     * The shape the rollup lane actually failed on in production: a row that
-     * parses as JSON and carries its identifiers, but is missing one of the
-     * `Array(UInt64)` count columns the decoder dereferences unguarded. The
-     * decoder used to walk straight into `undefined.map`, and the queue logs
-     * only an error's message — so the incident produced no column, no series
-     * and no query to work from.
+     * The shape the rollup lane actually failed on: a row that parses as JSON
+     * and carries its identifiers, but is missing one of the `Array(UInt64)`
+     * count columns the decoder dereferences unguarded. Walking straight into
+     * `undefined.map` costs the whole diagnosis — the queue logs an error's
+     * message and nothing else, so the failure names no column, no series and
+     * no query.
      */
     function rowMissingBucketCounts() {
       const point = dataPoint();
