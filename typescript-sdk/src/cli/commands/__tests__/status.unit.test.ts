@@ -668,6 +668,86 @@ describe("statusCommand", () => {
         expect(out).not.toContain("nothing needs your attention");
       });
 
+      it("reads a per-person template as a headcount, not as its anchor's total", async () => {
+        mockAllSuccess();
+        // ATTRIBUTED_USER rows cap each end user separately. The template's
+        // own spent_usd totals a bare anchor no debit lands on, so scoring it
+        // like any other scope printed a confident 0% while three people were
+        // being refused.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "ATTRIBUTED_USER",
+              scope_id: "vk_anchor",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 3,
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain('budget "seat cap"');
+        expect(out).toContain("3 of 10 over cap, $1.00/person");
+        expect(out).not.toContain("at 0%");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+
+      it("leaves a per-person template alone while nobody is over their cap", async () => {
+        mockAllSuccess();
+        // Ten people spending under their own cap is a healthy template. The
+        // REST resource carries no per-person utilization, so there is nothing
+        // honest to warn about until somebody crosses.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "ATTRIBUTED_USER",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 0,
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).not.toContain("seat cap");
+        expect(out).toContain("nothing needs your attention");
+      });
+
+      it("carries the headcount pair into the machine document", async () => {
+        mockAllSuccess();
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "ATTRIBUTED_USER",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 3,
+            }),
+          ],
+        });
+
+        await statusCommand({ output: "json" });
+
+        const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+        expect(doc.attention.budgetsAtRisk).toHaveLength(1);
+        expect(doc.attention.budgetsAtRisk[0]).toMatchObject({
+          scope: "ATTRIBUTED_USER",
+          endUsersSeen: 10,
+          endUsersOver: 3,
+        });
+      });
+
       it("withholds utilization when the server could not total spend", async () => {
         mockAllSuccess();
         // spend_available: false means spent_usd is NOT real spend — a

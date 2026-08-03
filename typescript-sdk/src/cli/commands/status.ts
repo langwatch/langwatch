@@ -108,6 +108,11 @@ export interface BudgetAtRisk {
   spentUsd: string;
   limitUsd: string;
   onBreach: string;
+  /** ATTRIBUTED_USER rows only: end users with spend this period, and how many
+   * of them are at or over the per-person cap. On those rows the standing is
+   * this pair, not `spentUsd`. */
+  endUsersSeen?: number;
+  endUsersOver?: number;
 }
 
 /**
@@ -275,12 +280,12 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   /**
-   * `GET /api/gateway/v1/budgets` now returns every scope dimension —
-   * org, team, project, virtual-key, principal, and group — with live
-   * ledger spend, so a virtual-key budget at 100% with `on_breach: BLOCK`
-   * is visible here like any other. The one remaining honesty signal is
-   * `spend_available`: when the server could not total spend, the numbers
-   * are not real spend and the scan must say so instead of ticking green.
+   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team,
+   * project, virtual-key, principal, group, and per-person, with live ledger
+   * spend, so a virtual-key budget at 100% with `on_breach: BLOCK` is visible
+   * here like any other. The one honesty signal is `spend_available`: when the
+   * server could not total spend, the numbers are not real spend and the scan
+   * must say so instead of ticking green.
    */
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
     const { budgets, spend_available } = await new GatewayBudgetsApiService({
@@ -298,6 +303,28 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
           unreadable.push(budget.name);
           return [];
+        }
+        // ATTRIBUTED_USER rows: limit_usd is a per-person cap and spent_usd
+        // totals the template's bare anchor, which no debit lands on. A
+        // percentage of it is a confident zero about nobody. The standing is
+        // a headcount: how many of the people seen this period are at or over
+        // their own cap.
+        if (budget.scope_type === "ATTRIBUTED_USER") {
+          const seen = budget.end_users_seen ?? 0;
+          const over = budget.end_users_over ?? 0;
+          return [
+            {
+              name: budget.name,
+              scope: budget.scope_type,
+              window: budget.window,
+              utilizationPct: seen > 0 ? Math.round((over / seen) * 100) : 0,
+              spentUsd: budget.spent_usd,
+              limitUsd: budget.limit_usd,
+              onBreach: budget.on_breach,
+              endUsersSeen: seen,
+              endUsersOver: over,
+            },
+          ];
         }
         // GROUP rows: limit_usd is the PER-MEMBER allowance while
         // spent_usd sums the whole group, so the comparable ceiling is
@@ -341,7 +368,14 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     }
 
     return scored
-      .filter((budget) => budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT)
+      .filter((budget) =>
+        budget.scope === "ATTRIBUTED_USER"
+          ? // One person refused is worth a look, and the share of seats over
+            // cap is not a utilization to threshold on: 1 of 20 people blocked
+            // reads as 5% and would never surface.
+            (budget.endUsersOver ?? 0) > 0
+          : budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT,
+      )
       .sort((a, b) => b.utilizationPct - a.utilizationPct);
   }
 
@@ -499,8 +533,16 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       }
       for (const budget of attention.budgetsAtRisk ?? []) {
         flagged++;
-        const breached = budget.utilizationPct >= 100;
-        const line = `    ⚠ budget "${budget.name}" (${budget.window.toLowerCase()}, ${budget.scope.toLowerCase()}) at ${budget.utilizationPct}% — $${budget.spentUsd} of $${budget.limitUsd}${budget.onBreach === "BLOCK" ? ", blocks on breach" : ""}`;
+        // A per-person template carries a headcount instead of a total, so it
+        // reports the headcount and the cap each person carries.
+        const overCap = budget.endUsersOver;
+        const breached =
+          overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
+        const standing =
+          overCap !== undefined
+            ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
+            : `at ${budget.utilizationPct}% — $${budget.spentUsd} of $${budget.limitUsd}`;
+        const line = `    ⚠ budget "${budget.name}" (${budget.window.toLowerCase()}, ${budget.scope.toLowerCase()}) ${standing}${budget.onBreach === "BLOCK" ? ", blocks on breach" : ""}`;
         console.log(
           (breached ? chalk.red(line) : chalk.yellow(line)) +
             chalk.gray(`  →  langwatch gateway-budgets list`),
