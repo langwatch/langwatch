@@ -28,7 +28,7 @@
  *
  * Two server-level prerequisites are NOT expressible in SQL and ship as XML —
  * see {@link CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML} and
- * {@link CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_XML}. Without the first, every
+ * {@link clickHouseAccessManagementConfigXml}. Without the first, every
  * statement here fails with UNKNOWN_SETTING (115).
  *
  * @see specs/analytics/governed-sql-api.feature
