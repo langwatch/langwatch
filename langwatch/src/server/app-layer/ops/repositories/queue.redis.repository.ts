@@ -1835,10 +1835,15 @@ export class QueueRedisRepository implements QueueRepository {
     // The lifecycle legs only cover a group the pass actually saw, and a group
     // moving between them mid-read is seen by neither. The keyspace sweep is what
     // covers those, because it reads key existence rather than membership.
+    let sweptUnindexed: number | null = null;
     if (await this.isKeyspaceSweepDue(prefix)) {
       const swept = await this.sweepKeyspaceForGroups({ prefix, refreshLease });
       if (swept === null) return null;
-      for (const groupId of swept) groupIds.add(groupId);
+      sweptUnindexed = 0;
+      for (const groupId of swept) {
+        groupIds.add(groupId);
+        if (!alreadyIndexed.has(groupId)) sweptUnindexed += 1;
+      }
     }
 
     const toAdopt = Array.from(groupIds).filter(
@@ -1850,7 +1855,13 @@ export class QueueRedisRepository implements QueueRepository {
       refreshLease,
     });
     if (!held) return null;
-    await this.recordSweepOutcome({ prefix, adopted: toAdopt.length });
+
+    // Only a pass that actually swept may move the deadline. Rescheduling on
+    // every pass would push it out by a fresh backstop each time and the sweep
+    // would never come due again — the deadline would outrun the clock.
+    if (sweptUnindexed !== null) {
+      await this.recordSweepOutcome({ prefix, adopted: sweptUnindexed });
+    }
 
     return groupIds;
   }
@@ -1977,6 +1988,16 @@ export class QueueRedisRepository implements QueueRepository {
    * what this reconcile cost before the index existed and no more. Adopting
    * nothing means the index is complete, and the sweep drops back to a slow
    * backstop that only has to catch a writer nobody has noticed is missing.
+   *
+   * `adopted` counts what the SWEEP found unindexed, not everything the pass
+   * adopted. The lifecycle legs also turn up unindexed ids, but they include
+   * groups that hold no jobs at all — a drained group still listed in `ready` or
+   * `blocked` is adopted, pruned for being empty, and found again next pass.
+   * Counting those would answer "sweep again" forever and pin the queue to the
+   * expensive walk on a group with no pending work to find.
+   *
+   * Only ever called by a pass that swept. Calling it otherwise moves the
+   * deadline without the walk that earns it, and the sweep stops coming due.
    */
   private async recordSweepOutcome(params: {
     prefix: string;

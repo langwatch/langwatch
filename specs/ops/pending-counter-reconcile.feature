@@ -136,3 +136,28 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When the reconcile runs
     Then its jobs are counted
     And it is added to the pending index for later passes
+
+  # The keyspace walk is the only enumeration that cannot miss a group, so it is
+  # kept as a backstop long after the index has caught up. A backstop that is
+  # rescheduled by passes which never ran it is not a backstop: the deadline
+  # outruns the clock and the walk never comes due again.
+  @unit
+  Scenario: Reconciles between sweeps do not postpone the scheduled sweep
+    Given a sweep has run and found nothing to adopt
+    When reconciles keep running before the next sweep is due
+    Then the sweep still runs once its interval has elapsed
+
+  @unit
+  Scenario: A sweep that adopts keeps sweeping on the next pass
+    Given a sweep finds a group holding jobs that the index does not list
+    When the next reconcile runs
+    Then it sweeps again without waiting for the interval
+
+  # A group listed in a lifecycle index while holding no jobs is adopted, pruned
+  # for being empty, and found again on the next pass. Treating that as progress
+  # would answer "sweep again" forever over work that does not exist.
+  @unit
+  Scenario: A drained group listed in a lifecycle index does not pin the sweep
+    Given a group listed in a lifecycle index whose jobs have all gone
+    When reconciles keep running
+    Then the sweep still backs off to its interval
