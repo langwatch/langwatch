@@ -15,7 +15,12 @@ const ORG_ID = "org_1";
 // protectedProcedure audits every mutation and every handled error through
 // the module-level Prisma client, which no injected ctx.prisma can stand in
 // for. Stubbed so the router's own behaviour is what these assertions see.
-vi.mock("../../../auditLog", () => ({
+//
+// The specifier has to be the one `trpc.ts` imports. A relative path that
+// resolves to no module mocks nothing and throws nothing: the real audit
+// log then runs, and this file passes anywhere a Postgres happens to be
+// listening on 5432 while failing in CI, where none is.
+vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
