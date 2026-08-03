@@ -44,3 +44,29 @@ Feature: GroupQueue pending counter ground-truth reconcile
     When the reconcile is triggered again immediately within the same window
     Then the second call is skipped
     And the counter remains as healed by the first call
+
+  @integration
+  Scenario: Reconcile counts blocked and parked groups alongside ready ones
+    Given jobs are spread across ready, blocked, and parked groups
+    When the reconcile runs
+    Then the pending counter equals the sum of jobs across all three group indexes
+
+  @integration
+  Scenario: Reconcile counts a group listed in two indexes only once
+    Given a group appears in more than one group index at the same time
+    When the reconcile runs
+    Then that group's jobs are counted exactly once
+
+  @integration
+  Scenario: An overrunning reconcile releases the marker instead of holding it past the window
+    Given a reconcile pass that takes longer than the single-flight window
+    When the pass completes
+    Then the single-flight marker is released
+    And the next trigger may start a fresh reconcile immediately
+
+  @integration
+  Scenario: A declined reconcile leaves the holder's marker untouched
+    Given another instance currently holds the single-flight marker
+    When a reconcile is triggered
+    Then the trigger declines without running
+    And the holder's marker and its expiry are left untouched
