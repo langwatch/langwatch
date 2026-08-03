@@ -330,6 +330,92 @@ describe("MetricDataPointClickHouseRepository", () => {
       expect(successorSeeks).not.toContain("ResourceAttributesJson");
       expect(bucketReads).toContain("BucketCounts");
     });
+
+    it("folds rows that arrive without the payload column all the way to a rollup write", async () => {
+      // Runtime counterpart to the SQL-text assertions above: the mock
+      // REJECTS any read that asks for the payload column and answers with
+      // rows that omit it, so this executes fromSeekRow and the
+      // payload-free fromRaw end to end instead of only inspecting strings.
+      const point = { ...dataPoint(), timeUnixMs: base + 1_000 };
+      const seekRow = {
+        SeriesId: point.seriesId,
+        PointId: "f".repeat(64),
+        TimeUnixMs: base + 2_000,
+        TimeUnixNano: String(BigInt(base + 2_000) * 1_000_000n),
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+      };
+      const authoritativeRow = {
+        TenantId: point.tenantId,
+        PointId: point.pointId,
+        SeriesId: point.seriesId,
+        ResourceSchemaUrl: "",
+        ResourceAttributesJson: "[]",
+        ResourceAttributeKeys: [],
+        ScopeSchemaUrl: "",
+        ScopeName: "scope",
+        ScopeVersion: "",
+        ScopeAttributesJson: "[]",
+        ScopeAttributeKeys: [],
+        MetricName: "requests",
+        MetricDescription: "",
+        MetricUnit: "1",
+        MetricKind: "gauge",
+        AggregationTemporality: "unspecified",
+        IsMonotonic: null,
+        PointAttributesJson: "[]",
+        PointAttributeKeys: [],
+        StartTimeUnixNano: "0",
+        TimeUnixNano: point.timeUnixNano,
+        TimeUnixMs: point.timeUnixMs,
+        Flags: 0,
+        ValueType: "double",
+        ValueInt: null,
+        ValueDouble: 1.5,
+        Count: null,
+        Sum: null,
+        Min: null,
+        Max: null,
+        ExplicitBounds: [],
+        BucketCounts: [],
+        ExponentialScale: null,
+        ExponentialZeroThreshold: null,
+        ZeroCount: null,
+        PositiveOffset: null,
+        PositiveBucketCounts: [],
+        NegativeOffset: null,
+        NegativeBucketCounts: [],
+        SummaryQuantilesJson: "[]",
+        _size_bytes: 23,
+        OccurredAt: point.timeUnixMs,
+        AcceptedAt: point.timeUnixMs,
+      };
+      const query = vi.fn<
+        (args: { query: string }) => Promise<{ json: () => Promise<unknown[]> }>
+      >(async ({ query: sql }) => {
+        if (sql.includes("CanonicalPayload")) {
+          throw new Error("read selected the payload column");
+        }
+        return sql.includes("{from0:")
+          ? { json: async () => [authoritativeRow] }
+          : { json: async () => [seekRow] };
+      });
+      const insert = vi.fn<
+        (args: { table: string; values: unknown[] }) => Promise<void>
+      >(async () => {});
+      const repository = new MetricDataPointClickHouseRepository({
+        resolveClient: async () => ({ query, insert }) as never,
+        resolveOrganizationClient: async () => ({ query, insert }) as never,
+      });
+
+      await repository.recomputeAffectedRollupsMany({ points: [point] });
+
+      const rollupInsert = insert.mock.calls.find(
+        (call) => call[0].table === "metric_time_rollups",
+      );
+      expect(rollupInsert).toBeDefined();
+      expect(rollupInsert![0].values.length).toBeGreaterThan(0);
+    });
   });
 
   describe("when a folded read answers with a row it cannot decode", () => {

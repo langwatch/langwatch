@@ -66,9 +66,13 @@ describe("createResilientClickHouseClient()", () => {
 
       const result = await wrapper.query({ query: "SELECT 1" } as never);
 
-      await expect(result.json()).rejects.toThrow(
-        /Code: 999\. DB::Exception: some future failure/,
-      );
+      // Code first — the message is supplementary coverage.
+      await expect(result.json()).rejects.toMatchObject({
+        code: "999",
+        message: expect.stringContaining(
+          "Code: 999. DB::Exception: some future failure",
+        ),
+      });
     });
 
     it("throws for exception subclasses that print their own class name", async () => {
