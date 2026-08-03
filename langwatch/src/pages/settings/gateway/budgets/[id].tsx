@@ -122,6 +122,11 @@ function BudgetDetailPage() {
   const limit = budget ? Number.parseFloat(budget.limitUsd) : 0;
   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
   const isArchived = !!budget?.archivedAt;
+  // Per-person templates fan out into one bucket per end user, so their
+  // standing is a headcount rather than a single total.
+  const seatsSeen = budget?.endUsersSeen ?? 0;
+  const seatsOver = budget?.endUsersOver ?? 0;
+  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
 
   return (
     <AiGatewayLayout>
@@ -238,6 +243,35 @@ function BudgetDetailPage() {
                       </Text>
                       <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                     </HStack>
+                  ) : budget.scopeType === "ATTRIBUTED_USER" ? (
+                    // The template's limit belongs to each end user
+                    // separately, so the headline is the per-person cap and
+                    // the standing underneath is a headcount.
+                    <VStack
+                      align="stretch"
+                      gap={2}
+                      data-testid="budget-attributed-user-utilization"
+                    >
+                      <HStack>
+                        <Text fontWeight="medium" fontSize="2xl">
+                          {formatBudgetUsd(limit)}
+                        </Text>
+                        <Text color="fg.muted">per person</Text>
+                        <Spacer />
+                        <Badge colorPalette={seatsOver > 0 ? "red" : "green"}>
+                          {seatsOver} of {seatsSeen} people over cap
+                        </Badge>
+                      </HStack>
+                      <Progress.Root
+                        value={seatsOverPct}
+                        size="sm"
+                        colorPalette={seatsOver > 0 ? "red" : "green"}
+                      >
+                        <Progress.Track>
+                          <Progress.Range />
+                        </Progress.Track>
+                      </Progress.Root>
+                    </VStack>
                   ) : (
                     <>
                       <HStack>

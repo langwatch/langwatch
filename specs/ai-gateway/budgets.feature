@@ -449,6 +449,66 @@ Feature: AI Gateway — Budgets
   # Dashboard and spend visibility
   # ============================================================================
 
+  # A per-person template is one row that fans out into one bucket per end
+  # user, so no single total describes it. What the screens report instead is
+  # the cap each person carries and how many people have passed it.
+
+  @integration
+  Scenario: A per-person template counts the people it has seen and the people over cap
+    Given a "$1.00 per person" template anchored on virtual key "prod-openai"
+    And 10 end users have spent against it this period
+    And 3 of them have spent $1.00 or more
+    When the budget list totals its spend
+    Then the template reports 10 end users seen and 3 over cap
+    And an end user at exactly the limit counts as over, matching what the gateway blocks on
+
+  @integration
+  Scenario: A per-person template counts an unpriced user but not a user who only ever failed
+    Given a "$1.00 per person" template anchored on virtual key "prod-openai"
+    And one end user's only requests were served by a model with no price
+    And another end user's only requests all failed
+    When the budget list totals its spend
+    Then the unpriced end user counts as seen, spending $0.00
+    But the end user who only ever failed does not count as seen
+
+  @integration
+  Scenario: A per-person template only counts buckets under its own anchor
+    Given a "$1.00 per person" template anchored on virtual key "vk_anchor"
+    And spend exists on a bucket keyed to the bare anchor with no end user
+    And spend exists under a different anchor whose id starts with "vk_anchor"
+    When the budget list totals its spend
+    Then neither the bare-anchor row nor the other anchor's buckets are counted
+
+  @integration
+  Scenario: A provider-filtered template and its unfiltered twin never count each other's people
+    Given an unfiltered "$1.00 per person" template on virtual key "prod-openai"
+    And an OpenAI-filtered "$1.00 per person" template on the same key
+    When the budget list totals both
+    Then the unfiltered template counts only buckets carrying no provider suffix
+    And the filtered template counts only buckets carrying its own provider suffix
+
+  @integration
+  Scenario: Resetting one end user's period drops them from the count until they spend again
+    Given a "$1.00 per person" template with 2 end users over cap
+    When one of those end users has their own bucket period reset
+    Then that end user no longer counts as seen or over cap
+    And the other end user's standing is untouched
+
+  @unit
+  Scenario: The budget list shows a per-person template as a cap and a headcount
+    Given a "$1.00 per person" template with 10 end users seen and 3 over cap
+    When I open the Budgets list
+    Then the row headlines "$1.00 per person" instead of a single spend total
+    And it reads "3 of 10 people over cap"
+    And the bar is filled 3/10 and coloured red because somebody is over
+
+  @unit
+  Scenario: A per-person template nobody has used yet says so instead of showing a dash
+    Given a "$1.00 per person" template no end user has spent against
+    When I open the Budgets list
+    Then the row reads "0 of 0 people over cap" with an empty bar
+    And the bar is not red, because nobody is over
+
   @visual
   Scenario: Budget detail drawer shows current spend, projection, and top consumers
     Given a monthly budget "demo-month" is 60% spent

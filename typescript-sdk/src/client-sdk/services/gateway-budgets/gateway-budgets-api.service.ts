@@ -9,7 +9,8 @@ export type BudgetScopeKind =
   | "PROJECT"
   | "VIRTUAL_KEY"
   | "PRINCIPAL"
-  | "GROUP";
+  | "GROUP"
+  | "ATTRIBUTED_USER";
 
 export type BudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 export type BudgetOnBreach = "BLOCK" | "WARN";
@@ -26,7 +27,9 @@ export interface GatewayBudget {
   /**
    * For GROUP rows this is the PER-MEMBER allowance, not a group total;
    * `spent_usd` sums the whole group and `member_count` says how many
-   * members the allowance currently covers.
+   * members the allowance currently covers. For ATTRIBUTED_USER rows it is
+   * the PER-PERSON cap, and `end_users_seen` / `end_users_over` carry the
+   * standing instead of `spent_usd`.
    */
   limit_usd: string;
   spent_usd: string;
@@ -40,6 +43,10 @@ export interface GatewayBudget {
   created_at: string;
   /** GROUP rows only. */
   member_count?: number;
+  /** ATTRIBUTED_USER rows only: end users with spend this period. */
+  end_users_seen?: number;
+  /** ATTRIBUTED_USER rows only: how many of those are at or over the cap. */
+  end_users_over?: number;
 }
 
 export interface GatewayBudgetList {

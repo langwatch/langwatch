@@ -20,6 +20,7 @@ const SCOPE_KINDS: BudgetScopeKind[] = [
   "VIRTUAL_KEY",
   "PRINCIPAL",
   "GROUP",
+  "ATTRIBUTED_USER",
 ];
 
 /**
@@ -82,15 +83,26 @@ export const listGatewayBudgetsCommand = async (
           // GROUP rows: limit is the PER-MEMBER allowance while spent sums
           // the whole group, so utilization compares against limit x members.
           const isGroup = b.scope_type === "GROUP";
+          // ATTRIBUTED_USER rows: the limit belongs to each end user
+          // separately, so there is no total to be a percentage of. The
+          // standing is a headcount of who has passed their own cap.
+          const isPerPerson = b.scope_type === "ATTRIBUTED_USER";
+          const seatsSeen = b.end_users_seen ?? 0;
+          const seatsOver = b.end_users_over ?? 0;
           const effectiveLimit = isGroup ? limit * (b.member_count ?? 0) : limit;
           // A zero effective limit admits no spend at all: maximally
           // breached, not 0% utilized (matches `langwatch status`).
           const pct = effectiveLimit > 0 ? (spent / effectiveLimit) * 100 : 100;
           const pctLabel = `${pct.toFixed(0)}%`;
           const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
-          const spentLabel = spend_available
-            ? `$${spent.toFixed(2)} (${coloredPct})`
-            : chalk.gray("unavailable");
+          const seatsLabel = `${seatsOver} of ${seatsSeen} over cap`;
+          const spentLabel = !spend_available
+            ? chalk.gray("unavailable")
+            : isPerPerson
+              ? seatsOver > 0
+                ? chalk.red(seatsLabel)
+                : chalk.green(seatsLabel)
+              : `$${spent.toFixed(2)} (${coloredPct})`;
           return {
             ID: b.id,
             Name: b.name,
@@ -99,7 +111,9 @@ export const listGatewayBudgetsCommand = async (
             Breach: b.on_breach === "BLOCK" ? chalk.red("block") : chalk.yellow("warn"),
             Limit: isGroup
               ? `$${limit.toFixed(2)}/member x${b.member_count ?? 0}`
-              : `$${limit.toFixed(2)}`,
+              : isPerPerson
+                ? `$${limit.toFixed(2)}/person`
+                : `$${limit.toFixed(2)}`,
             Spent: spentLabel,
             Provider: b.provider_key ?? chalk.gray("all"),
             Resets: new Date(b.resets_at).toLocaleString(),

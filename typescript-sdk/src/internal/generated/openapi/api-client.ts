@@ -1375,7 +1375,7 @@ export interface paths {
         };
         /**
          * List budgets
-         * @description Returns every non-archived budget in the caller's organization across all six scope types (organization / team / project / virtual_key / principal / group), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.
+         * @description Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.
          */
         get: operations["getApiGatewayV1Budgets"];
         put?: never;
@@ -2166,6 +2166,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/traces/{traceId}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content. */
+        get: operations["getApiTracesByTraceIdTranscript"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/traces/{traceId}": {
         parameters: {
             query?: never;
@@ -2439,7 +2456,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days per call. */
+        /** @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing. */
         post: operations["postApiGatewayV1Spend-eventsReplay"];
         delete?: never;
         options?: never;
@@ -6469,6 +6486,8 @@ export interface operations {
                             archived_at: string | null;
                             created_at: string;
                             member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
                         }[];
                         spend_available: boolean;
                     };
@@ -6567,6 +6586,8 @@ export interface operations {
                             archived_at: string | null;
                             created_at: string;
                             member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
                         };
                     };
                 };
@@ -6666,6 +6687,8 @@ export interface operations {
                             archived_at: string | null;
                             created_at: string;
                             member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
                         };
                     };
                 };
@@ -6759,6 +6782,8 @@ export interface operations {
                             archived_at: string | null;
                             created_at: string;
                             member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
                         };
                     };
                 };
@@ -6852,6 +6877,8 @@ export interface operations {
                             archived_at: string | null;
                             created_at: string;
                             member_count?: number;
+                            end_users_seen?: number;
+                            end_users_over?: number;
                         };
                     };
                 };
@@ -14512,6 +14539,115 @@ export interface operations {
             };
         };
     };
+    getApiTracesByTraceIdTranscript: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project. */
+                traceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transcript: ordered entries plus per-session totals and sub-agent tool counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        agent: string;
+                        sessionId: string | null;
+                        entries: {
+                            [key: string]: unknown;
+                        }[];
+                        totals: {
+                            modelCalls: number;
+                            toolCalls: number;
+                            tokens: number;
+                            costUsd: number;
+                        };
+                        subAgents: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Ambiguous trace ID prefix — the prefix matches more than one trace */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                        candidateTraceIds: string[];
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     getApiTracesByTraceId: {
         parameters: {
             query?: {
@@ -15296,6 +15432,7 @@ export interface operations {
     getApiWebhooksV1EndpointsByIdDeliveries: {
         parameters: {
             query?: {
+                cursor?: string;
                 limit?: number;
             };
             header?: never;

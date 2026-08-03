@@ -9688,6 +9688,12 @@
                           },
                           "member_count": {
                             "type": "integer"
+                          },
+                          "end_users_seen": {
+                            "type": "integer"
+                          },
+                          "end_users_over": {
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -9831,7 +9837,7 @@
         ],
         "parameters": [],
         "summary": "List budgets",
-        "description": "Returns every non-archived budget in the caller's organization across all six scope types (organization / team / project / virtual_key / principal / group), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend."
+        "description": "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend."
       },
       "post": {
         "responses": {
@@ -9925,6 +9931,12 @@
                           "type": "string"
                         },
                         "member_count": {
+                          "type": "integer"
+                        },
+                        "end_users_seen": {
+                          "type": "integer"
+                        },
+                        "end_users_over": {
                           "type": "integer"
                         }
                       },
@@ -10161,6 +10173,12 @@
                         },
                         "member_count": {
                           "type": "integer"
+                        },
+                        "end_users_seen": {
+                          "type": "integer"
+                        },
+                        "end_users_over": {
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -10385,6 +10403,12 @@
                           "type": "string"
                         },
                         "member_count": {
+                          "type": "integer"
+                        },
+                        "end_users_seen": {
+                          "type": "integer"
+                        },
+                        "end_users_over": {
                           "type": "integer"
                         }
                       },
@@ -10612,6 +10636,12 @@
                           "type": "string"
                         },
                         "member_count": {
+                          "type": "integer"
+                        },
+                        "end_users_seen": {
+                          "type": "integer"
+                        },
+                        "end_users_over": {
                           "type": "integer"
                         }
                       },
@@ -30177,6 +30207,217 @@
         }
       }
     },
+    "/api/traces/{traceId}/transcript": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The transcript: ordered entries plus per-session totals and sub-agent tool counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "modelCalls": {
+                          "type": "number"
+                        },
+                        "toolCalls": {
+                          "type": "number"
+                        },
+                        "tokens": {
+                          "type": "number"
+                        },
+                        "costUsd": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "modelCalls",
+                        "toolCalls",
+                        "tokens",
+                        "costUsd"
+                      ]
+                    },
+                    "subAgents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "agent",
+                    "sessionId",
+                    "entries",
+                    "totals",
+                    "subAgents"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trace not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ambiguous trace ID prefix — the prefix matches more than one trace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "candidateTraceIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "candidateTraceIds"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiTracesByTraceIdTranscript",
+        "parameters": [
+          {
+            "name": "traceId",
+            "in": "path",
+            "description": "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content."
+      }
+    },
     "/api/traces/{traceId}": {
       "get": {
         "responses": {
@@ -31693,6 +31934,14 @@
         "parameters": [
           {
             "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "schema": {
               "type": "integer",
@@ -32015,7 +32264,7 @@
         "responses": {},
         "operationId": "postApiGatewayV1Spend-eventsReplay",
         "parameters": [],
-        "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days per call.",
+        "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
         "requestBody": {
           "content": {
             "application/json": {

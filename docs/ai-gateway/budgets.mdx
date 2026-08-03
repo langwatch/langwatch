@@ -47,6 +47,7 @@ An `attributed_user` budget is a **template**, not a cap on one person: anchored
 - Enforcement is per bucket: one end user at their limit blocks only that user; every other user on the anchor passes. Breaches name `budget_scope: "attributed_user"` so your product can tell "this user's cap" from the tenant cap (see the [breach catalog](#breaches-warnings-and-budget-events) below).
 - Like group budgets, templates require the ClickHouse spend ledger, and creation is refused without it.
 - Read one user's current spend and applicable cap in one call: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend).
+- **How a template reports itself.** One template covers many people, so there is no single total to measure anyone against. The Budgets list and the budget detail page headline the per-person cap ("$1.00 per person") and put the standing underneath as a headcount: "3 of 10 people over cap", with a bar filled to the same ratio and turned red as soon as anyone is over. "Seen" means an end user with at least one successful request in the current period, so somebody served entirely by an unpriced model still counts, while somebody whose every request failed does not. Over-cap uses the same `>=` the gateway blocks on, so a person the page calls over is a person being refused. A template nobody has used yet reads "0 of 0 people over cap". The same two figures ride the management API as `end_users_seen` and `end_users_over`.
 
 ### Provider-filtered budgets
 

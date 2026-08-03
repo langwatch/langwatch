@@ -195,6 +195,13 @@ function BudgetsPage() {
                         const limit = Number.parseFloat(b.limitUsd);
                         const pct =
                           limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+                        // Per-person templates report a headcount, not a
+                        // total. Nobody seen yet is "0 of 0", which is true,
+                        // rather than a dash that reads as broken.
+                        const seatsSeen = b.endUsersSeen ?? 0;
+                        const seatsOver = b.endUsersOver ?? 0;
+                        const seatsOverPct =
+                          seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
                         return (
                           <Table.Row
                             key={b.id}
@@ -284,6 +291,38 @@ function BudgetsPage() {
                                         }`
                                       : ""}
                                   </Text>
+                                </VStack>
+                              ) : b.scopeType === "ATTRIBUTED_USER" ? (
+                                // A per-person template is one allowance per
+                                // end user, so there is no single total to
+                                // measure anyone against. What the list can
+                                // say honestly is the cap each person carries
+                                // and how many of them have passed it.
+                                <VStack
+                                  align="stretch"
+                                  gap={1}
+                                  data-testid="budget-attributed-user-spend"
+                                >
+                                  <HStack fontSize="xs" gap={1}>
+                                    <Text fontWeight="medium">
+                                      {formatBudgetUsd(limit)}
+                                    </Text>
+                                    <Text color="fg.muted">per person</Text>
+                                  </HStack>
+                                  <Text fontSize="2xs" color="fg.muted">
+                                    {seatsOver} of {seatsSeen} people over cap
+                                  </Text>
+                                  <Progress.Root
+                                    value={seatsOverPct}
+                                    size="xs"
+                                    colorPalette={
+                                      seatsOver > 0 ? "red" : "green"
+                                    }
+                                  >
+                                    <Progress.Track>
+                                      <Progress.Range />
+                                    </Progress.Track>
+                                  </Progress.Root>
                                 </VStack>
                               ) : (
                                 <VStack align="stretch" gap={1}>

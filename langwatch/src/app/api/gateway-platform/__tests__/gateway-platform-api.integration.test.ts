@@ -1018,6 +1018,94 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(row.limit_usd).toBe("40");
     });
 
+    /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
+    it("labels a per-person template with end_users_seen and end_users_over", async () => {
+      const vk = await createVk({ name: `seat-vk-${suffix}` });
+      const anchorId = vk.body.virtual_key.id;
+      const createRes = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: {
+            kind: "ATTRIBUTED_USER",
+            anchor_virtual_key_id: anchorId,
+          },
+          name: `seat-budget-${suffix}`,
+          window: "MONTH",
+          limit_usd: "1",
+        },
+        legacyAuth(),
+      );
+      expect(createRes.status).toBe(201);
+      const budgetId = (await createRes.json()).budget.id;
+
+      // Two people on the anchor, one of them at the cap. The per-user
+      // buckets are the only place this spend exists; the template's own
+      // scope id never accrues a row.
+      const chRepo = new GatewayBudgetClickHouseRepository(async () => ch());
+      for (const [endUserId, amountUsd] of [
+        ["seat-over", "1.500000"],
+        ["seat-under", "0.250000"],
+      ]) {
+        await chRepo.insertDebit([
+          {
+            tenantId: PROJECT_ID,
+            budgetId,
+            scope: "ATTRIBUTED_USER",
+            scopeId: `${anchorId}:${endUserId}`,
+            window: "MONTH",
+            virtualKeyId: anchorId,
+            gatewayRequestId: `req-seat-${endUserId}-${suffix}`,
+            amountUsd: amountUsd!,
+            tokensInput: 10,
+            tokensOutput: 5,
+            tokensCacheRead: 0,
+            tokensCacheWrite: 0,
+            model: "gpt-5-mini",
+            status: "SUCCESS",
+            occurredAt: new Date(),
+          },
+        ]);
+      }
+
+      const list = await app.request(
+        "/api/gateway/v1/budgets?scope_type=ATTRIBUTED_USER",
+        { headers: legacyAuth() },
+      );
+      const listBody = await list.json();
+      const row = listBody.data.find((b: any) => b.id === budgetId);
+      expect(row).toBeDefined();
+      // limit_usd is the PER-PERSON cap; the standing is the pair.
+      expect(row.limit_usd).toBe("1");
+      expect(row.end_users_seen).toBe(2);
+      expect(row.end_users_over).toBe(1);
+    });
+
+    /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
+    it("leaves both per-person fields off every other scope", async () => {
+      const createRes = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "PROJECT", project_id: PROJECT_ID },
+          name: `no-seats-budget-${suffix}`,
+          window: "MONTH",
+          limit_usd: 30,
+        },
+        legacyAuth(),
+      );
+      expect(createRes.status).toBe(201);
+
+      const list = await app.request(
+        "/api/gateway/v1/budgets?scope_type=PROJECT",
+        { headers: legacyAuth() },
+      );
+      const listBody = await list.json();
+      expect(listBody.data.length).toBeGreaterThan(0);
+      for (const row of listBody.data) {
+        expect(row.end_users_seen).toBeUndefined();
+        expect(row.end_users_over).toBeUndefined();
+      }
+    });
+
     /** @scenario A GROUP budget cannot target another org's group */
     it("refuses a foreign tenant naming this org's group", async () => {
       const res = await post(

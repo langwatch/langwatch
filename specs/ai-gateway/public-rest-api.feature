@@ -249,6 +249,14 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 400
 
   @integration @rest @budgets
+  Scenario: An ATTRIBUTED_USER budget over REST carries the per-person standing
+    Given an attributed-user template anchored on a virtual key, with limit_usd "1"
+    And 2 end users have spent against it, 1 of them at or over the cap
+    When I list budgets
+    Then the row says limit_usd "1" (the PER-PERSON cap) with end_users_seen 2 and end_users_over 1
+    And budgets on every other scope carry neither field
+
+  @integration @rest @budgets
   Scenario: A provider-filtered budget round-trips provider_key
     When I create a budget with `provider_key` naming my org's model provider
     Then the response status is 201 and the DTO echoes `provider_key`

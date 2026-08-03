@@ -21,7 +21,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget, GatewayCacheRule, Project } from "@prisma/client";
+import type { GatewayCacheRule, Project } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -34,6 +34,7 @@ import { prisma } from "~/server/db";
 import {
   type BudgetScope,
   GatewayBudgetService,
+  type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
@@ -130,6 +131,8 @@ const budgetDtoSchema = z.object({
   archived_at: z.string().nullable(),
   created_at: z.string(),
   member_count: z.number().int().optional(),
+  end_users_seen: z.number().int().optional(),
+  end_users_over: z.number().int().optional(),
 });
 
 const spendSummaryDtoSchema = z.object({
@@ -1201,7 +1204,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
   describeRoute({
     summary: "List budgets",
     description:
-      "Returns every non-archived budget in the caller's organization across all six scope types (organization / team / project / virtual_key / principal / group), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
+      "Returns every non-archived budget in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Filter with `scope_type` (comma-separated). GROUP rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. ATTRIBUTED_USER rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled and `spent_usd` must not be read as real spend.",
     tags: ["Budgets"],
     responses: {
       ...baseResponses,
@@ -1774,7 +1777,7 @@ async function groupMemberCounts(
   return new Map(groups.map((g) => [g.id, g._count.members]));
 }
 
-function toBudgetDto(b: GatewayBudget, memberCount?: number) {
+function toBudgetDto(b: GatewayBudgetWithSeats, memberCount?: number) {
   return {
     id: b.id,
     organization_id: b.organizationId,
@@ -1794,6 +1797,10 @@ function toBudgetDto(b: GatewayBudget, memberCount?: number) {
     archived_at: b.archivedAt?.toISOString() ?? null,
     created_at: b.createdAt.toISOString(),
     ...(memberCount !== undefined ? { member_count: memberCount } : {}),
+    // Per-person templates only: one allowance per end user, so the wire
+    // reports the distribution instead of pretending there is one total.
+    ...(b.endUsersSeen !== undefined ? { end_users_seen: b.endUsersSeen } : {}),
+    ...(b.endUsersOver !== undefined ? { end_users_over: b.endUsersOver } : {}),
   };
 }
 
