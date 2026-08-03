@@ -1147,7 +1147,12 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
           schema: {
             type: "object",
             properties: {
-              reason: { type: "string", maxLength: 500, description: "Operator note, audit-logged and shown in the key's detail view." },
+              reason: {
+                type: "string",
+                maxLength: 500,
+                description:
+                  "Operator note, audit-logged and shown in the key's detail view.",
+              },
             },
           },
         },
@@ -1647,7 +1652,12 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
           schema: {
             type: "object",
             properties: {
-              reason: { type: "string", maxLength: 500, description: "Free-text operator note, audit-logged with the reset." },
+              reason: {
+                type: "string",
+                maxLength: 500,
+                description:
+                  "Free-text operator note, audit-logged with the reset.",
+              },
             },
           },
         },
