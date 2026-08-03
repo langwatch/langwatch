@@ -377,4 +377,57 @@ describe("Feature: Webhook endpoints REST API", () => {
     );
     expect(completed).toMatchObject({ family: "gateway", is_emitting: true });
   });
+
+  describe("the events log serves what it says it serves", () => {
+    /** @scenario An event id the log cannot answer for is a canonical 404 */
+    it("404s for an event id that is not in this organization's log", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await app.request(
+        "/api/webhooks/v1/events/req_nothing_here:completed",
+        { headers: headers() },
+      );
+      expect(res.status).toBe(404);
+      await expectCanonicalError(res, {
+        status: 404,
+        code: "webhook_event_not_found",
+      });
+    });
+
+    /** @scenario A malformed event id is refused the same way as a missing one */
+    it("404s for an id that names no event this log ever minted", async () => {
+      planHasWebhookEndpoints = true;
+      // `admitted` rows are in-flight requests, never emitted events, so an
+      // id naming one addresses nothing the log served.
+      for (const id of ["no-suffix", "req_x:admitted", "req_x:invented"]) {
+        const res = await app.request(
+          `/api/webhooks/v1/events/${encodeURIComponent(id)}`,
+          { headers: headers() },
+        );
+        expect(res.status).toBe(404);
+      }
+    });
+
+    /** @scenario The governance families are absent from the log, not merely empty by chance */
+    it("serves an empty page for the governance families it does not retain", async () => {
+      planHasWebhookEndpoints = true;
+      // These types ARE delivered by webhook. They are not in this log, and
+      // the route documents that rather than implying a transient gap.
+      for (const type of [
+        "gateway.budget.threshold_crossed",
+        "gateway.budget.breached",
+        "gateway.virtual_key.created",
+      ]) {
+        const res = await app.request(`/api/webhooks/v1/events?type=${type}`, {
+          headers: headers(),
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          data: unknown[];
+          next_cursor: string | null;
+        };
+        expect(body.data).toEqual([]);
+        expect(body.next_cursor).toBeNull();
+      }
+    });
+  });
 });

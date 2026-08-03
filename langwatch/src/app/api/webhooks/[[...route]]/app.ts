@@ -6,7 +6,10 @@ import {
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
-import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
+import {
+  WebhookEventNotFoundError,
+  WebhookEventsService,
+} from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { createLogger } from "@langwatch/observability";
 import type { Organization } from "@prisma/client";
@@ -483,7 +486,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   requireWebhookPlan,
   describeRoute({
     description:
-      "The organization's emitted-events log (Stripe /v1/events parity): cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it.",
+      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
   }),
   zValidator("query", eventsQuerySchema),
   async (c) => {
@@ -501,6 +504,24 @@ secured.access(requires("webhookEndpoints:view")).get(
       types: query.type !== undefined ? [query.type] : undefined,
     });
     return c.json({ data: page.events, next_cursor: page.nextCursor });
+  },
+);
+
+secured.access(requires("webhookEndpoints:view")).get(
+  "/events/:id",
+  requireWebhookPlan,
+  describeRoute({
+    description:
+      "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
+  }),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const event = await eventsService.getEmittedEventById({
+      organizationId: organization.id,
+      id: c.req.param("id"),
+    });
+    if (!event) throw new WebhookEventNotFoundError();
+    return c.json({ data: event });
   },
 );
 

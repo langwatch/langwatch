@@ -1277,6 +1277,13 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_event_not_found: {
+    // Says the two things a caller can act on: the log's horizon, and that
+    // governance events were never in it to begin with.
+    title: "That event isn't in the log",
+    describe: () =>
+      "It may have aged out of the events log, or it may be a budget or virtual-key event, which are delivered by webhook but not retained here.",
+  },
   external_id_conflict: {
     // The id is the caller's own, so naming it back is the fastest way to see
     // which of a batch of provisioning calls collided.

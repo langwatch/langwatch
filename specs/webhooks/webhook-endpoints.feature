@@ -371,3 +371,29 @@ Feature: Webhook endpoints, signed outbound event delivery
     Scenario: Webhook management is an organization-scoped permission
       Given a user with an organization admin role
       Then the webhook and spend permissions resolve against the org role
+
+  Rule: The events log serves what it says it serves
+
+    # The request families are reconstructable from the spend ledger, which
+    # carries a 13-month retention contract. The governance families are
+    # delivered exactly like them but nothing retains the envelope in a
+    # queryable form, so the log says so instead of implying a transient gap.
+
+    @integration
+    Scenario: An event id the log cannot answer for is a canonical 404
+      When an event is read by an id this organization's log does not hold
+      Then the response status is 404
+      And error.code = "webhook_event_not_found"
+      And the refusal does not say which of the three reasons applies
+
+    @integration
+    Scenario: A malformed event id is refused the same way as a missing one
+      When an event is read by an id naming no event the log ever minted
+      Then the response status is 404
+      And an id naming an admitted row is refused too, being an in-flight request
+
+    @integration
+    Scenario: The governance families are absent from the log, not merely empty by chance
+      When the log is filtered to a budget or virtual-key event type
+      Then the page is empty and its next cursor is null
+      And the route documents that the log does not retain those families

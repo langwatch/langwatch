@@ -39,6 +39,7 @@ GET    /api/webhooks/v1/endpoints/:id/deliveries     webhookEndpoints:view
 GET    /api/webhooks/v1/endpoints/:id/health         webhookEndpoints:view
 GET    /api/webhooks/v1/event-types                  webhookEndpoints:view
 GET    /api/webhooks/v1/events                       webhookEndpoints:view
+GET    /api/webhooks/v1/events/:id                   webhookEndpoints:view
 ```
 
 Create an endpoint subscribed to the billing stream:
@@ -360,6 +361,21 @@ The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200)
 ## The events log
 
 `GET /api/webhooks/v1/events?type=&from=&to=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type and `created` range (unix milliseconds). Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+
+`GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
+
+### Which families the log holds
+
+The log serves the **request** families only:
+
+| Type | In the events log |
+|---|---|
+| `gateway.request.completed` | Yes |
+| `gateway.request.settled` | Yes |
+| `gateway.budget.*` | **No** |
+| `gateway.virtual_key.*` | **No** |
+
+The governance families are delivered to your endpoints exactly like the request families, but they are not retained in a queryable log, so they cannot be listed, read by id, or replayed. If you need a durable record of budget and virtual-key events, persist them from your receiver when they arrive. A request for a type this log does not hold returns an empty page rather than an error, so a client can probe for new families without breaking.
 
 For **billing reconciliation**, do not reconcile against this log: read the spend ledger surfaces instead ([`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger)), which include settled rows and carry the 13-month retention contract. The events log is for delivery recovery and debugging.
 

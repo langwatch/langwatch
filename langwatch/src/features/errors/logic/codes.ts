@@ -198,6 +198,7 @@ export const APP_ERROR_CODES = [
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
   "virtual_key_not_found",
+  "webhook_event_not_found",
   "workflow_execution_failed",
   "workflow_not_found",
 ] as const;

@@ -26,6 +26,31 @@ function rowStatusesFor(types?: string[]): string[] {
   return [...new Set(types.flatMap(statusesOfType))];
 }
 
+/**
+ * An event id, split back into the row it names.
+ *
+ * Ids are minted as `<gatewayRequestId>:<suffix>` by `spendRowToEnvelope`,
+ * and the suffix is what says which of the two events on a single request is
+ * meant. `admitted` is deliberately unparseable here: those rows are in-flight
+ * requests, never emitted events, so an id naming one addresses nothing this
+ * log ever served.
+ */
+export function parseEventId(
+  id: string,
+): { gatewayRequestId: string; statuses: string[] } | null {
+  const sep = id.lastIndexOf(":");
+  if (sep <= 0 || sep === id.length - 1) return null;
+  const gatewayRequestId = id.slice(0, sep);
+  const suffix = id.slice(sep + 1);
+  if (suffix === "completed") {
+    return { gatewayRequestId, statuses: ["confirmed", "failed"] };
+  }
+  if (suffix === "settled") {
+    return { gatewayRequestId, statuses: ["settled"] };
+  }
+  return null;
+}
+
 /** The optional WHERE fragments and the parameters they bind: the time
  *  window, then the cursor position. Order matters only for readability of
  *  the generated SQL. */
@@ -134,6 +159,51 @@ export class WebhookEventsClickHouseRepository {
             })
           : null,
     };
+  }
+
+  /**
+   * One emitted event by its id, or null when this log does not hold it.
+   *
+   * Null covers three cases the caller cannot tell apart and does not need
+   * to: never emitted, out of retention, or belonging to another
+   * organization. Collapsing them is deliberate — distinguishing "expired"
+   * from "not yours" would make the endpoint an existence oracle for other
+   * tenants' request ids.
+   *
+   * The lookup is a point read on the table's own sort key
+   * (TenantId, GatewayRequestId), so it does not scan the partition.
+   */
+  async readEmittedEventById({
+    tenantIds,
+    id,
+  }: {
+    tenantIds: string[];
+    id: string;
+  }): Promise<SpendEventRow | null> {
+    if (tenantIds.length === 0) return null;
+    const parsed = parseEventId(id);
+    if (!parsed) return null;
+    const client = await this.resolveClient(tenantIds[0]!);
+
+    const result = await client.query({
+      query: `
+        SELECT ${SPEND_ROW_COLUMNS}
+        FROM ${SPEND_TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND GatewayRequestId = {gatewayRequestId:String}
+          AND Status IN {statuses:Array(String)}
+        LIMIT 1
+      `,
+      query_params: {
+        tenantIds,
+        gatewayRequestId: parsed.gatewayRequestId,
+        statuses: parsed.statuses,
+      },
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const row = raw[0];
+    return row ? mapSpendEventRow(row) : null;
   }
 }
 
