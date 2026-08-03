@@ -4,9 +4,8 @@
  * Pins the two-phase partition-hint resolver on `getByEvaluationId`: the
  * ScheduledAt seek must probe the recent window first (local-disk partitions)
  * and only fall back to an unbounded scan when the probe misses. Without the
- * bound the resolver itself walks every weekly partition incl. cold S3 —
- * measured 768ms × 5k calls/45min fleet-wide during the 2026-08-03 queue
- * saturation, on lookups for evaluations scheduled minutes earlier.
+ * bound the resolver itself walks every weekly partition incl. cold S3,
+ * costing whole seconds per lookup for evaluations scheduled minutes earlier.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";

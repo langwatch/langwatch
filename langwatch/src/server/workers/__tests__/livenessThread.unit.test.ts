@@ -2,10 +2,10 @@
  * @vitest-environment node
  *
  * Boots the real liveness thread (LIVENESS_THREAD_SOURCE, eval'd exactly as
- * production does) against a shared heartbeat and asserts the property the
- * 2026-08-03 incident demands: `/healthz` answers from the thread using the
- * heartbeat's age — a saturated-but-alive main loop stays 200, a loop stalled
- * past the budget goes 503 — and non-liveness paths proxy to the parent.
+ * production does) against a shared heartbeat: `/healthz` answers from the
+ * thread using the heartbeat's age — a saturated-but-alive main loop stays
+ * 200, a loop stalled past the budget goes 503 — and non-liveness paths
+ * proxy to the parent.
  */
 import http from "node:http";
 import { Worker } from "node:worker_threads";
@@ -47,7 +47,7 @@ describe("worker liveness thread", () => {
     thread = undefined;
   });
 
-  async function bootThread(heartbeat: Float64Array): Promise<number> {
+  async function bootThread(heartbeat: BigInt64Array): Promise<number> {
     const port = await getFreePort();
     thread = new Worker(LIVENESS_THREAD_SOURCE, {
       eval: true,
@@ -61,8 +61,8 @@ describe("worker liveness thread", () => {
     });
     await new Promise<void>((resolve, reject) => {
       thread!.once("error", reject);
-      thread!.on("message", (msg: { listening?: boolean }) => {
-        if (msg.listening) resolve();
+      thread!.on("message", (msg: { isListening?: boolean }) => {
+        if (msg.isListening) resolve();
       });
     });
     return port;
@@ -71,8 +71,8 @@ describe("worker liveness thread", () => {
   describe("when the main loop heartbeat is fresh", () => {
     /** @scenario A busy-but-alive main loop still passes liveness */
     it("answers 200 on the liveness path", async () => {
-      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
-      heartbeat[0] = Date.now();
+      const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = BigInt(Date.now());
       const port = await bootThread(heartbeat);
 
       const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
@@ -84,8 +84,8 @@ describe("worker liveness thread", () => {
   describe("when the heartbeat is stalled past the budget", () => {
     /** @scenario A main loop stalled past the budget fails liveness */
     it("answers 503 so a genuinely dead main loop still gets restarted", async () => {
-      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
-      heartbeat[0] = Date.now() - STALL_BUDGET_MS - 60_000;
+      const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = BigInt(Date.now() - STALL_BUDGET_MS - 60_000);
       const port = await bootThread(heartbeat);
 
       const res = await fetchStatus(port, WORKER_LIVENESS_PATH);
@@ -95,10 +95,10 @@ describe("worker liveness thread", () => {
   });
 
   describe("when a non-liveness path is requested", () => {
-    /** @scenario Metrics proxy through to the main thread with a timeout */
+    /** @scenario Metrics proxy through to the main thread */
     it("proxies to the parent and serves its reply", async () => {
-      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
-      heartbeat[0] = Date.now();
+      const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = BigInt(Date.now());
       const port = await bootThread(heartbeat);
       thread!.on(
         "message",
@@ -118,9 +118,11 @@ describe("worker liveness thread", () => {
       expect(res.body).toBe("proxied:/metrics");
     });
 
+    /** @scenario A metrics request fails when the main thread never replies */
+    /** @scenario A metrics request fails when the main thread never replies */
     it("answers 503 when the parent never replies (stalled main loop)", async () => {
-      const heartbeat = new Float64Array(new SharedArrayBuffer(8));
-      heartbeat[0] = Date.now();
+      const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+      heartbeat[0] = BigInt(Date.now());
       const port = await bootThread(heartbeat);
 
       const res = await fetchStatus(port, "/metrics");

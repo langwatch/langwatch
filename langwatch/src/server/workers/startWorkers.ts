@@ -152,8 +152,51 @@ async function bootUsageStatsWorker(
 export const WORKER_LIVENESS_PATH = "/healthz";
 
 /**
+ * The single bearer gate + registry fetch for the worker's `/metrics`,
+ * transport-agnostic so the in-loop HTTP handler and the liveness thread's
+ * proxy share ONE copy of the security decision (two copies drift).
+ */
+async function evaluateMetricsRequest({
+  url,
+  request,
+  isMetricsAuthorized,
+}: {
+  url: string | undefined;
+  /** The auth input, shaped like the parts of IncomingMessage the gate reads. */
+  request: Pick<IncomingMessage, "headers">;
+  isMetricsAuthorized: (req: IncomingMessage) => boolean;
+}): Promise<{
+  status: number;
+  headers?: Record<string, string>;
+  body?: string;
+}> {
+  if (url !== "/metrics") return { status: 404 };
+  try {
+    if (!isMetricsAuthorized(request as IncomingMessage))
+      return { status: 401 };
+  } catch (error) {
+    // Fail closed when METRICS_API_KEY is unset in production.
+    logger.error({ error }, "worker metrics auth misconfigured");
+    return { status: 500 };
+  }
+  try {
+    const metrics = await register.metrics();
+    return {
+      status: 200,
+      headers: { "Content-Type": register.contentType },
+      body: metrics,
+    };
+  } catch (error) {
+    logger.error({ error }, "error getting worker metrics");
+    return { status: 500 };
+  }
+}
+
+/**
  * The worker metrics server's request handler, split out so the routing and
- * auth branches are testable without binding a port.
+ * auth branches are testable without binding a port. Used directly only on
+ * the fallback path (liveness thread failed to start); the normal path serves
+ * the same decisions through the thread proxy.
  */
 export function createWorkerMetricsHandler(
   isMetricsAuthorized: (req: IncomingMessage) => boolean,
@@ -163,29 +206,13 @@ export function createWorkerMetricsHandler(
       res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
       return;
     }
-    if (req.url !== "/metrics") {
-      res.writeHead(404).end();
-      return;
-    }
-    try {
-      if (!isMetricsAuthorized(req)) {
-        res.writeHead(401).end();
-        return;
-      }
-    } catch (error) {
-      // Fail closed when METRICS_API_KEY is unset in production.
-      logger.error({ error }, "worker metrics auth misconfigured");
-      res.writeHead(500).end();
-      return;
-    }
-    res.setHeader("Content-Type", register.contentType);
-    register
-      .metrics()
-      .then((metrics) => res.end(metrics))
-      .catch((error) => {
-        logger.error({ error }, "error getting worker metrics");
-        res.writeHead(500).end();
-      });
+    void evaluateMetricsRequest({
+      url: req.url,
+      request: req,
+      isMetricsAuthorized,
+    }).then(({ status, headers, body }) => {
+      res.writeHead(status, headers ?? {}).end(body ?? "");
+    });
   };
 }
 
@@ -203,14 +230,15 @@ export function createWorkerMetricsHandler(
  * How often the main event loop stamps its heartbeat, and how stale that
  * stamp may get before the liveness thread reports the process dead.
  *
- * The 2026-08-03 incident: a worker saturated with queue catch-up pins the
- * event loop for 60–90s of legitimate work, `/healthz` (served on that same
- * loop) misses even a 10s×6 probe budget, and Kubernetes kills exactly the
- * busiest pods — requeueing their in-flight jobs and deepening the backlog.
- * Serving liveness from a worker thread with a loop heartbeat separates the
- * two questions: "is the process alive" (thread answers instantly, always)
- * and "is the main loop moving" (heartbeat age, judged against a budget far
- * beyond any legitimate saturation but well short of "restart never comes").
+ * A worker saturated with queue catch-up can pin the event loop for over a
+ * minute of legitimate work; `/healthz` served on that same loop then misses
+ * any realistic kubelet probe budget, and Kubernetes kills exactly the
+ * busiest pods — requeueing their in-flight jobs and deepening the backlog
+ * that caused the saturation. Serving liveness from a worker thread with a
+ * loop heartbeat separates the two questions: "is the process alive" (thread
+ * answers instantly, always) and "is the main loop moving" (heartbeat age,
+ * judged against a budget far beyond any legitimate saturation but well
+ * short of "restart never comes").
  */
 export const WORKER_HEARTBEAT_INTERVAL_MS = 1_000;
 export const WORKER_HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
@@ -228,7 +256,10 @@ const METRICS_PROXY_TIMEOUT_MS = 10_000;
 export const LIVENESS_THREAD_SOURCE = `
 const http = require("node:http");
 const { parentPort, workerData } = require("node:worker_threads");
-const heartbeat = new Float64Array(workerData.heartbeat);
+// BigInt64 + Atomics: plain cross-thread Float64Array access has no atomicity
+// guarantee (a torn read yields a garbage timestamp); Atomics only supports
+// integer typed arrays, and epoch millis fit BigInt64 exactly.
+const heartbeat = new BigInt64Array(workerData.heartbeat);
 const pending = new Map();
 let nextId = 1;
 parentPort.on("message", (msg) => {
@@ -240,7 +271,7 @@ parentPort.on("message", (msg) => {
 });
 const server = http.createServer((req, res) => {
   if (req.url === workerData.livenessPath) {
-    const stalledMs = Date.now() - heartbeat[0];
+    const stalledMs = Date.now() - Number(Atomics.load(heartbeat, 0));
     if (stalledMs > workerData.stallBudgetMs) {
       res.writeHead(503, { "Content-Type": "text/plain" })
         .end("main loop stalled " + Math.round(stalledMs / 1000) + "s");
@@ -261,7 +292,7 @@ const server = http.createServer((req, res) => {
     authorization: req.headers.authorization ?? null,
   });
 });
-server.listen(workerData.port, () => parentPort.postMessage({ listening: true }));
+server.listen(workerData.port, () => parentPort.postMessage({ isListening: true }));
 `;
 
 // The metrics port is bound by the liveness thread (LIVENESS_THREAD_SOURCE)
@@ -271,20 +302,25 @@ server.listen(workerData.port, () => parentPort.postMessage({ listening: true })
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
+  // Deferred like every boot dependency in this file: keeps the worker's
+  // module graph (and prom-client registry construction) off the process
+  // import path until the metrics server actually boots.
   const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
     "~/server/metrics"
   );
   const metricsPort = getWorkerMetricsPort();
 
-  const heartbeat = new Float64Array(new SharedArrayBuffer(8));
-  heartbeat[0] = Date.now();
+  // BigInt64 + Atomics — see the note in LIVENESS_THREAD_SOURCE.
+  const heartbeat = new BigInt64Array(new SharedArrayBuffer(8));
+  Atomics.store(heartbeat, 0, BigInt(Date.now()));
   const heartbeatTimer = setInterval(() => {
-    heartbeat[0] = Date.now();
+    Atomics.store(heartbeat, 0, BigInt(Date.now()));
   }, WORKER_HEARTBEAT_INTERVAL_MS);
   heartbeatTimer.unref();
 
+  let thread: Worker | undefined;
   try {
-    const thread = new Worker(LIVENESS_THREAD_SOURCE, {
+    thread = new Worker(LIVENESS_THREAD_SOURCE, {
       eval: true,
       workerData: {
         port: metricsPort,
@@ -294,32 +330,50 @@ async function bootMetricsServer(
         proxyTimeoutMs: METRICS_PROXY_TIMEOUT_MS,
       },
     });
+    const startedThread = thread;
     await new Promise<void>((resolve, reject) => {
-      thread.once("error", reject);
-      thread.on("message", (msg: { listening?: boolean; id?: number }) => {
-        if (msg.listening) {
-          thread.removeListener("error", reject);
-          resolve();
-          return;
-        }
-        if (msg.id === undefined) return;
-        void respondToLivenessThread(
-          thread,
-          msg as { id: number; url: string; authorization: string | null },
-          isMetricsAuthorized,
-        );
-      });
+      startedThread.once("error", reject);
+      startedThread.on(
+        "message",
+        (msg: { isListening?: boolean; id?: number }) => {
+          if (msg.isListening) {
+            startedThread.removeListener("error", reject);
+            resolve();
+            return;
+          }
+          if (msg.id === undefined) return;
+          void respondToLivenessThread(
+            startedThread,
+            msg as { id: number; url: string; authorization: string | null },
+            isMetricsAuthorized,
+          );
+        },
+      );
+    });
+    // Post-startup lifecycle: an unhandled Worker "error" would re-throw on
+    // the main thread and kill the process. Log instead — a dead thread stops
+    // answering the port, probes fail, and the pod restarts through the
+    // normal Kubernetes path.
+    startedThread.on("error", (error) => {
+      logger.error({ error }, "worker liveness thread errored");
+    });
+    startedThread.on("exit", (code) => {
+      if (code !== 0) {
+        logger.error({ code }, "worker liveness thread exited unexpectedly");
+      }
     });
     logger.info(
       `worker liveness thread serving port ${metricsPort} (heartbeat budget ${WORKER_HEARTBEAT_STALL_BUDGET_MS}ms)`,
     );
     shutdownHandles.push(async () => {
       clearInterval(heartbeatTimer);
-      await thread.terminate();
+      await startedThread.terminate();
     });
   } catch (error) {
-    // The fallback server has no heartbeat consumer, so stop stamping it.
+    // The fallback server has no heartbeat consumer, so stop stamping it —
+    // and reap the thread if it was spawned but failed before listening.
     clearInterval(heartbeatTimer);
+    await thread?.terminate().catch(() => undefined);
     logger.warn(
       { error },
       "liveness thread failed to start; serving metrics/liveness on the main loop",
@@ -352,36 +406,12 @@ async function respondToLivenessThread(
   msg: { id: number; url: string; authorization: string | null },
   isMetricsAuthorized: (req: IncomingMessage) => boolean,
 ): Promise<void> {
-  const reply = (
-    status: number,
-    headers?: Record<string, string>,
-    body?: string,
-  ) => thread.postMessage({ id: msg.id, status, headers, body });
-  if (msg.url !== "/metrics") {
-    reply(404);
-    return;
-  }
-  try {
-    const fakeReq = {
-      headers: { authorization: msg.authorization ?? undefined },
-    } as IncomingMessage;
-    if (!isMetricsAuthorized(fakeReq)) {
-      reply(401);
-      return;
-    }
-  } catch (error) {
-    // Fail closed when METRICS_API_KEY is unset in production.
-    logger.error({ error }, "worker metrics auth misconfigured");
-    reply(500);
-    return;
-  }
-  try {
-    const metrics = await register.metrics();
-    reply(200, { "Content-Type": register.contentType }, metrics);
-  } catch (error) {
-    logger.error({ error }, "error getting worker metrics");
-    reply(500);
-  }
+  const { status, headers, body } = await evaluateMetricsRequest({
+    url: msg.url,
+    request: { headers: { authorization: msg.authorization ?? undefined } },
+    isMetricsAuthorized,
+  });
+  thread.postMessage({ id: msg.id, status, headers, body });
 }
 
 /**

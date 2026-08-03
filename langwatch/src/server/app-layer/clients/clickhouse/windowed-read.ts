@@ -18,10 +18,11 @@ export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
  * The resolvers (`resolveScheduledAtMs`, `resolveTraceOccurredAtMs`) exist to
  * find the partition-key value that lets the heavy read prune — but without a
  * bound of their own they walk every weekly partition's index, including
- * S3-tiered cold ones (measured 0.7–1.2s per call on the worker job paths,
- * which only ever resolve minutes-old aggregates). 35 days ≈ five weekly
- * partitions, comfortably on local disk, while the unbounded fallback keeps
- * old aggregates correct.
+ * S3-tiered cold ones — turning a point seek into a cold scan costing whole
+ * seconds. The dominant callers are worker jobs resolving minutes-old
+ * aggregates, but callers may resolve records of any age: 35 days ≈ five
+ * weekly partitions, comfortably on local disk, and anything older pays one
+ * extra probe before the unbounded fallback answers it correctly.
  */
 export const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 

@@ -4,8 +4,8 @@
  * Pins the two-phase partition-hint resolver behind the hint-less span reads:
  * the trace OccurredAt seek on `trace_summaries` must probe the recent window
  * first and only fall back to an unbounded scan on a miss. Without the bound
- * the resolver walks every weekly partition incl. cold S3 (measured ~0.9s avg
- * during the 2026-08-03 queue saturation, on traces minutes old).
+ * the resolver walks every weekly partition incl. cold S3, costing whole
+ * seconds per lookup for traces that are minutes old.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
@@ -68,7 +68,11 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
 
   describe("when the windowed probe misses", () => {
     it("falls back to the unbounded seek so old traces stay resolvable", async () => {
-      const { client, queries } = createCapturingClient([null, null]);
+      const oldOccurredAtMs = Date.now() - 200 * 24 * 60 * 60 * 1000;
+      const { client, queries } = createCapturingClient([
+        null,
+        oldOccurredAtMs,
+      ]);
       const repo = new SpanStorageClickHouseRepository(
         async () => client as never,
       );
@@ -85,6 +89,20 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
       expect(resolverQueries).toHaveLength(2);
       expect(resolverQueries[0]!.query).toContain("OccurredAt >=");
       expect(resolverQueries[1]!.query).not.toContain("OccurredAt >=");
+      // The fallback's resolved timestamp must reach the span read as a
+      // partition window centred on the old trace, not just be discarded.
+      const spanRead = queries.find((q) => q.query.includes("SpanId"));
+      expect(spanRead).toBeDefined();
+      expect(spanRead!.query_params).toMatchObject({
+        fromMs: expect.any(Number),
+        toMs: expect.any(Number),
+      });
+      const { fromMs, toMs } = spanRead!.query_params as {
+        fromMs: number;
+        toMs: number;
+      };
+      expect(fromMs).toBeLessThanOrEqual(oldOccurredAtMs);
+      expect(toMs).toBeGreaterThanOrEqual(oldOccurredAtMs);
     });
   });
 });

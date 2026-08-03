@@ -1240,27 +1240,33 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   /**
    * Two-phase probe: without an OccurredAt predicate this seek walks every
    * weekly partition's index on `trace_summaries` — including S3-tiered cold
-   * ones — even though the worker job paths only ever resolve minutes-old
-   * traces (measured 0.9s avg during the 2026-08-03 saturation). The recent
-   * window keeps the hot path on local-disk partitions; a miss (old trace)
-   * pays the unbounded fallback and stays correct.
+   * ones — costing whole seconds per call, while the worker job paths mostly
+   * resolve minutes-old traces. The recent window keeps the hot path on
+   * local-disk partitions; a miss (old trace) pays the unbounded fallback
+   * and stays correct.
    */
   private async resolveTraceOccurredAtMs(
     tenantId: string,
     traceId: string,
   ): Promise<number | undefined> {
-    const recent = await this.queryTraceOccurredAtMs(tenantId, traceId, {
+    const recent = await this.queryTraceOccurredAtMs({
+      tenantId,
+      traceId,
       sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
     });
     if (recent !== undefined) return recent;
-    return this.queryTraceOccurredAtMs(tenantId, traceId, {});
+    return this.queryTraceOccurredAtMs({ tenantId, traceId });
   }
 
-  private async queryTraceOccurredAtMs(
-    tenantId: string,
-    traceId: string,
-    { sinceMs }: { sinceMs?: number },
-  ): Promise<number | undefined> {
+  private async queryTraceOccurredAtMs({
+    tenantId,
+    traceId,
+    sinceMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    sinceMs?: number;
+  }): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
     const windowPredicate =
       sinceMs !== undefined
