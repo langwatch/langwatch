@@ -93,26 +93,48 @@ function affectedBucketsBySeries({
       ...seriesPoints,
       ...(successorsBySeries.get(seriesId) ?? []),
     ].sort(comparePoints);
-    const affected = new Set<number>();
-    for (const point of seriesPoints) {
-      let lo = 0;
-      let hi = candidates.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >>> 1;
-        if (comparePoints(candidates[mid]!, point) > 0) hi = mid;
-        else lo = mid + 1;
-      }
-      const successor = candidates[lo];
-      for (const bucket of affectedRollupBuckets({
-        points: successor ? [successor] : [],
-        insertedPoint: point,
-      })) {
-        affected.add(bucket);
-      }
-    }
+    const affected = affectedBucketsForSeries({ seriesPoints, candidates });
     if (affected.size > 0) affectedBySeries.set(seriesId, affected);
   }
   return affectedBySeries;
+}
+
+function affectedBucketsForSeries({
+  seriesPoints,
+  candidates,
+}: {
+  seriesPoints: readonly CanonicalMetricDataPoint[];
+  candidates: readonly CanonicalMetricDataPoint[];
+}): Set<number> {
+  const affected = new Set<number>();
+  for (const point of seriesPoints) {
+    const successor = successorIn({ sorted: candidates, point });
+    for (const bucket of affectedRollupBuckets({
+      points: successor ? [successor] : [],
+      insertedPoint: point,
+    })) {
+      affected.add(bucket);
+    }
+  }
+  return affected;
+}
+
+/** The first point ordering strictly after `point`, from a sorted array. */
+function successorIn({
+  sorted,
+  point,
+}: {
+  sorted: readonly CanonicalMetricDataPoint[];
+  point: CanonicalMetricDataPoint;
+}): CanonicalMetricDataPoint | undefined {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (comparePoints(sorted[mid]!, point) > 0) hi = mid;
+    else lo = mid + 1;
+  }
+  return sorted[lo];
 }
 
 export class MetricDataPointClickHouseRepository
