@@ -76,6 +76,14 @@ export function createGovernanceKpisSyncReactor(
     shouldReact: (_event, context) =>
       isGovernanceOriginTrace(context.foldState.attributes),
     options: {
+      // NOTE: the handler swallows repository failures by design (see its
+      // catch, and the test pinning it). The window makes that cheaper to get
+      // wrong: a burst now leaves ONE job, so a failed write is retried by
+      // the NEXT window rather than by the next span, and a failure in a
+      // trace's final window is not retried at all. Whether these should
+      // rethrow is an open question — rethrowing retries the job under Redis,
+      // but on the in-memory queue `send` awaits completion, so it would
+      // surface as fold redelivery instead.
       // Level-triggered: the row carries the fold's running totals, so the
       // LAST event of a trace must always land. shouldSurviveDispatch stays off.
       ...throttledPerWindow({
