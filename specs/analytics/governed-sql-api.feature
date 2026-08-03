@@ -194,6 +194,87 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then every attempt is rejected by the database
 
   # ---------------------------------------------------------------------------
+  # The governed analytics.* schema: the catalog and the views over the real
+  # fact tables (bound in this PR — Testcontainers, the shipped ClickHouse
+  # migrations applied, executing as the restricted user)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Every governed view declares its grain, join keys, and time column
+    Given the governed analytics schema catalog
+    When each dataset is inspected
+    Then it declares a grain, join keys, a freshness, and the column that prunes its partitions
+    And every column it advertises is one the dataset exposes
+
+  @unit
+  Scenario: The gated column set is derived from the data privacy policy, not hand-listed
+    Given the data privacy policy's content categories and their attribute keys
+    When the governed schema's gated columns are derived for a caller's permissions
+    Then a column built over a content-carrying attribute key is gated exactly as that policy classifies it
+    And no ungated column is built over a content-carrying key
+    And a caller whose permissions are unresolved has every gated column withheld
+
+  @integration
+  Scenario: The catalog's declared columns match the tables the views read
+    Given the shipped ClickHouse migrations applied to the test server
+    When the governed schema catalog is compared with the created tables and views
+    Then every column the catalog declares exists with the type it declares
+
+  @integration
+  Scenario: Every governed view names the column that prunes its partitions
+    Given the shipped ClickHouse migrations applied to the test server
+    When each governed view's advertised time column is compared with its source table's partitioning
+    Then the advertised column is the one the table partitions by
+
+  @integration
+  Scenario: A governed view returns only the calling tenant's rows
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it selects from each governed view
+    Then every returned row belongs to tenant-a
+    And no row of tenant-b is returned
+
+  @integration
+  Scenario: A governed view returns one row per logical record, the latest version
+    Given a fact table holding two versions of the same record
+    When the restricted identity selects that record through the governed view
+    Then one row is returned
+    And it carries the newer version's values
+
+  @integration
+  Scenario: A column no governed view exposes is unreachable, not merely unselected
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it references a column outside the governed schema catalog
+    Then the query is rejected by the database
+    And a column the catalog does expose reads normally
+
+  @integration
+  Scenario: Captured content is reachable only through the gated columns
+    Given seeded traces and spans whose attributes carry captured content
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads the attribute maps a governed view exposes
+    Then no captured content is present in them
+    And the same content is returned by the view's content-gated columns
+
+  @integration
+  Scenario: Reading the physical fact table directly is policed the same way
+    Given the restricted identity carries tenant-a's valid key-hash context
+    When it selects from the physical table a governed view reads
+    Then every returned row belongs to tenant-a
+
+  @integration
+  Scenario: Row policies leave the application's own reads untouched
+    Given the governed row policies applied to the fact tables
+    When an administrative identity reads those tables
+    Then rows of both tenants are returned
+
+  @integration
+  Scenario: A time predicate on a governed view prunes partitions
+    Given seeded fact rows spread across several weekly partitions
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it selects from a governed view with and without a predicate on the view's time column
+    Then the filtered query reads substantially fewer rows than the unfiltered one
+
+  # ---------------------------------------------------------------------------
   # Isolation proof, part 2: PG-resident data via named-collection
   # PostgreSQL-engine tables (bound in this PR — real PostgreSQL container)
   # ---------------------------------------------------------------------------
@@ -407,8 +488,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     When it attempts to supply, override, inspect, or widen tenant scope via SQL text or request parameters
     Then the attempt is rejected or ignored and only the authenticated tenant's data is reachable
 
-  # @unimplemented: content-gating parity lands with the schema/catalog PR of #6480.
-  @integration @unimplemented
+  @integration
   Scenario: Content-gated fields are refused in every expression position
     Given an authenticated API client without content permissions
     When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position
@@ -576,6 +656,26 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: Restricted identity with a valid key context reads only its own tenant's rows
 #   → Scenario: The restricted identity cannot enumerate the key map beyond its own key
 #   → Scenario: Multiple statements in one request are rejected
+#
+# Governed schema (the analytics.* catalog and the views over the fact tables):
+# AC "Expose a stable analytics.* namespace; every exposed dataset declares grain,
+#     join keys, sensitivity, freshness"
+#   → Scenario: Every governed view declares its grain, join keys, and time column
+#   → Scenario: The catalog's declared columns match the tables the views read
+#   → Scenario: Every governed view names the column that prunes its partitions
+# AC "Derive content-gated fields from the existing visibility stack — never a second
+#     handwritten gated-field list; keep a parity test"
+#   → Scenario: The gated column set is derived from the data privacy policy, not hand-listed
+#   → Scenario: Captured content is reachable only through the gated columns
+# (supporting invariants of the same proof: the views are bounded by the same row
+#  policies as the tables under them, the grant is the exposed surface, and the
+#  views are usable at scale)
+#   → Scenario: A governed view returns only the calling tenant's rows
+#   → Scenario: A governed view returns one row per logical record, the latest version
+#   → Scenario: A column no governed view exposes is unreachable, not merely unselected
+#   → Scenario: Reading the physical fact table directly is policed the same way
+#   → Scenario: Row policies leave the application's own reads untouched
+#   → Scenario: A time predicate on a governed view prunes partitions
 #
 # Product:
 # AC "schema discovery scoped to own permissions" → Scenario: Authenticated client discovers its governed schema scoped to its own permissions

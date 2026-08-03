@@ -72,6 +72,7 @@ import {
 } from "@testcontainers/postgresql";
 import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
+import { migrateUp } from "../../../clickhouse/goose";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
@@ -176,6 +177,22 @@ export const GOVERNED_FACT_TABLES: GovernedTable[] = [
   { table: "spans", tenantColumn: "TenantId" },
 ];
 
+/**
+ * Where the fact tables the proof reads come from.
+ *
+ * `fixture` is two toy `MergeTree` tables created by this harness — enough to
+ * prove row policies, grants and settings behave, and deliberately unlike the
+ * real schema so nothing about the real schema can be inferred from it passing.
+ *
+ * `migrated` runs the *shipped* ClickHouse migrations into the container and
+ * seeds the real `trace_summaries` / `stored_spans` / `evaluation_runs` /
+ * `simulation_runs` — the tables the governed views are built over. Anything
+ * about deduplication, partition pruning or column types is only meaningful
+ * against these: a `MergeTree` fixture has no versions to collapse and one
+ * partition to prune.
+ */
+export type GovernedFactTableMode = "fixture" | "migrated";
+
 export interface GovernedClickHouseHarness {
   names: GovernedSqlNames;
   /** Administrative client. Reads `system.*`, seeds fixtures, runs audits. */
@@ -183,6 +200,14 @@ export interface GovernedClickHouseHarness {
   tenantA: GovernedTenantFixture;
   tenantB: GovernedTenantFixture;
   governedTables: GovernedTable[];
+  /**
+   * Database holding the fact tables the governed views read.
+   *
+   * The governed database under `fixture`; a separate migrated database under
+   * `migrated`, because the shipped migrations own every table in the database
+   * they run against and would collide with the governed objects.
+   */
+  factDatabase: string;
   /**
    * A client authenticated as the restricted identity.
    *
@@ -231,11 +256,20 @@ function writeConfigFile(
 /**
  * Starts ClickHouse with the server-level prerequisites installed, then applies
  * the shipped provisioning and seeds two tenants' rows.
+ *
+ * Under `facts: "migrated"` the shipped ClickHouse migrations run into a second
+ * database first, and the access model is provisioned with no governed tables
+ * of its own — the caller applies `governedViewSetupStatements` over the
+ * migrated tables instead. The whole-table grant the fixture path issues would
+ * otherwise sit *underneath* the column-scoped one and quietly widen it back
+ * out, since ClickHouse grants are additive.
  */
 export async function startGovernedClickHouse({
   suite,
+  facts = "fixture",
 }: {
   suite: string;
+  facts?: GovernedFactTableMode;
 }): Promise<GovernedClickHouseHarness> {
   const names = governedNamesForSuite(suite);
   const accessManagementXml = clickHouseAccessManagementConfigXml({
@@ -304,26 +338,43 @@ export async function startGovernedClickHouse({
   // creates a fixture object cannot leak into the next run's audits.
   await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
-  await applyAsAdmin(
-    Object.entries(FACT_TABLE_DDL).map(
-      ([table, ddl]) => `CREATE TABLE ${names.database}.${table} ${ddl}`,
-    ),
-  );
+
+  const factDatabase =
+    facts === "migrated" ? `${names.database}_facts` : names.database;
+  const governedTables = facts === "migrated" ? [] : GOVERNED_FACT_TABLES;
+
+  if (facts === "migrated") {
+    await runShippedMigrations({ container, database: factDatabase });
+  } else {
+    await applyAsAdmin(
+      Object.entries(FACT_TABLE_DDL).map(
+        ([table, ddl]) => `CREATE TABLE ${names.database}.${table} ${ddl}`,
+      ),
+    );
+  }
+
   await applyAsAdmin(
     governedClickHouseSetupStatements({
       names,
       password: RESTRICTED_PASSWORD,
-      governedTables: GOVERNED_FACT_TABLES,
+      governedTables,
     }),
   );
-  await seedTenantRows({ admin, names });
+
+  await seedKeyMap({ admin, names });
+  if (facts === "migrated") {
+    await seedRealFactRows({ admin, database: factDatabase });
+  } else {
+    await seedTenantRows({ admin, names });
+  }
 
   const harness: GovernedClickHouseHarness = {
     names,
     admin,
     tenantA: TENANT_A,
     tenantB: TENANT_B,
-    governedTables: GOVERNED_FACT_TABLES,
+    governedTables,
+    factDatabase,
     container,
     applyAsAdmin,
     async restrictedClient(options) {
@@ -349,8 +400,8 @@ export async function startGovernedClickHouse({
   return harness;
 }
 
-/** Two tenants, each with rows in every fact table and a live key-map entry. */
-async function seedTenantRows({
+/** One live key-map entry per tenant. Both fact-table modes need this. */
+async function seedKeyMap({
   admin,
   names,
 }: {
@@ -365,6 +416,16 @@ async function seedTenantRows({
       TenantId: tenant.tenantId,
     })),
   });
+}
+
+/** Two tenants, each with rows in every fixture fact table. */
+async function seedTenantRows({
+  admin,
+  names,
+}: {
+  admin: ClickHouseClient;
+  names: GovernedSqlNames;
+}): Promise<void> {
   await admin.insert({
     table: `${names.database}.traces`,
     format: "JSONEachRow",
@@ -389,6 +450,438 @@ async function seedTenantRows({
       })),
     ),
   });
+}
+
+// ---------------------------------------------------------------------------
+// The real fact tables
+// ---------------------------------------------------------------------------
+
+/** Fact tables the governed views read, by the name the migrations give them. */
+export const REAL_FACT_TABLES = [
+  "trace_summaries",
+  "stored_spans",
+  "evaluation_runs",
+  "simulation_runs",
+] as const;
+
+/**
+ * Runs the shipped ClickHouse migrations into their own database.
+ *
+ * Its own, not the governed one: the migrations own every table in the database
+ * they run against, and the governed database holds the key map and the views.
+ *
+ * `CLICKHOUSE_CLUSTER` is unset for the duration. It is a *deployment* fact
+ * that switches every engine to its `Replicated` form, and a developer whose
+ * `.env` carries it would otherwise get migrations that need a Keeper the
+ * container has not got — a failure that reads like a broken migration.
+ */
+async function runShippedMigrations({
+  container,
+  database,
+}: {
+  container: StartedClickHouseContainer;
+  database: string;
+}): Promise<void> {
+  const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+  delete process.env.CLICKHOUSE_CLUSTER;
+  try {
+    await migrateUp({
+      connectionUrl: container.getConnectionUrl(),
+      database,
+    });
+  } finally {
+    if (previousCluster !== undefined) {
+      process.env.CLICKHOUSE_CLUSTER = previousCluster;
+    }
+  }
+}
+
+/**
+ * The seeded history: eight weekly partitions, the last of which is the window
+ * a "recent" query asks for.
+ *
+ * Fixed dates rather than offsets from `now`, so a reused container seeded last
+ * week and a fresh one seeded today hold the same partitions and the pruning
+ * measurement compares like with like.
+ */
+export const SEED_WEEK_COUNT = 8;
+const SEED_ANCHOR = Date.UTC(2026, 0, 5); // a Monday, so weeks line up
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+export const SEED_TRACES_PER_WEEK = 250;
+export const SEED_EVALUATIONS_PER_WEEK = 25;
+
+/** Start of seeded week `index`, as ClickHouse's `DateTime64` input format. */
+function seedWeekStart(index: number): string {
+  return new Date(SEED_ANCHOR + index * WEEK_MS)
+    .toISOString()
+    .replace("T", " ")
+    .replace("Z", "");
+}
+
+/** The single week a "recent" query narrows to — the last one seeded. */
+export const SEED_RECENT_WEEK = {
+  from: seedWeekStart(SEED_WEEK_COUNT - 1),
+  to: seedWeekStart(SEED_WEEK_COUNT),
+} as const;
+
+/**
+ * Content the seed writes, so a leak assertion names the exact string that
+ * would appear rather than checking a field is "not empty".
+ */
+export const SEEDED_CONTENT = {
+  traceInput: "CAPTURED-TRACE-INPUT-do-not-leak",
+  traceOutput: "CAPTURED-TRACE-OUTPUT-do-not-leak",
+  spanInput: "CAPTURED-SPAN-INPUT-do-not-leak",
+  spanOutput: "CAPTURED-SPAN-OUTPUT-do-not-leak",
+  /** Written under `gen_ai.prompt`, an exact key of the data-privacy catalog. */
+  spanPromptAttribute: "CAPTURED-SPAN-PROMPT-do-not-leak",
+  /** Written under `gen_ai.prompt.0.content`, the exploded form of the same key. */
+  spanExplodedPromptAttribute: "CAPTURED-SPAN-PROMPT-PART-do-not-leak",
+  evaluationInputs: "CAPTURED-EVALUATION-INPUTS-do-not-leak",
+  simulationMessage: "CAPTURED-SIMULATION-MESSAGE-do-not-leak",
+  simulationReasoning: "CAPTURED-SIMULATION-REASONING-do-not-leak",
+} as const;
+
+/** A span attribute that is a dimension rather than content, so it survives. */
+export const SEEDED_DIMENSION_ATTRIBUTE = {
+  key: "gen_ai.request.model",
+  value: "gpt-5-mini",
+} as const;
+
+/**
+ * The trace seeded twice, to prove the views collapse versions.
+ *
+ * Both versions carry the same partition-key time and differ only in
+ * `UpdatedAt` and in the value a reader can see, so "the view returned one row"
+ * and "it returned the newer one" are separate, checkable claims.
+ */
+export const DEDUP_FIXTURE = {
+  traceIdSuffix: "dedup-trace",
+  staleSpanCount: 1,
+  latestSpanCount: 99,
+  staleUpdatedAt: "2026-02-23 00:00:00.000",
+  latestUpdatedAt: "2026-02-23 00:00:01.000",
+} as const;
+
+/** The trace id the dedup fixture uses for a tenant. */
+export function dedupTraceId(tenantId: string): string {
+  return `${tenantId}-${DEDUP_FIXTURE.traceIdSuffix}`;
+}
+
+/**
+ * The trace whose newer version sits in a *different* weekly partition.
+ *
+ * The incident-backed case, and the one a dedup shape can get wrong without
+ * ever returning a duplicate: the partition key is a business time that a later
+ * fold can move, so a view that collapses versions per partition — or one whose
+ * `max()` scope carries a time range — reports the older version as current and
+ * looks entirely healthy doing it.
+ */
+export const MOVED_PARTITION_FIXTURE = {
+  traceIdSuffix: "moved-trace",
+  staleWeek: 0,
+  latestWeek: SEED_WEEK_COUNT - 1,
+  staleSpanCount: 7,
+  latestSpanCount: 88,
+  staleUpdatedAt: "2026-03-01 00:00:00.000",
+  latestUpdatedAt: "2026-03-01 00:00:01.000",
+} as const;
+
+/** The trace id the moved-partition fixture uses for a tenant. */
+export function movedPartitionTraceId(tenantId: string): string {
+  return `${tenantId}-${MOVED_PARTITION_FIXTURE.traceIdSuffix}`;
+}
+
+interface TraceSummarySeed {
+  TenantId: string;
+  TraceId: string;
+  OccurredAt: string;
+  UpdatedAt: string;
+  SpanCount: number;
+  [column: string]: unknown;
+}
+
+function traceSummaryRow({
+  tenantId,
+  traceId,
+  occurredAt,
+  updatedAt,
+  spanCount,
+}: {
+  tenantId: string;
+  traceId: string;
+  occurredAt: string;
+  updatedAt: string;
+  spanCount: number;
+}): TraceSummarySeed {
+  return {
+    ProjectionId: `${tenantId}/${traceId}`,
+    TenantId: tenantId,
+    TraceId: traceId,
+    Version: "1",
+    Attributes: {
+      "gen_ai.request.model": SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+    OccurredAt: occurredAt,
+    UpdatedAt: updatedAt,
+    ComputedIOSchemaVersion: "1",
+    ComputedInput: `${SEEDED_CONTENT.traceInput}/${traceId}`,
+    ComputedOutput: `${SEEDED_CONTENT.traceOutput}/${traceId}`,
+    TotalDurationMs: 1200,
+    SpanCount: spanCount,
+    ContainsErrorStatus: false,
+    ContainsOKStatus: true,
+    Models: [SEEDED_DIMENSION_ATTRIBUTE.value],
+    TotalCost: 0.0042,
+    TokensEstimated: false,
+    TraceName: `trace ${traceId}`,
+  };
+}
+
+/**
+ * Seeds both tenants into the real fact tables, across eight weekly partitions.
+ *
+ * Merges are stopped first. Without that, the two versions of the dedup fixture
+ * can be collapsed by a background merge before the test looks, and a
+ * deduplicating view would then be indistinguishable from one that does
+ * nothing — the test would pass with the dedup removed.
+ */
+async function seedRealFactRows({
+  admin,
+  database,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+}): Promise<void> {
+  for (const table of REAL_FACT_TABLES) {
+    await admin.command({ query: `SYSTEM STOP MERGES ${database}.${table}` });
+    await admin.command({ query: `TRUNCATE TABLE ${database}.${table}` });
+  }
+
+  const tenants = [TENANT_A, TENANT_B];
+  const weeks = [...Array(SEED_WEEK_COUNT).keys()];
+
+  const traceRows = tenants.flatMap((tenant) =>
+    weeks.flatMap((week) =>
+      [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          occurredAt: seedWeekStart(week),
+          updatedAt: seedWeekStart(week),
+          spanCount: 3,
+        }),
+      ),
+    ),
+  );
+  await admin.insert({
+    table: `${database}.trace_summaries`,
+    format: "JSONEachRow",
+    values: traceRows,
+  });
+
+  // A separate insert, so the two versions land in separate parts and the
+  // engine has something to collapse.
+  for (const updatedAt of [
+    DEDUP_FIXTURE.staleUpdatedAt,
+    DEDUP_FIXTURE.latestUpdatedAt,
+  ]) {
+    await admin.insert({
+      table: `${database}.trace_summaries`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
+          updatedAt,
+          spanCount:
+            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
+              ? DEDUP_FIXTURE.latestSpanCount
+              : DEDUP_FIXTURE.staleSpanCount,
+        }),
+      ),
+    });
+  }
+
+  // The same shape one partition apart, so a per-partition collapse returns the
+  // stale row rather than a duplicate.
+  for (const version of [
+    {
+      week: MOVED_PARTITION_FIXTURE.staleWeek,
+      spanCount: MOVED_PARTITION_FIXTURE.staleSpanCount,
+      updatedAt: MOVED_PARTITION_FIXTURE.staleUpdatedAt,
+    },
+    {
+      week: MOVED_PARTITION_FIXTURE.latestWeek,
+      spanCount: MOVED_PARTITION_FIXTURE.latestSpanCount,
+      updatedAt: MOVED_PARTITION_FIXTURE.latestUpdatedAt,
+    },
+  ]) {
+    await admin.insert({
+      table: `${database}.trace_summaries`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: movedPartitionTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(version.week),
+          updatedAt: version.updatedAt,
+          spanCount: version.spanCount,
+        }),
+      ),
+    });
+  }
+
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) => ({
+          ProjectionId: `${tenant.tenantId}/span-${week}-${index}`,
+          TenantId: tenant.tenantId,
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          SpanId: `${tenant.tenantId}-span-${week}-${index}`,
+          Sampled: 1,
+          StartTime: seedWeekStart(week),
+          EndTime: seedWeekStart(week),
+          DurationMs: 250,
+          SpanName: "llm.call",
+          SpanKind: 3,
+          ServiceName: "api",
+          ScopeName: "langwatch",
+          ResourceAttributes: { "service.name": "api" },
+          SpanAttributes: {
+            [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+            "langwatch.input": SEEDED_CONTENT.spanInput,
+            "langwatch.output": SEEDED_CONTENT.spanOutput,
+            "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+            "gen_ai.prompt.0.content":
+              SEEDED_CONTENT.spanExplodedPromptAttribute,
+          },
+          Cost: 0.0021,
+        })),
+      ),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_runs`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_EVALUATIONS_PER_WEEK).keys()].map((index) => ({
+          ProjectionId: `${tenant.tenantId}/eval-${week}-${index}`,
+          TenantId: tenant.tenantId,
+          EvaluationId: `${tenant.tenantId}-eval-${week}-${index}`,
+          Version: "1",
+          EvaluatorId: "quality",
+          EvaluatorType: "llm_judge",
+          EvaluatorName: "Quality",
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          Status: "processed",
+          Score: 0.8,
+          Passed: 1,
+          Details: "scored on rubric",
+          Inputs: `${SEEDED_CONTENT.evaluationInputs}/${tenant.tenantId}`,
+          ScheduledAt: seedWeekStart(week),
+          UpdatedAt: seedWeekStart(week),
+          LastProcessedEventId: "seed",
+        })),
+      ),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.simulation_runs`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        ProjectionId: `${tenant.tenantId}/sim-${week}`,
+        TenantId: tenant.tenantId,
+        ScenarioRunId: `${tenant.tenantId}-sim-${week}`,
+        ScenarioId: "checkout",
+        BatchRunId: `${tenant.tenantId}-batch-${week}`,
+        ScenarioSetId: "default",
+        Version: "1",
+        Status: "SUCCESS",
+        Name: "checkout flow",
+        "Messages.Id": ["m1"],
+        "Messages.Role": ["assistant"],
+        "Messages.Content": [
+          `${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`,
+        ],
+        "Messages.TraceId": [`${tenant.tenantId}-trace-${week}-0`],
+        "Messages.Rest": ["{}"],
+        TraceIds: [`${tenant.tenantId}-trace-${week}-0`],
+        Verdict: "success",
+        Reasoning: `${SEEDED_CONTENT.simulationReasoning}/${tenant.tenantId}`,
+        MetCriteria: ["completes checkout"],
+        UnmetCriteria: [],
+        StartedAt: seedWeekStart(week),
+        CreatedAt: seedWeekStart(week),
+        UpdatedAt: seedWeekStart(week),
+      })),
+    ),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Measurement
+// ---------------------------------------------------------------------------
+
+/** What one query cost, read back from the server's own accounting. */
+export interface GovernedQueryMeasurement {
+  /** Physical rows read off the parts — what partition pruning changes. */
+  rowsRead: number;
+  bytesRead: number;
+  resultRows: number;
+  durationMs: number;
+}
+
+/**
+ * Runs a query and reads its cost out of `system.query_log`.
+ *
+ * The server's own accounting rather than a wall-clock timer around the call:
+ * an HTTP round trip on a laptop is noise next to the number under measurement,
+ * and `read_rows` is the one that says whether a predicate reached the read.
+ */
+export async function measureQuery({
+  harness,
+  client,
+  query,
+}: {
+  harness: GovernedClickHouseHarness;
+  client: ClickHouseClient;
+  query: string;
+}): Promise<GovernedQueryMeasurement> {
+  const queryId = `governed-measure-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  await selectRows(client, query, { query_id: queryId });
+  await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
+
+  const entries = await selectRows<{
+    read_rows: string;
+    read_bytes: string;
+    result_rows: string;
+    query_duration_ms: string;
+  }>(
+    harness.admin,
+    `SELECT read_rows, read_bytes, result_rows, query_duration_ms ` +
+      `FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+  );
+  const entry = entries[0];
+  expect(
+    entry,
+    `no query_log entry for the measured query — the numbers below would be invented`,
+  ).toBeDefined();
+  return {
+    rowsRead: Number(entry!.read_rows),
+    bytesRead: Number(entry!.read_bytes),
+    resultRows: Number(entry!.result_rows),
+    durationMs: Number(entry!.query_duration_ms),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -522,15 +1015,18 @@ export async function recordSeedControl({
   harness,
   table,
   tenantColumn,
+  database,
 }: {
   harness: GovernedClickHouseHarness;
   table: string;
   tenantColumn: string;
+  /** Defaults to the governed database; the migrated facts live elsewhere. */
+  database?: string;
 }): Promise<SeedControl> {
   const rows = await selectRows<{ tenant: string; row_count: string }>(
     harness.admin,
     `SELECT ${tenantColumn} AS tenant, count() AS row_count ` +
-      `FROM ${harness.names.database}.${table} GROUP BY tenant`,
+      `FROM ${database ?? harness.names.database}.${table} GROUP BY tenant`,
   );
   const countFor = (tenantId: string): number =>
     Number(rows.find((row) => row.tenant === tenantId)?.row_count ?? 0);

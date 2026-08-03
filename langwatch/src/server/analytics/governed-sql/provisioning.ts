@@ -153,10 +153,19 @@ export interface GovernedSqlNames {
 
 /** A governed object and the column its row policy filters on. */
 export interface GovernedTable {
-  /** Table name within {@link GovernedSqlNames.database}. */
+  /** Table name within {@link GovernedTable.database}. */
   table: string;
   /** Column holding the owning tenant id. */
   tenantColumn: string;
+  /**
+   * Database holding the table. Defaults to {@link GovernedSqlNames.database}.
+   *
+   * The governed views are normal `INVOKER` views, so the row policy that
+   * bounds them has to sit on the *source* table — which lives in the
+   * application's own database, not the governed one. Everything created
+   * directly in the governed database omits this.
+   */
+  database?: string;
 }
 
 /**
@@ -194,8 +203,13 @@ function assertNames(names: GovernedSqlNames): GovernedSqlNames {
 }
 
 /** `database.table`, both validated. */
-function qualified(names: GovernedSqlNames, table: string): string {
-  return `${assertIdentifier(names.database, "database")}.${assertIdentifier(table, "table")}`;
+function qualified(
+  names: GovernedSqlNames,
+  table: string,
+  database?: string,
+): string {
+  const owner = database ?? names.database;
+  return `${assertIdentifier(owner, "database")}.${assertIdentifier(table, "table")}`;
 }
 
 /**
@@ -264,16 +278,27 @@ export function governedRestrictedUserStatement({
   );
 }
 
-/** `SELECT` on one governed object. The identity is granted nothing else. */
+/**
+ * `SELECT` on one governed object, every column. The identity is granted
+ * nothing else.
+ *
+ * Whole-object rather than column-scoped, because the objects granted this way
+ * are the governed views themselves and the key map — things whose entire
+ * column list is the exposed surface by construction. Source tables are granted
+ * column by column instead; see `governedSourceColumnGrantStatement`.
+ */
 export function governedGrantStatement({
   names,
   table,
+  database,
 }: {
   names: GovernedSqlNames;
   table: string;
+  /** Defaults to {@link GovernedSqlNames.database}. */
+  database?: string;
 }): string {
   assertNames(names);
-  return `GRANT SELECT ON ${qualified(names, table)} TO ${names.restrictedUser}`;
+  return `GRANT SELECT ON ${qualified(names, table, database)} TO ${names.restrictedUser}`;
 }
 
 /**
@@ -340,7 +365,7 @@ export function governedRowPolicyStatement({
   assertNames(names);
   return (
     `CREATE ROW POLICY OR REPLACE ${policyName(governedTable.table)} ` +
-    `ON ${qualified(names, governedTable.table)}\n` +
+    `ON ${qualified(names, governedTable.table, governedTable.database)}\n` +
     `  USING ${tenantPredicate({ names, tenantColumn: governedTable.tenantColumn })}\n` +
     `  TO ${names.restrictedUser}`
   );
@@ -350,12 +375,15 @@ export function governedRowPolicyStatement({
 export function dropGovernedRowPolicyStatement({
   names,
   table,
+  database,
 }: {
   names: GovernedSqlNames;
   table: string;
+  /** Defaults to {@link GovernedSqlNames.database}. */
+  database?: string;
 }): string {
   assertNames(names);
-  return `DROP ROW POLICY IF EXISTS ${policyName(table)} ON ${qualified(names, table)}`;
+  return `DROP ROW POLICY IF EXISTS ${policyName(table)} ON ${qualified(names, table, database)}`;
 }
 
 /**
@@ -429,19 +457,35 @@ export function definerViewAuditQuery({
 
 /**
  * Audits row-policy coverage from the server rather than from a hand-written
- * list: every object the restricted identity holds a `SELECT` grant on must
- * also carry a row policy that applies to it.
+ * list: every object the restricted identity holds a `SELECT` grant on must be
+ * scoped to one tenant, in one of exactly two ways.
  *
  * Grants are the definition of "exposed", so adding a governed object and
- * granting it without writing its policy turns this red with no test edit.
+ * granting it without scoping it turns this red with no test edit. Deliberately
+ * spans every database rather than only the governed one: the governed views
+ * are `INVOKER` views over the application's own fact tables, so the grants
+ * that matter most sit *outside* the governed database, and an audit scoped to
+ * that database would have reported a clean server while the real exposure went
+ * unexamined.
+ *
+ * The two ways an object can be scoped:
+ *
+ *  - `has_policy` — a row policy on the object itself, applying to this
+ *    identity. Every source table.
+ *  - `is_invoker_view` — a normal view carrying an explicit
+ *    `SQL SECURITY INVOKER`, which reads its sources as the caller and is
+ *    therefore bounded by *their* policies. The carve-out is tight on purpose:
+ *    a `DEFINER` view has no such clause and a `MATERIALIZED VIEW` is a
+ *    different engine, so neither qualifies, and both are separately reported
+ *    by {@link definerViewAuditQuery}.
  *
  * Intersected with `system.tables` on purpose: measured against 25.10.2.65, a
  * `SELECT` grant OUTLIVES the `DROP TABLE` of its object, so grants alone would
  * report long-dead objects as uncovered exposure. An object that no longer
  * exists exposes nothing.
  *
- * Returns rows of `{ table, has_policy }`, `has_policy` being ClickHouse's
- * UInt8 0/1. Run as an administrative user.
+ * Returns rows of `{ database, table, has_policy, is_invoker_view, covered }`,
+ * each flag being ClickHouse's UInt8 0/1. Run as an administrative user.
  */
 export function governedPolicyCoverageQuery({
   names,
@@ -450,24 +494,26 @@ export function governedPolicyCoverageQuery({
 }): string {
   assertNames(names);
   const user = clickHouseLiteral(names.restrictedUser);
-  const database = clickHouseLiteral(names.database);
   return (
     `SELECT\n` +
+    `  t.database AS database,\n` +
     `  t.name AS table,\n` +
-    `  t.name IN (\n` +
-    `    SELECT table FROM system.row_policies\n` +
-    `    WHERE database = ${database} AND has(apply_to_list, ${user})\n` +
-    `  ) AS has_policy\n` +
+    `  (t.database, t.name) IN (\n` +
+    `    SELECT database, table FROM system.row_policies\n` +
+    `    WHERE has(apply_to_list, ${user})\n` +
+    `  ) AS has_policy,\n` +
+    `  (t.engine = 'View'\n` +
+    `   AND positionCaseInsensitive(t.create_table_query, 'SQL SECURITY INVOKER') > 0) AS is_invoker_view,\n` +
+    `  (has_policy OR is_invoker_view) AS covered\n` +
     `FROM system.tables AS t\n` +
-    `WHERE t.database = ${database}\n` +
-    `  AND t.name IN (\n` +
-    `    SELECT table FROM system.grants\n` +
+    `WHERE (t.database, t.name) IN (\n` +
+    `    SELECT database, table FROM system.grants\n` +
     `    WHERE user_name = ${user}\n` +
-    `      AND database = ${database}\n` +
     `      AND access_type = 'SELECT'\n` +
+    `      AND database IS NOT NULL\n` +
     `      AND table IS NOT NULL\n` +
     `  )\n` +
-    `ORDER BY table`
+    `ORDER BY database, table`
   );
 }
 
