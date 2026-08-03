@@ -309,7 +309,13 @@ function inbandExceptionOf(row: unknown): string | undefined {
   return CLICKHOUSE_EXCEPTION_SIGNATURE.test(exception) ? exception : undefined;
 }
 
-function inbandExceptionError(message: string, durationMs: number): unknown {
+function inbandExceptionError({
+  message,
+  durationMs,
+}: {
+  message: string;
+  durationMs: number;
+}): unknown {
   const error = new Error(message);
   const code = /Code:\s*(\d+)/.exec(message)?.[1];
   if (code) (error as { code?: string }).code = code;
@@ -334,7 +340,15 @@ function inbandExceptionError(message: string, durationMs: number): unknown {
  */
 function guardInbandException<
   T extends { json?: (...args: never[]) => unknown },
->(result: T, startMs: number, params: unknown): T {
+>({
+  result,
+  startMs,
+  params,
+}: {
+  result: T;
+  startMs: number;
+  params: unknown;
+}): T {
   if (typeof result?.json !== "function") return result;
   const queryType = extractQueryType(params);
   const originalJson = result.json.bind(result);
@@ -344,7 +358,7 @@ function guardInbandException<
       const exception = inbandExceptionOf(row);
       if (exception !== undefined) {
         const durationMs = performance.now() - startMs;
-        const error = inbandExceptionError(exception, durationMs);
+        const error = inbandExceptionError({ message: exception, durationMs });
         logFailure({ operation: "query", error, durationMs, params });
         // Dedicated outcome, and no second duration sample: the transport
         // outcome (success + one histogram observation) was already
@@ -389,7 +403,7 @@ export function createResilientClickHouseClient({
       logSuccess({ operation: "query", durationMs, params });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "success");
-      return guardInbandException(result, start, params);
+      return guardInbandException({ result, startMs: start, params });
     } catch (error) {
       const durationMs = performance.now() - start;
       logFailure({ operation: "query", error, durationMs, params });

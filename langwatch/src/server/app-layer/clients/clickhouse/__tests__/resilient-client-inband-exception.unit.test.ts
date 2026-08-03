@@ -11,7 +11,9 @@ vi.mock("~/server/clickhouse/metrics", () => ({
     mockIncrementQueryCount(...args),
 }));
 
-// Must import after mock setup
+// Vitest hoists vi.mock above static imports, so this import receives the
+// mocked metrics module regardless of ordering; kept below the factory for
+// readability only.
 import { createResilientClickHouseClient } from "../resilient-client";
 
 /**
