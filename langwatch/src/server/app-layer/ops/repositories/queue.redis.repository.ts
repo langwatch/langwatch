@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
@@ -249,6 +251,22 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
+// Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile
+// single-flight marker, but only while the caller still holds it. A marker that
+// lapsed mid-pass may already have been re-acquired by another instance, and
+// extending or dropping that one would put two reconcile passes on the same
+// counter at once — exactly what the marker exists to prevent. GET-then-act is
+// safe only inside a script, where nothing else can run in between.
+const RECONCILE_MARKER_TTL_LUA = `
+local markerKey  = KEYS[1]
+local holderToken = ARGV[1]
+local ttlMs       = tonumber(ARGV[2])
+
+if redis.call("GET", markerKey) ~= holderToken then return 0 end
+if ttlMs <= 0 then return redis.call("DEL", markerKey) end
+return redis.call("PEXPIRE", markerKey, ttlMs)
+`;
+
 // ── Cached scripts ───────────────────────────────────────────────────
 //
 // EVALSHA, not EVAL: plain EVAL re-transfers and re-hashes the full source on
@@ -262,13 +280,29 @@ const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
 const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+const reconcileMarkerTtlScript = new CachedLuaScript(RECONCILE_MARKER_TTL_LUA);
 
 // ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
 const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
-const PENDING_RECONCILE_SCAN_COUNT = 1000;
+
+/** Page size for the index reads that enumerate a queue's groups. */
+const PENDING_RECONCILE_PAGE_SIZE = 1000;
+
+/** Number of ZCARDs sent per pipeline round trip during a reconcile pass. */
+const PENDING_RECONCILE_ZCARD_BATCH = 1000;
+
+/**
+ * How long the single-flight marker survives without a refresh.
+ *
+ * The marker is re-armed to this after every ZCARD batch, so a pass holds it for
+ * as long as it runs no matter how long that is. It bounds the other direction
+ * instead: an instance that dies mid-pass strands the marker for at most this
+ * long before another instance may take over.
+ */
+const PENDING_RECONCILE_LEASE_MS = 30_000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -1551,9 +1585,9 @@ export class QueueRedisRepository implements QueueRepository {
    * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
    * ground truth is safe and does not affect dispatch correctness.
    *
-   * The ground truth is the authoritative Σ ZCARD over ALL `group:*:jobs` keys
-   * for this queue — intentionally the complete count, distinct from the top-N
-   * sampled per-group dashboard tile.
+   * The ground truth is the authoritative Σ ZCARD over the `:jobs` zset of every
+   * group this queue knows about — intentionally the complete count, distinct
+   * from the top-N sampled per-group dashboard tile.
    *
    * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
    * window is acceptable and self-corrects on the next scheduled cycle.
@@ -1563,7 +1597,11 @@ export class QueueRedisRepository implements QueueRepository {
    * against multi-pod overlap.
    *
    * The reconcile is single-flighted per `singleFlightWindowMs` so only one
-   * pod recomputes per window. It is intentionally off the hot dispatch path.
+   * pod recomputes per window. The marker is held for the whole pass and only
+   * then downgraded to the remainder of the window, so a pass that outlives the
+   * window cannot be joined by a second one — the regime where a stacked pass
+   * would hurt most is exactly the regime where passes run long. It is
+   * intentionally off the hot dispatch path.
    *
    * See issue #4683.
    */
@@ -1574,51 +1612,47 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${queueName}:gq:`;
     const counterKey = `${prefix}stats:total-pending`;
     const markerKey = `${prefix}stats:pending-recon-ts`;
+    const holderToken = randomUUID();
+    const startedAtMs = Date.now();
 
-    // Single-flight gate: only one pod/cycle runs per window.
+    // Single-flight gate: only one pod/cycle runs per window. The marker is
+    // taken on a refreshable lease rather than for the full window so a pod that
+    // dies mid-pass cannot wedge the reconcile until the window elapses.
     const acquired = await this.redis.set(
       markerKey,
-      String(Date.now()),
+      holderToken,
       "PX",
-      singleFlightWindowMs,
+      PENDING_RECONCILE_LEASE_MS,
       "NX",
     );
     if (acquired !== "OK") return null;
 
-    // Read the pre-reconcile counter.
-    const raw = await this.redis.get(counterKey);
-    const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
+    try {
+      // Read the pre-reconcile counter.
+      const raw = await this.redis.get(counterKey);
+      const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
 
-    // Enumerate all group-jobs zsets via SCAN.
-    const jobsKeys: string[] = [];
-    const matchPattern = `${prefix}group:*:jobs`;
-    let cursor = "0";
-    do {
-      const [nextCursor, keys] = await this.redis.scan(
-        cursor,
-        "MATCH",
-        matchPattern,
-        "COUNT",
-        PENDING_RECONCILE_SCAN_COUNT,
-      );
-      cursor = nextCursor;
-      for (const key of keys) {
-        jobsKeys.push(key);
-      }
-    } while (cursor !== "0");
+      const jobsKeys = await this.collectGroupJobsKeys(prefix);
 
-    // Pipeline ZCARD for every collected key and sum the results.
-    // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
-    // a partial under-count as ground truth; the next cycle retries.
-    let groundTruth = 0;
-    if (jobsKeys.length > 0) {
-      const pipeline = this.redis.pipeline();
-      for (const key of jobsKeys) {
-        pipeline.zcard(key);
-      }
-      const results = await pipeline.exec();
-      if (results) {
-        for (const [err, val] of results) {
+      // Pipeline ZCARD for every collected key and sum the results, re-arming
+      // the single-flight lease between batches so a long pass keeps its hold.
+      // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
+      // a partial under-count as ground truth; the next cycle retries.
+      let groundTruth = 0;
+      for (
+        let offset = 0;
+        offset < jobsKeys.length;
+        offset += PENDING_RECONCILE_ZCARD_BATCH
+      ) {
+        const pipeline = this.redis.pipeline();
+        for (const key of jobsKeys.slice(
+          offset,
+          offset + PENDING_RECONCILE_ZCARD_BATCH,
+        )) {
+          pipeline.zcard(key);
+        }
+        const results = await pipeline.exec();
+        for (const [err, val] of results ?? []) {
           if (err) {
             logger.warn(
               { error: err },
@@ -1628,15 +1662,149 @@ export class QueueRedisRepository implements QueueRepository {
           }
           groundTruth += Number(val) || 0;
         }
+        await this.setReconcileMarkerTtl({
+          markerKey,
+          holderToken,
+          ttlMs: PENDING_RECONCILE_LEASE_MS,
+        });
       }
+
+      const drift = counter - groundTruth;
+
+      // Overwrite the counter with the ground truth.
+      await this.redis.set(counterKey, String(groundTruth));
+
+      return { counter, groundTruth, drift };
+    } finally {
+      // Hand the marker back as the unspent remainder of the window, so the
+      // cadence stays one reconcile per window measured from when this pass
+      // started. A pass that already outlived the window drops it outright and
+      // the next scheduled cycle may run immediately.
+      await this.setReconcileMarkerTtl({
+        markerKey,
+        holderToken,
+        ttlMs: singleFlightWindowMs - (Date.now() - startedAtMs),
+      });
+    }
+  }
+
+  /**
+   * Collect the `group:<id>:jobs` key of every group that can be holding a
+   * pending job, read from the queue's own group indexes.
+   *
+   * Deliberately not a keyspace SCAN: SCAN walks every key in the database
+   * regardless of MATCH, so the cost of a pass would track the size of the whole
+   * Redis instance rather than the number of groups in this queue. The indexes
+   * below hold group ids, so paging them costs what the queue actually contains.
+   *
+   * They are exhaustive for any group with jobs. A live group stays a member of
+   * `ready` even while its job is in flight (dispatch re-scores it into the
+   * future rather than removing it); the only other places a group can be are
+   * `parked:<tenant>`, for one deferred by the per-tenant cap, and `blocked`,
+   * for one held for operator triage. Every path that takes a group out of
+   * `ready` either puts it into one of those two or does so precisely because
+   * its `:jobs` zset is empty, so no group can hold jobs while absent from all
+   * three. DLQ jobs live under a separate `dlq:` prefix and are not pending.
+   *
+   * A group can briefly appear in two indexes while it moves between them, so
+   * ids are deduplicated before keys are built — counting one twice would be
+   * written to the counter as ground truth.
+   */
+  private async collectGroupJobsKeys(prefix: string): Promise<string[]> {
+    const groupIds = new Set<string>();
+
+    let readyCursor = "0";
+    do {
+      const [nextCursor, members] = await this.redis.zscan(
+        `${prefix}ready`,
+        readyCursor,
+        "COUNT",
+        PENDING_RECONCILE_PAGE_SIZE,
+      );
+      readyCursor = nextCursor;
+      // A ZSCAN page alternates [member, score, member, score, ...].
+      for (let i = 0; i < members.length; i += 2) {
+        groupIds.add(members[i]!);
+      }
+    } while (readyCursor !== "0");
+
+    let blockedCursor = "0";
+    do {
+      const [nextCursor, members] = await this.redis.sscan(
+        `${prefix}blocked`,
+        blockedCursor,
+        "COUNT",
+        PENDING_RECONCILE_PAGE_SIZE,
+      );
+      blockedCursor = nextCursor;
+      for (const groupId of members) {
+        groupIds.add(groupId);
+      }
+    } while (blockedCursor !== "0");
+
+    // One entry per tenant currently over cap — empty in the steady state where
+    // the cap is off, so the parked leg usually costs a single SSCAN.
+    const parkedTenants = new Set<string>();
+    let tenantCursor = "0";
+    do {
+      const [nextCursor, members] = await this.redis.sscan(
+        `${prefix}parked-tenants`,
+        tenantCursor,
+        "COUNT",
+        PENDING_RECONCILE_PAGE_SIZE,
+      );
+      tenantCursor = nextCursor;
+      for (const tenantId of members) {
+        parkedTenants.add(tenantId);
+      }
+    } while (tenantCursor !== "0");
+
+    for (const tenantId of parkedTenants) {
+      let parkedCursor = "0";
+      do {
+        const [nextCursor, members] = await this.redis.zscan(
+          `${prefix}parked:${tenantId}`,
+          parkedCursor,
+          "COUNT",
+          PENDING_RECONCILE_PAGE_SIZE,
+        );
+        parkedCursor = nextCursor;
+        for (let i = 0; i < members.length; i += 2) {
+          groupIds.add(members[i]!);
+        }
+      } while (parkedCursor !== "0");
     }
 
-    const drift = counter - groundTruth;
+    return Array.from(groupIds, (groupId) => `${prefix}group:${groupId}:jobs`);
+  }
 
-    // Overwrite the counter with the ground truth.
-    await this.redis.set(counterKey, String(groundTruth));
-
-    return { counter, groundTruth, drift };
+  /**
+   * Re-arm the single-flight marker this pass holds, or drop it when the
+   * requested TTL has already run out.
+   *
+   * Never throws: losing the marker mid-pass at worst lets a second pass start,
+   * and the pass in hand still produces a correct count, so a failure here must
+   * not take down a reconcile that otherwise succeeded.
+   */
+  private async setReconcileMarkerTtl(params: {
+    markerKey: string;
+    holderToken: string;
+    ttlMs: number;
+  }): Promise<void> {
+    try {
+      await reconcileMarkerTtlScript.run(
+        this.redis,
+        1,
+        params.markerKey,
+        params.holderToken,
+        Math.trunc(params.ttlMs),
+      );
+    } catch (err) {
+      logger.warn(
+        { error: err },
+        "Failed to re-arm the pending reconcile single-flight marker",
+      );
+    }
   }
 
   // ── Private Filter Helpers ──────────────────────────────────────
