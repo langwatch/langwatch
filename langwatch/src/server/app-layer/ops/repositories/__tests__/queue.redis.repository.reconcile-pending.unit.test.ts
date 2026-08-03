@@ -142,6 +142,7 @@ class FakeRedis {
    * counter write and the marker re-arm both act on the marker (and are then
    * separated by arity), while the prune acts on the pending index.
    */
+  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
   async evalsha(
     _sha: string,
     _numKeys: number,

@@ -1779,6 +1779,9 @@ export class QueueRedisRepository implements QueueRepository {
     });
     if (!heldThroughTenants) return null;
 
+    // TODO(cleanup): the three lifecycle legs below are additive only and exist
+    // solely to cover groups staged before the pending index did. Removable once
+    // no queue predates it — the index alone is what makes the count correct.
     const legs: { key: string; type: "zset" | "set" }[] = [
       { key: pendingGroupsKey(prefix), type: "set" },
       { key: `${prefix}ready`, type: "zset" },
@@ -1864,40 +1867,58 @@ export class QueueRedisRepository implements QueueRepository {
       offset < params.jobsKeys.length;
       offset += PENDING_RECONCILE_ZCARD_BATCH
     ) {
-      const batch = params.jobsKeys.slice(
+      const batch = await this.countOneBatch(
+        params.jobsKeys.slice(offset, offset + PENDING_RECONCILE_ZCARD_BATCH),
         offset,
-        offset + PENDING_RECONCILE_ZCARD_BATCH,
       );
-      const pipeline = this.redis.pipeline();
-      for (const key of batch) {
-        pipeline.zcard(key);
-      }
-      const results = await pipeline.exec();
-      // A null exec is the whole batch failing, not an empty batch. Treating it
-      // as empty would contribute 0 for every key in it and write the shortfall
-      // out as ground truth — the same under-count the per-entry check refuses.
-      if (results === null) {
-        logger.warn(
-          { batchOffset: offset },
-          "ZCARD pipeline returned no results during pending reconcile — aborting to avoid under-count",
-        );
-        return null;
-      }
-      for (const [index, [err, val]] of results.entries()) {
-        if (err) {
-          logger.warn(
-            { error: err },
-            "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
-          );
-          return null;
-        }
-        const count = Number(val) || 0;
-        groundTruth += count;
-        if (count === 0) emptyJobsKeys.push(batch[index]!);
-      }
+      if (batch === null) return null;
+      groundTruth += batch.sum;
+      emptyJobsKeys.push(...batch.emptyKeys);
       if (!(await params.refreshLease())) return null;
     }
     return { groundTruth, emptyJobsKeys };
+  }
+
+  /**
+   * ZCARD one batch of keys in a single round trip.
+   *
+   * Returns null on any failure — whole-batch or single-entry — so the caller
+   * abandons the pass rather than folding a shortfall into the total.
+   */
+  private async countOneBatch(
+    jobsKeys: string[],
+    batchOffset: number,
+  ): Promise<{ sum: number; emptyKeys: string[] } | null> {
+    const pipeline = this.redis.pipeline();
+    for (const key of jobsKeys) {
+      pipeline.zcard(key);
+    }
+    const results = await pipeline.exec();
+    // A null exec is the whole batch failing, not an empty batch. Treating it as
+    // empty would contribute 0 for every key in it and write the shortfall out as
+    // ground truth — the same under-count the per-entry check refuses.
+    if (results === null) {
+      logger.warn(
+        { batchOffset },
+        "ZCARD pipeline returned no results during pending reconcile — aborting to avoid under-count",
+      );
+      return null;
+    }
+    let sum = 0;
+    const emptyKeys: string[] = [];
+    for (const [index, [err, val]] of results.entries()) {
+      if (err) {
+        logger.warn(
+          { error: err },
+          "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
+        );
+        return null;
+      }
+      const count = Number(val) || 0;
+      sum += count;
+      if (count === 0) emptyKeys.push(jobsKeys[index]!);
+    }
+    return { sum, emptyKeys };
   }
 
   /**
