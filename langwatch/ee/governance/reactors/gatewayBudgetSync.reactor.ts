@@ -54,6 +54,360 @@ export interface GatewayBudgetSyncReactorDeps {
   budgetCHRepository: GatewayBudgetClickHouseRepository;
 }
 
+/** The VK a gateway trace debits against, as this reactor needs it. */
+interface GatewayVirtualKey {
+  id: string;
+  organizationId: string;
+  principalUserId: string | null;
+  lastUsedAt: Date | null;
+}
+
+/** The tenant project a gateway trace belongs to, with its owning org. */
+interface GatewayFoldProject {
+  id: string;
+  teamId: string;
+  organizationId: string;
+}
+
+/**
+ * Loads the VK the trace names, or null when it does not exist — a gateway
+ * trace referencing a VK we cannot find is a fold we must not attribute.
+ */
+async function findGatewayVirtualKey({
+  prisma,
+  projectId,
+  virtualKeyId,
+  gatewayRequestId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  virtualKeyId: string;
+  gatewayRequestId: string;
+}): Promise<GatewayVirtualKey | null> {
+  const vk = await prisma.virtualKey.findUnique({
+    where: { id: virtualKeyId },
+    select: {
+      id: true,
+      organizationId: true,
+      principalUserId: true,
+      lastUsedAt: true,
+    },
+  });
+  if (!vk) {
+    logger.warn(
+      { projectId, virtualKeyId, gatewayRequestId },
+      "gateway trace references unknown VK — skipping fold",
+    );
+  }
+  return vk;
+}
+
+/**
+ * EC6 — touch lastUsedAt on every gateway trace, regardless of whether the
+ * VK has applicable budgets. The /budget/check hook in gateway-internal.ts
+ * only fires when the gateway calls it (which it skips when there are no
+ * budgets to precheck), so VKs without budgets had `lastUsedAt = null`
+ * forever and admin oversight ("when did this user last use their personal
+ * VK") was broken on the most common case.
+ *
+ * 60s throttle mirrors the /budget/check fix — admin dashboards refresh on
+ * minute-scale, no need to thrash the row on every request.
+ *
+ * Best-effort: a row update failure here must not poison the budget fold,
+ * and the /budget/check hook is a fallback for the budgeted-VK case.
+ */
+async function touchVirtualKeyLastUsed({
+  prisma,
+  projectId,
+  vk,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  vk: GatewayVirtualKey;
+}): Promise<void> {
+  const now = new Date();
+  const shouldTouch =
+    !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
+  logger.info(
+    {
+      projectId,
+      virtualKeyId: vk.id,
+      previousLastUsedAt: vk.lastUsedAt,
+      shouldTouch,
+    },
+    "EC6 lastUsedAt touch decision",
+  );
+  if (!shouldTouch) return;
+
+  try {
+    // Post-collapse VirtualKey is org-scoped in SCOPED_MODELS; the dbMTP
+    // guard accepts a row id as tenancy proof for single-row writes, so the
+    // bare id-only where clause is valid.
+    await prisma.virtualKey.update({
+      where: { id: vk.id },
+      data: { lastUsedAt: now },
+    });
+    logger.info(
+      { projectId, virtualKeyId: vk.id, touchedAt: now.toISOString() },
+      "EC6 lastUsedAt touched",
+    );
+  } catch (touchErr) {
+    logger.warn(
+      { projectId, virtualKeyId: vk.id, error: touchErr },
+      "failed to touch virtualKey.lastUsedAt during gateway trace fold",
+    );
+  }
+}
+
+/**
+ * Loads the trace's tenant project, or null when the fold must not proceed.
+ *
+ * Cross-tenant guard: post-collapse VKs carry organizationId only, so the
+ * trace's tenant project must live under the same org as the VK it debits.
+ */
+async function findProjectForGatewayFold({
+  prisma,
+  projectId,
+  vk,
+  gatewayRequestId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  vk: GatewayVirtualKey;
+  gatewayRequestId: string;
+}): Promise<GatewayFoldProject | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { organizationId: true } },
+    },
+  });
+  if (!project?.team) {
+    logger.warn(
+      { projectId, virtualKeyId: vk.id },
+      "project missing team relation — skipping gateway budget fold",
+    );
+    return null;
+  }
+  if (project.team.organizationId !== vk.organizationId) {
+    logger.warn(
+      { projectId, virtualKeyId: vk.id, gatewayRequestId },
+      "gateway trace references cross-tenant VK — skipping fold",
+    );
+    return null;
+  }
+  return {
+    id: project.id,
+    teamId: project.teamId,
+    organizationId: project.team.organizationId,
+  };
+}
+
+/**
+ * The budgets this dispatch actually accrues against.
+ *
+ * `dispatchedProviderKey` is the provider the gateway dispatched to, absent
+ * on gateways that predate the field — in which case only unfiltered budgets
+ * accrue. Attributing an unknown dispatch to a provider-filtered budget would
+ * be a guess, and a guess here silently mis-bills a governance control.
+ */
+async function resolveApplicableBudgets({
+  budgetRepository,
+  scopes,
+  dispatchedProviderKey,
+}: {
+  budgetRepository: GatewayBudgetRepository;
+  scopes: ApplicableScopes;
+  dispatchedProviderKey: string | null;
+}) {
+  const resolved = await budgetRepository.resolveForRequest(scopes);
+  return resolved.filter((r) =>
+    budgetAppliesToProvider(r.budget, dispatchedProviderKey),
+  );
+}
+
+/**
+ * One debit row per applicable budget. Cost, tokens and duration come from
+ * the fold state (post cost-enrichment) rather than being recomputed here.
+ */
+function buildDebitRows({
+  projectId,
+  foldState,
+  vk,
+  gatewayRequestId,
+  dispatchedProviderKey,
+  budgets,
+  amountUsd,
+}: {
+  projectId: string;
+  foldState: TraceSummaryData;
+  vk: GatewayVirtualKey;
+  gatewayRequestId: string;
+  dispatchedProviderKey: string | null;
+  budgets: Awaited<ReturnType<typeof resolveApplicableBudgets>>;
+  amountUsd: string;
+}): BudgetDebitRow[] {
+  const status: GatewayBudgetLedgerStatus = foldState.blockedByGuardrail
+    ? "BLOCKED_BY_GUARDRAIL"
+    : foldState.containsErrorStatus
+      ? "PROVIDER_ERROR"
+      : "SUCCESS";
+
+  return budgets.map(({ budget: b, bucketScopeId }) => ({
+    tenantId: projectId,
+    budgetId: b.id,
+    scope: b.scopeType,
+    scopeId: bucketScopeId,
+    window: b.window,
+    virtualKeyId: vk.id,
+    providerKey: dispatchedProviderKey,
+    gatewayRequestId,
+    amountUsd,
+    tokensInput: foldState.totalPromptTokenCount ?? 0,
+    tokensOutput: foldState.totalCompletionTokenCount ?? 0,
+    tokensCacheRead: 0,
+    tokensCacheWrite: 0,
+    model: foldState.models[0] ?? "unknown",
+    durationMs: Math.round(foldState.totalDurationMs ?? 0),
+    status,
+    occurredAt: new Date(foldState.occurredAt),
+  }));
+}
+
+/**
+ * EC4 — emit a BUDGET_UPDATED change event so the gateway's /changes
+ * subscriber (services/aigateway/adapters/authresolver) evicts cached
+ * bundles for this project and the next request re-resolves with fresh
+ * spend. Without this, Bundle.Config.Budget.SpentMicroUSD stays frozen at
+ * populateConfig time and the on-breach=block precheck never fires until
+ * the JWT TTL (~15min) rolls.
+ *
+ * v2 TODO: dedupe — emit at most once per (projectId, budgetId) per ~10s
+ * window to avoid every gateway request triggering an L1 sweep + cold-miss
+ * on every other VK in the project. At single-tenant scale the
+ * unconditional emit is correct, just noisier than ideal.
+ *
+ * Best-effort: the CH ledger row already landed, so a failure here leaves
+ * the gateway's cache staler than it could be rather than corrupting state.
+ */
+async function emitBudgetUpdatedChangeEvent({
+  prisma,
+  project,
+  projectId,
+  vk,
+  gatewayRequestId,
+  budgetIds,
+  amountUsd,
+}: {
+  prisma: PrismaClient;
+  project: GatewayFoldProject;
+  projectId: string;
+  vk: GatewayVirtualKey;
+  gatewayRequestId: string;
+  budgetIds: string[];
+  amountUsd: string;
+}): Promise<void> {
+  try {
+    const changeEvents = new ChangeEventRepository(prisma);
+    await changeEvents.append({
+      organizationId: project.organizationId,
+      projectId,
+      kind: "BUDGET_UPDATED",
+      payload: {
+        gatewayRequestId,
+        virtualKeyId: vk.id,
+        budgetIds,
+        amountUsd,
+      },
+    });
+  } catch (changeErr) {
+    logger.warn(
+      { projectId, virtualKeyId: vk.id, gatewayRequestId, error: changeErr },
+      "failed to emit BUDGET_UPDATED change event after fold",
+    );
+  }
+}
+
+/**
+ * The fold itself: resolve who the trace belongs to, which budgets it
+ * accrues against, write the debit rows, and tell the gateway its cached
+ * spend is stale. Every step that can legitimately decline the trace
+ * returns early; anything unexpected throws to the caller's catch.
+ */
+async function foldGatewayTraceIntoLedger({
+  deps,
+  projectId,
+  foldState,
+  virtualKeyId,
+  gatewayRequestId,
+}: {
+  deps: GatewayBudgetSyncReactorDeps;
+  projectId: string;
+  foldState: TraceSummaryData;
+  virtualKeyId: string;
+  gatewayRequestId: string;
+}): Promise<void> {
+  const vk = await findGatewayVirtualKey({
+    prisma: deps.prisma,
+    projectId,
+    virtualKeyId,
+    gatewayRequestId,
+  });
+  if (!vk) return;
+
+  await touchVirtualKeyLastUsed({ prisma: deps.prisma, projectId, vk });
+
+  const project = await findProjectForGatewayFold({
+    prisma: deps.prisma,
+    projectId,
+    vk,
+    gatewayRequestId,
+  });
+  if (!project) return;
+
+  const scopes: ApplicableScopes = {
+    organizationId: project.organizationId,
+    teamId: project.teamId,
+    projectId: project.id,
+    virtualKeyId: vk.id,
+    principalUserId: vk.principalUserId,
+  };
+  const dispatchedProviderKey =
+    foldState.attributes["langwatch.model_provider_id"] ?? null;
+
+  const budgets = await resolveApplicableBudgets({
+    budgetRepository: deps.budgetRepository,
+    scopes,
+    dispatchedProviderKey,
+  });
+  if (budgets.length === 0) return;
+
+  const amountUsd = formatDecimal(foldState.totalCost ?? 0);
+  await deps.budgetCHRepository.insertDebit(
+    buildDebitRows({
+      projectId,
+      foldState,
+      vk,
+      gatewayRequestId,
+      dispatchedProviderKey,
+      budgets,
+      amountUsd,
+    }),
+  );
+
+  await emitBudgetUpdatedChangeEvent({
+    prisma: deps.prisma,
+    project,
+    projectId,
+    vk,
+    gatewayRequestId,
+    budgetIds: budgets.map((r) => r.budget.id),
+    amountUsd,
+  });
+}
+
 /**
  * Fold completed gateway traces into per-budget ClickHouse debit rows.
  *
@@ -108,186 +462,13 @@ export function createGatewayBudgetSyncReactor(
       const gatewayRequestId = foldState.attributes[ATTR_GATEWAY_REQUEST_ID]!;
 
       try {
-        const vk = await deps.prisma.virtualKey.findUnique({
-          where: { id: virtualKeyId },
-          select: {
-            id: true,
-            organizationId: true,
-            principalUserId: true,
-            lastUsedAt: true,
-          },
+        await foldGatewayTraceIntoLedger({
+          deps,
+          projectId,
+          foldState,
+          virtualKeyId,
+          gatewayRequestId,
         });
-        if (!vk) {
-          logger.warn(
-            { projectId, virtualKeyId, gatewayRequestId },
-            "gateway trace references unknown VK — skipping fold",
-          );
-          return;
-        }
-
-        // EC6 — touch lastUsedAt on every gateway trace, regardless of
-        // whether the VK has applicable budgets. The /budget/check
-        // hook in gateway-internal.ts only fires when the gateway
-        // calls it (which it skips when there are no budgets to
-        // precheck), so VKs without budgets had `lastUsedAt = null`
-        // forever and admin oversight ("when did this user last
-        // use their personal VK") was broken on the most common case.
-        //
-        // 60s throttle mirrors the /budget/check fix — admin
-        // dashboards refresh on minute-scale, no need to thrash the
-        // row on every request.
-        const now = new Date();
-        const shouldTouch =
-          !vk.lastUsedAt || now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
-        logger.info(
-          {
-            projectId,
-            virtualKeyId,
-            previousLastUsedAt: vk.lastUsedAt,
-            shouldTouch,
-          },
-          "EC6 lastUsedAt touch decision",
-        );
-        if (shouldTouch) {
-          try {
-            // Post-collapse VirtualKey is org-scoped in SCOPED_MODELS; the
-            // dbMTP guard accepts a row id as tenancy proof for single-row
-            // writes, so the bare id-only where clause is valid.
-            await deps.prisma.virtualKey.update({
-              where: { id: vk.id },
-              data: { lastUsedAt: now },
-            });
-            logger.info(
-              { projectId, virtualKeyId, touchedAt: now.toISOString() },
-              "EC6 lastUsedAt touched",
-            );
-          } catch (touchErr) {
-            // Best-effort: a row update failure here doesn't poison
-            // the budget fold below, and the /budget/check hook is
-            // a fallback for the budgeted-VK case.
-            logger.warn(
-              { projectId, virtualKeyId, error: touchErr },
-              "failed to touch virtualKey.lastUsedAt during gateway trace fold",
-            );
-          }
-        }
-
-        const project = await deps.prisma.project.findUnique({
-          where: { id: projectId },
-          select: {
-            id: true,
-            teamId: true,
-            team: { select: { organizationId: true } },
-          },
-        });
-        if (!project?.team) {
-          logger.warn(
-            { projectId, virtualKeyId },
-            "project missing team relation — skipping gateway budget fold",
-          );
-          return;
-        }
-        // Cross-tenant guard: post-collapse VKs carry organizationId only;
-        // the trace's tenant project must live under the same org.
-        if (project.team.organizationId !== vk.organizationId) {
-          logger.warn(
-            { projectId, virtualKeyId, gatewayRequestId },
-            "gateway trace references cross-tenant VK — skipping fold",
-          );
-          return;
-        }
-
-        const scopes: ApplicableScopes = {
-          organizationId: project.team.organizationId,
-          teamId: project.teamId,
-          projectId: project.id,
-          virtualKeyId: vk.id,
-          principalUserId: vk.principalUserId,
-        };
-        // The provider the gateway actually dispatched to. Absent on
-        // gateways that predate the field, in which case only unfiltered
-        // budgets accrue: attributing an unknown dispatch to a provider-
-        // filtered budget would be a guess, and a guess here silently
-        // mis-bills a governance control.
-        const dispatchedProviderKey =
-          foldState.attributes["langwatch.model_provider_id"] ?? null;
-
-        const resolved = await deps.budgetRepository.resolveForRequest(scopes);
-        const budgets = resolved.filter((r) =>
-          budgetAppliesToProvider(r.budget, dispatchedProviderKey),
-        );
-        if (budgets.length === 0) return;
-
-        const amountUsd = formatDecimal(foldState.totalCost ?? 0);
-        const tokensInput = foldState.totalPromptTokenCount ?? 0;
-        const tokensOutput = foldState.totalCompletionTokenCount ?? 0;
-        const model = foldState.models[0] ?? "unknown";
-        const status: GatewayBudgetLedgerStatus = foldState.blockedByGuardrail
-          ? "BLOCKED_BY_GUARDRAIL"
-          : foldState.containsErrorStatus
-            ? "PROVIDER_ERROR"
-            : "SUCCESS";
-        const occurredAt = new Date(foldState.occurredAt);
-
-        const rows: BudgetDebitRow[] = budgets.map(
-          ({ budget: b, bucketScopeId }) => ({
-            tenantId: projectId,
-            budgetId: b.id,
-            scope: b.scopeType,
-            scopeId: bucketScopeId,
-            window: b.window,
-            virtualKeyId: vk.id,
-            providerKey: dispatchedProviderKey,
-            gatewayRequestId,
-            amountUsd,
-            tokensInput,
-            tokensOutput,
-            tokensCacheRead: 0,
-            tokensCacheWrite: 0,
-            model,
-            durationMs: Math.round(foldState.totalDurationMs ?? 0),
-            status,
-            occurredAt,
-          }),
-        );
-
-        await deps.budgetCHRepository.insertDebit(rows);
-
-        // EC4 — emit a BUDGET_UPDATED change event so the gateway's
-        // /changes subscriber (services/aigateway/adapters/authresolver)
-        // evicts cached bundles for this project and the next request
-        // re-resolves with fresh spend. Without this, Bundle.Config.
-        // Budget.SpentMicroUSD stays frozen at populateConfig time and
-        // the on-breach=block precheck never fires until the JWT TTL
-        // (~15min) rolls.
-        //
-        // v2 TODO: dedupe — emit at most once per (projectId, budgetId)
-        // per ~10s window to avoid every gateway request triggering an
-        // L1 sweep + cold-miss on every other VK in the project. For
-        // current dogfood / single-tenant scale the unconditional emit
-        // is correct (just noisier than ideal).
-        try {
-          const changeEvents = new ChangeEventRepository(deps.prisma);
-          await changeEvents.append({
-            organizationId: project.team.organizationId,
-            projectId,
-            kind: "BUDGET_UPDATED",
-            payload: {
-              gatewayRequestId,
-              virtualKeyId: vk.id,
-              budgetIds: budgets.map((r) => r.budget.id),
-              amountUsd,
-            },
-          });
-        } catch (changeErr) {
-          // Best-effort. The CH ledger row already landed; failing the
-          // change event would just leave the gateway's cache slightly
-          // staler than it could be, not corrupt any state.
-          logger.warn(
-            { projectId, virtualKeyId, gatewayRequestId, error: changeErr },
-            "failed to emit BUDGET_UPDATED change event after fold",
-          );
-        }
       } catch (error) {
         logger.error(
           {

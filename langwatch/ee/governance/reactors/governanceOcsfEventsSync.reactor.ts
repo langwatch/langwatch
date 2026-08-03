@@ -48,6 +48,88 @@ export interface GovernanceOcsfEventsSyncReactorDeps {
 }
 
 /**
+ * Projects one governance trace onto an OCSF v1.1 row.
+ *
+ * Action prefers the trace's tool invocation as the verb; non-LLM activity
+ * (agent CRUD, plain traces) falls back to a generic "trace.recorded",
+ * which is better than an empty operation.
+ *
+ * Target prefers `gen_ai.request.model`, falling back to the rolled-up
+ * Models[0] on the fold state. For non-LLM events Models[] may be empty —
+ * an empty target is acceptable per the OCSF spec, where it is optional.
+ *
+ * Severity is INFO unless the trace carries an anomaly alert, which
+ * elevates it to MEDIUM per the spec.
+ */
+function buildOcsfEventRow({
+  tenantId,
+  foldState,
+  sourceId,
+  occurredAtMs,
+}: {
+  tenantId: string;
+  foldState: TraceSummaryData;
+  sourceId: string;
+  occurredAtMs: number;
+}): GovernanceOcsfEventInput {
+  const sourceType =
+    foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
+  const actorUserId = foldState.attributes[ATTR_USER_ID] ?? "";
+  const actorEmail = foldState.attributes[ATTR_USER_EMAIL] ?? "";
+  const actorEnduserId = foldState.attributes[ATTR_ENDUSER_ID] ?? "";
+  const actionName = foldState.attributes[ATTR_TOOL_NAME] ?? "trace.recorded";
+  const targetName =
+    foldState.attributes[ATTR_GEN_AI_REQUEST_MODEL] ??
+    foldState.models[0] ??
+    "";
+  const anomalyAlertId = foldState.attributes[ATTR_ANOMALY_ALERT_ID] ?? "";
+  const severityId = anomalyAlertId ? OCSF_SEVERITY.MEDIUM : OCSF_SEVERITY.INFO;
+
+  const rawOcsfJson = JSON.stringify({
+    class_uid: 6003,
+    category_uid: 6,
+    activity_id: OCSF_ACTIVITY.INVOKE,
+    type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
+    severity_id: severityId,
+    time: occurredAtMs,
+    actor: {
+      user: { uid: actorUserId, email_addr: actorEmail },
+      enduser: { uid: actorEnduserId },
+    },
+    api: { operation: actionName },
+    dst_endpoint: { name: targetName },
+    metadata: {
+      product: { name: "LangWatch", vendor_name: "LangWatch" },
+      extension: {
+        uid: "langwatch.governance",
+        source_type: sourceType,
+        source_id: sourceId,
+        trace_id: foldState.traceId,
+        anomaly_alert_id: anomalyAlertId || undefined,
+      },
+    },
+  });
+
+  return {
+    tenantId,
+    eventId: foldState.traceId,
+    traceId: foldState.traceId,
+    sourceId,
+    sourceType,
+    activityId: OCSF_ACTIVITY.INVOKE,
+    severityId,
+    eventTime: new Date(occurredAtMs),
+    actorUserId,
+    actorEmail,
+    actorEnduserId,
+    actionName,
+    targetName,
+    anomalyAlertId,
+    rawOcsfJson,
+  };
+}
+
+/**
  * Folds completed governance-origin traces into per-event OCSF v1.1
  * rows in ClickHouse. Each trace produces ONE row keyed by
  * (TenantId, EventId) where EventId = traceId (we use traceId as
@@ -61,8 +143,7 @@ export interface GovernanceOcsfEventsSyncReactorDeps {
  * `langwatch.origin.kind = "ingestion_source"` are not governance
  * traffic and are declined before a job is enqueued.
  *
- * Severity is INFO by default; elevated to MEDIUM (warning tier)
- * when `langwatch.governance.anomaly_alert_id` is set per the spec.
+ * The row itself is built by `buildOcsfEventRow`.
  *
  * Spec: specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
  */
@@ -112,78 +193,9 @@ export function createGovernanceOcsfEventsSyncReactor(
       }
 
       try {
-        const sourceType =
-          foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
-        const actorUserId = foldState.attributes[ATTR_USER_ID] ?? "";
-        const actorEmail = foldState.attributes[ATTR_USER_EMAIL] ?? "";
-        const actorEnduserId = foldState.attributes[ATTR_ENDUSER_ID] ?? "";
-
-        // Action: prefer the trace's first model invocation as the verb.
-        // For non-LLM activity (tool calls, agent CRUD), action will fall
-        // back to a generic "trace.recorded" — better than empty.
-        const actionName =
-          foldState.attributes[ATTR_TOOL_NAME] ?? "trace.recorded";
-
-        // Target: prefer gen_ai.request.model for LLM invocations; fall
-        // back to the rolled-up Models[0] from the fold state. For
-        // non-LLM events, Models[] may be empty — empty target is
-        // acceptable per OCSF spec (target is optional).
-        const targetName =
-          foldState.attributes[ATTR_GEN_AI_REQUEST_MODEL] ??
-          foldState.models[0] ??
-          "";
-
-        const anomalyAlertId =
-          foldState.attributes[ATTR_ANOMALY_ALERT_ID] ?? "";
-        const severityId = anomalyAlertId
-          ? OCSF_SEVERITY.MEDIUM
-          : OCSF_SEVERITY.INFO;
-
-        const eventTime = new Date(occurredAtMs);
-        const rawOcsfJson = JSON.stringify({
-          class_uid: 6003,
-          category_uid: 6,
-          activity_id: OCSF_ACTIVITY.INVOKE,
-          type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
-          severity_id: severityId,
-          time: occurredAtMs,
-          actor: {
-            user: { uid: actorUserId, email_addr: actorEmail },
-            enduser: { uid: actorEnduserId },
-          },
-          api: { operation: actionName },
-          dst_endpoint: { name: targetName },
-          metadata: {
-            product: { name: "LangWatch", vendor_name: "LangWatch" },
-            extension: {
-              uid: "langwatch.governance",
-              source_type: sourceType,
-              source_id: sourceId,
-              trace_id: foldState.traceId,
-              anomaly_alert_id: anomalyAlertId || undefined,
-            },
-          },
-        });
-
-        const row: GovernanceOcsfEventInput = {
-          tenantId,
-          eventId: foldState.traceId,
-          traceId: foldState.traceId,
-          sourceId,
-          sourceType,
-          activityId: OCSF_ACTIVITY.INVOKE,
-          severityId,
-          eventTime,
-          actorUserId,
-          actorEmail,
-          actorEnduserId,
-          actionName,
-          targetName,
-          anomalyAlertId,
-          rawOcsfJson,
-        };
-
-        await deps.governanceOcsfEventsRepository.insertEvent(row);
+        await deps.governanceOcsfEventsRepository.insertEvent(
+          buildOcsfEventRow({ tenantId, foldState, sourceId, occurredAtMs }),
+        );
       } catch (error) {
         logger.error(
           {
