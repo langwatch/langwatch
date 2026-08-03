@@ -57,7 +57,13 @@ class FakeRedis {
       const re = new RegExp(
         `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
       );
-      const keys = [...this.zsets.keys()].filter((k) => re.test(k)).sort();
+      // Redis drops a collection when its last member goes, so a drained group
+      // has no key for SCAN to return. Modelling that matters here: it is what
+      // stops the sweep treating an empty group as something to adopt.
+      const keys = [...this.zsets.entries()]
+        .filter(([k, members]) => members.length > 0 && re.test(k))
+        .map(([k]) => k)
+        .sort();
       const offset = Number(cursor);
       const page = keys.slice(offset, offset + count);
       const next = offset + page.length;
@@ -670,6 +676,94 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         // Nothing was adopted, so the sweep backs off instead of paying the
         // keyspace walk on every pass.
         expect(redis.scan.mock.calls.length).toBe(afterFirst);
+      });
+    });
+  });
+
+  describe("given the sweep has backed off to its backstop interval", () => {
+    const BACKSTOP_MS = 60 * 60 * 1000;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      redis.seedGroup({
+        groupId: "tenant-a/known",
+        jobCount: 1,
+        index: `${PREFIX}pending-groups`,
+        indexType: "set",
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Passes between sweeps, none of which should touch the deadline. */
+    const runPassesOver = async (totalMs: number, passes: number) => {
+      for (let i = 0; i < passes; i++) {
+        vi.advanceTimersByTime(Math.floor(totalMs / passes));
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+      }
+    };
+
+    describe("when reconciles keep running before the deadline", () => {
+      /** @scenario "Reconciles between sweeps do not postpone the scheduled sweep" */
+      it("still sweeps once the backstop elapses", async () => {
+        // First pass sweeps and finds nothing to adopt, so the next is scheduled
+        // a backstop away.
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+        const afterFirstSweep = redis.scan.mock.calls.length;
+        expect(afterFirstSweep).toBeGreaterThan(0);
+
+        // Passes covering most of the interval must leave the deadline alone.
+        await runPassesOver(BACKSTOP_MS - 60_000, 30);
+        expect(redis.scan.mock.calls.length).toBe(afterFirstSweep);
+
+        // Once the interval has genuinely elapsed, the sweep comes due.
+        vi.advanceTimersByTime(120_000);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+
+        expect(redis.scan.mock.calls.length).toBeGreaterThan(afterFirstSweep);
+      });
+    });
+
+    describe("when a sweep finds a group the index does not list", () => {
+      /** @scenario "A sweep that adopts keeps sweeping on the next pass" */
+      it("sweeps again on the very next pass", async () => {
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+        const afterFirstSweep = redis.scan.mock.calls.length;
+
+        // Arrives after the first sweep, indexed nowhere: the state a pod on the
+        // previous release leaves behind mid-rollout.
+        redis.zsets.set(`${PREFIX}group:tenant-a/late:jobs`, ["j1"]);
+        vi.advanceTimersByTime(BACKSTOP_MS + 1);
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+        const afterAdoptingSweep = redis.scan.mock.calls.length;
+        expect(afterAdoptingSweep).toBeGreaterThan(afterFirstSweep);
+
+        // That sweep adopted, so the next pass sweeps again without waiting.
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+
+        expect(redis.scan.mock.calls.length).toBeGreaterThan(
+          afterAdoptingSweep,
+        );
+      });
+    });
+
+    describe("when a drained group is still listed in a lifecycle index", () => {
+      /** @scenario "A drained group listed in a lifecycle index does not pin the sweep" */
+      it("does not keep the expensive walk running on it", async () => {
+        // Listed in ready with no jobs: adopted, pruned for being empty, and
+        // found again next pass. Counting it as an adoption would answer
+        // "sweep again" forever.
+        redis.zsets.set(`${PREFIX}ready`, ["tenant-a/drained"]);
+        redis.zsets.set(`${PREFIX}group:tenant-a/drained:jobs`, []);
+
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+        const afterFirstSweep = redis.scan.mock.calls.length;
+
+        await repo.reconcileTotalPending(QUEUE_NAME, 0);
+
+        expect(redis.scan.mock.calls.length).toBe(afterFirstSweep);
       });
     });
   });
