@@ -829,15 +829,22 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 | `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
 | `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
 | `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
-| `GET` | `/api/gateway/v1/model-providers` | List ModelProviders (gateway + legacy paths share this) | `modelProviders:view` |
-| `POST` | `/api/gateway/v1/model-providers` | Create ModelProvider (with optional gateway-Advanced fields) | `modelProviders:manage` |
-| `PATCH` | `/api/gateway/v1/model-providers/:id` | Update (including Advanced fields) | `modelProviders:manage` |
-| `DELETE` | `/api/gateway/v1/model-providers/:id` | Delete | `modelProviders:manage` |
+| `GET` `POST` | `/api/gateway/v1/providers` | Tombstone. Gateway provider bindings folded into ModelProvider in iter 110, so all four answer `410 Gone` with `gateway_provider_bindings_gone` and point at `/api/model-providers` | n/a |
+| `PATCH` `DELETE` | `/api/gateway/v1/providers/:id` | Tombstone, same as above | n/a |
 | `POST` | `/api/gateway/v1/virtual-keys/:id/disable` | Reversible stop (distinct `virtual_key_disabled` on use; grace preserved) | `virtualKeys:update` |
 | `POST` | `/api/gateway/v1/virtual-keys/:id/enable` | Reverse of disable; restores the key exactly as it was | `virtualKeys:update` |
 | `GET` | `/api/gateway/v1/virtual-keys/:id/spend` | Per-key spend + request count over a window | `gatewayUsage:view` |
 | `POST` | `/api/gateway/v1/budgets/:id/reset` | Move the period boundary; never mutates recorded spend; `?end_user_id=` for one template bucket | `gatewayBudgets:update` |
 | `GET` | `/api/gateway/v1/end-users/:id/spend` | Rolling-window usage rollup + the applicable template caps at their current-period spend; org key, billing surface | `gatewaySpend:view` |
+| `GET` | `/api/gateway/v1/cache-rules` | List cache rules, cursor-paged | `gatewayCacheRules:view` |
+| `POST` | `/api/gateway/v1/cache-rules` | Create a cache rule | `gatewayCacheRules:create` |
+| `GET` | `/api/gateway/v1/cache-rules/:id` | Get one cache rule | `gatewayCacheRules:view` |
+| `PATCH` | `/api/gateway/v1/cache-rules/:id` | Update a cache rule | `gatewayCacheRules:update` |
+| `DELETE` | `/api/gateway/v1/cache-rules/:id` | Delete a cache rule | `gatewayCacheRules:delete` |
+| `GET` | `/api/gateway/v1/spend-events` | Read the spend event log, cursor-paged and filterable by key, end user, model, and status | `gatewaySpend:view` |
+| `POST` | `/api/gateway/v1/spend-events/replay` | Re-deliver a window of spend events to the subscribed webhook endpoints | `gatewaySpend:manage` |
+| `GET` | `/api/gateway/v1/spend-summaries` | Aggregated spend over a window, grouped by the requested dimension | `gatewaySpend:view` |
+| `GET` | `/api/gateway/v1/openapi.json` | This API's OpenAPI description | none, deliberately public |
 
 **Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
 
@@ -845,7 +852,7 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 **Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `ModelProviderService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
 
-**OpenAPI spec:** generated via `pnpm run openapi:gen` (TBD if not present) and published at `/api/gateway/v1/openapi.json` plus the docs site.
+**OpenAPI spec:** generated into `langwatch/src/app/api/openapiLangWatch.json` by `pnpm run task generateOpenAPISpec`, served unauthenticated at `/api/gateway/v1/openapi.json`, and published on the docs site.
 
 ## 12b. Billing events, webhooks, and end-user attribution (2026-07)
 

@@ -54,6 +54,7 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
+import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
 import { app as githubLangyApp } from "./routes/github-langy";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
@@ -129,6 +130,11 @@ export function createApiRouter() {
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", exportScenarioRunsApp);
+  // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
+  // namespace with the credentialed resource routes, so it is mounted first
+  // and cannot be shadowed by a sibling that later grows a parameterised
+  // segment at the root of that namespace.
+  api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
