@@ -5,6 +5,7 @@ import {
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
+  MAX_BLOB_BYTES,
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
@@ -420,11 +421,20 @@ end
 // stored compressed. The encoder records the pre-compression, pre-offload
 // payload size in the envelope header (`s`), so the drain's byte budget can be
 // about the batch a worker will actually assemble rather than about Redis
-// occupancy. Mirrors the TS `readJobPayloadBytes` in `jobEnvelope.ts`,
-// including the fallback: legacy bare JSON and pre-`s` envelopes are worth
-// their stored length. The two are one budget read from two ends, so an
-// envelope-format change — new prefix, renamed header field, different
-// length-prefix encoding — has to land in both or they silently disagree.
+// occupancy.
+//
+// A value with no `s` gets the reading that cannot let the batch overshoot,
+// not simply its stored length: legacy bare JSON and a plain inline body
+// (`e:"j"`) ARE their stored length, but a pre-`s` compressed or offloaded body
+// is a fraction of one and the value does not say by how much. Those are worth
+// the payload cap, so they drain alone for the length of a rolling deploy
+// rather than reinstating the very blindness `s` closes — in the window where
+// the most jobs are queued. See the TS twin `readJobPayloadBytes` in
+// `jobEnvelope.ts` for the full reasoning.
+//
+// The two are one budget read from two ends, so an envelope-format change —
+// new prefix, renamed header field, different length-prefix encoding — has to
+// land in both or they silently disagree.
 const PAYLOAD_SIZE_HELPER_LUA = `
 local function gqPayloadSize(value)
   local prefix = string.sub(value, 1, 4)
@@ -434,8 +444,13 @@ local function gqPayloadSize(value)
       local headerLen = tonumber(string.sub(value, 5, barIdx - 1))
       if headerLen and headerLen > 0 then
         local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
-        if ok and type(header) == "table" and type(header["s"]) == "number" and header["s"] >= 0 then
-          return header["s"]
+        if ok and type(header) == "table" then
+          if type(header["s"]) == "number" and header["s"] >= 0 then
+            return header["s"]
+          end
+          if header["e"] ~= "j" then
+            return ${MAX_BLOB_BYTES}
+          end
         end
       end
     end

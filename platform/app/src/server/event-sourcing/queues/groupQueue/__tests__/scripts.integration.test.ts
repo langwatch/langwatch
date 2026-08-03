@@ -5264,9 +5264,10 @@ describe("GroupStagingScripts.drainGroupReady", () => {
         expect(await inspectTotalPending()).toBe("3");
       });
 
-      it("falls back to the stored length for an envelope that declares no size", async () => {
-        // Pre-`s` envelopes are still in flight during a rollout. They keep the
-        // old behaviour — bounded by count — rather than being read as zero-cost.
+      it("falls back to the stored length for a plain inline envelope that declares no size", async () => {
+        // Pre-`s` envelopes are still in flight during a rollout. An inline,
+        // uncompressed body IS its stored length, so it keeps the old
+        // behaviour rather than being read as zero-cost.
         const header = JSON.stringify({ v: 2, e: "j" });
         const value = `GQ2|${Buffer.byteLength(header)}|${header}{"p":"${"x".repeat(60)}"}`;
         for (const [index, dispatchAfterMs] of [100, 200].entries()) {
@@ -5288,6 +5289,84 @@ describe("GroupStagingScripts.drainGroupReady", () => {
         });
 
         expect(drained.map((d) => d.stagedJobId)).toEqual(["j1"]);
+      });
+
+      // The rollout window this fix is really about: an old worker stages an
+      // offloaded envelope with no `s` while a new worker drains it. Reading
+      // the ~150-byte reference there would reinstate the exact blindness `s`
+      // closes, in the window with the deepest backlog.
+      describe("given a pre-`s` envelope whose body was compressed or offloaded", () => {
+        const sizelessEnvelope = (encoding: string) => {
+          const header = JSON.stringify({
+            v: 2,
+            e: encoding,
+            ref: { tier: "redis", projectId: "project-a", hash: "abc123" },
+            h: "holder-1",
+          });
+          return `GQ2|${Buffer.byteLength(header)}|${header}`;
+        };
+
+        it.each(["redis", "s3", "ref", "gz"])(
+          "costs the payload cap rather than the stored length (e=%s)",
+          async (encoding) => {
+            const value = sizelessEnvelope(encoding);
+            expect(Buffer.byteLength(value)).toBeLessThan(300);
+
+            for (const [index, dispatchAfterMs] of [100, 200].entries()) {
+              await scripts.stage(
+                makeJob({
+                  stagedJobId: `j${index + 1}`,
+                  dispatchAfterMs,
+                  jobDataJson: value,
+                }),
+              );
+            }
+
+            // A budget that a stored-length reading would clear many times over.
+            const drained = await scripts.drainGroupReady({
+              groupId: "group-a",
+              nowMs: 10_000,
+              maxJobs: 10,
+              maxBytes: 4 * 1024 * 1024,
+              initialBytes: 0,
+            });
+
+            // Unknown payload: no sibling is coalesced, and none is dropped —
+            // the dispatched job processes alone and these stay staged for
+            // their own later dispatch.
+            expect(drained).toEqual([]);
+            expect(await inspectGroupJobs("group-a")).toEqual([
+              "j1",
+              "100",
+              "j2",
+              "200",
+            ]);
+            expect(await inspectTotalPending()).toBe("2");
+          },
+        );
+
+        it("still ignores the byte bound entirely when maxBytes is zero", async () => {
+          const value = sizelessEnvelope("redis");
+          for (const [index, dispatchAfterMs] of [100, 200].entries()) {
+            await scripts.stage(
+              makeJob({
+                stagedJobId: `j${index + 1}`,
+                dispatchAfterMs,
+                jobDataJson: value,
+              }),
+            );
+          }
+
+          const drained = await scripts.drainGroupReady({
+            groupId: "group-a",
+            nowMs: 10_000,
+            maxJobs: 10,
+            maxBytes: 0,
+            initialBytes: 0,
+          });
+
+          expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+        });
       });
     });
   });

@@ -459,6 +459,67 @@ describe("jobEnvelope", () => {
       it("falls back to the stored length for a corrupt value", () => {
         expect(readJobPayloadBytes("GQ2|not-a-length|{}")).toBe(19);
       });
+
+      // Old workers keep staging pre-`s` envelopes for the length of a rolling
+      // deploy. For those, the stored length is honest only when the body is
+      // inline and uncompressed; anything else is a fraction of the payload
+      // with nothing in the value saying by how much.
+      describe("when the envelope predates the recorded size", () => {
+        /** Strips `s` back out of an encoded envelope, leaving the rest intact. */
+        const withoutRecordedSize = (value: string): string => {
+          const buf = Buffer.from(value, "utf8");
+          const barIdx = buf.indexOf(0x7c, 4); // "|" after the prefix
+          const headerLen = Number(buf.subarray(4, barIdx).toString("utf8"));
+          const header = JSON.parse(
+            buf.subarray(barIdx + 1, barIdx + 1 + headerLen).toString("utf8"),
+          ) as Record<string, unknown>;
+          const body = buf.subarray(barIdx + 1 + headerLen).toString("utf8");
+          delete header.s;
+          const json = JSON.stringify(header);
+          return `${value.slice(0, 4)}${Buffer.byteLength(json)}|${json}${body}`;
+        };
+
+        it("costs the payload cap for an offloaded body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "spanReceived", bulk: "z".repeat(64 * 1024) },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          // A stored-length reading would call a 64 KiB payload ~200 bytes.
+          expect(Buffer.byteLength(legacy)).toBeLessThan(1024);
+          expect(readJobPayloadBytes(legacy)).toBe(MAX_BLOB_BYTES);
+        });
+
+        it("costs the payload cap for a compressed inline body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "tiny", bulk: "z".repeat(3 * 1024) },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          expect(readJobPayloadBytes(legacy)).toBe(MAX_BLOB_BYTES);
+        });
+
+        it("keeps the stored length for a plain inline body", async () => {
+          const { tieredBlobs } = makeTiered();
+          const encoded = await encodeJobEnvelope({
+            jobData: { __jobName: "tiny", value: 1 },
+            tieredBlobs,
+            projectId: PROJECT,
+          });
+
+          const legacy = withoutRecordedSize(encoded);
+
+          expect(readJobPayloadBytes(legacy)).toBe(Buffer.byteLength(legacy));
+        });
+      });
     });
 
     describe("when a small payload is encoded", () => {

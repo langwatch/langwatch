@@ -757,29 +757,45 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 
 /**
  * How many bytes this job costs a coalesced batch: the header's recorded
- * payload size when the value carries one, the stored length otherwise.
+ * payload size when the value carries one, and for the values that carry none,
+ * whichever reading cannot let the batch overshoot.
  *
- * The fallback is the honest answer for the values that have no `s` — legacy
- * bare JSON, and envelopes written before this field existed — because for them
- * the stored length IS the payload, modulo inline compression. It is also the
- * conservative direction only for uncompressed values; a pre-`s` envelope with a
- * blob body still under-reports. Those drain under the count bound alone, same
- * as before, and age out as the fleet cycles.
+ * Three cases, only one of which is a plain measurement:
  *
- * Never throws: a value this cannot read is worth its stored length, not an
- * exception on the drain path.
+ * 1. `s` present — the payload size the encoder recorded. Exact.
+ * 2. No `s`, body inline and uncompressed (`e:"j"`), or legacy bare JSON — the
+ *    stored length IS the payload. Exact enough.
+ * 3. No `s`, body compressed or offloaded (`e` of `gz`/`ref`/`redis`/`s3`, or
+ *    absent) — the stored length is a fraction of the payload and there is
+ *    nothing in the value that says by how much. Worth {@link MAX_BLOB_BYTES}:
+ *    an unreadable payload is treated as the largest payload we accept.
  *
- * Has a Lua twin: `gqPayloadSize` in `scripts.ts` reads the same `s` field with
- * the same fallback, because the drain spends the byte budget inside Redis
- * while this sets its starting point. An envelope-format change — new prefix,
- * renamed header field, different length-prefix encoding — has to land in both
- * or the two ends of one budget silently disagree.
+ * Case 3 exists for the length of a rolling deploy: old workers keep staging
+ * pre-`s` envelopes while new ones drain them, and a deep backlog is exactly
+ * where it does not age out promptly — which is also exactly where the byte
+ * bound is load-bearing. Reading the stored length there would reinstate the
+ * defect this field was added to close, for the window with the most jobs
+ * queued. Costing the cap instead makes such a job drain alone (any sane
+ * `coalesceMaxBytes` is far under 50 MiB), so the rollout loses coalescing on
+ * those jobs rather than losing the bound. Coalescing is an optimization; the
+ * bound is what keeps a worker from assembling a batch it cannot hold.
+ *
+ * Never throws: a value this cannot parse at all is worth its stored length,
+ * not an exception on the drain path.
+ *
+ * Has a Lua twin: `gqPayloadSize` in `scripts.ts` makes the same three
+ * decisions, because the drain spends the byte budget inside Redis while this
+ * sets its starting point. An envelope-format change — new prefix, renamed
+ * header field, different length-prefix encoding — has to land in both or the
+ * two ends of one budget silently disagree.
  */
 export function readJobPayloadBytes(value: string): number {
   try {
     if (isEnvelope(value)) {
       const { header } = splitEnvelope(value);
       if (typeof header.s === "number" && header.s >= 0) return header.s;
+      // Pre-`s` envelope: only a plain inline body is worth its stored length.
+      if (header.e !== "j") return MAX_BLOB_BYTES;
     }
   } catch {
     // Fall through: an unreadable envelope still occupies its stored bytes.
