@@ -29,6 +29,13 @@ import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../schemas/constants";
+import {
+  buildTraceDeps,
+  FIXTURE_TENANT_ID,
+  FIXTURE_TRACE_ID,
+  spanId,
+  spanPayload,
+} from "./support/traceProcessingFixtures";
 
 vi.mock("../../../utils/killSwitch", () => ({
   isComponentDisabled: vi.fn().mockResolvedValue(false),
@@ -37,36 +44,6 @@ vi.mock("../../../utils/killSwitch", () => ({
 import { isComponentDisabled } from "../../../utils/killSwitch";
 
 const mockedIsComponentDisabled = vi.mocked(isComponentDisabled);
-
-const TENANT_ID = "tenant-span-coalescing";
-const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
-
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
-
-function buildTraceDeps(
-  overrides: Partial<TraceProcessingPipelineDeps> = {},
-): TraceProcessingPipelineDeps {
-  const store = {} as any;
-  return {
-    spanAppendStore: store,
-    traceSummaryStore: store,
-    traceAnalyticsStore: store,
-    traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
-    automations: {
-      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
-      graphActivityHandler: vi.fn().mockResolvedValue(undefined),
-    },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    ...overrides,
-  };
-}
 
 function recordSpanRegistration(
   deps: Partial<TraceProcessingPipelineDeps> = {},
@@ -85,41 +62,6 @@ function coalesceResolverOf(deps: Partial<TraceProcessingPipelineDeps> = {}) {
   return recordSpanRegistration(deps)?.options?.coalesceMaxBatch as (
     payload: RecordSpanCommandData,
   ) => number;
-}
-
-function spanPayload({
-  spanId,
-  spoolRef,
-}: {
-  spanId: string;
-  spoolRef?: string;
-}): RecordSpanCommandData {
-  return {
-    tenantId: TENANT_ID,
-    occurredAt: 1_700_000_000_000,
-    ...(spoolRef ? { spoolRef } : {}),
-    span: {
-      traceId: TRACE_ID,
-      spanId,
-      name: "test-span",
-      kind: 1,
-      startTimeUnixNano: { low: 0, high: 0 },
-      endTimeUnixNano: { low: 1_000_000, high: 0 },
-      attributes: [],
-      events: [],
-      links: [],
-      status: {},
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    },
-    resource: null,
-    instrumentationScope: null,
-  } as unknown as RecordSpanCommandData;
-}
-
-function spanId(index: number): string {
-  return (index + 1).toString(16).padStart(16, "0");
 }
 
 /** A handler with every enrichment stubbed out — only the fold is under test. */
@@ -235,7 +177,7 @@ describe("recordSpan append coalescing", () => {
             (event) => event.type === SPAN_RECEIVED_EVENT_TYPE,
           ),
         ).toBe(true);
-        expect(context).toEqual({ tenantId: TENANT_ID });
+        expect(context).toEqual({ tenantId: FIXTURE_TENANT_ID });
       });
 
       /** @scenario 'coalescing preserves every item' */
@@ -252,7 +194,8 @@ describe("recordSpan append coalescing", () => {
           (events as Event[]).map((event) => event.idempotencyKey),
         ).toEqual(
           payloads.map(
-            (payload) => `${TENANT_ID}:${TRACE_ID}:${payload.span.spanId}`,
+            (payload) =>
+              `${FIXTURE_TENANT_ID}:${FIXTURE_TRACE_ID}:${payload.span.spanId}`,
           ),
         );
       });
@@ -269,7 +212,7 @@ describe("recordSpan append coalescing", () => {
         const [events] = storeEventsFn.mock.calls[0]!;
         expect(
           new Set((events as Event[]).map((event) => event.aggregateId)),
-        ).toEqual(new Set([TRACE_ID]));
+        ).toEqual(new Set([FIXTURE_TRACE_ID]));
       });
     });
 
