@@ -14,11 +14,36 @@ const logger = createLogger("langwatch:billing:meterDispatch");
 const GRACE_PERIOD_DAYS = 3;
 
 /**
+ * One queue lane per project, matching this reactor's per-project dedup id.
+ *
+ * The queue's dedup key is global to the queue, but the check that decides
+ * whether a duplicate is still squashable looks the existing job up in the
+ * CURRENT group's job set. So a dedup id that spans groups never squashes:
+ * the lookup misses, the key is treated as stale, and it is deleted before a
+ * fresh job stages — which also drops the guard protecting the pending job in
+ * the other group. A per-project dedup id therefore only bites under a
+ * per-project lane, and inheriting the default per-trace lane silently turns
+ * the dedup into a no-op that leaves one live job per concurrent trace.
+ *
+ * Nothing here reads the triggering event: the dispatch is derived from the
+ * project's organization and the current billing month, so every one of a
+ * project's jobs is interchangeable and they belong in one serialized lane.
+ * The queue prefixes `<tenantId>/map/orgBillableEventsMeter/reactor/
+ * billingMeterDispatch/` around this key.
+ */
+export function billingMeterDispatchGroupKey(event: {
+  tenantId: string;
+}): string {
+  return `billing-meter-dispatch:${event.tenantId}`;
+}
+
+/**
  * Reactor that dispatches billing usage reporting commands after
  * the orgBillableEventsMeter map projection succeeds.
  *
  * Two dedup layers:
- * - Reactor-level per-project: makeJobId creates one reactor job per project.
+ * - Reactor-level per-project: makeJobId creates one reactor job per project,
+ *   collapsed into one pending job by the per-project lane above.
  *   An org with N active projects creates N reactor jobs but each project
  *   only triggers one within the TTL window.
  * - Framework per-org: command dedup via makeId `${orgId}:${billingMonth}`, 310s TTL
@@ -34,6 +59,7 @@ export function createBillingMeterDispatchReactor(deps: {
     name: "billingMeterDispatch",
     options: {
       runIn: ["worker"],
+      groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
       makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,
       ttl: 300_000,
     },
