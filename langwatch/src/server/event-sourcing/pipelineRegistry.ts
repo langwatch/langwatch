@@ -2,11 +2,7 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
-import type { AttributedDebitsProcessDeps } from "@ee/governance/process-manager/attributedUserDebits.process";
-import {
-  createGatewayBudgetSyncReactor,
-  type GatewayBudgetSyncReactorDeps,
-} from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
@@ -335,10 +331,9 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
-  attributedDebits?: AttributedDebitsProcessDeps;
+  gatewayDebits?: GatewayDebitsProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -787,7 +782,7 @@ export class PipelineRegistry {
         // The ADR-073 delivery process manager consumes this pipeline's
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
-        attributedDebits: this.deps.attributedDebits,
+        gatewayDebits: this.deps.gatewayDebits,
         settlement: {
           // Lazy: the pipeline is being built by this very call, so the
           // sweeper resolves the command sender at execution time.
@@ -1020,10 +1015,6 @@ export class PipelineRegistry {
       },
     });
 
-    const gatewayBudgetSyncReactor = this.deps.gatewayBudgetSync
-      ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
-      : undefined;
-
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
       : undefined;
@@ -1058,7 +1049,6 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
-        gatewayBudgetSyncReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,

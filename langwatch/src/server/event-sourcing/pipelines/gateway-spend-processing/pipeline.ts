@@ -1,8 +1,8 @@
 import {
-  ATTRIBUTED_DEBITS_PROCESS_NAME,
-  type AttributedDebitsProcessDeps,
-  attributedUserDebitsPM,
-} from "@ee/governance/process-manager/attributedUserDebits.process";
+  GATEWAY_DEBITS_PROCESS_NAME,
+  type GatewayDebitsProcessDeps,
+  gatewayDebitsPM,
+} from "@ee/governance/process-manager/gatewayDebits.process";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,
@@ -36,9 +36,9 @@ export interface GatewaySpendProcessingPipelineDeps {
   /** The ADR-073 delivery process manager; absent when webhooks are off
    *  (the pipeline still projects, delivery just has no consumer). */
   webhookDelivery?: WebhookDeliveryProcessDeps;
-  /** Attributed-user budget debits; absent without the ClickHouse spend
-   *  path (per-user buckets cannot exist without the ledger). */
-  attributedDebits?: AttributedDebitsProcessDeps;
+  /** The gateway's budget debits; absent without the ClickHouse spend path
+   *  (the ledger is the only spend store). */
+  gatewayDebits?: GatewayDebitsProcessDeps;
   /** The M2 settlement sweeper: settles admissions whose confirmation
    *  never arrived inside the grace window. */
   settlement?: SpendSettlementProcessDeps;
@@ -85,10 +85,10 @@ export function createGatewaySpendProcessingPipeline(
       webhookDeliveryPM(deps.webhookDelivery),
     );
   }
-  if (deps.attributedDebits) {
+  if (deps.gatewayDebits) {
     pipeline = pipeline.withProcessManager(
-      ATTRIBUTED_DEBITS_PROCESS_NAME,
-      attributedUserDebitsPM(deps.attributedDebits),
+      GATEWAY_DEBITS_PROCESS_NAME,
+      gatewayDebitsPM(deps.gatewayDebits),
     );
   }
   if (deps.settlement) {

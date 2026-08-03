@@ -2,7 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { detectBudgetCrossings } from "@ee/governance/services/governanceSignals.service";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
@@ -32,7 +31,6 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -746,27 +744,6 @@ export function initializeDefaultApp(options?: {
     langyTurnAdmission,
   };
 
-  const gatewayBudgetSync = clickhouseEnabled
-    ? (() => {
-        const budgetCHRepository = new GatewayBudgetClickHouseRepository(
-          resolveClickHouseClient,
-        );
-        return {
-          prisma,
-          budgetRepository: new GatewayBudgetRepository(prisma),
-          budgetCHRepository,
-          detectCrossings: (
-            rows: Array<{
-              tenantId: string;
-              budgetId: string;
-              bucketScopeId: string;
-              endUserId: string | null;
-            }>,
-          ) => detectBudgetCrossings({ prisma, budgetCHRepository }, rows),
-        };
-      })()
-    : undefined;
-
   // The spend-command pipeline projects gateway_spend; it shares the
   // ClickHouse gate because the spend record has no PG fallback (a mutable
   // counter is the failure mode this table exists to replace).
@@ -789,9 +766,9 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Attributed-user budget debits ride the same pipeline and the same
-  // ClickHouse gate: per-user buckets only exist on the spend ledger.
-  const attributedDebits = clickhouseEnabled
+  // Gateway budget debits ride the spend pipeline and share its ClickHouse
+  // gate: the ledger is the only store spend accrues in.
+  const gatewayDebits = clickhouseEnabled
     ? {
         prisma,
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
@@ -1024,10 +1001,9 @@ export function initializeDefaultApp(options?: {
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
-    gatewayBudgetSync,
     gatewaySpend,
     webhookDelivery,
-    attributedDebits,
+    gatewayDebits,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.
