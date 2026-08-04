@@ -271,11 +271,11 @@ export class GatewayBudgetsApiService {
    * `listPage()`, or stream the walk with `iterate()`.
    *
    * A plain array, like every other exhaustive `list()` in the SDK: a walk
-   * that ran to the end has no cursor left to report, and the page envelope's
-   * `spend_available` is readable off the rows, since a page that could not
-   * total spend serves `spent_usd` and `spent_nano_usd` as null rather than a
-   * stale figure. `budgets.some((b) => b.spent_usd === null)` is the same
-   * answer. Use `listPage()` when you want the flag stated outright.
+   * that ran to the end has no cursor left to report. Null `spent_usd` /
+   * `spent_nano_usd` on a row is not by itself "spend unavailable": an
+   * `attributed_user` template row serves null deliberately, because one
+   * allowance per person has no single total. Use `listPage()` when you need
+   * `spend_available` stated outright.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
