@@ -1933,6 +1933,23 @@ Errors (like successes) always carry:
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
 
+## Control-plane codes
+
+The management and webhook APIs answer with the same envelope, and their `type` is the status class. Branch on `code`:
+
+| `code` | HTTP | When |
+|---|---|---|
+| `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
+| `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in. |
+| `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
+| `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
+| `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
+| `external_id_conflict` | `409` | The `external_id` you supplied already belongs to another resource of this type in the organization. |
+| `idempotency_error` | `409` | An `Idempotency-Key` was reused with a different body, or while its first request is still running. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely). |
+| `webhook_endpoint_not_found` | `404` | No webhook endpoint with that id is visible to this credential. |
+| `spend_source_unavailable` | `412` | The deployment has no ClickHouse spend source, so a spend figure would be indistinguishable from zero spend. |
+
 ## Budget-warning headers (not errors)
 
 These are *soft* signals on **successful** responses:
@@ -2072,6 +2089,121 @@ Content:  application/json
 
 Self-hosted: replace the base with your control plane's DNS.
 
+## Paging
+
+Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim, and keep going until it comes back `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
+
+## Retrying a create safely
+
+The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/v1/endpoints`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -H "Idempotency-Key: signup-acme-4171" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": {...}, "name": "customer-acme", "window": "month", "limit_usd": "250" }'
+```
+
+- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. Nothing is created twice.
+- Send the same key with a **different** body and the request is refused: `409` with `error.code = "idempotency_error"`. The key already stands for a different request.
+- Retry while the first attempt is still running and you also get `409 idempotency_error`, so two racing retries cannot both create.
+- Only successful outcomes are stored. If the create failed, a retry runs it again for real.
+- The key is yours to choose, 8 to 255 characters. Scope it to the thing you are creating, not the attempt.
+
+Replay is what makes a lost create recoverable on the two routes that return a secret exactly once: replaying the original request returns the original `secret`.
+
+<Warning>
+**The body has to be identical on the retry**, because the key is matched against a fingerprint of it. A field computed fresh each attempt makes every retry a `409`: `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive such values from something the first call already produced, for example the `created_at` of the virtual key you just minted, rather than from the clock at retry time.
+</Warning>
+
+Keys are scoped to your project on the gateway routes and to your organization on the webhook routes, so two projects can use the same key text without colliding. Stored responses are encrypted at rest and expire after 24 hours.
+
+## From the SDKs
+
+Both LangWatch SDKs wrap this API, so you get the paging walk, the error types, and the idempotency plumbing without writing them. `virtualKeys` / `virtual_keys` and `gatewayBudgets` / `gateway_budgets` cover this page; `spendEvents` / `spend_events` and `webhooks` cover the [billing](/ai-gateway/billing-events) and [webhook](/features/webhooks) surfaces.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
+
+// Three ways to read a list: one page, the whole walk, or a stream.
+const page = await langwatch.gatewayBudgets.listPage({ limit: 100 });
+const { data } = await langwatch.gatewayBudgets.list({ externalId: "acme-tenant-4171" });
+for await (const budget of langwatch.gatewayBudgets.iterate()) {
+  console.log(budget.name, budget.resets_at);
+}
+
+const budget = await langwatch.gatewayBudgets.create(
+  {
+    scope: { kind: "project", project_id: "proj_01HZ..." },
+    name: "customer-acme",
+    window: "month",
+    limit_usd: "250",
+    cycle_anchor_at: "2026-01-17T09:00:00Z",
+    external_id: "acme-tenant-4171",
+  },
+  {
+    idempotencyKey: "signup-acme-4171",
+    onIdempotentReplay: () => console.log("replayed, nothing was created"),
+  },
+);
+
+await langwatch.gatewayBudgets.archive(budget.id);
+```
+
+```python Python
+import os
+
+import langwatch
+
+langwatch.setup(api_key=os.environ["LANGWATCH_API_KEY"])
+
+# Three ways to read a list: one page, the whole walk, or a stream.
+page = langwatch.gateway_budgets.list_page(limit=100)
+listing = langwatch.gateway_budgets.list(external_id="acme-tenant-4171")
+for budget in langwatch.gateway_budgets.iterate():
+    print(budget["name"], budget["resets_at"])
+
+budget = langwatch.gateway_budgets.create(
+    scope={"kind": "project", "project_id": "proj_01HZ..."},
+    name="customer-acme",
+    window="month",
+    limit_usd="250",
+    cycle_anchor_at="2026-01-17T09:00:00Z",
+    external_id="acme-tenant-4171",
+    idempotency_key="signup-acme-4171",
+    on_idempotent_replay=lambda: print("replayed, nothing was created"),
+)
+
+langwatch.gateway_budgets.archive(budget["id"])
+```
+
+</CodeGroup>
+
+Three things are worth knowing before you write against them:
+
+- **Paging has three shapes on purpose.** `listPage` / `list_page` returns one page and its cursor when you want to drive the walk yourself. `list` returns the whole set. `iterate` streams rows and fetches pages behind you, which is what you want over a large window.
+- **`idempotencyKey` / `idempotency_key` is a per-call option**, not a body field, and the replay callback fires when the server answered from a stored receipt. That is how a provisioning job tells "I created it" from "it already existed".
+- **Retirement is named after what it does.** Budgets and webhook endpoints `archive`, which keeps their history readable. Virtual keys `disable` (reversible) or `revoke` (terminal).
+
+## Your own ids and metadata
+
+Virtual keys and budgets both take two optional fields on create, so you do not have to keep a mapping table between your system and LangWatch:
+
+- `external_id`: your identifier for whatever this resource belongs to, for example your customer id. Unique per organization and resource type. Reusing one answers `409` with `error.code = "external_id_conflict"`, which is what makes provisioning safe to retry.
+- `metadata`: a flat object of string keys and values, echoed back on every read.
+
+Filter by your own id instead of storing ours:
+
+```bash
+curl -sS "https://app.langwatch.ai/api/gateway/v1/budgets?external_id=acme-tenant-4171" \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY"
+```
+
 ## Virtual keys
 
 ### List
@@ -2082,8 +2214,6 @@ GET /virtual-keys?limit=100&cursor=<next_cursor>
 ```
 
 Returns the keys visible to your credential: keys scoped to your project, its team, or the whole organization, newest first.
-
-All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
 
 Visibility is applied to each page after it is read, so a page of virtual keys can hold fewer rows than `limit` while the walk still has more to give.
 
@@ -2117,6 +2247,8 @@ Response:
 ```
 
 `purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
+
+`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys nobody is using.
 
 ### Create
 
@@ -2169,18 +2301,7 @@ Response: `{ "virtual_key": {...} }`. No secret.
 GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
 ```
 
-Requires `gatewayUsage:view`. `from` and `to` are epoch milliseconds, the same unit every spend endpoint takes. Both are optional; the default window is the current UTC calendar month. The echoed `window` uses the same unit, so a response can be fed straight back as the next request. Reads the same cost path (`trace_summaries`) the dashboard reads, so this number and the UI agree by construction.
-
-Response:
-
-```json
-{
-  "virtual_key_id": "vk_01HZX...",
-  "spent_usd": "12.4531",
-  "requests": 1841,
-  "window": { "from": 1782950400000, "to": 1784160000000 }
-}
-```
+Requires `gatewayUsage:view`. `from` and `to` are epoch milliseconds, both optional, defaulting to the current UTC calendar month. Answers `{ "virtual_key_id", "spent_usd", "requests", "window" }`, with `window` echoed in the same unit so a response feeds straight back as the next request. It reads the cost path the dashboard reads, so this number and the UI agree by construction.
 
 On deployments without a ClickHouse spend source the endpoint answers `412` with `error.code = "spend_source_unavailable"` rather than a `$0.00` that cannot be told apart from a zero-spend key.
 
@@ -2204,39 +2325,22 @@ Body (all fields optional):
 
 `scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
 
-### Rotate
+### Rotate, disable, enable, revoke
 
 ```
 POST /virtual-keys/:id/rotate
-```
-
-Response `200`:
-
-```jsonc
-{
-  "virtual_key": { /* ... */ },
-  "secret": "vk-lw-NEW..."
-}
-```
-
-The previous secret keeps authenticating for a 24 h grace window so in-flight clients can roll over.
-
-### Disable / Enable
-
-```
 POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
 POST /virtual-keys/:id/enable
-```
-
-The reversible stop (`virtualKeys:update`): a disabled key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact; enable restores the key exactly as it was. Both are idempotent, audit-logged, and propagate to the gateway in seconds. Each transition emits a `gateway.virtual_key.disabled` / `gateway.virtual_key.enabled` [webhook event](/features/webhooks#family-gateway). See [Virtual Keys → Disable and enable](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
-
-### Revoke
-
-```
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets and discards any rotation grace. One-way; for a reversible stop use disable.
+**Rotate** answers `{ "virtual_key": {...}, "secret": "vk-lw-NEW..." }`. The previous secret keeps authenticating for a 24 hour grace window, so in-flight clients roll over without a coordinated deploy.
+
+**Disable** is the reversible stop (`virtualKeys:update`): the key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact, and enable restores the key exactly as it was.
+
+**Revoke** is one-way. It also archives the key's own budgets and discards any rotation grace.
+
+All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
 
 ## Budgets
 
@@ -2249,8 +2353,6 @@ GET /budgets?limit=100&cursor=<next_cursor>
 ```
 
 Returns the non-archived budgets in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), newest first, with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter, applied in the query, so `limit` counts the rows you get back.
-
-All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
 
 Response:
 
@@ -2271,8 +2373,11 @@ Response:
       "spent_usd": "12.4531",
       "timezone": null,
       "provider_key": null,
+      "external_id": "acme-tenant-4171",
+      "metadata": { "plan": "growth" },
       "current_period_started_at": "2026-07-01T00:00:00.000Z",
       "resets_at": "2026-08-01T00:00:00.000Z",
+      "cycle_anchor_at": null,
       "last_reset_at": null,
       "archived_at": null,
       "created_at": "2026-06-12T10:00:00.000Z"
@@ -2285,6 +2390,7 @@ Response:
 - `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
 - `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
 - `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
+- `current_period_started_at` and `resets_at` are computed as you read them, so they always describe the period the budget is actually in. `cycle_anchor_at` is the instant the cycle rolls from, or `null` for calendar alignment.
 
 ### Create
 
@@ -2310,11 +2416,24 @@ Body:
   "limit_usd": 5000,           // or "5000.00"
   "on_breach": "block",        // or warn
   "timezone": "Europe/Amsterdam",
-  "provider_key": null         // optional ModelProvider id to pin the budget to one provider
+  "provider_key": null,        // optional ModelProvider id to pin the budget to one provider
+  "cycle_anchor_at": null,     // optional ISO 8601 instant; rolls the cycle from here
+  "external_id": null,         // optional, your own id
+  "metadata": {}               // optional, flat string map
 }
 ```
 
-`group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period). See [Budgets](/ai-gateway/budgets) for semantics.
+`group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period).
+
+`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#anchoring-a-cycle-to-your-own-date) for the clamping rules.
+
+### Get
+
+```
+GET /budgets/:id
+```
+
+Response: `{ "budget": {...} }`, the same row shape the list returns, including live `spent_usd` and the current period pair.
 
 ### Update
 
@@ -2322,7 +2441,7 @@ Body:
 PATCH /budgets/:id
 ```
 
-Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope and window are immutable after create.
+Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope, window, and `cycle_anchor_at` are fixed at creation; to move a period boundary, [reset](#reset-period) it.
 
 ### Reset period
 
@@ -2347,111 +2466,27 @@ Soft archive: preserves ledger history, stops enforcement on new requests. Retur
 
 ## Provider bindings
 
-The `/providers` routes are **gone** (`410`). Gateway provider bindings were folded into the platform-wide ModelProvider in iteration 110: configure credentials, rate limits, and fallback priority via `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id (`provider_key`).
+Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
 
 ## Cache rules
 
-Organization-scoped overrides that modulate cache behaviour for requests routed through the gateway. Evaluated first-match-wins by priority DESC; a matched rule wins over the per-VK default but loses to a per-request `X-LangWatch-Cache` header. Full contract in [Cache control](/ai-gateway/cache-control).
-
-### List
+Organization-scoped overrides that modulate cache behaviour for gateway requests. Evaluated first-match-wins by priority descending; a matched rule beats the per-key default but loses to a per-request `X-LangWatch-Cache` header.
 
 ```
-GET /cache-rules
+GET    /cache-rules            gatewayCacheRules:view
+GET    /cache-rules/:id        gatewayCacheRules:view
+POST   /cache-rules            gatewayCacheRules:create
+PATCH  /cache-rules/:id        gatewayCacheRules:update
+DELETE /cache-rules/:id        gatewayCacheRules:delete   (archive)
 ```
 
-Requires `gatewayCacheRules:view`. Returns rules sorted priority descending then oldest first, excluding archived.
+The rule shape, the full matcher and action tables, and the evaluation order live on [Cache control](/ai-gateway/cache-control#cache-rules). What is specific to this API:
 
-All three lists are paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim. Keep going until `next_cursor` is `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
-
-```json
-{
-  "data": [
-    {
-      "id": "V1StGXR8_Z5jdHi6B-myT",
-      "organization_id": "org_01HZ...",
-      "name": "force-cache-enterprise",
-      "description": "Force cache on Anthropic for enterprise-tagged VKs",
-      "priority": 300,
-      "enabled": true,
-      "matchers": { "vk_tags": ["tier=enterprise"] },
-      "action": { "mode": "force", "ttl": 600 },
-      "mode_enum": "force",
-      "archived_at": null,
-      "created_at": "2026-04-19T09:00:00Z",
-      "updated_at": "2026-04-19T09:00:00Z"
-    }
-  ]
-}
-```
-
-`mode_enum` is echoed as a top-level field alongside `action.mode` so Prometheus, dashboards can filter by it without parsing the JSON action.
-
-### Get
-
-```
-GET /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:view`. Returns 404 for archived rules, use the audit log to inspect removed rules.
-
-### Create
-
-```
-POST /cache-rules
-```
-
-Requires `gatewayCacheRules:create`. At least one matcher is required (rules that match every request must be declared explicitly, unsupported in v1). Matchers across non-null fields are ANDed.
-
-```json
-{
-  "name": "disable-cache-evals",
-  "description": "Disable cache for evaluation traffic",
-  "priority": 200,
-  "enabled": true,
-  "matchers": {
-    "vk_prefix": "vk-lw-",
-    "request_metadata": { "x-langwatch-suite": "evals" }
-  },
-  "action": { "mode": "disable" }
-}
-```
-
-Matcher fields (all optional, ANDed):
-
-| field | type | semantics |
-|---|---|---|
-| `vk_id` | string | Exact match against the VK's display prefix form (`vk-lw-...`) |
-| `vk_prefix` | string | `strings.HasPrefix` against the same VK display prefix |
-| `vk_tags` | string[] | VK must carry EVERY listed tag (AND subset) |
-| `principal_id` | string | Exact match against the VK's principal user |
-| `model` | string | Exact match against the resolved model name (no regex; trailing `*` as a glob is accepted) |
-| `request_metadata` | object | Exact-match against request headers/metadata key-by-key |
-
-Action fields:
-
-| field | type | semantics |
-|---|---|---|
-| `mode` | `"respect"`, `"force"`, `"disable"` | Required. See [Cache control](/ai-gateway/cache-control) for per-provider semantics |
-| `ttl` | int seconds | Optional. Clamped to `[0, 86400]`. Only meaningful for `force` on providers that support TTL (Anthropic) |
-| `salt` | string (max 64) | Optional cache-bust tag, changing this on an existing rule forces regeneration on next hit |
-
-Response `201`: `{ "cache_rule": { ...full row } }`.
-
-### Update
-
-```
-PATCH /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:update`. Partial update; `matchers` and `action` **replace** the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. Name, description, priority, enabled update independently.
-
-### Archive
-
-```
-DELETE /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:delete`. Soft archive: sets `archivedAt`. The rule stops matching new requests. Returns the archived row (200, not 204) so scripts can confirm the `archivedAt` timestamp.
+- A create needs at least one matcher. A rule that matches every request has to be declared explicitly, which v1 does not support.
+- `matchers` and `action` **replace** the stored value when provided, rather than merging field by field. Omit them and the stored value is untouched.
+- `mode_enum` is echoed as a top-level field alongside `action.mode`, so dashboards can filter on it without parsing the action.
+- `GET /cache-rules/:id` answers `404` for archived rules; use the audit log to inspect removed ones.
+- `DELETE` is a soft archive and returns the archived row with `200`, not `204`, so a script can confirm the `archivedAt` timestamp.
 
 ## Webhooks and billing surfaces
 
@@ -2462,30 +2497,19 @@ Two sibling REST families complete the platform and are documented on their own 
 
 ## Errors
 
-All responses follow the OpenAI-compatible envelope:
+All responses follow the OpenAI-compatible envelope, with `type` as the status class and `code` as the stable machine name to branch on:
 
 ```json
 {
   "error": {
     "type": "bad_request",
     "code": "trace_project_required",
-    "message": "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in..."
+    "message": "an organization- or team-owned key needs a project for its traces and costs to land in..."
   }
 }
 ```
 
-`error.code` carries the machine code your integration can branch on (`validation_error`, `trace_project_required`, `routing_policy_required`, `gateway_scope_org_mismatch`, `group_budget_requires_clickhouse`, `spend_source_unavailable`, ...). See [API: Errors](/ai-gateway/api/errors) for the full type enum.
-
-Common management-side types:
-
-| HTTP | `type` | Meaning |
-|---|---|---|
-| 400 | `bad_request` | Validation, missing required field, cross-org scope |
-| 401 | `unauthenticated` | Missing or invalid API token |
-| 403 | `permission_denied` | Token lacks the required RBAC permission (route ceiling or per-scope) |
-| 404 | `not_found` | Resource doesn't exist or isn't visible to this credential |
-| 410 | `gone` | Route folded away (the `/providers` bindings) |
-| 412 | `precondition_failed` | Deployment lacks a required capability (`spend_source_unavailable`) |
+Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#control-plane-codes).
 
 ## Audit
 
@@ -2497,7 +2521,7 @@ Management endpoints are rate-limited to 100 req/min/token. For bulk operations,
 
 ## Shared service layer
 
-Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `gatewayUsage.*`) call the same service classes and pre-flight asserts on the server: `VirtualKeyService`, `GatewayBudgetService`, `GatewayUsageService`, and the scope-authorization helpers in `virtualKey.authz`. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase) and how the caller is identified (API credential vs browser session). Behaviour is identical, and the integration suite in `langwatch/src/app/api/gateway-platform/__tests__/` pins the refusals (`trace_project_required`, per-scope `permission_denied`, `group_budget_requires_clickhouse`, ...) so the two surfaces cannot drift apart again.
+This API and the dashboard call the same service layer on the server, so a rule enforced in one is enforced in the other. The only differences are the field naming (`snake_case` here, `camelCase` in the app) and how the caller is identified (API credential versus browser session). The refusals are pinned by an integration suite, so the two surfaces cannot drift apart.
 
 ## OpenAPI
 
@@ -2511,7 +2535,7 @@ It carries the whole public REST surface, not only the gateway routes, so one fe
 
 ## See also
 
-- [langwatch CLI](/ai-gateway/cli/langwatch-cli): higher-level access.
+- [langwatch CLI](/integration/cli#ai-gateway-commands): the same operations from a shell.
 - [RBAC](/ai-gateway/rbac): which scopes your token needs.
 - [Security](/ai-gateway/security): how your API tokens and resulting writes are protected.
 
@@ -2864,6 +2888,10 @@ Three properties make the feed billing-grade:
 The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
 </Note>
 
+<Warning>
+**These endpoints take an organization API key, not a project one.** `spend-events`, `spend-summaries`, and `end-users/:id/spend` are organization-level, while [budgets and virtual keys](/ai-gateway/api/management) accept your project key. Using a project key here answers `401` with `error.code = "invalid_credentials"` and says so: create an admin key under **Settings > API Keys**.
+</Warning>
+
 ## The spend event
 
 Spend events ride the standard envelope (`{id, type, created, schema_version, data}`). The `data` payload:
@@ -2971,7 +2999,7 @@ The pull surface reads the spend **ledger**, not the webhook stream, so it inclu
 GET /api/gateway/v1/spend-summaries?group_by=virtual_key&from=1751328000000&to=1753920000000
 ```
 
-`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` optionally narrows. Each row:
+`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` and `virtual_key_id` optionally narrow, the latter to one key's traffic. Rows come back ordered by group key, with a `next_cursor` when the window held more than one page: follow it the same way the item walk does, because a full page does not mean the window is exhausted. Each row:
 
 ```json
 {
@@ -3003,6 +3031,51 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
+
+### From the SDKs
+
+Both SDKs walk these two grains for you, so the reconciliation job is a loop rather than cursor bookkeeping. Reads on this surface need an **organization** API key.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_ORG_API_KEY });
+const from = Date.parse("2026-07-01T00:00:00Z");
+const to = Date.parse("2026-08-01T00:00:00Z");
+
+// Checksums first, one row per key.
+for await (const row of langwatch.spendEvents.iterSummaries({ groupBy: "virtual_key", from, to })) {
+  compareWithYourLedger(row.key, row.event_count, row.cost.nano_usd);
+}
+
+// Item diff only where a checksum disagreed.
+for await (const event of langwatch.spendEvents.iterate({ from, to, virtualKeyId: "vk_01HZX..." })) {
+  reconcile(event.gateway_request_id, event);
+}
+```
+
+```python Python
+import os
+
+import langwatch
+
+langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
+from_ms, to_ms = 1782950400000, 1785628800000
+
+# Checksums first, one row per key.
+for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
+    compare_with_your_ledger(row["key"], row["event_count"], row["cost"]["nano_usd"])
+
+# Item diff only where a checksum disagreed.
+for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtual_key_id="vk_01HZX..."):
+    reconcile(event["gateway_request_id"], event)
+```
+
+</CodeGroup>
+
+`iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
 
 ### The settled work queue
 
@@ -3104,9 +3177,39 @@ description: Hierarchical, windowed spend limits enforced at the gateway.
 sidebarTitle: Budgets
 ---
 
-A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it; any hard-block breach blocks the request, any warn breach surfaces a header.
+A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it: any hard-block breach rejects the request, any warn breach adds a header.
 
-<Tip>**Detect spikes before a budget breach**: pair budgets with [AI Governance → Anomaly Rules](/ai-governance/anomaly-rules) so spend-spike, geo-mismatch, and off-hours patterns surface as alerts *before* they hit a hard cap.</Tip>
+## Creating a budget
+
+**AI Gateway > Budgets > New budget**, or over the API:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "project", "project_id": "proj_01HZ..." },
+    "name": "project-monthly-cap",
+    "window": "month",
+    "limit_usd": "5000",
+    "on_breach": "block"
+  }'
+```
+
+```bash
+langwatch gateway-budgets create \
+  --name project-monthly-cap \
+  --scope project --project proj_01HZ... \
+  --window month --limit 5000 --on-breach block
+```
+
+The budget is in force immediately; the next request counts against it. Everything else is optional: a provider filter, a [cycle anchor](#anchoring-a-cycle-to-your-own-date), a `timezone`, and your own [`external_id` and `metadata`](/ai-gateway/api/management#your-own-ids-and-metadata).
+
+<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
+  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
+</Frame>
+
+<Tip>**Detect spikes before a budget breach**: pair budgets with [AI Governance > Anomaly Rules](/ai-governance/anomaly-rules) so spend-spike, geo-mismatch, and off-hours patterns surface as alerts *before* they hit a hard cap.</Tip>
 
 ## Scopes
 
@@ -3120,58 +3223,75 @@ A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every g
 | `group` | Each member of the group individually (see below). |
 | `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
 
-A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
-
-- Org `acme`'s budgets (all windows).
-- Team `platform`'s budgets (all windows).
-- Project `demo`'s budgets (all windows).
-- VK `prod-key`'s budgets (all windows).
-- Alice's principal budgets (all windows).
-- Per-member budgets of every group Alice belongs to (all windows).
+A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
 
 ### Group budgets are per member
 
-A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve without anyone editing budgets.
+A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve.
 
 Two consequences worth knowing:
 
-- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the per-member allowance to, so group budgets do not constrain it; cap shared keys with `project`, `team`, or `virtual_key` budgets instead.
-- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. On self-hosted deploys reading budget spend from Postgres only, creating a group budget is refused with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
+- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the allowance to, so cap it with `project`, `team`, or `virtual_key` budgets instead.
+- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. Deployments reading budget spend from Postgres only refuse the create with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
 
 ### Per-end-user budgets (attributed-user templates)
 
 An `attributed_user` budget is a **template**, not a cap on one person: anchored on a virtual key or a project, it means "each distinct end user seen here: this limit per window". One row covers every current and future end user; per-user buckets appear lazily on first spend, keyed `<anchor_id>:<end_user_id>`, and there is nothing to provision or delete per user. This is the cap layer for [platforms that rebill their own customers](/ai-gateway/cookbooks/metering-and-rebilling), whose end users are not LangWatch users (for real LangWatch accounts, use `principal` or `group`).
 
 - The end-user id is resolved from the request: the `x-langwatch-end-user-id` header, then the `x-litellm-end-user-id` alias, then the OpenAI `user` body field. Headers win over the body. The same resolution feeds [spend events](/ai-gateway/billing-events#attribution-what-the-request-carries), so metering and enforcement always agree about who a request was.
-- **Fail closed**: while a template is active on the anchor, a request carrying no end-user id anywhere is rejected with `error.code = "end_user_required"`, naming both accepted wire fields. A cap evadable by omitting a field is not a cap. The rejection is still recorded per key, so it is visible, and it produces no provider spend.
-- Enforcement is per bucket: one end user at their limit blocks only that user; every other user on the anchor passes. Breaches name `budget_scope: "attributed_user"` so your product can tell "this user's cap" from the tenant cap (see the [breach catalog](#breaches-warnings-and-budget-events) below).
-- Like group budgets, templates require the ClickHouse spend ledger, and creation is refused without it.
+- **Fail closed**: while a template is active on the anchor, a request carrying no end-user id anywhere is rejected with `error.code = "end_user_required"`, naming both accepted wire fields. A cap evadable by omitting a field is not a cap. The rejection is still recorded per key, and it produces no provider spend.
+- Enforcement is per bucket: one end user at their limit blocks only that user; every other user on the anchor passes. Breaches name `budget_scope: "attributed_user"` so your product can tell "this user's cap" from the tenant cap.
+- Like group budgets, templates require the ClickHouse spend ledger.
 - Read one user's current spend and applicable cap in one call: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend).
-- **How a template reports itself.** One template covers many people, so there is no single total to measure anyone against. The Budgets list and the budget detail page headline the per-person cap ("$1.00 per person") and put the standing underneath as a headcount: "3 of 10 people over cap", with a bar filled to the same ratio and turned red as soon as anyone is over. "Seen" means an end user with at least one successful request in the current period, so somebody served entirely by an unpriced model still counts, while somebody whose every request failed does not. Over-cap uses the same `>=` the gateway blocks on, so a person the page calls over is a person being refused. A template nobody has used yet reads "0 of 0 people over cap". The same two figures ride the management API as `end_users_seen` and `end_users_over`.
+- **How a template reports itself.** One template covers many people, so there is no single total to measure anyone against. The Budgets list and detail page headline the per-person cap ("$1.00 per person") and put the standing underneath as a headcount: "3 of 10 people over cap", the bar filled to the same ratio and red as soon as anyone is over. "Seen" means an end user with at least one successful request in the current period, so somebody served entirely by an unpriced model still counts, while somebody whose every request failed does not. Over-cap uses the same `>=` the gateway blocks on, so a person the page calls over is a person being refused. The same two figures ride the API as `end_users_seen` and `end_users_over`.
 
 ### Provider-filtered budgets
 
 Any budget, on any scope, can additionally be filtered to a **single provider**: "OpenAI $200/month for this team" is one budget with a provider filter, not a new kind of scope. With a filter set:
 
 - Only requests dispatched to that provider debit the budget. Every ledger debit stamps the provider that actually served the request, so two budgets on the same target with different filters never share spend.
-- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty (for example on a key with routing set to no fallback) is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
-
-If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
+- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
 
 ## Windows
 
-- `minute`, `hour`, `day`, `week`, `month`, `total`, `manual`.
-- Calendar-aligned and computed in **UTC**: `day` resets at 00:00 UTC, `week` starts Monday 00:00 UTC (ISO-8601), `month` resets on day 1 at 00:00 UTC. The `timezone` column exists on the API for forward compatibility but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
-- `total` never resets, useful for one-off grant-style budgets.
-- `manual` accrues until **you** reset it: the period boundary moves only when your system says so. Use it when billing periods belong to your own cycle (per-tenant anniversaries) rather than the calendar. Without it, a reset endpoint alone would not help you: a `month` budget would still calendar-reset mid-cycle.
+`minute`, `hour`, `day`, `week`, `month`, `total`, `manual`.
+
+- The five cycling windows roll on a schedule, computed in **UTC**. By default they align to the calendar: `day` resets at 00:00, `week` on Monday 00:00 (ISO 8601), `month` on day 1 at 00:00. The `timezone` field exists on the API for forward compatibility, but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
+- `total` never resets, which suits one-off grant-style budgets.
+- `manual` accrues until **you** reset it: the period boundary moves only when your system says so. Without it a reset endpoint alone would not help you, because a `month` budget would still calendar-reset mid-cycle.
+
+### Anchoring a cycle to your own date
+
+Set `cycle_anchor_at` on a cycling window and the period rolls from that instant instead of the calendar. This is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00.
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "virtual_key", "virtual_key_id": "vk_01HZX..." },
+    "name": "customer-acme",
+    "window": "month",
+    "limit_usd": "250",
+    "cycle_anchor_at": "2026-01-17T09:00:00Z"
+  }'
+```
+
+- **The anchor day is never rewritten.** A monthly cycle anchored past the 28th clamps into shorter months and springs back: anchored on Jan 31, the periods start Feb 28 (Feb 29 in a leap year), then Mar 31, then Apr 30, then May 31.
+- **Fixed windows are pure modulo** from the anchor. A week anchored on a Saturday rolls Saturdays; the ISO Monday plays no part.
+- **A future anchor is allowed.** The budget reads zero and reports the anchor as its reset until the anchor arrives, which is how you say "start cycling on the 1st of next month".
+- **`total` and `manual` refuse an anchor**, with `400 gateway_budget_cycle_anchor_invalid`. Those windows do not cycle, so an anchor would be a silently ignored instruction.
+- **The anchor is fixed at creation.** Changing the clock mid-period is a reset in disguise, and [reset](#resetting-a-period) already exists. Update requests carrying `cycle_anchor_at` leave it untouched.
+
+`current_period_started_at` and `resets_at` are computed when you read the budget, for every budget, so the pair always describes the period you are actually in.
 
 ### Resetting a period
 
-`POST /api/gateway/v1/budgets/:id/reset` moves the budget's period boundary to now and recomputes the next reset:
+`POST /api/gateway/v1/budgets/:id/reset` moves the boundary to now and recomputes the next reset:
 
-- Recorded spend is **never mutated**. The spend ledger and every emitted [billing event](/ai-gateway/billing-events) are immutable, so reconciliation is unaffected by resets. What changes is the lower bound of "spend inside the current period".
-- On calendar windows, reset truncates the running period; the next boundary stays calendar. On `manual` windows the new period stays open until the next reset.
-- On attributed-user templates, `?end_user_id=` resets **one** end user's bucket boundary and leaves the template period untouched, for per-user cycles.
+- Recorded spend is **never mutated**. The ledger and every emitted [billing event](/ai-gateway/billing-events) are immutable, so reconciliation is unaffected. What changes is the lower bound of "spend inside the current period".
+- On a cycling window, reset truncates the running period and the next boundary stays on its schedule, calendar or anchored. On `manual` the new period stays open until the next reset.
+- On attributed-user templates, `?end_user_id=` resets **one** end user's bucket and leaves the template period untouched.
 - Resets take the same permission as edits (`gatewayBudgets:update`) and are audit-logged with the actor and an optional `reason`.
 
 ## on_breach
@@ -3179,140 +3299,79 @@ If **any** budget hard-blocks, the request is rejected. If **any** warn-threshol
 - `block`, hard-cap. The next request after `spent_usd >= limit_usd` returns `402 budget_exceeded` with an OpenAI-compatible error envelope.
 - `warn`, soft-cap. The request passes but the response gains `X-LangWatch-Budget-Warning: <scope>:<pct_used>`. Multiple soft caps can fire on one request.
 
-## Breaches, warnings, and budget events
+### Breaches, warnings, and budget events
 
-Three signals fire around a budget's limit, each with a distinct consumer:
+Three signals fire around a limit, each with a distinct consumer:
 
-- **The `402`** is for the caller whose request was rejected. Its `error.meta` is machine-readable: `budget_id` (which allowance to raise), `budget_scope` (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, or `attributed_user`, lowercase), `budget_window`, and `budget_provider` when a provider filter emptied the request's provider chain. `budget_scope` is the branch a rebilling platform's copy needs: `attributed_user` means the end user's own allowance, `virtual_key` means the tenant cap.
+- **The `402`** is for the caller whose request was rejected. Its `error.meta` is machine-readable: `budget_id` (which allowance to raise), `budget_scope` (lowercase), `budget_window`, and `budget_provider` when a provider filter emptied the chain. `budget_scope` is the branch a rebilling platform's copy needs: `attributed_user` means the end user's own allowance, `virtual_key` means the tenant cap.
 - **The warning header** is for the caller whose request still passed: any budget at or past **80 percent** contributes `X-LangWatch-Budget-Warning: <scope>:<pct_used>`, whatever its `on_breach`. A `warn` budget past its limit stays a warning; a `block` budget warns on approach before it starts rejecting.
-- **The webhook events** are for your backend, so it learns without polling: crossing 80 percent of any budget emits `gateway.budget.threshold_crossed`; reaching the limit emits `gateway.budget.breached` (on `warn` budgets too, even though nothing is rejected). Each fires **once per crossing per period**: re-crossing inside the same period is deduplicated, and a new period starts the cycle fresh. Payloads and subscription setup: [Webhooks](/features/webhooks#family-gateway).
+- **The webhook events** are for your backend, so it learns without polling: crossing 80 percent emits `gateway.budget.threshold_crossed`, reaching the limit emits `gateway.budget.breached` (on `warn` budgets too). Each fires **once per crossing per period**: re-crossing inside the same period is deduplicated, and a new period starts the cycle fresh. See [Webhooks](/features/webhooks#family-gateway).
 
-One more rejection belongs to this catalog: `end_user_required`, the fail-closed refusal when an attributed-user template is active and the request carried no end-user id (see [per-end-user budgets](#per-end-user-budgets-attributed-user-templates)). It is a request-shape problem, not a breach: the fix is sending the id, not raising a limit.
-
-## Creating a budget
-
-**AI Gateway → Budgets → New budget.**
-
-| Field | Example |
-|---|---|
-| Name | `eng-team-monthly` |
-| Applies to | `organization`, `group`, `team`, `project`, `member`, or `virtual key` |
-| Target | `platform` team |
-| Provider | `All providers` (default), or a single provider to filter to |
-| Window | `month` |
-| Limit (USD) | `5000` |
-| on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
-
-Save. The budget is in force immediately; the next request counts against it.
-
-<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
-  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
-</Frame>
+One more rejection belongs to this catalog: `end_user_required`, the fail-closed refusal when an attributed-user template is active and the request carried no end-user id. It is a request-shape problem, not a breach: the fix is sending the id, not raising a limit.
 
 ## Multiple tiers on the same scope
 
-A single scope can carry multiple budgets with different `on_breach` values. Common pattern:
+A single scope can carry several budgets with different `on_breach` values. Common pattern:
 
 - Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
 - Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
 
-The UI surfaces this as "Warning thresholds" on a single budget row; each threshold is stored as its own `GatewayBudget` row in the schema for simplicity.
+The UI surfaces this as "Warning thresholds" on a single budget row.
 
-## Debit model
-
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` and is **idempotent** by that id, so a gateway retry or a redelivered batch never double-bills.
-
-Debit flow:
-
-1. The gateway admits the request before any budget or guardrail gating runs, recording who it belongs to. Admission is a local, non-blocking write to a bounded on-disk spool, so the request path never waits on the control plane.
-2. The gateway streams the response. When it closes, the gateway records the provider's token counts as a confirmation, or the failure with its error class. Both go to the same spool.
-3. A background drainer ships spooled batches to the control plane, which prices each outcome once from `tokens × pricing catalog` and appends the priced command to the spend pipeline.
-4. The debits process manager joins the admission to the outcome, resolves every applicable budget (org, team, project, VK, principal, group, per-person) and writes one ledger row per budget to `gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view. It is the only writer of that ledger.
-5. The same debit emits a change event, so the gateway drops its cached bundle for that project and the next request enforces against fresh spend.
-
-Because admission happens before gating, a request the gateway refused is a record rather than a silence. Those rows land with the reason (`PROVIDER_ERROR`, or `BLOCKED_BY_GUARDRAIL` for a guardrail refusal) and show in a budget's activity list, but they do **not** count toward a cap: only successful requests accrue enforcement spend. A platform failure should be visible to you without charging your customer for it.
-
-<Note>
-The ClickHouse ledger is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. A $1 budget blocks at $1 of spend on either.
-</Note>
-
-## Pre-request check
-
-Before dispatching to the provider, the gateway runs a **local precheck**. Every scope but one is decided from memory, with no control-plane round trip on the hot path.
-
-The gateway evaluates the VK's in-memory budget snapshot, which arrives baked into the cached bundle and is refreshed via the `/changes` long-poll. For each applicable scope it compares `spent_usd` against `limit_usd`:
-
-- `on_breach: block` and nothing remaining → reject with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely.
-- Any budget at or over 80% used → allow, flagged as a warn verdict (whatever its `on_breach`).
-- Otherwise → allow.
-
-This costs ~0 μs: it's an in-process map lookup.
-
-The exception is an attributed-user template, where one row governs a separate allowance for every end user the anchor will ever see. That fan-out cannot be baked into a bundle, so the bundle carries the template's limit and the gateway reads the request's own bucket from the control plane, cached 15 seconds per (budget, end user). A bucket it cannot read skips that scope and the request proceeds: unreadable allows, it never blocks. A request carrying no end-user id at all is a different case and is still refused, per [per-end-user budgets](#per-end-user-budgets-attributed-user-templates).
-
-```
-request → precheck against cached snapshot (always, ~0μs)
-            → hard breach on a block scope? → 402 (saved provider spend)
-            → otherwise                     → dispatch
-```
-
-Rejections are counted by `gateway_budget_blocks_total{scope}`, the single gateway-side signal that enforcement fired.
-
-### The stale-snapshot trade-off
-
-Because the check is local and the snapshot lags the ledger by one `/changes` refresh, two replicas can each see `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 against a $25 cap. This is a deliberate trade: a control-plane call on every near-limit request would put the gateway's availability and latency at the mercy of the control plane, and the overshoot is bounded by one refresh interval of traffic.
-
-Precheck is permissive by design. A stale or missing snapshot allows requests through rather than rejecting them, so a control-plane outage degrades enforcement accuracy, never availability. Spend reconciles once the ledger catches up.
-
-## What "USD cost" means
-
-Token × unit-price lookup, computed per provider using their published pricing. Updates land as provider pricing changes (pricing table is a separate Prisma table owned by LangWatch).
-
-Cache reads, writes are priced **separately** per provider, Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
-
-## Viewing budget spend (UI)
+## Viewing budget spend
 
 <Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
   ![Budgets list](/images/ai-gateway/budgets-page.png)
 </Frame>
 
-The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
-
-- **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
-- **Window column** wraps `hour`, `day`, `week`, `month`, `total`, `manual` in a subtle gray identifier badge matching the rest of the product.
-- **Resets column** shows a humanised relative time ("in 3 days", "in 11 hours", "in 15 minutes") with a hover tooltip for the exact UTC timestamp. `total`-window budgets render a muted `never`.
-- **Scope column** resolves the raw scope id into the target's human name and link: `organization acme-demo`, `team platform`, `virtual_key prod-openai` (linking to the VK detail page), `principal user@example.com`. Resolution is batched per scope type so the column adds no per-row DB cost.
-
-Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK detail layout:
-
-- **Header action bar**: **Audit history** (deep-links to `/settings/audit-log?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
-- **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
-- **Identity**: name, description, window, timezone, created/updated timestamps.
-- **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
-- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
+**/gateway/budgets** lists every budget with a utilization bar, its cap, and what remains. The bar and its percentage badge are colour-graded, so "which budgets are hot" is a one-glance read, and the Resets column shows a relative time with the exact UTC timestamp on hover. Clicking a row opens the detail page: utilization, enforcement mode, the resolved scope target, a link to this budget's audit history, and the 20 most recent debits with amount, model, originating key, and the gateway request id for trace search.
 
 <Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
   ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
 </Frame>
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down. The **This month** preset covers the same UTC month-to-date window the keys list's spend column reports, which is where that column's click-through lands.
+**/gateway/usage** pairs with it for the time series: spend by day, top virtual keys, and a **This month** preset covering the same UTC month-to-date window the keys list reports.
 
 <Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
   ![Usage this month](/images/ai-gateway/usage-this-month.png)
 </Frame>
 
-Programmatic equivalent:
+The same figures over the API:
 
 ```bash
-# List budgets
 langwatch gateway-budgets list
 
-# Spend detail (same data the UI detail page renders)
 curl -sS https://app.langwatch.ai/api/gateway/v1/budgets/<id> \
   -H "Authorization: Bearer $LANGWATCH_API_KEY"
 ```
 
-The REST response includes the resolved scope-target fields the UI uses; the `gatewayBudgets.get` tRPC procedure powers both surfaces from a shared service method.
+## How spend is counted
+
+<Accordion title="The debit model, the pre-request check, and what they trade off">
+
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` and is **idempotent** by that id, so a retry or a redelivered batch never double-bills.
+
+1. The gateway admits the request before any budget or guardrail gating runs, recording who it belongs to. Admission is a local, non-blocking write to a bounded on-disk spool, so the request path never waits on the control plane.
+2. The gateway streams the response. When it closes, it records the provider's token counts as a confirmation, or the failure with its error class. Both go to the same spool.
+3. A background drainer ships spooled batches to the control plane, which prices each outcome once from tokens times the pricing catalog.
+4. The debits process resolves every applicable budget and writes one ledger row per budget, rolled up by a materialised view. It is the only writer of that ledger.
+5. The same debit emits a change event, so the gateway drops its cached bundle for that project and the next request enforces against fresh spend.
+
+Because admission happens before gating, a request the gateway refused is a record rather than a silence. Those rows land with the reason (`PROVIDER_ERROR`, or `BLOCKED_BY_GUARDRAIL`) and show in a budget's activity list, but they do **not** count toward a cap: only successful requests accrue enforcement spend. A platform failure should be visible to you without charging your customer for it.
+
+**The pre-request check.** Before dispatching, the gateway evaluates the key's in-memory budget snapshot, which arrives baked into its cached bundle. No control-plane round trip on the hot path: a `block` scope with nothing remaining is rejected outright, saving the provider spend and the round trip, and anything at or over 80% is allowed and flagged as a warning.
+
+The exception is an attributed-user template, where one row governs a separate allowance for every end user the anchor will ever see. That fan-out cannot be baked into a bundle, so the gateway reads the request's own bucket from the control plane, cached 15 seconds per (budget, end user). A bucket it cannot read skips that scope: unreadable allows, it never blocks.
+
+**The stale-snapshot trade-off.** Because the check is local and the snapshot lags the ledger by one refresh, two replicas can each see `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 against a $25 cap. This is deliberate: a control-plane call on every near-limit request would put the gateway's availability at the mercy of the control plane, and the overshoot is bounded by one refresh interval of traffic. Precheck is permissive by design, so a control-plane outage degrades enforcement accuracy, never availability, and spend reconciles once the ledger catches up.
+
+**What "USD cost" means.** Tokens times unit price, per provider, from their published pricing. Cache reads and writes are priced separately per provider: Anthropic cache reads are about 10% of regular input tokens and cache writes 125%. See [Caching passthrough](/ai-gateway/caching-passthrough).
+
+</Accordion>
+
+<Note>
+The ClickHouse ledger is the primary read wherever it is enabled; the Postgres `spentUsd` column is the fallback for self-hosted installs without it. A $1 budget blocks at $1 of spend on either.
+</Note>
 
 ## Permissions
 
@@ -3320,8 +3379,8 @@ The REST response includes the resolved scope-target fields the UI uses; the `ga
 |---|---|
 | View budgets | `gatewayBudgets:view` |
 | Create | `gatewayBudgets:create` |
-| Edit | `gatewayBudgets:update` |
-| Delete | `gatewayBudgets:delete` |
+| Edit and reset | `gatewayBudgets:update` |
+| Archive | `gatewayBudgets:delete` |
 | All of the above | `gatewayBudgets:manage` |
 
 See [RBAC](/ai-gateway/rbac).
@@ -3329,8 +3388,8 @@ See [RBAC](/ai-gateway/rbac).
 ## Trace attributes
 
 - `langwatch.cost_usd`, cost of this single request.
-- `langwatch.budget.breached_scope`, present when the request was blocked; format `scope:window` (e.g. `project:month`).
-- `langwatch.budget.warnings`, comma-separated list of `scope:pct_used` entries for soft breaches.
+- `langwatch.budget.breached_scope`, present when the request was blocked; format `scope:window` (for example `project:month`).
+- `langwatch.budget.warnings`, comma-separated `scope:pct_used` entries for soft breaches.
 
 ---
 
@@ -4691,7 +4750,9 @@ The id also flows into the CH ledger as the idempotency key for debit replays, s
 - **Semantic caching across unrelated requests**: Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.
 - **Per-region provider routing for data residency**: tracked as an open question in the contract; not in v1.
 
-Once these concepts are in your head the rest of the docs, [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), [CLI Integrations](/ai-gateway/cli/overview): are detail views on the same primitives.
+Once these concepts are in your head the rest of the docs are detail views on the same primitives: [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), and [CLI Integrations](/ai-gateway/cli/overview).
+
+If you rebill this traffic to your own customers, two more read next: [Billing and spend events](/ai-gateway/billing-events) for the per-request record you reconcile against, and [Webhooks](/features/webhooks) for having it pushed to you instead of polling.
 
 ---
 
@@ -4730,17 +4791,6 @@ Pick one path, all three land the same row via the same service layer.
 - Match → VK tags: `tier=enterprise`
 - Match → Model (optional): `claude-*`
 - Action: `force`, TTL: `600`
-
-**CLI:**
-
-```bash
-langwatch cache-rules create \
-  --name force-cache-enterprise-anthropic \
-  --priority 300 \
-  --mode force --ttl 600 \
-  --match-tag tier=enterprise \
-  --match-model "claude-*"
-```
 
 **REST:**
 
@@ -4812,12 +4862,18 @@ Your eval suite uses dedicated VKs prefixed `vk-lw-*` and tags every request wit
 ### Author
 
 ```bash
-langwatch cache-rules create \
-  --name disable-cache-evals \
-  --priority 200 \
-  --mode disable \
-  --match-vk-prefix vk-lw- \
-  --match-metadata X-Langwatch-Suite=evals
+curl -X POST https://app.langwatch.ai/api/gateway/v1/cache-rules \
+  -H "Authorization: Bearer $LANGWATCH_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "disable-cache-evals",
+    "priority": 200,
+    "action": { "mode": "disable" },
+    "matchers": {
+      "vk_prefix": "vk-lw-",
+      "request_metadata": { "x-langwatch-suite": "evals" }
+    }
+  }'
 ```
 
 Matchers are ANDed, this rule only fires when BOTH the VK prefix and the metadata header match. Other eval traffic from non-prefixed VKs stays on the per-VK default.
@@ -4853,8 +4909,13 @@ You've rolled out a new system prompt template. Existing cache entries now point
 Update the rule's `salt` rather than archive+recreate, this preserves the audit trail and the rule id (so dashboards don't break).
 
 ```bash
-langwatch cache-rules update <rule_id> --salt "2026Q2-template-rollout"
+curl -X PATCH https://app.langwatch.ai/api/gateway/v1/cache-rules/<rule_id> \
+  -H "Authorization: Bearer $LANGWATCH_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{ "action": { "mode": "force", "ttl": 600, "salt": "2026Q2-template-rollout" } }'
 ```
+
+`action` is replaced wholesale, so send the mode and TTL you want to keep alongside the new salt.
 
 Any cache the provider or downstream layer keys by the rule's salt will miss on the next hit and be populated fresh. For providers without explicit TTL, salt support, this is a no-op on the wire but the `rule_id` + `mode_applied` attributes record the intent so dashboards can correlate the rollout.
 
@@ -4863,9 +4924,7 @@ Any cache the provider or downstream layer keys by the rule's salt will miss on 
 Archiving a rule stops it matching new requests. History is preserved in the audit log + Prometheus counter.
 
 ```bash
-# UI: Cache control → … → Archive
-# CLI:
-langwatch cache-rules archive <rule_id>
+# UI: Cache control > ... > Archive
 # REST:
 curl -X DELETE https://app.langwatch.ai/api/gateway/v1/cache-rules/<rule_id> \
   -H "Authorization: Bearer $LANGWATCH_PAT"
@@ -4877,14 +4936,13 @@ DELETE returns `200` + the archived row (not `204`), so scripts can confirm the 
 
 - **At least one matcher is required.** Rules with no matchers that would match every request are unsupported in v1, that's the per-VK `cache.mode` default's job. Author an explicit matcher instead.
 - **`matchers` and `action` are REPLACED on PATCH.** If you `PATCH /cache-rules/:id` with a `matchers` object, the stored value is replaced wholesale. To add a new matcher, include the existing ones too.
-- **`model` matchers fire on both endpoints.** Earlier iterations had a caveat that `matchers.model` didn't fire on `/v1/messages` due to pipeline ordering, that was fixed via a cheap single-field JSON peek (`extractModelField`, ~150 ns, zero-alloc on no-rules path). Rules like `matchers.model = "claude-haiku-*"` now match on both `/v1/chat/completions` and `/v1/messages`.
+- **`model` matchers fire on both endpoints.** A rule like `matchers.model = "claude-haiku-*"` matches on `/v1/chat/completions` and `/v1/messages` alike.
 - **Per-request header always wins.** A client that sends `X-LangWatch-Cache: disable` bypasses every rule. This is intentional, it's the per-request escape hatch for repros and cold-cache benchmarks.
 - **Rules are organization-scoped.** They apply to every VK in the organization, not just the project whose API key you used to author them. Scope a rule narrowly with `matchers.vk_id`, `vk_tags`, `vk_prefix` if you want project- or environment-specific behaviour.
 
 ## See also
 
 - [Cache control](/ai-gateway/cache-control): full per-provider semantics + precedence
-- [CLI reference](/ai-gateway/cli/langwatch-cli#cache-rules): `langwatch cache-rules` subcommand
 - [Management REST API](/ai-gateway/api/management#cache-rules): 5-route wire contract
 - [RBAC](/ai-gateway/rbac): `gatewayCacheRules:*` permission matrix
 
@@ -5696,7 +5754,8 @@ curl -sS $LW/api/gateway/v1/budgets \
 
 Choices worth making deliberately:
 
-- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets. The two combine freely.
+- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and every budget, and send an `Idempotency-Key` on each create. Then a signup that times out halfway can simply be replayed: the calls that already succeeded return their original response instead of minting a second key, and `external_id` lets you find what you created without having stored our ids first. That is what turns provisioning from "store four ids in a transaction and hope" into a retryable job, and it means you can look a tenant up with `?external_id=acme-tenant-4171` instead of keeping a mapping table in sync. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely).
+- **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets, or set `cycle_anchor_at` to the moment the customer signed up so their period rolls on their own anniversary rather than the 1st. The three combine freely.
 - **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
 - **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
 
@@ -9020,7 +9079,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
                                                 │   - guardrail pre-call            │
                                                 │   - dispatch via bifrost/core     │
                                                 │   - guardrail post-call           │
-                                                │   - budget debit (outbox)         │
+                                                │   - spend record (spooled)         │
                                                 │   - per-tenant OTel emit          │
                                                 └───────┬───────────────┬───────────┘
                                                         │               │
@@ -9062,7 +9121,9 @@ The gateway and the existing LangWatch SDK live in the same project: the VK you 
 2. **[Concepts](/ai-gateway/concepts)**: virtual keys, budgets, fallback, guardrails, caching.
 3. **[CLI Integrations](/ai-gateway/cli/overview)**: Claude Code, Codex, opencode, Cursor, Aider.
 4. **[Self-Hosting](/ai-gateway/self-hosting/helm)**: ship the gateway with your LangWatch Helm chart.
-5. **[AI Governance](/ai-governance/overview)**: once the gateway is in place, layer on org-wide controls: anomaly detection, OCSF/SIEM export, per-user workspaces, IngestionSources for non-gateway telemetry.
+5. **[Budgets](/ai-gateway/budgets)** and **[Billing and spend events](/ai-gateway/billing-events)**: cap spend per scope, and pull the per-request record to rebill your own customers.
+6. **[Webhooks](/features/webhooks)**: get budget breaches and the spend stream pushed to your systems instead of polling.
+7. **[AI Governance](/ai-governance/overview)**: once the gateway is in place, layer on org-wide controls: anomaly detection, OCSF/SIEM export, per-user workspaces, IngestionSources for non-gateway telemetry.
 
 ---
 
@@ -10270,6 +10331,8 @@ See [Budgets](/ai-gateway/budgets) for full scoping details.
 - [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
 - [Caching passthrough](/ai-gateway/caching-passthrough): the load-bearing rule for keeping your 90% Anthropic cache discount.
 - [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.
+- [Budgets](/ai-gateway/budgets): cap spend per organization, team, project, key, person, or end user.
+- [Billing and spend events](/ai-gateway/billing-events): the per-request record, for reconciliation and rebilling.
 
 ---
 
@@ -11928,6 +11991,8 @@ Two control-plane components must be running for the gateway to function fully:
 
 - **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
 - **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+
+  The gateway side of that pipeline is `spend.enabled`, on by default. It is what writes each request's spend record to the on-disk spool a background drainer ships to the control plane, so **turning it off leaves the gateway serving traffic that costs money and debits nothing**: budgets sit at zero and stop enforcing. Turn it off only while running a gateway newer than a control plane that has no spend ingest route yet, and even then leaving it on is the safer degraded state, because the drainer retries on backoff and the spool is bounded. Watch `gateway_spend_spool_dropped_total`: every drop is spend nobody bills.
 
 ## Networking
 
@@ -35631,7 +35696,7 @@ An endpoint belongs to your **organization** and carries:
 
 | Field | Meaning |
 |---|---|
-| `url` | Where batches are POSTed. HTTPS required (see [self-hosted egress](/self-hosting/webhooks) for the local-development exception). |
+| `url` | Where batches are POSTed. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
 | `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
@@ -35666,7 +35731,31 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/ai-gateway/api/management#retrying-a-create-safely) and a retry that lost its response returns the original secret instead of stranding it.
+
+### What a receiver URL must look like
+
+A webhook URL is a destination our workers dial on your behalf, so it is held to one policy across the product:
+
+| Rule | Why |
+|---|---|
+| `https` only | The batch carries your data and your signature; plaintext exposes both. |
+| The default port, 443 | A URL pointing at another port is how an outbound webhook gets used to probe internal services. |
+| No credentials in the URL | `https://user:pass@host/...` puts a secret in every log line that records the destination. Send credentials in a header instead. |
+| A public host | Private, loopback, and link-local addresses are refused, so an endpoint cannot reach inside our network. |
+
+Anything else is refused at create and update time with `400` and `error.code = "webhook_endpoint_invalid"`, naming the rule it broke:
+
+```json
+{ "error": { "type": "bad_request", "code": "webhook_endpoint_invalid",
+             "message": "url must use the default https port (443)" } }
+```
+
+<Warning>
+The port and credential rules apply to endpoints you already have. If an existing endpoint uses a non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move credentials into a custom header.
+</Warning>
+
+Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
 
 <Warning>
 The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints carry signing secrets and stream org-wide events out of the platform, so by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
@@ -35768,126 +35857,86 @@ X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw bo
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
 
-<Warning>
-`X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is not an event id and must not be used for deduplication: every event in the batch shares it, so deduping on it drops all but one of them.
-
-**Deduplicate on the envelope `id` inside the body**, which is stable across retries and replays and unique per event.
-</Warning>
-
-Verify by recomputing the HMAC over the **exact raw bytes** you received (parsing and re-serializing the JSON first breaks the digest), and reject timestamps outside a 5-minute tolerance. Compare digests in constant time.
-
-<Warning>
-**`v1` may appear more than once.** During a secret rotation the header carries one `v1` per currently valid secret, newest first:
-
-```
-X-LangWatch-Signature: t=1753000000,v1=<signed with the new secret>,v1=<signed with the previous one>
-```
-
-Your verifier must accept the delivery when **any** `v1` matches. A verifier that reads only the first `v1` (or that treats the header as holding exactly one) rejects every delivery signed during a rotation window. Both snippets below collect all of them.
-</Warning>
+Both SDKs ship a verifier, so you do not have to get the digest, the timestamp tolerance, the constant-time compare, and the rotation window right yourself. Pass the **raw bytes** you received: parsing and re-serializing the JSON first breaks the digest.
 
 <CodeGroup>
 
-```typescript verify-signature.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+```typescript verify.ts
+import {
+  verifyWebhookSignature,
+  WebhookSignatureVerificationError,
+} from "langwatch";
 
-const TOLERANCE_SECONDS = 5 * 60;
+// Pass both secrets while a rotation is in flight: the header carries one
+// v1 per valid secret, and any match accepts the delivery.
+const secrets = [
+  process.env.LANGWATCH_WEBHOOK_SECRET!,
+  process.env.LANGWATCH_WEBHOOK_SECRET_PREVIOUS,
+].filter(Boolean) as string[];
 
-export function verifySignature(params: {
-  rawBody: string | Buffer;       // exactly as received
-  signatureHeader: string | undefined;
-  secret: string;                 // shown once at endpoint creation
-}): boolean {
-  if (!params.signatureHeader) return false;
-
-  const parts = new Map<string, string>();
-  for (const piece of params.signatureHeader.split(",")) {
-    const eq = piece.indexOf("=");
-    if (eq > 0) parts.set(piece.slice(0, eq).trim(), piece.slice(eq + 1).trim());
-  }
-  const timestamp = parts.get("t");
-  // Every v1, not just the first: a rotation window carries one per secret.
-  const signatures = params.signatureHeader
-    .split(",")
-    .map((piece) => piece.split("="))
-    .filter(([key]) => key?.trim() === "v1")
-    .map(([, value]) => value?.trim() ?? "");
-  if (!timestamp || signatures.length === 0) return false;
-
-  const timestampSeconds = Number(timestamp);
-  if (!Number.isFinite(timestampSeconds)) return false;
-  if (Math.abs(Date.now() / 1000 - timestampSeconds) > TOLERANCE_SECONDS) return false;
-
-  const expected = createHmac("sha256", params.secret)
-    .update(`${timestamp}.`)
-    .update(params.rawBody)
-    .digest();
-  let matched = false;
-  for (const signature of signatures) {
-    let received: Buffer;
-    try {
-      received = Buffer.from(signature, "hex");
-    } catch {
-      continue;
+export function handleDelivery(rawBody: Buffer, signatureHeader: string) {
+  try {
+    verifyWebhookSignature({
+      body: rawBody,
+      header: signatureHeader,
+      secret: secrets,
+    });
+  } catch (error) {
+    if (error instanceof WebhookSignatureVerificationError) {
+      // error.code is "malformed_header", "stale_timestamp",
+      // or "invalid_signature". Reject, do not retry.
+      return { status: 400, reason: error.code };
     }
-    // Compare every candidate even after a match, so the work does not
-    // depend on WHICH signature matched.
-    if (received.length === expected.length && timingSafeEqual(received, expected)) {
-      matched = true;
-    }
+    throw error;
   }
-  return matched;
+  return { status: 200, batch: JSON.parse(rawBody.toString("utf8")).batch };
 }
 ```
 
-```python verify_signature.py
-import hashlib
-import hmac
-import time
+```python verify.py
+import json
+import os
 
-TOLERANCE_SECONDS = 5 * 60
+from langwatch import (
+    WebhookSignatureVerificationError,
+    verify_webhook_signature,
+)
+
+# Pass both secrets while a rotation is in flight: the header carries one
+# v1 per valid secret, and any match accepts the delivery.
+secrets = [
+    s
+    for s in (
+        os.environ["LANGWATCH_WEBHOOK_SECRET"],
+        os.environ.get("LANGWATCH_WEBHOOK_SECRET_PREVIOUS"),
+    )
+    if s
+]
 
 
-def verify_signature(raw_body: bytes, signature_header: str | None, secret: str) -> bool:
-    if not signature_header:
-        return False
-
-    timestamp: str | None = None
-    signatures: list[str] = []
-    for piece in signature_header.split(","):
-        key, eq, value = piece.partition("=")
-        if not eq:
-            continue
-        if key.strip() == "t":
-            timestamp = value.strip()
-        elif key.strip() == "v1":
-            # Every v1: a rotation window carries one per valid secret.
-            signatures.append(value.strip())
-    if not timestamp or not signatures:
-        return False
-
+def handle_delivery(raw_body: bytes, signature_header: str):
     try:
-        timestamp_seconds = float(timestamp)
-    except ValueError:
-        return False
-    if abs(time.time() - timestamp_seconds) > TOLERANCE_SECONDS:
-        return False
-
-    expected = hmac.new(
-        secret.encode(), f"{timestamp}.".encode() + raw_body, hashlib.sha256
-    ).hexdigest()
-    # Compare every candidate even after a match, so the work does not
-    # depend on WHICH signature matched.
-    matched = False
-    for signature in signatures:
-        if hmac.compare_digest(expected, signature):
-            matched = True
-    return matched
+        verify_webhook_signature(
+            body=raw_body,
+            header=signature_header,
+            secret=secrets,
+        )
+    except WebhookSignatureVerificationError as error:
+        # error.code is "malformed_header", "stale_timestamp",
+        # or "invalid_signature". Reject, do not retry.
+        return 400, error.code
+    return 200, json.loads(raw_body)["batch"]
 ```
 
 </CodeGroup>
 
-Both snippets, wired into working receivers, live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
+The verifier throws (Python raises) rather than returning a boolean, so a receiver cannot accept a delivery by ignoring a return value. Branch on `.code` when you want to tell a clock-skew problem from a wrong secret. Timestamps outside a 5-minute tolerance are rejected; pass `toleranceSeconds` / `tolerance_seconds` if your receiver needs a different window.
+
+<Warning>
+`X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is not an event id and must not be used for deduplication: every event in the batch shares it, so deduping on it drops all but one of them. **Deduplicate on the envelope `id` inside the body**, which is stable across retries and replays and unique per event.
+</Warning>
+
+Working receivers built on both snippets live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
 
 ### Rotating the signing secret
 
@@ -35898,6 +35947,16 @@ Both snippets, wired into working receivers, live in the [agent-billing-demo](ht
 3. After the window the old secret stops being signed with and stops verifying.
 
 Rolling twice inside a window discards the secret that was already rolling off, so the oldest one stops working immediately. That is what you want when you are rolling because a secret leaked.
+
+## Signing automation webhooks
+
+Endpoints are not the only thing LangWatch POSTs to you: an [automation trigger](/features/automations) can call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
+
+Set one and every fire from that trigger carries the same `X-LangWatch-Signature: t=...,v1=...` header, computed the same way, so the verifier above validates it without a single change. The trigger's own id header is `X-LangWatch-Event-Id` rather than `X-LangWatch-Delivery-Id`, and it groups the attempts of one fire.
+
+- **Opt-in per trigger.** A trigger with no secret keeps sending exactly what it sent before, so adding this breaks no existing receiver.
+- **Rotation works the same way.** Replacing the secret keeps the previous one signing for 24 hours, so you deploy the new value on your own schedule. During the window the header carries a `v1` for each, which is why a verifier has to accept any match.
+- Secrets are encrypted at rest, and, like an endpoint's, are not readable again after you save them.
 
 ## Delivery, retries, and auto-disable
 
@@ -35966,11 +36025,17 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
+Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. Nothing about our request is stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
+
 ## Test fire
 
 `POST /endpoints/:id/test` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
 
 ## The events log
+
+<Warning>
+**Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
+</Warning>
 
 `GET /api/webhooks/v1/events?type=&from=&to=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type and `created` range (unix milliseconds). Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
@@ -35988,8 +36053,6 @@ The log serves the **request** families only:
 | `gateway.virtual_key.*` | **No** |
 
 The governance families are delivered to your endpoints exactly like the request families, but they are not retained in a queryable log, so they cannot be listed, read by id, or replayed. If you need a durable record of budget and virtual-key events, persist them from your receiver when they arrive. A request for a type this log does not hold returns an empty page rather than an error, so a client can probe for new families without breaking.
-
-For **billing reconciliation**, do not reconcile against this log: read the spend ledger surfaces instead ([`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger)), which include settled rows and carry the 13-month retention contract. The events log is for delivery recovery and debugging.
 
 ## What events never carry
 

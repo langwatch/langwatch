@@ -17,6 +17,10 @@ Three properties make the feed billing-grade:
 The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
 </Note>
 
+<Warning>
+**These endpoints take an organization API key, not a project one.** `spend-events`, `spend-summaries`, and `end-users/:id/spend` are organization-level, while [budgets and virtual keys](/ai-gateway/api/management) accept your project key. Using a project key here answers `401` with `error.code = "invalid_credentials"` and says so: create an admin key under **Settings > API Keys**.
+</Warning>
+
 ## The spend event
 
 Spend events ride the standard envelope (`{id, type, created, schema_version, data}`). The `data` payload:
@@ -124,7 +128,7 @@ The pull surface reads the spend **ledger**, not the webhook stream, so it inclu
 GET /api/gateway/v1/spend-summaries?group_by=virtual_key&from=1751328000000&to=1753920000000
 ```
 
-`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` optionally narrows. Each row:
+`group_by` is `virtual_key` or `end_user`; `from`/`to` are unix milliseconds and required; `limit` caps rows (default 500, max 1000); `project_id` and `virtual_key_id` optionally narrow, the latter to one key's traffic. Rows come back ordered by group key, with a `next_cursor` when the window held more than one page: follow it the same way the item walk does, because a full page does not mean the window is exhausted. Each row:
 
 ```json
 {
@@ -156,6 +160,51 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
+
+### From the SDKs
+
+Both SDKs walk these two grains for you, so the reconciliation job is a loop rather than cursor bookkeeping. Reads on this surface need an **organization** API key.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_ORG_API_KEY });
+const from = Date.parse("2026-07-01T00:00:00Z");
+const to = Date.parse("2026-08-01T00:00:00Z");
+
+// Checksums first, one row per key.
+for await (const row of langwatch.spendEvents.iterSummaries({ groupBy: "virtual_key", from, to })) {
+  compareWithYourLedger(row.key, row.event_count, row.cost.nano_usd);
+}
+
+// Item diff only where a checksum disagreed.
+for await (const event of langwatch.spendEvents.iterate({ from, to, virtualKeyId: "vk_01HZX..." })) {
+  reconcile(event.gateway_request_id, event);
+}
+```
+
+```python Python
+import os
+
+import langwatch
+
+langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
+from_ms, to_ms = 1782950400000, 1785628800000
+
+# Checksums first, one row per key.
+for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
+    compare_with_your_ledger(row["key"], row["event_count"], row["cost"]["nano_usd"])
+
+# Item diff only where a checksum disagreed.
+for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtual_key_id="vk_01HZX..."):
+    reconcile(event["gateway_request_id"], event)
+```
+
+</CodeGroup>
+
+`iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
 
 ### The settled work queue
 

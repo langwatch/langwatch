@@ -93,6 +93,23 @@ Errors (like successes) always carry:
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
 
+## Control-plane codes
+
+The management and webhook APIs answer with the same envelope, and their `type` is the status class. Branch on `code`:
+
+| `code` | HTTP | When |
+|---|---|---|
+| `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
+| `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in. |
+| `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
+| `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
+| `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
+| `external_id_conflict` | `409` | The `external_id` you supplied already belongs to another resource of this type in the organization. |
+| `idempotency_error` | `409` | An `Idempotency-Key` was reused with a different body, or while its first request is still running. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely). |
+| `webhook_endpoint_not_found` | `404` | No webhook endpoint with that id is visible to this credential. |
+| `spend_source_unavailable` | `412` | The deployment has no ClickHouse spend source, so a spend figure would be indistinguishable from zero spend. |
+
 ## Budget-warning headers (not errors)
 
 These are *soft* signals on **successful** responses:

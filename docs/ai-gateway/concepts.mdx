@@ -171,4 +171,6 @@ The id also flows into the CH ledger as the idempotency key for debit replays, s
 - **Semantic caching across unrelated requests**: Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.
 - **Per-region provider routing for data residency**: tracked as an open question in the contract; not in v1.
 
-Once these concepts are in your head the rest of the docs, [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), [CLI Integrations](/ai-gateway/cli/overview): are detail views on the same primitives.
+Once these concepts are in your head the rest of the docs are detail views on the same primitives: [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), and [CLI Integrations](/ai-gateway/cli/overview).
+
+If you rebill this traffic to your own customers, two more read next: [Billing and spend events](/ai-gateway/billing-events) for the per-request record you reconcile against, and [Webhooks](/features/webhooks) for having it pushed to you instead of polling.
