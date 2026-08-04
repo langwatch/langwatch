@@ -19,7 +19,15 @@ function endTimestamp(group: ConversationGroup): number {
   return group.latestTimestamp + (lastTrace?.durationMs ?? 0);
 }
 
-function pluralise(count: number, singular: string, plural: string): string {
+function pluralise({
+  count,
+  singular,
+  plural,
+}: {
+  count: number;
+  singular: string;
+  plural: string;
+}): string {
   return count === 1 ? singular : plural;
 }
 
@@ -30,7 +38,11 @@ function pluralise(count: number, singular: string, plural: string): string {
  * is showing rather than letting the list read as complete.
  */
 export function traceCountLabel(group: ConversationGroup): string {
-  const noun = pluralise(group.traceCount, "trace", "traces");
+  const noun = pluralise({
+    count: group.traceCount,
+    singular: "trace",
+    plural: "traces",
+  });
   const loaded = group.traces.length;
   if (loaded > 0 && loaded < group.traceCount) {
     return `${loaded} of ${group.traceCount} ${noun}`;
@@ -74,7 +86,11 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
             </Icon>
             <Text color="red.fg">
               {group.errorCount}{" "}
-              {pluralise(group.errorCount, "error", "errors")}
+              {pluralise({
+                count: group.errorCount,
+                singular: "error",
+                plural: "errors",
+              })}
             </Text>
           </HStack>
         </>
@@ -132,7 +148,11 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
             </Icon>
             <Text color="red.fg">
               {group.errorCount}{" "}
-              {pluralise(group.errorCount, "error", "errors")}
+              {pluralise({
+                count: group.errorCount,
+                singular: "error",
+                plural: "errors",
+              })}
             </Text>
           </HStack>
         </>
@@ -146,7 +166,11 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
             </Icon>
             <Text>
               {group.totalEvents}{" "}
-              {pluralise(group.totalEvents, "event", "events")}
+              {pluralise({
+                count: group.totalEvents,
+                singular: "event",
+                plural: "events",
+              })}
             </Text>
           </HStack>
         </>

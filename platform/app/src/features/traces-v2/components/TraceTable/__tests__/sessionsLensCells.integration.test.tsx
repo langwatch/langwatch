@@ -79,7 +79,13 @@ function serverSession(
   });
 }
 
-function renderCell(cellId: string, row: ConversationGroup) {
+function renderCell({
+  cellId,
+  row,
+}: {
+  cellId: string;
+  row: ConversationGroup;
+}) {
   const cell = conversationCells[cellId];
   if (!cell) throw new Error(`No conversation cell registered for ${cellId}`);
   return render(
@@ -102,31 +108,31 @@ describe("sessions lens cells", () => {
       // come from the server rollup.
       expect(row.traces).toHaveLength(0);
 
-      renderCell("turns", row);
+      renderCell({ cellId: "turns", row });
       expect(screen.getByText("128")).toBeInTheDocument();
       expect(screen.getByText("traces")).toBeInTheDocument();
 
-      renderCell("tokens", row);
+      renderCell({ cellId: "tokens", row });
       expect(screen.getByText("2400.0K")).toBeInTheDocument();
 
-      renderCell("cost", row);
+      renderCell({ cellId: "cost", row });
       expect(screen.getByText("$42.50")).toBeInTheDocument();
     });
 
     it("shows last activity, context size, model calls and compactions", () => {
       const row = serverSession();
 
-      renderCell("lastTurn", row);
+      renderCell({ cellId: "lastTurn", row });
       expect(screen.getByText(/1m|60s|1 minute/)).toBeInTheDocument();
 
-      renderCell("contextSize", row);
+      renderCell({ cellId: "contextSize", row });
       // Enriched sessions surface the coding-agent fold's peak context.
       expect(screen.getByText("173.0K")).toBeInTheDocument();
 
-      renderCell("modelCalls", row);
+      renderCell({ cellId: "modelCalls", row });
       expect(screen.getByText("63")).toBeInTheDocument();
 
-      renderCell("compactions", row);
+      renderCell({ cellId: "compactions", row });
       expect(screen.getByText("4")).toBeInTheDocument();
     });
 
@@ -139,7 +145,7 @@ describe("sessions lens cells", () => {
         codingAgent: null,
       });
 
-      renderCell("contextSize", row);
+      renderCell({ cellId: "contextSize", row });
 
       expect(screen.getByText("0")).toBeInTheDocument();
     });
@@ -147,8 +153,8 @@ describe("sessions lens cells", () => {
     it("dashes model calls and compactions for sessions without a coding-agent row", () => {
       const row = serverSession({ codingAgent: null });
 
-      renderCell("modelCalls", row);
-      renderCell("compactions", row);
+      renderCell({ cellId: "modelCalls", row });
+      renderCell({ cellId: "compactions", row });
       // The shared dash placeholder glyph, same as every other empty cell.
       expect(screen.getAllByText("—")).toHaveLength(2);
     });

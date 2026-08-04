@@ -21,20 +21,22 @@ import { Pagination } from "../Pagination";
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_TO_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 
-function renderPagination(
-  nextCursor: {
-    sortValue: number;
-    traceId: string;
-  },
-  props: { visibleCount?: number; maxPageSize?: number } = {},
-): void {
+function renderPagination({
+  nextCursor,
+  visibleCount = 50,
+  maxPageSize,
+}: {
+  nextCursor: { sortValue: number; traceId: string };
+  visibleCount?: number;
+  maxPageSize?: number;
+}): void {
   render(
     <ChakraProvider value={defaultSystem}>
       <Pagination
         totalHits={500}
         nextCursor={nextCursor}
-        visibleCount={props.visibleCount ?? 50}
-        maxPageSize={props.maxPageSize}
+        visibleCount={visibleCount}
+        maxPageSize={maxPageSize}
       />
     </ChakraProvider>,
   );
@@ -59,7 +61,7 @@ describe("Pagination Next", () => {
   describe("given the first batch, which the server answered with a cursor", () => {
     describe("when the user clicks Next", () => {
       it("files that cursor under the batch it opens, leaving the first batch cursor-free", () => {
-        renderPagination(CURSOR_TO_PAGE_2);
+        renderPagination({ nextCursor: CURSOR_TO_PAGE_2 });
 
         clickNext();
 
@@ -79,7 +81,8 @@ describe("Pagination Next", () => {
         pageSize: 250,
         pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
       });
-      renderPagination(CURSOR_TO_PAGE_3, {
+      renderPagination({
+        nextCursor: CURSOR_TO_PAGE_3,
         visibleCount: 100,
         maxPageSize: 100,
       });
@@ -100,7 +103,7 @@ describe("Pagination Next", () => {
           page: 2,
           pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
         });
-        renderPagination(CURSOR_TO_PAGE_3);
+        renderPagination({ nextCursor: CURSOR_TO_PAGE_3 });
 
         clickNext();
 

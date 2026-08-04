@@ -193,10 +193,13 @@ function keysetCursorFor({
 }
 
 /** Keep in lockstep with SORT_EXPRESSIONS in the ClickHouse repository. */
-function cursorSortValueForRow(
-  row: SessionGroupRow,
-  column: SessionGroupSortColumn,
-): number {
+function cursorSortValueForRow({
+  row,
+  column,
+}: {
+  row: SessionGroupRow;
+  column: SessionGroupSortColumn;
+}): number {
   switch (column) {
     case "lastActivity":
       return row.lastActivityMs;
@@ -213,10 +216,13 @@ function cursorSortValueForRow(
   }
 }
 
-export function mapSessionGroupRowToDto(
-  row: SessionGroupRow,
-  codingAgent: SessionGroupCodingAgentDto | null,
-): SessionGroupDto {
+export function mapSessionGroupRowToDto({
+  row,
+  codingAgent,
+}: {
+  row: SessionGroupRow;
+  codingAgent: SessionGroupCodingAgentDto | null;
+}): SessionGroupDto {
   return {
     conversationId: row.conversationId,
     traceCount: row.traceCount,
@@ -272,10 +278,16 @@ export class SessionGroupsService {
       ? page.rows.slice(0, params.pageSize)
       : page.rows;
 
-    const enrichments = await this.enrich(params.tenantId, visibleRows);
+    const enrichments = await this.enrich({
+      tenantId: params.tenantId,
+      rows: visibleRows,
+    });
 
     const sessions = visibleRows.map((row, index) => {
-      const dto = mapSessionGroupRowToDto(row, enrichments[index] ?? null);
+      const dto = mapSessionGroupRowToDto({
+        row,
+        codingAgent: enrichments[index] ?? null,
+      });
       // Tease previews of sessions beyond the caller's visibility window,
       // rollup numbers stay untouched, mirroring the trace list's gate.
       if (
@@ -299,7 +311,10 @@ export class SessionGroupsService {
       nextCursor:
         hasMore && lastRow
           ? encodeSessionGroupsCursor({
-              sortValue: cursorSortValueForRow(lastRow, sortColumn),
+              sortValue: cursorSortValueForRow({
+                row: lastRow,
+                column: sortColumn,
+              }),
               conversationId: lastRow.conversationId,
               sortColumn,
               sortDirection,
@@ -313,10 +328,13 @@ export class SessionGroupsService {
    * design: a missing session row is the normal answer for ordinary
    * conversations, and a failed lookup must not take the whole list down.
    */
-  private async enrich(
-    tenantId: string,
-    rows: SessionGroupRow[],
-  ): Promise<(SessionGroupCodingAgentDto | null)[]> {
+  private async enrich({
+    tenantId,
+    rows,
+  }: {
+    tenantId: string;
+    rows: SessionGroupRow[];
+  }): Promise<(SessionGroupCodingAgentDto | null)[]> {
     const results: (SessionGroupCodingAgentDto | null)[] = [];
     for (let i = 0; i < rows.length; i += ENRICHMENT_CONCURRENCY) {
       const chunk = rows.slice(i, i + ENRICHMENT_CONCURRENCY);

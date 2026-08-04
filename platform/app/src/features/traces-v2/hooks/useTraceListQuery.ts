@@ -33,7 +33,15 @@ export interface TraceListQueryResult {
  * internals — `useSamplePreview` is the entire integration seam.
  */
 /** The `tracesV2.list` input for the current filter, sort and page state. */
-function traceListQueryInput(args: {
+function traceListQueryInput({
+  projectId,
+  timeRange,
+  sort,
+  page,
+  pageSize,
+  traceCursor,
+  queryText,
+}: {
   projectId: string;
   timeRange: { from: number; to: number; label?: string | null };
   sort: { columnId: string; direction: "asc" | "desc" };
@@ -42,19 +50,19 @@ function traceListQueryInput(args: {
   traceCursor: TraceListCursor | undefined;
   queryText: string;
 }) {
-  const cursor = args.page > 1 ? args.traceCursor : undefined;
+  const cursor = page > 1 ? traceCursor : undefined;
   return {
-    projectId: args.projectId,
+    projectId,
     timeRange: {
-      from: args.timeRange.from,
-      to: args.timeRange.to,
-      live: !!args.timeRange.label,
+      from: timeRange.from,
+      to: timeRange.to,
+      live: !!timeRange.label,
     },
-    sort: { columnId: args.sort.columnId, direction: args.sort.direction },
-    page: args.page,
-    pageSize: args.pageSize,
+    sort: { columnId: sort.columnId, direction: sort.direction },
+    page,
+    pageSize,
     ...(cursor ? { cursor } : {}),
-    query: args.queryText || undefined,
+    query: queryText || undefined,
   };
 }
 
