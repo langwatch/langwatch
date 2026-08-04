@@ -38,10 +38,15 @@ jobs:
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
       # first. Sparse: nothing else in this job reads the tree.
+      #
+      # persist-credentials: false because nothing here talks to git after the
+      # checkout, and the default would leave the workflow token in
+      # .git/config for the `curl | sh` installer that runs next.
       - name: Check out .github
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           sparse-checkout: .github
+          persist-credentials: false
 
       - name: Install boxd CLI
         run: |
@@ -178,10 +183,15 @@ jobs:
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
       # first. Sparse: nothing else in this job reads the tree.
+      #
+      # persist-credentials: false because nothing here talks to git after the
+      # checkout, and the default would leave the workflow token in
+      # .git/config for the `curl | sh` installer that runs next.
       - name: Check out .github
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           sparse-checkout: .github
+          persist-credentials: false
 
       - name: Install boxd CLI
         run: |
@@ -223,10 +233,15 @@ jobs:
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
       # first. Sparse: nothing else in this job reads the tree.
+      #
+      # persist-credentials: false because nothing here talks to git after the
+      # checkout, and the default would leave the workflow token in
+      # .git/config for the `curl | sh` installer that runs next.
       - name: Check out .github
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           sparse-checkout: .github
+          persist-credentials: false
 
       - name: Install boxd CLI
         run: |
@@ -280,10 +295,15 @@ jobs:
     steps:
       # The ssh-agent step below is a local action, so it has to be on disk
       # first. Sparse: nothing else in this job reads the tree.
+      #
+      # persist-credentials: false because nothing here talks to git after the
+      # checkout, and the default would leave the workflow token in
+      # .git/config for the `curl | sh` installer that runs next.
       - name: Check out .github
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
           sparse-checkout: .github
+          persist-credentials: false
 
       - name: Install boxd CLI
         run: |
