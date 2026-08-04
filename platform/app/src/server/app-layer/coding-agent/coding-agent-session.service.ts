@@ -85,6 +85,13 @@ export class CodingAgentSessionService {
    *
    * `limit` is clamped to {@link MAX_SESSION_EVENTS_PAGE_SIZE}: callers walk
    * the cursor for more, and no caller gets to size the scan itself.
+   *
+   * A caller that names no window gets one resolved for it. `TimeUnixMs` is
+   * the fact table's partition key, so a read without a bound on it opens
+   * every weekly partition the retention holds, cold S3 ones included, to
+   * answer about a session that lived for minutes. The session row carries
+   * `startedAtMs`, and reading it is a keyed point lookup, so the cheap read
+   * buys the bound for the expensive one.
    */
   async getSessionEvents({
     projectId,
@@ -104,13 +111,55 @@ export class CodingAgentSessionService {
     events: CodingAgentSessionEventRow[];
     nextCursor: SessionEventsCursor | null;
   }> {
+    const clampedLimit = clampSessionEventsLimit(limit);
+    const window =
+      occurredAt ?? (await this.resolveEventsWindow({ projectId, sessionId }));
+    const page = await this.sessionEvents.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+      kinds,
+      occurredAt: window,
+      cursor,
+      limit: clampedLimit,
+    });
+    // A derived window is a hint, not a fact: a session running longer than
+    // the declared width has events outside it. Only a first page that came
+    // back empty under a hint we invented is retried unbounded, so a long
+    // session degrades to a slower read rather than a short answer. An
+    // explicit window is the caller's own bound and is never widened, and a
+    // cursor page is already anchored by the cursor.
+    const derivedWindow = occurredAt === undefined && window !== undefined;
+    if (page.events.length > 0 || cursor !== undefined || !derivedWindow) {
+      return page;
+    }
     return this.sessionEvents.findBySessionId({
       tenantId: projectId,
       sessionId,
       kinds,
-      occurredAt,
       cursor,
-      limit: clampSessionEventsLimit(limit),
+      limit: clampedLimit,
+    });
+  }
+
+  /**
+   * The partition-pruning window for a session's events, or undefined when
+   * the session has no row to anchor on and the read has to go unbounded.
+   */
+  private async resolveEventsWindow({
+    projectId,
+    sessionId,
+  }: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<{ fromMs: number; toMs: number } | undefined> {
+    const row = await this.sessions.findBySessionId({
+      tenantId: projectId,
+      sessionId,
+    });
+    if (row === null) return undefined;
+    return readWindowAround({
+      anchorMs: row.startedAtMs,
+      widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS,
     });
   }
 

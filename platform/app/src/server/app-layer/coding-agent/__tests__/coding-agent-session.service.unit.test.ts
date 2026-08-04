@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
   projectCodingAgentSessionToRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
@@ -15,6 +16,7 @@ import {
   MAX_SESSION_EVENTS_PAGE_SIZE,
 } from "../coding-agent-session.service";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
+import type { CodingAgentSessionEventRow } from "../repositories/coding-agent-session-events.repository";
 import { NullCodingAgentSessionEventsRepository } from "../repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
 import type {
@@ -25,6 +27,15 @@ import type {
 const PROJECT = "project-1";
 const SESSION = "sess-1";
 const TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+const STARTED_AT_MS = 1_700_000_000_000;
+
+/** One row back from a session-events read; only its presence is asserted. */
+const SESSION_EVENT = {
+  sessionId: SESSION,
+  timeUnixMs: STARTED_AT_MS,
+  recordId: "rec-1",
+  eventKind: "model_call",
+} as CodingAgentSessionEventRow;
 
 function makeRow(
   overrides?: Partial<CodingAgentSessionRow>,
@@ -36,7 +47,7 @@ function makeRow(
       ...emptyState(),
       sessionKeySource: "provider",
       traceIds: [TRACE],
-      startedAtMs: 1_700_000_000_000,
+      startedAtMs: STARTED_AT_MS,
       createdAt: 0,
       updatedAt: 0,
       LastEventOccurredAt: 0,
@@ -130,16 +141,25 @@ function emptyState() {
   };
 }
 
+/** The window a session-events read was bounded by, or undefined if unbounded. */
+type ReadWindow = { fromMs: number; toMs: number } | undefined;
+
 function makeService({
   row = null,
   rows,
   mapping = null,
   totals = [],
+  onEventsRead,
 }: {
   row?: CodingAgentSessionRow | null;
   rows?: CodingAgentSessionRow[];
   mapping?: { sessionId: string; occurredAtMs: number } | null;
   totals?: SessionMetricTotal[];
+  /** Answers a session-events read, so a test can observe the window it got. */
+  onEventsRead?: (args: { occurredAt: ReadWindow }) => {
+    events: CodingAgentSessionEventRow[];
+    nextCursor: null;
+  };
 }) {
   const listed = rows ?? (row ? [row] : []);
   const sessions: CodingAgentSessionRepository = {
@@ -162,7 +182,13 @@ function makeService({
     sessions,
     traceSessions,
     metricSeries,
-    sessionEvents: new NullCodingAgentSessionEventsRepository(),
+    sessionEvents: onEventsRead
+      ? {
+          ensure: async () => {},
+          findBySessionId: async ({ occurredAt }) =>
+            onEventsRead({ occurredAt }),
+        }
+      : new NullCodingAgentSessionEventsRepository(),
   });
 }
 
@@ -211,6 +237,84 @@ describe("CodingAgentSessionService", () => {
       });
 
       expect(seen).toEqual([MAX_SESSION_EVENTS_PAGE_SIZE, 1, 25]);
+    });
+  });
+
+  describe("given a session whose events are asked for without a window", () => {
+    /** @scenario reading a session's events prunes to the session's own weeks */
+    it("bounds the read on the session's start instead of every partition", async () => {
+      const windows: ReadWindow[] = [];
+      const service = makeService({
+        row: makeRow(),
+        onEventsRead: ({ occurredAt }) => {
+          windows.push(occurredAt);
+          return { events: [SESSION_EVENT], nextCursor: null };
+        },
+      });
+
+      await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        limit: 25,
+      });
+
+      expect(windows).toEqual([
+        {
+          fromMs: STARTED_AT_MS - CODING_AGENT_SESSION_READ_WINDOW_MS,
+          toMs: STARTED_AT_MS + CODING_AGENT_SESSION_READ_WINDOW_MS,
+        },
+      ]);
+    });
+
+    describe("when the session outlived the window we guessed", () => {
+      /** @scenario a session longer than the guessed window still answers in full */
+      it("retries unbounded rather than answering empty", async () => {
+        const windows: ReadWindow[] = [];
+        const service = makeService({
+          row: makeRow(),
+          onEventsRead: ({ occurredAt }) => {
+            windows.push(occurredAt);
+            return occurredAt === undefined
+              ? { events: [SESSION_EVENT], nextCursor: null }
+              : { events: [], nextCursor: null };
+          },
+        });
+
+        const page = await service.getSessionEvents({
+          projectId: PROJECT,
+          sessionId: SESSION,
+          limit: 25,
+        });
+
+        expect(windows).toHaveLength(2);
+        expect(windows[1]).toBeUndefined();
+        expect(page.events).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given a caller that named its own window", () => {
+    /** @scenario a caller's own window is never widened behind its back */
+    it("passes it through and never retries unbounded", async () => {
+      const windows: ReadWindow[] = [];
+      const service = makeService({
+        row: makeRow(),
+        onEventsRead: ({ occurredAt }) => {
+          windows.push(occurredAt);
+          return { events: [], nextCursor: null };
+        },
+      });
+
+      const asked = { fromMs: 1_000, toMs: 2_000 };
+      const page = await service.getSessionEvents({
+        projectId: PROJECT,
+        sessionId: SESSION,
+        occurredAt: asked,
+        limit: 25,
+      });
+
+      expect(windows).toEqual([asked]);
+      expect(page.events).toEqual([]);
     });
   });
 
