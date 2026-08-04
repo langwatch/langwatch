@@ -874,14 +874,17 @@ describe.skipIf(!hasTestcontainers)(
           // about that gap, which is the side-lining decision (#6482).
           const POISON = "j5";
           const attempted: TestPayload[][] = [];
-          const processedIds = new Set<string>();
+          // An ARRAY, not a set: a set cannot tell "committed once" from
+          // "committed twice", and the second is the thing worth watching when
+          // a dispatch applies part of a batch before failing.
+          const committed: string[] = [];
 
           const queue = createQueue(
             async (p) => {
               // The isolate ends up here only if it is ever dispatched alone;
               // healthy singles land here too once a half narrows to one.
               if (p.id === POISON) throw new Error("unprocessable payload");
-              processedIds.add(p.id);
+              committed.push(p.id);
             },
             {
               processBatch: async (ps) => {
@@ -892,7 +895,7 @@ describe.skipIf(!hasTestcontainers)(
                 if (batch.some((p) => p.id === POISON)) {
                   throw new Error("unprocessable payload");
                 }
-                for (const p of batch) processedIds.add(p.id);
+                for (const p of batch) committed.push(p.id);
               },
               coalesceMaxBatch: () => 50,
               score: (p) => Number(p.value) * 1000,
@@ -908,22 +911,35 @@ describe.skipIf(!hasTestcontainers)(
             })),
           );
 
+          const HEALTHY_PREFIX = ["j0", "j1", "j2", "j3", "j4"];
+
           // j0..j4 commit despite sharing a batch with the offender. Without
           // bisection the whole batch fails together and NONE of them apply —
           // that is the regression this pins.
           await vi.waitFor(
             () => {
-              expect([...processedIds].sort()).toEqual([
-                "j0",
-                "j1",
-                "j2",
-                "j3",
-                "j4",
-              ]);
+              expect([...new Set(committed)].sort()).toEqual(HEALTHY_PREFIX);
             },
             { timeout: 30000, interval: 50 },
           );
-          expect(processedIds.has(POISON)).toBe(false);
+          expect(committed).not.toContain(POISON);
+
+          // No payload is applied more often than its peers. The prefix always
+          // commits as a unit, so equal counts hold however many times the
+          // group is redelivered — while a payload applied one extra time (the
+          // failure a set-based assertion cannot see) breaks equality.
+          //
+          // Scope note: this pins that BISECTION does not re-run a payload it
+          // already committed within a dispatch. Redelivery across dispatches
+          // is at-least-once by design and is made safe by the fold store's
+          // applied-event-id set, which has its own suite
+          // (projections/foldCache/__tests__/foldRedeliveryIdempotency) — this
+          // handler is a mock with no such guard, so asserting it here would
+          // test the mock rather than the queue.
+          const counts = HEALTHY_PREFIX.map(
+            (id) => committed.filter((c) => c === id).length,
+          );
+          expect(new Set(counts).size).toBe(1);
 
           // The split actually narrowed to the offender rather than retrying
           // the batch whole: some attempt isolated it on its own.

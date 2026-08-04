@@ -418,9 +418,16 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
  * A coalesced batch failed retryably and was split in half to isolate the
  * cause.
  *
- * Counts SPLITS, not batches: isolating one poison payload out of a full batch
- * costs `log2(batchSize)` increments, so a single stubborn payload shows up as
- * a burst rather than a single event. Read it as a rate, not a total.
+ * Increments ONCE PER SPLIT, not once per batch, so one failing batch produces
+ * a burst rather than a single event. Read it as a rate, not a total, and do
+ * not infer a batch count from it — how many splits a batch costs depends on
+ * why it failed:
+ * - a single unprocessable payload costs one split per level of the descent to
+ *   it, so roughly `log2(batchSize)` — but the exact count moves with the
+ *   payload's position (a batch of 5 costs 2 or 3, not 2.32).
+ * - a batch that fails purely on size keeps splitting until every part fits, so
+ *   the cost is driven by how far the working size is below the batch bound and
+ *   approaches `batchSize - 1` in the worst case, far above `log2(batchSize)`.
  *
  * A steady non-zero rate is the signal worth acting on, and it means one of two
  * things — both real:
@@ -435,6 +442,6 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
  */
 export const gqBatchBisectionsTotal = new Counter({
   name: "gq_batch_bisections_total",
-  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — counts splits, so isolating one payload costs log2(batchSize)",
+  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — increments once per split, so one failing batch costs several",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
