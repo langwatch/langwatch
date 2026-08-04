@@ -284,14 +284,14 @@ function fanoutDiagnostic({
   block: GovernedSqlQueryBlock;
   pair: JoinedPair;
 }): GovernedSqlDiagnostic {
-  const collapses = block.hasGroupBy || block.isAggregated;
+  const isRowCollapsing = block.hasGroupBy || block.isAggregated;
   return {
     code: "POSSIBLE_FANOUT",
     message:
       `The join repeats each row of ${multiplied.datasetName} once per matching row of ` +
       `${multiplier.datasetName}, because it does not match ${multiplier.datasetName} on ` +
       `${unmatched.join(", ")}. ` +
-      (collapses
+      (isRowCollapsing
         ? `Any aggregate over a ${multiplied.datasetName} measure therefore counts that measure ` +
           `once per matching row. Aggregate ${multiplied.datasetName} to its own grain first, ` +
           `then join.`
@@ -314,7 +314,7 @@ function fanoutDiagnostic({
         ...new Set([...pair.leftColumns, ...pair.rightColumns]),
       ].sort(),
       /** Whether the block collapses rows, which decides what is at risk. */
-      aggregated: collapses,
+      aggregated: isRowCollapsing,
     },
   };
 }
