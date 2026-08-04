@@ -28,6 +28,83 @@ import type { WorkflowAgentData } from "../types";
 const NLP_FETCH_TIMEOUT_MS = 120_000;
 
 /**
+ * The error-carrying part of an NLP service response, in either shape the
+ * service emits: the engine's own envelope (`error: {type, message}`, sent
+ * with HTTP 200 for engine-level failures) and the `detail` field the older
+ * Python service used for 4xx bodies.
+ */
+type NlpErrorBody = {
+  detail?: string;
+  error?: { type?: string; message?: string };
+};
+
+/**
+ * First non-empty candidate. Deliberately not a `??` chain: `??` only skips
+ * `null`/`undefined`, so an envelope carrying `message: ""` would fall through
+ * as the answer and leave a thrown message ending in a bare colon.
+ */
+function firstNonEmpty(
+  ...candidates: (string | undefined)[]
+): string | undefined {
+  return candidates.find((c) => typeof c === "string" && c.length > 0);
+}
+
+/**
+ * Best available human-readable reason from an engine error envelope.
+ *
+ * The type is a fallback rather than a discriminator, and it is worth knowing
+ * how weak a one: `cmd/engine_adapter.go` flattens EVERY error the engine
+ * returns to `type: "engine_error"`, so for planner-originated failures — the
+ * primary #3198 case — the type conveys nothing. The specific types
+ * (`missing_end_node`, `unreached_end_node`) only survive on the `finalize`
+ * path, where `convertResult` copies `NodeError.Type` through. Do not treat
+ * `error.type` as machine-readable here.
+ *
+ * The literal last resort keeps the thrown message well-formed if the engine
+ * ever sends `status: "error"` with nothing else.
+ */
+function engineErrorMessage(body: NlpErrorBody): string {
+  return (
+    firstNonEmpty(body.error?.message, body.error?.type) ??
+    "unknown engine error"
+  );
+}
+
+/**
+ * Best available reason from a NON-2xx response, read defensively because at
+ * this point we know only that the request failed, not who failed it.
+ *
+ * Three shapes are in play and any of them can arrive: nlpgo's own envelope
+ * (`error: {type, message}`, pkg/herr/http.go), the `detail` field the older
+ * Python service used, and — for a proxy or gateway that never reached the
+ * service — a body that is not JSON at all. The raw text is the last resort
+ * rather than an error so that a gateway failure is never swallowed.
+ *
+ * Returns "" when the body cannot be read; the caller appends nothing then and
+ * the status code stands on its own.
+ */
+async function httpErrorMessage(response: Response): Promise<string> {
+  let bodyStr: string;
+  try {
+    bodyStr = await response.text();
+  } catch {
+    return "";
+  }
+  try {
+    const errorBody = JSON.parse(bodyStr) as NlpErrorBody;
+    return (
+      firstNonEmpty(
+        errorBody.detail,
+        errorBody.error?.message,
+        errorBody.error?.type,
+      ) ?? bodyStr
+    );
+  } catch {
+    return bodyStr;
+  }
+}
+
+/**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
@@ -157,18 +234,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       }
 
       if (!response.ok) {
-        let errorMessage = "";
-        try {
-          const bodyStr = await response.text();
-          try {
-            const errorBody = JSON.parse(bodyStr) as { detail?: string };
-            errorMessage = errorBody.detail ?? bodyStr;
-          } catch {
-            errorMessage = bodyStr;
-          }
-        } catch {
-          errorMessage = "";
-        }
+        const errorMessage = await httpErrorMessage(response);
         throw new Error(
           `Workflow execution failed: HTTP ${response.status}${
             errorMessage ? ` - ${errorMessage}` : ""
@@ -180,7 +246,20 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
         trace_id: string;
         status: string;
         result: Record<string, unknown> | null;
-      };
+      } & NlpErrorBody;
+
+      // The engine reports engine-level failures INSIDE a 200 body
+      // (`{status: "error", error: {...}}`) rather than as a 4xx — see
+      // services/nlpgo/cmd/engine_adapter.go. Trusting `response.ok` alone
+      // therefore reads a failed run as a success with a null result, and
+      // extractOutput turns that into "": the scenario shows an empty agent
+      // turn and the real reason is never surfaced (#3198).
+      if (result.status === "error") {
+        throw new Error(
+          `Workflow execution failed: ${engineErrorMessage(result)}`,
+        );
+      }
+
       return result.result;
     } finally {
       clearTimeout(timeout);

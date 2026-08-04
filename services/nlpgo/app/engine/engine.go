@@ -212,7 +212,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 	if err != nil {
 		return nil, err
 	}
-	state := newRunState(req.Workflow)
+	state := newRunState(req.Workflow, requireEndNode(req))
 	applyManualInputs(state, req)
 	started := time.Now()
 	// execute_component (req.NodeID set) dispatches ONLY the requested
@@ -297,10 +297,72 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 	wg.Wait()
 }
 
-// dispatch routes a node to its executor and returns its declared
-// outputs (already filtered to the node's `outputs` declaration so
-// downstream nodes get exactly what the workflow author requested).
+// dispatch routes a node to its executor, then scrubs resolved secret values
+// out of that executor's DIAGNOSTIC output — stdout, stderr, and error text.
+// Not its outputs; see redactNodeSecrets for why that asymmetry is deliberate.
+//
+// The redaction lives HERE, at the one point both runLayer and runLayerStream
+// funnel through, rather than at each executor — because a per-executor guard
+// is only as complete as the last person to remember it. That is not
+// hypothetical: runHTTP redacted its own error from the start, runCode and
+// runIfElsePython did not, and when they were fixed the secret simply left via
+// NodeState.Stdout/.Stderr instead, which ride in the same `result.nodes` map
+// and in every execution_state_change frame (#3198).
+//
+// Why it matters at all: code nodes get project secrets as a live
+// `secrets.NAME` namespace, so user code can print one or interpolate one into
+// a message that then raises. Before #3198 the scenario adapter discarded
+// engine errors entirely; now it re-throws them and the runner persists them
+// onto the user-visible run record.
 func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	outputs, derr := e.dispatchNode(ctx, req, node, inputs, ns)
+	redactNodeSecrets(ns, derr, req.Workflow.Secrets)
+	return outputs, derr
+}
+
+// redactNodeSecrets scrubs resolved secret values from a node's DIAGNOSTIC
+// output — the error message, the traceback, stdout and stderr.
+//
+// It deliberately does NOT touch ns.Outputs, and that asymmetry is the whole
+// design rather than an oversight. Those four channels only ever carry a
+// secret by accident: nobody means to put one in a traceback. Outputs are a
+// DATA channel, and routing a secret through one is the supported use — a code
+// node returning a token for an HTTP node's header is exactly what the
+// `secrets.NAME` namespace exists for. Redacting there would corrupt the
+// workflow's own data, and for an End node it would corrupt the run's result.
+//
+// So: if you are here because a secret reached somewhere it should not have,
+// check whether it arrived through an output before adding a field to this
+// function.
+//
+// Mutates in place: derr is the same pointer that reaches
+// runState.firstError and therefore the run's top-level error. Both callers
+// (runLayer, runLayerStream) read it only after dispatch returns, so the
+// mutation lands before ns.Error, recordError, logNodeFailure, the OTel span,
+// and the execution_state_change frame all see it.
+func redactNodeSecrets(ns *NodeState, derr *NodeError, secrets map[string]string) {
+	if len(secrets) == 0 {
+		return
+	}
+	if ns != nil {
+		ns.Stdout = redactSecrets(ns.Stdout, secrets)
+		ns.Stderr = redactSecrets(ns.Stderr, secrets)
+	}
+	if derr != nil {
+		derr.Message = redactSecrets(derr.Message, secrets)
+		derr.Traceback = redactSecrets(derr.Traceback, secrets)
+	}
+}
+
+// dispatchNode is the executor switch. It carries `dispatch`'s original
+// signature verbatim — this fix only moved the body down a level so redaction
+// could sit at the single choke point above it, so the argument count is
+// inherited, not chosen. Reshaping it into a params struct would touch every
+// executor for no benefit to the reader; the house rule is scoped to new and
+// changed lines, and the only thing new on this line is the name.
+//
+//nolint:revive // argument-limit: signature unchanged from dispatch, see above
+func (e *Engine) dispatchNode(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	switch node.Type {
 	case dsl.ComponentEntry:
 		return e.runEntry(node, req)
@@ -1155,7 +1217,27 @@ func planOptionsFor(req ExecuteRequest) []planner.Option {
 	if req.UntilNodeID != "" {
 		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
 	}
+	// execute_component dispatches a single node; the End node is
+	// irrelevant, so don't trip the planner's missing-End guard (#3198).
+	if req.NodeID != "" {
+		opts = append(opts, planner.AllowMissingEnd())
+	}
 	return opts
+}
+
+// requireEndNode reports whether a run is expected to terminate at an End
+// node — a full execute_flow, not a single-component run (NodeID) and not
+// a "run until here" partial plan (UntilNodeID). finalize uses it to turn
+// a missing End node into an explicit error instead of a silent empty
+// success (#3198), mirroring the planner's MissingEndNodeError gate (#3198).
+//
+// Invariant: this predicate must remain the boolean dual of planOptionsFor's
+// AllowMissingEnd/WithUntilNode conditions. If a new partial-run shape is
+// ever added, BOTH planOptionsFor (which sets AllowMissingEnd or WithUntilNode)
+// AND this function must be updated together — otherwise the planner guard and
+// the finalize guard will silently disagree about what constitutes a full run.
+func requireEndNode(req ExecuteRequest) bool {
+	return req.NodeID == "" && req.UntilNodeID == ""
 }
 
 // applyManualInputs primes runState with the inbound execute_component
@@ -1180,7 +1262,12 @@ type runState struct {
 	outputs    map[string]map[string]any
 	states     map[string]*NodeState
 	firstError *NodeError
-	endNodeID  string
+	// endNodeIDs lists every End node in the workflow, in node order.
+	// Deliberately not a single "the End node" field: a branching workflow
+	// can terminate at an End that is not the first one declared, and keying
+	// the result off the first would report an empty success for a run that
+	// did produce one (#3198).
+	endNodeIDs []string
 	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
@@ -1192,10 +1279,23 @@ type runState struct {
 	// inbound edges. Both are zero-valued for execute_flow runs.
 	manualInputsTarget string
 	manualInputs       map[string]any
+	// requireEnd says this run is a FULL run, so finalize must insist the
+	// End node exists and actually ran rather than reporting an empty
+	// success (#3198). Request-derived and fixed for the run's lifetime —
+	// see requireEndNode — so it rides here beside manualInputsTarget
+	// instead of being threaded through finalize and doneEvent.
+	//
+	// It is a REQUIRED argument to newRunState rather than a field a caller
+	// may forget to set. That is deliberate: there are five construction
+	// sites, only two of which want it true, and a silently-defaulted false
+	// disables the guard with no signal anywhere. A sixth caller now has to
+	// answer the question.
+	requireEnd bool
 }
 
-func newRunState(w *dsl.Workflow) *runState {
+func newRunState(w *dsl.Workflow, requireEnd bool) *runState {
 	r := &runState{
+		requireEnd:    requireEnd,
 		nodes:         make(map[string]*dsl.Node, len(w.Nodes)),
 		outputs:       make(map[string]map[string]any, len(w.Nodes)),
 		states:        make(map[string]*NodeState, len(w.Nodes)),
@@ -1204,14 +1304,27 @@ func newRunState(w *dsl.Workflow) *runState {
 	for i := range w.Nodes {
 		n := &w.Nodes[i]
 		r.nodes[n.ID] = n
-		if n.Type == dsl.ComponentEnd && r.endNodeID == "" {
-			r.endNodeID = n.ID
+		if n.Type == dsl.ComponentEnd {
+			r.endNodeIDs = append(r.endNodeIDs, n.ID)
 		}
 	}
 	for _, e := range w.Edges {
 		r.edgesByTarget[e.Target] = append(r.edgesByTarget[e.Target], e)
 	}
 	return r
+}
+
+// endOutputs returns the outputs recorded against the first End node that
+// actually executed, and whether any End node executed at all.
+func (r *runState) endOutputs() (map[string]any, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, id := range r.endNodeIDs {
+		if outs, ok := r.outputs[id]; ok {
+			return outs, true
+		}
+	}
+	return nil, false
 }
 
 func (r *runState) recordOutputs(id string, outputs map[string]any) {
@@ -1369,6 +1482,12 @@ func stripHandlePrefix(handle, prefix string) string {
 	return handle
 }
 
+// UnreachedEndNodeMessage explains a run that planned fine and still finished
+// without its End node producing anything. Unlike the planner's two End-node
+// messages this describes a condition only observable AFTER a run, so it lives
+// with finalize rather than in the planner's validation vocabulary.
+const UnreachedEndNodeMessage = "workflow finished without reaching its End node, so it produced no result; check that the End node is wired and reachable on every branch"
+
 func finalize(state *runState, traceID string, started time.Time, ctxErr error) *ExecuteResult {
 	res := &ExecuteResult{
 		TraceID:    traceID,
@@ -1386,11 +1505,40 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 		res.Error = state.firstError
 		return res
 	}
+	// A full run that never reached an End node finalizes with an empty
+	// result and a misleading success — issue #3198. Turn it into an
+	// explicit error instead, mirroring the planner's MissingEndNodeError
+	// gate (#3198). Partial runs (execute_component, "run until here")
+	// legitimately have no End, so requireEnd is false for them and the
+	// happy path proceeds.
+	if state.requireEnd && len(state.endNodeIDs) == 0 {
+		res.Status = "error"
+		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
+		return res
+	}
+	endOutputs, endRan := state.endOutputs()
+	// An End node that exists but never ran is the other half of #3198: the
+	// planner's presence check is satisfied, so the guard above stays quiet,
+	// yet nothing was recorded against the End node and the old code fell
+	// straight through to an empty `success`.
+	//
+	// This is not belt-and-braces for a hypothetical future caller — it is the
+	// ONLY guard for a shape that exists today. The planner's unwired-End check
+	// is skipped when reachability scoping did not run (no Entry node →
+	// allowed == nil), so an Entry-less workflow with a dangling End plans
+	// cleanly and arrives here. It also catches an End skipped at runtime by
+	// if/else branch gating, which no static check can see.
+	//
+	// A partial run (execute_component, "run until here") stops before the End
+	// by design, so requireEnd is false and the happy path proceeds.
+	if state.requireEnd && !endRan {
+		res.Status = "error"
+		res.Error = &NodeError{Type: "unreached_end_node", Message: UnreachedEndNodeMessage}
+		return res
+	}
 	res.Status = "success"
-	if state.endNodeID != "" {
-		if outs, ok := state.outputs[state.endNodeID]; ok {
-			res.Result = outs
-		}
+	if endRan {
+		res.Result = endOutputs
 	}
 	if res.Result == nil {
 		res.Result = map[string]any{}

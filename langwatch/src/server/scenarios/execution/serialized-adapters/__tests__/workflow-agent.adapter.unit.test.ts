@@ -209,6 +209,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       expect(callBody.payload.workflow.nodes[2].id).toBe("end");
     });
 
+    /** @scenario A successful engine response is still returned unchanged */
     it("returns the end node output as a response string", async () => {
       const adapter = new SerializedWorkflowAgentAdapter(
         defaultConfig,
@@ -468,6 +469,176 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
         "Workflow execution failed: HTTP 502 - Bad Gateway",
+      );
+    });
+
+    /**
+     * The engine reports engine-level failures inside a 200 body
+     * (`{status: "error", error: {...}}`), not as a 4xx — see
+     * cmd/engine_adapter.go. Reading only `response.ok` therefore treats the
+     * error as a success carrying a null result, and the scenario shows an
+     * empty agent turn with nothing to act on. That is the #3198 symptom.
+     */
+    describe("when the engine reports the failure inside a 200 response", () => {
+      const MISSING_END_MESSAGE =
+        "planner: workflow has no End node; add an End node so the run produces a result";
+
+      const engineErrorResponse = (
+        error: { type?: string; message?: string } | undefined,
+      ) => ({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          trace_id: "trace_abc123",
+          status: "error",
+          result: null,
+          error,
+        }),
+        text: vi.fn().mockResolvedValue(""),
+      });
+
+      /** @scenario The workflow agent throws when the engine answers 200 with an error status */
+      it("throws with the engine's error message", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({
+            type: "engine_error",
+            message: MISSING_END_MESSAGE,
+          }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          `Workflow execution failed: ${MISSING_END_MESSAGE}`,
+        );
+      });
+
+      /** @scenario The workflow agent does not return an empty string for an engine error */
+      it("does not resolve with an empty string", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({
+            type: "engine_error",
+            message: MISSING_END_MESSAGE,
+          }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        // Deliberately not `rejects.toThrow`: the pre-fix behavior was a
+        // *resolved* "", which a throw-shaped assertion alone would report
+        // as an unrelated failure. Assert on the settled outcome instead.
+        const settled = await adapter
+          .call(defaultInput)
+          .then((value) => ({ resolved: value }))
+          .catch((err: unknown) => ({ rejected: err }));
+
+        expect(settled).not.toHaveProperty("resolved");
+        expect(settled).toHaveProperty("rejected");
+      });
+
+      /** @scenario The workflow agent names the engine error type when the envelope carries no message */
+      it("falls back to the error type when the envelope has no message", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({ type: "missing_end_node" }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: missing_end_node",
+        );
+      });
+
+      it("still throws when the envelope carries no error object at all", async () => {
+        mockFetch.mockResolvedValue(engineErrorResponse(undefined));
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: unknown engine error",
+        );
+      });
+
+      // `??` passes "" straight through, so an empty-string message would
+      // leave the thrown text ending in a bare colon with nothing after it.
+      it("skips an empty message rather than throwing a reasonless error", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({ type: "missing_end_node", message: "" }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: missing_end_node",
+        );
+      });
+
+      it("falls back to the literal when every field is empty", async () => {
+        mockFetch.mockResolvedValue(
+          engineErrorResponse({ type: "", message: "" }),
+        );
+
+        const adapter = new SerializedWorkflowAgentAdapter(
+          defaultConfig,
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          "Workflow execution failed: unknown engine error",
+        );
+      });
+    });
+
+    /**
+     * nlpgo's non-2xx envelope is `{error: {type, message}}` (pkg/herr/http.go),
+     * not `{detail}`. Reading only `detail` reduced a real 4xx to the raw JSON
+     * blob, which is what the PR description previously claimed was forwarded
+     * "verbatim".
+     */
+    /** @scenario The workflow agent surfaces the engine error message on a non-2xx response */
+    it("extracts the herr error message from a non-2xx response", async () => {
+      const body = JSON.stringify({
+        error: {
+          type: "bad_request",
+          message: "workflow has no End node; add an End node",
+        },
+      });
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: vi.fn().mockResolvedValue(JSON.parse(body)),
+        text: vi.fn().mockResolvedValue(body),
+      });
+
+      const adapter = new SerializedWorkflowAgentAdapter(
+        defaultConfig,
+        nlpServiceUrl,
+        apiKey,
+      );
+
+      await expect(adapter.call(defaultInput)).rejects.toThrow(
+        "Workflow execution failed: HTTP 400 - workflow has no End node; add an End node",
       );
     });
   });

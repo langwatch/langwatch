@@ -1535,6 +1535,16 @@ const presentations = {
     title: "A condition in this workflow isn't valid",
     describe: () => "Check the branch condition and try again.",
   },
+  missing_end_node: {
+    title: "This workflow has no End node",
+    describe: () =>
+      "Add an End node and connect it, so the run has a result to return.",
+  },
+  unreached_end_node: {
+    title: "The run finished without reaching its End node",
+    describe: () =>
+      "Connect the End node, and check it's reachable on the branch the run takes.",
+  },
   attachment_fetch_error: {
     title: "Couldn't load an attachment",
     describe: () => "Check the file is still available, then run again.",

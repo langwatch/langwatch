@@ -65,10 +65,15 @@ func runEvaluatorNodeOutputs(t *testing.T, declaredOutputs []string) map[string]
 					Outputs:   declared,
 				},
 			},
+			// End node required by the missing-End planner guard (#3198);
+			// assertions below read the evaluator node's outputs, not the
+			// workflow result, so the pass-through End is harmless.
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.output", Target: "evaluator-1", TargetHandle: "inputs.output"},
 			{Source: "entry", SourceHandle: "outputs.expected_output", Target: "evaluator-1", TargetHandle: "inputs.expected_output"},
+			{Source: "evaluator-1", Target: "end"},
 		},
 	}
 

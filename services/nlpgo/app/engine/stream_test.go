@@ -30,6 +30,11 @@ func TestExecuteStream_HeartbeatExitDoesNotRaceWithClose(t *testing.T) {
 				Type: dsl.ComponentEntry,
 				Data: dsl.Component{},
 			},
+			// End node required by the missing-End planner guard (#3198).
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", Target: "end"},
 		},
 	}
 

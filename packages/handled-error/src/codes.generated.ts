@@ -508,6 +508,14 @@ export const nodeErrorCodes = {
    * @source services/nlpgo/app/engine/engine.go
    */
   llm_model_not_set: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  missing_end_node: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  unreached_end_node: { service: "nlpgo" },
 } as const;
 
 export type NodeErrorCode = keyof typeof nodeErrorCodes;
