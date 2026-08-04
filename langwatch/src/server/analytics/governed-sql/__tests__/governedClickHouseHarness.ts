@@ -1462,6 +1462,16 @@ export function postgresTenantSeedStatements({
  * ordering is the whole trick: ClickHouse pools its PostgreSQL connections, and
  * a connection opened before the setting was changed keeps the old value, so
  * enabling it later measures nothing until the pool is cycled.
+ *
+ * Deliberately NOT `.withReuse()`, unlike the ClickHouse container beside it.
+ * Reuse hands every caller the same container, and this setup drops and
+ * recreates a fixed set of relations in a fixed schema — so with
+ * `VITEST_INTEGRATION_PARALLEL=1` (CI, `maxWorkers: 2`) two suites interleave
+ * their drop/create and the second `CREATE TYPE "ExperimentType"` loses to the
+ * first with `42710: type already exists`. The ClickHouse half is safe because
+ * each suite gets its own governed database; the PostgreSQL half has no such
+ * per-suite name, so isolation comes from the container. A private container
+ * per suite costs a few seconds and removes the race by construction.
  */
 export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> {
   const container = await new PostgreSqlContainer(TEST_POSTGRES_IMAGE)
@@ -1472,7 +1482,6 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
       "langwatch.test": "true",
       "langwatch.test.type": "integration",
     })
-    .withReuse()
     .withStartupTimeout(120_000)
     .start();
 
@@ -1598,7 +1607,7 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
       return Number(result.stdout.trim() || "0");
     },
     async stop() {
-      // Reusable container, deliberately left running.
+      await container.stop();
     },
   };
 }

@@ -211,22 +211,44 @@ function fanoutDiagnostics({
 
   for (const block of validation.blocks) {
     for (const pair of joinedPairs({ block, database, views })) {
-      for (const [multiplied, multiplier, matched] of [
-        [pair.left, pair.right, pair.rightColumns],
-        [pair.right, pair.left, pair.leftColumns],
-      ] as const) {
-        const unmatched = unmatchedGrainColumns(multiplier.view, matched);
-        if (unmatched.length === 0) continue;
-
-        const key = `${multiplied.datasetName}<-${multiplier.datasetName}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        diagnostics.push(
-          fanoutDiagnostic({ multiplied, multiplier, unmatched, block, pair }),
-        );
-      }
+      diagnostics.push(...fanoutForPair({ pair, block, seen }));
     }
+  }
+  return diagnostics;
+}
+
+/**
+ * The fan-out diagnostics one joined pair earns, in both directions.
+ *
+ * Both, because a join under-matched on either side multiplies the *other*
+ * side's rows, and which side a reader cares about is not knowable here. The
+ * `seen` set is shared across the whole query so the same dataset pairing is
+ * reported once however many blocks join it.
+ */
+function fanoutForPair({
+  pair,
+  block,
+  seen,
+}: {
+  pair: JoinedPair;
+  block: GovernedSqlQueryBlock;
+  seen: Set<string>;
+}): GovernedSqlDiagnostic[] {
+  const diagnostics: GovernedSqlDiagnostic[] = [];
+  for (const [multiplied, multiplier, matched] of [
+    [pair.left, pair.right, pair.rightColumns],
+    [pair.right, pair.left, pair.leftColumns],
+  ] as const) {
+    const unmatched = unmatchedGrainColumns(multiplier.view, matched);
+    if (unmatched.length === 0) continue;
+
+    const key = `${multiplied.datasetName}<-${multiplier.datasetName}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    diagnostics.push(
+      fanoutDiagnostic({ multiplied, multiplier, unmatched, block, pair }),
+    );
   }
   return diagnostics;
 }
@@ -362,37 +384,86 @@ function joinedPairs({
     const right = readJoinSide(edge.right);
 
     if (left.qualifier === undefined && right.qualifier === undefined) {
-      // `USING (col)` and a bare `ON a = a`: the same column on every side, so
-      // it is matched for every dataset the block reads.
-      if (left.column !== right.column) continue;
-      for (let index = 0; index < references.length; index += 1) {
-        for (let other = index + 1; other < references.length; other += 1) {
-          const pair = pairFor(index, other);
-          pair.leftColumns.add(left.column);
-          pair.rightColumns.add(right.column);
-        }
-      }
+      applyUnqualifiedEquality({
+        left,
+        right,
+        referenceCount: references.length,
+        pairFor,
+      });
       continue;
     }
 
-    const leftIndex =
-      left.qualifier === undefined
-        ? undefined
-        : byQualifier.get(left.qualifier);
-    const rightIndex =
-      right.qualifier === undefined
-        ? undefined
-        : byQualifier.get(right.qualifier);
-    if (leftIndex === undefined || rightIndex === undefined) continue;
-    if (leftIndex === rightIndex) continue;
-
-    const pair = pairFor(leftIndex, rightIndex);
-    const leftIsLow = leftIndex < rightIndex;
-    (leftIsLow ? pair.leftColumns : pair.rightColumns).add(left.column);
-    (leftIsLow ? pair.rightColumns : pair.leftColumns).add(right.column);
+    applyQualifiedEquality({ left, right, byQualifier, pairFor });
   }
 
   return [...pairs.values()];
+}
+
+/** One side of a join equality, resolved into its qualifier and column. */
+type JoinSide = ReturnType<typeof readJoinSide>;
+/** Looks up (creating on first use) the pair two reference indexes describe. */
+type PairLookup = (leftIndex: number, rightIndex: number) => JoinedPair;
+
+/**
+ * Records an equality neither side qualified — `USING (col)`, or a bare
+ * `ON a = a`.
+ *
+ * With no qualifier there is nothing to say which two datasets the equality
+ * belongs to, so it matches the column for *every* pair the block reads. A
+ * differing column on each side names nothing at all and is dropped.
+ */
+function applyUnqualifiedEquality({
+  left,
+  right,
+  referenceCount,
+  pairFor,
+}: {
+  left: JoinSide;
+  right: JoinSide;
+  referenceCount: number;
+  pairFor: PairLookup;
+}): void {
+  if (left.column !== right.column) return;
+  for (let index = 0; index < referenceCount; index += 1) {
+    for (let other = index + 1; other < referenceCount; other += 1) {
+      const pair = pairFor(index, other);
+      pair.leftColumns.add(left.column);
+      pair.rightColumns.add(right.column);
+    }
+  }
+}
+
+/**
+ * Records an equality that named at least one side's table.
+ *
+ * A qualifier the block never introduced, or both sides resolving to the same
+ * reference, matches no pair of datasets and is dropped — a self-equality is
+ * not a join key.
+ */
+function applyQualifiedEquality({
+  left,
+  right,
+  byQualifier,
+  pairFor,
+}: {
+  left: JoinSide;
+  right: JoinSide;
+  byQualifier: ReadonlyMap<string, number>;
+  pairFor: PairLookup;
+}): void {
+  const leftIndex =
+    left.qualifier === undefined ? undefined : byQualifier.get(left.qualifier);
+  const rightIndex =
+    right.qualifier === undefined
+      ? undefined
+      : byQualifier.get(right.qualifier);
+  if (leftIndex === undefined || rightIndex === undefined) return;
+  if (leftIndex === rightIndex) return;
+
+  const pair = pairFor(leftIndex, rightIndex);
+  const leftIsLow = leftIndex < rightIndex;
+  (leftIsLow ? pair.leftColumns : pair.rightColumns).add(left.column);
+  (leftIsLow ? pair.rightColumns : pair.leftColumns).add(right.column);
 }
 
 /** One side of a join equality, split into the qualifier and the column. */

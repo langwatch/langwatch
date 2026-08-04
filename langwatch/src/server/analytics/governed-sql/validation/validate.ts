@@ -815,31 +815,83 @@ function collectJoinEdges({
   node: SqlAstNode;
   block: BlockAccumulator;
 }): void {
-  if (Array.isArray(node.using)) {
-    // `USING (col)` matches the same name on both sides, which is exactly the
-    // pair an `ON` would have spelled out.
-    for (const element of node.using) {
-      const name = joinSideName(element);
-      if (name !== null) block.joins.push({ left: name, right: name });
-    }
-  }
+  collectUsingEdges({ using: node.using, block });
+  collectOnEdges({ on: node.on, block });
+}
 
-  const pending: unknown[] = [node.on];
+/**
+ * Records the pairs a `USING (col)` clause implies.
+ *
+ * `USING` matches the same name on both sides, which is exactly the pair an
+ * `ON` would have spelled out.
+ */
+function collectUsingEdges({
+  using,
+  block,
+}: {
+  using: unknown;
+  block: BlockAccumulator;
+}): void {
+  if (!Array.isArray(using)) return;
+  for (const element of using) {
+    const name = joinSideName(element);
+    if (name !== null) block.joins.push({ left: name, right: name });
+  }
+}
+
+/**
+ * Records the equality pairs reachable from an `ON` condition through `AND`.
+ *
+ * Bounded by {@link MAX_JOIN_KEY_SCAN_NODES}: the condition is caller-written,
+ * so the descent needs a ceiling that does not depend on it being reasonable.
+ */
+function collectOnEdges({
+  on,
+  block,
+}: {
+  on: unknown;
+  block: BlockAccumulator;
+}): void {
+  const pending: unknown[] = [on];
   let visited = 0;
   while (pending.length > 0 && visited < MAX_JOIN_KEY_SCAN_NODES) {
     visited += 1;
     const current = pending.pop();
-    if (!isNode(current) || current.type !== "Function") continue;
-    if (!Array.isArray(current.arguments)) continue;
-    if (current.name === "and") {
-      pending.push(...current.arguments);
+
+    const conjuncts = conjunctArguments(current);
+    if (conjuncts !== null) {
+      pending.push(...conjuncts);
       continue;
     }
-    if (current.name !== "equals" || current.arguments.length !== 2) continue;
-    const left = joinSideName(current.arguments[0]);
-    const right = joinSideName(current.arguments[1]);
-    if (left !== null && right !== null) block.joins.push({ left, right });
+
+    const edge = readEqualityEdge(current);
+    if (edge !== null) block.joins.push(edge);
   }
+}
+
+/** The operands of an `AND`, or `null` for any other node. */
+function conjunctArguments(node: unknown): unknown[] | null {
+  if (!isNode(node) || node.type !== "Function") return null;
+  if (node.name !== "and" || !Array.isArray(node.arguments)) return null;
+  return node.arguments;
+}
+
+/**
+ * The join edge an `a = b` node names, or `null` for anything else.
+ *
+ * Both sides have to resolve to a name: an equality against an expression is
+ * not a key two datasets line up on, and recording half of one would claim a
+ * match that was never written.
+ */
+function readEqualityEdge(
+  node: unknown,
+): { left: string; right: string } | null {
+  if (!isNode(node) || node.type !== "Function") return null;
+  if (node.name !== "equals" || !Array.isArray(node.arguments)) return null;
+  if (node.arguments.length !== 2) return null;
+  const left = joinSideName(node.arguments[0]);
+  const right = joinSideName(node.arguments[1]);
+  return left !== null && right !== null ? { left, right } : null;
 }
 
 /** Records the join's key pairs, then lets the walk validate the condition itself. */

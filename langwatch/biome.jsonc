@@ -361,6 +361,40 @@
 					}
 				}
 			}
+		},
+		{
+			// The governed-SQL proof suites (#6480). Both rules are off for
+			// these files only, and for the reason the repo-wide test-file
+			// block already names rather than a new one.
+			//
+			// noMisplacedAssertion: this suite's assertions deliberately live
+			// in shared helpers, because every zero-row claim is paired with an
+			// admin-side control proving the rows it failed to return exist.
+			// That pairing is the thing that keeps the proof non-vacuous, and
+			// it only stays consistent across four suites by being written
+			// once. Inlining the helpers to satisfy the rule would make the
+			// proof weaker, not the code clearer — exactly the "custom
+			// assertion helpers" case the repo-wide block flags as warn.
+			//
+			// noExcessiveCognitiveComplexity: these are table-driven bodies —
+			// a list of governed datasets, a loop, and a branch per column
+			// gate. The score counts entries in the table, not tangle, and the
+			// production findings this PR raised were refactored rather than
+			// silenced (see diagnostics.ts and validation/validate.ts).
+			"includes": [
+				"src/server/analytics/governed-sql/**/__tests__/**",
+				"src/app/api/analytics-sql/__tests__/**"
+			],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off"
+					},
+					"suspicious": {
+						"noMisplacedAssertion": "off"
+					}
+				}
+			}
 		}
 	],
 	"assist": {
