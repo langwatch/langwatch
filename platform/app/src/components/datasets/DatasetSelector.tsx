@@ -17,6 +17,54 @@ import type {
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
 
+/**
+ * What the picker has to show. An empty dropdown renders identically whether
+ * the list is still coming, genuinely empty, or failed to arrive, so the three
+ * are kept apart here rather than collapsing into "no items": a slow project
+ * reads as having no datasets, and a failed request reads as the same, which
+ * is the one thing we know is false.
+ */
+type PickerState = "loading" | "unavailable" | "empty" | "ready";
+
+const pickerStateOf = ({
+  datasets,
+  isLoading,
+  isError,
+}: {
+  datasets: Dataset[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}): PickerState => {
+  if (isLoading) return "loading";
+  if (isError || datasets === undefined) return "unavailable";
+  if (datasets.length === 0) return "empty";
+  return "ready";
+};
+
+const PLACEHOLDER: Record<Exclude<PickerState, "loading">, string> = {
+  unavailable: "Could not load datasets",
+  empty: "No datasets yet",
+  ready: "Select Dataset",
+};
+
+function LoadingDatasets() {
+  return (
+    <HStack
+      height="40px"
+      paddingX={3}
+      gap={2}
+      borderWidth="1px"
+      borderRadius="md"
+      color="fg.muted"
+      role="status"
+      aria-label="Loading datasets"
+    >
+      <Spinner size="xs" />
+      <Text textStyle="sm">Loading datasets...</Text>
+    </HStack>
+  );
+}
+
 interface DatasetSelectorProps<T extends { datasetId: string }> {
   datasets: Dataset[] | undefined;
   localStorageDatasetId: string;
@@ -37,6 +85,8 @@ export function DatasetSelector<T extends { datasetId: string }>({
   isLoading = false,
   isError = false,
 }: DatasetSelectorProps<T>) {
+  const state = pickerStateOf({ datasets, isLoading, isError });
+
   const datasetCollection = createListCollection({
     items:
       datasets?.map((dataset) => ({
@@ -53,41 +103,19 @@ export function DatasetSelector<T extends { datasetId: string }>({
     setSelectedValue(localStorageDatasetId ? [localStorageDatasetId] : []);
   }, [localStorageDatasetId]);
 
-  // An empty dropdown looks exactly like a project with no datasets, so while
-  // the list is in flight the trigger says so outright rather than inviting a
-  // click that would open nothing. A failed request leaves no datasets either,
-  // and telling someone they have none when we simply could not ask is worse
-  // than saying nothing worked — so only a list that actually arrived empty
-  // counts as empty.
-  const hasLoaded = !isLoading && !isError && datasets !== undefined;
-  const isEmpty = hasLoaded && datasetCollection.items.length === 0;
-  const isUnavailable = isError || (!isLoading && datasets === undefined);
-
   return (
     <HorizontalFormControl
       label="Dataset"
       helper="Add to an existing dataset or create a new one"
       invalid={!!errors.datasetId}
     >
-      {isLoading ? (
-        <HStack
-          height="40px"
-          paddingX={3}
-          gap={2}
-          borderWidth="1px"
-          borderRadius="md"
-          color="fg.muted"
-          role="status"
-          aria-label="Loading datasets"
-        >
-          <Spinner size="xs" />
-          <Text textStyle="sm">Loading datasets...</Text>
-        </HStack>
+      {state === "loading" ? (
+        <LoadingDatasets />
       ) : (
         <Select.Root
           collection={datasetCollection}
           value={selectedValue}
-          disabled={isEmpty || isUnavailable}
+          disabled={state !== "ready"}
           onValueChange={(e) => {
             const value = e.value[0] ?? "";
             setSelectedValue(e.value);
@@ -95,15 +123,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
           }}
         >
           <Select.Trigger>
-            <Select.ValueText
-              placeholder={
-                isUnavailable
-                  ? "Could not load datasets"
-                  : isEmpty
-                    ? "No datasets yet"
-                    : "Select Dataset"
-              }
-            />
+            <Select.ValueText placeholder={PLACEHOLDER[state]} />
           </Select.Trigger>
           <Select.Content portalled={false}>
             {datasetCollection.items.map((dataset) => (
