@@ -1,6 +1,7 @@
 /**
  * The parts of `Idempotency-Key` handling that need no storage: reading the
- * header, and deciding whether two bodies are the same body.
+ * header, deciding whether two bodies are the same body, and deciding whether
+ * a receipt can still be read back at all.
  *
  * Everything that turns on a stored receipt (replay, the pending window,
  * expiry, fingerprint conflict) is asserted against real Postgres in
@@ -8,8 +9,13 @@
  * because the unique index is what implements the serialisation and a fake of
  * it would be asserting the fake.
  */
+
+import crypto from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
+import type { IdempotencyReceipt } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+
+import { encrypt } from "~/utils/encryption";
 
 import {
   fingerprintRequestBody,
@@ -18,6 +24,8 @@ import {
   PENDING_TAKEOVER_MS,
   RECEIPT_TTL_MS,
   readIdempotencyKey,
+  readStoredBody,
+  serializeResponseBody,
   withIdempotency,
 } from "../idempotency";
 
@@ -160,6 +168,62 @@ describe("withIdempotency without a key", () => {
         handler: () => Promise.reject(boom),
       }),
     ).rejects.toBe(boom);
+  });
+});
+
+describe("readStoredBody", () => {
+  const receiptWith = (responseBody: string | null): IdempotencyReceipt =>
+    ({
+      id: "rcpt-1",
+      scopeId: "proj-1",
+      key: "order-4711",
+      requestFingerprint: "f".repeat(64),
+      responseStatus: 201,
+      responseBody,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+    }) as IdempotencyReceipt;
+
+  /**
+   * A well-formed AES-256-GCM ciphertext in the shared format, under a key
+   * that is not this deployment's. Exactly what CREDENTIALS_SECRET having been
+   * rotated inside a receipt's 24 hours leaves behind: authentic bytes that
+   * this process can no longer read.
+   */
+  function encryptUnderAnotherKey(text: string): string {
+    const key = crypto.randomBytes(32);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    const body = cipher.update(text, "utf8", "hex") + cipher.final("hex");
+    return `${iv.toString("hex")}:${body}:${cipher.getAuthTag().toString("hex")}`;
+  }
+
+  it("reads back exactly what was stored", () => {
+    const bytes = serializeResponseBody({ budget: { id: "bg-1", limit: 5 } });
+    expect(readStoredBody(receiptWith(encrypt(bytes)))).toBe(bytes);
+  });
+
+  it("drops a receipt encrypted under a different key", () => {
+    const foreign = encryptUnderAnotherKey('{"budget":{"id":"bg-1"}}');
+    // Null rather than a throw: the caller treats it like an expired receipt
+    // and runs the create fresh, which is better than refusing a create the
+    // caller can never otherwise make.
+    expect(readStoredBody(receiptWith(foreign))).toBeNull();
+  });
+
+  it("drops a receipt whose stored body is not the expected format", () => {
+    expect(readStoredBody(receiptWith('{"budget":{"id":"bg-1"}}'))).toBeNull();
+  });
+
+  it("reads a missing body as nothing to replay", () => {
+    expect(readStoredBody(receiptWith(null))).toBeNull();
+  });
+
+  it("does not store the response as readable text", () => {
+    const bytes = serializeResponseBody({ secret: "vk-lw-supersecret" });
+    const stored = encrypt(bytes);
+    expect(stored).not.toContain("vk-lw-supersecret");
+    expect(stored).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
   });
 });
 

@@ -22,11 +22,12 @@
  *
  * Spec: specs/ai-gateway/public-rest-api.feature
  */
+
+import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
-  Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -1951,6 +1952,17 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         where: { scopeId_key: { scopeId: PROJECT_ID, key } },
       });
 
+    /** Re-encrypt under a key this deployment does not hold. */
+    function encryptUnderAnotherKey(text: string): string {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+      const body = cipher.update(text, "utf8", "hex") + cipher.final("hex");
+      return `${iv.toString("hex")}:${body}:${cipher
+        .getAuthTag()
+        .toString("hex")}`;
+    }
+
     /** @scenario A create sent without an idempotency key is unchanged */
     it("writes no receipt when the header is absent", async () => {
       const body = budgetBody("keyless");
@@ -1980,15 +1992,51 @@ describe("gateway platform REST API (real PG + real CH)", () => {
 
       const receipt = await receiptFor(key);
       expect(receipt?.responseStatus).toBe(201);
+      // At rest it is ciphertext, not the document. Asserted on the stored
+      // column rather than through the helper, because the point is what an
+      // operator reading this table would see.
+      expect(receipt?.responseBody).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+      expect(receipt?.responseBody).not.toContain(body.name);
 
       const second = await post("/api/gateway/v1/budgets", body, keyed(key));
       expect(second.status).toBe(201);
       expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
-      // Byte-for-byte, not merely equivalent: the receipt column is `json`
-      // rather than `jsonb` precisely so key order survives the round trip.
+      // Byte-for-byte, not merely equivalent: the receipt stores the response's
+      // serialised bytes, so a replay writes them through rather than
+      // re-deriving them from a parsed document.
       expect(await second.text()).toBe(firstBody);
+      expect(second.headers.get("Content-Type")).toBe(
+        first.headers.get("Content-Type"),
+      );
 
       expect(await budgetsNamed(body.name)).toHaveLength(1);
+    });
+
+    /** @scenario A receipt that no longer decrypts lets the key be used again */
+    it("treats a receipt written under a rotated secret as a fresh key", async () => {
+      const key = `idem-rotated-key-${suffix}`;
+      const body = budgetBody("rotated");
+
+      expect(
+        (await post("/api/gateway/v1/budgets", body, keyed(key))).status,
+      ).toBe(201);
+
+      // What rotating CREDENTIALS_SECRET inside the receipt's 24 hours leaves
+      // behind: an authentic row this process can no longer read.
+      const stored = await receiptFor(key);
+      await prisma.idempotencyReceipt.update({
+        where: { id: stored!.id },
+        data: { responseBody: encryptUnderAnotherKey(stored!.responseBody!) },
+      });
+
+      const again = await post("/api/gateway/v1/budgets", body, keyed(key));
+      expect(again.status).toBe(201);
+      expect(again.headers.get("X-Idempotent-Replay")).toBeNull();
+      expect(await budgetsNamed(body.name)).toHaveLength(2);
+
+      // Superseded rather than left to keep failing for the rest of its life.
+      const replacement = await receiptFor(key);
+      expect(replacement?.id).not.toBe(stored!.id);
     });
 
     /** @scenario Reusing a key with a different body is refused */
@@ -2031,7 +2079,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         where: { id: claimed!.id },
         data: {
           responseStatus: null,
-          responseBody: Prisma.DbNull,
+          responseBody: null,
           createdAt: new Date(),
         },
       });
@@ -2060,7 +2108,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         where: { id: claimed!.id },
         data: {
           responseStatus: null,
-          responseBody: Prisma.DbNull,
+          responseBody: null,
           createdAt: new Date(Date.now() - 61_000),
         },
       });

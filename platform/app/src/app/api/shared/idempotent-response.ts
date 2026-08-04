@@ -60,11 +60,17 @@ export function idempotentJson<T>(
   c: Context,
   outcome: IdempotentOutcome<T>,
 ): Response {
-  if (outcome.replayed) {
-    c.header(IDEMPOTENT_REPLAY_HEADER, "true");
+  if (!outcome.replayed) {
+    return c.json(
+      outcome.body as Record<string, unknown>,
+      outcome.status as ContentfulStatusCode,
+    );
   }
-  return c.json(
-    outcome.body as Record<string, unknown>,
-    outcome.status as ContentfulStatusCode,
-  );
+
+  c.header(IDEMPOTENT_REPLAY_HEADER, "true");
+  // The stored bytes are written through rather than parsed and re-serialised,
+  // so a replay cannot drift from the response it is standing in for. The
+  // content type is set by hand for the same reason `c.json` is not used.
+  c.header("Content-Type", "application/json");
+  return c.body(outcome.serializedBody, outcome.status as ContentfulStatusCode);
 }

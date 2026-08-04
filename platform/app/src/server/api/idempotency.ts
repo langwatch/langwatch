@@ -44,6 +44,20 @@
  * and superseded. Without that, a process that died between the insert and the
  * update would hold the key locked for the full 24 hour lifetime, and the
  * caller could never complete the create it was trying to make.
+ *
+ * ── THE STORED BODY IS ENCRYPTED ───────────────────────────────────────────
+ *
+ * Two of the four creates answer with a secret that is kept nowhere else in
+ * readable form: the virtual key's secret and the webhook endpoint's signing
+ * secret are both shown once and stored only as a hash. Replaying those
+ * responses is the whole point of a key on those routes, and it means the
+ * secret transits the receipt. So the body is held as AES-256-GCM ciphertext
+ * under `CREDENTIALS_SECRET`, the same treatment the automations webhook gives
+ * its custom headers, and expiry bounds how long it exists at all.
+ *
+ * The body is stored as the exact bytes the first response carried, which is
+ * also what makes a replay byte-identical: it is a string round trip, so
+ * nothing in storage is in a position to reorder or renormalise it.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -57,6 +71,7 @@ import {
   sha256,
   stableStringify,
 } from "~/server/event-sourcing/pipelines/metric-processing/canonical/serialization";
+import { decrypt, encrypt } from "~/utils/encryption";
 
 import { RequestValidationError } from "./validation";
 
@@ -171,10 +186,24 @@ export interface IdempotentHandlerResult<T> {
   body: T;
 }
 
-export interface IdempotentOutcome<T> extends IdempotentHandlerResult<T> {
-  /** True when the body came from a receipt and the handler did not run. */
-  replayed: boolean;
+/** The handler ran: its own result, still to be serialised by the route. */
+export interface IdempotentExecuted<T> extends IdempotentHandlerResult<T> {
+  replayed: false;
 }
+
+/**
+ * The handler did not run: the exact bytes the first execution answered with.
+ *
+ * Carried as a string rather than a parsed object so the replay cannot differ
+ * from the original by so much as a key order. See {@link withIdempotency}.
+ */
+export interface IdempotentReplayed {
+  replayed: true;
+  status: number;
+  serializedBody: string;
+}
+
+export type IdempotentOutcome<T> = IdempotentExecuted<T> | IdempotentReplayed;
 
 export interface WithIdempotencyParams<T> {
   prisma: PrismaClient;
@@ -212,7 +241,11 @@ export async function withIdempotency<T>({
   });
 
   if (claim.kind === "replay") {
-    return { status: claim.status, body: claim.body as T, replayed: true };
+    return {
+      replayed: true,
+      status: claim.status,
+      serializedBody: claim.serializedBody,
+    };
   }
 
   let result: IdempotentHandlerResult<T>;
@@ -228,7 +261,9 @@ export async function withIdempotency<T>({
       where: { id: claim.receiptId },
       data: {
         responseStatus: result.status,
-        responseBody: result.body as Prisma.InputJsonValue,
+        // The bytes the route is about to write, not the object behind them,
+        // so a replay reproduces this response rather than re-deriving it.
+        responseBody: encrypt(serializeResponseBody(result.body)),
       },
     });
   } else {
@@ -238,9 +273,20 @@ export async function withIdempotency<T>({
   return { ...result, replayed: false };
 }
 
+/**
+ * The exact bytes a route answers a body with.
+ *
+ * Must stay in step with how the route writes a fresh response, because the
+ * stored copy is what a replay serves in place of re-running the handler.
+ * Both are `JSON.stringify`, which is what Hono's `c.json` does.
+ */
+export function serializeResponseBody(body: unknown): string {
+  return JSON.stringify(body);
+}
+
 type Claim =
   | { kind: "claimed"; receiptId: string }
-  | { kind: "replay"; status: number; body: unknown };
+  | { kind: "replay"; status: number; serializedBody: string };
 
 /**
  * Take the key, or read what the row already there says to do.
@@ -366,11 +412,43 @@ async function readExistingReceipt({
     return { kind: "retry" };
   }
 
+  const serializedBody = readStoredBody(existing);
+  // Nothing readable to replay, so the receipt cannot answer for the key. Same
+  // handling as expiry: drop it and let the request through as a first use,
+  // which is strictly better than refusing a create the caller can never make.
+  if (serializedBody === null) {
+    await releaseClaim(prisma, existing.id);
+    return { kind: "retry" };
+  }
+
   return {
     kind: "replay",
     status: existing.responseStatus,
-    body: existing.responseBody,
+    serializedBody,
   };
+}
+
+/**
+ * The stored response bytes, or null when this row cannot be read back.
+ *
+ * The realistic cause is `CREDENTIALS_SECRET` having been rotated inside the
+ * receipt's 24 hours, which leaves rows that are authentic but no longer
+ * decryptable. Dropping them matches how the model provider repository treats
+ * customKeys it can no longer read: an unreadable secret is treated as absent
+ * rather than as a failure the caller has to understand.
+ */
+export function readStoredBody(receipt: IdempotencyReceipt): string | null {
+  if (receipt.responseBody === null) return null;
+
+  try {
+    return decrypt(receipt.responseBody);
+  } catch (error) {
+    logger.warn(
+      { receiptId: receipt.id, error },
+      "Dropping an unreadable idempotency receipt, likely CREDENTIALS_SECRET rotated since it was written",
+    );
+    return null;
+  }
 }
 
 /**

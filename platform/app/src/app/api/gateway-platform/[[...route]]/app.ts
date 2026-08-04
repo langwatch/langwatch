@@ -1000,9 +1000,10 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           );
           // The secret is minted once and stored only as a hash, so a caller
           // that loses this response has no second way to read it. That is the
-          // whole reason this route takes an idempotency key, and the reason a
-          // stored receipt holds the secret in clear for its 24 hours: a replay
-          // that withheld it would hand back a key nobody can ever use.
+          // whole reason this route takes an idempotency key, and the reason
+          // the receipt holding this response is encrypted at rest: a replay
+          // that withheld the secret would hand back a key nobody can ever
+          // use, so the secret has to transit the receipt.
           return {
             status: 201,
             body: { virtual_key: toVkDto(virtualKey), secret },

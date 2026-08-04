@@ -19,12 +19,22 @@
 -- the hazard idempotency exists to prevent is double creation, which only
 -- happens on success.
 --
--- `responseBody` is `json`, not the `jsonb` used by every other JSON column
--- here. jsonb normalises key order, which would make a replay answer the same
--- document with different bytes than the original request received; `json`
--- stores the text as written, so a replay is byte-for-byte identical.
+-- `responseBody` is the original response's exact bytes, AES-256-GCM encrypted
+-- under CREDENTIALS_SECRET, the same treatment the automations webhook gives
+-- its custom headers. It is encrypted because two of the four creates answer
+-- with a secret that exists in readable form nowhere else: the virtual key's
+-- secret and the webhook endpoint's signing secret are both shown once and
+-- otherwise stored only as a hash. Replaying those responses is precisely why
+-- a key is worth sending on those routes, so the secret has to transit this
+-- row, and the row should not be the one place it sits in the clear. Expiry
+-- bounds how long it exists at all.
 --
--- Rows are dropped lazily, when an expired key is next presented. The
+-- Held as text rather than as a JSON document for a second reason: a string
+-- round trip is what makes a replay byte-identical, since nothing in storage
+-- is then in a position to reorder keys or renormalise the document.
+--
+-- Rows are dropped lazily, when an expired key is next presented, as are rows
+-- that no longer decrypt because the secret was rotated under them. The
 -- `expiresAt` index exists so an operator can prune in bulk as well, because a
 -- key that is never retried is never revisited.
 
@@ -35,7 +45,7 @@ CREATE TABLE "IdempotencyReceipt" (
     "key" TEXT NOT NULL,
     "requestFingerprint" TEXT NOT NULL,
     "responseStatus" INTEGER,
-    "responseBody" JSON,
+    "responseBody" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "expiresAt" TIMESTAMP(3) NOT NULL,
 

@@ -3654,13 +3654,16 @@ model BugReport {
 // runs and filled in once it succeeds. Only successful outcomes are ever
 // stored, so a row with a status is always a 2xx worth replaying.
 //
-// `responseBody` is `json` rather than the `jsonb` used everywhere else in
-// this schema, and that is the point: jsonb normalises key order, so a replay
-// read back through it would answer the same document with different bytes
-// than the original caller received. `json` keeps the text as written, which
-// is what makes a replay byte-for-byte identical.
+// `responseBody` holds the exact bytes of the original response, AES-256-GCM
+// encrypted under CREDENTIALS_SECRET. Encrypted because two of the four creates
+// answer with a show-once secret that is kept nowhere else in readable form, so
+// replaying them means the secret transits this row. Stored as the serialised
+// bytes rather than as a document because that is what makes a replay
+// byte-identical: a string round trip leaves nothing in a position to reorder
+// or renormalise it.
 //
-// Expired rows are dropped lazily, when their key is next presented. The
+// Expired rows are dropped lazily, when their key is next presented, as are
+// rows that no longer decrypt because the secret was rotated under them. The
 // `expiresAt` index is there so an operator can also prune in bulk, since keys
 // that are never retried are never revisited.
 model IdempotencyReceipt {
@@ -3669,7 +3672,7 @@ model IdempotencyReceipt {
   key                String
   requestFingerprint String
   responseStatus     Int?
-  responseBody       Json?    @db.Json
+  responseBody       String?  @db.Text
   createdAt          DateTime @default(now())
   expiresAt          DateTime
 

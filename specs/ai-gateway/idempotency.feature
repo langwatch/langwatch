@@ -131,3 +131,15 @@ Feature: Idempotency-Key on the control-plane creates
     Then the response status is 201
     And the response carries no X-Idempotent-Replay header
     And the lapsed receipt was replaced rather than left behind
+
+  @integration @rest
+  Scenario: A receipt that no longer decrypts lets the key be used again
+    Given a receipt for Idempotency-Key "k" written before CREDENTIALS_SECRET was rotated
+    When I send the same request again with Idempotency-Key "k"
+    Then the response status is 201
+    And the response carries no X-Idempotent-Replay header
+    And the unreadable receipt was replaced rather than left behind
+    # Stored bodies are encrypted, so a rotation inside the 24 hours leaves
+    # rows that are authentic and no longer readable. Handled exactly like
+    # expiry, because refusing would leave the caller with a create it can
+    # never make and a key it cannot reuse.
