@@ -65,7 +65,7 @@ describe("DatasetSelector", () => {
       it("shows that it is loading instead of an empty dropdown", () => {
         renderSelector({ datasets: undefined, isLoading: true });
 
-        expect(screen.getByLabelText("Loading datasets")).toBeInTheDocument();
+        expect(screen.getByText("Loading datasets...")).toBeInTheDocument();
         expect(screen.queryByText("Select Dataset")).not.toBeInTheDocument();
         expect(screen.queryByText("No datasets yet")).not.toBeInTheDocument();
       });
@@ -79,7 +79,7 @@ describe("DatasetSelector", () => {
         renderSelector({ datasets: [], isLoading: false });
 
         expect(screen.getByText("No datasets yet")).toBeInTheDocument();
-        expect(screen.queryByLabelText("Loading datasets")).toBeNull();
+        expect(screen.queryByText("Loading datasets...")).toBeNull();
         expect(
           screen.getByRole("button", { name: "+ Create New" }),
         ).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe("DatasetSelector", () => {
           isLoading: false,
         });
 
-        expect(screen.queryByLabelText("Loading datasets")).toBeNull();
+        expect(screen.queryByText("Loading datasets...")).toBeNull();
         expect(screen.queryByText("No datasets yet")).not.toBeInTheDocument();
         expect(screen.getByText("Select Dataset")).toBeInTheDocument();
         expect(screen.getByRole("combobox")).not.toBeDisabled();

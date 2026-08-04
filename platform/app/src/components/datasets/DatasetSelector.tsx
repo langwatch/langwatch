@@ -2,7 +2,9 @@ import {
   Button,
   createListCollection,
   Field,
-  Skeleton,
+  HStack,
+  Spinner,
+  Text,
 } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
 import { type ReactNode, useEffect, useState } from "react";
@@ -50,8 +52,8 @@ export function DatasetSelector<T extends { datasetId: string }>({
   }, [localStorageDatasetId]);
 
   // An empty dropdown looks exactly like a project with no datasets, so while
-  // the list is in flight the trigger is replaced by a skeleton rather than
-  // inviting a click that would open nothing.
+  // the list is in flight the trigger says so outright rather than inviting a
+  // click that would open nothing.
   const isEmpty = !isLoading && datasetCollection.items.length === 0;
 
   return (
@@ -61,11 +63,18 @@ export function DatasetSelector<T extends { datasetId: string }>({
       invalid={!!errors.datasetId}
     >
       {isLoading ? (
-        <Skeleton
+        <HStack
           height="40px"
+          paddingX={3}
+          gap={2}
+          borderWidth="1px"
           borderRadius="md"
-          aria-label="Loading datasets"
-        />
+          color="fg.muted"
+          aria-live="polite"
+        >
+          <Spinner size="xs" />
+          <Text textStyle="sm">Loading datasets...</Text>
+        </HStack>
       ) : (
         <Select.Root
           collection={datasetCollection}
