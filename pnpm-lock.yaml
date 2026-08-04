@@ -1075,6 +1075,9 @@ importers:
       '@ai-sdk/openai':
         specifier: '>=2.0.0 <5.0.0'
         version: 3.0.79(zod@4.4.3)
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
       '@opentelemetry/api-logs':
         specifier: 0.205.0
         version: 0.205.0
@@ -1105,6 +1108,9 @@ importers:
       '@opentelemetry/sdk-metrics':
         specifier: ^2.0.1
         version: 2.8.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-node':
+        specifier: ^0.219.0
+        version: 0.219.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.0.1
         version: 2.8.0(@opentelemetry/api@1.9.1)
@@ -1160,12 +1166,6 @@ importers:
       '@langwatch/langy':
         specifier: workspace:*
         version: link:../../packages/langy
-      '@opentelemetry/api':
-        specifier: ^1.9.0
-        version: 1.9.1
-      '@opentelemetry/sdk-node':
-        specifier: 0.219.0
-        version: 0.219.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-node':
         specifier: ^2.0.1
         version: 2.8.0(@opentelemetry/api@1.9.1)
