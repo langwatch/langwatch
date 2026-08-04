@@ -51,6 +51,39 @@ const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
  */
 const SEEKS_PER_QUERY = 64;
 
+/**
+ * Why the `LIMIT 1` seeks below order by `DedupVersion DESC` rather than
+ * reading FINAL.
+ *
+ * `metric_data_points` is `ReplacingMergeTree(DedupVersion)` whose dedup key is
+ * exactly its sort key `(TenantId, SeriesId, TimeUnixMs, TimeUnixNano,
+ * PointId)`, and it declares no `is_deleted` column. So for a seek that keeps
+ * one row per key, "the row FINAL would have kept" is just "the highest
+ * DedupVersion among rows sharing that key", which the sort key plus this
+ * tiebreak already picks. The two are equivalent here; they would not be on a
+ * table whose dedup key was narrower than its sort key, or one that could
+ * delete rows outright.
+ *
+ * The difference is what ClickHouse reads to get there. `ORDER BY ... LIMIT n`
+ * qualifies for the LazilyRead optimisation, which resolves the ordering from
+ * sort-key columns and only then fetches the remaining columns, for the rows
+ * that survive the LIMIT. FINAL disqualifies it, because the replacing merge
+ * has to see whole rows: every row in the seek range is materialised across
+ * every selected column to return one of them. EXPLAIN shows a `LazilyRead`
+ * step that disappears the moment FINAL is added to an otherwise identical
+ * seek.
+ *
+ * Narrowing the projection (SEEK_SELECT, and dropping the payload column from
+ * AUTHORITATIVE_SELECT) cut the per-row cost of that, but the seeks still pay
+ * it per row scanned rather than per row returned, and folding many seeks into
+ * one statement multiplies it within a single query's memory budget.
+ *
+ * Reads that return every row in their range keep FINAL: they have nothing to
+ * defer, so it costs them nothing and stays the clearer way to say "latest
+ * version".
+ */
+const LATEST_VERSION_TIEBREAK = "DedupVersion DESC";
+
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -441,16 +474,17 @@ export class MetricDataPointClickHouseRepository
         params[`time${index}`] = new Date(point.timeUnixMs);
         params[`nano${index}`] = point.timeUnixNano;
         params[`point${index}`] = point.pointId;
-        // SEEK_SELECT, never the full row: each branch runs FINAL over its
-        // series, and materialising the megabyte-scale payload column across
+        // SEEK_SELECT, never the full row: the seek only exists to order
+        // points and locate buckets, and materialising anything wider across
         // SEEKS_PER_QUERY branches is what pushed one query past the server's
         // per-query memory cap (MEMORY_LIMIT_EXCEEDED in ReplacingSorted).
-        // The seek only exists to order points and locate buckets.
+        // Reading without FINAL lets even these columns be fetched per row
+        // returned rather than per row scanned (LATEST_VERSION_TIEBREAK).
         return `(SELECT ${SEEK_SELECT}
-          FROM metric_data_points FINAL
+          FROM metric_data_points
           WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
             AND (metric_data_points.TimeUnixMs > {time${index}:DateTime64(3)} OR (metric_data_points.TimeUnixMs = {time${index}:DateTime64(3)} AND (TimeUnixNano > {nano${index}:UInt64} OR (TimeUnixNano = {nano${index}:UInt64} AND PointId > {point${index}:String}))))
-          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC LIMIT 1)`;
+          ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC, ${LATEST_VERSION_TIEBREAK} LIMIT 1)`;
       });
       const result = await client.query({
         query: selects.join("\n UNION ALL\n"),
@@ -515,14 +549,20 @@ export class MetricDataPointClickHouseRepository
         );
         // AUTHORITATIVE_SELECT: everything the fold reads, without the
         // payload column — the fold never touches it, and it is the column
-        // that made these FINAL reads memory-heavy.
+        // that made these reads memory-heavy.
+        //
+        // The predecessor seek returns one row out of a range that spans the
+        // retention window, so it reads without FINAL and lets the remaining
+        // columns be fetched for that row alone (LATEST_VERSION_TIEBREAK). The
+        // bucket range below returns everything it reads, so FINAL costs it
+        // nothing and stays.
         return [
           `(SELECT ${AUTHORITATIVE_SELECT}
-            FROM metric_data_points FINAL
+            FROM metric_data_points
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs < {from${index}:DateTime64(3)}
               AND metric_data_points.TimeUnixMs >= {cutoff${index}:DateTime64(3)}
-            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
+            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC, ${LATEST_VERSION_TIEBREAK} LIMIT 1)`,
           `(SELECT ${AUTHORITATIVE_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}

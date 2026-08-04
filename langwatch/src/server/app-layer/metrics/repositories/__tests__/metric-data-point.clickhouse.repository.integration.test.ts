@@ -365,3 +365,98 @@ describe("given a cumulative series long enough to span several rollup buckets",
     });
   });
 });
+
+describe("given a differencing predecessor stored as two acceptances", () => {
+  // The predecessor seek reads without FINAL and re-creates FINAL's choice with
+  // an ORDER BY tiebreak, so this pins the two to the same row. DedupVersion is
+  // MAX_UINT64 - acceptedAt, which makes the earlier acceptance the winner.
+  const supersededSeriesId = "9".repeat(64);
+
+  function supersedablePoint({
+    timeUnixMs,
+    value,
+    acceptedAt: acceptedAtOverride,
+  }: {
+    timeUnixMs: number;
+    value: number;
+    acceptedAt: number;
+  }): CanonicalMetricDataPoint {
+    return point({
+      tenantId,
+      organizationId,
+      seriesId: supersededSeriesId,
+      timeUnixMs,
+      metricKind: "sum",
+      aggregationTemporality: "cumulative",
+      isMonotonic: true,
+      valueDouble: value,
+      acceptedAt: acceptedAtOverride,
+    });
+  }
+
+  beforeAll(async () => {
+    // A background merge collapses the two versions, after which the seek
+    // returns the winner whatever it ordered by. That is precisely the state
+    // that cannot catch a regression, so merges stay off for this case.
+    await ch.exec({ query: "SYSTEM STOP MERGES metric_data_points" });
+
+    await repo.recomputeAffectedRollupsMany({
+      points: [
+        supersedablePoint({
+          timeUnixMs: bucket0 + 5_000,
+          value: 10,
+          acceptedAt,
+        }),
+      ],
+    });
+    // Same point, accepted later, so it loses and must never be differenced
+    // against.
+    await repo.recomputeAffectedRollupsMany({
+      points: [
+        supersedablePoint({
+          timeUnixMs: bucket0 + 5_000,
+          value: 999,
+          acceptedAt: acceptedAt + 60_000,
+        }),
+      ],
+    });
+    // Lands in the next bucket, so its delta is taken against whichever
+    // version of the bucket0 point the predecessor seek returns.
+    await repo.recomputeAffectedRollupsMany({
+      points: [
+        supersedablePoint({
+          timeUnixMs: bucket1 + 5_000,
+          value: 12,
+          acceptedAt,
+        }),
+      ],
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await ch.exec({ query: "SYSTEM START MERGES metric_data_points" });
+  });
+
+  it("differences the next bucket against the winning version", async () => {
+    const rollups = await readRollups(supersededSeriesId);
+
+    // 12 - 10 = 2. Had the seek returned the superseded 999, the delta would
+    // have gone negative and folded as a reset (sum 12, resetCount 1).
+    expect(rollups).toEqual([
+      {
+        bucketStartMs: bucket0,
+        sum: 10,
+        count: 1,
+        resetCount: 0,
+        sourcePointCount: 1,
+      },
+      {
+        bucketStartMs: bucket1,
+        sum: 2,
+        count: 1,
+        resetCount: 0,
+        sourcePointCount: 1,
+      },
+    ]);
+  });
+});
