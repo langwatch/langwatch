@@ -107,7 +107,7 @@ Feature: haven lifecycle usability
   # Bound by cmd/uplifecycle_test.go.
   @unit
   Scenario: A piped up streams in the foreground
-    When "haven up" runs with output piped (pnpm dev:haven | tee)
+    When "haven up" runs with output piped (make haven up | tee)
     Then it streams plainly in the foreground and Ctrl-C stops the stack
     And agent mode streams the same way even from a terminal
 

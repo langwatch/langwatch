@@ -11,8 +11,8 @@ Feature: Model provider step in product onboarding
   # through it at all.
   #
   # Tests:
-  #   langwatch/src/features/onboarding/hooks/__tests__/use-product-flow.unit.test.tsx
-  #   langwatch/src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
+  #   platform/app/src/features/onboarding/hooks/__tests__/use-product-flow.unit.test.tsx
+  #   platform/app/src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
 
   Background:
     Given I finished the welcome questions and reached the flavour selection

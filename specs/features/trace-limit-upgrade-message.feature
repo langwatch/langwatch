@@ -8,9 +8,9 @@ Feature: Usage limit 429 message includes upgrade instructions
   # The message must reflect the actual usage unit being counted.
   #
   # All 4 scenarios bound via @scenario JSDoc in two test files:
-  #   - langwatch/src/server/app-layer/usage/__tests__/limit-message.unit.test.ts
+  #   - platform/app/src/server/app-layer/usage/__tests__/limit-message.unit.test.ts
   #     (tests buildLimitMessage — the consolidated helper extracted from usage.service.ts)
-  #   - langwatch/src/server/license-enforcement/__tests__/limit-message.unit.test.ts
+  #   - platform/app/src/server/license-enforcement/__tests__/limit-message.unit.test.ts
   #     (tests buildMessagePrefix + buildUpgradeAction — the lower-level helpers)
 
   Scenario: Free-tier org on SaaS told to upgrade with correct unit

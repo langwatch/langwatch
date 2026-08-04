@@ -62,6 +62,7 @@ var notMetrics = map[string]string{
 	"gateway_budget_ledger_events":   "ClickHouse table",
 	"gateway_budget_scope_totals":    "ClickHouse rollup table",
 	"gateway_budget_scope_totals_mv": "ClickHouse materialized view",
+	"gateway_spend":                  "ClickHouse table (the billing spend ledger)",
 
 	// Structured log event names. gateway_draining is deliberately absent
 	// from this list: it is both a log event and a real gauge, so it has
@@ -73,6 +74,11 @@ var notMetrics = map[string]string{
 
 	// Log fields and JSON keys.
 	"gateway_request_id": "log field and response-header value",
+
+	// `error.code` values on the REST error envelope. They share the
+	// `gateway_` prefix with the metrics because they name the same
+	// subsystem, but they are values inside a JSON body, not series.
+	"gateway_scope_org_mismatch": "REST error code",
 }
 
 // plannedMetrics are names the docs explicitly describe as not yet

@@ -1,0 +1,19 @@
+id: no-empty-test-tsx
+message: >
+  An empty test body always passes and reports as coverage. If the case is not
+  written yet, mark it `it.todo("...")` so the runner counts it as outstanding
+  instead of green. If it was emptied to unblock something, delete it — git
+  remembers.
+severity: warning
+language: Tsx
+rule:
+  any:
+    - pattern: it($NAME, () => {})
+    - pattern: it($NAME, async () => {})
+    - pattern: test($NAME, () => {})
+    - pattern: test($NAME, async () => {})
+files:
+  - "platform/app/**/*.test.tsx"
+  - "platform/app/**/*.spec.tsx"
+  - "sdks/typescript/**/*.test.tsx"
+  - "packages/**/*.test.tsx"
