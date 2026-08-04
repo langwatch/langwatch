@@ -652,6 +652,20 @@ Feature: AI Gateway — Budgets
     And a second crossing inside the same anchored period is the same event
     And the first crossing after the anchored rollover is a new one
 
+  @integration
+  Scenario: Creating an anchored budget reports its true cycle on the wire
+    When I create a budget over REST with "cycle_anchor_at" set a few days in the past
+    Then the response echoes "cycle_anchor_at"
+    And "current_period_started_at" and "resets_at" describe the anchored period, not the calendar one
+    And reading the budget back agrees with what create returned
+    And a patch naming "cycle_anchor_at" leaves it untouched, because the anchor is immutable
+
+  @integration
+  Scenario: A cycle anchor is rejected on windows that do not cycle
+    When I create a budget over REST with window "manual" or "total" and "cycle_anchor_at" set
+    Then the request is rejected with 400 and code "gateway_budget_cycle_anchor_invalid"
+    But the same windows are accepted without one
+
   # ============================================================================
   # Dashboard and spend visibility
   # ============================================================================

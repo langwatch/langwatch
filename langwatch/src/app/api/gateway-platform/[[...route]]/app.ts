@@ -201,8 +201,22 @@ const budgetDtoSchema = z.object({
   external_id: z.string().nullable(),
   /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
   metadata: z.record(z.string(), z.string()),
-  current_period_started_at: z.string(),
-  resets_at: z.string(),
+  current_period_started_at: z
+    .string()
+    .describe(
+      "Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's.",
+    ),
+  resets_at: z
+    .string()
+    .describe(
+      "When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own.",
+    ),
+  cycle_anchor_at: z
+    .string()
+    .nullable()
+    .describe(
+      "The instant this budget's cycle is phased to, or null when the window is calendar aligned.",
+    ),
   last_reset_at: z.string().nullable(),
   archived_at: z.string().nullable(),
   created_at: z.string(),
@@ -543,6 +557,13 @@ const createBudgetSchema = z.object({
   external_id: externalIdSchema.nullable().optional(),
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata: resourceMetadataSchema.optional(),
+  cycle_anchor_at: z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .describe(
+      "Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.",
+    ),
 });
 
 const toVkDto = toVirtualKeySnakeDto;
@@ -1577,7 +1598,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   describeRoute({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,
@@ -1617,6 +1638,9 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
         providerKey: body.data.provider_key ?? null,
         externalId: body.data.external_id,
         metadata: body.data.metadata,
+        cycleAnchorAt: body.data.cycle_anchor_at
+          ? new Date(body.data.cycle_anchor_at)
+          : null,
         actorUserId,
       });
       const memberCounts = await groupMemberCounts([row]);
@@ -1635,7 +1659,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
   describeRoute({
     summary: "Update budget",
     description:
-      "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
+      "Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.",
     tags: ["Budgets"],
     responses: {
       ...canonicalBaseResponses,

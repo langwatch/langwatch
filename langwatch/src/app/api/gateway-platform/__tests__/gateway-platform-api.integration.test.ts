@@ -38,7 +38,11 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  currentPeriodStart,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
+import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -1061,6 +1065,98 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       });
       const listed = (await list.json()).data.find((b: any) => b.id === id);
       expect(body.budget).toEqual(listed);
+    });
+
+    /** @scenario "Creating an anchored budget reports its true cycle on the wire" */
+    it("echoes a cycle anchor and reports the anchored period, not the calendar one", async () => {
+      // A few days back, at a time of day no calendar period starts on.
+      const anchor = new Date(Date.now() - 5 * 86_400_000);
+      anchor.setUTCHours(9, 0, 0, 0);
+
+      const created = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `anchored-${suffix}`,
+          window: "month",
+          limit_usd: "40",
+          cycle_anchor_at: anchor.toISOString(),
+        },
+        legacyAuth(),
+      );
+      expect(created.status).toBe(201);
+      const budget = (await created.json()).budget;
+      expect(budget.cycle_anchor_at).toBe(anchor.toISOString());
+
+      // The reported period is the anchored one. Since the anchor is days
+      // old and the window is a month, the period start IS the anchor and
+      // the reset is one anchored month on, neither of which is a calendar
+      // month boundary.
+      expect(budget.current_period_started_at).toBe(anchor.toISOString());
+      expect(budget.resets_at).toBe(
+        nextAnchoredResetAt("MONTH", anchor, new Date()).toISOString(),
+      );
+      expect(budget.resets_at).not.toBe(
+        currentPeriodStart("MONTH", new Date()).toISOString(),
+      );
+
+      // Reading it back agrees, so a caller polling the budget sees the
+      // same cycle the create call promised.
+      const read = await app.request(`/api/gateway/v1/budgets/${budget.id}`, {
+        headers: legacyAuth(),
+      });
+      expect(read.status).toBe(200);
+      expect((await read.json()).budget).toEqual(budget);
+
+      // The anchor is immutable: a patch naming it changes nothing, since
+      // moving it would redraw periods already reported and enforced on.
+      const patched = await patch(
+        `/api/gateway/v1/budgets/${budget.id}`,
+        { name: `anchored-renamed-${suffix}`, cycle_anchor_at: null },
+        legacyAuth(),
+      );
+      expect(patched.status).toBe(200);
+      const after = (await patched.json()).budget;
+      expect(after.name).toBe(`anchored-renamed-${suffix}`);
+      expect(after.cycle_anchor_at).toBe(anchor.toISOString());
+      expect(after.current_period_started_at).toBe(
+        budget.current_period_started_at,
+      );
+    });
+
+    /** @scenario "A cycle anchor is rejected on windows that do not cycle" */
+    it("refuses a cycle anchor on the windows that never roll", async () => {
+      for (const window of ["manual", "total"]) {
+        const res = await post(
+          "/api/gateway/v1/budgets",
+          {
+            scope: { kind: "project", project_id: PROJECT_ID },
+            name: `anchored-${window}-${suffix}`,
+            window,
+            limit_usd: "10",
+            cycle_anchor_at: "2026-01-17T09:00:00.000Z",
+          },
+          legacyAuth(),
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+          error: { code: "gateway_budget_cycle_anchor_invalid" },
+        });
+      }
+
+      // The same windows are fine without one.
+      const ok = await post(
+        "/api/gateway/v1/budgets",
+        {
+          scope: { kind: "project", project_id: PROJECT_ID },
+          name: `unanchored-manual-${suffix}`,
+          window: "manual",
+          limit_usd: "10",
+        },
+        legacyAuth(),
+      );
+      expect(ok.status).toBe(201);
+      expect((await ok.json()).budget.cycle_anchor_at).toBeNull();
     });
 
     /** @scenario An absent budget answers a canonical 404 */

@@ -1381,7 +1381,7 @@ export interface paths {
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -1413,7 +1413,7 @@ export interface paths {
         head?: never;
         /**
          * Update budget
-         * @description Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.
+         * @description Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.
          */
         patch: operations["patchApiGatewayV1BudgetsById"];
         trace?: never;
@@ -7121,8 +7121,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7271,6 +7275,11 @@ export interface operations {
                     metadata?: {
                         [key: string]: string;
                     };
+                    /**
+                     * Format: date-time
+                     * @description Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
+                     */
+                    cycle_anchor_at?: string;
                 };
             };
         };
@@ -7308,8 +7317,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7446,8 +7459,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7605,8 +7622,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7758,8 +7779,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7905,8 +7930,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to, or null when the window is calendar aligned. */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;

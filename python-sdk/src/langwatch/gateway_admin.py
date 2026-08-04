@@ -143,7 +143,10 @@ class GatewayAdminFacade:
         """Create a budget. ``scope`` is the discriminated target, e.g.
         {"kind": "virtual_key", "virtual_key_id": vk} or the per-end-user
         template {"kind": "attributed_user", "anchor_virtual_key_id": vk}.
-        ``manual`` windows accrue until an explicit reset."""
+        ``manual`` windows accrue until an explicit reset. A
+        ``cycle_anchor_at`` field (an RFC3339 instant) phases a cyclic window
+        off that moment instead of the calendar, and is not valid on
+        ``total`` or ``manual``."""
         body = {
             "scope": scope,
             "name": name,

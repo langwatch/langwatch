@@ -1811,11 +1811,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--virtual-key <id>", "Virtual key id (for scope=virtual-key)")
       .option("--principal <id>", "Principal user id (for scope=principal)")
       .option("--group <id>", "Group id (for scope=group; --limit becomes the PER-MEMBER allowance)")
-      .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total")
+      .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total|manual")
       .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99). Per member for scope=group")
       .option("--on-breach <action>", "block (default) or warn", "block")
       .option("--timezone <tz>", "IANA timezone for window boundaries (e.g. Europe/Amsterdam)")
       .option("--provider-key <id>", "Pin the budget to one ModelProvider id (default: counts every provider)")
+      .option("--cycle-anchor-at <rfc3339>", "Start the budget's cycle at this instant instead of the calendar (e.g. 2026-01-17T09:00:00Z). Not valid on total or manual windows")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -1832,6 +1833,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       onBreach?: "block" | "warn";
       timezone?: string;
       providerKey?: string;
+      cycleAnchorAt?: string;
     }) => {
       const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
       return impl(options);

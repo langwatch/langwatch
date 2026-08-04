@@ -29,6 +29,7 @@ import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   bucketPeriodFloorMs,
+  effectiveBudgetPeriod,
   GatewayBudgetClickHouseRepository,
 } from "~/server/gateway/budget.clickhouse.repository";
 import {
@@ -175,6 +176,9 @@ async function applicableEndUserCaps(params: {
     if (!client) throw new Error("clickhouse unavailable");
     return client;
   });
+  // One instant for the whole answer: the floor the spend is read from and
+  // the period it is reported under have to be the same period.
+  const now = new Date();
   const targets = templates.map((t) => {
     const bucketScopeId = bucketFor(t);
     const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
@@ -184,12 +188,17 @@ async function applicableEndUserCaps(params: {
       scopeId: bucketScopeId,
       window: t.window,
       match: "exact" as const,
-      periodFloorMs: bucketPeriodFloorMs(t, bucketBoundary?.periodStartedAt),
+      periodFloorMs: bucketPeriodFloorMs(
+        t,
+        bucketBoundary?.periodStartedAt,
+        now,
+      ),
     };
   });
   const spends = await budgetCH.getSpendForTargetsAcrossTenants(
     tenantIds,
     targets,
+    now,
   );
   const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
   return templates.map((t) => {
@@ -204,8 +213,13 @@ async function applicableEndUserCaps(params: {
       on_breach: toWireEnum(t.onBreach),
       limit_usd: usdDisplayString(t.limitUsd),
       spent_usd: usdDisplayString(spentByBudget.get(t.id) ?? "0"),
-      period_started_at: (
-        bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt
+      // The exact bound `spent_usd` was summed from, so a rebilling caller
+      // can reconcile the figure against the period it names. The stored
+      // column would say the template's creation date on every cycle after
+      // the first.
+      period_started_at: new Date(
+        bucketPeriodFloorMs(t, bucketBoundary?.periodStartedAt, now) ??
+          effectiveBudgetPeriod(t, now).currentPeriodStartedAt.getTime(),
       ).toISOString(),
     };
   });

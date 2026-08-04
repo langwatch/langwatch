@@ -6,6 +6,7 @@
  * can be asserted directly, without standing up a request to find out what a
  * budget with no spend source renders as.
  */
+import { effectiveBudgetPeriod } from "./budget.clickhouse.repository";
 import type { GatewayBudgetWithSeats } from "./budget.service";
 import { metadataFromRow } from "./resourceMetadata";
 import { toWireEnum } from "./wireEnums";
@@ -24,6 +25,12 @@ function toBudgetDto(
   memberCount?: number,
   spendAvailable = true,
 ) {
+  // The period is computed here rather than read off the row. The stored
+  // columns move only at create and at an explicit reset, so a budget past
+  // its first boundary carries a start from months ago and a reset instant
+  // in the past, while the spend beside them is the current period's. The
+  // pair has to bracket the figure it is printed next to.
+  const period = effectiveBudgetPeriod(b);
   return {
     id: b.id,
     organization_id: b.organizationId,
@@ -44,8 +51,12 @@ function toBudgetDto(
     provider_key: b.providerKey,
     external_id: b.externalId ?? null,
     metadata: metadataFromRow(b.metadata),
-    current_period_started_at: b.currentPeriodStartedAt.toISOString(),
-    resets_at: b.resetsAt.toISOString(),
+    current_period_started_at: period.currentPeriodStartedAt.toISOString(),
+    resets_at: period.resetsAt.toISOString(),
+    // Null is calendar alignment. Set, it is the phase the window cycles
+    // on, and the period fields above describe that cycle rather than the
+    // calendar one.
+    cycle_anchor_at: b.cycleAnchorAt?.toISOString() ?? null,
     last_reset_at: b.lastResetAt?.toISOString() ?? null,
     archived_at: b.archivedAt?.toISOString() ?? null,
     created_at: b.createdAt.toISOString(),

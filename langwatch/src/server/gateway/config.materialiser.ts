@@ -24,6 +24,7 @@ import {
 import { modelProviders } from "../modelProviders/registry";
 import {
   budgetPeriodFloorMs,
+  effectiveBudgetPeriod,
   type GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
 import {
@@ -748,7 +749,9 @@ function budgetToWire(
     window: b.window.toLowerCase(),
     limit_micro_usd: decimalToMicroUSD(b.limitUsd),
     spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
-    resets_at: Math.floor(b.resetsAt.getTime() / 1000),
+    // The boundary this budget is actually heading for, not the stored
+    // column, which only moves at create and at an explicit reset.
+    resets_at: Math.floor(effectiveBudgetPeriod(b).resetsAt.getTime() / 1000),
     on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
   };
 }

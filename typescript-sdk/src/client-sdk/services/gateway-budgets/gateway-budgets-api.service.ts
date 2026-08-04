@@ -51,6 +51,8 @@ export interface GatewayBudget {
   provider_key: string | null;
   current_period_started_at: string;
   resets_at: string;
+  /** Instant the cycle is phased from; null means calendar aligned. */
+  cycle_anchor_at: string | null;
   last_reset_at: string | null;
   archived_at: string | null;
   created_at: string;
@@ -103,6 +105,13 @@ export interface CreateGatewayBudgetInput {
   timezone?: string | null;
   /** ModelProvider id to pin the budget to one provider. */
   provider_key?: string | null;
+  /**
+   * RFC3339 instant that phases the budget's cycle instead of the calendar:
+   * a `month` budget anchored `2026-01-17T09:00:00Z` rolls every 17th at
+   * 09:00 UTC. Omit for calendar alignment. Immutable once created, and
+   * rejected on the windows that never cycle (`total`, `manual`).
+   */
+  cycle_anchor_at?: string;
 }
 
 export interface UpdateGatewayBudgetInput {
