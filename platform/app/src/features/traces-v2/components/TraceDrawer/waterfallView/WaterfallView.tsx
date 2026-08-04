@@ -35,6 +35,8 @@ import {
   ROW_HEIGHT,
   type WaterfallViewProps,
 } from "./types";
+import { useCorrectionMarks } from "./useCorrectionMarks";
+import { useWaterfallEditing } from "./useWaterfallEditing";
 
 // Shared fallback for spans without signals — a fresh `[]` per row per
 // render would defeat TreeRow's memo by changing prop identity.
@@ -73,6 +75,11 @@ export const WaterfallView = memo(function WaterfallView({
     },
     [pinSpan, unpinSpan],
   );
+
+  const { isEditing, deletedSpanIds, toggleSpanDeleted } =
+    useWaterfallEditing(spans);
+  const { correctedSpanIds, deletedByCorrectionSpanIds } =
+    useCorrectionMarks(spans);
 
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
@@ -594,6 +601,13 @@ export const WaterfallView = memo(function WaterfallView({
                     signals={
                       signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS
                     }
+                    isEditing={isEditing}
+                    isDraftDeleted={deletedSpanIds.has(node.span.spanId)}
+                    isCorrected={correctedSpanIds.has(node.span.spanId)}
+                    isDeletedByCorrection={deletedByCorrectionSpanIds.has(
+                      node.span.spanId,
+                    )}
+                    onToggleDelete={toggleSpanDeleted}
                     onToggleCollapse={handleToggleCollapse}
                     onSelect={handleSelectSpan}
                     onTogglePin={handleTogglePin}

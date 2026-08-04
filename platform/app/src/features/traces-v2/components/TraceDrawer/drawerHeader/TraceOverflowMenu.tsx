@@ -7,6 +7,7 @@ import {
   LuDatabase,
   LuExternalLink,
   LuKeyboard,
+  LuListPlus,
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
@@ -23,6 +24,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { enterTraceEditMode } from "../../../utils/traceEditMode";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -39,6 +41,11 @@ interface TraceOverflowMenuProps {
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
+  /**
+   * Public share view. Correcting a trace is authenticated review work, so the
+   * action is absent rather than shown and refused.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -59,11 +66,20 @@ export function TraceOverflowMenu({
   onAddToAnnotationQueue,
   pinned,
   onTogglePinned,
+  readOnly = false,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
   const { project, hasPermission } = useOrganizationTeamProject();
   const canShare = hasPermission("traces:share");
   const canQueueForAnnotation = hasPermission("annotations:create");
+  // Correcting a trace is review work, which is the permission external
+  // reviewers hold, and it is the same one the correction write itself checks.
+  const canEditTrace = !readOnly && hasPermission("annotations:update");
+
+  const handleEditTrace = useCallback(
+    () => enterTraceEditMode(traceId),
+    [traceId],
+  );
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -135,6 +151,17 @@ export function TraceOverflowMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="240px">
+        {/* Near the top: correcting a trace is the reason a reviewer opens
+            this menu, not a secondary escape hatch. */}
+        {canEditTrace && (
+          <Menu.Item value="edit-trace" onClick={handleEditTrace}>
+            <HStack gap={2}>
+              <Icon as={LuPencil} boxSize={3.5} />
+              <Text>Edit trace</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+
         <Menu.Item value="copy" onClick={onCopyTraceId}>
           <HStack gap={2}>
             <Icon as={LuCopy} boxSize={3.5} />
@@ -179,7 +206,7 @@ export function TraceOverflowMenu({
             onClick={onAddToAnnotationQueue}
           >
             <HStack gap={2}>
-              <Icon as={LuPencil} boxSize={3.5} />
+              <Icon as={LuListPlus} boxSize={3.5} />
               <Text>Add to annotation queue</Text>
             </HStack>
           </Menu.Item>

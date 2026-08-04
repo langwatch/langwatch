@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import {
@@ -7,6 +8,7 @@ import {
 } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /** When prompt aggregation is still catching up (containsPrompt=true but
@@ -14,7 +16,11 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  * chips fill in without making the user click around. */
 const PROMPTS_PENDING_REFETCH_MS = 8_000;
 
-export function useTraceHeader() {
+/**
+ * The trace header exactly as captured, before any correction. Read it when
+ * the captured trace is the point: the Original view and the difference view.
+ */
+export function useTraceHeaderCanonical() {
   const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
@@ -85,4 +91,25 @@ export function useTraceHeader() {
   if (shared)
     return asSharedQueryResult(shared.header) as unknown as typeof query;
   return query;
+}
+
+/**
+ * The trace header as the reader sees it: corrected when a correction applies,
+ * captured otherwise. Only the trace's own input and output move: span counts,
+ * durations and cost describe the run, not the corrected content.
+ */
+export function useTraceHeader() {
+  const query = useTraceHeaderCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const header = query.data;
+
+  const data = useMemo(
+    () => (header ? applyOverlayToTraceHeader({ header, patch }) : header),
+    [header, patch],
+  );
+
+  return useMemo(
+    () => (data === header ? query : { ...query, data }),
+    [query, data, header],
+  );
 }

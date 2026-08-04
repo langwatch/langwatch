@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import {
@@ -14,9 +15,15 @@ import {
   spanTreeQueryFn,
   spanTreeQueryKey,
 } from "./spanTreePagedQuery";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
-export function useSpanTree() {
+/**
+ * The span tree exactly as captured, before any correction. Read it when the
+ * captured trace is the point: the Original view, the hover-original marks and
+ * the difference view.
+ */
+export function useSpanTreeCanonical() {
   const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
@@ -124,4 +131,26 @@ export function useSpanTree() {
     return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
   }
   return treeQuery;
+}
+
+/**
+ * The span tree the reader sees: corrected when a correction applies, captured
+ * otherwise. The correction is applied to the query's result and never written
+ * back into the cache, so the delta poll's high-water mark keeps tracking what
+ * was actually ingested.
+ */
+export function useSpanTree() {
+  const query = useSpanTreeCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const nodes = query.data;
+
+  const data = useMemo(
+    () => (nodes ? applyOverlayToSpanTreeNodes({ nodes, patch }) : nodes),
+    [nodes, patch],
+  );
+
+  return useMemo(
+    () => (data === nodes ? query : { ...query, data }),
+    [query, data, nodes],
+  );
 }

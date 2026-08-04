@@ -1,6 +1,11 @@
 import { useEffect } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
-import { useDrawerStore } from "../stores/drawerStore";
+import { parseEditParam, useDrawerStore } from "../stores/drawerStore";
+import {
+  selectIsTraceEditDirty,
+  useTraceEditStore,
+} from "../stores/traceEditStore";
+import { enterTraceEditMode, exitTraceEditMode } from "../utils/traceEditMode";
 
 /**
  * One-way URL → drawer store sync. Lives at the page level so the
@@ -32,15 +37,42 @@ export function useTraceDrawerUrlHydrator(): void {
     const store = useDrawerStore.getState();
 
     if (wantsOpen && traceId) {
-      if (store.traceId === traceId && store.occurredAtMs === validTimestamp) {
-        return;
-      }
-      store.openTrace(traceId, validTimestamp);
+      const alreadyOnTrace =
+        store.traceId === traceId && store.occurredAtMs === validTimestamp;
+      if (!alreadyOnTrace) store.openTrace(traceId, validTimestamp);
+      syncEditMode({ traceId, editParam: params.edit });
       return;
     }
 
     if (!wantsOpen && store.traceId) {
       store.closeDrawer();
+      exitTraceEditMode();
     }
-  }, [currentDrawer, params.traceId, params.t]);
+  }, [currentDrawer, params.traceId, params.t, params.edit]);
+}
+
+/**
+ * Brings the edit session in line with what the link asks for. The one case
+ * that is not a straight assignment is browser history: going back to a URL
+ * from before the reviewer started editing would drop an unsaved correction,
+ * so a dirty session stays open and the URL sync re-asserts the parameter.
+ */
+function syncEditMode({
+  traceId,
+  editParam,
+}: {
+  traceId: string;
+  editParam: string | undefined;
+}): void {
+  const wantsEdit = parseEditParam({ raw: editParam, traceId });
+  const editingTraceId = useTraceEditStore.getState().editingTraceId;
+
+  if (wantsEdit) {
+    if (editingTraceId !== traceId) enterTraceEditMode(traceId);
+    return;
+  }
+
+  if (editingTraceId === null) return;
+  if (selectIsTraceEditDirty(useTraceEditStore.getState())) return;
+  exitTraceEditMode();
 }

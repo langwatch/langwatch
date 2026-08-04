@@ -18,7 +18,11 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { AttributeTable } from "../AttributeTable";
+import { SpanEditableIO } from "../editMode/SpanEditableIO";
+import { SpanNameTypeEditor } from "../editMode/SpanNameTypeEditor";
+import { useSpanAttributeEditing } from "../editMode/useSpanAttributeEditing";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
 import { ScopeBlock } from "../ScopeChip";
@@ -43,6 +47,13 @@ export function SpanAccordions({
 }) {
   const detailQuery = useSpanDetail();
   const detail = detailQuery.data;
+  const isEditing = useDrawerStore((s) => s.editing);
+  const attributeEditing = useSpanAttributeEditing({
+    spanId: span.spanId,
+    capturedParams:
+      (detail?.params as Record<string, unknown> | undefined) ?? {},
+    enabled: isEditing,
+  });
   const resources = useTraceResources(traceId);
   const spanResource = resources.bySpanId[span.spanId] ?? null;
   const spanScope = spanResource?.scope ?? null;
@@ -124,6 +135,13 @@ export function SpanAccordions({
 
   return (
     <Box ref={containerRef}>
+      {isEditing && detail && (
+        <SpanNameTypeEditor
+          spanId={span.spanId}
+          capturedName={detail.name}
+          capturedType={detail.type}
+        />
+      )}
       {/* Span-switch loading banner — makes it explicit that the panel
         below is still resolving, instead of letting the user stare at
         an empty accordion stack and wonder if anything's happening. */}
@@ -199,7 +217,14 @@ export function SpanAccordions({
                         redacted={detail?.inputRedacted ?? false}
                         visibleTo={detail?.inputVisibleTo}
                       >
-                        {detail?.input ? (
+                        {isEditing && detail ? (
+                          <SpanEditableIO
+                            spanId={detail.spanId}
+                            field="input"
+                            label="Input"
+                            capturedText={detail.input ?? null}
+                          />
+                        ) : detail?.input ? (
                           <IOViewer
                             label="Input"
                             content={detail.input}
@@ -214,7 +239,14 @@ export function SpanAccordions({
                         redacted={detail?.outputRedacted ?? false}
                         visibleTo={detail?.outputVisibleTo}
                       >
-                        {detail?.output ? (
+                        {isEditing && detail ? (
+                          <SpanEditableIO
+                            spanId={detail.spanId}
+                            field="output"
+                            label="Output"
+                            capturedText={detail.output ?? null}
+                          />
+                        ) : detail?.output ? (
                           <IOViewer
                             label="Output"
                             content={detail.output}
@@ -311,6 +343,7 @@ export function SpanAccordions({
                   count={attrCount}
                   empty={
                     !hasAttributes &&
+                    !isEditing &&
                     !resources.isLoading &&
                     !detailQuery.isLoading
                   }
@@ -322,13 +355,9 @@ export function SpanAccordions({
                       model={detail.costSuggestion.model}
                     />
                   )}
-                  {hasAttributes ? (
+                  {hasAttributes || isEditing ? (
                     <AttributeTable
-                      attributes={
-                        (detail?.params as
-                          | Record<string, unknown>
-                          | undefined) ?? {}
-                      }
+                      attributes={attributeEditing.baselineParams}
                       resourceAttributes={
                         hasResourceAttrs
                           ? spanResource!.resourceAttributes
@@ -337,6 +366,7 @@ export function SpanAccordions({
                       restrictedAttributes={detail?.restrictedAttributes}
                       title="Span Attributes"
                       spanId={detail?.spanId ?? span.spanId}
+                      editing={attributeEditing.editing}
                     />
                   ) : resources.isLoading || detailQuery.isLoading ? (
                     <EmptyHint>Loading attributes…</EmptyHint>

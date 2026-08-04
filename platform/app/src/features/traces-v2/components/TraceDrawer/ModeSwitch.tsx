@@ -38,12 +38,22 @@ interface ModeSwitchProps {
    */
   showTerminal?: boolean;
   /**
+   * True while the reviewer is correcting the trace. Conversation, Usage and
+   * Terminal replay an agent run rather than showing the trace's own spans, so
+   * there is nothing in them to correct and they stay unavailable until the
+   * reviewer finishes.
+   */
+  isEditing?: boolean;
+  /**
    * Right-aligned trailing content for this row — typically the trace ID
    * + relative timestamp. Sits in the same horizontal band as the tabs so
    * the meta tucks neatly into the corner.
    */
   endSlot?: ReactNode;
 }
+
+/** Shown on every tab edit mode makes unavailable. */
+const EDITING_DISABLED_REASON = "Finish editing to switch views";
 
 interface TabProps {
   label: string;
@@ -158,17 +168,21 @@ export function ModeSwitch({
   isConversationHidden = false,
   traceId,
   showTerminal = false,
+  isEditing = false,
   endSlot,
 }: ModeSwitchProps) {
   // Tristate gate: no conversationId → permanently disabled; has id
   // but turns still in flight → disabled with loading copy; has id +
   // turns → enabled.
-  const conversationDisabled = !hasConversation || isConversationLoading;
-  const conversationDisabledReason = !hasConversation
-    ? "This trace is not part of a conversation"
-    : isConversationLoading
-      ? "Loading conversation…"
-      : undefined;
+  const conversationDisabled =
+    isEditing || !hasConversation || isConversationLoading;
+  const conversationDisabledReason = isEditing
+    ? EDITING_DISABLED_REASON
+    : !hasConversation
+      ? "This trace is not part of a conversation"
+      : isConversationLoading
+        ? "Loading conversation…"
+        : undefined;
   const presenceFor = (mode: DrawerViewMode) =>
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
@@ -222,6 +236,8 @@ export function ModeSwitch({
             label="Usage"
             shortcut="U"
             active={viewMode === "session"}
+            disabled={isEditing}
+            disabledReason={isEditing ? EDITING_DISABLED_REASON : undefined}
             onClick={() => onViewModeChange("session")}
             presence={presenceFor("session")}
           />
@@ -231,6 +247,8 @@ export function ModeSwitch({
             // something else entirely, which is worse than having none.
             shortcut="E"
             active={viewMode === "terminal"}
+            disabled={isEditing}
+            disabledReason={isEditing ? EDITING_DISABLED_REASON : undefined}
             onClick={() => onViewModeChange("terminal")}
             presence={presenceFor("terminal")}
           />

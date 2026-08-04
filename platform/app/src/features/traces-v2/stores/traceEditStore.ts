@@ -1,0 +1,534 @@
+import { create } from "zustand";
+import { stringifySpanIO } from "~/server/tracer/spanIOStringify";
+import type { SpanInputOutput, SpanTypes } from "~/server/tracer/types";
+import {
+  encodeSpanIOFromEditedText,
+  TRACE_EDIT_OVERLAY_PATCH_VERSION,
+  type TraceEditOverlayPatch,
+  type TraceEditSpanPatch,
+} from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+
+/**
+ * Which trace the reader is looking at: the corrected one or the one that was
+ * captured. Only meaningful once a correction exists.
+ */
+export type TraceOverlayView = "edited" | "original";
+
+/**
+ * One edited input or output. The drawer only ever sees a rendered string, so
+ * the text it was seeded from travels alongside the edited text: a value that
+ * was never structured stays unstructured when it is encoded back into the
+ * correction, instead of a typed number or object appearing where the trace
+ * held prose.
+ */
+export interface SpanIODraft {
+  text: string;
+  baselineText: string | null;
+}
+
+/**
+ * The uncommitted changes to one span. Every key is optional and only present
+ * once the reviewer has actually touched that field, which is what keeps "has
+ * anything changed" a question about presence.
+ */
+export interface SpanEditDraft {
+  name?: string;
+  type?: SpanTypes;
+  input?: SpanIODraft;
+  output?: SpanIODraft;
+  /**
+   * The attributes the overrides below apply on top of, snapshotted the first
+   * time an attribute is edited. A correction replaces the whole attribute
+   * record, so the untouched keys have to travel with the edits.
+   */
+  paramsBase?: Record<string, unknown>;
+  /** Per-key attribute overrides. A `null` value removes that key. */
+  params?: Record<string, unknown>;
+}
+
+/** The fields of a span a reviewer edits directly in the drawer. */
+export type SpanDraftField = "name" | "type" | "input" | "output";
+
+/**
+ * What the drawer should show for one span while it is being edited: the
+ * correction already stored for it, with the reviewer's uncommitted changes on
+ * top. Reading it rather than the captured span is what stops a second editing
+ * session from quietly reverting the first one.
+ */
+export interface EffectiveSpanEdit {
+  name?: string;
+  type?: SpanTypes;
+  input?: string;
+  output?: string;
+  params?: Record<string, unknown>;
+}
+
+interface TraceEditState {
+  /** The trace being edited, or null when the drawer is only reading. */
+  editingTraceId: string | null;
+  /**
+   * The correction already stored for this trace when editing started. Drafts
+   * layer on top of it and the save merges the two, so correcting a trace a
+   * second time adds to the first correction instead of replacing it.
+   */
+  basePatch: TraceEditOverlayPatch | null;
+  spanDrafts: Record<string, SpanEditDraft>;
+  /** Spans the reviewer deleted in this session. */
+  deletedSpanIds: string[];
+  /** Spans the stored correction deleted that the reviewer brought back. */
+  restoredSpanIds: string[];
+  traceOutputDraft: SpanIODraft | null;
+  overlayView: TraceOverlayView;
+  /**
+   * Something that wants to leave the trace (closing the drawer, opening
+   * another trace) and is waiting on the reviewer to say what happens to their
+   * unsaved work. Held rather than run so the confirmation and the action stay
+   * one decision.
+   */
+  pendingExit: (() => void) | null;
+
+  requestExit: (run: () => void) => void;
+  clearPendingExit: () => void;
+
+  startEditing: (params: {
+    traceId: string;
+    basePatch?: TraceEditOverlayPatch | null;
+  }) => void;
+  /**
+   * Records the stored correction once the read for it lands. Editing can
+   * start before that read resolves (a link straight into edit mode), and this
+   * is what keeps the session layered on the correction instead of replacing
+   * it. Ignored once a baseline is set, so a refetch can never move the ground
+   * under an edit in progress.
+   */
+  adoptBasePatch: (params: {
+    traceId: string;
+    basePatch: TraceEditOverlayPatch;
+  }) => void;
+  stopEditing: () => void;
+  /** Drops every uncommitted change and leaves edit mode. */
+  discard: () => void;
+
+  setSpanName: (params: { spanId: string; name: string }) => void;
+  setSpanType: (params: { spanId: string; type: SpanTypes }) => void;
+  setSpanIO: (params: {
+    spanId: string;
+    field: "input" | "output";
+    text: string;
+    baselineText: string | null;
+  }) => void;
+  /** Removes one field's draft, returning that field to its baseline. */
+  resetSpanField: (params: { spanId: string; field: SpanDraftField }) => void;
+
+  setSpanParam: (params: {
+    spanId: string;
+    key: string;
+    /** `null` removes the key from the corrected span. */
+    value: unknown;
+    baselineParams: Record<string, unknown>;
+  }) => void;
+  resetSpanParam: (params: { spanId: string; key: string }) => void;
+
+  deleteSpan: (spanId: string) => void;
+  restoreSpan: (spanId: string) => void;
+
+  setTraceOutput: (params: {
+    text: string;
+    baselineText: string | null;
+  }) => void;
+  resetTraceOutput: () => void;
+
+  setOverlayView: (view: TraceOverlayView) => void;
+}
+
+type TraceEditDraftState = Pick<
+  TraceEditState,
+  | "basePatch"
+  | "spanDrafts"
+  | "deletedSpanIds"
+  | "restoredSpanIds"
+  | "traceOutputDraft"
+>;
+
+const EMPTY_DRAFTS = {
+  spanDrafts: {} as Record<string, SpanEditDraft>,
+  deletedSpanIds: [] as string[],
+  restoredSpanIds: [] as string[],
+  traceOutputDraft: null as SpanIODraft | null,
+};
+
+function withSpanDraft(
+  drafts: Record<string, SpanEditDraft>,
+  spanId: string,
+  update: (draft: SpanEditDraft) => SpanEditDraft,
+): Record<string, SpanEditDraft> {
+  const next = update(drafts[spanId] ?? {});
+  // A draft that ended up empty is removed outright, so "is anything changed"
+  // stays a question about presence rather than about contents.
+  if (Object.keys(next).length === 0) {
+    if (!(spanId in drafts)) return drafts;
+    const { [spanId]: _dropped, ...rest } = drafts;
+    return rest;
+  }
+  return { ...drafts, [spanId]: next };
+}
+
+export const useTraceEditStore = create<TraceEditState>((set) => ({
+  editingTraceId: null,
+  basePatch: null,
+  ...EMPTY_DRAFTS,
+  overlayView: "edited",
+  pendingExit: null,
+
+  requestExit: (run) => set({ pendingExit: run }),
+  clearPendingExit: () => set({ pendingExit: null }),
+
+  startEditing: ({ traceId, basePatch }) =>
+    // Always from a clean slate: a draft left behind by an earlier trace (or
+    // an earlier editing session on this one) would otherwise be attributed to
+    // whatever the reviewer opens next.
+    set({
+      editingTraceId: traceId,
+      basePatch: basePatch ?? null,
+      ...EMPTY_DRAFTS,
+      overlayView: "edited",
+    }),
+
+  adoptBasePatch: ({ traceId, basePatch }) =>
+    set((s) =>
+      s.editingTraceId === traceId && s.basePatch === null ? { basePatch } : s,
+    ),
+
+  stopEditing: () =>
+    set({
+      editingTraceId: null,
+      basePatch: null,
+      pendingExit: null,
+      ...EMPTY_DRAFTS,
+    }),
+  discard: () =>
+    set({
+      editingTraceId: null,
+      basePatch: null,
+      pendingExit: null,
+      ...EMPTY_DRAFTS,
+    }),
+
+  setSpanName: ({ spanId, name }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
+        ...draft,
+        name,
+      })),
+    })),
+
+  setSpanType: ({ spanId, type }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
+        ...draft,
+        type,
+      })),
+    })),
+
+  setSpanIO: ({ spanId, field, text, baselineText }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
+        ...draft,
+        [field]: { text, baselineText },
+      })),
+    })),
+
+  resetSpanField: ({ spanId, field }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
+        const { [field]: _dropped, ...rest } = draft;
+        return rest;
+      }),
+    })),
+
+  setSpanParam: ({ spanId, key, value, baselineParams }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
+        ...draft,
+        paramsBase: draft.paramsBase ?? baselineParams,
+        params: { ...draft.params, [key]: value },
+      })),
+    })),
+
+  resetSpanParam: ({ spanId, key }) =>
+    set((s) => ({
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
+        if (!draft.params) return draft;
+        const { [key]: _dropped, ...rest } = draft.params;
+        if (Object.keys(rest).length === 0) {
+          const {
+            params: _params,
+            paramsBase: _base,
+            ...withoutParams
+          } = draft;
+          return withoutParams;
+        }
+        return { ...draft, params: rest };
+      }),
+    })),
+
+  deleteSpan: (spanId) =>
+    set((s) => ({
+      deletedSpanIds: s.deletedSpanIds.includes(spanId)
+        ? s.deletedSpanIds
+        : [...s.deletedSpanIds, spanId],
+      restoredSpanIds: s.restoredSpanIds.filter((id) => id !== spanId),
+    })),
+
+  restoreSpan: (spanId) =>
+    set((s) => {
+      const wasDeletedByCorrection =
+        s.basePatch?.deletedSpanIds.includes(spanId) ?? false;
+      return {
+        deletedSpanIds: s.deletedSpanIds.filter((id) => id !== spanId),
+        restoredSpanIds:
+          wasDeletedByCorrection && !s.restoredSpanIds.includes(spanId)
+            ? [...s.restoredSpanIds, spanId]
+            : s.restoredSpanIds,
+      };
+    }),
+
+  setTraceOutput: ({ text, baselineText }) =>
+    set({ traceOutputDraft: { text, baselineText } }),
+  resetTraceOutput: () => set({ traceOutputDraft: null }),
+
+  setOverlayView: (view) => set({ overlayView: view }),
+}));
+
+// ---------------------------------------------------------------------------
+// Selectors
+// ---------------------------------------------------------------------------
+
+function basePatchForSpan(
+  basePatch: TraceEditOverlayPatch | null,
+  spanId: string,
+): TraceEditSpanPatch | undefined {
+  return basePatch?.spans.find((span) => span.spanId === spanId);
+}
+
+/**
+ * What a field should read before this session touched it: the stored
+ * correction's value if it has one, and nothing otherwise (the caller falls
+ * back to the captured span). This is what an editor is seeded from and what
+ * Reset returns to, so correcting a trace twice starts from the first
+ * correction rather than from the raw capture.
+ */
+export function selectSpanEditBaseline({
+  basePatch,
+  spanId,
+}: {
+  basePatch: TraceEditOverlayPatch | null;
+  spanId: string;
+}): EffectiveSpanEdit {
+  const base = basePatchForSpan(basePatch, spanId);
+  if (!base) return {};
+
+  const baseline: EffectiveSpanEdit = {};
+  if (base.name != null) baseline.name = base.name;
+  if (base.type !== undefined) baseline.type = base.type;
+  if (base.input !== undefined)
+    baseline.input = stringifySpanIO(base.input) ?? "";
+  if (base.output !== undefined) {
+    baseline.output = stringifySpanIO(base.output) ?? "";
+  }
+  if (base.params != null) baseline.params = base.params;
+  return baseline;
+}
+
+/** The trace-level output the stored correction already carries, if any. */
+export function selectTraceOutputBaseline(
+  basePatch: TraceEditOverlayPatch | null,
+): string | undefined {
+  return basePatch?.trace?.output?.value;
+}
+
+/** True when this span is removed by the correction as it currently stands. */
+export function selectIsSpanDeleted(
+  state: Pick<
+    TraceEditState,
+    "basePatch" | "deletedSpanIds" | "restoredSpanIds"
+  >,
+  spanId: string,
+): boolean {
+  if (state.deletedSpanIds.includes(spanId)) return true;
+  if (state.restoredSpanIds.includes(spanId)) return false;
+  return state.basePatch?.deletedSpanIds.includes(spanId) ?? false;
+}
+
+/** The attributes an editor starts from: corrected if they already are. */
+export function selectSpanParamsBaseline({
+  basePatch,
+  spanId,
+  captured,
+}: {
+  basePatch: TraceEditOverlayPatch | null;
+  spanId: string;
+  captured: Record<string, unknown>;
+}): Record<string, unknown> {
+  return selectSpanEditBaseline({ basePatch, spanId }).params ?? captured;
+}
+
+/** Everything the correction would change, as counted for the edit bar. */
+export interface TraceEditSummary {
+  changedFields: number;
+  deletedSpans: number;
+}
+
+const IO_FIELDS = ["input", "output"] as const;
+
+function draftFieldCount(draft: SpanEditDraft): number {
+  let count = 0;
+  if (draft.name !== undefined) count++;
+  if (draft.type !== undefined) count++;
+  for (const field of IO_FIELDS) if (draft[field] !== undefined) count++;
+  if (draft.params !== undefined) count++;
+  return count;
+}
+
+/**
+ * Counts what this editing session changes. The stored correction is not part
+ * of the count: the reviewer is being told what they are about to add, not
+ * what somebody already saved.
+ */
+export function summarizeTraceEdit(
+  state: TraceEditDraftState,
+): TraceEditSummary {
+  const deleted = new Set(state.deletedSpanIds);
+  let changedFields = state.traceOutputDraft ? 1 : 0;
+  for (const [spanId, draft] of Object.entries(state.spanDrafts)) {
+    if (deleted.has(spanId)) continue;
+    changedFields += draftFieldCount(draft);
+  }
+  changedFields += state.restoredSpanIds.length;
+  return { changedFields, deletedSpans: state.deletedSpanIds.length };
+}
+
+/** True when the session would change something. Drives the Save button. */
+export function selectIsTraceEditDirty(state: TraceEditDraftState): boolean {
+  const summary = summarizeTraceEdit(state);
+  return summary.changedFields > 0 || summary.deletedSpans > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Building the correction
+// ---------------------------------------------------------------------------
+
+/**
+ * A hint about what the baseline value was, for the shared encoder. Text that
+ * never parsed as JSON was prose, so it is declared as text and stays text
+ * however the reviewer rewrites it; anything else lets the encoder decide from
+ * the new text.
+ */
+function baselineShapeHint(
+  baselineText: string | null,
+): SpanInputOutput | null {
+  if (baselineText === null) return null;
+  const trimmed = baselineText.trim();
+  if (trimmed.length === 0) return null;
+  try {
+    JSON.parse(trimmed);
+    return null;
+  } catch {
+    return { type: "text", value: baselineText };
+  }
+}
+
+function encodeDraftIO(draft: SpanIODraft): SpanInputOutput {
+  return encodeSpanIOFromEditedText({
+    text: draft.text,
+    original: baselineShapeHint(draft.baselineText),
+  });
+}
+
+function mergedParams(draft: SpanEditDraft): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...draft.paramsBase };
+  for (const [key, value] of Object.entries(draft.params ?? {})) {
+    if (value === null) delete merged[key];
+    else merged[key] = value;
+  }
+  return merged;
+}
+
+function mergeSpanPatch({
+  base,
+  draft,
+  spanId,
+}: {
+  base: TraceEditSpanPatch | undefined;
+  draft: SpanEditDraft | undefined;
+  spanId: string;
+}): TraceEditSpanPatch | null {
+  const merged: TraceEditSpanPatch = { ...(base ?? { spanId }), spanId };
+  if (draft?.name !== undefined) merged.name = draft.name;
+  if (draft?.type !== undefined) merged.type = draft.type;
+  if (draft?.input !== undefined) merged.input = encodeDraftIO(draft.input);
+  if (draft?.output !== undefined) merged.output = encodeDraftIO(draft.output);
+  if (draft?.params !== undefined) merged.params = mergedParams(draft);
+
+  const touchesSomething = Object.keys(merged).some((key) => key !== "spanId");
+  return touchesSomething ? merged : null;
+}
+
+/**
+ * Turns the stored correction plus this session's draft into the correction to
+ * save. Text becomes a canonical captured value through the same encoder the
+ * server uses, so the drawer and the suggestion flow agree on what a given
+ * piece of text means.
+ */
+export function buildTraceEditPatch(
+  state: TraceEditDraftState,
+): TraceEditOverlayPatch {
+  const base = state.basePatch;
+  const restored = new Set(state.restoredSpanIds);
+  const deletedSpanIds = [
+    ...(base?.deletedSpanIds ?? []).filter((id) => !restored.has(id)),
+    ...state.deletedSpanIds.filter(
+      (id) => !(base?.deletedSpanIds ?? []).includes(id),
+    ),
+  ];
+  const deleted = new Set(deletedSpanIds);
+
+  const spanIds = new Set([
+    ...(base?.spans ?? []).map((span) => span.spanId),
+    ...Object.keys(state.spanDrafts),
+  ]);
+
+  const spans: TraceEditSpanPatch[] = [];
+  for (const spanId of spanIds) {
+    // A span that is being removed carries no field corrections: the span is
+    // going away, so an edit to it would only make the stored patch disagree
+    // with what the reader sees.
+    if (deleted.has(spanId)) continue;
+    const merged = mergeSpanPatch({
+      base: basePatchForSpan(base, spanId),
+      draft: state.spanDrafts[spanId],
+      spanId,
+    });
+    if (merged) spans.push(merged);
+  }
+
+  const traceOutput =
+    state.traceOutputDraft?.text ?? base?.trace?.output?.value;
+  const traceInput = base?.trace?.input;
+  const trace =
+    traceInput !== undefined || traceOutput !== undefined
+      ? {
+          ...(traceInput !== undefined ? { input: traceInput } : {}),
+          ...(traceOutput !== undefined
+            ? { output: { value: traceOutput } }
+            : {}),
+        }
+      : undefined;
+
+  return {
+    version: TRACE_EDIT_OVERLAY_PATCH_VERSION,
+    ...(trace ? { trace } : {}),
+    spans,
+    deletedSpanIds,
+  };
+}

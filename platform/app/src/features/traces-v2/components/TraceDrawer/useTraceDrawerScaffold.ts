@@ -15,6 +15,7 @@ import { useTraceDrawerShortcuts } from "../../hooks/useTraceDrawerShortcuts";
 import { useTraceHeader } from "../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../hooks/useTraceRefresh";
 import { useDrawerStore } from "../../stores/drawerStore";
+import { guardTraceEditExit } from "../../utils/traceEditMode";
 
 interface TraceDrawerScaffold {
   traceId: string | undefined;
@@ -129,7 +130,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   }, [selectedSpanId, spanTree, prefetchSpan]);
 
   const trpcUtils = api.useUtils();
-  const handleClose = useCallback(() => {
+  const closeDrawerNow = useCallback(() => {
     // Cancel any in-flight per-trace queries so closing during a slow
     // load doesn't leave the request running in the background, racing
     // against a future re-open of the same drawer (or a different
@@ -149,6 +150,12 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     useDrawerStore.getState().closeDrawer();
     goBack();
   }, [goBack, setMaximized, trpcUtils, traceId]);
+
+  // Closing the drawer on an unsaved correction asks first: the drawer is the
+  // only place that correction exists, so closing is the same as discarding it.
+  const handleClose = useCallback(() => {
+    guardTraceEditExit(closeDrawerNow);
+  }, [closeDrawerNow]);
 
   const drawerContentRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);

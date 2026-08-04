@@ -18,10 +18,12 @@ import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { TraceEditableOutput } from "../editMode/TraceEditableOutput";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
 import { PromptsPanel } from "../PromptsPanel";
@@ -43,6 +45,7 @@ export function TraceSummaryAccordions({
   spans: SpanTreeNode[];
   onSelectSpan?: (spanId: string) => void;
 }) {
+  const isEditing = useDrawerStore((s) => s.editing);
   const hasIO = !!(trace.input || trace.output);
   // A restrict privacy rule hides content the viewer may not see — the server
   // nulls `input`/`output` and sets these flags. The IO section then reads as a
@@ -258,7 +261,11 @@ export function TraceSummaryAccordions({
                     redacted={trace.outputRedacted ?? false}
                     visibleTo={trace.outputVisibleTo}
                   >
-                    {trace.output ? (
+                    {isEditing ? (
+                      <TraceEditableOutput
+                        capturedText={trace.output ?? null}
+                      />
+                    ) : trace.output ? (
                       <IOViewer
                         label="Output"
                         content={trace.output}

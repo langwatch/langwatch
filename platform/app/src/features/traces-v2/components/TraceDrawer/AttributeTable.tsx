@@ -159,6 +159,33 @@ function LabelResizeHandle({
   );
 }
 
+/**
+ * Turns the span attributes section into an editor. Resource attributes are
+ * never editable: they describe the process that emitted the span, not what the
+ * span did, so there is nothing about them a reviewer would be correcting.
+ */
+export interface AttributeEditing {
+  /** Per-key overrides on the captured attributes. `null` marks it removed. */
+  edits: Record<string, unknown>;
+  onEditAttribute: (params: { key: string; value: unknown }) => void;
+  /** Drops the override for a key, returning it to what was captured. */
+  onResetAttribute: (key: string) => void;
+}
+
+/**
+ * Reads an attribute value out of a text field. Numbers, booleans and JSON
+ * keep their shape; anything else stays the string the reviewer typed.
+ */
+export function parseAttributeInput(text: string): unknown {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return text;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return text;
+  }
+}
+
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
@@ -175,6 +202,8 @@ interface AttributeTableProps {
    * first regardless of search / pinning and can't be pinned to the header.
    */
   spanId?: string;
+  /** Present while the reviewer is correcting this span's attributes. */
+  editing?: AttributeEditing;
 }
 
 /** Synthetic, always-first row key for the injected span id. */
@@ -419,6 +448,84 @@ function isApiKeyIdRow(attrKey: string, value: unknown): value is string {
   );
 }
 
+/** How one row behaves while the reviewer is correcting the span. */
+interface RowEditing {
+  /** True when the correction removes this key. */
+  removed: boolean;
+  /** True when the correction replaces this key's value. */
+  changed: boolean;
+  onChangeValue: (value: unknown) => void;
+  onRemove: () => void;
+  onRestore: () => void;
+}
+
+/**
+ * The value cell while editing: a text field for the value, plus remove and
+ * restore. A removed key stays on screen struck through rather than vanishing,
+ * so the reviewer can see (and undo) what the correction takes away.
+ */
+function EditableValueCell({
+  attrKey,
+  value,
+  editing,
+}: {
+  attrKey: string;
+  value: unknown;
+  editing: RowEditing;
+}) {
+  const display = formatValue(value);
+
+  if (editing.removed) {
+    return (
+      <HStack flex={1} minWidth={0} gap={2} paddingY={1}>
+        <Text
+          flex={1}
+          minWidth={0}
+          textStyle="xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          textDecoration="line-through"
+          truncate
+        >
+          {display}
+        </Text>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={editing.onRestore}
+          aria-label={`Restore ${attrKey}`}
+        >
+          <Text textStyle="2xs">Restore</Text>
+        </Button>
+      </HStack>
+    );
+  }
+
+  return (
+    <HStack flex={1} minWidth={0} gap={2} paddingY={1}>
+      <Input
+        size="xs"
+        aria-label={`Edit ${attrKey}`}
+        value={value === undefined || value === null ? "" : display}
+        onChange={(e) =>
+          editing.onChangeValue(parseAttributeInput(e.target.value))
+        }
+        fontFamily="mono"
+        bg={editing.changed ? "green.subtle" : undefined}
+        borderColor={editing.changed ? "green.muted" : "border.muted"}
+      />
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={editing.onRemove}
+        aria-label={`Remove ${attrKey}`}
+      >
+        <Text textStyle="2xs">Remove</Text>
+      </Button>
+    </HStack>
+  );
+}
+
 function FlatRow({
   attrKey,
   value,
@@ -430,6 +537,7 @@ function FlatRow({
   labelWidth,
   onLabelResize,
   restriction,
+  editing,
 }: {
   attrKey: string;
   value: unknown;
@@ -441,8 +549,12 @@ function FlatRow({
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
   restriction?: AttributeRestriction | null;
+  editing?: RowEditing;
 }) {
   const display = formatValue(value);
+  // A value already hidden from this viewer has nothing on screen to correct,
+  // so it keeps its read-only cell.
+  const isEditableRow = !!editing && restriction?.canSee !== false;
   return (
     <HStack
       borderBottomWidth={isLast ? "0px" : "1px"}
@@ -478,6 +590,7 @@ function FlatRow({
           fontFamily="mono"
           color={pinned ? "fg" : "fg.muted"}
           fontWeight={pinned ? "semibold" : "normal"}
+          textDecoration={editing?.removed ? "line-through" : undefined}
           truncate
           paddingX={3}
           paddingY={1.5}
@@ -500,27 +613,37 @@ function FlatRow({
           payload reads identically wherever it surfaces. */}
       <HStack flex={1} minWidth={0} gap={1.5}>
         {restriction ? <RestrictionMarker {...restriction} /> : null}
-        <Box flex={1} minWidth={0}>
-          {isApiKeyIdRow(attrKey, value) ? (
-            <ApiKeyAttributeValue apiKeyId={value} />
-          ) : (
-            <AttributeValue attrKey={attrKey} value={value} />
-          )}
-        </Box>
+        {isEditableRow ? (
+          <EditableValueCell
+            attrKey={attrKey}
+            value={value}
+            editing={editing!}
+          />
+        ) : (
+          <Box flex={1} minWidth={0}>
+            {isApiKeyIdRow(attrKey, value) ? (
+              <ApiKeyAttributeValue apiKeyId={value} />
+            ) : (
+              <AttributeValue attrKey={attrKey} value={value} />
+            )}
+          </Box>
+        )}
       </HStack>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={() => void navigator.clipboard.writeText(display)}
-        aria-label={`Copy ${attrKey}`}
-        padding={0}
-        minWidth="auto"
-        height="auto"
-        opacity={0}
-        css={{ ".attr-row:hover &": { opacity: 1 } }}
-      >
-        <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
-      </Button>
+      {!isEditableRow && (
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => void navigator.clipboard.writeText(display)}
+          aria-label={`Copy ${attrKey}`}
+          padding={0}
+          minWidth="auto"
+          height="auto"
+          opacity={0}
+          css={{ ".attr-row:hover &": { opacity: 1 } }}
+        >
+          <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
+        </Button>
+      )}
     </HStack>
   );
 }
@@ -534,6 +657,7 @@ function AttrSection({
   onLabelResize,
   leadingKeys,
   restrictionFor,
+  editing,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -545,6 +669,8 @@ function AttrSection({
   leadingKeys?: readonly string[];
   /** Resolves a custom-attribute restrict marker for a row, when one applies. */
   restrictionFor?: (key: string) => AttributeRestriction | null;
+  /** Present while this section's attributes are being corrected. */
+  editing?: AttributeEditing;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -569,7 +695,7 @@ function AttrSection({
     [flat, pinnedKeys, leading],
   );
 
-  if (sortedEntries.length === 0) return null;
+  if (sortedEntries.length === 0 && !editing) return null;
 
   return (
     <Box marginBottom={3}>
@@ -611,6 +737,20 @@ function AttrSection({
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
                 restriction={restrictionFor ? restrictionFor(key) : null}
+                editing={
+                  editing && !isLeading
+                    ? {
+                        removed: editing.edits[key] === null,
+                        changed:
+                          key in editing.edits && editing.edits[key] !== null,
+                        onChangeValue: (value) =>
+                          editing.onEditAttribute({ key, value }),
+                        onRemove: () =>
+                          editing.onEditAttribute({ key, value: null }),
+                        onRestore: () => editing.onResetAttribute(key),
+                      }
+                    : undefined
+                }
               />
             );
           })}
@@ -631,6 +771,76 @@ function AttrSection({
           />
         </Box>
       )}
+      {editing && (
+        <AddAttributeRow
+          existingKeys={new Set(Object.keys(flat))}
+          {...editing}
+        />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Adds an attribute the trace never recorded. The key check is here rather
+ * than on save because a duplicate key would silently overwrite the row above
+ * it, and the reviewer would only find out by reading the saved correction.
+ */
+function AddAttributeRow({
+  existingKeys,
+  onEditAttribute,
+}: AttributeEditing & { existingKeys: Set<string> }) {
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAdd = () => {
+    const trimmedKey = key.trim();
+    if (trimmedKey.length === 0) return;
+    if (existingKeys.has(trimmedKey)) {
+      setError("This key already exists");
+      return;
+    }
+    onEditAttribute({ key: trimmedKey, value: parseAttributeInput(value) });
+    setKey("");
+    setValue("");
+    setError(null);
+  };
+
+  return (
+    <Box marginTop={2}>
+      <HStack gap={2} align="center">
+        <Input
+          size="xs"
+          aria-label="New attribute name"
+          placeholder="Attribute name"
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setError(null);
+          }}
+          fontFamily="mono"
+          width="220px"
+          flexShrink={0}
+        />
+        <Input
+          size="xs"
+          aria-label="New attribute value"
+          placeholder="Value"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          fontFamily="mono"
+          flex={1}
+        />
+        <Button size="xs" variant="outline" onClick={handleAdd}>
+          Add attribute
+        </Button>
+      </HStack>
+      {error && (
+        <Text textStyle="2xs" color="red.fg" marginTop={1}>
+          {error}
+        </Text>
+      )}
     </Box>
   );
 }
@@ -641,8 +851,12 @@ export function AttributeTable({
   restrictedAttributes,
   title,
   spanId,
+  editing,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
+  // The JSON view is a read-only rendering of the same rows, so while the
+  // attributes are being corrected the table stays on the editable one.
+  const effectiveViewMode: AttrViewMode = editing ? "flat" : viewMode;
   // Compile the viewer's restrict rules once; a row is marked when its flat key
   // matches a rule. Same wildcard matcher the server redaction uses, so the
   // marker lines up with what is actually redacted.
@@ -666,10 +880,17 @@ export function AttributeTable({
 
   const flatAttrs = useMemo(() => {
     const flat = flattenAttributes(attributes);
+    // Attributes the correction adds are rows in their own right; ones it
+    // removes keep their captured value so the struck-through row still shows
+    // what is being taken away.
+    for (const [key, value] of Object.entries(editing?.edits ?? {})) {
+      if (value === null) continue;
+      flat[key] = value;
+    }
     // Prepend the span id as a synthetic, copyable first row. A real
     // `span_id` attribute (vanishingly unlikely) still wins via the spread.
     return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
-  }, [attributes, spanId]);
+  }, [attributes, spanId, editing?.edits]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -716,29 +937,32 @@ export function AttributeTable({
           borderColor="border.muted"
           _focus={{ borderColor: "border.emphasized" }}
         />
-        <SegmentedToggle
-          value={viewMode}
-          onChange={(m) => setViewMode(m as AttrViewMode)}
-          options={VIEW_MODE_OPTIONS}
-        />
+        {!editing && (
+          <SegmentedToggle
+            value={viewMode}
+            onChange={(m) => setViewMode(m as AttrViewMode)}
+            options={VIEW_MODE_OPTIONS}
+          />
+        )}
         <CopyAllButton payload={copyPayload} />
       </HStack>
 
       <AttrSection
         title={spanAttrTitle}
         attributes={filterAttrs}
-        viewMode={viewMode}
+        viewMode={effectiveViewMode}
         source="attribute"
         labelWidth={labelWidth}
         onLabelResize={handleLabelResize}
         leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
         restrictionFor={restrictionFor}
+        editing={editing}
       />
       {filterResAttrs && (
         <AttrSection
           title="Resource Attributes"
           attributes={filterResAttrs}
-          viewMode={viewMode}
+          viewMode={effectiveViewMode}
           source="resource"
           labelWidth={labelWidth}
           onLabelResize={handleLabelResize}

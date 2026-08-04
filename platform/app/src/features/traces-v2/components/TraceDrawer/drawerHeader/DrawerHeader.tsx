@@ -61,6 +61,7 @@ import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { EditedOriginalToggle } from "../editMode/EditedOriginalToggle";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
@@ -489,6 +490,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
+  const isEditing = useDrawerStore((s) => s.editing);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
@@ -1081,6 +1083,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               onAddToAnnotationQueue={handleAddToAnnotationQueue}
               pinned={pinned}
               onTogglePinned={togglePinned}
+              readOnly={readOnly}
             />
             <Box
               width="1px"
@@ -1305,8 +1308,13 @@ export const DrawerHeader = memo(function DrawerHeader({
               origin: trace.origin,
             })
           }
+          isEditing={isEditing}
           endSlot={
             <HStack gap={2}>
+              {/* Switching between the corrected and the captured trace, and
+                  the full difference between them. Renders nothing until the
+                  trace actually has a correction. */}
+              {!readOnly && <EditedOriginalToggle />}
               {/* Presence avatars sit at the trailing edge of the mode-tab
                   row — out of the way of the title and not crowding the
                   action cluster. Copy trace ID lives in the overflow

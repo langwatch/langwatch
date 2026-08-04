@@ -6,6 +6,7 @@ import {
   type DrawerViewMode,
   isViewMode,
   isVizTab,
+  parseEditParam,
   parsePinnedSpansParam,
   serializePinnedSpansParam,
   useDrawerStore,
@@ -36,6 +37,7 @@ function readUrlState(): DrawerUrlState {
       vizTab: DEFAULTS.viz,
       selectedSpanId: null,
       pinnedSpanIds: [],
+      editing: false,
     };
   }
   const params = new URLSearchParams(window.location.search);
@@ -45,6 +47,10 @@ function readUrlState(): DrawerUrlState {
     vizTab: parseViz(params.get("drawer.viz") ?? undefined),
     selectedSpanId: span,
     pinnedSpanIds: parsePinnedSpansParam(params.get("drawer.pinnedSpans")),
+    editing: parseEditParam({
+      raw: params.get("drawer.edit"),
+      traceId: params.get("drawer.traceId"),
+    }),
   };
 }
 
@@ -88,6 +94,7 @@ export function useDrawerUrlSync() {
   const vizTab = useDrawerStore((s) => s.vizTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const editing = useDrawerStore((s) => s.editing);
 
   // Parsed URL view of the same fields. We compare against these — not
   // raw store-vs-store — so a freshly-clicked tab never re-pushes when the
@@ -102,6 +109,7 @@ export function useDrawerUrlSync() {
     () => serializePinnedSpansParam(pinnedSpanIds) ?? "",
     [pinnedSpanIds],
   );
+  const urlEditing = params.edit === "1";
 
   useEffect(() => {
     if (!drawerOpenInUrl) return;
@@ -115,6 +123,11 @@ export function useDrawerUrlSync() {
       // `undefined` removes the param when the store has zero pins —
       // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
       updates.pinnedSpans = storePinnedRaw || undefined;
+    }
+    if (editing !== urlEditing) {
+      // Absent rather than `drawer.edit=0` when reading: the URL only names
+      // the mode when it is on.
+      updates.edit = editing ? "1" : undefined;
     }
     if (Object.keys(updates).length === 0) return;
     // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
@@ -130,10 +143,12 @@ export function useDrawerUrlSync() {
     vizTab,
     selectedSpanId,
     storePinnedRaw,
+    editing,
     urlMode,
     urlViz,
     urlSpan,
     urlPinnedRaw,
+    urlEditing,
     updateDrawerParams,
   ]);
 

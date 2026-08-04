@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type DrawerViewMode, useDrawerStore } from "../stores/drawerStore";
+import { guardTraceEditExit } from "../utils/traceEditMode";
 
 /**
  * Trace-to-trace navigation inside the v2 drawer with a back stack.
@@ -58,21 +59,25 @@ export function useTraceDrawerNavigation() {
       ) {
         return;
       }
-      pushTraceHistory({
-        traceId: fromTraceId,
-        viewMode: fromViewMode,
-        occurredAtMs: fromTimestamp,
-      });
-      if (toViewMode) {
-        if (persistViewMode) setViewMode(toViewMode);
-        else useDrawerStore.getState().setViewModeTransient(toViewMode);
-      }
-      // Push into the store immediately so drawer hooks render with the
-      // right traceId/occurredAtMs before the URL change settles.
-      useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
-      openDrawer("traceV2Details", {
-        traceId: toTraceId,
-        ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+      // Moving to another trace leaves the correction behind, so an unsaved
+      // one asks first and the navigation waits on the answer.
+      guardTraceEditExit(() => {
+        pushTraceHistory({
+          traceId: fromTraceId,
+          viewMode: fromViewMode,
+          occurredAtMs: fromTimestamp,
+        });
+        if (toViewMode) {
+          if (persistViewMode) setViewMode(toViewMode);
+          else useDrawerStore.getState().setViewModeTransient(toViewMode);
+        }
+        // Push into the store immediately so drawer hooks render with the
+        // right traceId/occurredAtMs before the URL change settles.
+        useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
+        openDrawer("traceV2Details", {
+          traceId: toTraceId,
+          ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+        });
       });
     },
     [openDrawer, pushTraceHistory, setViewMode],
