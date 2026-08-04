@@ -36393,6 +36393,9 @@
           }
         },
         "operationId": "postApiWebhooksV1Endpoints",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -36730,6 +36733,9 @@
           }
         },
         "operationId": "getApiWebhooksV1Endpoints",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [],
         "description": "List the organization's webhook endpoints"
       }
@@ -37059,6 +37065,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37395,6 +37404,9 @@
           }
         },
         "operationId": "patchApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -37700,6 +37712,9 @@
           }
         },
         "operationId": "deleteApiWebhooksV1EndpointsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -38042,6 +38057,9 @@
           }
         },
         "operationId": "postApiWebhooksV1EndpointsByIdRoll-secret",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -38319,6 +38337,9 @@
           }
         },
         "operationId": "postApiWebhooksV1EndpointsByIdTest",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -38641,6 +38662,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsByIdDeliveries",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -38984,6 +39008,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EndpointsByIdHealth",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {
@@ -39223,6 +39250,9 @@
           }
         },
         "operationId": "getApiWebhooksV1Event-types",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [],
         "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet"
       }
@@ -39462,6 +39492,9 @@
           }
         },
         "operationId": "getApiWebhooksV1Events",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -39778,6 +39811,9 @@
           }
         },
         "operationId": "getApiWebhooksV1EventsById",
+        "tags": [
+          "Webhooks"
+        ],
         "parameters": [
           {
             "schema": {

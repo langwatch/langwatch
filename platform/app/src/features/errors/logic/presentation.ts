@@ -1293,6 +1293,21 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_endpoint_not_found: {
+    // An archived endpoint reads the same as one that never existed, so the
+    // copy names archiving as the likely cause rather than only the typo.
+    title: "That webhook endpoint isn't there",
+    describe: () =>
+      "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
+  },
+  webhook_endpoint_invalid: {
+    // Names the three things the endpoint form can get wrong, rather than
+    // echoing the server's sentence: `meta.message` on this code can carry
+    // an internal reason, and the customer channel is not where that goes.
+    title: "That webhook endpoint can't be saved",
+    describe: () =>
+      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+  },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
     // governance events were never in it to begin with.

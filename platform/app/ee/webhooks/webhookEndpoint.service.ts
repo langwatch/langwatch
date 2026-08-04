@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -85,10 +86,40 @@ export function assertValidDeliveryControls(
   }
 }
 
-export class WebhookEndpointValidationError extends Error {}
-export class WebhookEndpointNotFoundError extends Error {
+/**
+ * The endpoint as asked for cannot be saved: the URL is refused by the
+ * admission policy, an event name is not in the catalog, or a delivery
+ * control is out of bounds. The message names which, because every one of
+ * them is something the caller can correct on the next attempt.
+ */
+export class WebhookEndpointValidationError extends HandledError {
+  declare readonly code: "webhook_endpoint_invalid";
+
+  constructor(message: string) {
+    super("webhook_endpoint_invalid", message, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointValidationError";
+  }
+}
+
+/**
+ * No live endpoint in this organization has that id.
+ *
+ * Archived endpoints answer the same as ids that never existed and as ids
+ * belonging to another organization: telling those apart would confirm the
+ * existence of another tenant's rows.
+ */
+export class WebhookEndpointNotFoundError extends HandledError {
+  declare readonly code: "webhook_endpoint_not_found";
+
   constructor() {
-    super("Webhook endpoint not found");
+    super("webhook_endpoint_not_found", "Webhook endpoint not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "WebhookEndpointNotFoundError";
   }
 }
 
