@@ -76,3 +76,10 @@ Feature: Every shipped install profile can hold the evaluations service it start
     Given the service passes an explicit worker count to its web server
     Then setting WEB_CONCURRENCY changes nothing about how many workers run
     And no shipped profile sets it, so none implies a bound it does not have
+
+  @unit
+  Scenario: The sizing documentation quotes the profile it is describing
+    Given someone provisioning a cluster reads the sizing page to decide how big to make it
+    When a profile changes what the evaluations service asks for
+    Then the figures on that page still match the profile they name
+    And nobody sizes a cluster from a number the chart stopped using

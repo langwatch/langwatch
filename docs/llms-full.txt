@@ -53691,25 +53691,39 @@ These are the default resource requests and limits from the Helm chart (`values.
 
 The Helm chart ships with composable overlay files in `examples/overlays/`. Use them with `helm install -f`:
 
-### Development (`values-local.yaml`)
+Every figure below is `requests`/`limits` as the chart renders it, and the totals are the sum of requests across all replicas. They include the AI Gateway and Langy, which run by default and are a real part of what your cluster has to fit.
 
-For local development and small teams.
+### Development (`size-dev.yaml`)
+
+For development, demos and small teams.
 
 - LangWatch App: 1 replica, 250m/1 CPU, 1Gi/3Gi memory
-- LangWatch Workers: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- LangWatch Workers: 1 replica, 250m/1 CPU, 768Mi/2Gi memory
 - LangWatch NLP: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
-- LangEvals: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
-- ClickHouse: 1 CPU, 1Gi memory, 5Gi storage
+- LangEvals: 1 replica, 100m/500m CPU, 768Mi/4Gi memory
+- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
+- ClickHouse: 1 CPU, 2Gi memory, 5Gi storage
 - PostgreSQL: 100m/500m CPU, 256Mi/512Mi memory, 2Gi storage
 - Redis: 50m/250m CPU, 64Mi/256Mi memory, 1Gi storage
-- Total: ~1 CPU, ~4 Gi RAM requests
+- Prometheus: 50m/250m CPU, 128Mi/512Mi memory
+- Total: ~2.6 CPU, ~6.7 Gi RAM requests
 
 ```yaml
-# Example: helm install with dev sizing
 helm install langwatch langwatch/langwatch \
-  -f examples/values-local.yaml \
+  -f examples/overlays/size-dev.yaml \
   --set autogen.enabled=true
 ```
+
+`examples/values-local.yaml` is the same sizing without Prometheus (~2.6 CPU, ~6.6 Gi), bundled with NodePort access and images pinned to a locally built `local` tag. That last part makes it Kind-only: see [Local Kubernetes](/self-hosting/deployment/kubernetes-local).
+
+### Minimal (`size-minimal.yaml`)
+
+The smallest configuration the platform still boots in. Trims the app, NLP, PostgreSQL and Redis further and drops ClickHouse to 1Gi.
+
+- Total: ~2.4 CPU, ~4.9 Gi RAM requests
+
+LangEvals is the one thing this overlay does not shrink much. A single worker holding every local model needs roughly 2.6 Gi resident, so its limit stays at 4Gi. The limit is a ceiling rather than a reservation, so it costs nothing until an evaluator actually loads a model.
 
 ### Production (`size-prod.yaml`)
 
@@ -53719,11 +53733,13 @@ For production with single-node ClickHouse.
 - LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
 - LangWatch NLP: 1 replica, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
+- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
-- PostgreSQL: 20Gi storage
-- Redis: 5Gi storage
-- Prometheus: 30d retention, 20Gi storage
-- Total: ~12 CPU, ~28 Gi RAM requests
+- PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
+- Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
+- Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
+- Total: ~8.7 CPU, ~22.8 Gi RAM requests
 
 ```yaml
 helm install langwatch langwatch/langwatch \
@@ -53739,11 +53755,14 @@ For production with replicated ClickHouse.
 - LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
 - LangWatch NLP: 2 replicas, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
+- AI Gateway: 1 replica, 200m/1 CPU, 256Mi/512Mi memory
+- Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
-- PostgreSQL: 50Gi storage
-- Redis: 10Gi storage
-- Prometheus: 60d retention, 50Gi storage
-- Total: ~25 CPU, ~70 Gi RAM requests (plus 3x ClickHouse)
+- ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
+- PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
+- Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
+- Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
+- Total: ~22.7 CPU, ~84.5 Gi RAM requests
 
 ```yaml
 helm install langwatch langwatch/langwatch \
@@ -54707,7 +54726,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
-- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+- **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
 
@@ -54744,7 +54763,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 ## Low-Resources Deployment
 
-The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
 curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
@@ -57175,10 +57194,16 @@ helm repo update
 helm pull langwatch/langwatch --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
-  -f langwatch/examples/values-local.yaml
+  --set autogen.enabled=true \
+  -f langwatch/examples/overlays/size-dev.yaml \
+  --wait --timeout 10m
 ```
 
-See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets so there is nothing to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+
+Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
+
+`examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
 Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
 </Tip>

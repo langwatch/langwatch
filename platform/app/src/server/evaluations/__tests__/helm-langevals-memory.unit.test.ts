@@ -55,6 +55,30 @@ const SMALL_PROFILES = [
 const CHART_DEFAULTS = "charts/langwatch/values.yaml";
 const MEBIBYTES: Record<string, number> = { Mi: 1, Gi: 1024, M: 1, G: 1024 };
 
+const SIZING_DOC = "docs/self-hosting/configuration/sizing-and-scaling.mdx";
+
+/**
+ * The sizing page quotes each profile's figures so someone can decide how much
+ * cluster to buy without reading YAML. A quote is a copy, and copies rot: these
+ * numbers had drifted far enough that the page understated a dev install by
+ * more than a gigabyte. Each entry pairs a heading on that page with the file
+ * it claims to describe.
+ */
+const DOCUMENTED_PROFILES = [
+  {
+    heading: "### Development (`size-dev.yaml`)",
+    values: "charts/langwatch/examples/overlays/size-dev.yaml",
+  },
+  {
+    heading: "### Production (`size-prod.yaml`)",
+    values: "charts/langwatch/examples/overlays/size-prod.yaml",
+  },
+  {
+    heading: "### High Availability (`size-ha.yaml`)",
+    values: "charts/langwatch/examples/overlays/size-ha.yaml",
+  },
+] as const;
+
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
 }
@@ -93,6 +117,35 @@ function langevalsMemory(relativePath: string): {
   };
 
   return { request: read("requests"), limit: read("limits") };
+}
+
+/**
+ * The memory figures the sizing page quotes for the evaluations service under
+ * one heading, written there as `<request>/<limit> memory`. Scoped to the
+ * section so another profile's bullet cannot satisfy the assertion.
+ */
+function documentedLangevalsMemory(heading: string): {
+  request: number;
+  limit: number;
+} {
+  const doc = readRepoFile(SIZING_DOC);
+  const start = doc.indexOf(heading);
+  if (start === -1) {
+    throw new Error(`No "${heading}" section in ${SIZING_DOC}`);
+  }
+  const after = doc.slice(start + heading.length);
+  const end = after.indexOf("\n### ");
+  const section = end === -1 ? after : after.slice(0, end);
+
+  const bullet = /^- LangEvals:.*?(\S+)\/(\S+) memory/m.exec(section);
+  if (!bullet) {
+    throw new Error(`No LangEvals memory bullet under "${heading}"`);
+  }
+
+  return {
+    request: toMebibytes(bullet[1]!),
+    limit: toMebibytes(bullet[2]!),
+  };
 }
 
 describe("Helm sizing for the evaluations service", () => {
@@ -144,6 +197,18 @@ describe("Helm sizing for the evaluations service", () => {
       // the request to a fraction of the ceiling is what makes the pod fit on
       // a node it could never fill.
       expect(request).toBeLessThanOrEqual(limit / 2);
+    });
+  });
+
+  describe("when the sizing page quotes a profile's figures", () => {
+    /** @scenario "The sizing documentation quotes the profile it is describing" */
+    it.each(DOCUMENTED_PROFILES)("matches $values under $heading", ({
+      heading,
+      values,
+    }) => {
+      expect(documentedLangevalsMemory(heading)).toEqual(
+        langevalsMemory(values),
+      );
     });
   });
 
