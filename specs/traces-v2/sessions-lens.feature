@@ -121,6 +121,13 @@ Rule: Session pages walk with a stable keyset cursor
     Then the read is refused with a validation error
     And the repository is never queried
 
+  @unit
+  Scenario: Switching lenses does not carry a cursor across
+    Given the list is on its second page
+    When the reader switches to a lens that pages differently
+    Then the new lens starts at its own first page
+    And the previous lens's cursor is not offered to it
+
   @integration
   Scenario: A larger persisted page size clamps to the sessions cap
     Given the shared rows-per-page preference is larger than the sessions lens allows

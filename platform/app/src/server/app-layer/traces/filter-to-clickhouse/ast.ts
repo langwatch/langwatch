@@ -13,6 +13,7 @@ import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
+  MAX_VALUE_LENGTH,
   nextParam,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
@@ -120,12 +121,13 @@ export function extractFreeTextTerms(queryText: string): string[] {
   const terms: string[] = [];
   collectFreeTextTerms(ast, false, terms);
   // Each term becomes its own `positionCaseInsensitive` over the transcript
-  // bodies, so the count decides how many passes that subquery makes. Past
-  // the cap the content branch is dropped whole rather than truncated: the
-  // terms are ANDed, so keeping a prefix would answer a narrower question
-  // than the one asked and return sessions that do not match the rest. Same
-  // call as the OR case above, for the same reason.
+  // bodies, so the count and the width of each term decide how much work that
+  // subquery does. Past either bound the content branch is dropped whole
+  // rather than truncated: the terms are ANDed, so keeping a prefix would
+  // answer a narrower question than the one asked and return sessions that do
+  // not match the rest. Same call as the OR case above, for the same reason.
   if (terms.length > MAX_CONTENT_TERMS) return [];
+  if (terms.some((term) => term.length > MAX_VALUE_LENGTH)) return [];
   return terms;
 }
 

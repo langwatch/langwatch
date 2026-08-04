@@ -46,6 +46,18 @@ function seedThirdPageSortedBy(sort: {
   });
 }
 
+/** The same, one batch earlier: the state a single click of Next leaves. */
+function seedSecondPageSortedBy(sort: {
+  columnId: string;
+  direction: "asc" | "desc";
+}): void {
+  seedThirdPageSortedBy(sort);
+  useFilterStore.setState({
+    page: 2,
+    pageCursors: { 1: null, 2: CURSOR_PAGE_2 },
+  });
+}
+
 beforeEach(() => {
   useFilterStore.getState().clearAll();
 });
@@ -133,6 +145,43 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
         view().setGrouping("flat");
 
         expect(view().sort.columnId).toBe("time");
+        expect(pagination()).toEqual(FIRST_PAGE);
+      });
+    });
+  });
+
+  // The second batch is the boundary worth pinning on its own: it is the first
+  // page that holds a cursor at all, and the sessions lens pages with opaque
+  // strings while the flat list pages with objects. A cursor surviving this
+  // switch is one lens reading the other's cursor space.
+  describe("given the second batch, one click of Next from the start", () => {
+    describe("when the user switches from the flat list to Sessions", () => {
+      beforeEach(() =>
+        seedSecondPageSortedBy({ columnId: "time", direction: "desc" }),
+      );
+
+      /** @scenario Switching lenses does not carry a cursor across */
+      it("starts Sessions at its own first batch", () => {
+        view().setGrouping("by-conversation");
+
+        expect(pagination()).toEqual(FIRST_PAGE);
+      });
+    });
+
+    describe("when the user switches from Sessions back to the flat list", () => {
+      beforeEach(() => {
+        seedSecondPageSortedBy({ columnId: "lastTurn", direction: "desc" });
+        useViewStore.setState({ grouping: "by-conversation" });
+        useFilterStore.setState({
+          page: 2,
+          pageCursors: { 1: null, 2: "opaque-sessions-cursor" },
+        });
+      });
+
+      /** @scenario Switching lenses does not carry a cursor across */
+      it("leaves no sessions cursor behind for the flat list to read", () => {
+        view().setGrouping("flat");
+
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });

@@ -43,8 +43,11 @@ function describe(
     }
     case "api_refusal":
       return "The model refused this request";
+    // Distinct from the 429 above: that one is inferred from a failed call,
+    // this one is the agent saying so itself. The session rollup counts them
+    // apart, so the log list has to read apart too.
     case "rate_limit":
-      return "Rate limited by the provider";
+      return "Rate limit reported by the agent";
     case "retries_exhausted":
       return `Gave up after retrying${attrs.total_attempts ? ` (${attrs.total_attempts} attempts)` : ""}`;
     case "tool_result":

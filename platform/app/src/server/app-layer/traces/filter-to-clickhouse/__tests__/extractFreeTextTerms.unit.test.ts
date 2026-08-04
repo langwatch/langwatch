@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { extractFreeTextTerms } from "../ast";
+import { MAX_VALUE_LENGTH } from "../value-helpers";
 
 describe("given plain free text", () => {
   describe("when extracting the content terms", () => {
@@ -35,6 +36,12 @@ describe("given a mix of structured tags and free text", () => {
 
     it("skips terms negated with the dash prefix", () => {
       expect(extractFreeTextTerms("keep -dropped")).toEqual(["keep"]);
+    });
+
+    // Negation is tracked as a parity, not a flag, so the second NOT cancels
+    // the first and the term is positive again.
+    it("keeps a doubly negated term", () => {
+      expect(extractFreeTextTerms("NOT (NOT keep)")).toEqual(["keep"]);
     });
   });
 });
@@ -78,6 +85,31 @@ describe("given empty or unparsable input", () => {
     it("returns no terms", () => {
       expect(extractFreeTextTerms("")).toEqual([]);
       expect(extractFreeTextTerms("   ")).toEqual([]);
+    });
+
+    // Blank input never reaches the parser, so a genuinely malformed query is
+    // what proves the parse failure is caught rather than thrown at the caller.
+    it("returns no terms for a query the parser rejects", () => {
+      expect(extractFreeTextTerms('"unterminated')).toEqual([]);
+    });
+  });
+});
+
+describe("given a free-text term wider than a filter value may be", () => {
+  describe("when extracting the content terms", () => {
+    // Every term becomes its own substring scan over transcript bodies, so an
+    // unbounded literal is a scan nobody asked for. Dropped whole for the same
+    // reason the cap drops: the terms are ANDed.
+    it("drops the content branch rather than scanning on it", () => {
+      const wide = "x".repeat(MAX_VALUE_LENGTH + 1);
+
+      expect(extractFreeTextTerms(`keep ${wide}`)).toEqual([]);
+    });
+
+    it("keeps a term sitting on the width limit", () => {
+      const wide = "x".repeat(MAX_VALUE_LENGTH);
+
+      expect(extractFreeTextTerms(wide)).toEqual([wide]);
     });
   });
 });

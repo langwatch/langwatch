@@ -494,6 +494,7 @@ describe("SessionGroupsClickHouseRepository", () => {
       const seen: string[] = [];
       const activities: number[] = [];
       let cursor: SessionGroupsQuery["cursor"];
+      let didReachLastPage = false;
       for (let guard = 0; guard < 10; guard++) {
         const page = await repository.findSessionGroups(
           query({ limit: 3, cursor }),
@@ -501,7 +502,10 @@ describe("SessionGroupsClickHouseRepository", () => {
         const pageRows = page.rows.slice(0, 2);
         seen.push(...pageRows.map((row) => row.conversationId));
         activities.push(...pageRows.map((row) => row.lastActivityMs));
-        if (page.rows.length <= 2) break;
+        if (page.rows.length <= 2) {
+          didReachLastPage = true;
+          break;
+        }
         const last = pageRows[pageRows.length - 1]!;
         cursor = {
           sortValue: last.lastActivityMs,
@@ -509,6 +513,10 @@ describe("SessionGroupsClickHouseRepository", () => {
         };
       }
 
+      // Without this the walk running out of iterations lands on the
+      // session-list assertion below, which reports a short walk as missing
+      // rows rather than as the loop giving up.
+      expect(didReachLastPage).toBe(true);
       const pagedSessions = seen.filter((id) => id.startsWith(pagedTag));
       expect(new Set(seen).size).toBe(seen.length);
       expect(pagedSessions).toEqual(
