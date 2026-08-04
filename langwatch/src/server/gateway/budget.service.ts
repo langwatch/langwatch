@@ -33,9 +33,14 @@ import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
 } from "./budgetScopeReach";
-import { nextResetAt, shouldResetBudget } from "./budgetWindow";
+import {
+  isCyclicWindow,
+  nextBoundaryFor,
+  shouldResetBudget,
+} from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
 import {
+  GatewayBudgetCycleAnchorInvalidError,
   GatewayBudgetNotFoundError,
   GatewayGroupBudgetUnsupportedError,
   GatewayScopeOrgMismatchError,
@@ -105,6 +110,13 @@ export type CreateBudgetInput = {
   externalId?: string | null;
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata?: ResourceMetadata;
+  /**
+   * Phases a cyclic window off this instant instead of the calendar, so a
+   * MONTH budget anchored on the 17th at 09:00 UTC rolls every 17th at
+   * 09:00 UTC. Null (the default) keeps the calendar alignment every budget
+   * has today. Rejected on TOTAL and MANUAL, which do not cycle.
+   */
+  cycleAnchorAt?: Date | null;
   actorUserId: string;
 };
 
@@ -813,6 +825,15 @@ export class GatewayBudgetService {
   }
 
   async create(input: CreateBudgetInput): Promise<GatewayBudget> {
+    // An anchor only means something on a window that rolls. Checked before
+    // any lookup, since it needs nothing but the request.
+    const cycleAnchorAt = input.cycleAnchorAt ?? null;
+    if (cycleAnchorAt && !isCyclicWindow(input.window)) {
+      throw new GatewayBudgetCycleAnchorInvalidError(
+        input.window.toLowerCase(),
+      );
+    }
+
     // Cross-org guard for PRINCIPAL budgets: the named user must be a
     // member of the budget's organization. Without this check an admin
     // in org A could create a PRINCIPAL budget for any userId — the FK
@@ -966,7 +987,7 @@ export class GatewayBudgetService {
       }
     }
 
-    const resetsAt = nextResetAt(input.window);
+    const resetsAt = nextBoundaryFor({ window: input.window, cycleAnchorAt });
     const projectId = resolveProjectFromScope(input.scope);
 
     const created = await this.prisma
@@ -985,6 +1006,7 @@ export class GatewayBudgetService {
             providerKey: input.providerKey ?? null,
             externalId: input.externalId ?? null,
             ...identityPatchData({ metadata: input.metadata }),
+            cycleAnchorAt,
             resetsAt,
             currentPeriodStartedAt: new Date(),
             createdById: input.actorUserId,
@@ -1208,7 +1230,10 @@ export class GatewayBudgetService {
         data: {
           currentPeriodStartedAt: now,
           lastResetAt: now,
-          resetsAt: nextResetAt(existing.window, now),
+          // A reset forgives the spend so far; it does not re-phase the
+          // cycle, so an anchored budget reports the next boundary on its
+          // own schedule rather than one window from this instant.
+          resetsAt: nextBoundaryFor(existing, now),
           // The current-period figure the bundle reads; the period just
           // restarted, so it is zero by definition. Ledger rows untouched.
           spentUsd: new Prisma.Decimal(0),

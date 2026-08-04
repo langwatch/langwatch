@@ -46,6 +46,11 @@ import {
   bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
 } from "./budgetResolution.service";
+import {
+  anchoredPeriodStart,
+  isCyclicWindow,
+  nextBoundaryFor,
+} from "./budgetWindow";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -1125,7 +1130,7 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * This is one half of a contract: the rollup only ever returns a row when
  * this lands on exactly the PeriodStart the materialised view bucketed the
  * debit into. The other half is the multiIf() in
- * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
+ * 00069_gateway_budget_scope_totals_budget_grain.sql, and the two are pinned
  * together by budget.clickhouse.repository.periodStart.integration.test.ts.
  * Change one without the other and the affected window stops accruing
  * entirely: spend is written, every read returns 0, and budgets on that
@@ -1134,28 +1139,94 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose
  * period boundary is not the calendar one, or undefined for the rollup
- * fast path. MANUAL windows always read from their stored boundary. A
+ * fast path. MANUAL windows always read from their stored boundary. An
+ * anchored budget always reads from its own period start, since the rollup
+ * buckets by calendar period and has no row that matches an anchored one. A
  * calendar (or TOTAL) window reads from the boundary only after an actual
  * mid-period reset (lastResetAt set) and only until the next calendar
  * boundary passes it; an unreset TOTAL budget keeps its lifetime-bucket
  * semantics.
+ *
+ * `cycleAnchorAt` is required rather than optional so that a caller reading
+ * a budget row cannot forget it and silently get a calendar floor for an
+ * anchored budget, which would count another period's spend against it.
  */
 export function budgetPeriodFloorMs(
   budget: {
     window: GatewayBudgetWindow;
     currentPeriodStartedAt: Date;
     lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
   },
   now: Date = new Date(),
 ): number | undefined {
   if (budget.window === "MANUAL") {
     return budget.currentPeriodStartedAt.getTime();
   }
+  if (budget.cycleAnchorAt && isCyclicWindow(budget.window)) {
+    const anchored = anchoredPeriodStart(
+      budget.window,
+      budget.cycleAnchorAt,
+      now,
+    ).getTime();
+    // A reset forgives the spend so far but never re-phases the cycle: the
+    // clamp holds only until this period ends, and the next one starts on
+    // the anchor's schedule as if the reset had not happened. Same shape as
+    // the calendar clamp below, with the anchored boundary in place of the
+    // calendar one.
+    return budget.lastResetAt
+      ? Math.max(anchored, budget.currentPeriodStartedAt.getTime())
+      : anchored;
+  }
   if (!budget.lastResetAt) return undefined;
   const boundary = budget.currentPeriodStartedAt.getTime();
   return boundary > currentPeriodStart(budget.window, now).getTime()
     ? boundary
     : undefined;
+}
+
+/**
+ * The period a budget is actually in right now, as opposed to the one its
+ * stored columns claim.
+ *
+ * `currentPeriodStartedAt` and `resetsAt` are written once at create and
+ * again at each explicit reset, and nothing sweeps them forward when a
+ * period rolls. For a calendar budget past its first boundary the stored
+ * start is therefore its creation date and the stored reset instant is in
+ * the past, while enforcement has long since moved on to the current
+ * calendar period. Reporting the stored pair tells a caller their month
+ * started in March.
+ *
+ * So every read-side surface computes the pair here instead: anchored
+ * budgets report their anchored bounds, cyclic ones their calendar bounds
+ * (clamped forward by a mid-period reset, exactly as the floor is), and
+ * TOTAL / MANUAL pass their stored values through since those windows have
+ * no boundary to drift past.
+ */
+export function effectiveBudgetPeriod(
+  budget: {
+    window: GatewayBudgetWindow;
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+  },
+  now: Date = new Date(),
+): { currentPeriodStartedAt: Date; resetsAt: Date } {
+  if (!isCyclicWindow(budget.window)) {
+    return {
+      currentPeriodStartedAt: budget.currentPeriodStartedAt,
+      resetsAt: budget.resetsAt,
+    };
+  }
+  const floorMs = budgetPeriodFloorMs(budget, now);
+  return {
+    currentPeriodStartedAt:
+      floorMs === undefined
+        ? currentPeriodStart(budget.window, now)
+        : new Date(floorMs),
+    resetsAt: nextBoundaryFor(budget, now),
+  };
 }
 
 /**
@@ -1174,6 +1245,7 @@ export function bucketPeriodFloorMs(
     window: GatewayBudgetWindow;
     currentPeriodStartedAt: Date;
     lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
   },
   boundaryPeriodStartedAt: Date | null | undefined,
   now: Date = new Date(),

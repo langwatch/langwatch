@@ -3161,6 +3161,14 @@ model GatewayBudget {
   resetsAt               DateTime
   lastResetAt            DateTime?
 
+  // The phase of a cyclic window. NULL keeps the window calendar aligned
+  // (a MONTH budget rolls on the 1st); set, the window rolls from this
+  // instant instead, so a budget anchored on the 17th at 09:00 UTC starts a
+  // fresh month every 17th at 09:00 UTC. Immutable once written: moving it
+  // would redraw every period the budget has already reported and enforced
+  // on. Only ever set on a cyclic window; TOTAL and MANUAL do not cycle.
+  cycleAnchorAt DateTime?
+
   archivedAt DateTime?
 
   createdAt   DateTime @default(now())

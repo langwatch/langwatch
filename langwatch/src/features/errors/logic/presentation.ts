@@ -1250,6 +1250,17 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  gateway_budget_cycle_anchor_invalid: {
+    // Names the window back, because the fix is to change one of the two:
+    // drop the anchor, or pick a window that rolls.
+    title: "That window can't start on a chosen date",
+    describe: (error) => {
+      const window = str(error, "window", "");
+      return window
+        ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
+        : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
     // another organization, which is exactly what this guard refuses to

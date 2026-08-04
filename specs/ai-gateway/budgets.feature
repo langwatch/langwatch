@@ -565,6 +565,63 @@ Feature: AI Gateway — Budgets
     Then the reset fires at 00:00 Europe/Amsterdam, not UTC
 
   # ============================================================================
+  # Anchored budget cycles
+  # ============================================================================
+  #
+  # Cyclic windows are calendar aligned by default: a month budget starts on
+  # the 1st, a week budget on Monday. A budget created with a cycle anchor
+  # cycles from that instant instead, so a customer whose own billing runs
+  # from the 17th gets a gateway period that lines up with their invoice.
+  # The anchor is the phase of the cycle and never moves: it is set at create
+  # and immutable after, because moving it would redraw every period the
+  # budget has already reported and enforced on.
+
+  @unit
+  Scenario: An anchored cycle starts periods at the anchor instant, not the calendar
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    When the clock reads 2026-07-15T00:00Z
+    Then its current period started at 2026-06-17T09:00Z
+    And its next boundary is 2026-07-17T09:00Z
+    And the period rolls at that instant, not at 2026-07-01T00:00Z
+
+  @unit
+  Scenario: A month cycle anchored past the 28th clamps into shorter months and springs back
+    Given a budget with window "month" anchored at 2026-01-31T10:00Z
+    Then its periods start on Jan 31, Feb 28, Mar 31, Apr 30, May 31, Jun 30 and Jul 31, each at 10:00Z
+    And the same anchor in a leap year clamps to Feb 29 instead of Feb 28
+    And every period clamps from the original anchor day, so a short month never moves the billing day permanently
+
+  @unit
+  Scenario: An anchored budget floors every read at its own period start
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    When spend is read for it
+    Then the read is floored at the anchored period start rather than served from the calendar rollup
+    And a budget anchored to a future instant floors at that instant, so its spend reads zero until the period opens
+
+  @unit
+  Scenario: A reset inside an anchored period forgives spend until the next anchored boundary
+    Given a budget with window "month" anchored at 2026-06-17T09:00Z
+    And it was reset at 2026-07-02T14:00Z
+    When spend is read before 2026-07-17T09:00Z
+    Then the read is floored at the reset instant, so the forgiven spend stays forgiven
+    But from 2026-07-17T09:00Z the floor returns to the anchored schedule
+    And the reset never re-phases the cycle
+
+  @unit
+  Scenario: A cycle anchor needs a cyclic window
+    When I create a budget with window "total" or "manual" and a cycle anchor
+    Then creation is rejected with "gateway_budget_cycle_anchor_invalid"
+    Because neither window rolls, so there is no cycle for an anchor to phase
+
+  @unit
+  Scenario: The reported period is computed at read time, not stored
+    Given a calendar month budget created in March and never reset
+    When I read it in July
+    Then it reports the July period, not the stored March columns
+    And an anchored budget reports its own anchored bounds
+    And "total" and "manual" budgets keep their stored pair and far-future sentinel
+
+  # ============================================================================
   # Dashboard and spend visibility
   # ============================================================================
 
