@@ -7,9 +7,11 @@ import {
   useTraceEditStore,
 } from "../../../stores/traceEditStore";
 
+const NO_DRAFT_NAMES: ReadonlyMap<string, string> = new Map();
+
 /**
- * The waterfall's half of edit mode: which rows the correction removes, and
- * how to remove or bring one back.
+ * The waterfall's half of edit mode: which rows the correction removes, what
+ * the reviewer has renamed so far, and how to remove a span or bring one back.
  *
  * Deleting a span deletes its subtree, so every descendant is marked too:
  * a struck-through parent above untouched children would say the correction
@@ -18,6 +20,7 @@ import {
 export function useWaterfallEditing(spans: SpanTreeNode[]): {
   isEditing: boolean;
   deletedSpanIds: Set<string>;
+  draftNames: ReadonlyMap<string, string>;
   toggleSpanDeleted: (spanId: string) => void;
 } {
   const isEditing = useDrawerStore((s) => s.editing);
@@ -26,6 +29,7 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
   const basePatch = useTraceEditStore((s) => s.basePatch);
   const sessionDeleted = useTraceEditStore((s) => s.deletedSpanIds);
   const restoredSpanIds = useTraceEditStore((s) => s.restoredSpanIds);
+  const spanDrafts = useTraceEditStore((s) => s.spanDrafts);
 
   const deletedSpanIds = useMemo(() => {
     if (!isEditing) return new Set<string>();
@@ -46,6 +50,18 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
     });
   }, [isEditing, spans, basePatch, sessionDeleted, restoredSpanIds]);
 
+  // The rename each row should read with while it is unsaved. Only this
+  // session's drafts: the stored correction is already in the tree the reader
+  // came from.
+  const draftNames = useMemo(() => {
+    if (!isEditing) return NO_DRAFT_NAMES;
+    const names = new Map<string, string>();
+    for (const [spanId, draft] of Object.entries(spanDrafts)) {
+      if (draft.name !== undefined) names.set(spanId, draft.name);
+    }
+    return names;
+  }, [isEditing, spanDrafts]);
+
   const toggleSpanDeleted = useCallback(
     (spanId: string) => {
       const store = useTraceEditStore.getState();
@@ -64,5 +80,5 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
     [clearSpan, unpinSpan],
   );
 
-  return { isEditing, deletedSpanIds, toggleSpanDeleted };
+  return { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted };
 }

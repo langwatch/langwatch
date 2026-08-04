@@ -93,16 +93,26 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
       )}
       <Popover.Content
         width={isSuggest ? "560px" : "380px"}
-        // When the viewport really can't fit the popover, scroll inside
-        // rather than letting the positioner shrink and clip content.
-        maxHeight="min(640px, calc(100vh - 32px))"
-        overflowY="auto"
-        overflowX="hidden"
+        // The popover caps itself at `--available-height`, the room the
+        // positioner measured on the side it settled on. Capping at the
+        // viewport height instead replaced that measurement with a number that
+        // never binds, so the form kept its natural height and hung off the
+        // bottom of a short window with Save below the fold. Keep both: the
+        // measured room, and 640px so a tall window does not get a tall form.
+        maxHeight="min(640px, var(--available-height, 100vh))"
+        overflow="hidden"
         onClick={(e) => e.stopPropagation()}
         bg="bg.panel/92"
       >
         <Popover.Arrow />
-        <Popover.Body padding={isSuggest ? 4 : 3}>
+        <Popover.Body
+          padding={isSuggest ? 4 : 3}
+          // The form scrolls; the footer under it does not. Save stays on
+          // screen however little room the popover was given.
+          overflowY="auto"
+          overflowX="hidden"
+          minHeight={0}
+        >
           {isSuggest ? (
             <SuggestBody
               state={formState}
@@ -112,6 +122,7 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
             <AnnotateBody state={formState} />
           )}
         </Popover.Body>
+        <FormFooter state={formState} padding={isSuggest ? 4 : 3} />
       </Popover.Content>
     </Popover.Root>
   );
@@ -285,8 +296,6 @@ function AnnotateBody({ state }: { state: AnnotationFormState }) {
       />
 
       <ScoreFields state={state} />
-
-      <FormFooter state={state} />
     </VStack>
   );
 }
@@ -371,8 +380,6 @@ function SuggestBody({
       <CommentField value={state.comment} onChange={state.setComment} />
 
       <ScoreFields state={state} />
-
-      <FormFooter state={state} />
     </VStack>
   );
 }
@@ -451,9 +458,28 @@ function ScoreFields({ state }: { state: AnnotationFormState }) {
   );
 }
 
-function FormFooter({ state }: { state: AnnotationFormState }) {
+/**
+ * Cancel and Save, pinned under the scrolling form. Inside it, they would be a
+ * Save button the reviewer has to go looking for whenever the popover opened
+ * with less room than the form wants.
+ */
+function FormFooter({
+  state,
+  padding,
+}: {
+  state: AnnotationFormState;
+  padding: number;
+}) {
   return (
-    <HStack width="full" paddingTop={1}>
+    <HStack
+      width="full"
+      flexShrink={0}
+      paddingX={padding}
+      paddingBottom={padding}
+      // The form's own bottom padding sits above this, inside the scroll area,
+      // so the gap reads the same whether the form scrolls or not.
+      paddingTop={0}
+    >
       <Spacer />
       <Button size="xs" variant="ghost" onClick={state.onCancel}>
         Cancel

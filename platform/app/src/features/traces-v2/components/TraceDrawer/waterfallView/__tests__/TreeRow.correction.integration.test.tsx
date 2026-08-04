@@ -77,14 +77,15 @@ describe("TreeRow with a correction", () => {
   describe("given the trace is being corrected", () => {
     describe("when the row is rendered", () => {
       /** @scenario "Deleting a span marks it and its descendants" */
-      it("offers to delete the span", () => {
+      /** @scenario "Each row's delete action names the span it removes" */
+      it("offers to delete the span, named after that span", () => {
         const onToggleDelete = vi.fn();
         const { getByLabelText } = renderRow({
           isEditing: true,
           onToggleDelete,
         });
 
-        fireEvent.click(getByLabelText("Delete span"));
+        fireEvent.click(getByLabelText("Delete span web_search"));
 
         expect(onToggleDelete).toHaveBeenCalledWith("span-1");
       });
@@ -92,7 +93,8 @@ describe("TreeRow with a correction", () => {
 
     describe("when the span is already removed by the correction", () => {
       /** @scenario "Restoring a deleted span brings it back" */
-      it("offers to restore it", () => {
+      /** @scenario "Each row's delete action names the span it removes" */
+      it("offers to restore it, named after that span", () => {
         const onToggleDelete = vi.fn();
         const { getByLabelText } = renderRow({
           isEditing: true,
@@ -100,9 +102,36 @@ describe("TreeRow with a correction", () => {
           onToggleDelete,
         });
 
-        fireEvent.click(getByLabelText("Restore span"));
+        fireEvent.click(getByLabelText("Restore span web_search"));
 
         expect(onToggleDelete).toHaveBeenCalledWith("span-1");
+      });
+    });
+
+    describe("when the reviewer has renamed the span but not saved yet", () => {
+      /** @scenario "A pending rename shows in the waterfall while editing" */
+      it("lists the span under the name being typed", () => {
+        const { getByText, queryByText } = renderRow({
+          isEditing: true,
+          draftName: "search the web",
+          onToggleDelete: vi.fn(),
+        });
+
+        expect(getByText("search the web")).toBeInTheDocument();
+        expect(queryByText("web_search")).not.toBeInTheDocument();
+      });
+
+      /** @scenario "A pending rename shows in the waterfall while editing" */
+      it("names the delete action after the pending name", () => {
+        const { getByLabelText } = renderRow({
+          isEditing: true,
+          draftName: "search the web",
+          onToggleDelete: vi.fn(),
+        });
+
+        expect(
+          getByLabelText("Delete span search the web"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -112,7 +141,9 @@ describe("TreeRow with a correction", () => {
       it("offers no delete affordance", () => {
         const { queryByLabelText } = renderRow();
 
-        expect(queryByLabelText("Delete span")).not.toBeInTheDocument();
+        expect(
+          queryByLabelText("Delete span web_search"),
+        ).not.toBeInTheDocument();
       });
     });
   });

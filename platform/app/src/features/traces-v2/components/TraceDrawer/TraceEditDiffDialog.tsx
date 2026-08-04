@@ -35,35 +35,21 @@ export function TraceEditDiffDialog({
   onClose,
   patch,
 }: TraceEditDiffDialogProps) {
-  const [tab, setTab] = useState<DiffTab>("trace");
-  const headerQuery = useTraceHeaderCanonical();
-  const spansQuery = useSpansFullCanonical(open);
+  // Null until the reader picks a side themselves, so the dialog can keep
+  // opening on whichever one has something to read as the payloads land.
+  const [pickedTab, setPickedTab] = useState<DiffTab | null>(null);
+  const { traceLines, spansLines, traceStat, spansStat } = useTraceEditDiff({
+    open,
+    patch,
+  });
 
-  const tracePair = useMemo(() => {
-    const header = headerQuery.data;
-    if (!header) return { before: "", after: "" };
-    return {
-      before: prettyJson(header),
-      after: prettyJson(applyOverlayToTraceHeader({ header, patch })),
-    };
-  }, [headerQuery.data, patch]);
-
-  const spansPair = useMemo(() => {
-    const spans = spansQuery.data;
-    if (!spans) return { before: "", after: "" };
-    return {
-      before: prettyJson(spans),
-      after: prettyJson(applyOverlayToSpansFull({ spans, patch })),
-    };
-  }, [spansQuery.data, patch]);
-
-  const pair = tab === "trace" ? tracePair : spansPair;
-  const lines = useMemo(
-    () => computeLineDiff(pair.before, pair.after),
-    [pair.before, pair.after],
-  );
-  const stat = useMemo(() => diffStat(lines), [lines]);
-  const hunks = useMemo(() => collapseUnchanged(lines), [lines]);
+  // A correction that only touched spans used to open on the trace tab, which
+  // greeted the reader with "No changes" about a trace they had just corrected.
+  // The trace tab still wins when both changed: it is the whole trace, and the
+  // span differences are one click away.
+  const tab = pickedTab ?? defaultDiffTab({ traceStat, spansStat });
+  const lines = tab === "trace" ? traceLines : spansLines;
+  const stat = tab === "trace" ? traceStat : spansStat;
 
   return (
     <Dialog.Root
@@ -87,54 +73,140 @@ export function TraceEditDiffDialog({
                 Trace edits
               </Text>
             </Dialog.Title>
+            {/* Each tab carries its own counts, so the reader can see which
+                part of the trace changed without opening both. */}
             <SegmentedToggle
               value={tab}
-              onChange={(next) => setTab(next as DiffTab)}
-              options={["trace", "spans"]}
+              onChange={(next) => setPickedTab(next as DiffTab)}
+              options={[
+                { value: "trace", label: tabLabel("trace", traceStat) },
+                { value: "spans", label: tabLabel("spans", spansStat) },
+              ]}
             />
-            <Box flex={1} />
-            <Text textStyle="2xs" fontFamily="mono" color="green.fg">
-              +{stat.added}
-            </Text>
-            <Text textStyle="2xs" fontFamily="mono" color="red.fg">
-              -{stat.removed}
-            </Text>
           </HStack>
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body padding={0} overflow="auto" flex={1}>
-          {stat.added === 0 && stat.removed === 0 ? (
-            <VStack gap={2} paddingY={8} justify="center">
-              <Text textStyle="xs" color="fg.muted">
-                No changes
-              </Text>
-            </VStack>
-          ) : (
-            <Box
-              as="pre"
-              margin={0}
-              paddingY={2}
-              fontFamily="mono"
-              textStyle="xs"
-              lineHeight="1.6"
-            >
-              {hunks.map((entry, index) =>
-                entry === "gap" ? (
-                  <GapRow key={`gap-${index}`} />
-                ) : (
-                  <DiffRow key={index} line={entry} />
-                ),
-              )}
-            </Box>
-          )}
+          <DiffHunks lines={lines} stat={stat} />
         </Dialog.Body>
       </Dialog.Content>
     </Dialog.Root>
   );
 }
 
+/**
+ * Both sides of the difference, each already diffed and counted, so the dialog
+ * can label a tab with what it holds before the reader opens it.
+ */
+function useTraceEditDiff({
+  open,
+  patch,
+}: {
+  open: boolean;
+  patch: TraceEditOverlayPatch;
+}): {
+  traceLines: DiffLine[];
+  spansLines: DiffLine[];
+  traceStat: DiffStat;
+  spansStat: DiffStat;
+} {
+  const headerQuery = useTraceHeaderCanonical();
+  const spansQuery = useSpansFullCanonical(open);
+
+  const tracePair = useMemo(() => {
+    const header = headerQuery.data;
+    if (!header) return { before: "", after: "" };
+    return {
+      before: prettyJson(header),
+      after: prettyJson(applyOverlayToTraceHeader({ header, patch })),
+    };
+  }, [headerQuery.data, patch]);
+
+  const spansPair = useMemo(() => {
+    const spans = spansQuery.data;
+    if (!spans) return { before: "", after: "" };
+    return {
+      before: prettyJson(spans),
+      after: prettyJson(applyOverlayToSpansFull({ spans, patch })),
+    };
+  }, [spansQuery.data, patch]);
+
+  const traceLines = useMemo(
+    () => computeLineDiff(tracePair.before, tracePair.after),
+    [tracePair.before, tracePair.after],
+  );
+  const spansLines = useMemo(
+    () => computeLineDiff(spansPair.before, spansPair.after),
+    [spansPair.before, spansPair.after],
+  );
+  const traceStat = useMemo(() => diffStat(traceLines), [traceLines]);
+  const spansStat = useMemo(() => diffStat(spansLines), [spansLines]);
+
+  return { traceLines, spansLines, traceStat, spansStat };
+}
+
+/** The lines of one side, or a note that this side is unchanged. */
+function DiffHunks({ lines, stat }: { lines: DiffLine[]; stat: DiffStat }) {
+  const hunks = useMemo(() => collapseUnchanged(lines), [lines]);
+
+  if (!hasChanges(stat)) {
+    return (
+      <VStack gap={2} paddingY={8} justify="center">
+        <Text textStyle="xs" color="fg.muted">
+          No changes
+        </Text>
+      </VStack>
+    );
+  }
+
+  return (
+    <Box
+      as="pre"
+      margin={0}
+      paddingY={2}
+      fontFamily="mono"
+      textStyle="xs"
+      lineHeight="1.6"
+    >
+      {hunks.map((entry, index) =>
+        entry === "gap" ? (
+          <GapRow key={`gap-${index}`} />
+        ) : (
+          <DiffRow key={index} line={entry} />
+        ),
+      )}
+    </Box>
+  );
+}
+
 function prettyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+interface DiffStat {
+  added: number;
+  removed: number;
+}
+
+function hasChanges(stat: DiffStat): boolean {
+  return stat.added > 0 || stat.removed > 0;
+}
+
+/** The tab that has something to show, trace first when both do. */
+export function defaultDiffTab({
+  traceStat,
+  spansStat,
+}: {
+  traceStat: DiffStat;
+  spansStat: DiffStat;
+}): DiffTab {
+  if (hasChanges(traceStat)) return "trace";
+  if (hasChanges(spansStat)) return "spans";
+  return "trace";
+}
+
+function tabLabel(name: DiffTab, stat: DiffStat): string {
+  return `${name} +${stat.added} -${stat.removed}`;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
@@ -95,17 +96,25 @@ export function useTraceHeaderCanonical() {
 
 /**
  * The trace header as the reader sees it: corrected when a correction applies,
- * captured otherwise. Only the trace's own input and output move: span counts,
- * durations and cost describe the run, not the corrected content.
+ * captured otherwise. The trace's own input and output move, and so does the
+ * span count once the caller hands over the captured spans, so the header
+ * agrees with the waterfall underneath it. Durations and cost describe the run
+ * rather than the corrected content, and never move.
  */
-export function useTraceHeader() {
+export function useTraceHeader({
+  spans,
+}: {
+  /** The spans as captured, for counting the ones a correction removes. */
+  spans?: SpanTreeNode[];
+} = {}) {
   const query = useTraceHeaderCanonical();
   const patch = useAppliedTraceEditPatch();
   const header = query.data;
 
   const data = useMemo(
-    () => (header ? applyOverlayToTraceHeader({ header, patch }) : header),
-    [header, patch],
+    () =>
+      header ? applyOverlayToTraceHeader({ header, patch, spans }) : header,
+    [header, patch, spans],
   );
 
   return useMemo(

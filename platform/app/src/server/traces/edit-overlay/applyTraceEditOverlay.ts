@@ -94,6 +94,25 @@ export function expandDeletedSpanIds({
   return deleted;
 }
 
+/**
+ * How many of the spans a trace actually has this correction removes. Ids the
+ * correction lists that are not in the trace do not count: the answer is how
+ * many rows disappear, not how large the correction is.
+ */
+export function countRemovedSpans({
+  links,
+  deletedSpanIds,
+}: {
+  links: ReadonlyArray<{ id: string; parentId?: string | null }>;
+  deletedSpanIds: readonly string[];
+}): number {
+  const deleted = expandDeletedSpanIds({ links, deletedSpanIds });
+  if (deleted.size === 0) return 0;
+  let removed = 0;
+  for (const link of links) if (deleted.has(link.id)) removed++;
+  return removed;
+}
+
 function indexSpanPatches(
   patch: TraceEditOverlayPatch,
 ): Map<string, TraceEditSpanPatch> {
@@ -337,18 +356,50 @@ export function applyOverlayToSpanDetail({
 }
 
 /**
- * Applies the trace-level part of a correction to the v2 header. Span counts
- * and durations stay as captured: they describe the run, not the corrected
- * content.
+ * The span count a correction leaves the header with, or undefined when it
+ * removes nothing the trace actually has (including when the caller has no
+ * spans to count against).
+ */
+function correctedSpanCount({
+  header,
+  patch,
+  spans,
+}: {
+  header: TraceHeader;
+  patch: TraceEditOverlayPatch;
+  spans?: ReadonlyArray<{ spanId: string; parentSpanId?: string | null }>;
+}): number | undefined {
+  if (!spans || spans.length === 0) return undefined;
+  const removed = countRemovedSpans({
+    links: spans.map((span) => ({
+      id: span.spanId,
+      parentId: span.parentSpanId,
+    })),
+    deletedSpanIds: patch.deletedSpanIds,
+  });
+  if (removed === 0) return undefined;
+  return Math.max(0, header.spanCount - removed);
+}
+
+/**
+ * Applies the trace-level part of a correction to the v2 header. Durations and
+ * cost stay as captured: they describe the run, not the corrected content.
+ *
+ * The span count is the exception, and only when the caller supplies the spans
+ * the trace has: a corrected trace does not contain the spans the correction
+ * removes, so a header counting eight above a waterfall listing seven reads as
+ * a bug rather than as the correction working.
  */
 export function applyOverlayToTraceHeader({
   header,
   patch,
   suppressContent,
+  spans,
 }: {
   header: TraceHeader;
   patch: TraceEditOverlayPatch | null | undefined;
   suppressContent?: SuppressedContent;
+  spans?: ReadonlyArray<{ spanId: string; parentSpanId?: string | null }>;
 }): TraceHeader {
   if (!patch || !patchHasAnyEdit(patch)) return header;
 
@@ -360,6 +411,11 @@ export function applyOverlayToTraceHeader({
   }
   if (patch.trace?.output !== undefined && !suppressContent?.output) {
     next.output = patch.trace.output.value;
+    changed = true;
+  }
+  const spanCount = correctedSpanCount({ header, patch, spans });
+  if (spanCount !== undefined) {
+    next.spanCount = spanCount;
     changed = true;
   }
   return changed ? next : header;

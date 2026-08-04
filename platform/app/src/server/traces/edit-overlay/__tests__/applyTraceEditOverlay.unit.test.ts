@@ -367,6 +367,41 @@ describe("applying a correction to the drawer views", () => {
 
       expect(corrected.output).toBe("corrected output");
     });
+
+    /** @scenario "The header counts the spans the corrected trace has" */
+    it("counts only the spans the corrected trace still has", () => {
+      const spans = [
+        { spanId: "root", parentSpanId: null },
+        { spanId: "tool", parentSpanId: "root" },
+        { spanId: "tool-child", parentSpanId: "tool" },
+      ];
+      const header = {
+        traceId: "trace-1",
+        spanCount: 3,
+      } as Parameters<typeof applyOverlayToTraceHeader>[0]["header"];
+
+      const corrected = applyOverlayToTraceHeader({
+        header,
+        patch: patchOf({ deletedSpanIds: ["tool"] }),
+        spans,
+      });
+      expect(corrected.spanCount).toBe(1);
+
+      // The captured trace is counted as it was captured.
+      expect(
+        applyOverlayToTraceHeader({ header, patch: null, spans }).spanCount,
+      ).toBe(3);
+
+      // An id the correction lists that the trace does not have removes nothing
+      // from the count.
+      expect(
+        applyOverlayToTraceHeader({
+          header,
+          patch: patchOf({ deletedSpanIds: ["never-ingested"] }),
+          spans,
+        }).spanCount,
+      ).toBe(3);
+    });
   });
 
   describe("when highlighting what changed", () => {

@@ -76,7 +76,7 @@ export const WaterfallView = memo(function WaterfallView({
     [pinSpan, unpinSpan],
   );
 
-  const { isEditing, deletedSpanIds, toggleSpanDeleted } =
+  const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } =
     useWaterfallEditing(spans);
   const { correctedSpanIds, deletedByCorrectionSpanIds } =
     useCorrectionMarks(spans);
@@ -607,6 +607,7 @@ export const WaterfallView = memo(function WaterfallView({
                     isDeletedByCorrection={deletedByCorrectionSpanIds.has(
                       node.span.spanId,
                     )}
+                    draftName={draftNames.get(node.span.spanId)}
                     onToggleDelete={toggleSpanDeleted}
                     onToggleCollapse={handleToggleCollapse}
                     onSelect={handleSelectSpan}

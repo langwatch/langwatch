@@ -46,6 +46,7 @@ export const TreeRow = memo(function TreeRow({
   isDraftDeleted = false,
   isCorrected = false,
   isDeletedByCorrection = false,
+  draftName,
   onToggleDelete,
   onToggleCollapse,
   onSelect,
@@ -85,6 +86,12 @@ export const TreeRow = memo(function TreeRow({
    * at the captured trace, where it is still listed.
    */
   isDeletedByCorrection?: boolean;
+  /**
+   * The name an unsaved rename gives this span. The row reads with it while the
+   * reviewer is editing, so a rename lands where they can see it instead of
+   * only appearing once the correction is saved.
+   */
+  draftName?: string;
   /** Removes or brings back this span. Only wired while editing. */
   onToggleDelete?: (spanId: string) => void;
   onToggleCollapse: (spanId: string) => void;
@@ -114,6 +121,12 @@ export const TreeRow = memo(function TreeRow({
   // boolean so only the row whose pulse flips actually re-renders, the
   // rest of the virtualized list stays untouched.
   const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
+  // What the span is called right now: the pending rename while the reviewer is
+  // editing, the captured name otherwise.
+  const displayName = draftName ?? span.name;
+  // A pending rename reads the same way a saved correction does, so an edit
+  // looks like an edit before it is saved.
+  const isEdited = isCorrected || draftName !== undefined;
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   // A named tool span gets the same two-line treatment as an LLM span: the
@@ -151,7 +164,7 @@ export const TreeRow = memo(function TreeRow({
         color="fg"
         wordBreak="break-word"
       >
-        {span.name}
+        {displayName}
       </Text>
       <HStack gap={1.5} marginTop={1} flexWrap="wrap">
         <Text
@@ -331,14 +344,14 @@ export const TreeRow = memo(function TreeRow({
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
               : isHovered
                 ? "colorPalette.subtle/40"
-                : isCorrected
+                : isEdited
                   ? "green.subtle"
                   : undefined
           }
           // Edge tick on a corrected row so a change is spottable while
           // scanning the tree, not only once the row is read.
           boxShadow={
-            isCorrected
+            isEdited
               ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
               : undefined
           }
@@ -442,7 +455,7 @@ export const TreeRow = memo(function TreeRow({
                 minWidth={0}
                 lineHeight={1.2}
               >
-                {span.name}
+                {displayName}
               </Text>
               {/* Book icon (the Prompts nav glyph) flags spans that used a
                   managed prompt, so prompt-bearing spans are spottable in
@@ -583,7 +596,14 @@ export const TreeRow = memo(function TreeRow({
                   e.stopPropagation();
                   onToggleDelete(span.spanId);
                 }}
-                aria-label={isDraftDeleted ? "Restore span" : "Delete span"}
+                // Named after the span it acts on: every row carries one of
+                // these, and "Delete span" on all of them tells a screen reader
+                // user nothing about which one they are on.
+                aria-label={
+                  isDraftDeleted
+                    ? `Restore span ${displayName}`
+                    : `Delete span ${displayName}`
+                }
               >
                 <Icon
                   as={isDraftDeleted ? LuRotateCcw : LuTrash2}

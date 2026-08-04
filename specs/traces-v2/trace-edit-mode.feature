@@ -120,6 +120,15 @@ Feature: Editing a trace in the drawer
       Then the drawer reports that the correction could not be saved
       And I am still editing with my changes intact
 
+  Rule: An unsaved change reads where the reviewer made it
+
+    @integration
+    Scenario: A pending rename shows in the waterfall while editing
+      Given I am editing the trace
+      When I rename a span
+      Then the waterfall lists that span under its new name
+      And the row reads as edited
+
   Rule: Unsaved work is never discarded silently
 
     @integration
@@ -234,6 +243,11 @@ Feature: Editing a trace in the drawer
       When I restore that span
       Then the correction no longer deletes it
 
+    @integration
+    Scenario: Each row's delete action names the span it removes
+      Given I am editing a trace whose spans form a tree
+      Then each span's delete action names that span
+
     @planned
     Scenario: Deleting the selected span closes its detail pane
       Given I am editing the trace
@@ -273,6 +287,13 @@ Feature: Editing a trace in the drawer
       Given the trace has a correction that deletes a span
       When I read the corrected trace
       Then that span is not listed
+
+    @unit
+    Scenario: The header counts the spans the corrected trace has
+      Given the trace has a correction that deletes a span
+      When I read the corrected trace
+      Then the header counts one span fewer than was captured
+      And the captured trace still counts them all
 
     @integration
     Scenario: A deleted span is marked in the captured trace
@@ -325,3 +346,10 @@ Feature: Editing a trace in the drawer
       Given the trace has a correction that changes nothing about the trace
       When I open the difference view
       Then it reports no changes
+
+    @integration
+    Scenario: The difference opens on the part of the trace that changed
+      Given the trace has a correction that only changes a span
+      When I open the difference view
+      Then the span differences are shown
+      And each part of the trace carries the lines it adds and removes
