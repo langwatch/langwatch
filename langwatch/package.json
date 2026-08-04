@@ -202,7 +202,7 @@
     "posthog-js": "^1.396.9",
     "posthog-node": "^5.39.4",
     "prism-react-renderer": "^2.4.1",
-    "prisma": "5.7.1",
+    "prisma": "7.9.0",
     "prismjs": "^1.30.0",
     "prom-client": "^15.1.3",
     "qs": "^6.15.3",
