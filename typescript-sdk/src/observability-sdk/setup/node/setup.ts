@@ -14,7 +14,7 @@ import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { setLangWatchLoggerProvider } from "../../logger";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { resolveEndpoint } from "@/internal/endpoint";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 
 // Helper functions
@@ -31,7 +31,7 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
   return {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
-    endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT),
+    endpoint: isDisabled ? void 0 : resolveEndpoint(config.endpoint),
     processorType: config.processorType ?? 'batch'
   };
 };

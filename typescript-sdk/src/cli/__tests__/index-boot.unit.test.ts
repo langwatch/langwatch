@@ -189,6 +189,11 @@ describe("the CLI boot module graph", () => {
         // few lines over node:async_hooks (no third-party deps), so its boot
         // cost is negligible; it belongs here deliberately.
         "internal/credentialContext.ts",
+        // The endpoint normalizer shared with the client SDK, so the CLI and an
+        // embedded SDK agree on what a configured endpoint means. Two pure
+        // string functions over internal/constants.ts, which is already at
+        // boot; it adds no transitive dependency.
+        "internal/endpoint.ts",
         "internal/runtime.ts",
       ]);
     });

@@ -5,7 +5,7 @@ import {
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { resolveEndpoint } from "@/internal/endpoint";
 
 export type VirtualKeyScopeType = "organization" | "team" | "project";
 
@@ -134,7 +134,7 @@ export class VirtualKeysApiService {
   private readonly projectId: string | undefined;
 
   constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
-    this.endpoint = (config?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+    this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }

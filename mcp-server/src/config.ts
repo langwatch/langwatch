@@ -49,13 +49,28 @@ function getGlobalState(): McpGlobalState {
   };
 }
 
+/**
+ * Trim surrounding whitespace and drop any trailing slashes.
+ *
+ * Request URLs are built as `${endpoint}/api/...`, so an endpoint written as
+ * `https://app.langwatch.ai/` would produce a double slash the router does not
+ * match, and the caller gets an opaque 404 with nothing pointing at the
+ * endpoint as the cause.
+ */
+function normalizeEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  let end = trimmed.length;
+  while (end > 0 && trimmed[end - 1] === "/") end--;
+  return trimmed.slice(0, end);
+}
+
 export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
   const state = getGlobalState();
   state.globalConfig = {
     apiKey: args.apiKey || process.env.LANGWATCH_API_KEY,
     endpoint:
-      args.endpoint ||
-      process.env.LANGWATCH_ENDPOINT ||
+      normalizeEndpoint(args.endpoint ?? "") ||
+      normalizeEndpoint(process.env.LANGWATCH_ENDPOINT ?? "") ||
       "https://app.langwatch.ai",
     projectId: process.env.LANGWATCH_PROJECT_ID,
   };
