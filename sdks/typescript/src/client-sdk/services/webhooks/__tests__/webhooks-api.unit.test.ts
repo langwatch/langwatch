@@ -86,7 +86,7 @@ const initOf = (call: number): RequestInit =>
 
 /** The nth fetch's request body, parsed back from the JSON that was sent. */
 const bodyOf = (call: number): Record<string, unknown> =>
-  JSON.parse(String(initOf(call).body)) as Record<string, unknown>;
+  JSON.parse(initOf(call).body as string) as Record<string, unknown>;
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
 const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {

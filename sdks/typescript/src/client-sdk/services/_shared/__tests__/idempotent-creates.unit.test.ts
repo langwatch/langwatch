@@ -38,9 +38,7 @@ const jsonResponse = (
 /** The headers of one recorded call, however fetch was handed them. */
 const headersOf = (call: number): Headers =>
   new Headers(
-    (mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers as
-      | HeadersInit
-      | undefined,
+    (mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers,
   );
 
 const bodyOf = (call: number): string =>
