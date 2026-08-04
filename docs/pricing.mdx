@@ -18,7 +18,7 @@ An event is a standard telemetry point, the building block of everything you obs
 
 A **billable event** is any of these:
 
-- **A span your app sent us.** The individual steps that make up a request to your agent or LLM application, or to a coding assistant you track. Logs and metrics arrive alongside them and are not metered.
+- **A span, log or metric your app sent us.** The telemetry that makes up a request to your agent or LLM application, or to a coding assistant you track. Spans are the individual steps; logs and metrics are what those steps recorded along the way.
 - **An evaluation result.** One score from an evaluator, whether it ran on live traffic or over a dataset.
 - **A step of an experiment run.** A sweep counts its start, each dataset row it ran, and each score it produced, so one experiment is many events rather than one.
 - **A step of a scenario simulation.** A run counts its start plus each turn of the conversation.
@@ -76,7 +76,7 @@ Self-hosted deployments are different: the data sits in your own database, so th
   </Accordion>
 
   <Accordion title="What counts as a billable event?">
-    Billable events are the spans your app or a tracked coding assistant sends, evaluation results, the steps of an experiment run, and the steps of a scenario simulation. Logs and metrics ride along with those spans and are not metered. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including how many events a sweep or a simulation produces, what is never billed, and how retries are deduplicated.
+    Billable events are the spans, logs and metrics your app or a tracked coding assistant sends, evaluation results, the steps of an experiment run, and the steps of a scenario simulation. Pricing is based on the total number of ingested events per billing period. [The full list is here](/pricing/billable-events), including how many events a sweep or a simulation produces, what is never billed, and how retries are deduplicated.
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
