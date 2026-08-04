@@ -2,7 +2,7 @@ package integration_test
 
 // Spec-bound code-block tests. Each test carries a `@scenario` annotation
 // tying it to a scenario in specs/nlp-go/code-block.feature so the
-// feature-parity checker (langwatch/scripts/check-feature-parity.ts, Go
+// feature-parity checker (platform/app/scripts/check-feature-parity.ts, Go
 // walker) can bind it. These cover the deterministic execution-semantics
 // scenarios that run fully through /go/studio/execute_sync: declared I/O,
 // missing/extra outputs, the secrets namespace, surfaced exceptions with

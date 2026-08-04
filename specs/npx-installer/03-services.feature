@@ -223,7 +223,7 @@ Feature: Service orchestration after pre-deps are installed
 
   Scenario: Lockfile change forces a re-sync of only the affected venv
     Given "langwatch_nlp/uv.lock" hash changed since last run
-    And "langevals/uv.lock" hash is unchanged
+    And "services/langevals/uv.lock" hash is unchanged
     When the CLI calls `runtime.installServices(ctx)`
     Then "uv sync" runs ONLY for "langwatch_nlp"
     And "langevals" is skipped

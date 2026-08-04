@@ -24,7 +24,7 @@ useDefault = true
 [[allowlists]]
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
+paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
 
 # Gateway test fixtures that pattern-match `generic-api-key` but are provably
 # not credentials: a sequential-hex HMAC fixture (`0123456789abcdef...`) signing
@@ -36,14 +36,14 @@ paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
 description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
 targetRules = ["generic-api-key"]
 paths = [
-  '''langwatch/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
-  '''langwatch/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
 ]
 
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
+paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
 
 # The self-hosted license fixtures are base64 payloads signed with the TEST
 # keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
@@ -60,4 +60,4 @@ paths = ['''langwatch/src/server/event-sourcing/process-manager/stores/__tests__
 [[allowlists]]
 description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
+paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
