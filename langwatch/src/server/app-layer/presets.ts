@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
@@ -30,7 +31,8 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
+import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -746,13 +748,37 @@ export function initializeDefaultApp(options?: {
     langyTurnAdmission,
   };
 
-  const gatewayBudgetSync = clickhouseEnabled
+  // The spend-command pipeline projects gateway_spend; it shares the
+  // ClickHouse gate because the spend record has no PG fallback (a mutable
+  // counter is the failure mode this table exists to replace).
+  const gatewaySpend = clickhouseEnabled
+    ? {
+        repository: new GatewaySpendEventsRepository(resolveClickHouseClient),
+      }
+    : undefined;
+
+  // The webhook delivery process manager scans the spend table, so it
+  // shares the same ClickHouse gate. Registration is global; the per-org
+  // enterprise flag is enforced inside the scan (and at the REST surface).
+  const webhookEndpointService = new WebhookEndpointService({ prisma });
+  const webhookDelivery = clickhouseEnabled
+    ? {
+        processStore: repositories.processStore,
+        endpoints: webhookEndpointService,
+        getPlan: (organizationId: string) =>
+          planProvider.getActivePlan({ organizationId }),
+      }
+    : undefined;
+
+  // Gateway budget debits ride the spend pipeline and share its ClickHouse
+  // gate: the ledger is the only store spend accrues in.
+  const gatewayDebits = clickhouseEnabled
     ? {
         prisma,
-        budgetRepository: new GatewayBudgetRepository(prisma),
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        changeEventDedupe: createBudgetChangeEventDedupeService(redis),
       }
     : undefined;
 
@@ -980,7 +1006,9 @@ export function initializeDefaultApp(options?: {
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
-    gatewayBudgetSync,
+    gatewaySpend,
+    webhookDelivery,
+    gatewayDebits,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.

@@ -440,7 +440,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-activation-ui.feature",
-  "specs/licensing/license-generation.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",

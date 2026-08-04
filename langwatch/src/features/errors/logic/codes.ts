@@ -41,6 +41,7 @@ export const APP_ERROR_CODES = [
   "billing_plan_price_missing",
   "billing_provider_unavailable",
   "broadcaster_not_active",
+  "budget_not_found",
   "cache_rule_not_found",
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
@@ -60,11 +61,13 @@ export const APP_ERROR_CODES = [
   "evaluator_not_found",
   "experiment_not_found",
   "export_failed",
+  "external_id_conflict",
   "filter_field_unknown",
   "filter_parse_error",
   "gateway_budget_not_found",
   "gateway_group_budget_unsupported",
   "gateway_guardrail_project_mismatch",
+  "gateway_provider_bindings_gone",
   "gateway_scope_org_mismatch",
   "gateway_spend_unavailable",
   "guardrail_attach_forbidden",
@@ -75,6 +78,8 @@ export const APP_ERROR_CODES = [
   // code for an unhandled failure, so the scan sees it here too.
   "internal_error",
   "invalid_action_params",
+  "invalid_credentials",
+  "invalid_cursor",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
   "langy_agent_at_capacity",
@@ -111,6 +116,7 @@ export const APP_ERROR_CODES = [
   "malformed_custom_role_permissions",
   "malformed_request",
   "missing_annotator",
+  "missing_credentials",
   // Not declared by a subclass anywhere: `nlpgo/goHandledError.ts` promotes a
   // relayed Go error's `meta.reason` to the code, so this one is minted at the
   // boundary rather than thrown. It still reaches a customer, so it still needs
@@ -193,6 +199,7 @@ export const APP_ERROR_CODES = [
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
   "virtual_key_not_found",
+  "webhook_event_not_found",
   "workflow_execution_failed",
   "workflow_not_found",
 ] as const;

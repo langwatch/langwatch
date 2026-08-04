@@ -36,7 +36,12 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     permission.startsWith("anomalyRules:") ||
     permission.startsWith("complianceExport:") ||
     permission.startsWith("activityMonitor:") ||
-    permission.startsWith("aiTools:")
+    permission.startsWith("aiTools:") ||
+    // Webhook endpoints and the spend record are org-tier resources
+    // (rbac.ts ADMIN defaults); resolving them against team roles denies
+    // org admins client-side while the server correctly allows them.
+    permission.startsWith("webhookEndpoints:") ||
+    permission.startsWith("gatewaySpend:")
   );
 }
 

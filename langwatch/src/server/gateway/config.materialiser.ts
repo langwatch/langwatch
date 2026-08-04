@@ -22,7 +22,10 @@ import {
   resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import {
+  budgetPeriodFloorMs,
+  type GatewayBudgetClickHouseRepository,
+} from "./budget.clickhouse.repository";
 import {
   type ResolvedBudget,
   resolveApplicableBudgets,
@@ -143,7 +146,8 @@ export type GatewayConfigPayload = {
       | "project"
       | "virtual_key"
       | "principal"
-      | "group";
+      | "group"
+      | "attributed_user";
     /**
      * The bucket spend accumulates under. Equal to the budget's target for
      * every scope except "group", where it is `<groupId>:<userId>` so each
@@ -152,6 +156,14 @@ export type GatewayConfigPayload = {
     scope_id: string;
     /** Only set for "group": the member this bucket belongs to. */
     principal_id?: string;
+    /**
+     * Only set for "attributed_user": the entry is a TEMPLATE ("each
+     * distinct end user on this anchor: this limit per window"). scope_id
+     * stays the ANCHOR; per-user spend is unbounded-cardinality and never
+     * materialises here, the gateway fetches the request's bucket through
+     * its cached bucket-spend read. spent_micro_usd is 0 on templates.
+     */
+    per_user?: true;
     /**
      * Provider filter. Null = the budget counts every dispatch; set = it
      * counts and constrains only dispatches to that ModelProvider id, so a
@@ -270,20 +282,9 @@ export class GatewayConfigMaterialiser {
         tpm: config.rateLimits.tpm,
         rpd: config.rateLimits.rpd,
       },
-      budgets: budgets.map(({ budget: b, bucketScopeId, principalUserId }) => ({
-        id: b.id,
-        scope: scopeToWire(b.scopeType),
-        scope_id: bucketScopeId,
-        ...(principalUserId ? { principal_id: principalUserId } : {}),
-        provider_key: b.providerKey,
-        window: b.window.toLowerCase(),
-        limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-        spent_micro_usd: spendByBudgetId.has(b.id)
-          ? decimalUSDStringToMicroUSD(spendByBudgetId.get(b.id)!)
-          : decimalToMicroUSD(b.spentUsd),
-        resets_at: Math.floor(b.resetsAt.getTime() / 1000),
-        on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
-      })),
+      budgets: budgets.map((resolved) =>
+        budgetToWire(resolved, spendByBudgetId),
+      ),
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
@@ -374,13 +375,18 @@ export class GatewayConfigMaterialiser {
       // at what the whole group spent together.
       const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
         tenantIds,
-        budgets.map((r) => ({
-          budgetId: r.budget.id,
-          scope: r.budget.scopeType,
-          scopeId: r.bucketScopeId,
-          window: r.budget.window,
-          match: "exact" as const,
-        })),
+        budgets
+          // Templates have no single bucket to read; their per-user spend
+          // is fetched request-side through the bucket-spend endpoint.
+          .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
+          .map((r) => ({
+            budgetId: r.budget.id,
+            scope: r.budget.scopeType,
+            scopeId: r.bucketScopeId,
+            window: r.budget.window,
+            match: "exact" as const,
+            periodFloorMs: budgetPeriodFloorMs(r.budget),
+          })),
       );
       const out = new Map<string, string>();
       for (const s of spends) {
@@ -398,8 +404,8 @@ export class GatewayConfigMaterialiser {
    * (single-project-scope VK or governance fallback); PRINCIPAL and
    * per-member GROUP only when the key carries a principal. The scope
    * semantics live in the shared resolver, which the request-time check
-   * and the trace fold also call, so the bundle can never disagree with
-   * what they pick.
+   * and the debits process also call, so the bundle can never disagree
+   * with what they pick.
    */
   private async applicableBudgets(
     vk: VirtualKey,
@@ -691,6 +697,8 @@ function scopeToWire(
       return "principal";
     case "GROUP":
       return "group";
+    case "ATTRIBUTED_USER":
+      return "attributed_user";
   }
 }
 
@@ -705,6 +713,44 @@ function routingModeToWire(
     case "POLICY":
       return "policy";
   }
+}
+
+type BudgetWire = GatewayConfigPayload["budgets"][number];
+
+/**
+ * The current-period figure the bundle ships for one budget. Templates carry
+ * no aggregate: spend is per end-user bucket and the gateway fetches the
+ * request's bucket on demand. Every other scope takes the CH rollup when it
+ * was loaded, falling back to the PG column when it was not.
+ */
+function budgetSpentMicroUSD(
+  budget: GatewayBudget,
+  spendByBudgetId: Map<string, string>,
+): number {
+  if (budget.scopeType === "ATTRIBUTED_USER") return 0;
+  const rollup = spendByBudgetId.get(budget.id);
+  return rollup === undefined
+    ? decimalToMicroUSD(budget.spentUsd)
+    : decimalUSDStringToMicroUSD(rollup);
+}
+
+function budgetToWire(
+  { budget: b, bucketScopeId, principalUserId }: ResolvedBudget,
+  spendByBudgetId: Map<string, string>,
+): BudgetWire {
+  return {
+    id: b.id,
+    scope: scopeToWire(b.scopeType),
+    scope_id: bucketScopeId,
+    ...(principalUserId ? { principal_id: principalUserId } : {}),
+    ...(b.scopeType === "ATTRIBUTED_USER" ? { per_user: true as const } : {}),
+    provider_key: b.providerKey,
+    window: b.window.toLowerCase(),
+    limit_micro_usd: decimalToMicroUSD(b.limitUsd),
+    spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
+    resets_at: Math.floor(b.resetsAt.getTime() / 1000),
+    on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
+  };
 }
 
 type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];

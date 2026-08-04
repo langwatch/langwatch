@@ -783,7 +783,15 @@ secured
                   virtualKeyId: sentinelVK,
                   principalUserId,
                 };
-                const budgets = await budgetRepo.applicableForRequest(scopes);
+                // ATTRIBUTED_USER templates bucket spend per end user, and
+                // an ingestion source carries none, so a row here could
+                // only name the bare anchor: a bucket no enforcement reads,
+                // filed under the same (budget, request) identity the
+                // per-user row needs. Templates accrue on the gateway
+                // spend pipeline alone.
+                const budgets = (
+                  await budgetRepo.applicableForRequest(scopes)
+                ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
                 const rows = budgets.map((b) => ({

@@ -123,3 +123,37 @@ describe("RETENTION_MANAGED_TABLES", () => {
     }
   });
 });
+
+describe("gateway_spend retention exemption", () => {
+  // Billing records must never be governed by tenant retention: policies are
+  // customer-shrinkable to weeks and retroactively rewrite _retention_days
+  // across every mapped table. The spend table follows the usage-estimate
+  // ledgers instead: a fixed 13-month TTL declared in its own migration, and
+  // total absence from the reconciler config so MODIFY TTL never rewrites
+  // that clause. If either assertion here fails, someone has wired billing
+  // data into tenant retention and a 35-day tenant policy would start
+  // hard-deleting invoiceable rows.
+  /** @scenario Billing records are exempt from tenant retention and keep a fixed thirteen month window */
+  it("is absent from tenant retention and from the TTL reconciler config", () => {
+    expect(RETENTION_MANAGED_TABLES).not.toContain("gateway_spend");
+    expect(
+      TABLE_TTL_CONFIG.find((c) => c.table === "gateway_spend"),
+    ).toBeUndefined();
+  });
+
+  it("declares its fixed 13-month delete in the migration itself", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        "src/server/clickhouse/migrations/00067_create_gateway_spend.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain(
+      "TTL toDateTime(OccurredAt) + INTERVAL 13 MONTH DELETE",
+    );
+    expect(migration).not.toContain("_retention_days");
+  });
+});

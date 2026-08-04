@@ -89,6 +89,7 @@ async function insertLedgerRow({
   amountUsd,
   model,
   occurredAt,
+  gatewayRequestId = `req-${nanoid(8)}`,
 }: {
   ch: ClickHouseClient;
   tenantId: string;
@@ -96,6 +97,11 @@ async function insertLedgerRow({
   amountUsd: number;
   model: string;
   occurredAt: Date;
+  /**
+   * Defaults to a fresh request. Pass the same id twice to seed the two
+   * rows one request writes when two budgets apply to it.
+   */
+  gatewayRequestId?: string;
 }): Promise<void> {
   await ch.insert({
     table: "gateway_budget_ledger_events",
@@ -108,7 +114,7 @@ async function insertLedgerRow({
         Window: "MONTH",
         VirtualKeyId: "",
         ProviderCredentialId: "",
-        GatewayRequestId: `req-${nanoid(8)}`,
+        GatewayRequestId: gatewayRequestId,
         AmountUSD: amountUsd,
         TokensInput: 10,
         TokensOutput: 5,
@@ -359,10 +365,17 @@ describe("Feature: Personal usage REST API", () => {
         models: ["claude-opus-4-8"],
       });
 
-      // Ingestion ledger for ingestionUser: one row under THIS org's
+      // Ingestion ledger for ingestionUser: one request under THIS org's
       // governance tenant (must count), one under a FOREIGN tenant (must be
       // excluded by the TenantId scope — the multi-org-leak guard), and one
       // under the right tenant but OUT of window (must be excluded by time).
+      //
+      // The in-window request writes TWO rows, because this user carries a
+      // hard cap and a soft cap and the ledger files one row per applicable
+      // budget. Both carry the request's full $0.30. Scope='principal'
+      // narrows to the user, not to one row per request, so a read that
+      // summed the rows as they sit would report $0.60.
+      const pairedRequestId = `req-paired-${nanoid(8)}`;
       await insertLedgerRow({
         ch,
         tenantId: governanceProjectId,
@@ -370,6 +383,16 @@ describe("Feature: Personal usage REST API", () => {
         amountUsd: 0.3,
         model: "claude-sonnet-4-6",
         occurredAt: inWindow,
+        gatewayRequestId: pairedRequestId,
+      });
+      await insertLedgerRow({
+        ch,
+        tenantId: governanceProjectId,
+        scopeId: ingestionUserId,
+        amountUsd: 0.3,
+        model: "claude-sonnet-4-6",
+        occurredAt: inWindow,
+        gatewayRequestId: pairedRequestId,
       });
       await insertLedgerRow({
         ch,
@@ -634,9 +657,12 @@ describe("Feature: Personal usage REST API", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
 
-        // Only the in-org, in-window ledger row ($0.30, 1 request) counts.
+        // Only the in-org, in-window request ($0.30, 1 request) counts.
         // The $99 foreign-tenant row is excluded by the TenantId scope (the
-        // multi-org leak guard) and the $7 out-of-window row by time.
+        // multi-org leak guard) and the $7 out-of-window row by time. The
+        // two budget rows that one request wrote count once between them:
+        // $0.60 here would mean a user's own dashboard inflates their spend
+        // by however many budgets happen to watch them.
         expect(body.summary.spentUsd).toBeCloseTo(0.3, 5);
         expect(body.summary.requests).toBe(1);
         const labels = body.breakdownByModel.map(

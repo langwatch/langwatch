@@ -54,6 +54,7 @@ export function generateLicenseKey({
     maxMembersLite: template.maxMembersLite,
     maxMessagesPerMonth: template.maxMessagesPerMonth,
     canPublish: template.canPublish,
+    webhookEndpointsEnabled: template.webhookEndpointsEnabled,
     usageUnit: template.usageUnit,
   });
 

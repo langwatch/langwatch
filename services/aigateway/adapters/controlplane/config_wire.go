@@ -119,7 +119,12 @@ type budgetWire struct {
 	PrincipalID string `json:"principal_id"`
 	// ProviderKey is the ModelProvider row id the budget is filtered to.
 	// null on the wire (= counts every dispatch) decodes to "".
-	ProviderKey   string `json:"provider_key"`
+	ProviderKey string `json:"provider_key"`
+	// PerUser marks an attributed-user TEMPLATE: ScopeID is the anchor and
+	// the limit applies to each distinct external end user separately. The
+	// gateway resolves the request's own bucket through the cached
+	// bucket-spend read; SpentMicroUSD is 0 on templates.
+	PerUser       bool   `json:"per_user"`
 	Window        string `json:"window"`
 	LimitMicroUSD int64  `json:"limit_micro_usd"`
 	SpentMicroUSD int64  `json:"spent_micro_usd"`
@@ -206,6 +211,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 			Scope:         b.Scope,
 			ScopeID:       b.ScopeID,
 			PrincipalID:   b.PrincipalID,
+			PerUser:       b.PerUser,
 			ProviderKey:   b.ProviderKey,
 			Window:        b.Window,
 			LimitMicroUSD: b.LimitMicroUSD,

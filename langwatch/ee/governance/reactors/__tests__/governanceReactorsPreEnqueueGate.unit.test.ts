@@ -1,26 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The three governance reactors are registered on the trace_processing
- * pipeline, so they fan out on every trace fold completion — but each one
- * only does work for its own slice of traffic (gateway traces for
- * gatewayBudgetSync, ingestion-source traces for the other two).
+ * The governance reactors are registered on the trace_processing pipeline,
+ * so they fan out on every trace fold completion, and each one only does
+ * work for its own slice of traffic: ingestion-source traces.
  *
  * That relevance check belongs in `shouldReact`, which the router evaluates
  * BEFORE a job is packed and queued (ADR-026). A check that lives only
- * inside `handle` still passes a per-reactor test — the handler no-ops
- * either way — while the job is serialized, queued, dispatched and unpacked
- * first, and counts as a success rather than a skip in
+ * inside `handle` still passes a per-reactor test, because the handler
+ * no-ops either way, while the job is serialized, queued, dispatched and
+ * unpacked first, and counts as a success rather than a skip in
  * `es_reactor_total`.
  *
  * So the unit under test here is the router with the real reactors
  * registered: no job enqueued, no handler run, and the skip counter moved.
  */
 
-import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import { createGovernanceKpisSyncReactor } from "@ee/governance/reactors/governanceKpisSync.reactor";
 import { createGovernanceOcsfEventsSyncReactor } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Event } from "~/server/event-sourcing/domain/types";
@@ -64,14 +61,6 @@ function createFoldState(attributes: Record<string, string>): TraceSummaryData {
 
 function createGovernanceReactors(): ReactorDefinition<Event>[] {
   return [
-    createGatewayBudgetSyncReactor({
-      prisma: {
-        virtualKey: { findUnique: vi.fn(), update: vi.fn() },
-        project: { findUnique: vi.fn() },
-      } as unknown as PrismaClient,
-      budgetRepository: { resolveForRequest: vi.fn() } as any,
-      budgetCHRepository: { insertDebit: vi.fn() } as any,
-    }),
     createGovernanceKpisSyncReactor({
       governanceKpisRepository: { insertContribution: vi.fn() } as any,
     }),
@@ -155,7 +144,6 @@ describe("governance reactors on the trace-processing router", () => {
         );
 
         for (const reactorName of [
-          "gatewayBudgetSync",
           "governanceKpisSync",
           "governanceOcsfEventsSync",
         ]) {
@@ -176,7 +164,7 @@ describe("governance reactors on the trace-processing router", () => {
 
   describe("given a governance-origin trace", () => {
     describe("when the fold completes", () => {
-      it("enqueues the two governance reactors and still declines the gateway one", async () => {
+      it("enqueues both governance reactors", async () => {
         const { router, send } = createRouterWithGovernanceReactors(
           createFoldState({
             "langwatch.origin.kind": "ingestion_source",
@@ -196,18 +184,13 @@ describe("governance reactors on the trace-processing router", () => {
         );
 
         expect(send).toHaveBeenCalledTimes(2);
-        expect(incrementEsReactorTotal).toHaveBeenCalledWith(
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "gatewayBudgetSync",
-          "skipped",
-        );
       });
     });
   });
 
   describe("given a gateway trace", () => {
     describe("when the fold completes", () => {
-      it("enqueues the budget reactor and declines the governance ones", async () => {
+      it("declines both governance reactors", async () => {
         const { router, send } = createRouterWithGovernanceReactors(
           createFoldState({
             "langwatch.virtual_key_id": "vk-1",
@@ -226,7 +209,7 @@ describe("governance reactors on the trace-processing router", () => {
           { tenantId },
         );
 
-        expect(send).toHaveBeenCalledTimes(1);
+        expect(send).not.toHaveBeenCalled();
         for (const reactorName of [
           "governanceKpisSync",
           "governanceOcsfEventsSync",

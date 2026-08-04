@@ -136,6 +136,44 @@ describe("SecuredApp", () => {
     });
   });
 
+  describe("the error envelope a project-scoped family publishes", () => {
+    /** @scenario A canonical family refuses unauthenticated calls canonically */
+    it("answers the canonical envelope when the family declares canonical", async () => {
+      const app = createProjectApp({
+        basePath: "/api/__test_canonical",
+        errorEnvelope: "canonical",
+      });
+      app
+        .access(apiKeyPermission("virtualKeys:view"))
+        .get("/x", (c) => c.text("ok"));
+
+      const res = await app.hono.request("/api/__test_canonical/x");
+      expect(res.status).toBe(401);
+      // The refusal comes from the auth middleware, BENEATH the family's own
+      // error handler, so this is the case that silently stayed flat when only
+      // the org-scoped strategy was threaded.
+      expect(await res.json()).toEqual({
+        error: {
+          type: "unauthenticated",
+          code: "missing_credentials",
+          message: expect.stringContaining("Authentication required"),
+        },
+      });
+    });
+
+    /** @scenario A legacy family keeps the flat error body its consumers parse */
+    it("keeps the flat legacy body by default", async () => {
+      const app = createProjectApp({ basePath: "/api/__test_legacy" });
+      app
+        .access(apiKeyPermission("virtualKeys:view"))
+        .get("/x", (c) => c.text("ok"));
+
+      const res = await app.hono.request("/api/__test_legacy/x");
+      expect(res.status).toBe(401);
+      expect(await res.json()).toMatchObject({ error: "Unauthorized" });
+    });
+  });
+
   describe("the compile-time guarantee", () => {
     /** @scenario "Registering a route without an access policy is a type error" */
     it("does not expose verb methods on the bare app — only via access()", () => {

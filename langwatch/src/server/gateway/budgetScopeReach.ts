@@ -29,6 +29,12 @@ type KeyReach = {
   projectId: string | null;
   virtualKeyId: string;
   principalUserId: string | null;
+  /**
+   * Groups the key's principal belongs to in this organization. Empty for a
+   * key with no principal, which is what makes group budgets unreachable
+   * through shared keys.
+   */
+  groupIds: string[];
 };
 
 export type BudgetScopeReach = {
@@ -45,7 +51,9 @@ export type BudgetScopeReach = {
 /**
  * Resolve, once per organization, the scopes every active key can put on a
  * request. One `resolveTraceProject` call per key: keys are per-organization
- * and few, and the result is reused across every budget in the list.
+ * and few, and the result is reused across every budget in the list. Group
+ * membership is read for every principal in one query, so adding keys costs
+ * no extra round-trips.
  */
 async function loadKeyReach(
   prisma: PrismaClient,
@@ -56,6 +64,12 @@ async function loadKeyReach(
     include: { scopes: true },
   });
 
+  const groupIdsByPrincipal = await loadGroupIdsByPrincipal(
+    prisma,
+    organizationId,
+    keys.map((key) => key.principalUserId),
+  );
+
   const reach: KeyReach[] = [];
   for (const key of keys) {
     const traceProject = await resolveTraceProject(prisma, key);
@@ -65,9 +79,43 @@ async function loadKeyReach(
       projectId: traceProject?.id ?? null,
       virtualKeyId: key.id,
       principalUserId: key.principalUserId,
+      groupIds: key.principalUserId
+        ? (groupIdsByPrincipal.get(key.principalUserId) ?? [])
+        : [],
     });
   }
   return reach;
+}
+
+/**
+ * Group ids per principal, scoped to this organization so a user who also
+ * belongs to a group elsewhere never makes another organization's group
+ * budget look reachable here. Mirrors memberGroupIds in
+ * budgetResolution.service, batched over the distinct principals.
+ */
+async function loadGroupIdsByPrincipal(
+  prisma: PrismaClient,
+  organizationId: string,
+  principalUserIds: (string | null)[],
+): Promise<Map<string, string[]>> {
+  const byPrincipal = new Map<string, string[]>();
+  const distinct = Array.from(
+    new Set(
+      principalUserIds.filter((id): id is string => typeof id === "string"),
+    ),
+  );
+  if (distinct.length === 0) return byPrincipal;
+
+  const memberships = await prisma.groupMembership.findMany({
+    where: { userId: { in: distinct }, group: { organizationId } },
+    select: { userId: true, groupId: true },
+  });
+  for (const membership of memberships) {
+    const groupIds = byPrincipal.get(membership.userId);
+    if (groupIds) groupIds.push(membership.groupId);
+    else byPrincipal.set(membership.userId, [membership.groupId]);
+  }
+  return byPrincipal;
 }
 
 /** The same predicate applicableForRequest uses, evaluated in memory. */
@@ -83,8 +131,24 @@ function budgetMatchesKey(budget: GatewayBudget, key: KeyReach): boolean {
       return budget.scopeId === key.virtualKeyId;
     case "PRINCIPAL":
       return budget.scopeId === key.principalUserId;
-    default:
+    case "ATTRIBUTED_USER":
+      // The template anchors on a virtual key or a project and applies to
+      // every request on that anchor, whoever the end user turns out to be,
+      // so a key reaches it by being the anchor or by tracing into it.
+      return (
+        budget.scopeId === key.virtualKeyId || budget.scopeId === key.projectId
+      );
+    case "GROUP":
+      // Group budgets enforce per member, so only a key that carries a
+      // principal reaches one, and only through that principal's groups.
+      return key.groupIds.includes(budget.scopeId);
+    default: {
+      // Every scope type answers for itself here. Without this arm a scope
+      // added to the enum falls through to "no key can reach it", which
+      // reads in the UI as a warning on a budget that is enforcing.
+      const _exhaustive: never = budget.scopeType;
       return false;
+    }
   }
 }
 

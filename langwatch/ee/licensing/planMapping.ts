@@ -15,6 +15,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     maxMembersLite: resolved.maxMembersLite,
     maxMessagesPerMonth: resolved.maxMessagesPerMonth,
     canPublish: resolved.canPublish,
+    webhookEndpointsEnabled: resolved.webhookEndpointsEnabled,
     usageUnit: resolved.usageUnit,
     prices: {
       USD: 0,

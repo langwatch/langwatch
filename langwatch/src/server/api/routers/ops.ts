@@ -378,6 +378,32 @@ export const opsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * Dead-letter recovery: requeue one process instance's DEAD outbox rows
+   * (optionally narrowed by message-key prefix) as pending, due now, with a
+   * fresh attempt budget. The webhook platform's re-enable flow points here
+   * for batches that exhausted the retry ladder.
+   */
+  requeueDeadOutboxMessages: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        tenantId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageKeyPrefix: z.string().min(1).max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.requeueDeadMessages({
+        processName: input.processName,
+        projectId: input.tenantId,
+        processKey: input.processKey,
+        messageKeyPrefix: input.messageKeyPrefix,
+        requestedBy: ctx.session.user.id,
+      });
+    }),
+
   discoverAggregates: protectedProcedure
     .use(opsViewPermission)
     .input(

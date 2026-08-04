@@ -1850,7 +1850,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
    * except two that exist to *suppress* re-fires.)
    *
-   * `governanceOcsfEventsSync` (OCSF audit) and `gatewayBudgetSync` (billing) are
+   * `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
    * reactors on the `traceSummary` fold — so for them this method IS the terminal
    * event, and the counter below is the only evidence it ever happened. Scoped
    * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`

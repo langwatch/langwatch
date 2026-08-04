@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+import type { JsonValue } from "./types";
+
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
+);
+
 // Kept OUT of `types.ts` on purpose: `types.ts` is imported by `program.ts`,
 // which is on the always-loaded cold-start path of every CLI invocation, and
 // zod costs ~39ms to load. Only the prompt commands need this schema, and
@@ -25,7 +38,13 @@ export const localPromptConfigSchema = z
           .loose(),
       )
       .min(1, "At least one message is required"),
-    parameters: z.record(z.string(), z.unknown()).optional().default({}),
+    // Parameters persist as JSON: parse them AS json so the value's type
+    // matches the API contract (the spec's recursive JsonValue) instead of
+    // laundering unknowns into a typed pipeline.
+    parameters: z
+      .record(z.string(), jsonValueSchema)
+      .optional()
+      .default({}),
   })
   .loose();
 

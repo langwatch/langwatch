@@ -48,6 +48,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxMembersLite: 50,
   maxMessagesPerMonth: 10000000,
   canPublish: true,
+  webhookEndpointsEnabled: true,
   usageUnit: "traces",
 };
 

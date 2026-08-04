@@ -9,7 +9,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import {
+  GatewayBudgetService,
+  type GatewayBudgetWithSeats,
+} from "~/server/gateway/budget.service";
 import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import {
   providerLabelFor,
@@ -257,6 +260,31 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       });
       return toDto(row);
     }),
+
+  reset: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        id: z.string(),
+        endUserId: z.string().optional(),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = GatewayBudgetService.create(
+        ctx.prisma,
+        chRepoOrUndefined(),
+      );
+      const row = await service.reset({
+        id: input.id,
+        organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
+        endUserId: input.endUserId ?? null,
+        reason: input.reason ?? null,
+      });
+      return toDto(row);
+    }),
 });
 
 export type BudgetListScopeTarget = {
@@ -285,6 +313,7 @@ async function resolveScopeTargetsBatch(
     VIRTUAL_KEY: new Set(),
     PRINCIPAL: new Set(),
     GROUP: new Set(),
+    ATTRIBUTED_USER: new Set(),
   };
   for (const b of budgets) {
     ids[b.scopeType]?.add(b.scopeId);
@@ -413,10 +442,42 @@ async function resolveScopeTargetsBatch(
       memberCount: g._count.members,
     });
   }
+  // A per-person template anchors on a virtual key or a project, and the
+  // scopeId alone does not say which, so both are asked for and the key
+  // wins where an id somehow matches both.
+  const anchorIds = [...(ids.ATTRIBUTED_USER ?? [])];
+  if (anchorIds.length > 0 && organizationId) {
+    const [anchorKeys, anchorProjects] = await Promise.all([
+      prisma.virtualKey.findMany({
+        where: { id: { in: anchorIds }, organizationId },
+        select: { id: true, name: true, displayPrefix: true },
+      }),
+      prisma.project.findMany({
+        where: { id: { in: anchorIds }, team: { organizationId } },
+        select: { id: true, name: true, slug: true },
+      }),
+    ]);
+    for (const p of anchorProjects) {
+      out.set(`ATTRIBUTED_USER:${p.id}`, {
+        kind: "ATTRIBUTED_USER",
+        id: p.id,
+        name: p.name,
+        secondary: p.slug,
+      });
+    }
+    for (const vk of anchorKeys) {
+      out.set(`ATTRIBUTED_USER:${vk.id}`, {
+        kind: "ATTRIBUTED_USER",
+        id: vk.id,
+        name: vk.name,
+        secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
+      });
+    }
+  }
   return out;
 }
 
-function toDto(b: import("@prisma/client").GatewayBudget) {
+function toDto(b: GatewayBudgetWithSeats) {
   return {
     id: b.id,
     organizationId: b.organizationId,
@@ -435,5 +496,9 @@ function toDto(b: import("@prisma/client").GatewayBudget) {
     lastResetAt: b.lastResetAt?.toISOString() ?? null,
     archivedAt: b.archivedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),
+    // Per-person templates only: how many end users the template saw this
+    // period and how many are over their own cap.
+    endUsersSeen: b.endUsersSeen ?? null,
+    endUsersOver: b.endUsersOver ?? null,
   };
 }

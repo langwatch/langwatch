@@ -17,18 +17,34 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import { createLogger } from "@langwatch/observability";
+import type { GatewayBudget } from "@prisma/client";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import {
+  admitSpendWireSchema,
+  confirmSpendWireSchema,
+  failSpendWireSchema,
+  type SpendUsage,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import {
+  bucketPeriodFloorMs,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+} from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
@@ -295,6 +311,67 @@ secured.access(gatewayPolicy()).get("/health", (c) => {
  * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
  * Response: { jwt, revision, key_id, display_prefix }
  */
+/** A refusal to resolve a presented key, in the contract's error shape. */
+interface KeyAuthRejection {
+  status: 401 | 403;
+  type: string;
+  code: string;
+  message: string;
+}
+
+function rejectionBody(rejection: KeyAuthRejection) {
+  return {
+    error: {
+      type: rejection.type,
+      code: rejection.code,
+      message: rejection.message,
+    },
+  };
+}
+
+/** Why the presented key does not parse, or null when it does. Anything
+ *  that is not a VirtualKeyCryptoError is a bug rather than a bad
+ *  credential, so it rethrows. */
+function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
+  try {
+    parseVirtualKey(presented);
+    return null;
+  } catch (err) {
+    if (!(err instanceof VirtualKeyCryptoError)) throw err;
+    return {
+      status: 401,
+      type: "invalid_api_key",
+      code: err.code,
+      message: err.message,
+    };
+  }
+}
+
+/** Why a resolved key's status bars it from serving, or null when it may.
+ *  Disabled is distinct from revoked AND from a bad key: a disabled tenant
+ *  must be able to tell "we turned you off" from "your credential is
+ *  wrong", and the platform's own tooling branches on this code. */
+function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
+  if (status === "REVOKED") {
+    return {
+      status: 403,
+      type: "virtual_key_revoked",
+      code: "virtual_key_revoked",
+      message: "virtual key has been revoked",
+    };
+  }
+  if (status === "DISABLED") {
+    return {
+      status: 403,
+      type: "virtual_key_disabled",
+      code: "virtual_key_disabled",
+      message:
+        "virtual key is disabled; it can be re-enabled by an administrator",
+    };
+  }
+  return null;
+}
+
 secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     key_presented?: string;
@@ -314,28 +391,16 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     );
   }
 
-  try {
-    parseVirtualKey(presented);
-  } catch (err) {
-    if (err instanceof VirtualKeyCryptoError) {
-      logAuthDecision(c, err.code, 401);
-      return c.json(
-        {
-          error: {
-            type: "invalid_api_key",
-            code: err.code,
-            message: err.message,
-          },
-        },
-        401,
-      );
-    }
-    throw err;
+  const parseRejection = virtualKeyParseRejection(presented);
+  if (parseRejection) {
+    logAuthDecision(c, parseRejection.code, parseRejection.status);
+    return c.json(rejectionBody(parseRejection), parseRejection.status);
   }
 
-  const hashed = hashVirtualKeySecret(presented);
   const service = VirtualKeyService.create(prisma);
-  const vk = await service.getByHashedSecretInternal(hashed);
+  const vk = await service.getByHashedSecretInternal(
+    hashVirtualKeySecret(presented),
+  );
   if (!vk) {
     logAuthDecision(c, "virtual_key_not_found", 401);
     return c.json(
@@ -349,18 +414,12 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       401,
     );
   }
-  if (vk.status === "REVOKED") {
-    logAuthDecision(c, "virtual_key_revoked", 403, { vkId: vk.id });
-    return c.json(
-      {
-        error: {
-          type: "virtual_key_revoked",
-          code: "virtual_key_revoked",
-          message: "virtual key has been revoked",
-        },
-      },
-      403,
-    );
+  const statusRejection = virtualKeyStatusRejection(vk.status);
+  if (statusRejection) {
+    logAuthDecision(c, statusRejection.code, statusRejection.status, {
+      vkId: vk.id,
+    });
+    return c.json(rejectionBody(statusRejection), statusRejection.status);
   }
 
   // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
@@ -601,127 +660,12 @@ secured.access(gatewayPolicy()).get("/changes", async (c) => {
   });
 });
 
-/**
- * §4.4 — projective pre-request budget check.
- *
- * Request:  { vk_id, gateway_request_id, projected_cost_usd, model }
- * Response: { decision: allow|soft_warn|hard_block, warnings[], block_reason }
- */
-secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    vk_id?: string;
-    gateway_request_id?: string;
-    projected_cost_usd?: number | string;
-    model?: string;
-  };
-  if (!body.vk_id || body.projected_cost_usd === undefined) {
-    return c.json(
-      {
-        error: {
-          type: "bad_request",
-          code: "missing_required_fields",
-          message: "vk_id and projected_cost_usd are required",
-        },
-      },
-      400,
-    );
-  }
-
-  const vk = await prisma.virtualKey.findUnique({
-    where: { id: body.vk_id },
-    include: { scopes: true },
-  });
-  if (!vk) {
-    return c.json(
-      {
-        error: {
-          type: "invalid_api_key",
-          code: "virtual_key_not_found",
-          message: "unknown virtual key",
-        },
-      },
-      404,
-    );
-  }
-  // Trace project resolution mirrors the /config/:vk_id and /resolve-key
-  // paths: single-PROJECT-scope VK uses that project; otherwise fall
-  // back to the org's internal_governance project; otherwise null —
-  // budget check still runs against ORG/VIRTUAL_KEY/PRINCIPAL scopes.
-  const traceProject = await resolveTraceProject(prisma, vk);
-
-  // EC6 — admin oversight ("when did this user last use their VK")
-  // was broken because /resolve-key only fires on bundle cache miss
-  // (~once per JWT TTL = 15 min). The gateway hits /budget/check on
-  // every dispatch, so this is the right hook for last-used updates.
-  // Throttle to 60s to avoid hot-row contention at high RPS — admin
-  // dashboards refresh on minute-scale anyway. Fire-and-forget so a
-  // DB blip doesn't deny the request.
-  if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
-    const vkService = VirtualKeyService.create(prisma);
-    void vkService.touchUsage(vk.id).catch(() => {});
-  }
-
-  const service = GatewayBudgetService.create(
-    prisma,
-    isClickHouseEnabled()
-      ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-          const client = await getClickHouseClientForProject(projectId);
-          if (!client) {
-            throw new Error(
-              `ClickHouse enabled but no client for project ${projectId}`,
-            );
-          }
-          return client;
-        })
-      : undefined,
-  );
-  const result = await service.check({
-    organizationId: vk.organizationId,
-    teamId: traceProject?.teamId ?? null,
-    projectId: traceProject?.id ?? null,
-    virtualKeyId: vk.id,
-    principalUserId: vk.principalUserId,
-    projectedCostUsd: body.projected_cost_usd,
-  });
-
-  return c.json(
-    {
-      decision: result.decision,
-      warnings: result.warnings.map((w) => ({
-        scope: w.scope,
-        pct_used: w.pctUsed,
-        limit_usd: w.limitUsd,
-      })),
-      block_reason: result.blockReason,
-      blocked_by: result.blockedBy.map((b) => ({
-        budget_id: b.budgetId,
-        scope: b.scope,
-        scope_id: b.scopeId,
-        window: b.window,
-        limit_usd: b.limitUsd,
-        spent_usd: b.spentUsd,
-      })),
-      // Contract §4.4 — raw per-scope ledger consumed by the gateway's
-      // Checker.ApplyLive reconciliation path. Includes every applicable
-      // budget, not just the ones in warn/block.
-      scopes: result.scopes.map((s) => ({
-        scope: s.scope,
-        scope_id: s.scopeId,
-        window: s.window,
-        spent_usd: s.spentUsd,
-        limit_usd: s.limitUsd,
-      })),
-    },
-    200,
-  );
-});
-
-// §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
-// trace-fold reactor on the trace-processing pipeline
-// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
-// gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
-// into the ClickHouse `gateway_budget_ledger_events` table. Single source
-// of truth, no PG dual-write — see CLAUDE.md & the migration
+// §4.5: `/budget/debit` is removed. Cost recording rides the spend
+// commands the gateway posts below: the debits process manager
+// (langwatch/ee/governance/process-manager/gatewayDebits.process.ts) joins
+// each request's admission to its outcome and writes the ClickHouse
+// `gateway_budget_ledger_events` table, once per applicable budget. Single
+// source of truth, no PG dual-write. See the migration
 // 00017_create_gateway_budget_ledger.sql for the CH schema.
 
 /**
@@ -798,6 +742,531 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
  * Query: ?cursor=<opaque>&limit=1000
  * Response: { jwts: [...], next_cursor: null | string, current_revision }
  */
+
+// ── attributed-user bucket spend ────────────────────────────────────────
+
+/**
+ * Per-bucket spend read for ATTRIBUTED_USER templates. The bundle carries
+ * the template entry only (per-user cardinality is unbounded), so the
+ * gateway resolves the request's own bucket here, caches it briefly, and
+ * enforces against the returned figure. The read honors the template's
+ * period boundary and any single-bucket boundary from a per-user reset:
+ * whichever is later bounds the sum.
+ */
+/** The budget ledger's ClickHouse reader, resolving one client per project. */
+function budgetClickHouseRepository(): GatewayBudgetClickHouseRepository {
+  return new GatewayBudgetClickHouseRepository(async (projectId) => {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        `ClickHouse enabled but no client for project ${projectId}`,
+      );
+    }
+    return client;
+  });
+}
+
+/** Spend in one budget bucket, in micro USD. An organization with no
+ *  projects has nothing to read, so it reports zero. */
+async function bucketSpentMicroUsd(params: {
+  budget: GatewayBudget;
+  bucketScopeId: string;
+  periodFloorMs: number | undefined;
+}): Promise<number> {
+  const projects = await prisma.project.findMany({
+    where: { team: { organizationId: params.budget.organizationId } },
+    select: { id: true },
+  });
+  if (projects.length === 0) return 0;
+  const spends =
+    await budgetClickHouseRepository().getSpendForTargetsAcrossTenants(
+      projects.map((p) => p.id),
+      [
+        {
+          budgetId: params.budget.id,
+          scope: params.budget.scopeType,
+          scopeId: params.bucketScopeId,
+          window: params.budget.window,
+          match: "exact",
+          periodFloorMs: params.periodFloorMs,
+        },
+      ],
+    );
+  const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
+  return Math.round(spentUsd * 1_000_000);
+}
+
+secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
+  const budgetId = c.req.query("budget_id") ?? "";
+  const endUserId = c.req.query("end_user_id") ?? "";
+  if (!budgetId || !endUserId) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_parameter",
+          message: "budget_id and end_user_id are required",
+        },
+      },
+      400,
+    );
+  }
+  const budget = await prisma.gatewayBudget.findUnique({
+    where: { id: budgetId },
+  });
+  if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
+    return c.json(
+      {
+        error: {
+          type: "not_found",
+          code: "budget_not_found",
+          message: "unknown attributed-user budget",
+        },
+      },
+      404,
+    );
+  }
+  if (!isClickHouseEnabled()) {
+    // Without the ledger there is no bucket figure; report zero spend so
+    // enforcement stays permissive rather than inventing a number.
+    return c.json({ spent_micro_usd: 0, bucket: null });
+  }
+  const bucketScopeId = bucketScopeIdFor(
+    budget,
+    attributedUserBucketScopeId(budget.scopeId, endUserId),
+  );
+  const boundary = await prisma.gatewayBudgetBucketBoundary.findUnique({
+    where: { budgetId_bucketScopeId: { budgetId: budget.id, bucketScopeId } },
+    select: { periodStartedAt: true },
+  });
+  const spentMicroUsd = await bucketSpentMicroUsd({
+    budget,
+    bucketScopeId,
+    periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),
+  });
+  return c.json({ spent_micro_usd: spentMicroUsd, bucket: bucketScopeId });
+});
+
+// ── spend command ingest (spend-command spine) ──────────────────────────
+
+const spendCommandWireSchema = z.object({
+  command: z.enum(["admitSpend", "confirmSpend", "failSpend"]),
+  /** The spine-spec event payload; project_id on the wire maps to the
+   *  internal tenantId. Validated per command type below. */
+  payload: z.record(z.string(), z.unknown()),
+  pod_id: z.string().max(128).default(""),
+  pod_seq: z.number().int().min(0).default(0),
+});
+
+const spendCommandBatchSchema = z.object({
+  records: z.array(spendCommandWireSchema).min(1).max(500),
+});
+
+type SpendCommandName = z.infer<typeof spendCommandWireSchema>["command"];
+type SpendCommandRecord = z.infer<typeof spendCommandWireSchema>;
+
+const SPEND_COMMAND_NAMES = [
+  "admitSpend",
+  "confirmSpend",
+  "failSpend",
+] as const;
+
+const SPEND_COMMAND_SCHEMAS = {
+  admitSpend: admitSpendWireSchema,
+  confirmSpend: confirmSpendWireSchema,
+  failSpend: failSpendWireSchema,
+} as const;
+
+interface SpendCommandReject {
+  code: string;
+  message: string;
+  issues?: unknown[];
+}
+
+/** The gateway-spend pipeline, or undefined when event sourcing is not
+ *  registered (ClickHouse disabled). */
+function spendPipeline() {
+  try {
+    return getApp().eventSourcing?.getPipeline(GATEWAY_SPEND_PIPELINE_NAME);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The single seam that prices a gateway outcome. The wire carries
+ * quantities, never money, so the server rates here, once, and the
+ * appended event carries the figure from then on: the fold, the
+ * attributed-user debits, and the webhook envelope all copy it instead of
+ * each pricing the same request at its own instant against a model
+ * catalog that moves under them.
+ *
+ * The gateway always names a model on an outcome (the resolved identity
+ * once dispatch settled it, the requested one before that), which is the
+ * identity the ledger stores for the request.
+ */
+function pricedOutcomeData(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const outcome = data as unknown as {
+    model: string;
+    usage: SpendUsage;
+    rate_version?: string;
+  };
+  const rated = rateSpendNanoUsd({
+    model: outcome.model,
+    usage: outcome.usage,
+    rateVersion: outcome.rate_version,
+  });
+  return {
+    ...data,
+    cost_nano_usd: rated.costNanoUsd,
+    rate_version: rated.rateVersion,
+  };
+}
+
+/** The internal command data one wire record maps to, or why it cannot be
+ *  accepted. `project_id` on the wire is the internal `tenantId`; only
+ *  admits carry the pod identity the gap detector reads, and outcomes are
+ *  priced on the way through. */
+function toSpendCommandData(
+  record: SpendCommandRecord,
+):
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; reject: SpendCommandReject } {
+  const wire = record.payload;
+  const projectId = wire.project_id;
+  if (typeof projectId !== "string" || projectId.length === 0) {
+    return {
+      ok: false,
+      reject: {
+        code: "missing_project_id",
+        message: "spend command record rejected: missing project_id",
+      },
+    };
+  }
+  const { project_id: _projectId, ...rest } = wire;
+  const mapped: Record<string, unknown> =
+    record.command === "admitSpend"
+      ? {
+          ...rest,
+          tenantId: projectId,
+          pod_id: record.pod_id,
+          pod_seq: record.pod_seq,
+        }
+      : { ...rest, tenantId: projectId };
+  const validated = SPEND_COMMAND_SCHEMAS[record.command].safeParse(mapped);
+  if (!validated.success) {
+    return {
+      ok: false,
+      reject: {
+        code: "invalid_payload",
+        message: "spend command record rejected",
+        issues: validated.error.issues.slice(0, 3),
+      },
+    };
+  }
+  const data = validated.data as Record<string, unknown>;
+  return {
+    ok: true,
+    data: record.command === "admitSpend" ? data : pricedOutcomeData(data),
+  };
+}
+
+/** The wire fields that identify a rejected record, so the log line can be
+ *  reconciled against the gateway's own. Read defensively: a record is only
+ *  rejected because its payload did not hold up. */
+function rejectedRecordIdentity(
+  record: SpendCommandRecord,
+): Record<string, string | null> {
+  const wireString = (key: string): string | null => {
+    const value = record.payload[key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+  return {
+    gatewayRequestId: wireString("gateway_request_id"),
+    tenantId: wireString("project_id"),
+  };
+}
+
+/** Group the batch by command, reporting unacceptable records by index.
+ *  Every reject path logs: a silent per-record drop looks like a healthy
+ *  200 from the emitter's side and loses billing records. */
+function groupSpendCommands(records: SpendCommandRecord[]): {
+  perCommand: Record<SpendCommandName, Array<Record<string, unknown>>>;
+  rejected: Array<{ index: number; code: string }>;
+} {
+  const perCommand: Record<SpendCommandName, Array<Record<string, unknown>>> = {
+    admitSpend: [],
+    confirmSpend: [],
+    failSpend: [],
+  };
+  const rejected: Array<{ index: number; code: string }> = [];
+  records.forEach((record, index) => {
+    const mapped = toSpendCommandData(record);
+    if (!mapped.ok) {
+      rejected.push({ index, code: mapped.reject.code });
+      // Error, not warn: the drainer reads a 200 and acks the segment, so this
+      // line is the only trace the record ever existed. It names the request
+      // because "a record was rejected" cannot be reconciled against anything.
+      logger.error(
+        {
+          command: record.command,
+          index,
+          code: mapped.reject.code,
+          ...rejectedRecordIdentity(record),
+          ...(mapped.reject.issues ? { issues: mapped.reject.issues } : {}),
+        },
+        mapped.reject.message,
+      );
+      return;
+    }
+    perCommand[record.command].push(mapped.data);
+  });
+  return { perCommand, rejected };
+}
+
+/** How stale `lastUsedAt` has to be before a drain batch advances it.
+ *  Admin oversight reads the column on minute scale, so writing it per
+ *  request would buy nothing. */
+const VIRTUAL_KEY_TOUCH_THROTTLE_MS = 60_000;
+
+/** The key row an admission is attributed against. */
+type AttributionVirtualKey = {
+  id: string;
+  organizationId: string;
+  principalUserId: string | null;
+  lastUsedAt: Date | null;
+};
+
+/** The ids an admit record was validated with. Every one of them is a
+ *  required field on the wire schema, so these reads are total. */
+function admitIdentity(admit: Record<string, unknown>): {
+  gatewayRequestId: string;
+  virtualKeyId: string;
+  projectId: string;
+  organizationId: string;
+} {
+  return {
+    gatewayRequestId: String(admit.gateway_request_id ?? ""),
+    virtualKeyId: String(admit.virtual_key_id ?? ""),
+    projectId: String(admit.tenantId ?? ""),
+    organizationId: String(admit.organization_id ?? ""),
+  };
+}
+
+/**
+ * Advance `lastUsedAt` on the keys this batch admitted.
+ *
+ * Admission is the one moment that sees every kind of use: the requests the
+ * gateway went on to block over a budget or a guardrail, and the ones whose
+ * outcome never arrives, are all admitted first. One conditional write per
+ * drain batch, decided off the rows the enrichment already read, and a batch
+ * whose keys were all touched recently writes nothing.
+ *
+ * Best effort: the column is oversight, not enforcement, and failing the
+ * batch over it would cost the drainer a retry of records that appended.
+ */
+async function touchAdmittedVirtualKeys(
+  virtualKeys: AttributionVirtualKey[],
+  now: Date,
+): Promise<void> {
+  const staleIds = virtualKeys
+    .filter(
+      (vk) =>
+        !vk.lastUsedAt ||
+        now.getTime() - vk.lastUsedAt.getTime() > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
+    )
+    .map((vk) => vk.id);
+  if (staleIds.length === 0) return;
+  try {
+    await prisma.virtualKey.updateMany({
+      where: { id: { in: staleIds } },
+      data: { lastUsedAt: now },
+    });
+  } catch (error) {
+    logger.warn(
+      { virtualKeyIds: staleIds, error },
+      "failed to advance virtualKey.lastUsedAt for admitted spend commands",
+    );
+  }
+}
+
+/**
+ * Join every admission to the attribution the gateway cannot see: the key's
+ * principal and the tenant project's team. Two batched reads answer for a
+ * whole batch of up to 500 records, and the appended event carries the
+ * result from then on, so nothing downstream re-reads identity per request.
+ *
+ * The two ways this can come up short are deliberately not treated alike. A
+ * MISSING row (a key deleted between dispatch and drain, a project without a
+ * team) is a fact about the world: that one record degrades to empty
+ * attribution, still owes its organization, project and key debits, and logs
+ * the ids so the team, principal and group budgets it skipped can be
+ * reconciled from the log. A prisma FAILURE is not a fact, it is an unknown,
+ * and an event is immutable once appended, so it propagates to a 500 and the
+ * drainer retries the whole batch.
+ */
+async function enrichAdmitCommands(
+  admits: Array<Record<string, unknown>>,
+): Promise<void> {
+  if (admits.length === 0) return;
+  const identities = admits.map(admitIdentity);
+  const [virtualKeys, projects] = await Promise.all([
+    prisma.virtualKey.findMany({
+      where: {
+        id: { in: [...new Set(identities.map((i) => i.virtualKeyId))] },
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        principalUserId: true,
+        lastUsedAt: true,
+      },
+    }),
+    prisma.project.findMany({
+      where: { id: { in: [...new Set(identities.map((i) => i.projectId))] } },
+      select: { id: true, teamId: true },
+    }),
+  ]);
+  const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
+  const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));
+
+  admits.forEach((admit, index) => {
+    const identity = identities[index]!;
+    const key = keyById.get(identity.virtualKeyId);
+    const teamId = teamIdByProject.get(identity.projectId) ?? "";
+    if (!key) {
+      logger.error(
+        identity,
+        "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+      );
+    } else if (key.organizationId !== identity.organizationId) {
+      // Logged, not dropped. The record is already durable on the gateway's
+      // side, and a discarded admission loses the outcome that follows it;
+      // the mismatch is a control-plane inconsistency to chase, not a reason
+      // to lose billing evidence.
+      logger.error(
+        { ...identity, keyOrganizationId: key.organizationId },
+        "spend admission names a virtual key from another organization",
+      );
+    }
+    if (!teamId) {
+      logger.error(
+        identity,
+        "spend admission names a project with no team: team budgets will not see this request",
+      );
+    }
+    admit.principal_user_id = key?.principalUserId ?? "";
+    admit.team_id = teamId;
+  });
+
+  await touchAdmittedVirtualKeys(virtualKeys, new Date());
+}
+
+interface SpendCommandSender {
+  sendBatch?: (payloads: unknown[]) => Promise<unknown>;
+  send: (payload: unknown) => Promise<unknown>;
+}
+
+/** Hand each command's group to the pipeline, preferring the batched
+ *  sender where the command exposes one. Answers the command whose sender
+ *  is missing, which is a registration bug the caller reports as a 503. */
+async function sendSpendCommands(
+  commands: unknown,
+  perCommand: Record<SpendCommandName, Array<Record<string, unknown>>>,
+): Promise<SpendCommandName | null> {
+  const senders = commands as Record<string, SpendCommandSender | undefined>;
+  for (const name of SPEND_COMMAND_NAMES) {
+    const batch = perCommand[name];
+    if (batch.length === 0) continue;
+    const sender = senders[name];
+    if (!sender) return name;
+    if (sender.sendBatch) {
+      await sender.sendBatch(batch);
+      continue;
+    }
+    for (const payloadItem of batch) {
+      await sender.send(payloadItem);
+    }
+  }
+  return null;
+}
+
+/**
+ * Async spend-command ingest. The gateway's drainer posts spooled batches
+ * here at-least-once; every command carries a per-(request, step)
+ * idempotency key at the event store, so redelivery is a no-op and the
+ * drainer can retry the whole batch safely.
+ *
+ * Per-record acceptance: one malformed record must not wedge the spool
+ * (the drainer would retry a permanently rejected batch forever), so bad
+ * records are reported back by index and the rest append. The gateway
+ * counts rejects; a nonzero rate is a contract bug, and a rejected outcome
+ * still surfaces later when settlement flags the admission for
+ * reconciliation (the pod-seq gap detector only covers admits).
+ *
+ * Admissions are enriched before they append, which is the one thing here
+ * that can fail the whole batch: attribution the gateway cannot see has to
+ * be right on an immutable event, so an unreadable database answers 500 and
+ * lets the drainer come back rather than appending a guess.
+ */
+secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
+  const parsed = spendCommandBatchSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_batch",
+          message: "records[] of {command, payload, pod_id, pod_seq} required",
+        },
+      },
+      400,
+    );
+  }
+
+  const pipeline = spendPipeline();
+  if (!pipeline) {
+    return c.json(
+      {
+        error: {
+          type: "unavailable",
+          code: "spend_pipeline_disabled",
+          message:
+            "gateway spend pipeline is not registered (ClickHouse disabled)",
+        },
+      },
+      503,
+    );
+  }
+
+  const { perCommand, rejected } = groupSpendCommands(parsed.data.records);
+
+  await enrichAdmitCommands(perCommand.admitSpend);
+
+  const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
+  if (unregistered) {
+    return c.json(
+      {
+        error: {
+          type: "unavailable",
+          code: "spend_command_missing",
+          message: `command ${unregistered} is not registered`,
+        },
+      },
+      503,
+    );
+  }
+
+  return c.json({
+    accepted: parsed.data.records.length - rejected.length,
+    rejected,
+  });
+});
+
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 
 export const app = secured.hono;

@@ -371,7 +371,7 @@ describe.skipIf(!hasTestcontainers)(
             extra: {
               __pipelineName: "billing",
               __jobType: "fold",
-              __jobName: "gatewayBudgetSync",
+              __jobName: "governanceOcsfEventsSync",
             },
           });
 
@@ -405,7 +405,7 @@ describe.skipIf(!hasTestcontainers)(
             queue_name: name,
             pipeline_name: "billing",
             job_type: "fold",
-            job_name: "gatewayBudgetSync",
+            job_name: "governanceOcsfEventsSync",
             reason: "body_unreadable",
           });
         });
@@ -668,7 +668,7 @@ describe.skipIf(!hasTestcontainers)(
               value: OFFLOADABLE_S3_VALUE(),
               __pipelineName: "billing",
               __jobType: "fold",
-              __jobName: "gatewayBudgetSync",
+              __jobName: "governanceOcsfEventsSync",
             },
             tieredBlobs: encodeTiered,
             projectId: PROJECT,

@@ -1,11 +1,12 @@
 /**
  * @vitest-environment node
  *
- * Every virtual key must resolve a project for its traces and costs to
- * land in, against real Postgres.
+ * Every virtual key must resolve a project for its traces to land in,
+ * against real Postgres.
  *
- * Budget spend is accrued from the trace fold, so a key whose traces land
- * nowhere accrues nothing against ANY budget, the org-wide cap included.
+ * Debits ride the gateway's spend commands and no longer depend on this,
+ * but a key whose traces land nowhere is invisible in every usage view,
+ * and per-key spend is read from the trace path.
  * These tests pin the write-path refusal (`trace_project_required`) on
  * create, on the update that would remove the destination, and on edits
  * to keys that predate the rule, plus the governance-project fallback

@@ -23,7 +23,7 @@ Both paths call into the same service-layer functions, there is no business-logi
 | Property | Value |
 |---|---|
 | Mount point | `/api/governance/<resource>` |
-| Spec | Emitted into the canonical `openapiLangWatch.json` on the next `sdk:regen`, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API |
+| Spec | Emitted into the canonical `openapiLangWatch.json` on the next spec regeneration, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API |
 | Auth | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team |
 | RBAC | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view`, `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling, same model as `gateway-platform` |
 | Tenancy | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector) |
@@ -88,15 +88,18 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/src/app/api/openapiLangWatch.json`, and the generated client layers regenerate from it.
 
 ```bash
-pnpm openapi:emit                  # regenerate openapiLangWatch.json from Hono routes
-pnpm sdk:regen --target typescript # regenerate the TS SDK
-pnpm sdk:regen --target python     # regenerate the Python SDK
-```
+# from langwatch/
+pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
 
-<Note>**TBD-IMPL, exact script names**: Sergey's first route SHA at `0bb951160` mounts ingestion-templates into `api-router` + `generateOpenAPISpec` so the OpenAPI shape lands in `openapiLangWatch.json` on the next regen. The exact `package.json` script names fold in once the SDK regen target lands.</Note>
+# from typescript-sdk/
+pnpm generate:openapi-types         # regenerate the TS generated client from that spec
+
+# from python-sdk/ (regenerates the spec first, then the client)
+make generate/api-client            # regenerate the Python generated client
+```
 
 The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
 

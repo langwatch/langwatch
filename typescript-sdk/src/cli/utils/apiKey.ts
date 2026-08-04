@@ -294,3 +294,41 @@ function reportMissingCredentials(endpoint: string): never {
   }
   process.exit(1);
 }
+
+/**
+ * Org-anchored surfaces (webhooks, spend-events) authenticate with the ONE
+ * supported credential, LANGWATCH_API_KEY, exactly like every other
+ * command: org and project permission checks are enforced server-side, and
+ * a project-scoped key gets a 401 from these routes. No separate org-key
+ * variable and no client-side fallback chain, per the recorded auth
+ * decision.
+ */
+export const checkOrgApiKey = (): string => {
+  loadEnvFileScoped();
+  const key = process.env.LANGWATCH_API_KEY;
+  if (key && key.trim() !== "") return key;
+
+  const settingsUrl = `${getEndpoint()}/settings/api-keys`;
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: "missing_api_key",
+        kind: "missing_api_key",
+        message:
+          "LANGWATCH_API_KEY is not set. This command needs an organization-capable API key; create one in Settings > API Keys and add it to your .env file.",
+        httpStatus: 0,
+        meta: { settingsUrl },
+        isHandled: true,
+      }),
+    );
+    console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
+    process.exit(1);
+  }
+
+  console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
+  console.error(chalk.gray("This command needs an organization-capable API key. Create one at:"));
+  console.error(chalk.cyan(`  ${settingsUrl}`));
+  console.error(chalk.gray("Then add it to your .env file:"));
+  console.error(chalk.cyan("  echo 'LANGWATCH_API_KEY=<your-key>' >> .env"));
+  process.exit(1);
+};

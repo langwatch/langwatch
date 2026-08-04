@@ -5,8 +5,9 @@
  * window a budget can be created with.
  *
  * Real ClickHouse, no mocks. A debit goes in through the same repository the
- * trace fold uses, and comes back out through the same repository the budgets
- * UI, /budget/check, and the gateway config bundle all read from.
+ * debits process uses, and comes back out through the same repository the
+ * budgets UI, the gateway config bundle, and the per-end-user bucket poll
+ * all read from.
  *
  * This is the regression guard for issue #6141. The rollup only returns a row
  * when the period the reader asks for is exactly the period the materialised
@@ -20,7 +21,10 @@ import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
+import {
+  CURRENT_ROLLUP_REBUILD_MIGRATION,
+  replayGooseMigrationUp,
+} from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -351,11 +355,15 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       );
       spendBeforeRebuild = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
 
-      // The upgrade under test: pin the truncation to UTC and rebuild the
-      // rollup from the ledger.
+      // The upgrade under test: the CURRENT rollup rebuild, which pins the
+      // truncation to UTC, keys the aggregate by budget, and re-derives
+      // every row from the ledger. Replaying the newest rebuild rather than
+      // the one that first fixed the timezone is what keeps this scenario
+      // honest as the rollup evolves: the claim is that history folded by
+      // any older view survives the upgrade a deployment actually runs.
       await replayGooseMigrationUp({
         client: client!,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
 
       utcRowsAfterRebuild = await captureUtcRows();
@@ -369,7 +377,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       const client = await getClickHouseClientForProject(TENANT_ID);
       await replayGooseMigrationUp({
         client: client!,
-        fileName: "00058_gateway_budget_scope_totals_utc.sql",
+        fileName: CURRENT_ROLLUP_REBUILD_MIGRATION,
       });
     }, 120_000);
 

@@ -415,6 +415,35 @@ export class PrismaProcessStore implements ProcessStore {
     );
   }
 
+  async requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+    now: number;
+  }): Promise<number> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        processName: params.processName,
+        projectId: params.projectId,
+        processKey: params.processKey,
+        status: "dead",
+        ...(params.messageKeyPrefix
+          ? { messageKey: { startsWith: params.messageKeyPrefix } }
+          : {}),
+      },
+      data: {
+        status: "pending",
+        attempts: 0,
+        nextAttemptAt: asDate(params.now),
+        leasedUntil: null,
+        leaseToken: null,
+        updatedAt: asDate(params.now),
+      },
+    });
+    return result.count;
+  }
+
   async deleteDispatchedBefore(params: {
     processName: string;
     before: number;

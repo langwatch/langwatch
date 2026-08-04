@@ -9,7 +9,6 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import { createGovernanceKpisSyncReactor } from "@ee/governance/reactors/governanceKpisSync.reactor";
 import { createGovernanceOcsfEventsSyncReactor } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import { createProjectMetadataReactor } from "../../pipelines/trace-processing/reactors/projectMetadata.reactor";
@@ -115,14 +114,8 @@ describe("reactor throttle policy", () => {
   });
 
   describe("given a consumer that cannot absorb added latency", () => {
-    // Both are deliberately excluded. Read the comment on each reactor before
-    // adding a window here — the reasons are specific, not incidental.
-    it("leaves gatewayBudgetSync firing immediately, because a budget block reads what it writes", () => {
-      const reactor = createGatewayBudgetSyncReactor(anyDeps);
-
-      expect(reactor.options?.delay ?? 0).toBe(0);
-    });
-
+    // Deliberately excluded. Read the comment on the reactor before adding a
+    // window here — the reason is specific, not incidental.
     it("leaves spanStorageBroadcast firing immediately, because nothing polls behind it while a trace is open", () => {
       const reactor = createSpanStorageBroadcastReactor({
         broadcast: anyDeps,

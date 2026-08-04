@@ -612,6 +612,20 @@ const presentations = {
     describe: () =>
       "Browser monitoring is sending faster than we accept. It will resume on its own.",
   },
+  // ---- REST API credentials ----
+  // Raised by the organization-scoped REST boundary, which an integration
+  // calls with an API key rather than a session. The copy points at the key
+  // because that is the only thing the caller can fix.
+  missing_credentials: {
+    title: "This request carried no API key",
+    describe: () =>
+      "Send an organization API key as Authorization: Bearer <api-key>.",
+  },
+  invalid_credentials: {
+    title: "That API key was not accepted",
+    describe: () =>
+      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>
@@ -1120,6 +1134,16 @@ const presentations = {
     title: "You've reached your spending limit",
     describe: () => "Raise the limit in settings to keep going.",
   },
+  end_user_required: {
+    title: "This key needs a user on every request",
+    describe: () =>
+      "Send the OpenAI user field or the X-LangWatch-End-User-Id header.",
+  },
+  virtual_key_disabled: {
+    title: "This key is disabled",
+    describe: () =>
+      "An administrator can re-enable it; the key itself is unchanged.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",
@@ -1232,9 +1256,9 @@ const presentations = {
     // confirm the existence of.
     title: "That scope isn't in this organization",
     describe: (error) => {
-      const kind = str(error, "scopeKind", "");
-      return kind
-        ? `Pick a ${kind} that belongs to this organization.`
+      const scopeType = str(error, "scope_type", "");
+      return scopeType
+        ? `Pick a ${scopeType} that belongs to this organization.`
         : "Pick a scope that belongs to this organization.";
     },
   },
@@ -1258,9 +1282,45 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_event_not_found: {
+    // Says the two things a caller can act on: the log's horizon, and that
+    // governance events were never in it to begin with.
+    title: "That event isn't in the log",
+    describe: () =>
+      "It may have aged out of the events log, or it may be a budget or virtual-key event, which are delivered by webhook but not retained here.",
+  },
+  external_id_conflict: {
+    // The id is the caller's own, so naming it back is the fastest way to see
+    // which of a batch of provisioning calls collided.
+    title: "That external ID is already in use",
+    describe: (error) => {
+      const externalId = str(error, "external_id", "");
+      return externalId
+        ? `Another record in this organization already uses "${externalId}". Pick a different one, or update that record instead.`
+        : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
+    },
+  },
   cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",
+  },
+  budget_not_found: {
+    title: "Budget not found",
+    describe: () => "It may have been archived by someone else.",
+  },
+  gateway_provider_bindings_gone: {
+    // A 410 whose copy only says "gone" leaves the reader stuck. The whole
+    // value of this refusal is naming where the capability moved to.
+    title: "Gateway provider bindings have moved",
+    describe: () =>
+      "Rate limits, rotation and fallback priority now live on the model provider itself, under the Advanced (Gateway) tab.",
+  },
+  invalid_cursor: {
+    // Restarting the walk silently would re-serve every row the caller already
+    // has, so this refuses instead; the copy says what to do about it.
+    title: "That page cursor isn't valid",
+    describe: () =>
+      "Start the list again from the beginning and follow next_cursor from there.",
   },
   gateway_group_budget_unsupported: {
     // Refusing beats creating a cap that quietly means something else, so the

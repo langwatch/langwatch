@@ -107,8 +107,11 @@ generate/api-client: ensure-openapi-python-client
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
+	@python3 scripts/spec-for-python-generator.py \
+		../langwatch/src/app/api/openapiLangWatch.json \
+		.tmp/openapiLangWatch.python.json
 	uv run openapi-python-client generate \
-		--path ../langwatch/src/app/api/openapiLangWatch.json \
+		--path .tmp/openapiLangWatch.python.json \
 		--output-path .tmp/api-client \
 		--custom-template-path openapi-templates \
 		--overwrite
@@ -116,7 +119,7 @@ generate/api-client: ensure-openapi-python-client
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
 	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
-	@rm -rf .tmp/api-client
+	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."
 
 %:

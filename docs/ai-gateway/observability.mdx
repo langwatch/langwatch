@@ -128,6 +128,25 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 
 `endpoint` is one of `resolve-key`, `guardrail-check`, `config`, `codex-refresh`. The change-feed long poll is deliberately excluded: it blocks until an event or its own timeout, so timing it would say nothing about control-plane health.
 
+### Spend emission
+
+Every request writes a spend record to a bounded on-disk spool, which a background drainer ships to the control plane. Those records are what the control plane debits budgets from, so a record the spool never took is spend that is never billed and never enforced against.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_spend_spool_appended_total` | counter | none | Spend records written to the spool. The denominator for the drop counters |
+| `gateway_spend_spool_dropped_total` | counter | `reason` | Records lost before they could ship |
+
+`reason` is `intake` (the spool's writer could not take the record: its queue was full, or the pod is already shutting down) or `overflow` (the oldest sealed segments were deleted to keep the spool inside its 64 MiB bound, which means the drainer is not keeping up with the pod). Alert on any sustained positive rate:
+
+```promql
+sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
+```
+
+Both counters read `0` on a pod whose spool failed to open, which is a pod serving traffic with no spend emission at all. It logs that at startup, and the flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
+
+The spool is pod-local and deliberately not on a volume: a pod deleted with records still unshipped loses them, bounded by the drain lag of roughly a second of traffic. The alternative is a per-pod PersistentVolume, which buys back that second at the price of a stateful gateway.
+
 The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
 Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config, see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).

@@ -12,9 +12,9 @@
  *   4. 200 with a valid token + personal VK + no budget exhausted.
  *
  * The 402 (budget_exceeded) case requires a ClickHouse-backed budget
- * ledger entry showing actual spend; that lives in the existing
- * gatewayBudgetSync.reactor integration test which exercises the
- * same `GatewayBudgetService.check()` code path.
+ * ledger entry showing actual spend; that lives in
+ * budgetEnforcement.integration.test.ts which exercises the same
+ * `GatewayBudgetService.check()` code path.
  *
  * Spec: specs/ai-gateway/governance/budget-exceeded.feature
  *       docs/ai-gateway/governance/cli-reference.mdx
@@ -163,6 +163,6 @@ describe("GET /api/auth/cli/budget/status", () => {
   // That path is exhaustively covered by personalVirtualKey.service
   // integration tests; here we focus on the budget/status endpoint
   // contract itself. The hard_block / 402 path is exercised end-to-end
-  // by gatewayBudgetSync.reactor.integration.test.ts which uses the
-  // same GatewayBudgetService.check() code path.
+  // by budgetEnforcement.integration.test.ts which uses the same
+  // GatewayBudgetService.check() code path.
 });

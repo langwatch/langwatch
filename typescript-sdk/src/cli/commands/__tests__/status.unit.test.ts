@@ -64,12 +64,12 @@ const noExperiments = {
 const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "bud_1",
   organization_id: "org_1",
-  scope_type: "PROJECT",
+  scope_type: "project",
   scope_id: "proj_1",
   name: "prod",
   description: null,
-  window: "MONTH",
-  on_breach: "BLOCK",
+  window: "month",
+  on_breach: "block",
   limit_usd: "100",
   spent_usd: "92",
   timezone: null,
@@ -95,6 +95,30 @@ const mockGatewayFetch = ({
         ok: true,
         status: 200,
         json: async () => ({ data: budgets, spend_available: spendAvailable }),
+      };
+    }
+    return { ok: true, status: 200, json: async () => [{ id: "1" }] };
+  }) as unknown as typeof fetch;
+
+/**
+ * The budgets endpoint pages by cursor, serving one page per request. The scan
+ * has to walk it: the at-risk list is a decision, not a display, so a breached
+ * budget sitting behind the first page would turn into a green tick.
+ */
+const mockPagedGatewayFetch = (pages: unknown[][]) =>
+  vi.fn().mockImplementation(async (input: unknown) => {
+    const url = String(input);
+    if (url.includes("/api/gateway/v1/budgets")) {
+      const cursor = new URL(url).searchParams.get("cursor");
+      const index = cursor === null ? 0 : Number(cursor);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: pages[index] ?? [],
+          spend_available: true,
+          next_cursor: index + 1 < pages.length ? String(index + 1) : null,
+        }),
       };
     }
     return { ok: true, status: 200, json: async () => [{ id: "1" }] };
@@ -590,12 +614,12 @@ describe("statusCommand", () => {
       });
     });
 
-    describe("when a BLOCK budget has a zero limit", () => {
+    describe("when a block budget has a zero limit", () => {
       it("reports the zero-limit budget as fully breached", async () => {
         mockAllSuccess();
         // A limit of 0 admits no spend at all: maximally breached, not 0%.
         global.fetch = mockGatewayFetch({
-          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "BLOCK" })],
+          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" })],
         });
 
         await statusCommand();
@@ -624,15 +648,42 @@ describe("statusCommand", () => {
       });
     });
 
+    describe("when spend could not be totalled", () => {
+      it("treats null spend as unreadable, not as zero spent", async () => {
+        mockAllSuccess();
+        // The API sends null rather than a stale figure when spend_available
+        // is false. `Number(null)` is 0, which is finite, so a null used to
+        // score the budget at 0% and drop it out of the at-risk list looking
+        // perfectly healthy.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "untotalled",
+              spent_usd: null,
+              spent_nano_usd: null,
+              on_breach: "block",
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain("could not check gateway budgets");
+        expect(out).toContain("untotalled");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+    });
+
     describe("when budgets live on the once-invisible scope dimensions", () => {
       it("scores a virtual-key-scoped budget like any other", async () => {
         mockAllSuccess();
-        // Before #6261 the REST list hid VIRTUAL_KEY/PRINCIPAL scopes, so a
-        // VK budget at 92% BLOCK was structurally invisible here. Now it is
+        // Before #6261 the REST list hid virtual_key/principal scopes, so a
+        // VK budget at 92% block was structurally invisible here. Now it is
         // a row like any other and must gate the tick.
         global.fetch = mockGatewayFetch({
           budgets: [
-            budgetFixture({ scope_type: "VIRTUAL_KEY", scope_id: "vk_1" }),
+            budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" }),
           ],
         });
 
@@ -646,12 +697,12 @@ describe("statusCommand", () => {
 
       it("compares group spend against the per-member allowance times members", async () => {
         mockAllSuccess();
-        // GROUP rows: limit_usd is per member, spent_usd sums the group.
+        // `group` rows: limit_usd is per member, spent_usd sums the group.
         // $10/member x 2 members with $19 spent is 95%, not 190%.
         global.fetch = mockGatewayFetch({
           budgets: [
             budgetFixture({
-              scope_type: "GROUP",
+              scope_type: "group",
               scope_id: "grp_1",
               limit_usd: "10",
               spent_usd: "19",
@@ -666,6 +717,104 @@ describe("statusCommand", () => {
         expect(out).toContain('budget "prod"');
         expect(out).toContain("at 95%");
         expect(out).not.toContain("nothing needs your attention");
+      });
+
+      it("reads a per-person template as a headcount, not as its anchor's total", async () => {
+        mockAllSuccess();
+        // `attributed_user` rows cap each end user separately. The template's
+        // own spent_usd totals a bare anchor no debit lands on, so scoring it
+        // like any other scope printed a confident 0% while three people were
+        // being refused.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "attributed_user",
+              scope_id: "vk_anchor",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 3,
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain('budget "seat cap"');
+        expect(out).toContain("3 of 10 over cap, $1.00/person");
+        expect(out).not.toContain("at 0%");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+
+      it("finds a breached budget the first page of the walk did not carry", async () => {
+        mockAllSuccess();
+        // Reading page one and stopping would print "nothing needs your
+        // attention" while a block budget refuses every request.
+        global.fetch = mockPagedGatewayFetch([
+          [budgetFixture({ name: "quiet", spent_usd: "1" })],
+          [budgetFixture({ name: "quieter", spent_usd: "2" })],
+          [budgetFixture({ name: "breached", limit_usd: "100", spent_usd: "150" })],
+        ]);
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).toContain('budget "breached"');
+        expect(out).toContain("at 150%");
+        expect(out).not.toContain("nothing needs your attention");
+      });
+
+      it("leaves a per-person template alone while nobody is over their cap", async () => {
+        mockAllSuccess();
+        // Ten people spending under their own cap is a healthy template. The
+        // REST resource carries no per-person utilization, so there is nothing
+        // honest to warn about until somebody crosses.
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "attributed_user",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 0,
+            }),
+          ],
+        });
+
+        await statusCommand();
+
+        const out = consoleLogSpy.mock.calls.flat().join("\n");
+        expect(out).not.toContain("seat cap");
+        expect(out).toContain("nothing needs your attention");
+      });
+
+      it("carries the headcount pair into the machine document", async () => {
+        mockAllSuccess();
+        global.fetch = mockGatewayFetch({
+          budgets: [
+            budgetFixture({
+              name: "seat cap",
+              scope_type: "attributed_user",
+              limit_usd: "1.00",
+              spent_usd: "0",
+              end_users_seen: 10,
+              end_users_over: 3,
+            }),
+          ],
+        });
+
+        await statusCommand({ output: "json" });
+
+        const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+        expect(doc.attention.budgetsAtRisk).toHaveLength(1);
+        expect(doc.attention.budgetsAtRisk[0]).toMatchObject({
+          scope: "attributed_user",
+          endUsersSeen: 10,
+          endUsersOver: 3,
+        });
       });
 
       it("withholds utilization when the server could not total spend", async () => {

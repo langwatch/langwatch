@@ -10,13 +10,55 @@ import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
+import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
-import currentSpec from "../app/api/openapiLangWatch.json";
+import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+
+// Surfaces whose routes come straight from their Hono apps. Their paths
+// REPLACE on merge, and any path the apps no longer serve is pruned from
+// the previous spec below: without the prune, a deleted route would ride
+// the merge union forever.
+const APP_DERIVED_PREFIXES = [
+  "/api/agents",
+  "/api/analytics",
+  "/api/dashboards",
+  "/api/evaluators",
+  "/api/events",
+  "/api/webhooks",
+  "/api/gateway/v1",
+  "/api/governance",
+  "/api/graphs",
+  "/api/me",
+  "/api/prompts",
+  "/api/dataset",
+  "/api/model-providers",
+  "/api/monitors",
+  "/api/scenario-events",
+  "/api/scenarios",
+  "/api/secrets",
+  "/api/simulation-runs",
+  "/api/suites",
+  "/api/traces",
+  "/api/triggers",
+  "/api/workflows",
+];
+
+const currentSpec = {
+  ...rawCurrentSpec,
+  paths: Object.fromEntries(
+    Object.entries(
+      (rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {},
+    ).filter(
+      ([route]) => !APP_DERIVED_PREFIXES.some((p) => route.startsWith(p)),
+    ),
+  ),
+};
+
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
@@ -25,6 +67,7 @@ import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -92,6 +135,8 @@ export default async function execute() {
   const triggersSpec = await generateSpecs(triggersApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
+  const webhooksSpec = await generateSpecs(webhooksApp);
+  const gatewaySpendSpec = await generateSpecs(gatewaySpendApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
@@ -118,6 +163,8 @@ export default async function execute() {
       suitesSpec,
       tracesSpec,
       triggersSpec,
+      webhooksSpec,
+      gatewaySpendSpec,
       workflowsSpec,
       langwatchSpec,
     ],
@@ -126,29 +173,7 @@ export default async function execute() {
       customMerge(key) {
         // Since we get these routes from the app directly,
         // we don't want to merge, we just want to replace.
-        if (
-          key.includes("/api/agents") ||
-          key.includes("/api/analytics") ||
-          key.includes("/api/dashboards") ||
-          key.includes("/api/evaluators") ||
-          key.includes("/api/events") ||
-          key.includes("/api/gateway/v1") ||
-          key.includes("/api/governance") ||
-          key.includes("/api/graphs") ||
-          key.includes("/api/me") ||
-          key.includes("/api/prompts") ||
-          key.includes("/api/dataset") ||
-          key.includes("/api/model-providers") ||
-          key.includes("/api/monitors") ||
-          key.includes("/api/scenario-events") ||
-          key.includes("/api/scenarios") ||
-          key.includes("/api/secrets") ||
-          key.includes("/api/simulation-runs") ||
-          key.includes("/api/suites") ||
-          key.includes("/api/traces") ||
-          key.includes("/api/triggers") ||
-          key.includes("/api/workflows")
-        ) {
+        if (APP_DERIVED_PREFIXES.some((p) => key.includes(p))) {
           // Replace with new
           return (_target, source) => {
             return source;

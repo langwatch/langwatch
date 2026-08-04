@@ -43,6 +43,7 @@ import { TRPCError } from "@trpc/server";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
+import { keysetAfter } from "./wirePagination";
 
 export type CacheRuleMatchers = {
   vk_id?: string;
@@ -138,6 +139,13 @@ function validateAction(action: CacheRuleAction): void {
   }
 }
 
+/** The sort key of the last cache rule served: (priority, createdAt, id). */
+export interface CacheRuleCursor {
+  priority: number;
+  createdAt: Date;
+  id: string;
+}
+
 export class GatewayCacheRuleService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -153,6 +161,44 @@ export class GatewayCacheRuleService {
     return this.prisma.gatewayCacheRule.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    });
+  }
+
+  /**
+   * One page of rules, in the same order {@link list} returns them.
+   *
+   * `id` joins the sort key because priority and createdAt are not unique
+   * together, and a keyset needs a total order or it can serve a row twice.
+   */
+  async listPage(args: {
+    organizationId: string;
+    limit: number;
+    cursor: CacheRuleCursor | null;
+  }): Promise<GatewayCacheRule[]> {
+    return this.prisma.gatewayCacheRule.findMany({
+      where: {
+        organizationId: args.organizationId,
+        archivedAt: null,
+        ...(args.cursor
+          ? {
+              OR: keysetAfter([
+                {
+                  name: "priority",
+                  value: args.cursor.priority,
+                  direction: "desc",
+                },
+                {
+                  name: "createdAt",
+                  value: args.cursor.createdAt,
+                  direction: "asc",
+                },
+                { name: "id", value: args.cursor.id, direction: "asc" },
+              ]),
+            }
+          : {}),
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }, { id: "asc" }],
+      take: args.limit,
     });
   }
 

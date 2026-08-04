@@ -102,6 +102,18 @@ function retryAfterMsOf(error: unknown): number | undefined {
 }
 
 /**
+ * A handler can mark an error as not worth retrying by throwing with
+ * `retryable: false` (DispatchError's shape, same classification the queue
+ * path honors): the message retires as dead on this attempt instead of
+ * burning the remaining ladder against a permanent failure, e.g. a webhook
+ * receiver answering 404.
+ */
+function isTerminalError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return Reflect.get(error, "retryable") === false;
+}
+
+/**
  * Leases due process-outbox messages and dispatches each inside a CONSUMER
  * span whose remote parent is restored from the message's persisted W3C
  * carrier. This keeps the effect on the trace that committed its intent,
@@ -252,7 +264,7 @@ export class OutboxDispatcherService {
             message: errorMessage,
           });
           span.setStatus({ code: SpanStatusCode.ERROR });
-          const dead = attempt >= this.maxAttempts;
+          const dead = attempt >= this.maxAttempts || isTerminalError(error);
           const retryDelayMs = Math.max(
             this.retryDelayMs({ attempt }),
             retryAfterMsOf(error) ?? 0,

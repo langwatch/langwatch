@@ -12,10 +12,20 @@ describe("isOrgScopedPermission", () => {
       "anomalyRules:view",
       "complianceExport:view",
       "activityMonitor:view",
+      "webhookEndpoints:view",
+      "webhookEndpoints:manage",
+      "gatewaySpend:view",
+      "gatewaySpend:manage",
       "aiTools:view",
       "aiTools:manage",
     ] as const)("routes %s against the organization role", (permission) => {
       expect(isOrgScopedPermission(permission)).toBe(true);
+    });
+
+    /** @scenario Webhook management is an organization-scoped permission */
+    it("routes webhook and spend permissions against the org role", () => {
+      expect(isOrgScopedPermission("webhookEndpoints:manage")).toBe(true);
+      expect(isOrgScopedPermission("gatewaySpend:manage")).toBe(true);
     });
 
     // Regression: the /me portal admin getting-started banner gates on

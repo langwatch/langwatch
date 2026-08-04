@@ -12,7 +12,9 @@
  * The token format is `vk-lw-<ulid>` with no live/test discriminator;
  * the gateway never branches on environment, so there is no env field.
  */
+import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+import { toWireEnum } from "./wireEnums";
 
 export type VirtualKeyScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -24,13 +26,17 @@ export type VirtualKeyCamelDto = {
   organizationId: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   purpose: "user" | "langy";
   displayPrefix: string;
   principalUserId: string | null;
   /** Explicit trace destination; grants no access to the key. */
   traceProjectId: string | null;
   principalUser: { name: string | null; email: string | null } | null;
+  /** The caller's own id for this key, unique per organization. */
+  externalId: string | null;
+  /** Customer-owned bookkeeping, echoed back verbatim. */
+  metadata: ResourceMetadata;
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode: "NONE" | "FALLBACK_ALL" | "POLICY";
@@ -47,14 +53,24 @@ export type VirtualKeySnakeDto = {
   organization_id: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   purpose: "user" | "langy";
   display_prefix: string;
   principal_user_id: string | null;
   trace_project_id: string | null;
-  scopes: Array<{ scope_type: string; scope_id: string }>;
+  external_id: string | null;
+  metadata: ResourceMetadata;
+  /**
+   * Wire casing, lower_snake_case, unlike the camel DTO next to it: this is
+   * the shape the public REST surface publishes, and every enum it carries is
+   * lowercase there.
+   */
+  scopes: Array<{
+    scope_type: "organization" | "team" | "project";
+    scope_id: string;
+  }>;
   routing_policy_id: string | null;
-  routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
+  routing_mode: "none" | "fallback_all" | "policy";
   config: unknown;
   revision: string;
   created_at: string;
@@ -71,7 +87,12 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     organizationId: vk.organizationId,
     name: vk.name,
     description: vk.description,
-    status: vk.status === "ACTIVE" ? "active" : "revoked",
+    status:
+      vk.status === "ACTIVE"
+        ? "active"
+        : vk.status === "DISABLED"
+          ? "disabled"
+          : "revoked",
     purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
@@ -79,6 +100,8 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     principalUser: vk.principalUser
       ? { name: vk.principalUser.name, email: vk.principalUser.email }
       : null,
+    externalId: vk.externalId ?? null,
+    metadata: metadataFromRow(vk.metadata),
     scopes: vk.scopes.map((s) => ({
       scopeType: s.scopeType,
       scopeId: s.scopeId,
@@ -114,12 +137,14 @@ export function toVirtualKeySnakeDto(
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
     trace_project_id: base.traceProjectId,
+    external_id: base.externalId,
+    metadata: base.metadata,
     scopes: base.scopes.map((s) => ({
-      scope_type: s.scopeType,
+      scope_type: toWireEnum(s.scopeType),
       scope_id: s.scopeId,
     })),
     routing_policy_id: base.routingPolicyId,
-    routing_mode: base.routingMode,
+    routing_mode: toWireEnum(base.routingMode),
     config: base.config,
     revision: base.revision,
     created_at: base.createdAt,

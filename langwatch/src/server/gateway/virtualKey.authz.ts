@@ -331,14 +331,14 @@ export async function assertScopesBelongToOrg(
  * itself.
  */
 async function assertAllResolve(
-  scopeKind: string,
+  scopeType: string,
   ids: string[],
   lookup: (ids: string[]) => Promise<{ id: string }[]>,
 ): Promise<void> {
   if (ids.length === 0) return;
   const found = new Set((await lookup(ids)).map((row) => row.id));
   if (ids.some((id) => !found.has(id))) {
-    throw new GatewayScopeOrgMismatchError(scopeKind);
+    throw new GatewayScopeOrgMismatchError(scopeType);
   }
 }
 

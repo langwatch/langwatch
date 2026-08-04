@@ -1647,7 +1647,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--description <desc>", "Optional description")
       .option(
         "--scope <typeAndId>",
-        "Scope row in TYPE:id form (repeat the flag for several). Types: ORG | TEAM | PROJECT. Defaults to the calling project when omitted. Example: --scope ORG:acme --scope TEAM:platform",
+        "Scope row in type:id form (repeat the flag for several). Types: org | team | project. Defaults to the calling project when omitted. Example: --scope org:acme --scope team:platform",
         (value: string, previous: string[] = []) => [...previous, value],
       )
       .option("--trace-project <id>", "Explicit trace destination project for org- or team-scoped keys (needs virtualKeys:manage there)")
@@ -1749,6 +1749,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     virtualKeysCmd
+      .command("disable <id>")
+      .description("Disable a virtual key (reversible; requests get a distinct virtual_key_disabled error)")
+      .option("--reason <text>", "Audit-logged note shown on the key's detail view")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { reason?: string }) => {
+      const { disableVirtualKeyCommand: impl } = await import("./commands/virtual-keys/disable.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    virtualKeysCmd
+      .command("enable <id>")
+      .description("Re-enable a disabled virtual key, restoring it exactly as it was")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { enableVirtualKeyCommand: impl } = await import("./commands/virtual-keys/disable.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    virtualKeysCmd
       .command("revoke <id>")
       .description("Revoke a virtual key (cannot be reactivated)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
@@ -1817,6 +1840,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     gatewayBudgetsCmd
+      .command("reset <id>")
+      .description("Move a budget's period boundary to now (never mutates recorded spend)")
+      .option("--end-user <id>", "Reset only this end user's bucket (attributed-user templates)")
+      .option("--reason <text>", "Audit-logged note for the reset")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { endUser?: string; reason?: string }) => {
+      const { resetGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/reset.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    gatewayBudgetsCmd
       .command("update <id>")
       .description("Update a budget's name/description/limit/on-breach/timezone")
       .option("--name <name>", "New display name")
@@ -1849,6 +1885,260 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { archiveGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/archive.js");
       return impl(id);
+    },
+  );
+
+  // Add webhooks command group (org-anchored webhook platform)
+  const webhooksCmd = program
+    .command("webhooks")
+    .description("Manage outbound webhook endpoints (org API key; enterprise)");
+
+  emitsResult(
+    webhooksCmd
+      .command("list")
+      .description("List the organization's webhook endpoints")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listWebhooksCommand: impl } = await import("./commands/webhooks/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("get <id>")
+      .description("Get one webhook endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getWebhookCommand: impl } = await import("./commands/webhooks/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("create")
+      .description("Create an endpoint; prints the signing secret ONCE")
+      .requiredOption("--url <url>", "HTTPS receiver URL")
+      .requiredOption("--events <types>", "Comma-separated event types (see: langwatch webhooks event-types)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { url: string; events: string }) => {
+      const { createWebhookCommand: impl } = await import("./commands/webhooks/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("update <id>")
+      .description("Update an endpoint's URL, event subscriptions, or delivery controls")
+      .option("--url <url>", "New HTTPS receiver URL")
+      .option("--events <types>", "New comma-separated event types (replaces the set)")
+      .option("--max-batch-size <n>", "Envelopes per POST, 1-100")
+      .option("--max-batch-delay <ms>", "Coalescing window in ms before a partial batch ships, 0-60000")
+      .option("--max-in-flight <n>", "Concurrent POSTs to the receiver, 1-8")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (
+      id: string,
+      options: {
+        url?: string;
+        events?: string;
+        maxBatchSize?: string;
+        maxBatchDelay?: string;
+        maxInFlight?: string;
+      },
+    ) => {
+      const { updateWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("enable <id>")
+      .description("Re-enable a disabled endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { enableWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("disable <id>")
+      .description("Disable an endpoint (queued deliveries drain without sending)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { disableWebhookCommand: impl } = await import("./commands/webhooks/update.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("delete <id>")
+      .description("Archive an endpoint")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { deleteWebhookCommand: impl } = await import("./commands/webhooks/delete.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("roll-secret <id>")
+      .description("Roll the signing secret; prints the new one ONCE")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { rollWebhookSecretCommand: impl } = await import("./commands/webhooks/roll-secret.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("test <id>")
+      .description("Send a signed test event and report the receiver's answer")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { testWebhookCommand: impl } = await import("./commands/webhooks/test.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("deliveries <id>")
+      .description("The endpoint's delivery log with receiver status codes")
+      .option("--limit <n>", "Max attempts to return (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string }) => {
+      const { webhookDeliveriesCommand: impl } = await import("./commands/webhooks/deliveries.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("health <id>")
+      .description("Delivery health: status, failure streak, last success")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { webhookHealthCommand: impl } = await import("./commands/webhooks/health.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("event-types")
+      .description("The subscribable event catalog, grouped by family")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { webhookEventTypesCommand: impl } = await import("./commands/webhooks/events.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    webhooksCmd
+      .command("events")
+      .description("The org's emitted-events log (Stripe /v1/events parity)")
+      .option("--type <type>", "Filter by event type")
+      .option("--from <instant>", "ISO-8601 or epoch ms lower bound")
+      .option("--to <instant>", "ISO-8601 or epoch ms upper bound")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Events per page (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { type?: string; from?: string; to?: string; cursor?: string; limit?: string }) => {
+      const { webhookEventsCommand: impl } = await import("./commands/webhooks/events.js");
+      return impl(options);
+    },
+  );
+
+  // Add spend-events command group (billing reconciliation pull)
+  const spendEventsCmd = program
+    .command("spend-events")
+    .description("Pull the per-request spend record (org API key; enterprise)");
+
+  emitsResult(
+    spendEventsCmd
+      .command("list")
+      .description("Cursor-paged spend events with filters")
+      .option("--from <instant>", "ISO-8601 or epoch ms lower bound (occurred-at)")
+      .option("--to <instant>", "ISO-8601 or epoch ms upper bound (occurred-at)")
+      .option("--cursor <cursor>", "Page cursor from the previous call")
+      .option("--limit <n>", "Events per page (default 50, max 200)")
+      .option("--virtual-key <id>", "Filter by virtual key")
+      .option("--end-user <id>", "Filter by external end-user id")
+      .option("--project <id>", "Filter by project")
+      .option("--model <model>", "Filter by model")
+      .option("--status <status>", "Filter by status: success|error")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      from?: string;
+      to?: string;
+      cursor?: string;
+      limit?: string;
+      virtualKey?: string;
+      endUser?: string;
+      project?: string;
+      model?: string;
+      status?: "success" | "error";
+    }) => {
+      const { listSpendEventsCommand: impl } = await import("./commands/spend-events/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
+      .command("replay")
+      .description("Re-deliver a window's spend envelopes to one endpoint (7-day cap)")
+      .requiredOption("--from <instant>", "ISO-8601 or epoch ms window start")
+      .requiredOption("--to <instant>", "ISO-8601 or epoch ms window end")
+      .requiredOption("--endpoint <id>", "Webhook endpoint id to replay to")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { from: string; to: string; endpoint: string }) => {
+      const { spendReplayCommand: impl } = await import("./commands/spend-events/replay.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
+      .command("by-user <endUserId>")
+      .description("Windowed spend rollup for one external end user")
+      .option("--window <window>", "day|week|month (default month)")
+      .option("--virtual-key <id>", "Narrow to one virtual key")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (endUserId: string, options: { window?: "day" | "week" | "month"; virtualKey?: string }) => {
+      const { spendByUserCommand: impl } = await import("./commands/spend-events/by-user.js");
+      return impl(endUserId, options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
+      .command("summary")
+      .description("Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)")
+      .option("--group-by <key>", "virtual_key (default) or end_user")
+      .option("--from <instant>", "Range start (ISO or unix ms), default 24h ago")
+      .option("--to <instant>", "Range end (ISO or unix ms), default now")
+      .option("--project <id>", "Narrow to one project")
+      .option("--limit <n>", "Max rows, default 500")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      groupBy?: string;
+      from?: string;
+      to?: string;
+      project?: string;
+      limit?: string;
+    }) => {
+      const { spendSummaryCommand: impl } = await import("./commands/spend-events/summary.js");
+      return impl(options);
     },
   );
 
