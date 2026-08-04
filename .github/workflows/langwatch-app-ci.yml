@@ -193,11 +193,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      # Throwaway 32-byte hex key. Anything encrypted at rest (webhook header
-      # values, signing secrets, stored idempotency responses) needs a real key
-      # to round-trip, and a test asserting that ciphertext is not readable text
-      # cannot mock the cipher it is asserting about.
-      CREDENTIALS_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
@@ -217,6 +212,15 @@ jobs:
       - name: Prepare files
         working-directory: platform/app
         run: pnpm start:prepare:files
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # Anything encrypted at rest (webhook header values, signing secrets,
+        # stored idempotency responses) needs a real key to round-trip, and a
+        # test asserting that ciphertext is not readable text cannot mock the
+        # cipher it is asserting about. Generated per run rather than written
+        # into this file: a committed 32-byte hex literal is indistinguishable
+        # from a leaked key, to a scanner and to a reader.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
@@ -313,11 +317,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      # Throwaway 32-byte hex key. Anything encrypted at rest (webhook header
-      # values, signing secrets, stored idempotency responses) needs a real key
-      # to round-trip, and a test asserting that ciphertext is not readable text
-      # cannot mock the cipher it is asserting about.
-      CREDENTIALS_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
@@ -368,6 +367,15 @@ jobs:
       - name: Prepare files
         working-directory: platform/app
         run: pnpm start:prepare:files
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # Anything encrypted at rest (webhook header values, signing secrets,
+        # stored idempotency responses) needs a real key to round-trip, and a
+        # test asserting that ciphertext is not readable text cannot mock the
+        # cipher it is asserting about. Generated per run rather than written
+        # into this file: a committed 32-byte hex literal is indistinguishable
+        # from a leaked key, to a scanner and to a reader.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
       # so it compiles it: `go build ./cmd/service` into platform/app/.vitest-tmp/.
