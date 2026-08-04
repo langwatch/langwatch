@@ -12105,7 +12105,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                            "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                           },
                           "last_reset_at": {
                             "type": [
@@ -12533,7 +12533,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13170,7 +13170,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13595,7 +13595,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -14039,7 +14039,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -14418,7 +14418,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [

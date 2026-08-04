@@ -12105,7 +12105,7 @@
                               "string",
                               "null"
                             ],
-                            "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                            "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                           },
                           "last_reset_at": {
                             "type": [
@@ -12397,7 +12397,7 @@
           }
         ],
         "summary": "List budgets",
-        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals."
+        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals."
       },
       "post": {
         "responses": {
@@ -12533,7 +12533,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13170,7 +13170,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -13470,7 +13470,7 @@
           }
         ],
         "summary": "Get budget",
-        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend."
+        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets."
       },
       "patch": {
         "responses": {
@@ -13595,7 +13595,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -14039,7 +14039,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
@@ -14418,7 +14418,7 @@
                             "string",
                             "null"
                           ],
-                          "description": "The instant this budget's cycle is phased to, or null when the window is calendar aligned."
+                          "description": "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual)."
                         },
                         "last_reset_at": {
                           "type": [
