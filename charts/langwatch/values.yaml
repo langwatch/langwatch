@@ -987,6 +987,13 @@ langevals:
 
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
+  #
+  # The CPU limit here also sizes the service's worker pool, via the CPU_COUNT
+  # the chart derives from it: each worker loads its own copy of every local
+  # model it serves (~2.1Gi), so memory scales with the pool. Raise the CPU and
+  # the memory together, or pin the pool with a CPU_COUNT of your own in
+  # extraEnvs. See langwatch.langevals.cpuCount in templates/_helpers.tpl.
+  #
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langevals.resources Resource requests and limits.
   ## @param langevals.resources.requests.cpu [string, default: 1000m] Requested CPU.

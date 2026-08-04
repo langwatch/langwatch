@@ -97,6 +97,20 @@ spec:
 
           # Environment variables for the LangEvals service
           env:
+            {{- /*
+              Size the worker pool to this container's CPU allowance. Left to
+              itself the service counts the node's cores, not the container's,
+              and every extra worker loads its own copy of each local model.
+              See langwatch.langevals.cpuCount.
+            */}}
+            {{- $envNames := list }}
+            {{- range .Values.langevals.extraEnvs }}
+            {{- $envNames = append $envNames .name }}
+            {{- end }}
+            {{- if not (has "CPU_COUNT" $envNames) }}
+            - name: CPU_COUNT
+              value: {{ include "langwatch.langevals.cpuCount" . | quote }}
+            {{- end }}
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}

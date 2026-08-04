@@ -118,6 +118,7 @@ jobs:
             # edited only dev/scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
+              - 'charts/langwatch/tests/**'
               - 'platform/app/**'
               - 'packages/**'
               - 'skills/**'
