@@ -156,8 +156,16 @@ describe("governance envelopes", () => {
   it("keys an anchored budget's crossings on its own period, not the calendar month", async () => {
     const anchor = new Date("2026-06-17T09:00:00.000Z");
     const insidePeriod = new Date("2026-07-01T00:00:00.000Z");
-    const periodStart = anchoredPeriodStart("MONTH", anchor, insidePeriod);
-    const nextPeriodStart = nextAnchoredResetAt("MONTH", anchor, insidePeriod);
+    const periodStart = anchoredPeriodStart({
+      window: "MONTH",
+      anchorAt: anchor,
+      now: insidePeriod,
+    });
+    const nextPeriodStart = nextAnchoredResetAt({
+      window: "MONTH",
+      anchorAt: anchor,
+      now: insidePeriod,
+    });
 
     // The anchored period spans the calendar boundary, so its start is the
     // 17th of June, not the 1st of July that the calendar would give.

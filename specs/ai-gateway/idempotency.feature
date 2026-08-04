@@ -13,7 +13,7 @@ Feature: Idempotency-Key on the control-plane creates
   # platform/app/src/app/api/webhooks/__tests__/ against the real Hono apps and
   # real Postgres.
 
-  As a backend provisioning gateway resources programmatically
+  As a backend that provisions gateway resources programmatically
   I want a create I can retry without checking first whether it landed
   So that a timeout costs me a retry rather than a duplicate I have to find
   and clean up.
@@ -47,8 +47,8 @@ Feature: Idempotency-Key on the control-plane creates
 
   @integration @rest
   Scenario: Retrying a create with the same key replays the first response
-    Given I created a budget with Idempotency-Key "k" and got 201
-    When I send the identical request again with Idempotency-Key "k"
+    Given I created a budget with Idempotency-Key "order-4711" and got 201
+    When I send the identical request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the response carries `X-Idempotent-Replay: true`
     And the body is byte-for-byte the body of the first response
@@ -58,21 +58,21 @@ Feature: Idempotency-Key on the control-plane creates
 
   @integration @rest
   Scenario: The other keyed creates take the same header
-    Given I created a cache rule with Idempotency-Key "k" and got 201
-    When I send the identical request again with Idempotency-Key "k"
+    Given I created a cache rule with Idempotency-Key "order-4711" and got 201
+    When I send the identical request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the response carries `X-Idempotent-Replay: true`
     And only one cache rule exists
 
   @integration @rest @webhooks
   Scenario: An idempotency key on this family is unique within the organization
-    Given I created a webhook endpoint with Idempotency-Key "k" and got 201
-    When I send the identical request again with Idempotency-Key "k"
+    Given I created a webhook endpoint with Idempotency-Key "order-4711" and got 201
+    When I send the identical request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the response carries `X-Idempotent-Replay: true`
     And the replayed body carries the same signing secret as the first
     And the receipt is stored against the organization, not a project
-    When I send a different body with Idempotency-Key "k"
+    When I send a different body with Idempotency-Key "order-4711"
     Then the response status is 409 and the code is `idempotency_error`
     # The secret is minted once and stored only as a hash, so a replay that
     # withheld it would hand back an endpoint nobody can verify.
@@ -81,19 +81,29 @@ Feature: Idempotency-Key on the control-plane creates
   # Refusals
   # ============================================================================
 
+  @unit
+  Scenario: One key cannot answer for two different creates
+    Given a virtual key create and a cache rule create in the same project
+    When the same key and the same body are sent to both
+    Then the second is refused rather than answered with the first response
+    # The gateway platform's creates all authenticate at the project, so one
+    # key lands on one receipt whichever create sent it. Which create it was
+    # is therefore part of the request fingerprint, and two creates that
+    # happen to validate to the same body do not replay each other.
+
   @integration @rest
   Scenario: Reusing a key with a different body is refused
-    Given I created a budget with Idempotency-Key "k" and got 201
-    When I send a request with Idempotency-Key "k" and a changed limit
+    Given I created a budget with Idempotency-Key "order-4711" and got 201
+    When I send a request with Idempotency-Key "order-4711" and a changed limit
     Then the response status is 409 and the code is `idempotency_error`
     And `meta.reason` is "body_mismatch"
     And no second budget was created
 
   @integration @rest
   Scenario: A retry sent while the original is still running is refused
-    Given a receipt for Idempotency-Key "k" that is claimed but not yet answered
+    Given a receipt for Idempotency-Key "order-4711" that is claimed but not yet answered
     And it was claimed less than 60 seconds ago
-    When I send the same request again with Idempotency-Key "k"
+    When I send the same request again with Idempotency-Key "order-4711"
     Then the response status is 409 and the code is `idempotency_error`
     And `meta.reason` is "in_progress"
     And nothing new was created
@@ -115,9 +125,9 @@ Feature: Idempotency-Key on the control-plane creates
 
   @integration @rest
   Scenario: A pending receipt older than the window is treated as a crash
-    Given a receipt for Idempotency-Key "k" that is claimed but not yet answered
+    Given a receipt for Idempotency-Key "order-4711" that is claimed but not yet answered
     And it was claimed more than 60 seconds ago
-    When I send the same request again with Idempotency-Key "k"
+    When I send the same request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the receipt now holds the new response
     # Without this the key stays locked for its full 24 hours whenever a
@@ -126,16 +136,16 @@ Feature: Idempotency-Key on the control-plane creates
 
   @integration @rest
   Scenario: An expired receipt lets the key be used again
-    Given a receipt for Idempotency-Key "k" whose 24 hours have elapsed
-    When I send the same request again with Idempotency-Key "k"
+    Given a receipt for Idempotency-Key "order-4711" whose 24 hours have elapsed
+    When I send the same request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the response carries no X-Idempotent-Replay header
     And the lapsed receipt was replaced rather than left behind
 
   @integration @rest
   Scenario: A receipt that no longer decrypts lets the key be used again
-    Given a receipt for Idempotency-Key "k" written before CREDENTIALS_SECRET was rotated
-    When I send the same request again with Idempotency-Key "k"
+    Given a receipt for Idempotency-Key "order-4711" written before CREDENTIALS_SECRET was rotated
+    When I send the same request again with Idempotency-Key "order-4711"
     Then the response status is 201
     And the response carries no X-Idempotent-Replay header
     And the unreadable receipt was replaced rather than left behind

@@ -100,7 +100,13 @@ const FIXED_CYCLE_MS: Record<Exclude<CyclicWindow, "MONTH">, number> = {
   WEEK: 604_800_000,
 };
 
-function daysInUtcMonth(year: number, monthIndex: number): number {
+function daysInUtcMonth({
+  year,
+  monthIndex,
+}: {
+  year: number;
+  monthIndex: number;
+}): number {
   // Day 0 of the following month is the last day of this one.
   return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 }
@@ -115,11 +121,17 @@ function daysInUtcMonth(year: number, monthIndex: number): number {
  * month would walk the cycle backwards a few days a year until it settled
  * on the 28th, silently moving a customer's billing day.
  */
-function monthlyCycleStart(anchorAt: Date, n: number): Date {
+function monthlyCycleStart({
+  anchorAt,
+  cycles,
+}: {
+  anchorAt: Date;
+  cycles: number;
+}): Date {
   const anchorDay = anchorAt.getUTCDate();
   // Date.UTC normalises month overflow and underflow into the year.
   const normalised = new Date(
-    Date.UTC(anchorAt.getUTCFullYear(), anchorAt.getUTCMonth() + n, 1),
+    Date.UTC(anchorAt.getUTCFullYear(), anchorAt.getUTCMonth() + cycles, 1),
   );
   const year = normalised.getUTCFullYear();
   const monthIndex = normalised.getUTCMonth();
@@ -127,7 +139,7 @@ function monthlyCycleStart(anchorAt: Date, n: number): Date {
     Date.UTC(
       year,
       monthIndex,
-      Math.min(anchorDay, daysInUtcMonth(year, monthIndex)),
+      Math.min(anchorDay, daysInUtcMonth({ year, monthIndex })),
       anchorAt.getUTCHours(),
       anchorAt.getUTCMinutes(),
       anchorAt.getUTCSeconds(),
@@ -150,11 +162,15 @@ function monthlyCycleStart(anchorAt: Date, n: number): Date {
  * anchor ("start on the 1st of next month") work without a special case
  * anywhere downstream.
  */
-export function anchoredPeriodStart(
-  window: CyclicWindow,
-  anchorAt: Date,
-  now: Date = new Date(),
-): Date {
+export function anchoredPeriodStart({
+  window,
+  anchorAt,
+  now = new Date(),
+}: {
+  window: CyclicWindow;
+  anchorAt: Date;
+  now?: Date;
+}): Date {
   const anchorMs = anchorAt.getTime();
   if (now.getTime() < anchorMs) return new Date(anchorMs);
 
@@ -169,38 +185,44 @@ export function anchoredPeriodStart(
   // arrived yet (anchored on the 17th, now the 3rd: still last month's
   // period). One step is always enough, because the previous cycle starts
   // in the previous month and so before every instant in this one.
-  let n =
+  let cycles =
     (now.getUTCFullYear() - anchorAt.getUTCFullYear()) * 12 +
     (now.getUTCMonth() - anchorAt.getUTCMonth());
-  if (monthlyCycleStart(anchorAt, n).getTime() > now.getTime()) n -= 1;
-  if (n < 0) return new Date(anchorMs);
-  return monthlyCycleStart(anchorAt, n);
+  if (monthlyCycleStart({ anchorAt, cycles }).getTime() > now.getTime()) {
+    cycles -= 1;
+  }
+  if (cycles < 0) return new Date(anchorMs);
+  return monthlyCycleStart({ anchorAt, cycles });
 }
 
 /**
  * The instant the anchored period containing `now` gives way to the next.
  * Before the anchor that is the anchor itself: the first period opens then.
  */
-export function nextAnchoredResetAt(
-  window: CyclicWindow,
-  anchorAt: Date,
-  now: Date = new Date(),
-): Date {
+export function nextAnchoredResetAt({
+  window,
+  anchorAt,
+  now = new Date(),
+}: {
+  window: CyclicWindow;
+  anchorAt: Date;
+  now?: Date;
+}): Date {
   const anchorMs = anchorAt.getTime();
   if (now.getTime() < anchorMs) return new Date(anchorMs);
 
   if (window !== "MONTH") {
     return new Date(
-      anchoredPeriodStart(window, anchorAt, now).getTime() +
+      anchoredPeriodStart({ window, anchorAt, now }).getTime() +
         FIXED_CYCLE_MS[window],
     );
   }
 
-  const start = anchoredPeriodStart(window, anchorAt, now);
+  const start = anchoredPeriodStart({ window, anchorAt, now });
   const elapsedMonths =
     (start.getUTCFullYear() - anchorAt.getUTCFullYear()) * 12 +
     (start.getUTCMonth() - anchorAt.getUTCMonth());
-  return monthlyCycleStart(anchorAt, elapsedMonths + 1);
+  return monthlyCycleStart({ anchorAt, cycles: elapsedMonths + 1 });
 }
 
 /**
@@ -209,12 +231,19 @@ export function nextAnchoredResetAt(
  * MANUAL keep the far-future sentinel whether or not a stray anchor sits on
  * the row, because neither window rolls.
  */
-export function nextBoundaryFor(
-  budget: { window: GatewayBudgetWindow; cycleAnchorAt: Date | null },
-  now: Date = new Date(),
-): Date {
+export function nextBoundaryFor({
+  budget,
+  now = new Date(),
+}: {
+  budget: { window: GatewayBudgetWindow; cycleAnchorAt: Date | null };
+  now?: Date;
+}): Date {
   if (budget.cycleAnchorAt && isCyclicWindow(budget.window)) {
-    return nextAnchoredResetAt(budget.window, budget.cycleAnchorAt, now);
+    return nextAnchoredResetAt({
+      window: budget.window,
+      anchorAt: budget.cycleAnchorAt,
+      now,
+    });
   }
   return nextResetAt(budget.window, now);
 }

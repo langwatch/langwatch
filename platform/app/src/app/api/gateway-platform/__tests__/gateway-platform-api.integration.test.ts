@@ -40,10 +40,8 @@ import {
   getTestClickHouseClient,
   startTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  currentPeriodStart,
-  GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -1097,7 +1095,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       // month boundary.
       expect(budget.current_period_started_at).toBe(anchor.toISOString());
       expect(budget.resets_at).toBe(
-        nextAnchoredResetAt("MONTH", anchor, new Date()).toISOString(),
+        nextAnchoredResetAt({
+          window: "MONTH",
+          anchorAt: anchor,
+          now: new Date(),
+        }).toISOString(),
       );
       expect(budget.resets_at).not.toBe(
         currentPeriodStart("MONTH", new Date()).toISOString(),

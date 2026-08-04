@@ -7,12 +7,8 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-
-import {
-  budgetPeriodFloorMs,
-  effectiveBudgetPeriod,
-} from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "../budgetPeriod";
 import {
   anchoredPeriodStart,
   CYCLIC_WINDOWS,
@@ -33,7 +29,7 @@ function walkPeriods(
   let cursor = anchor;
   for (let i = 0; i < count; i++) {
     starts.push(iso(cursor));
-    cursor = nextAnchoredResetAt(window, anchor, cursor);
+    cursor = nextAnchoredResetAt({ window, anchorAt: anchor, now: cursor });
   }
   return starts;
 }
@@ -45,7 +41,7 @@ function refloorPeriods(
   starts: string[],
 ): string[] {
   return starts.map((s) =>
-    iso(anchoredPeriodStart(window, anchor, new Date(s))),
+    iso(anchoredPeriodStart({ window, anchorAt: anchor, now: new Date(s) })),
   );
 }
 
@@ -70,31 +66,31 @@ describe("anchored cycle math", () => {
     // Mid-period: July 15th still belongs to the period that opened on the
     // 17th of June, and the next boundary is the 17th of July.
     const now = new Date("2026-07-15T00:00:00.000Z");
-    expect(iso(anchoredPeriodStart("MONTH", anchor, now))).toBe(
-      "2026-06-17T09:00:00.000Z",
-    );
-    expect(iso(nextAnchoredResetAt("MONTH", anchor, now))).toBe(
-      "2026-07-17T09:00:00.000Z",
-    );
+    expect(
+      iso(anchoredPeriodStart({ window: "MONTH", anchorAt: anchor, now })),
+    ).toBe("2026-06-17T09:00:00.000Z");
+    expect(
+      iso(nextAnchoredResetAt({ window: "MONTH", anchorAt: anchor, now })),
+    ).toBe("2026-07-17T09:00:00.000Z");
 
     // The boundary opens the new period: one millisecond before it the old
     // period still holds, at it exactly the new one does.
     expect(
       iso(
-        anchoredPeriodStart(
-          "MONTH",
-          anchor,
-          new Date("2026-07-17T08:59:59.999Z"),
-        ),
+        anchoredPeriodStart({
+          window: "MONTH",
+          anchorAt: anchor,
+          now: new Date("2026-07-17T08:59:59.999Z"),
+        }),
       ),
     ).toBe("2026-06-17T09:00:00.000Z");
     expect(
       iso(
-        anchoredPeriodStart(
-          "MONTH",
-          anchor,
-          new Date("2026-07-17T09:00:00.000Z"),
-        ),
+        anchoredPeriodStart({
+          window: "MONTH",
+          anchorAt: anchor,
+          now: new Date("2026-07-17T09:00:00.000Z"),
+        }),
       ),
     ).toBe("2026-07-17T09:00:00.000Z");
   });
@@ -179,12 +175,20 @@ describe("anchored cycle math", () => {
     for (const { window, lengthMs } of cases) {
       for (const k of [0, 1, 5, 97]) {
         const inside = new Date(anchor.getTime() + k * lengthMs + 17);
-        expect(anchoredPeriodStart(window, anchor, inside).getTime()).toBe(
-          anchor.getTime() + k * lengthMs,
-        );
-        expect(nextAnchoredResetAt(window, anchor, inside).getTime()).toBe(
-          anchor.getTime() + (k + 1) * lengthMs,
-        );
+        expect(
+          anchoredPeriodStart({
+            window,
+            anchorAt: anchor,
+            now: inside,
+          }).getTime(),
+        ).toBe(anchor.getTime() + k * lengthMs);
+        expect(
+          nextAnchoredResetAt({
+            window,
+            anchorAt: anchor,
+            now: inside,
+          }).getTime(),
+        ).toBe(anchor.getTime() + (k + 1) * lengthMs);
       }
     }
 
@@ -192,7 +196,11 @@ describe("anchored cycle math", () => {
     // calendar window uses plays no part once a budget is anchored.
     const saturday = new Date("2026-03-07T13:42:17.500Z");
     expect(saturday.getUTCDay()).toBe(6);
-    const nextWeek = nextAnchoredResetAt("WEEK", saturday, saturday);
+    const nextWeek = nextAnchoredResetAt({
+      window: "WEEK",
+      anchorAt: saturday,
+      now: saturday,
+    });
     expect(nextWeek.getUTCDay()).toBe(6);
     expect(iso(nextWeek)).toBe("2026-03-14T13:42:17.500Z");
   });
@@ -203,7 +211,11 @@ describe("anchored cycle math", () => {
     const anchor = new Date("2026-03-08T02:30:00.000Z");
     for (let k = 0; k <= 30; k++) {
       const inside = new Date(anchor.getTime() + k * 86_400_000 + 3_600_000);
-      const start = anchoredPeriodStart("DAY", anchor, inside);
+      const start = anchoredPeriodStart({
+        window: "DAY",
+        anchorAt: anchor,
+        now: inside,
+      });
       expect(start.getTime()).toBe(anchor.getTime() + k * 86_400_000);
       expect(start.getUTCHours()).toBe(2);
       expect(start.getUTCMinutes()).toBe(30);
@@ -217,8 +229,12 @@ describe("anchored cycle math", () => {
     const anchor = new Date("2026-09-01T00:00:00.000Z");
     const now = new Date("2026-08-04T12:00:00.000Z");
     for (const window of CYCLIC_WINDOWS) {
-      expect(iso(anchoredPeriodStart(window, anchor, now))).toBe(iso(anchor));
-      expect(iso(nextAnchoredResetAt(window, anchor, now))).toBe(iso(anchor));
+      expect(iso(anchoredPeriodStart({ window, anchorAt: anchor, now }))).toBe(
+        iso(anchor),
+      );
+      expect(iso(nextAnchoredResetAt({ window, anchorAt: anchor, now }))).toBe(
+        iso(anchor),
+      );
     }
   });
 
@@ -227,18 +243,28 @@ describe("anchored cycle math", () => {
     const now = new Date("2026-07-15T00:00:00.000Z");
     for (const window of ["TOTAL", "MANUAL"] as const) {
       expect(
-        nextBoundaryFor(
-          { window, cycleAnchorAt: anchor },
+        nextBoundaryFor({
+          budget: { window, cycleAnchorAt: anchor },
           now,
-        ).getUTCFullYear(),
+        }).getUTCFullYear(),
       ).toBe(9999);
     }
     // Unanchored cyclic windows keep the calendar boundary.
     expect(
-      iso(nextBoundaryFor({ window: "MONTH", cycleAnchorAt: null }, now)),
+      iso(
+        nextBoundaryFor({
+          budget: { window: "MONTH", cycleAnchorAt: null },
+          now,
+        }),
+      ),
     ).toBe("2026-08-01T00:00:00.000Z");
     expect(
-      iso(nextBoundaryFor({ window: "MONTH", cycleAnchorAt: anchor }, now)),
+      iso(
+        nextBoundaryFor({
+          budget: { window: "MONTH", cycleAnchorAt: anchor },
+          now,
+        }),
+      ),
     ).toBe("2026-07-17T09:00:00.000Z");
   });
 });

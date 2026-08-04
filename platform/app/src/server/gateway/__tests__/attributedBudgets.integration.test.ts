@@ -20,11 +20,10 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import {
   type BudgetDebitRow,
-  bucketPeriodFloorMs,
-  budgetPeriodFloorMs,
   GatewayBudgetClickHouseRepository,
 } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
+import { bucketPeriodFloorMs, budgetPeriodFloorMs } from "../budgetPeriod";
 import { attributedUserBucketScopeId } from "../budgetResolution.service";
 import { anchoredPeriodStart, nextAnchoredResetAt } from "../budgetWindow";
 
@@ -456,11 +455,11 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // Created mid-cycle, it reports the anchor's next boundary rather than
     // one month from the creation instant.
     expect(anchored.resetsAt.toISOString()).toBe(
-      nextAnchoredResetAt(
-        "MONTH",
-        CYCLE_ANCHOR,
-        anchored.createdAt,
-      ).toISOString(),
+      nextAnchoredResetAt({
+        window: "MONTH",
+        anchorAt: CYCLE_ANCHOR,
+        now: anchored.createdAt,
+      }).toISOString(),
     );
 
     const readAt = async (budget: typeof anchored, now: Date) => {
@@ -510,11 +509,11 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // ...and the reported boundary is the anchor's next one, not one month
     // from the reset. A reset is a credit, not a re-phasing.
     expect(reset.resetsAt.toISOString()).toBe(
-      nextAnchoredResetAt(
-        "MONTH",
-        CYCLE_ANCHOR,
-        reset.lastResetAt!,
-      ).toISOString(),
+      nextAnchoredResetAt({
+        window: "MONTH",
+        anchorAt: CYCLE_ANCHOR,
+        now: reset.lastResetAt!,
+      }).toISOString(),
     );
 
     // Once that boundary passes, the floor is the anchored period start
@@ -522,7 +521,11 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     // private boundary forward forever.
     const afterRollover = new Date(reset.resetsAt.getTime() + 1000);
     expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
-      anchoredPeriodStart("MONTH", CYCLE_ANCHOR, afterRollover).getTime(),
+      anchoredPeriodStart({
+        window: "MONTH",
+        anchorAt: CYCLE_ANCHOR,
+        now: afterRollover,
+      }).getTime(),
     );
     expect(budgetPeriodFloorMs(reset, afterRollover)).toBe(
       reset.resetsAt.getTime(),
@@ -541,7 +544,11 @@ describe("attributed budgets and resets (real PG + real CH)", () => {
     });
     const bucket = attributedUserBucketScopeId(VK_ID, `seat-${suffix}`);
     const now = new Date("2026-07-15T18:00:00.000Z");
-    const periodStart = anchoredPeriodStart("MONTH", CYCLE_ANCHOR, now);
+    const periodStart = anchoredPeriodStart({
+      window: "MONTH",
+      anchorAt: CYCLE_ANCHOR,
+      now,
+    });
 
     // One debit either side of the anchored period start, both inside the
     // July calendar month the rollup would have keyed them under.

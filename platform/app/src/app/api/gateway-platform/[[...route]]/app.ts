@@ -228,7 +228,7 @@ const budgetDtoSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "The instant this budget's cycle is phased to, or null when the window is calendar aligned.",
+      "The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual).",
     ),
   last_reset_at: z.string().nullable(),
   archived_at: z.string().nullable(),
@@ -989,6 +989,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       // the caller's scopes rather than trusting a grant it held yesterday.
       const outcome = await withIdempotency({
         prisma,
+        operation: "gateway.v1.virtual-keys.create",
         scopeId: project.id,
         key: idempotencyKey,
         validatedBody: body.data,
@@ -1010,7 +1011,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           };
         },
       });
-      return idempotentJson(c, outcome);
+      return idempotentJson({ c, outcome });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1551,7 +1552,11 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     }
     const organizationId = await orgIdForProject(project.id);
     const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
-    const { budgets: rows, spendAvailable } = await service.listPageWithHealth({
+    const {
+      budgets: rows,
+      spendAvailable,
+      readAt,
+    } = await service.listPageWithHealth({
       organizationId,
       limit: page.data.limit,
       cursor: cursor ?? null,
@@ -1567,7 +1572,12 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     return c.json({
       spend_available: spendAvailable,
       data: rows.map((b) =>
-        toBudgetDto(b, memberCounts.get(b.scopeId), spendAvailable),
+        toBudgetDto({
+          budget: b,
+          memberCount: memberCounts.get(b.scopeId),
+          spendAvailable,
+          readAt,
+        }),
       ),
       next_cursor: nextPageCursor(rows, page.data.limit, (b) => [
         b.createdAt.getTime(),
@@ -1623,11 +1633,12 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const memberCounts = await groupMemberCounts([found.budget]);
     return c.json({
       spend_available: found.spendAvailable,
-      budget: toBudgetDto(
-        found.budget,
-        memberCounts.get(found.budget.scopeId),
-        found.spendAvailable,
-      ),
+      budget: toBudgetDto({
+        budget: found.budget,
+        memberCount: memberCounts.get(found.budget.scopeId),
+        spendAvailable: found.spendAvailable,
+        readAt: found.readAt,
+      }),
     });
   },
 );
@@ -1676,6 +1687,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
     try {
       const outcome = await withIdempotency({
         prisma,
+        operation: "gateway.v1.budgets.create",
         scopeId: project.id,
         key: idempotencyKey,
         validatedBody: body.data,
@@ -1700,11 +1712,16 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
           const memberCounts = await groupMemberCounts([row]);
           return {
             status: 201,
-            body: { budget: toBudgetDto(row, memberCounts.get(row.scopeId)) },
+            body: {
+              budget: toBudgetDto({
+                budget: row,
+                memberCount: memberCounts.get(row.scopeId),
+              }),
+            },
           };
         },
       });
-      return idempotentJson(c, outcome);
+      return idempotentJson({ c, outcome });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1753,7 +1770,10 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
       });
       const memberCounts = await groupMemberCounts([row]);
       return c.json({
-        budget: toBudgetDto(row, memberCounts.get(row.scopeId)),
+        budget: toBudgetDto({
+          budget: row,
+          memberCount: memberCounts.get(row.scopeId),
+        }),
       });
     } catch (error) {
       return trpcErrorResponse(c, error);
@@ -1792,7 +1812,7 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
         organizationId,
         actorUserId,
       });
-      return c.json({ budget: toBudgetDto(row) });
+      return c.json({ budget: toBudgetDto({ budget: row }) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1866,7 +1886,10 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
       });
       const memberCounts = await groupMemberCounts([row]);
       return c.json({
-        budget: toBudgetDto(row, memberCounts.get(row.scopeId)),
+        budget: toBudgetDto({
+          budget: row,
+          memberCount: memberCounts.get(row.scopeId),
+        }),
       });
     } catch (error) {
       return trpcErrorResponse(c, error);
@@ -2058,6 +2081,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
     try {
       const outcome = await withIdempotency({
         prisma,
+        operation: "gateway.v1.cache-rules.create",
         scopeId: project.id,
         key: idempotencyKey,
         validatedBody: body.data,
@@ -2075,7 +2099,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
           return { status: 201, body: { cache_rule: toCacheRuleDto(row) } };
         },
       });
-      return idempotentJson(c, outcome);
+      return idempotentJson({ c, outcome });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }

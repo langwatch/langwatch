@@ -22,11 +22,8 @@ import {
   resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import {
-  budgetPeriodFloorMs,
-  effectiveBudgetPeriod,
-  type GatewayBudgetClickHouseRepository,
-} from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
 import {
   type ResolvedBudget,
   resolveApplicableBudgets,

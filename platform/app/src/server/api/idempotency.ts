@@ -110,12 +110,12 @@ const CLAIM_ATTEMPTS = 3;
 /** Why a key was refused. Echoed as `meta.reason` so a caller can branch. */
 export type IdempotencyConflictReason = "body_mismatch" | "in_progress";
 
-const CONFLICT_MESSAGES: Record<IdempotencyConflictReason, string> = {
+const CONFLICT_MESSAGES = {
   body_mismatch:
     "This Idempotency-Key was already used with a different request body.",
   in_progress:
     "The original request with this Idempotency-Key is still in progress; retry shortly.",
-};
+} as const satisfies Record<IdempotencyConflictReason, string>;
 
 /**
  * The key cannot answer this request.
@@ -175,9 +175,21 @@ export function readIdempotencyKey(
  *
  * Key order independent, so a caller whose serialiser emits fields in a
  * different order on the retry is not told its body changed.
+ *
+ * The operation is part of it because the receipt is keyed by tenancy alone:
+ * the gateway platform's creates all authenticate at the project, so one key
+ * reused across two different creates lands on the same row. Without the
+ * operation, two creates that happen to validate to the same body would
+ * replay each other's response; with it, they are told the key is taken.
  */
-export function fingerprintRequestBody(body: unknown): string {
-  return sha256(stableStringify(body));
+export function fingerprintRequestBody({
+  operation,
+  body,
+}: {
+  operation: string;
+  body: unknown;
+}): string {
+  return sha256(stableStringify({ operation, body }));
 }
 
 /** What a handler hands back: the status and body it wants answered with. */
@@ -188,7 +200,7 @@ export interface IdempotentHandlerResult<T> {
 
 /** The handler ran: its own result, still to be serialised by the route. */
 export interface IdempotentExecuted<T> extends IdempotentHandlerResult<T> {
-  replayed: false;
+  isReplayed: false;
 }
 
 /**
@@ -198,7 +210,7 @@ export interface IdempotentExecuted<T> extends IdempotentHandlerResult<T> {
  * from the original by so much as a key order. See {@link withIdempotency}.
  */
 export interface IdempotentReplayed {
-  replayed: true;
+  isReplayed: true;
   status: number;
   serializedBody: string;
 }
@@ -207,6 +219,12 @@ export type IdempotentOutcome<T> = IdempotentExecuted<T> | IdempotentReplayed;
 
 export interface WithIdempotencyParams<T> {
   prisma: PrismaClient;
+  /**
+   * Which create this is, e.g. `gateway.v1.virtual-keys.create`. Folded into
+   * the fingerprint so one key cannot answer for two different creates that
+   * share a tenancy.
+   */
+  operation: string;
   /** The tenancy the key is unique within: a project id or an organization id. */
   scopeId: string;
   /** The key from {@link readIdempotencyKey}, or null for the unkeyed path. */
@@ -223,16 +241,20 @@ export interface WithIdempotencyParams<T> {
  */
 export async function withIdempotency<T>({
   prisma,
+  operation,
   scopeId,
   key,
   validatedBody,
   handler,
 }: WithIdempotencyParams<T>): Promise<IdempotentOutcome<T>> {
   if (key === null) {
-    return { ...(await handler()), replayed: false };
+    return { ...(await handler()), isReplayed: false };
   }
 
-  const requestFingerprint = fingerprintRequestBody(validatedBody);
+  const requestFingerprint = fingerprintRequestBody({
+    operation,
+    body: validatedBody,
+  });
   const claim = await claimReceipt({
     prisma,
     scopeId,
@@ -242,7 +264,7 @@ export async function withIdempotency<T>({
 
   if (claim.kind === "replay") {
     return {
-      replayed: true,
+      isReplayed: true,
       status: claim.status,
       serializedBody: claim.serializedBody,
     };
@@ -252,7 +274,7 @@ export async function withIdempotency<T>({
   try {
     result = await handler();
   } catch (error) {
-    await releaseClaim(prisma, claim.receiptId);
+    await releaseClaim({ prisma, receiptId: claim.receiptId });
     throw error;
   }
 
@@ -267,10 +289,10 @@ export async function withIdempotency<T>({
       },
     });
   } else {
-    await releaseClaim(prisma, claim.receiptId);
+    await releaseClaim({ prisma, receiptId: claim.receiptId });
   }
 
-  return { ...result, replayed: false };
+  return { ...result, isReplayed: false };
 }
 
 /**
@@ -287,6 +309,13 @@ export function serializeResponseBody(body: unknown): string {
 type Claim =
   | { kind: "claimed"; receiptId: string }
   | { kind: "replay"; status: number; serializedBody: string };
+
+/**
+ * What a row already under the key resolves to. Never `claimed`: this side
+ * of the race did not take the key, so the only answers are "replay the
+ * stored response" and "the row was not authoritative, try again".
+ */
+type ExistingVerdict = Extract<Claim, { kind: "replay" }> | { kind: "retry" };
 
 /**
  * Take the key, or read what the row already there says to do.
@@ -388,11 +417,11 @@ async function readExistingReceipt({
   existing: IdempotencyReceipt;
   requestFingerprint: string;
   now: Date;
-}): Promise<Claim | { kind: "retry" }> {
+}): Promise<ExistingVerdict> {
   // Expiry is read before anything else, so a key past its lifetime is a
   // fresh key regardless of what the stale row happens to say.
   if (existing.expiresAt.getTime() <= now.getTime()) {
-    await releaseClaim(prisma, existing.id);
+    await releaseClaim({ prisma, receiptId: existing.id });
     return { kind: "retry" };
   }
 
@@ -408,7 +437,7 @@ async function readExistingReceipt({
       throw new IdempotencyConflictError("in_progress");
     }
     // Older than the window: whoever inserted this is not coming back.
-    await releaseClaim(prisma, existing.id);
+    await releaseClaim({ prisma, receiptId: existing.id });
     return { kind: "retry" };
   }
 
@@ -417,7 +446,7 @@ async function readExistingReceipt({
   // handling as expiry: drop it and let the request through as a first use,
   // which is strictly better than refusing a create the caller can never make.
   if (serializedBody === null) {
-    await releaseClaim(prisma, existing.id);
+    await releaseClaim({ prisma, receiptId: existing.id });
     return { kind: "retry" };
   }
 
@@ -457,10 +486,13 @@ export function readStoredBody(receipt: IdempotencyReceipt): string | null {
  * `deleteMany` rather than `delete` so a row already cleared by a concurrent
  * attempt is not a second error on top of whatever is being handled.
  */
-async function releaseClaim(
-  prisma: PrismaClient,
-  receiptId: string,
-): Promise<void> {
+async function releaseClaim({
+  prisma,
+  receiptId,
+}: {
+  prisma: PrismaClient;
+  receiptId: string;
+}): Promise<void> {
   try {
     await prisma.idempotencyReceipt.deleteMany({ where: { id: receiptId } });
   } catch (error) {

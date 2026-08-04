@@ -8,12 +8,11 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import { effectiveBudgetPeriod } from "~/server/gateway/budget.clickhouse.repository";
 import {
   GatewayBudgetService,
   type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
+import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
 import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import {
   providerLabelFor,
@@ -210,7 +209,22 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         // Phases a cyclic window off this instant instead of the calendar.
         // Absent keeps the calendar alignment. Rejected on TOTAL and
         // MANUAL, which do not cycle.
-        cycleAnchorAt: z.coerce.date().nullable().optional(),
+        //
+        // A Date, or an ISO string carrying its offset, and nothing looser:
+        // the same instant the REST surface demands. An offsetless string
+        // would be read in whichever zone the server process happens to run
+        // in, so the anchor a customer set would land on a different instant
+        // per deployment.
+        cycleAnchorAt: z
+          .union([
+            z.date(),
+            z
+              .string()
+              .datetime({ offset: true })
+              .transform((iso) => new Date(iso)),
+          ])
+          .nullable()
+          .optional(),
       }),
     )
     .use(checkOrganizationPermission("gatewayBudgets:create"))

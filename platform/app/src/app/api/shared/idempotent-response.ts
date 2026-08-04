@@ -43,9 +43,12 @@ export const idempotentReplayHeaders = {
   [IDEMPOTENT_REPLAY_HEADER]: {
     description:
       "Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key.",
-    schema: { type: "string" as const, enum: ["true"] },
+    // The values stay a mutable `string[]`: the OpenAPI header object this
+    // is handed to types `enum` as a mutable array, and a readonly tuple
+    // cannot be assigned to one.
+    schema: { type: "string", enum: ["true"] as string[] },
   },
-};
+} as const;
 
 /**
  * Write the outcome, flagging the ones that were replayed.
@@ -56,11 +59,14 @@ export const idempotentReplayHeaders = {
  * absent rather than `false` on a first execution, so its presence alone is
  * the signal.
  */
-export function idempotentJson<T>(
-  c: Context,
-  outcome: IdempotentOutcome<T>,
-): Response {
-  if (!outcome.replayed) {
+export function idempotentJson<T>({
+  c,
+  outcome,
+}: {
+  c: Context;
+  outcome: IdempotentOutcome<T>;
+}): Response {
+  if (!outcome.isReplayed) {
     return c.json(
       outcome.body as Record<string, unknown>,
       outcome.status as ContentfulStatusCode,

@@ -5,5 +5,8 @@ export interface RouteResponse {
   // Response headers a caller can read something from. Only worth declaring
   // for a header that carries meaning the body does not, which is why this is
   // optional rather than filled in everywhere.
-  headers?: Record<string, { description: string; schema: any }>;
+  headers?: Record<
+    string,
+    { description: string; schema: { type: "string"; enum?: string[] } }
+  >;
 }

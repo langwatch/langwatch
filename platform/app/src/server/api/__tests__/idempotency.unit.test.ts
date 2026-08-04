@@ -89,13 +89,17 @@ describe("readIdempotencyKey", () => {
 });
 
 describe("fingerprintRequestBody", () => {
+  const OPERATION = "gateway.v1.budgets.create";
+  const fingerprint = (body: unknown) =>
+    fingerprintRequestBody({ operation: OPERATION, body });
+
   it("ignores the order the caller's serialiser emitted keys in", () => {
-    const one = fingerprintRequestBody({
+    const one = fingerprint({
       name: "monthly",
       window: "month",
       limit_usd: 25,
     });
-    const other = fingerprintRequestBody({
+    const other = fingerprint({
       limit_usd: 25,
       window: "month",
       name: "monthly",
@@ -104,11 +108,11 @@ describe("fingerprintRequestBody", () => {
   });
 
   it("ignores key order at every depth", () => {
-    const one = fingerprintRequestBody({
+    const one = fingerprint({
       scope: { kind: "project", project_id: "proj-1" },
       metadata: { b: 2, a: 1 },
     });
-    const other = fingerprintRequestBody({
+    const other = fingerprint({
       metadata: { a: 1, b: 2 },
       scope: { project_id: "proj-1", kind: "project" },
     });
@@ -116,27 +120,45 @@ describe("fingerprintRequestBody", () => {
   });
 
   it("treats a changed value as a different request", () => {
-    const one = fingerprintRequestBody({ limit_usd: 25 });
-    const other = fingerprintRequestBody({ limit_usd: 26 });
+    const one = fingerprint({ limit_usd: 25 });
+    const other = fingerprint({ limit_usd: 26 });
     expect(one).not.toBe(other);
   });
 
   it("treats array order as meaningful", () => {
     // Order carries meaning in the wire schemas that take lists (scopes,
     // enabled_events), so two orderings are two different requests.
-    expect(fingerprintRequestBody({ events: ["a", "b"] })).not.toBe(
-      fingerprintRequestBody({ events: ["b", "a"] }),
+    expect(fingerprint({ events: ["a", "b"] })).not.toBe(
+      fingerprint({ events: ["b", "a"] }),
     );
   });
 
   it("distinguishes a missing key from an explicit null", () => {
-    expect(fingerprintRequestBody({ name: "x" })).not.toBe(
-      fingerprintRequestBody({ name: "x", description: null }),
+    expect(fingerprint({ name: "x" })).not.toBe(
+      fingerprint({ name: "x", description: null }),
     );
   });
 
   it("is a sha256 hex digest", () => {
-    expect(fingerprintRequestBody({ a: 1 })).toMatch(/^[0-9a-f]{64}$/);
+    expect(fingerprint({ a: 1 })).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  describe("when the same body is sent to two different creates", () => {
+    /** @scenario "One key cannot answer for two different creates" */
+    it("fingerprints them apart", () => {
+      const body = { name: "shared" };
+      expect(
+        fingerprintRequestBody({
+          operation: "gateway.v1.virtual-keys.create",
+          body,
+        }),
+      ).not.toBe(
+        fingerprintRequestBody({
+          operation: "gateway.v1.cache-rules.create",
+          body,
+        }),
+      );
+    });
   });
 });
 
@@ -144,6 +166,7 @@ describe("withIdempotency without a key", () => {
   it("runs the handler and touches no storage", async () => {
     const outcome = await withIdempotency({
       prisma: forbiddenPrisma,
+      operation: "gateway.v1.budgets.create",
       scopeId: "proj-1",
       key: null,
       validatedBody: { name: "monthly" },
@@ -153,7 +176,7 @@ describe("withIdempotency without a key", () => {
     expect(outcome).toEqual({
       status: 201,
       body: { budget: { id: "bg-1" } },
-      replayed: false,
+      isReplayed: false,
     });
   });
 
@@ -162,6 +185,7 @@ describe("withIdempotency without a key", () => {
     await expect(
       withIdempotency({
         prisma: forbiddenPrisma,
+        operation: "gateway.v1.budgets.create",
         scopeId: "proj-1",
         key: null,
         validatedBody: {},

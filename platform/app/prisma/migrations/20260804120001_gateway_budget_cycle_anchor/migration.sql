@@ -14,3 +14,8 @@
 -- re-phase every budget in the fleet onto the day it happened to be made.
 
 ALTER TABLE "GatewayBudget" ADD COLUMN "cycleAnchorAt" TIMESTAMP(3);
+
+-- To roll back, uncomment and run manually. Dropping the column deletes the
+-- anchors customers have set, and every anchored budget silently re-phases
+-- onto the calendar; there is no way to recover the values afterwards.
+-- ALTER TABLE "GatewayBudget" DROP COLUMN "cycleAnchorAt";

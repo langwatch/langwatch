@@ -361,6 +361,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
     // the org, so that is the tenancy a key is unique within.
     const outcome = await withIdempotency({
       prisma,
+      operation: "webhooks.v1.endpoints.create",
       scopeId: organization.id,
       key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
       validatedBody: body,
@@ -379,7 +380,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
         };
       },
     });
-    return idempotentJson(c, outcome);
+    return idempotentJson({ c, outcome });
   },
 );
 

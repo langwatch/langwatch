@@ -6,8 +6,9 @@
  * can be asserted directly, without standing up a request to find out what a
  * budget with no spend source renders as.
  */
-import { effectiveBudgetPeriod } from "./budget.clickhouse.repository";
+
 import type { GatewayBudgetWithSeats } from "./budget.service";
+import { effectiveBudgetPeriod } from "./budgetPeriod";
 import { metadataFromRow } from "./resourceMetadata";
 import { toWireEnum } from "./wireEnums";
 import {
@@ -49,18 +50,30 @@ function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
 
 export /**
  * The budget row on the wire.
+ *
+ * `readAt` is the instant the spend on the row was totalled at, for the
+ * callers that read spend before serialising. The period is bracketed at
+ * that same instant so a boundary crossing between the two reads cannot
+ * print a fresh period beside the previous period's figure. Callers with no
+ * spend read take the wall clock.
  */
-function toBudgetDto(
-  b: GatewayBudgetWithSeats,
-  memberCount?: number,
+function toBudgetDto({
+  budget: b,
+  memberCount,
   spendAvailable = true,
-) {
+  readAt = new Date(),
+}: {
+  budget: GatewayBudgetWithSeats;
+  memberCount?: number;
+  spendAvailable?: boolean;
+  readAt?: Date;
+}) {
   // The period is computed here rather than read off the row. The stored
   // columns move only at create and at an explicit reset, so a budget past
   // its first boundary carries a start from months ago and a reset instant
   // in the past, while the spend beside them is the current period's. The
   // pair has to bracket the figure it is printed next to.
-  const period = effectiveBudgetPeriod(b);
+  const period = effectiveBudgetPeriod(b, readAt);
   return {
     id: b.id,
     organization_id: b.organizationId,
@@ -82,9 +95,10 @@ function toBudgetDto(
     metadata: metadataFromRow(b.metadata),
     current_period_started_at: period.currentPeriodStartedAt.toISOString(),
     resets_at: period.resetsAt.toISOString(),
-    // Null is calendar alignment. Set, it is the phase the window cycles
-    // on, and the period fields above describe that cycle rather than the
-    // calendar one.
+    // Null is no anchor at all: a cyclic window aligned to the calendar, or
+    // one of the two windows that do not cycle (total, manual) and so have
+    // no phase to set. Set, it is the phase the window cycles on, and the
+    // period fields above describe that cycle rather than the calendar one.
     cycle_anchor_at: b.cycleAnchorAt?.toISOString() ?? null,
     last_reset_at: b.lastResetAt?.toISOString() ?? null,
     archived_at: b.archivedAt?.toISOString() ?? null,

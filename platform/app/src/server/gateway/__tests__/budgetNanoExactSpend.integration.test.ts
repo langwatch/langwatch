@@ -156,7 +156,7 @@ async function wireRowFor(budgetId: string) {
   const listed = await service.list(ORG_ID);
   const row = listed.find((b) => b.id === budgetId);
   if (!row) throw new Error(`budget ${budgetId} missing from the list`);
-  return toBudgetDto(row);
+  return toBudgetDto({ budget: row });
 }
 
 /** The nano sum the ledger itself holds, read straight out of ClickHouse. */

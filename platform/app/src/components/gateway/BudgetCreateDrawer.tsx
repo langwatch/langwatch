@@ -77,7 +77,7 @@ export function BudgetCreateDrawer({
   // Only a window that rolls on its own can be phased. Total never rolls
   // and manual rolls only when someone asks it to, so neither offers the
   // field, and the server refuses an anchor on either.
-  const cyclesOnASchedule = window !== "TOTAL" && window !== "MANUAL";
+  const isScheduledWindow = window !== "TOTAL" && window !== "MANUAL";
 
   const orgId = organization?.id ?? "";
 
@@ -254,7 +254,7 @@ export function BudgetCreateDrawer({
         // Date constructor reads it in the browser's zone, which is the
         // one the admin typed it in.
         cycleAnchorAt:
-          cyclesOnASchedule && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
+          isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
       });
       onCreated();
       reset();
@@ -452,7 +452,7 @@ export function BudgetCreateDrawer({
                 />
               </Field.Root>
             </HStack>
-            {cyclesOnASchedule && (
+            {isScheduledWindow && (
               <Field.Root>
                 <Field.Label>
                   Start cycle on

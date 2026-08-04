@@ -57,3 +57,10 @@ CREATE UNIQUE INDEX "IdempotencyReceipt_scopeId_key_key" ON "IdempotencyReceipt"
 
 -- CreateIndex
 CREATE INDEX "IdempotencyReceipt_expiresAt_idx" ON "IdempotencyReceipt"("expiresAt");
+
+-- To roll back, uncomment and run manually. Dropping the table discards only
+-- in-flight receipts, so a retry that would have replayed a stored response
+-- executes its create again instead.
+-- DROP INDEX IF EXISTS "IdempotencyReceipt_expiresAt_idx";
+-- DROP INDEX IF EXISTS "IdempotencyReceipt_scopeId_key_key";
+-- DROP TABLE IF EXISTS "IdempotencyReceipt";

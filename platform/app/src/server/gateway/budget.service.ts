@@ -22,7 +22,7 @@ import type {
   BudgetBucketBoundary,
   GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
-import { budgetPeriodFloorMs } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs } from "./budgetPeriod";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -82,6 +82,13 @@ export type BudgetListWithHealth = {
    * than render the untotalled figure as if it were real spend.
    */
   spendAvailable: boolean;
+  /**
+   * The instant the spend above was read at. A caller that renders the
+   * period beside the figure has to resolve it at this instant rather than
+   * at the wall clock: a boundary crossed in between would print the new
+   * period next to the previous period's spend.
+   */
+  readAt: Date;
   scopeReach: Map<string, BudgetScopeReach>;
 };
 
@@ -348,9 +355,19 @@ export class GatewayBudgetService {
   private async applyClickHouseSpendWithHealth(
     budgets: GatewayBudget[],
     organizationId: string,
-  ): Promise<{ budgets: GatewayBudgetWithSeats[]; spendAvailable: boolean }> {
-    if (budgets.length === 0) return { budgets, spendAvailable: true };
-    if (!this.chRepo) return { budgets, spendAvailable: false };
+  ): Promise<{
+    budgets: GatewayBudgetWithSeats[];
+    spendAvailable: boolean;
+    readAt: Date;
+  }> {
+    // One instant for every read below, so the per-person breakdown cannot
+    // land in a later period than the totals it sits beside, and so the
+    // period a caller reports is the one the figure was summed in.
+    const now = new Date();
+    if (budgets.length === 0) {
+      return { budgets, spendAvailable: true, readAt: now };
+    }
+    if (!this.chRepo) return { budgets, spendAvailable: false, readAt: now };
 
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId }, archivedAt: null },
@@ -358,12 +375,11 @@ export class GatewayBudgetService {
     });
     // No project means nothing has ever been able to emit a ledger row, so
     // zero is the true total rather than a missing one.
-    if (projects.length === 0) return { budgets, spendAvailable: true };
+    if (projects.length === 0) {
+      return { budgets, spendAvailable: true, readAt: now };
+    }
 
     const tenantIds = projects.map((p) => p.id);
-    // One instant for every read below, so the per-person breakdown cannot
-    // land in a later period than the totals it sits beside.
-    const now = new Date();
     const boundariesByBudget = await this.bucketBoundaries(
       budgets,
       organizationId,
@@ -388,12 +404,13 @@ export class GatewayBudgetService {
         { organizationId, budgetCount: budgets.length, error },
         "failed to read gateway budget spend totals",
       );
-      return { budgets, spendAvailable: false };
+      return { budgets, spendAvailable: false, readAt: now };
     }
 
     const spendByBudget = new Map(spends.map((s) => [s.budgetId, s]));
     return {
       spendAvailable: true,
+      readAt: now,
       budgets: budgets.map((b) => {
         const ch = spendByBudget.get(b.id);
         const seat = seats.get(b.id);
@@ -541,7 +558,12 @@ export class GatewayBudgetService {
       include: { team: true },
     });
     if (!project) {
-      return { budgets: [], spendAvailable: true, scopeReach: new Map() };
+      return {
+        budgets: [],
+        spendAvailable: true,
+        readAt: new Date(),
+        scopeReach: new Map(),
+      };
     }
     const rows = await this.prisma.gatewayBudget.findMany({
       where: {
@@ -562,11 +584,13 @@ export class GatewayBudgetService {
     rows: GatewayBudget[],
     organizationId: string,
   ): Promise<BudgetListWithHealth> {
-    const [{ budgets, spendAvailable }, scopeReach] = await Promise.all([
-      this.applyClickHouseSpendWithHealth(rows, organizationId),
-      resolveBudgetScopeReach(this.prisma, organizationId, rows),
-    ]);
-    return { budgets, spendAvailable, scopeReach };
+    const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all(
+      [
+        this.applyClickHouseSpendWithHealth(rows, organizationId),
+        resolveBudgetScopeReach(this.prisma, organizationId, rows),
+      ],
+    );
+    return { budgets, spendAvailable, readAt, scopeReach };
   }
 
   /**
@@ -583,14 +607,15 @@ export class GatewayBudgetService {
   ): Promise<{
     budget: GatewayBudgetWithSeats;
     spendAvailable: boolean;
+    readAt: Date;
   } | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId, archivedAt: null },
     });
     if (!row) return null;
-    const { budgets, spendAvailable } =
+    const { budgets, spendAvailable, readAt } =
       await this.applyClickHouseSpendWithHealth([row], organizationId);
-    return { budget: budgets[0] ?? row, spendAvailable };
+    return { budget: budgets[0] ?? row, spendAvailable, readAt };
   }
 
   async get(
@@ -1003,7 +1028,9 @@ export class GatewayBudgetService {
       }
     }
 
-    const resetsAt = nextBoundaryFor({ window: input.window, cycleAnchorAt });
+    const resetsAt = nextBoundaryFor({
+      budget: { window: input.window, cycleAnchorAt },
+    });
     const projectId = resolveProjectFromScope(input.scope);
 
     const created = await this.prisma
@@ -1249,7 +1276,7 @@ export class GatewayBudgetService {
           // A reset forgives the spend so far; it does not re-phase the
           // cycle, so an anchored budget reports the next boundary on its
           // own schedule rather than one window from this instant.
-          resetsAt: nextBoundaryFor(existing, now),
+          resetsAt: nextBoundaryFor({ budget: existing, now }),
           // The current-period figure the bundle reads; the period just
           // restarted, so it is zero by definition. Ledger rows untouched.
           spentUsd: new Prisma.Decimal(0),

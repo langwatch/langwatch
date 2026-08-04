@@ -23,8 +23,23 @@
 -- That window is seconds of drain lag, and the ClickHouse ledger's
 -- ReplacingMergeTree key collapses anything written twice across the straddle.
 
-UPDATE "ProcessManagerInstance" SET "processName" = 'gatewayDebits' WHERE "processName" = 'attributedUserDebits';
+UPDATE "ProcessManagerInstance" SET "processName" = 'gatewayDebits'
+WHERE "processName" = 'attributedUserDebits';
 
-UPDATE "ProcessManagerInbox" SET "processName" = 'gatewayDebits' WHERE "processName" = 'attributedUserDebits';
+UPDATE "ProcessManagerInbox" SET "processName" = 'gatewayDebits'
+WHERE "processName" = 'attributedUserDebits';
 
-UPDATE "ProcessManagerOutbox" SET "processName" = 'gatewayDebits' WHERE "processName" = 'attributedUserDebits';
+UPDATE "ProcessManagerOutbox" SET "processName" = 'gatewayDebits'
+WHERE "processName" = 'attributedUserDebits';
+
+-- To roll back, uncomment and run manually. Reverses in the same order the
+-- rows are read in, outbox first, so a pod picking work up mid-rollback sees
+-- the pending money intents under the name its code is looking for.
+-- UPDATE "ProcessManagerOutbox" SET "processName" = 'attributedUserDebits'
+-- WHERE "processName" = 'gatewayDebits';
+--
+-- UPDATE "ProcessManagerInbox" SET "processName" = 'attributedUserDebits'
+-- WHERE "processName" = 'gatewayDebits';
+--
+-- UPDATE "ProcessManagerInstance" SET "processName" = 'attributedUserDebits'
+-- WHERE "processName" = 'gatewayDebits';

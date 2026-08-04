@@ -16,7 +16,7 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import { currentPeriodStart } from "~/server/gateway/budget.clickhouse.repository";
+import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { anchoredPeriodStart } from "~/server/gateway/budgetWindow";
 
 import { detectBudgetCrossings } from "../services/governanceSignals.service";
@@ -123,7 +123,11 @@ describe("budget crossing detection", () => {
     // crossing fire once per billed period rather than once per calendar
     // month. Without it the fallback would stamp the calendar start.
     expect(crossing.period_started_at_ms).toBe(
-      anchoredPeriodStart("MONTH", cycleAnchorAt, at).getTime(),
+      anchoredPeriodStart({
+        window: "MONTH",
+        anchorAt: cycleAnchorAt,
+        now: at,
+      }).getTime(),
     );
     expect(crossing.period_started_at_ms).not.toBe(
       currentPeriodStart("MONTH", at).getTime(),
