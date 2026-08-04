@@ -205,7 +205,7 @@ Feature: Token Created modal command snippets
 
   @unit
   Scenario: No new highlighting library is added
-    # Verifiable by grepping langwatch/package.json: no new syntax-highlighting dependency added.
+    # Verifiable by grepping platform/app/package.json: no new syntax-highlighting dependency added.
     # Per-render instantiation guard is covered by the Shiki singleton integration scenario above.
     When this feature is implemented
-    Then no syntax-highlighting library other than Shiki appears in langwatch/package.json
+    Then no syntax-highlighting library other than Shiki appears in platform/app/package.json

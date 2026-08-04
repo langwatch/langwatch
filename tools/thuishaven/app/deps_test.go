@@ -109,3 +109,81 @@ func TestDepsStale(t *testing.T) {
 		}
 	})
 }
+
+// The repo is a single pnpm workspace (ADR-076): the lockfile and node_modules
+// live at the root, and langwatch/ has neither. ensureDeps used to trust its
+// caller to pass the root; both call sites passed langwatch/, depsStale found
+// no lockfile there and read that as "nothing to install" — so `haven up` in a
+// fresh worktree silently installed nothing and started every service against
+// absent dependencies. ensureDeps resolves the workspace root itself now, so
+// the test exercises the regression directly: hand it the WRONG directory (the
+// member, exactly what the broken call sites passed) and the install must
+// still land at the root.
+//
+// @scenario A fresh clone needs one install
+func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
+	// A checkout shaped like the repo: lockfile at the root, none in platform/app/.
+	repo := func(t *testing.T) (root, lwDir string) {
+		t.Helper()
+		root = t.TempDir()
+		lwDir = filepath.Join(root, "langwatch")
+		if err := os.MkdirAll(lwDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "pnpm-lock.yaml"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return root, lwDir
+	}
+
+	t.Run("given a workspace whose lockfile is only at the root", func(t *testing.T) {
+		t.Run("when handed the member directory, the install still runs at the root", func(t *testing.T) {
+			root, lwDir := repo(t)
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			if err := o.ensureDeps(context.Background(), lwDir, true); err != nil {
+				t.Fatalf("ensureDeps: %v", err)
+			}
+			if len(sup.dirs) != 1 {
+				t.Fatalf("dirs = %v, want exactly one install", sup.dirs)
+			}
+			if sup.dirs[0] != root {
+				t.Fatalf("install ran in %q, want the workspace root %q", sup.dirs[0], root)
+			}
+		})
+
+		t.Run("when handed the root itself, the install runs there", func(t *testing.T) {
+			root, _ := repo(t)
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			if err := o.ensureDeps(context.Background(), root, true); err != nil {
+				t.Fatalf("ensureDeps: %v", err)
+			}
+			if len(sup.dirs) != 1 || sup.dirs[0] != root {
+				t.Fatalf("dirs = %v, want one install at %q", sup.dirs, root)
+			}
+		})
+
+		t.Run("when no lockfile exists anywhere above, the up fails loudly", func(t *testing.T) {
+			// "No lockfile" used to read as "nothing to install" — the silent
+			// no-op this whole test exists to prevent. A checkout without one
+			// is broken, and every service would otherwise fail later, worse.
+			dir := filepath.Join(t.TempDir(), "langwatch")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			err := o.ensureDeps(context.Background(), dir, true)
+			if err == nil {
+				t.Fatal("ensureDeps = nil, want an error naming the missing lockfile")
+			}
+			if !strings.Contains(err.Error(), "pnpm-lock.yaml") {
+				t.Fatalf("err = %v, want it to name pnpm-lock.yaml", err)
+			}
+			if len(sup.dirs) != 0 {
+				t.Fatalf("dirs = %v, want no install attempt", sup.dirs)
+			}
+		})
+	})
+}

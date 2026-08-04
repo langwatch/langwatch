@@ -50,12 +50,12 @@ Feature: CI smoke + publish for `@langwatch/server`
   Scenario: Smoke job triggers
     Given the smoke workflow file is "/.github/workflows/npx-server-smoke.yml"
     Then it triggers on:
-      | trigger                   | detail                                                                 |
-      | workflow_dispatch         | manual                                                                 |
-      | schedule                  | "0 4 * * *" (nightly, UTC)                                             |
-      | push paths                | package.json, pnpm-workspace.yaml, packages/server/**                   |
-      | push paths                | langwatch_nlp/pyproject.toml, langevals/**/pyproject.toml               |
-      | push paths                | services/aigateway/**, langwatch/package.json, langwatch/scripts/**     |
+      | trigger           | detail                                                                    |
+      | workflow_dispatch | manual                                                                    |
+      | schedule          | "0 4 * * *" (nightly, UTC)                                                |
+      | push paths        | package.json, pnpm-workspace.yaml, packages/server/**                     |
+      | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
+      | push paths        | services/aigateway/**, platform/app/package.json, platform/app/scripts/** |
 
   # =========================================================================
   # Publish job
@@ -68,7 +68,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And it publishes "@langwatch/server@3.1.1" to npm
 
   Scenario: Version-lock guard refuses mismatched tag and package version
-    Given "langwatch/package.json" version is "3.1.1"
+    Given "platform/app/package.json" version is "3.1.1"
     But the release tag is "v3.2.0"
     When the publish job runs
     Then the job fails fast with "version mismatch: tag=v3.2.0 package.json=3.1.1"
@@ -81,29 +81,36 @@ Feature: CI smoke + publish for `@langwatch/server`
   Scenario: Publish builds the langwatch app first
     Given a clean checkout
     When the publish job runs
-    Then "pnpm --filter langwatch build" runs before npm pack
-    And the resulting tarball contains "langwatch/.next/standalone/server.js"
-    And the tarball does NOT contain "langwatch/.next/cache" or "node_modules/.cache"
+    Then the app's production build runs before npm pack
+    And the resulting tarball contains the prebuilt client at "app/langwatch/dist/client/"
+    And the tarball does NOT contain "node_modules" or build caches
+    # `pnpm --filter langwatch build` would be WRONG now: since ADR-076 that
+    # filter selects the published TypeScript SDK. The app is @langwatch/web.
 
   Scenario: Tarball contains expected directories only
+    # Everything ships one level down, under app/ — npm deletes a lockfile at
+    # the package ROOT no matter what the manifest asks, and shipping the
+    # lockfile is what keeps the end-user install reproducible. See ADR-076.
     When the publish job builds the tarball
     Then the tarball contains:
       | path                                  |
-      | bin/langwatch-server.mjs              |
-      | dist/                                 |
-      | langwatch/.next/standalone/           |
-      | langwatch/public/                     |
-      | langwatch/prisma/                     |
-      | langwatch_nlp/                        |
-      | langevals/                            |
-      | scripts/clickhouse-migrations/        |
+      | app/packages/server/dist/             |
+      | app/pnpm-workspace.yaml               |
+      | app/pnpm-lock.yaml                    |
+      | app/langwatch/dist/client/            |
+      | app/langwatch/public/                 |
+      | app/langwatch/prisma/                 |
+      | app/langevals/                        |
+      | app/python-sdk/                       |
+      | app/mcp-server/dist/                  |
     And the tarball does NOT contain:
       | path                       |
-      | langwatch/node_modules     |
-      | langwatch_nlp/.venv        |
-      | langevals/**/.venv         |
-      | langwatch/.next/cache      |
+      | app/langwatch/node_modules |
+      | app/langevals/**/.venv     |
       | **/.env                    |
+      | **/.env.*                  |
+      | **/*.pem                   |
+      | **/.npmrc                  |
       | **/__pycache__             |
 
   Scenario: Tarball gzipped size is under 300 MB

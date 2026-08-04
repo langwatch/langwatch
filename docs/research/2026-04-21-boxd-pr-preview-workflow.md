@@ -28,7 +28,7 @@ After several rounds of iteration, the shape is:
 
 1. Does Boxd accept the bot GitHub identity at sign-up? Email `user-test-agent@langwatch.ai` is available and viable; the only remaining verification is "walk through Boxd's browser-based SSH-key pairing flow as the bot user and confirm the key links cleanly." Falls out of the bootstrap in step A below — not a separate upfront question.
 2. Real p50/p95 fork-to-domain-healthy time on the 100GB staging VM. Must be CI-acceptable or the UX premise dies.
-3. ~~Full list of `*.boxd.sh` hostname references.~~ **Audited: non-issue.** Every hostname reference in `langwatch/src/` goes through `NEXTAUTH_URL` or `BASE_HOST`; compose.dev.yml already parameterizes both from the shell env (lines 170-176) with an explicit comment anticipating Boxd-proxied URLs. `NEXTAUTH_PROVIDER: "email"` (line 181) sidesteps per-fork OAuth callback registration. Fork boot = two `-e` flags on `boxd exec` — no file edits.
+3. ~~Full list of `*.boxd.sh` hostname references.~~ **Audited: non-issue.** Every hostname reference in `platform/app/src/` goes through `NEXTAUTH_URL` or `BASE_HOST`; compose.dev.yml already parameterizes both from the shell env (lines 170-176) with an explicit comment anticipating Boxd-proxied URLs. `NEXTAUTH_PROVIDER: "email"` (line 181) sidesteps per-fork OAuth callback registration. Fork boot = two `-e` flags on `boxd exec` — no file edits.
 
 All other risks surfaced below have an agreed mitigation in the consolidated design. The findings below are preserved for historical context.
 
@@ -64,13 +64,13 @@ A real golden pipeline either (a) rebuilds the VM from scratch from a declarativ
 
 ### 3. The in-VM NEXTAUTH_URL quirk is the tip of a config-drift iceberg
 
-The golden's `langwatch/.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
+The golden's `platform/app/.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
 
 ### 4. State contamination across PRs (resolved via no-direct-access policy)
 
 **Originally flagged as structural.** Resolved during iteration: forks are COW overlays, so fork writes stay in the fork's overlay and never propagate back to staging. Cross-PR contamination only happens if staging itself accumulates state between refreshes — which only happens if humans poke it directly.
 
-**Mitigation adopted:** staging is not exposed to humans. No shared proxy URL for devs to click, only bot/exec access. Combined with the verified fact that langwatch does not self-instrument into its own Clickhouse (checked via grep — no `new LangWatch()` in `langwatch/src/server/`), and with destroy-and-recreate refresh semantics in finding §2, staging stays dataless between refreshes. Cross-PR contamination is no longer a design concern.
+**Mitigation adopted:** staging is not exposed to humans. No shared proxy URL for devs to click, only bot/exec access. Combined with the verified fact that langwatch does not self-instrument into its own Clickhouse (checked via grep — no `new LangWatch()` in `platform/app/src/server/`), and with destroy-and-recreate refresh semantics in finding §2, staging stays dataless between refreshes. Cross-PR contamination is no longer a design concern.
 
 One residual: the app emits product analytics to PostHog (external SaaS). Idle staging sends events that pollute real telemetry unless PostHog is disabled via env on staging and forks. Add that to the fork/staging env override step.
 
@@ -114,7 +114,7 @@ Do **not** skip straight to writing workflow YAML. In order:
 2. **Time a `boxd fork` of `langwatch-main-golden-image` to domain-level health**, end-to-end, manually, from a cold cache. Instrument it. Numbers, not vibes. This is the load-bearing number for "is this CI-fast?"
 3. **Decide whether per-PR data isolation is actually required.** If UI review is the real goal, strategy F is 10× cheaper. If isolated data matters (testing migrations, seeding fixtures), strategies A/C/D/E are candidates.
 4. **If proceeding with Boxd (A/B/C/D): design golden refresh as a rebuild or snapshot, not a `git pull` on a live VM.** See finding §2.
-5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `langwatch/.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
+5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `platform/app/.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
 6. **Build the reaper before the happy path, and wire FIFO eviction into the fork path.** Before every `boxd fork pr<N>`, list current `pr<N>` VMs and destroy the oldest if the soft cap (e.g. 4) would be exceeded. Separately: a scheduled workflow that lists all `pr<N>` VMs, checks each PR's state via `gh pr view --json state`, and destroys `CLOSED` / `MERGED` orphans. Both guards are needed — FIFO handles missed close events in the moment, the scheduled reaper handles the long tail.
 7. **Required secrets (all set at the repo/org level, owned by the bot identity — never tied to a personal account):** For A: `BOXD_TOKEN` (JWT issued via `ssh boxd.sh token create` from the bot's linked SSH session). For B: `BOXD_SSH_KEY` (ed25519 private key generated for the bot, public key paired once to the org Boxd account) plus `boxd.sh` entries in `known_hosts`. Already-existing repo secrets like `DOCKERHUB_TOKEN` / `SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL` are the pattern to follow for storage and access control.
 8. **Concurrency group:** `boxd-pr-${{ github.event.pull_request.number }}` with `cancel-in-progress: true`. Matches existing SDK-workflow convention in the repo.
