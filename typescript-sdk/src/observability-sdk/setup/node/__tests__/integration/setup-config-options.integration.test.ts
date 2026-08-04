@@ -69,9 +69,9 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource.attributes['service.name']).toBe('test-service');
-    expect(provider._config.resource.attributes['deployment.environment']).toBe('test');
-    expect(provider._config.resource.attributes['service.version']).toBe('1.0.0');
+    expect(provider._tracerOptions.resource.attributes['service.name']).toBe('test-service');
+    expect(provider._tracerOptions.resource.attributes['deployment.environment']).toBe('test');
+    expect(provider._tracerOptions.resource.attributes['service.version']).toBe('1.0.0');
     await handle.shutdown();
   });
 
@@ -85,7 +85,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource.attributes['custom.resource']).toBe('yes');
+    expect(provider._tracerOptions.resource.attributes['custom.resource']).toBe('yes');
     await handle.shutdown();
   });
 
@@ -98,7 +98,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.spanLimits?.attributeCountLimit).toBe(1);
+    expect(provider._tracerOptions.spanLimits?.attributeCountLimit).toBe(1);
     await handle.shutdown();
   });
 
@@ -111,7 +111,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.resource).toBeDefined();
+    expect(provider._tracerOptions.resource).toBeDefined();
     await handle.shutdown();
   });
 
@@ -125,7 +125,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.sampler.toString()).toBe('customSampler');
+    expect(provider._tracerOptions.sampler.toString()).toBe('customSampler');
     await handle.shutdown();
   });
 
@@ -139,8 +139,8 @@ describe('setupObservability Integration - Configuration Options', () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(provider._config.idGenerator.generateSpanId()).toBe('spanid');
-    expect(provider._config.idGenerator.generateTraceId()).toBe('traceid');
+    expect(provider._tracerOptions.idGenerator.generateSpanId()).toBe('spanid');
+    expect(provider._tracerOptions.idGenerator.generateTraceId()).toBe('traceid');
     await handle.shutdown();
   });
 

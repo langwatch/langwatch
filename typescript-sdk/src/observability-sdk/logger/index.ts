@@ -1,7 +1,7 @@
 import {
   type Logger,
   type LoggerProvider,
-  NoopLoggerProvider,
+  createNoopLogger,
 } from "@opentelemetry/api-logs";
 import {
   type LangWatchLogger,
@@ -14,7 +14,9 @@ import { LangWatchLoggerInternal } from "./implementation";
  * knows about.
  * @internal
  */
-let currentLoggerProvider: LoggerProvider = new NoopLoggerProvider();
+const noopLoggerProvider: LoggerProvider = { getLogger: () => createNoopLogger() };
+
+let currentLoggerProvider: LoggerProvider = noopLoggerProvider;
 
 /**
  * @module observability/logger
