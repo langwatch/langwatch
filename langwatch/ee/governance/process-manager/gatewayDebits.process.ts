@@ -35,13 +35,8 @@ import {
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 
-/**
- * The registered process name. It reads as the narrower thing this process
- * used to be, and it stays that way on purpose: the inbox, instance and
- * outbox rows key on this string, so renaming it would orphan every
- * in-flight instance halfway through a deploy.
- */
-export const GATEWAY_DEBITS_PROCESS_NAME = "attributedUserDebits" as const;
+/** The registered process name. Instance, inbox and outbox rows key on it. */
+export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 
 /**
  * The sole writer of gateway budget debits.
