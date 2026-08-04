@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
+import { attachDatasetRecordCounts } from "../../datasets/dataset-record-counts";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
   datasetColumnsSchema,
@@ -98,14 +99,13 @@ export const datasetRouter = createTRPCRouter({
       const { projectId } = input;
       const prisma = ctx.prisma;
 
-      const datasets = await prisma.dataset.findMany({
-        where: { projectId, archivedAt: null },
-        orderBy: { createdAt: "desc" },
-        include: {
-          _count: {
-            select: { datasetRecords: true },
-          },
-        },
+      const datasets = await attachDatasetRecordCounts({
+        prisma,
+        projectId,
+        datasets: await prisma.dataset.findMany({
+          where: { projectId, archivedAt: null },
+          orderBy: { createdAt: "desc" },
+        }),
       });
 
       return datasets.map((dataset) => ({

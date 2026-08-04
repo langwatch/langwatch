@@ -677,6 +677,11 @@ model DatasetRecord {
   @@index([datasetId])
   @@index([projectId])
   @@index([createdAt])
+  // Serves the per-project entry counts the dataset lists render, and the
+  // project-scoped record reads on the editor page, as an index-only scan.
+  // Without it the planner has to combine the two single-column indexes and
+  // falls back to a sequential scan once a project's rows dominate the table.
+  @@index([projectId, datasetId])
 }
 
 model Dashboard {

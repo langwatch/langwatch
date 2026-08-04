@@ -1,5 +1,7 @@
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 
+import { attachDatasetRecordCounts } from "./dataset-record-counts";
+
 /**
  * Input types derived from Prisma for type safety
  */
@@ -354,16 +356,21 @@ export class DatasetRepository {
   }> {
     const where = { projectId: input.projectId, archivedAt: null };
 
-    const [datasets, total] = await Promise.all([
+    const [page, total] = await Promise.all([
       this.prisma.dataset.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: { _count: { select: { datasetRecords: true } } },
         skip: input.skip,
         take: input.take,
       }),
       this.prisma.dataset.count({ where }),
     ]);
+
+    const datasets = await attachDatasetRecordCounts({
+      prisma: this.prisma,
+      projectId: input.projectId,
+      datasets: page,
+    });
 
     return { datasets, total };
   }
