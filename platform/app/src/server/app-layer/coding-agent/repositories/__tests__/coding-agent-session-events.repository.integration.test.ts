@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the per-call fact table (migration 00067) through its real
+ * Round-trips the per-call fact table (migration 00070) through its real
  * INSERT/SELECT SQL against ClickHouse: the DDL↔repository column contract,
  * the RecordId dedup the ReplacingMergeTree + `LIMIT 1 BY` read promise, and
  * the keyset pagination the REST export walks.

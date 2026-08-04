@@ -12,7 +12,7 @@ const logger = createLogger(
 );
 
 /**
- * Persistence for the per-call fact table (migration 00067). One row per
+ * Persistence for the per-call fact table (migration 00070). One row per
  * session event, identity = the canonical log record's content hash, so
  * re-delivery and replay collapse under the ReplacingMergeTree instead of
  * double-counting. Reads dedup with `LIMIT 1 BY` on the row identity, which is

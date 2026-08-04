@@ -57,7 +57,7 @@ const codingAgentSessionEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
  *
- *  2026-08-02: the context-economics columns of migration 00068 joined the
+ *  2026-08-02: the context-economics columns of migration 00071 joined the
  *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
  *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
  *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows
@@ -100,7 +100,7 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-02";
  * these rows predate
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
- * discriminator already covers the shape. (The same trade holds for the 00068
+ * discriminator already covers the shape. (The same trade holds for the 00071
  * context-economics columns: a pre-stamp row decodes them as zeros, which is
  * honest for sessions that old, and a replay can backfill them if they ever
  * matter.)
