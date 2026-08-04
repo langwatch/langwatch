@@ -38,7 +38,7 @@ describe("PrismaSubscriptionRepository", () => {
     });
   });
 
-  describe("activate", () => {
+  describe("when activating a subscription", () => {
     /** @scenario Reactivation clears stale endDate left by a prior cancellation */
     it("clears endDate when reactivating a subscription", async () => {
       await repo.activate({ id: "sub_456", previousStatus: SubscriptionStatus.CANCELLED });
@@ -56,7 +56,7 @@ describe("PrismaSubscriptionRepository", () => {
     });
   });
 
-  describe("updateQuantities", () => {
+  describe("when updating subscription quantities", () => {
     /** @scenario Quantity update clears stale endDate left by a prior cancellation */
     it("clears endDate when updating subscription quantities", async () => {
       await repo.updateQuantities({
