@@ -229,7 +229,7 @@ function traceRow(
     TotalPromptTokenCount: promptTokens,
     TotalCompletionTokenCount: completionTokens,
     ContainsPrompt: true,
-    LastUsedPromptId: "prompt-checkout",
+    LastUsedPromptId: SEEDED_PROMPT_ID,
     LastUsedPromptVersionNumber: promptVersion,
     TraceName: "checkout",
   };
@@ -868,9 +868,16 @@ describe("given the governed analytics SQL API and a seed with known answers", (
 
   afterAll(async () => {
     setGovernedSqlService(null);
-    if (organization) {
+    // Guarded on the identifier each statement actually uses: `team` gates
+    // everything keyed by teamId, while `organization.delete` gets its own
+    // guard so a team-creation failure never leaves the organization behind
+    // — and never turns an undefined teamId into a `deleteMany` that matches
+    // every project in the database.
+    if (team) {
       await prisma.project.deleteMany({ where: { teamId: team.id } });
       await prisma.team.delete({ where: { id: team.id } });
+    }
+    if (organization) {
       await prisma.organization.delete({ where: { id: organization.id } });
     }
     await harness?.stop();

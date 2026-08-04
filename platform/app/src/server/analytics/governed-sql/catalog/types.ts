@@ -256,11 +256,19 @@ export function columnExpression(
   source: (name: string) => string,
 ): string {
   if (column.expression) return column.expression(source);
-  const [only] = column.sourceColumns;
-  if (!only || column.sourceColumns.length !== 1) {
+  if (column.sourceColumns.length !== 1) {
     throw new Error(
       `governed-sql catalog: column "${column.name}" reads ${column.sourceColumns.length} source columns ` +
         `and must declare an expression`,
+    );
+  }
+  // Reported separately from the count, because a single empty name satisfies
+  // the count and would otherwise be blamed on it — sending whoever reads the
+  // failure to look for a missing expression that is not the problem.
+  const [only] = column.sourceColumns;
+  if (!only) {
+    throw new Error(
+      `governed-sql catalog: column "${column.name}" declares an empty source column name`,
     );
   }
   return source(only);

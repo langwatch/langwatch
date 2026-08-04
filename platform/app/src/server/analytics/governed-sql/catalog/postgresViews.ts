@@ -244,6 +244,12 @@ const PROMPTS: GovernedViewDefinition = {
       gates: [],
       sourceColumns: ["createdAt"],
     },
+    // `DeletedAt` and not `ArchivedAt`, which is the spelling the rest of this
+    // file uses: `LlmPromptConfig` really does soft-delete through `deletedAt`
+    // and declares no `archivedAt` at all, so the house spelling here would
+    // publish a column name for a field that does not exist. An exposed name
+    // tracks the field behind it; where the two agree — `Experiment.archivedAt`
+    // — the exposed name is `ArchivedAt`.
     {
       name: "DeletedAt",
       type: "Nullable(DateTime64(3))",

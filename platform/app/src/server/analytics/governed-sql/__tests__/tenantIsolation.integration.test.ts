@@ -656,8 +656,16 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
           `CREATE ROW POLICY evil ON ${database}.traces USING 1 TO ${harness.names.restrictedUser}`,
         ],
         [
+          // Derived, not spelled by hand: ClickHouse checks the privilege
+          // before it resolves the object, so a hardcoded name that no longer
+          // matches any policy still raises ACCESS_DENIED and still passes —
+          // while having stopped testing a refusal to drop a policy that
+          // actually exists.
           "DROP ROW POLICY",
-          `DROP ROW POLICY traces_tenant ON ${database}.traces`,
+          dropGovernedRowPolicyStatement({
+            names: harness.names,
+            table: "traces",
+          }),
         ],
         [
           "GRANT",

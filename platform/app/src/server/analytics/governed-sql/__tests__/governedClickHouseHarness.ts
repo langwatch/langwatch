@@ -1184,6 +1184,9 @@ export async function expectZeroRowsWithControl({
 
 /** The PostgreSQL role the named collection connects as. */
 const PG_READER_ROLE = "ch_reader";
+/** How long a terminated reader backend gets to leave `pg_stat_activity`. */
+const PG_BACKEND_EXIT_TIMEOUT_MS = 15_000;
+const PG_BACKEND_EXIT_POLL_MS = 50;
 const PG_READER_PASSWORD = "governed-pg-reader-test-password";
 const PG_ADMIN_USER = "test";
 const PG_ADMIN_PASSWORD = "test";
@@ -1261,9 +1264,12 @@ export interface GovernedPostgresHarness {
    * a two-second wait reports the previous measurement's rows, which is worse
    * than reporting none, and even twelve seconds raced.
    *
-   * Terminating the backend runs its shutdown hook, which flushes. That turns
-   * the measurement from a wait long enough to probably work into one that is
-   * true when it returns. ClickHouse reconnects on the next read.
+   * Terminating the backend runs its shutdown hook, which flushes, and this
+   * then waits for the backend to actually leave `pg_stat_activity` rather than
+   * for a duration. That turns the measurement from a wait long enough to
+   * probably work into one that is true when it returns, and it throws rather
+   * than returning a stale number if the backends outlast the timeout.
+   * ClickHouse reconnects on the next read.
    */
   flushStatistics(): Promise<void>;
   /**
@@ -1598,9 +1604,31 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
         `SELECT pg_terminate_backend(pid) FROM pg_stat_activity ` +
           `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
       ]);
-      // The terminated backends flush as they exit; this is the handoff, not a
-      // hopeful wait for a periodic flush.
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      // `pg_terminate_backend` only signals; it returns before the backend has
+      // run the shutdown hook that flushes its statistics. Waiting for the rows
+      // to leave `pg_stat_activity` waits for the thing that actually has to
+      // have happened — a fixed grace period here would be the hopeful wait
+      // this whole mechanism exists to avoid, and it is the shape that flakes
+      // first on a loaded CI worker.
+      const deadline = Date.now() + PG_BACKEND_EXIT_TIMEOUT_MS;
+      for (;;) {
+        const remaining = await asAdmin(
+          `SELECT count(*) FROM pg_stat_activity ` +
+            `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
+        );
+        if (remaining.exitCode === 0 && remaining.stdout.trim() === "0") return;
+        if (Date.now() >= deadline) {
+          throw new Error(
+            `governed-sql harness: ${PG_READER_ROLE} backends were still ` +
+              `attached ${PG_BACKEND_EXIT_TIMEOUT_MS}ms after termination, so ` +
+              `their statistics are not flushed and any measurement taken now ` +
+              `would silently report the previous one`,
+          );
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, PG_BACKEND_EXIT_POLL_MS),
+        );
+      }
     },
     async rowsRead(baseRelation: string) {
       const result = await asAdmin(

@@ -31,38 +31,20 @@
  * {@link clickHouseAccessManagementConfigXml}. Without the first, every
  * statement here fails with UNKNOWN_SETTING (115).
  *
+ * Every name emitted below is interpolated into SQL text, so it goes through
+ * `./sqlText.ts`: `assertIdentifier` on the ClickHouse side, `postgresQuoted`
+ * on the PostgreSQL side, and the literal escapers for values.
+ *
+ * @see ./sqlText.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/governed-sql-api.feature
  */
 
-/**
- * Identifier shape both ClickHouse and PostgreSQL accept unquoted.
- *
- * Every name in this module is interpolated into SQL text: neither database
- * binds identifiers as parameters, and a row policy's `USING` expression is
- * text by definition. Names come from deployment configuration rather than from
- * a request, so the check is a programming-error guard, not a customer-facing
- * one — hence a plain `Error`.
- */
-const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-function assertIdentifier(value: string, role: string): string {
-  if (!SAFE_IDENTIFIER.test(value)) {
-    throw new Error(
-      `governed-sql provisioning: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`,
-    );
-  }
-  return value;
-}
-
-/** ClickHouse string literal: backslash-escaped, single quotes doubled out. */
-function clickHouseLiteral(value: string): string {
-  return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-}
-
-/** PostgreSQL string literal under `standard_conforming_strings`: quote-doubled. */
-function postgresLiteral(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
+import {
+  assertIdentifier,
+  clickHouseLiteral,
+  postgresLiteral,
+  postgresQuoted,
+} from "./sqlText";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -262,7 +244,17 @@ export function governedSettingsProfileStatement({
   );
 }
 
-/** The shared restricted identity, carrying the profile and nothing else. */
+/**
+ * The shared restricted identity, carrying the profile and nothing else.
+ *
+ * `sha256_password` rather than `plaintext_password`, because the two differ
+ * only in what ClickHouse keeps at rest: the wire is identical — the client
+ * sends the password and the server hashes it to compare — so nothing about the
+ * connection changes, while `plaintext_password` would leave the credential
+ * recoverable in the access storage and in `SHOW CREATE USER` for anyone who
+ * reaches the server as an administrator. This identity is shared by every
+ * governed query, so a recovered password is a foothold on all of them.
+ */
 export function governedRestrictedUserStatement({
   names,
   password,
@@ -273,7 +265,7 @@ export function governedRestrictedUserStatement({
   assertNames(names);
   return (
     `CREATE USER OR REPLACE ${names.restrictedUser} ` +
-    `IDENTIFIED WITH plaintext_password BY ${clickHouseLiteral(password)} ` +
+    `IDENTIFIED WITH sha256_password BY ${clickHouseLiteral(password)} ` +
     `SETTINGS PROFILE ${names.settingsProfile}`
   );
 }
@@ -712,8 +704,8 @@ export function postgresApprovedViewStatement({
   /** Exposed name and the base relation's column behind it, in catalog order. */
   columns: readonly { exposed: string; source: string }[];
 }): string {
-  assertIdentifier(schema, "PostgreSQL schema");
-  assertIdentifier(view, "approved view");
+  const quotedSchema = postgresQuoted(schema);
+  const quotedView = postgresQuoted(view);
   if (columns.length === 0) {
     throw new Error(
       `governed-sql provisioning: approved view "${view}" needs at least one column`,
@@ -726,31 +718,10 @@ export function postgresApprovedViewStatement({
     )
     .join(",\n");
   return (
-    `CREATE OR REPLACE VIEW ${schema}.${view} AS\nSELECT\n${projection}\n` +
-    `FROM ${schema}.${postgresQuoted(baseRelation)}`
+    `CREATE OR REPLACE VIEW ${quotedSchema}.${quotedView} AS\nSELECT\n${projection}\n` +
+    `FROM ${quotedSchema}.${postgresQuoted(baseRelation)}`
   );
 }
-
-/**
- * A PostgreSQL identifier as SQL: always double-quoted.
- *
- * Not optional here the way it is on the ClickHouse side. Prisma names its
- * tables and columns in the case the model declares (`Annotation`,
- * `projectId`), and PostgreSQL folds an unquoted identifier to lower case, so
- * an unquoted `Annotation` resolves to a relation that does not exist.
- */
-function postgresQuoted(value: string): string {
-  if (!POSTGRES_SAFE_IDENTIFIER.test(value)) {
-    throw new Error(
-      `governed-sql provisioning: PostgreSQL identifier must match ` +
-        `${String(POSTGRES_SAFE_IDENTIFIER)}, got "${value}"`,
-    );
-  }
-  return `"${value}"`;
-}
-
-/** Identifier shape safe to quote into PostgreSQL DDL. */
-const POSTGRES_SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** How the dedicated PostgreSQL role is constrained. */
 export interface PostgresReaderRole {
@@ -801,8 +772,13 @@ export function postgresReaderRoleStatements({
 }: {
   reader: PostgresReaderRole;
 }): string[] {
-  assertIdentifier(reader.role, "PostgreSQL role");
-  assertIdentifier(reader.schema, "PostgreSQL schema");
+  // Quoted, like every other PostgreSQL identifier this module emits — and the
+  // existence probe compares `rolname` against the *unquoted* spelling on
+  // purpose: `CREATE ROLE "ChReader"` stores `ChReader`, so an unquoted create
+  // would store `chreader`, never match the probe, and make every re-run try to
+  // create a role that already exists.
+  const role = postgresQuoted(reader.role);
+  const schema = postgresQuoted(reader.schema);
   if (reader.approvedViews.length === 0) {
     throw new Error(
       `governed-sql provisioning: PostgreSQL role "${reader.role}" needs at least one approved view; ` +
@@ -817,17 +793,16 @@ export function postgresReaderRoleStatements({
   return [
     `DO $$\nBEGIN\n` +
       `  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(reader.role)}) THEN\n` +
-      `    EXECUTE 'CREATE ROLE ${reader.role} LOGIN';\n` +
+      `    EXECUTE 'CREATE ROLE ${role} LOGIN';\n` +
       `  END IF;\nEND\n$$`,
-    `ALTER ROLE ${reader.role} WITH LOGIN PASSWORD ${postgresLiteral(reader.password)} ` +
+    `ALTER ROLE ${role} WITH LOGIN PASSWORD ${postgresLiteral(reader.password)} ` +
       `CONNECTION LIMIT ${reader.connectionLimit}`,
-    `ALTER ROLE ${reader.role} SET default_transaction_read_only = on`,
-    `ALTER ROLE ${reader.role} SET statement_timeout = ${postgresLiteral(reader.statementTimeout)}`,
-    `REVOKE ALL ON SCHEMA ${reader.schema} FROM ${reader.role}`,
-    `GRANT USAGE ON SCHEMA ${reader.schema} TO ${reader.role}`,
+    `ALTER ROLE ${role} SET default_transaction_read_only = on`,
+    `ALTER ROLE ${role} SET statement_timeout = ${postgresLiteral(reader.statementTimeout)}`,
+    `REVOKE ALL ON SCHEMA ${schema} FROM ${role}`,
+    `GRANT USAGE ON SCHEMA ${schema} TO ${role}`,
     ...reader.approvedViews.map(
-      (view) =>
-        `GRANT SELECT ON ${reader.schema}.${assertIdentifier(view, "approved view")} TO ${reader.role}`,
+      (view) => `GRANT SELECT ON ${schema}.${postgresQuoted(view)} TO ${role}`,
     ),
   ];
 }

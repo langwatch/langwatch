@@ -614,52 +614,153 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     /** @scenario "A wrong tenant predicate costs a wrong read and never a wrong answer" */
     it("returns zero rows when the pushed-down predicate names a foreign tenant", async () => {
       const probe = `${PG_MAPPED_VIEW}_wrong_tenant_probe`;
-      await harness.applyAsAdmin([
-        `CREATE OR REPLACE VIEW ${database}.${probe}\n` +
-          `SQL SECURITY INVOKER\n` +
-          `AS SELECT src.${PG_MAPPED_TENANT_COLUMN} AS ${PG_MAPPED_TENANT_COLUMN}, ` +
-          `src.AnnotationId AS AnnotationId\n` +
-          `FROM ${database}.${PG_MAPPED_TABLE} AS src\n` +
-          `WHERE src.${PG_MAPPED_TENANT_COLUMN} = '${harness.tenantB.tenantId}'`,
-        `GRANT SELECT ON ${database}.${probe} TO ${harness.names.restrictedUser}`,
-      ]);
+      try {
+        await harness.applyAsAdmin([
+          `CREATE OR REPLACE VIEW ${database}.${probe}\n` +
+            `SQL SECURITY INVOKER\n` +
+            `AS SELECT src.${PG_MAPPED_TENANT_COLUMN} AS ${PG_MAPPED_TENANT_COLUMN}, ` +
+            `src.AnnotationId AS AnnotationId\n` +
+            `FROM ${database}.${PG_MAPPED_TABLE} AS src\n` +
+            `WHERE src.${PG_MAPPED_TENANT_COLUMN} = '${harness.tenantB.tenantId}'`,
+          `GRANT SELECT ON ${database}.${probe} TO ${harness.names.restrictedUser}`,
+        ]);
 
+        const control = await recordSeedControl({
+          harness,
+          table: PG_MAPPED_TABLE,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        });
+        await postgres.resetStatistics();
+        const before = await postgres.readLog();
+
+        const rows = await selectRows(
+          tenantA,
+          `SELECT * FROM ${database}.${probe}`,
+        );
+
+        const scans = statementsLoggedSince(
+          before,
+          await postgres.readLog(),
+        ).filter((statement) => statement.includes(postgres.approvedView));
+        await postgres.flushStatistics();
+        const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
+
+        // The foreign predicate really did reach PostgreSQL, and PostgreSQL
+        // really did read those rows: without both, "zero rows out" would prove
+        // nothing about what the predicate can and cannot do.
+        expect(
+          scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
+          `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
+        ).toBe(true);
+        expect(
+          rowsReadOnPrimary,
+          "PostgreSQL read nothing, so the row policy was never the thing that filtered",
+        ).toBeGreaterThan(0);
+
+        expect(
+          rows,
+          `expected zero rows while ${control.tenantB} foreign rows were fetched`,
+        ).toHaveLength(0);
+      } finally {
+        // Same discipline as the DEFINER-view probe in
+        // `tenantIsolation.integration.test.ts`: the grant outlives the drop,
+        // and a container this suite reuses across runs would otherwise keep
+        // both the probe view and its grant on the restricted user forever.
+        await harness.applyAsAdmin([
+          `REVOKE SELECT ON ${database}.${probe} FROM ${harness.names.restrictedUser}`,
+          `DROP TABLE IF EXISTS ${database}.${probe}`,
+        ]);
+      }
+    }, 120_000);
+  });
+
+  describe("when the key map holds a duplicate row for the caller's key", () => {
+    /**
+     * The bug this pins: the key map is `ORDER BY KeyHash` with no uniqueness
+     * enforced, so a retried provisioning step or a re-issued key can leave two
+     * rows the key map's own self-policy admits for the same hash. The governed
+     * view's tenant predicate (`postgresTenantPredicate` in `../views.ts`) is a
+     * scalar subquery over exactly that self-policed read — before its
+     * `LIMIT 1`, two admitted rows made the subquery return two rows and
+     * ClickHouse rejected the whole read with
+     * `Code: 125. INCORRECT_RESULT_OF_SCALAR_SUBQUERY`, taking out every
+     * PostgreSQL-resident dataset for the affected key at once.
+     */
+    /** @scenario "A duplicate key-map row does not break a PostgreSQL-resident read" */
+    it("reads its own tenant's rows through a PG-resident view when its key hash is duplicated", async () => {
       const control = await recordSeedControl({
         harness,
         table: PG_MAPPED_TABLE,
         tenantColumn: PG_MAPPED_TENANT_COLUMN,
       });
-      await postgres.resetStatistics();
-      const before = await postgres.readLog();
 
-      const rows = await selectRows(
+      try {
+        // A retried provisioning step or a re-issued key: same hash, same
+        // tenant — duplicates are copies, per the module comment this pins —
+        // a second row alongside the one every other test in this file
+        // depends on.
+        await harness.admin.insert({
+          table: `${database}.${harness.names.keyMapTable}`,
+          format: "JSONEachRow",
+          values: [
+            {
+              KeyHash: harness.tenantA.keyHash,
+              TenantId: harness.tenantA.tenantId,
+            },
+          ],
+        });
+
+        let thrown: unknown;
+        let rows: { AnnotationId: string; TenantId: string }[] = [];
+        try {
+          rows = await selectRows<{ AnnotationId: string; TenantId: string }>(
+            tenantA,
+            `SELECT AnnotationId, ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_VIEW} ORDER BY AnnotationId`,
+          );
+        } catch (error) {
+          thrown = error;
+        }
+
+        expect(
+          thrown,
+          `reading the PG-resident view with a duplicated key-map row was rejected: ${String(thrown)}`,
+        ).toBeUndefined();
+        expectOnlyTenantA({
+          rows,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+          harness,
+          context: "PG-resident view read behind a duplicated key-map row",
+        });
+        expect(rows).toHaveLength(control.tenantA);
+      } finally {
+        // Both rows share a hash, so restoring means clearing it entirely and
+        // reseeding the single row — the same recipe
+        // `tenantIsolation.integration.test.ts` uses to restore a revoked key,
+        // so a reused container is not left holding the duplicate.
+        await harness.applyAsAdmin([
+          `ALTER TABLE ${database}.${harness.names.keyMapTable} ` +
+            `DELETE WHERE KeyHash = '${harness.tenantA.keyHash}' SETTINGS mutations_sync = 2`,
+        ]);
+        await harness.admin.insert({
+          table: `${database}.${harness.names.keyMapTable}`,
+          format: "JSONEachRow",
+          values: [
+            {
+              KeyHash: harness.tenantA.keyHash,
+              TenantId: harness.tenantA.tenantId,
+            },
+          ],
+        });
+      }
+
+      const restored = await selectScalar<string>(
         tenantA,
-        `SELECT * FROM ${database}.${probe}`,
+        `SELECT count() AS value FROM ${database}.${PG_MAPPED_VIEW}`,
       );
-
-      const scans = statementsLoggedSince(
-        before,
-        await postgres.readLog(),
-      ).filter((statement) => statement.includes(postgres.approvedView));
-      await postgres.flushStatistics();
-      const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
-
-      // The foreign predicate really did reach PostgreSQL, and PostgreSQL
-      // really did read those rows: without both, "zero rows out" would prove
-      // nothing about what the predicate can and cannot do.
       expect(
-        scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
-        `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
-      ).toBe(true);
-      expect(
-        rowsReadOnPrimary,
-        "PostgreSQL read nothing, so the row policy was never the thing that filtered",
-      ).toBeGreaterThan(0);
-
-      expect(
-        rows,
-        `expected zero rows while ${control.tenantB} foreign rows were fetched`,
-      ).toHaveLength(0);
-    }, 120_000);
+        Number(restored),
+        "the key map was not restored, later tests would still see the duplicate",
+      ).toBe(control.tenantA);
+    });
   });
 });
