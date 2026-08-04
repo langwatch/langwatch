@@ -36,11 +36,10 @@ const partitionHint = (startedAt: unknown): number | null =>
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  // Every status, not only what is still pending: an item marked for the
-  // end-of-queue dataset hand-off keeps its mark after it is done, and the
-  // hand-off has to find those items once the queue is empty.
+  // Only what is still waiting: this read resolves the trace behind every item
+  // it returns, so widening it to a whole review history is a page load the
+  // reviewer pays for on every visit. The marks are read separately.
   const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
-    selectedAnnotations: "all",
     showQueueAndUser: true,
     allQueueItems: true,
   });
@@ -70,6 +69,7 @@ export default function TraceAnnotations() {
 
   const refetchQueueItems = useCallback(async () => {
     await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
+    await queryClient.annotation.getMarkedForDatasetItems.invalidate();
     await queryClient.annotation.getPendingItemsCount.invalidate();
     await queryClient.annotation.getAssignedItemsCount.invalidate();
     await queryClient.annotation.getQueueItemsCounts.invalidate();
@@ -97,11 +97,19 @@ export default function TraceAnnotations() {
   }, [traceDetails.data?.metadata.thread_id, currentQueueItem?.id]);
 
   // ── End-of-queue dataset hand-off ─────────────────────────────────────
-  // Marked items keep their mark after they are done, so the set below spans
-  // the whole queue walk and not only what is still waiting.
+  // Marked items keep their mark after they are done, so this set spans the
+  // whole queue walk and not only what is still waiting. It carries marks and
+  // trace ids alone, without the traces themselves.
+  const markedItemsQuery = api.annotation.getMarkedForDatasetItems.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id,
+      refetchOnWindowFocus: false,
+    },
+  );
   const markedItems = useMemo(
-    () => (assignedQueueItems ?? []).filter((item) => item.markedForDatasetAt),
-    [assignedQueueItems],
+    () => markedItemsQuery.data ?? [],
+    [markedItemsQuery.data],
   );
   const markedTraceIds = useMemo(
     () => Array.from(new Set(markedItems.map((item) => item.traceId))),
@@ -118,13 +126,18 @@ export default function TraceAnnotations() {
   const clearDatasetMarks = api.annotation.clearDatasetMarks.useMutation();
   const clearMarks = clearDatasetMarks.mutate;
 
+  const projectId = project?.id;
+  // The hand-off waits for a queue that has been read, walked to its end, and
+  // still has marks to answer for.
+  const handoffDue =
+    !queuesLoading &&
+    !markedItemsQuery.isLoading &&
+    pendingQueueItems.length === 0 &&
+    markedTraceIds.length > 0;
+
   useEffect(() => {
-    if (queuesLoading) return;
-    if (pendingQueueItems.length > 0) return;
-    if (markedTraceIds.length === 0) return;
+    if (!handoffDue || !projectId) return;
     if (offeredHandoffFor.current === markSignature) return;
-    const projectId = project?.id;
-    if (!projectId) return;
 
     offeredHandoffFor.current = markSignature;
     const handedOverItemIds = [...markedItemIds];
@@ -138,12 +151,11 @@ export default function TraceAnnotations() {
     });
     openDrawer("addDatasetRecord", { selectedTraceIds: markedTraceIds });
   }, [
-    queuesLoading,
-    pendingQueueItems.length,
+    handoffDue,
     markSignature,
     markedTraceIds,
     markedItemIds,
-    project?.id,
+    projectId,
     openDrawer,
     setFlowCallbacks,
     clearMarks,
@@ -213,6 +225,7 @@ export default function TraceAnnotations() {
               key={queueItemsKey}
               queueItems={pendingQueueItems}
               currentQueueItem={currentQueueItem}
+              markedItemIds={markedItemIds}
               refetchQueueItems={refetchQueueItems}
             />
           </Box>
@@ -225,14 +238,17 @@ export default function TraceAnnotations() {
 const AnnotationQueuePicker = ({
   queueItems,
   currentQueueItem,
+  markedItemIds,
   refetchQueueItems,
 }: {
   queueItems: AssignedQueueItem[];
   currentQueueItem: AssignedQueueItem;
+  markedItemIds: string[];
   refetchQueueItems: () => Promise<void>;
 }) => {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const canEditTrace = hasPermission("annotations:update");
   const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
   // Whichever way the reviewer last answered the checkbox, until the queue is
@@ -286,7 +302,7 @@ const AnnotationQueuePicker = ({
 
   const isMarkedForDataset =
     markAnswers[currentQueueItem.id] ??
-    currentQueueItem.markedForDatasetAt !== null;
+    markedItemIds.includes(currentQueueItem.id);
 
   const toggleDatasetMark = (marked: boolean) => {
     setMarkAnswers((answers) => ({
@@ -391,9 +407,11 @@ const AnnotationQueuePicker = ({
         >
           Add to dataset at the end
         </Checkbox>
-        <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
-          <LuPencil /> Edit trace
-        </Button>
+        {canEditTrace && (
+          <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
+            <LuPencil /> Edit trace
+          </Button>
+        )}
         <Button
           colorPalette="blue"
           disabled={

@@ -17,12 +17,18 @@ type TestQueueItem = {
   id: string;
   traceId: string;
   doneAt: Date | null;
-  markedForDatasetAt: Date | null;
+};
+
+type TestMark = {
+  id: string;
+  traceId: string;
 };
 
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
+  marks: [] as unknown[],
   queuesLoading: false,
+  canUpdateAnnotations: true,
   replace: vi.fn(),
   push: vi.fn(),
   openDrawer: vi.fn(),
@@ -33,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   markDone: vi.fn(),
   clearMarks: vi.fn(),
   invalidateQueues: vi.fn(),
+  invalidateMarks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
@@ -47,6 +54,8 @@ vi.mock("~/hooks/useAnnotationQueues", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
+    hasPermission: (permission: string) =>
+      permission === "annotations:update" ? mocks.canUpdateAnnotations : true,
   }),
 }));
 
@@ -100,6 +109,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getMarkedForDatasetItems: { invalidate: mocks.invalidateMarks },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -109,6 +119,9 @@ vi.mock("~/utils/api", () => ({
       getById: { useQuery: () => ({ data: undefined }) },
     },
     annotation: {
+      getMarkedForDatasetItems: {
+        useQuery: () => ({ data: mocks.marks, isLoading: false }),
+      },
       markQueueItemDone: {
         useMutation: () => ({ mutate: mocks.markDone, isLoading: false }),
       },
@@ -144,6 +157,15 @@ const setItems = (items: TestQueueItem[]) => {
   }));
 };
 
+// The marks are read on their own, so they are told apart from the queue: a
+// mark can point at an item that is already done and out of the walk.
+const setMarks = (marks: TestMark[]) => {
+  mocks.marks = marks.map((mark) => ({
+    ...mark,
+    markedForDatasetAt: new Date("2026-08-01T11:00:00Z"),
+  }));
+};
+
 // A fresh element every time: React skips re-rendering an element it is handed
 // by the same reference, which would hide the refreshed queue data.
 const page = () => (
@@ -160,25 +182,12 @@ const datasetCheckbox = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
+  mocks.canUpdateAnnotations = true;
+  setMarks([]);
   setItems([
-    {
-      id: "item-1",
-      traceId: "trace-1",
-      doneAt: null,
-      markedForDatasetAt: null,
-    },
-    {
-      id: "item-2",
-      traceId: "trace-2",
-      doneAt: null,
-      markedForDatasetAt: null,
-    },
-    {
-      id: "item-3",
-      traceId: "trace-3",
-      doneAt: null,
-      markedForDatasetAt: null,
-    },
+    { id: "item-1", traceId: "trace-1", doneAt: null },
+    { id: "item-2", traceId: "trace-2", doneAt: null },
+    { id: "item-3", traceId: "trace-3", doneAt: null },
   ]);
 });
 
@@ -208,6 +217,23 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer may not update annotations", () => {
+    beforeEach(() => {
+      mocks.canUpdateAnnotations = false;
+    });
+
+    /** @scenario "A reviewer who cannot update annotations is offered no correction" */
+    it("offers no way to edit the trace, and keeps the rest of the bar", () => {
+      renderPage();
+
+      expect(
+        screen.queryByRole("button", { name: /Edit trace/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
+      expect(datasetCheckbox()).toBeInTheDocument();
     });
   });
 
@@ -257,14 +283,8 @@ describe("given a reviewer walking their annotation queue", () => {
 
   describe("when the open item was already marked", () => {
     beforeEach(() => {
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: null,
-          markedForDatasetAt: new Date("2026-08-01T11:00:00Z"),
-        },
-      ]);
+      setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
+      setMarks([{ id: "item-1", traceId: "trace-1" }]);
     });
 
     /** @scenario "A mark made earlier is still ticked when the queue is reopened" */
@@ -308,14 +328,8 @@ describe("given a reviewer walking their annotation queue", () => {
     /** @scenario "Finishing the last item opens the dataset drawer with the marked traces" */
     it("opens the dataset drawer with the marked traces", async () => {
       const user = userEvent.setup();
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: null,
-          markedForDatasetAt: new Date("2026-08-01T11:00:00Z"),
-        },
-      ]);
+      setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
+      setMarks([{ id: "item-1", traceId: "trace-1" }]);
       const { rerender } = renderPage();
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
@@ -331,19 +345,11 @@ describe("given a reviewer walking their annotation queue", () => {
     /** @scenario "Traces marked before they were finished are part of the hand-off" */
     it("includes traces that were marked and then finished earlier", async () => {
       const user = userEvent.setup();
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: new Date("2026-08-01T09:00:00Z"),
-          markedForDatasetAt: new Date("2026-08-01T09:00:00Z"),
-        },
-        {
-          id: "item-2",
-          traceId: "trace-2",
-          doneAt: null,
-          markedForDatasetAt: new Date("2026-08-01T11:00:00Z"),
-        },
+      // The finished item is no longer in the walk, but its mark is still read.
+      setItems([{ id: "item-2", traceId: "trace-2", doneAt: null }]);
+      setMarks([
+        { id: "item-1", traceId: "trace-1" },
+        { id: "item-2", traceId: "trace-2" },
       ]);
       const { rerender } = renderPage();
 
@@ -360,14 +366,7 @@ describe("given a reviewer walking their annotation queue", () => {
     /** @scenario "Finishing the last item with nothing marked skips the hand-off" */
     it("lands on the finished queue without opening a drawer", async () => {
       const user = userEvent.setup();
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: null,
-          markedForDatasetAt: null,
-        },
-      ]);
+      setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       const { rerender } = renderPage();
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
@@ -380,19 +379,10 @@ describe("given a reviewer walking their annotation queue", () => {
 
   describe("when the reviewer opens a queue that is already finished", () => {
     beforeEach(() => {
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: new Date("2026-08-01T09:00:00Z"),
-          markedForDatasetAt: new Date("2026-08-01T09:00:00Z"),
-        },
-        {
-          id: "item-2",
-          traceId: "trace-2",
-          doneAt: new Date("2026-08-01T09:30:00Z"),
-          markedForDatasetAt: new Date("2026-08-01T09:30:00Z"),
-        },
+      setItems([]);
+      setMarks([
+        { id: "item-1", traceId: "trace-1" },
+        { id: "item-2", traceId: "trace-2" },
       ]);
     });
 
@@ -433,14 +423,7 @@ describe("given a reviewer walking their annotation queue", () => {
       rerender(page());
       expect(mocks.openDrawer).toHaveBeenCalledTimes(1);
 
-      setItems([
-        {
-          id: "item-1",
-          traceId: "trace-1",
-          doneAt: new Date("2026-08-01T09:00:00Z"),
-          markedForDatasetAt: new Date("2026-08-01T09:00:00Z"),
-        },
-      ]);
+      setMarks([{ id: "item-1", traceId: "trace-1" }]);
       rerender(page());
 
       await waitFor(() => expect(mocks.openDrawer).toHaveBeenCalledTimes(2));

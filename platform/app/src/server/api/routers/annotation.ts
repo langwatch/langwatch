@@ -172,6 +172,40 @@ const queueItemReferenceFilter = ({
   ],
 });
 
+/**
+ * The queue items a reviewer is responsible for: assigned to them directly, or
+ * sitting in a queue they belong to. Same reach as the pending and assigned
+ * counts, so what the queue page walks and what it hands to a dataset agree.
+ */
+const callerQueueItemsFilter = ({
+  projectId,
+  organizationId,
+  userId,
+}: {
+  projectId: string;
+  organizationId: string;
+  userId: string;
+}) => {
+  const reference = queueItemReferenceFilter({ projectId, organizationId });
+  return {
+    ...reference,
+    AND: [
+      ...reference.AND,
+      {
+        OR: [
+          { userId },
+          {
+            annotationQueue: {
+              projectId,
+              members: { some: { userId } },
+            },
+          },
+        ],
+      },
+    ],
+  };
+};
+
 export const annotationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -709,6 +743,35 @@ export const annotationRouter = createTRPCRouter({
         data: {
           markedForDatasetAt: input.marked ? new Date() : null,
         },
+      });
+    }),
+  /**
+   * The reviewer's queue items that are waiting for the dataset hand-off,
+   * marks only. A mark outlives the item being done, so the hand-off has to see
+   * the whole review history; reading that history through the queue itself
+   * would resolve every trace behind it, which is a page load a reviewer pays
+   * for on every visit.
+   */
+  getMarkedForDatasetItems: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("annotations:view"))
+    .query(async ({ ctx, input }) => {
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+
+      return ctx.prisma.annotationQueueItem.findMany({
+        where: {
+          ...callerQueueItemsFilter({
+            projectId: input.projectId,
+            organizationId,
+            userId: ctx.session.user.id,
+          }),
+          markedForDatasetAt: { not: null },
+        },
+        select: { id: true, traceId: true, markedForDatasetAt: true },
+        orderBy: { createdAt: "asc" },
       });
     }),
   /** Clears the marks after the hand-off, so the next queue walk starts clean. */

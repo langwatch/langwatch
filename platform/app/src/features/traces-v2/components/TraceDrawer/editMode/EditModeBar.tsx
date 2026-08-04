@@ -1,5 +1,5 @@
 import { Button, HStack, Icon, Spinner, Text } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
@@ -35,39 +35,36 @@ function describeEdit({
   return parts.length > 0 ? parts.join(", ") : "No changes yet";
 }
 
-/**
- * The strip that says the drawer is being edited, what the correction changes
- * so far, and how to finish. Rendered between the header and the panes for as
- * long as edit mode is on.
- */
-export function EditModeBar({ traceId }: { traceId: string }) {
-  const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
-  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
-  // Something else already asked to leave the trace (closing the drawer,
-  // opening another one) and is waiting on the same decision, so both use one
-  // dialog and one set of words.
-  const pendingExit = useTraceEditStore((s) => s.pendingExit);
-  const clearPendingExit = useTraceEditStore((s) => s.clearPendingExit);
-  const confirmOpen = cancelConfirmOpen || pendingExit !== null;
-
+/** The draft the bar summarizes and, on Save, writes as the correction. */
+function useTraceEditDraft() {
   const basePatch = useTraceEditStore((s) => s.basePatch);
   const spanDrafts = useTraceEditStore((s) => s.spanDrafts);
   const deletedSpanIds = useTraceEditStore((s) => s.deletedSpanIds);
   const restoredSpanIds = useTraceEditStore((s) => s.restoredSpanIds);
   const traceOutputDraft = useTraceEditStore((s) => s.traceOutputDraft);
-  const setViewModeTransient = useDrawerStore((s) => s.setViewModeTransient);
-  const requestFocusSection = useFocusSectionStore((s) => s.request);
 
-  const draftState = {
-    basePatch,
-    spanDrafts,
-    deletedSpanIds,
-    restoredSpanIds,
-    traceOutputDraft,
-  };
-  const summary = summarizeTraceEdit(draftState);
-  const isDirty = summary.changedFields > 0 || summary.deletedSpans > 0;
+  return useMemo(
+    () => ({
+      basePatch,
+      spanDrafts,
+      deletedSpanIds,
+      restoredSpanIds,
+      traceOutputDraft,
+    }),
+    [basePatch, spanDrafts, deletedSpanIds, restoredSpanIds, traceOutputDraft],
+  );
+}
+
+/** Writing the correction, confirming it, and leaving edit mode behind it. */
+function useSaveTraceEdit({
+  traceId,
+  draft,
+}: {
+  traceId: string;
+  draft: ReturnType<typeof useTraceEditDraft>;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const utils = api.useUtils();
 
   const upsert = api.traceEditOverlay.upsert.useMutation({
     onSuccess: () => {
@@ -84,29 +81,39 @@ export function EditModeBar({ traceId }: { traceId: string }) {
       showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" }),
   });
 
-  const handleSave = useCallback(() => {
+  const save = useCallback(() => {
     if (!project) return;
     upsert.mutate({
       projectId: project.id,
       traceId,
-      patch: buildTraceEditPatch({
-        basePatch,
-        spanDrafts,
-        deletedSpanIds,
-        restoredSpanIds,
-        traceOutputDraft,
-      }),
+      patch: buildTraceEditPatch(draft),
     });
-  }, [
-    project,
-    traceId,
-    upsert,
-    basePatch,
-    spanDrafts,
-    deletedSpanIds,
-    restoredSpanIds,
-    traceOutputDraft,
-  ]);
+  }, [project, traceId, upsert, draft]);
+
+  return { save, isSaving: upsert.isLoading };
+}
+
+/**
+ * The strip that says the drawer is being edited, what the correction changes
+ * so far, and how to finish. Rendered between the header and the panes for as
+ * long as edit mode is on.
+ */
+export function EditModeBar({ traceId }: { traceId: string }) {
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  // Something else already asked to leave the trace (closing the drawer,
+  // opening another one) and is waiting on the same decision, so both use one
+  // dialog and one set of words.
+  const pendingExit = useTraceEditStore((s) => s.pendingExit);
+  const clearPendingExit = useTraceEditStore((s) => s.clearPendingExit);
+  const confirmOpen = cancelConfirmOpen || pendingExit !== null;
+
+  const setViewModeTransient = useDrawerStore((s) => s.setViewModeTransient);
+  const requestFocusSection = useFocusSectionStore((s) => s.request);
+
+  const draft = useTraceEditDraft();
+  const summary = summarizeTraceEdit(draft);
+  const isDirty = summary.changedFields > 0 || summary.deletedSpans > 0;
+  const { save, isSaving } = useSaveTraceEdit({ traceId, draft });
 
   const handleCancel = useCallback(() => {
     if (isDirty) {
@@ -171,44 +178,63 @@ export function EditModeBar({ traceId }: { traceId: string }) {
           <Button
             size="xs"
             colorPalette="blue"
-            onClick={handleSave}
-            disabled={!isDirty || upsert.isLoading}
+            onClick={save}
+            disabled={!isDirty || isSaving}
             gap={1.5}
           >
-            {upsert.isLoading && <Spinner size="xs" />}
+            {isSaving && <Spinner size="xs" />}
             Save
           </Button>
         </HStack>
       </HStack>
 
-      <Dialog.Root
+      <DiscardTraceEditsDialog
         open={confirmOpen}
-        onOpenChange={(e) => {
-          if (!e.open) handleKeepEditing();
-        }}
-        size="sm"
-        placement="center"
-      >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Discard trace edits?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text textStyle="sm" color="fg.muted">
-              Your changes to this trace have not been saved.
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button size="sm" variant="outline" onClick={handleKeepEditing}>
-              Keep editing
-            </Button>
-            <Button size="sm" colorPalette="red" onClick={handleDiscard}>
-              Discard changes
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+        onKeepEditing={handleKeepEditing}
+        onDiscard={handleDiscard}
+      />
     </>
+  );
+}
+
+/** The one question asked for every way of leaving an unsaved correction. */
+function DiscardTraceEditsDialog({
+  open,
+  onKeepEditing,
+  onDiscard,
+}: {
+  open: boolean;
+  onKeepEditing: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(e) => {
+        if (!e.open) onKeepEditing();
+      }}
+      size="sm"
+      placement="center"
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>Discard trace edits?</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Text textStyle="sm" color="fg.muted">
+            Your changes to this trace have not been saved.
+          </Text>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button size="sm" variant="outline" onClick={onKeepEditing}>
+            Keep editing
+          </Button>
+          <Button size="sm" colorPalette="red" onClick={onDiscard}>
+            Discard changes
+          </Button>
+        </Dialog.Footer>
+        <Dialog.CloseTrigger />
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

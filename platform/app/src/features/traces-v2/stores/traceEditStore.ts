@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create, type StoreApi } from "zustand";
 import { stringifySpanIO } from "~/server/tracer/spanIOStringify";
 import type { SpanInputOutput, SpanTypes } from "~/server/tracer/types";
 import {
@@ -180,19 +180,21 @@ function withSpanDraft(
   return { ...drafts, [spanId]: next };
 }
 
-export const useTraceEditStore = create<TraceEditState>((set) => ({
-  editingTraceId: null,
-  basePatch: null,
-  ...EMPTY_DRAFTS,
-  overlayView: "edited",
-  pendingExit: null,
-  diffOpen: false,
+type SetTraceEditState = StoreApi<TraceEditState>["setState"];
 
-  requestExit: (run) => set({ pendingExit: run }),
+/** Starting an editing session, and every way of ending one. */
+const sessionActions = (set: SetTraceEditState) => ({
+  requestExit: (run: () => void) => set({ pendingExit: run }),
   clearPendingExit: () => set({ pendingExit: null }),
-  setDiffOpen: (open) => set({ diffOpen: open }),
+  setDiffOpen: (open: boolean) => set({ diffOpen: open }),
 
-  startEditing: ({ traceId, basePatch }) =>
+  startEditing: ({
+    traceId,
+    basePatch,
+  }: {
+    traceId: string;
+    basePatch?: TraceEditOverlayPatch | null;
+  }) =>
     // Always from a clean slate: a draft left behind by an earlier trace (or
     // an earlier editing session on this one) would otherwise be attributed to
     // whatever the reviewer opens next.
@@ -200,10 +202,16 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       editingTraceId: traceId,
       basePatch: basePatch ?? null,
       ...EMPTY_DRAFTS,
-      overlayView: "edited",
+      overlayView: "edited" as const,
     }),
 
-  adoptBasePatch: ({ traceId, basePatch }) =>
+  adoptBasePatch: ({
+    traceId,
+    basePatch,
+  }: {
+    traceId: string;
+    basePatch: TraceEditOverlayPatch;
+  }) =>
     set((s) =>
       s.editingTraceId === traceId && s.basePatch === null ? { basePatch } : s,
     ),
@@ -222,8 +230,11 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       pendingExit: null,
       ...EMPTY_DRAFTS,
     }),
+});
 
-  setSpanName: ({ spanId, name }) =>
+/** Editing the fields and attributes of one span. */
+const spanDraftActions = (set: SetTraceEditState) => ({
+  setSpanName: ({ spanId, name }: { spanId: string; name: string }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
         ...draft,
@@ -231,7 +242,7 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       })),
     })),
 
-  setSpanType: ({ spanId, type }) =>
+  setSpanType: ({ spanId, type }: { spanId: string; type: SpanTypes }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
         ...draft,
@@ -239,7 +250,17 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       })),
     })),
 
-  setSpanIO: ({ spanId, field, text, baselineText }) =>
+  setSpanIO: ({
+    spanId,
+    field,
+    text,
+    baselineText,
+  }: {
+    spanId: string;
+    field: "input" | "output";
+    text: string;
+    baselineText: string | null;
+  }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
         ...draft,
@@ -247,7 +268,13 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       })),
     })),
 
-  resetSpanField: ({ spanId, field }) =>
+  resetSpanField: ({
+    spanId,
+    field,
+  }: {
+    spanId: string;
+    field: SpanDraftField;
+  }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
         const { [field]: _dropped, ...rest } = draft;
@@ -255,7 +282,17 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       }),
     })),
 
-  setSpanParam: ({ spanId, key, value, baselineParams }) =>
+  setSpanParam: ({
+    spanId,
+    key,
+    value,
+    baselineParams,
+  }: {
+    spanId: string;
+    key: string;
+    value: unknown;
+    baselineParams: Record<string, unknown>;
+  }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => ({
         ...draft,
@@ -264,7 +301,7 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       })),
     })),
 
-  resetSpanParam: ({ spanId, key }) =>
+  resetSpanParam: ({ spanId, key }: { spanId: string; key: string }) =>
     set((s) => ({
       spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => {
         if (!draft.params) return draft;
@@ -280,8 +317,11 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
         return { ...draft, params: rest };
       }),
     })),
+});
 
-  deleteSpan: (spanId) =>
+/** Removing a span from the trace, and bringing one back. */
+const spanRemovalActions = (set: SetTraceEditState) => ({
+  deleteSpan: (spanId: string) =>
     set((s) => ({
       deletedSpanIds: s.deletedSpanIds.includes(spanId)
         ? s.deletedSpanIds
@@ -289,7 +329,7 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
       restoredSpanIds: s.restoredSpanIds.filter((id) => id !== spanId),
     })),
 
-  restoreSpan: (spanId) =>
+  restoreSpan: (spanId: string) =>
     set((s) => {
       const wasDeletedByCorrection =
         s.basePatch?.deletedSpanIds.includes(spanId) ?? false;
@@ -301,6 +341,19 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
             : s.restoredSpanIds,
       };
     }),
+});
+
+export const useTraceEditStore = create<TraceEditState>((set) => ({
+  editingTraceId: null,
+  basePatch: null,
+  ...EMPTY_DRAFTS,
+  overlayView: "edited",
+  pendingExit: null,
+  diffOpen: false,
+
+  ...sessionActions(set),
+  ...spanDraftActions(set),
+  ...spanRemovalActions(set),
 
   setTraceOutput: ({ text, baselineText }) =>
     set({ traceOutputDraft: { text, baselineText } }),
@@ -492,16 +545,40 @@ function mergeSpanPatch({
 export function buildTraceEditPatch(
   state: TraceEditDraftState,
 ): TraceEditOverlayPatch {
-  const base = state.basePatch;
-  const restored = new Set(state.restoredSpanIds);
-  const deletedSpanIds = [
-    ...(base?.deletedSpanIds ?? []).filter((id) => !restored.has(id)),
-    ...state.deletedSpanIds.filter(
-      (id) => !(base?.deletedSpanIds ?? []).includes(id),
-    ),
-  ];
-  const deleted = new Set(deletedSpanIds);
+  const deletedSpanIds = mergeDeletedSpanIds(state);
+  const trace = mergeTracePatch(state);
 
+  return {
+    version: TRACE_EDIT_OVERLAY_PATCH_VERSION,
+    ...(trace ? { trace } : {}),
+    spans: mergeSpanPatches({ state, deletedSpanIds }),
+    deletedSpanIds,
+  };
+}
+
+/**
+ * The spans the correction removes: what it already removed, minus anything
+ * the reviewer brought back, plus what they removed in this session.
+ */
+function mergeDeletedSpanIds(state: TraceEditDraftState): string[] {
+  const storedDeleted = state.basePatch?.deletedSpanIds ?? [];
+  const restored = new Set(state.restoredSpanIds);
+  return [
+    ...storedDeleted.filter((id) => !restored.has(id)),
+    ...state.deletedSpanIds.filter((id) => !storedDeleted.includes(id)),
+  ];
+}
+
+/** The per-span corrections, layered on whatever was already stored. */
+function mergeSpanPatches({
+  state,
+  deletedSpanIds,
+}: {
+  state: TraceEditDraftState;
+  deletedSpanIds: string[];
+}): TraceEditSpanPatch[] {
+  const base = state.basePatch;
+  const deleted = new Set(deletedSpanIds);
   const spanIds = new Set([
     ...(base?.spans ?? []).map((span) => span.spanId),
     ...Object.keys(state.spanDrafts),
@@ -520,24 +597,20 @@ export function buildTraceEditPatch(
     });
     if (merged) spans.push(merged);
   }
+  return spans;
+}
 
-  const traceOutput =
-    state.traceOutputDraft?.text ?? base?.trace?.output?.value;
-  const traceInput = base?.trace?.input;
-  const trace =
-    traceInput !== undefined || traceOutput !== undefined
-      ? {
-          ...(traceInput !== undefined ? { input: traceInput } : {}),
-          ...(traceOutput !== undefined
-            ? { output: { value: traceOutput } }
-            : {}),
-        }
-      : undefined;
+/** The trace's own corrected input and output, when either has one. */
+function mergeTracePatch(
+  state: TraceEditDraftState,
+): TraceEditOverlayPatch["trace"] {
+  const base = state.basePatch;
+  const output = state.traceOutputDraft?.text ?? base?.trace?.output?.value;
+  const input = base?.trace?.input;
+  if (input === undefined && output === undefined) return undefined;
 
   return {
-    version: TRACE_EDIT_OVERLAY_PATCH_VERSION,
-    ...(trace ? { trace } : {}),
-    spans,
-    deletedSpanIds,
+    ...(input !== undefined ? { input } : {}),
+    ...(output !== undefined ? { output: { value: output } } : {}),
   };
 }

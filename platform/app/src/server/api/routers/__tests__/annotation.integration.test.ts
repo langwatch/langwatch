@@ -296,8 +296,9 @@ describe("Annotation CRUD", () => {
     const queueTracePrefix = "test-trace-annotation-queue-mark";
     let viewerCaller: ReturnType<typeof appRouter.createCaller>;
     let ownerUserId: string;
+    let viewerUserId: string;
 
-    const createQueueItem = async (suffix: string) => {
+    const createQueueItem = async (suffix: string, userId?: string) => {
       const itemTraceId = `${queueTracePrefix}-${suffix}`;
       await prisma.annotationQueueItem.deleteMany({
         where: { projectId, traceId: itemTraceId },
@@ -306,7 +307,7 @@ describe("Annotation CRUD", () => {
         data: {
           projectId,
           traceId: itemTraceId,
-          userId: ownerUserId,
+          userId: userId ?? ownerUserId,
         },
       });
     };
@@ -352,6 +353,7 @@ describe("Annotation CRUD", () => {
           role: OrganizationUserRole.MEMBER,
         },
       });
+      viewerUserId = readOnly.id;
       viewerCaller = appRouter.createCaller(
         createInnerTRPCContext({
           session: { user: { id: readOnly.id }, expires: "1" },
@@ -431,6 +433,65 @@ describe("Annotation CRUD", () => {
       expect(marked[first.id]).toBe(false);
       expect(marked[second.id]).toBe(false);
       expect(marked[untouched.id]).toBe(true);
+    });
+
+    /** @scenario "Marks outlive being done and are read without their traces" */
+    it("lists the marked items with their marks and nothing else", async () => {
+      const finished = await createQueueItem("read-finished");
+      const waiting = await createQueueItem("read-waiting");
+      const unmarked = await createQueueItem("read-unmarked");
+
+      for (const item of [finished, waiting]) {
+        await caller.annotation.markQueueItemForDataset({
+          queueItemId: item.id,
+          projectId,
+          marked: true,
+        });
+      }
+      await caller.annotation.markQueueItemDone({
+        queueItemId: finished.id,
+        projectId,
+      });
+
+      const marked = await caller.annotation.getMarkedForDatasetItems({
+        projectId,
+      });
+
+      const ids = marked.map((item) => item.id);
+      expect(ids).toContain(finished.id);
+      expect(ids).toContain(waiting.id);
+      expect(ids).not.toContain(unmarked.id);
+
+      const row = marked.find((item) => item.id === waiting.id)!;
+      expect(Object.keys(row).sort()).toEqual([
+        "id",
+        "markedForDatasetAt",
+        "traceId",
+      ]);
+      expect(row.traceId).toBe(waiting.traceId);
+      expect(row.markedForDatasetAt).not.toBeNull();
+    });
+
+    /** @scenario "A teammate's marks are not part of my hand-off" */
+    it("leaves out an item marked on someone else's queue", async () => {
+      const mine = await createQueueItem("read-mine");
+      const theirs = await createQueueItem("read-theirs", viewerUserId);
+
+      for (const item of [mine, theirs]) {
+        await caller.annotation.markQueueItemForDataset({
+          queueItemId: item.id,
+          projectId,
+          marked: true,
+        });
+      }
+
+      const marked = await caller.annotation.getMarkedForDatasetItems({
+        projectId,
+      });
+
+      const ids = marked.map((item) => item.id);
+      expect(ids).toContain(mine.id);
+      expect(ids).not.toContain(theirs.id);
     });
 
     /** @scenario "Marking a queue item needs permission to update annotations" */

@@ -178,16 +178,22 @@ function GapRow() {
   );
 }
 
+/** How each kind of diff line reads: its tint, its sign, and its text colour. */
+const DIFF_ROW_STYLE: Record<
+  DiffLine["kind"],
+  { bg?: string; marker: string; sign: string; text: string }
+> = {
+  add: { bg: "green.subtle", marker: "green.fg", sign: "+", text: "green.fg" },
+  remove: { bg: "red.subtle", marker: "red.fg", sign: "-", text: "red.fg" },
+  context: { marker: "fg.muted", sign: " ", text: "fg" },
+};
+
 function DiffRow({ line }: { line: DiffLine }) {
-  const isAdd = line.kind === "add";
-  const isRemove = line.kind === "remove";
-  const bg = isAdd ? "green.subtle" : isRemove ? "red.subtle" : undefined;
-  const fg = isAdd ? "green.fg" : isRemove ? "red.fg" : "fg.muted";
-  const sign = isAdd ? "+" : isRemove ? "-" : " ";
-  const lineNo = isAdd ? line.newLineNo : line.oldLineNo;
+  const style = DIFF_ROW_STYLE[line.kind];
+  const lineNo = line.kind === "add" ? line.newLineNo : line.oldLineNo;
 
   return (
-    <HStack as="span" display="flex" gap={0} align="stretch" bg={bg}>
+    <HStack as="span" display="flex" gap={0} align="stretch" bg={style.bg}>
       <Text
         as="span"
         color="fg.subtle"
@@ -199,12 +205,18 @@ function DiffRow({ line }: { line: DiffLine }) {
       >
         {lineNo ?? ""}
       </Text>
-      <Text as="span" color={fg} width="1.2em" flexShrink={0} userSelect="none">
-        {sign}
+      <Text
+        as="span"
+        color={style.marker}
+        width="1.2em"
+        flexShrink={0}
+        userSelect="none"
+      >
+        {style.sign}
       </Text>
       <Text
         as="span"
-        color={isAdd || isRemove ? fg : "fg"}
+        color={style.text}
         whiteSpace="pre-wrap"
         wordBreak="break-word"
         flex={1}

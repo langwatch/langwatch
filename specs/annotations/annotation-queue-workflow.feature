@@ -55,6 +55,13 @@ Feature: Walking an annotation queue into a dataset
       Then the trace drawer opens on that item's trace
       And it is already in edit mode, so I can correct the trace without a second click
 
+    @integration
+    Scenario: A reviewer who cannot update annotations is offered no correction
+      Given I may work my queue but not update its annotations
+      When I open a queue item
+      Then the bar offers no way to edit the trace
+      And the rest of the bar still works
+
   Rule: Items are marked for the dataset while the queue is walked
 
     @integration
@@ -119,6 +126,21 @@ Feature: Walking an annotation queue into a dataset
       When the queue re-renders with the same marks
       Then the drawer is not opened again
       And it is offered again once the set of marked items changes
+
+  Rule: What is marked is read apart from the queue itself
+
+    @integration
+    Scenario: Marks outlive being done and are read without their traces
+      Given I marked two items and finished one of them
+      When the marked items are read
+      Then both are listed, each with its trace and when it was marked
+      And nothing else about them is read
+
+    @integration
+    Scenario: A teammate's marks are not part of my hand-off
+      Given a teammate marked an item that is assigned to them alone
+      When the marked items are read
+      Then that item is not among them
 
   Rule: A better output is suggested through the correction popover
 

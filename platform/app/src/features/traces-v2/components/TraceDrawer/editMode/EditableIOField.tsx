@@ -100,30 +100,12 @@ export function EditableIOField({
 
   return (
     <Box>
-      <HStack gap={2} marginBottom={1} align="center">
-        <FieldHeading label={label} />
-        {delta !== 0 && (
-          <Text
-            textStyle="2xs"
-            fontFamily="mono"
-            color={delta > 0 ? "green.fg" : "red.fg"}
-          >
-            {delta > 0 ? `+${delta}` : `${delta}`}
-          </Text>
-        )}
-        {isEdited && (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onReset}
-            gap={1}
-            marginLeft="auto"
-          >
-            <Icon as={LuRotateCcw} boxSize={3} />
-            <Text textStyle="2xs">Reset</Text>
-          </Button>
-        )}
-      </HStack>
+      <FieldHeader
+        label={label}
+        delta={delta}
+        isEdited={isEdited}
+        onReset={onReset}
+      />
       <Textarea
         aria-label={`Edit ${label.toLowerCase()}`}
         value={value}
@@ -144,6 +126,47 @@ export function EditableIOField({
         </HStack>
       )}
     </Box>
+  );
+}
+
+/** The heading row: what is being edited, how much it grew, how to undo it. */
+function FieldHeader({
+  label,
+  delta,
+  isEdited,
+  onReset,
+}: {
+  label: string;
+  /** Characters the correction added or removed, against what was captured. */
+  delta: number;
+  isEdited: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <HStack gap={2} marginBottom={1} align="center">
+      <FieldHeading label={label} />
+      {delta !== 0 && (
+        <Text
+          textStyle="2xs"
+          fontFamily="mono"
+          color={delta > 0 ? "green.fg" : "red.fg"}
+        >
+          {delta > 0 ? `+${delta}` : `${delta}`}
+        </Text>
+      )}
+      {isEdited && (
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={onReset}
+          gap={1}
+          marginLeft="auto"
+        >
+          <Icon as={LuRotateCcw} boxSize={3} />
+          <Text textStyle="2xs">Reset</Text>
+        </Button>
+      )}
+    </HStack>
   );
 }
 

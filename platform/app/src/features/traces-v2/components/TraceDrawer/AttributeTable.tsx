@@ -579,6 +579,113 @@ function EditableValueCell({
   );
 }
 
+/** A corrected row is tinted and ticked; a pinned one is only tinted. */
+function rowHighlight({
+  corrected,
+  pinned,
+}: {
+  corrected: boolean;
+  pinned: boolean;
+}): { bg?: string; boxShadow?: string } {
+  if (corrected) {
+    return {
+      bg: "green.subtle",
+      boxShadow: "inset 2px 0 0 var(--chakra-colors-green-solid)",
+    };
+  }
+  if (pinned) return { bg: "bg.subtle" };
+  return {};
+}
+
+/** The attribute name column, with the full key on hover. */
+function RowLabelCell({
+  attrKey,
+  labelWidth,
+  pinned,
+  removed,
+}: {
+  attrKey: string;
+  labelWidth: number;
+  pinned: boolean;
+  /** The correction removes this attribute, so the name is struck through. */
+  removed: boolean;
+}) {
+  return (
+    <Tooltip
+      content={attrKey}
+      openDelay={250}
+      positioning={{ placement: "top-start" }}
+    >
+      <Text
+        width={`${labelWidth}px`}
+        flexShrink={0}
+        textStyle="xs"
+        fontFamily="mono"
+        color={pinned ? "fg" : "fg.muted"}
+        fontWeight={pinned ? "semibold" : "normal"}
+        textDecoration={removed ? "line-through" : undefined}
+        truncate
+        paddingX={3}
+        paddingY={1.5}
+        bg="bg.subtle"
+        transition="color 0.12s ease, font-weight 0.12s ease"
+        css={{
+          // Strengthen the key column when the row is hovered so the
+          // attribute name reads as the focus, not just a tint change.
+          ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
+        }}
+      >
+        {attributeRowLabel(attrKey)}
+      </Text>
+    </Tooltip>
+  );
+}
+
+/**
+ * The value column: what is restricted or corrected about this attribute, and
+ * then the value itself, editable or read-only.
+ *
+ * Pretty-print column. Heuristic format detection picks chat / json / text /
+ * leaf; non-leaf values render a `📋 format` pill that opens a popover with the
+ * prettified payload + an override row. The same component is wired into
+ * table-cell expanders so the same payload reads identically wherever it
+ * surfaces.
+ */
+function RowValueCell({
+  attrKey,
+  value,
+  restriction,
+  correction,
+  editing,
+}: {
+  attrKey: string;
+  value: unknown;
+  restriction?: AttributeRestriction | null;
+  correction?: AttributeCorrection | null;
+  /** Present only when this row is editable. */
+  editing?: RowEditing;
+}) {
+  return (
+    <HStack flex={1} minWidth={0} gap={1.5}>
+      {restriction ? <RestrictionMarker {...restriction} /> : null}
+      {correction ? (
+        <CorrectionMarker attrKey={attrKey} original={correction.original} />
+      ) : null}
+      {editing ? (
+        <EditableValueCell attrKey={attrKey} value={value} editing={editing} />
+      ) : (
+        <Box flex={1} minWidth={0}>
+          {isApiKeyIdRow(attrKey, value) ? (
+            <ApiKeyAttributeValue apiKeyId={value} />
+          ) : (
+            <AttributeValue attrKey={attrKey} value={value} />
+          )}
+        </Box>
+      )}
+    </HStack>
+  );
+}
+
 function FlatRow({
   attrKey,
   value,
@@ -609,7 +716,7 @@ function FlatRow({
   const display = formatValue(value);
   // A value already hidden from this viewer has nothing on screen to correct,
   // so it keeps its read-only cell.
-  const isEditableRow = !!editing && restriction?.canSee !== false;
+  const rowEditing = restriction?.canSee === false ? undefined : editing;
   return (
     <HStack
       borderBottomWidth={isLast ? "0px" : "1px"}
@@ -618,12 +725,7 @@ function FlatRow({
       gap={0}
       paddingRight={2}
       className="attr-row"
-      bg={correction ? "green.subtle" : pinned ? "bg.subtle" : undefined}
-      boxShadow={
-        correction
-          ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
-          : undefined
-      }
+      {...rowHighlight({ corrected: !!correction, pinned })}
     >
       {pinnable ? (
         <PinToggle
@@ -638,61 +740,21 @@ function FlatRow({
         // (matching the PinToggle footprint) instead of a blank gap.
         <DisabledPin attrKey={attrKey} />
       )}
-      <Tooltip
-        content={attrKey}
-        openDelay={250}
-        positioning={{ placement: "top-start" }}
-      >
-        <Text
-          width={`${labelWidth}px`}
-          flexShrink={0}
-          textStyle="xs"
-          fontFamily="mono"
-          color={pinned ? "fg" : "fg.muted"}
-          fontWeight={pinned ? "semibold" : "normal"}
-          textDecoration={editing?.removed ? "line-through" : undefined}
-          truncate
-          paddingX={3}
-          paddingY={1.5}
-          bg="bg.subtle"
-          transition="color 0.12s ease, font-weight 0.12s ease"
-          css={{
-            // Strengthen the key column when the row is hovered so the
-            // attribute name reads as the focus, not just a tint change.
-            ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
-          }}
-        >
-          {attributeRowLabel(attrKey)}
-        </Text>
-      </Tooltip>
+      <RowLabelCell
+        attrKey={attrKey}
+        labelWidth={labelWidth}
+        pinned={pinned}
+        removed={editing?.removed === true}
+      />
       <LabelResizeHandle onResize={onLabelResize} />
-      {/* Pretty-print column. Heuristic format detection picks chat / json
-          / text / leaf; non-leaf values render a `📋 format` pill that
-          opens a popover with the prettified payload + an override row.
-          Same component is wired into table-cell expanders so the same
-          payload reads identically wherever it surfaces. */}
-      <HStack flex={1} minWidth={0} gap={1.5}>
-        {restriction ? <RestrictionMarker {...restriction} /> : null}
-        {correction ? (
-          <CorrectionMarker attrKey={attrKey} original={correction.original} />
-        ) : null}
-        {isEditableRow ? (
-          <EditableValueCell
-            attrKey={attrKey}
-            value={value}
-            editing={editing!}
-          />
-        ) : (
-          <Box flex={1} minWidth={0}>
-            {isApiKeyIdRow(attrKey, value) ? (
-              <ApiKeyAttributeValue apiKeyId={value} />
-            ) : (
-              <AttributeValue attrKey={attrKey} value={value} />
-            )}
-          </Box>
-        )}
-      </HStack>
-      {!isEditableRow && (
+      <RowValueCell
+        attrKey={attrKey}
+        value={value}
+        restriction={restriction}
+        correction={correction}
+        editing={rowEditing}
+      />
+      {!rowEditing && (
         <Button
           size="xs"
           variant="ghost"
@@ -709,6 +771,29 @@ function FlatRow({
       )}
     </HStack>
   );
+}
+
+/**
+ * What one row offers a reviewer who is correcting the attributes. A synthetic
+ * leading row (span_id) is not a real attribute, so it stays read-only.
+ */
+function rowEditingFor({
+  editing,
+  key,
+  isLeading,
+}: {
+  editing?: AttributeEditing;
+  key: string;
+  isLeading: boolean;
+}): RowEditing | undefined {
+  if (!editing || isLeading) return undefined;
+  return {
+    removed: editing.edits[key] === null,
+    changed: key in editing.edits && editing.edits[key] !== null,
+    onChangeValue: (value) => editing.onEditAttribute({ key, value }),
+    onRemove: () => editing.onEditAttribute({ key, value: null }),
+    onRestore: () => editing.onResetAttribute(key),
+  };
 }
 
 function AttrSection({
@@ -806,20 +891,7 @@ function AttrSection({
                 correction={
                   correctionFor && !isLeading ? correctionFor(key) : null
                 }
-                editing={
-                  editing && !isLeading
-                    ? {
-                        removed: editing.edits[key] === null,
-                        changed:
-                          key in editing.edits && editing.edits[key] !== null,
-                        onChangeValue: (value) =>
-                          editing.onEditAttribute({ key, value }),
-                        onRemove: () =>
-                          editing.onEditAttribute({ key, value: null }),
-                        onRestore: () => editing.onResetAttribute(key),
-                      }
-                    : undefined
-                }
+                editing={rowEditingFor({ editing, key, isLeading })}
               />
             );
           })}
