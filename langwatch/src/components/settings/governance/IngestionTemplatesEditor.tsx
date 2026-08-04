@@ -133,6 +133,7 @@ export function IngestionTemplatesEditor({
           borderColor="border.muted"
           borderRadius="md"
           overflow="hidden"
+          overflowX="auto"
         >
           <Table.Root size="sm">
             <Table.Header backgroundColor="bg.subtle">

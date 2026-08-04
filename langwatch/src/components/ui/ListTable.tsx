@@ -25,6 +25,7 @@ export function ListTable({
       borderColor="border.emphasized"
       borderRadius="md"
       overflow="hidden"
+      overflowX="auto"
     >
       <Table.Root
         variant="line"
