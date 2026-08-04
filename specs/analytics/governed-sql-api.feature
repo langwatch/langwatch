@@ -363,6 +363,14 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And the caller receives zero rows, because the row policy decides the answer
 
   @integration
+  Scenario: A duplicate key-map row does not break a PostgreSQL-resident read
+    Given the key map holds two rows carrying the caller's key hash
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads a PostgreSQL-resident governed view
+    Then it receives its own tenant's rows
+    And the read is not rejected for returning more than one tenant
+
+  @integration
   Scenario: The dedicated PG role is bounded by a statement timeout and a connection cap
     Given the dedicated PostgreSQL role the named collection connects as
     When its statement timeout and connection limit are read back from the server

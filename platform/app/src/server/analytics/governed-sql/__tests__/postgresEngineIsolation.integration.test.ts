@@ -649,7 +649,9 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         // really did read those rows: without both, "zero rows out" would prove
         // nothing about what the predicate can and cannot do.
         expect(
-          scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
+          scans.some((scan) =>
+            scan.includes(`= '${harness.tenantB.tenantId}'`),
+          ),
           `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
         ).toBe(true);
         expect(
